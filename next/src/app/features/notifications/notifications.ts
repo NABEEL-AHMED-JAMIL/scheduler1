@@ -1,3 +1,4 @@
+import { toneClass } from '../../shared/ui/tone';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -46,6 +47,8 @@ interface NotificationListResponse
   templateUrl: './notifications.html',
 })
 export class Notifications implements OnInit {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);

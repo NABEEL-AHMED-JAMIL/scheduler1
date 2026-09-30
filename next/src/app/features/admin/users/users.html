@@ -99,14 +99,14 @@
                    [class.opacity-55]="busy() === user.appUserId">
             <!-- Privilege, readable before any text is. Quiet for a plain user so every card
                  keeps the same anatomy. -->
-            <div class="h-1 shrink-0" [style.background]="roleAccent(user.userRole)"></div>
+            <div class="h-1 shrink-0 tone-fill" [class]="toneClass(roleAccent(user.userRole))"></div>
 
             <div class="p-4 flex flex-col gap-3 flex-1">
               <div class="flex items-start gap-3">
                 <!-- The ring says what the status pill says. Two channels for one fact, because
                      colour alone is not a signal everybody receives. -->
-                <span class="rounded-full shrink-0 p-[2px]"
-                      [style.box-shadow]="'0 0 0 2px ' + statusRing(user.status)">
+                <span class="rounded-full shrink-0 p-[2px] tone-ring"
+                      [class]="toneClass(statusRing(user.status))">
                   <app-avatar [appUserId]="avatarOwner(user)"
                               [name]="user.fullName || user.username" [size]="2.75" />
                 </span>
@@ -193,7 +193,7 @@
                     ]; track tile.label) {
                       <div class="px-2 py-1.5 text-center bg-raised" [title]="tile.hint">
                         <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
-                        <div class="text-[10px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
+                        <div class="text-[11px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
                           {{ tile.label }}
                         </div>
                       </div>

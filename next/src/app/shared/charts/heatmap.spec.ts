@@ -162,7 +162,8 @@ describe('the heatmap on a narrow screen', () => {
   it('gives every hour at least 1.5rem and scrolls sideways inside its own box', () => {
     const el = render();
     const grid = el.querySelector<HTMLElement>('.grid')!;
-    expect(grid.style.gridTemplateColumns).toContain('minmax(1.5rem, 1fr)');
+    // A class since MIG-257 rather than an inline style; the track sizes are the same.
+    expect([...grid.classList].join(' ')).toContain('minmax(1.5rem,1fr)');
     expect(grid.classList).toContain('w-max');
     expect(grid.classList).toContain('min-w-full');
     expect(grid.parentElement!.classList).toContain('overflow-x-auto');

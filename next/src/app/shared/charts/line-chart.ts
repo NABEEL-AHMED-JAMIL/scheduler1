@@ -56,7 +56,7 @@ const PAD_BOTTOM = 18;
           </circle>
         }
       </svg>
-      <div class="flex justify-between text-[10px] text-[color:var(--text-muted)] tabular">
+      <div class="flex justify-between text-[11px] text-[color:var(--text-muted)] tabular">
         @for (mark of labelled(); track mark.label) {
           <span class="truncate">{{ mark.short }}</span>
         }

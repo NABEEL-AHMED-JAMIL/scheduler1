@@ -3,7 +3,7 @@
   <div class="flex items-baseline gap-2 min-w-0">
     <span class="mono text-sm truncate flex-1"
           [title]="column().name">{{ column().name }}</span>
-    <span class="text-[10px] mono text-[color:var(--text-muted)] border
+    <span class="text-[11px] mono text-[color:var(--text-muted)] border
                  border-subtle rounded px-1 shrink-0"
           [title]="column().type">{{ column().shortType }}</span>
   </div>
@@ -38,8 +38,7 @@
       <div class="mt-1 h-1.5 rounded-full overflow-hidden bg-sunken">
         <span class="block h-full rounded-full"
               [style.width.%]="column().filledPercent"
-              [style.background]="column().nullPercent >= 25
-                                  ? 'var(--chart-3)' : 'var(--chart-2)'"></span>
+              [class]="column().nullPercent >= 25 ? 'bg-[color:var(--chart-3)]' : 'bg-[color:var(--chart-2)]'"></span>
       </div>
     </div>
   } @else {
@@ -165,10 +164,8 @@
           <!-- A zero-wide quarter is the most interesting one on the bar:
                a quarter of the rows sharing a single value. It keeps two
                pixels so it does not vanish into its neighbours. -->
-          <span class="h-full" [style.width.%]="segment.width"
-                [style.minWidth.px]="2"
-                [style.background]="'var(--chart-1)'"
-                [style.opacity]="$index === 1 || $index === 2 ? 1 : 0.45"
+          <span class="h-full min-w-[2px] bg-[color:var(--chart-1)]" [style.width.%]="segment.width"
+                [class.opacity-45]="!($index === 1 || $index === 2)"
                 [title]="segment.label"></span>
         }
       </div>
@@ -268,7 +265,7 @@
                 <div class="flex items-center gap-1.5">
                   <!-- A slot 80px wide, so the whole value is an icon away rather than
                        the two words "Show all". -->
-                  <app-data-text data-bar-label class="text-[10px] mono w-20 shrink-0
+                  <app-data-text data-bar-label class="text-[11px] mono w-20 shrink-0
                                  text-[color:var(--text-muted)]"
                                  [value]="bar.label" [compact]="true"
                                  [label]="column().name + ' · value'" />
@@ -278,13 +275,12 @@
                          where there are no values, and a sliver would draw a
                          continuous shape over a hole. -->
                     @if (bar.rows > 0) {
-                      <div class="h-full rounded-sm"
+                      <div class="h-full rounded-sm bg-[color:var(--chart-1)]"
                            [style.width.%]="bar.percent"
-                           [style.background]="'var(--chart-1)'"
                            [title]="bar.title"></div>
                     }
                   </div>
-                  <span class="text-[10px] tabular w-12 text-right shrink-0
+                  <span class="text-[11px] tabular w-12 text-right shrink-0
                                text-[color:var(--text-muted)]">{{ bar.rows }}</span>
                 </div>
               }

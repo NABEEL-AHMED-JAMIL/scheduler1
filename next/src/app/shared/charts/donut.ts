@@ -35,7 +35,7 @@ export interface Slice { name: string; value: number; }
           <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-3 text-center">
             <span class="text-xl font-semibold tabular leading-none">{{ compactTotal() }}</span>
             @if (totalLabel()) {
-              <span class="text-[10px] leading-tight mt-0.5 max-w-[70px] truncate
+              <span class="text-[11px] leading-tight mt-0.5 max-w-[70px] truncate
                            text-[color:var(--text-muted)]" [title]="totalLabel()">
                 {{ totalLabel() }}
               </span>

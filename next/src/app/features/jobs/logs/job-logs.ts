@@ -1,3 +1,4 @@
+import { toneClass } from '../../../shared/ui/tone';
 import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
@@ -32,6 +33,8 @@ interface AuditLog {
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
   readonly jobId = input.required<string>();
   readonly jobQueueId = input.required<string>();
 

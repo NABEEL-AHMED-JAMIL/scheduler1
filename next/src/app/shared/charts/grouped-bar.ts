@@ -68,9 +68,8 @@ export interface GroupedSeries {
                            precisely the distinction this chart is supposed to make in its
                            geometry. The Profile tab's spread bar does the same for a
                            zero-wide quarter, for the same reason. -->
-                      <div class="h-full rounded-sm transition-[width]"
+                      <div class="h-full rounded-sm transition-[width] min-w-[2px]"
                            [style.width.%]="bar.percent"
-                           [style.minWidth.px]="2"
                            [style.background]="bar.color"
                            [attr.title]="bar.title + ': ' + bar.display"></div>
                     }

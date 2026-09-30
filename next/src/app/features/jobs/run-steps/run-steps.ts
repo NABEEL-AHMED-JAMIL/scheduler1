@@ -1,3 +1,4 @@
+import { toneClass } from '../../../shared/ui/tone';
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
@@ -39,6 +40,8 @@ const TERMINAL = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
   templateUrl: './run-steps.html',
 })
 export class RunSteps {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
   readonly jobQueueId = input.required<string>();
   /**
    * Bumped by the page each time it re-reads the run (its poll and its socket), so a running run's steps move with its

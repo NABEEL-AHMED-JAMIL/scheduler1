@@ -54,7 +54,7 @@
         <!-- Below sm the date and buttons wrap to their own line; beside the text they left the
              message a ~90px column on a phone. gap-y-2 spaces that second line. -->
         <li class="notification-row flex-wrap sm:flex-nowrap gap-y-2" [class.is-unread]="!item.read"
-            [style.--tone]="toneOf(item)">
+            [class]="toneClass(toneOf(item))">
           <app-icon [name]="glyphOf(item)" [class]="intentOf(item)" size="1.1em"
                     class="mt-0.5 shrink-0" />
 

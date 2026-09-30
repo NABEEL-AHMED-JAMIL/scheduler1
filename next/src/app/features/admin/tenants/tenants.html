@@ -134,7 +134,7 @@
                     [class.text-[color:var(--text-muted)]]="!$any(tenant)[res.key]">
                   {{ $any(tenant)[res.key] || 0 }}
                   @if (res.sub && res.sub(tenant); as sub) {
-                    <div class="text-[10px] text-[color:var(--text-muted)] leading-tight">{{ sub }}</div>
+                    <div class="text-[11px] text-[color:var(--text-muted)] leading-tight">{{ sub }}</div>
                   }
                 </td>
               }
@@ -236,16 +236,16 @@
                          icon used to turn grey at zero, which on this data left whole cards
                          colourless; weight carries the empty/non-empty distinction instead. -->
                     <app-icon [name]="res.icon" size="1.05em" [class]="resourceTone(res.key)"
-                              [style.opacity]="$any(tenant)[res.key] ? '1' : '0.45'" />
+                              [class.opacity-45]="!$any(tenant)[res.key]" />
                     <span class="text-sm font-semibold tabular leading-none"
                           [class]="$any(tenant)[res.key] ? '' : 'text-[color:var(--text-muted)]'">
                       {{ $any(tenant)[res.key] || 0 }}
                     </span>
-                    <span class="text-[10px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]">
+                    <span class="text-[11px] uppercase tracking-wide leading-none text-[color:var(--text-muted)]">
                       {{ res.label }}
                     </span>
                     @if (res.sub && res.sub(tenant); as sub) {
-                      <span class="text-[10px] leading-none text-[color:var(--text-muted)]">{{ sub }}</span>
+                      <span class="text-[11px] leading-none text-[color:var(--text-muted)]">{{ sub }}</span>
                     }
                   </div>
                 }
@@ -261,7 +261,7 @@
                     <div class="h-full rounded-full bg-[color:var(--chart-0)] transition-all"
                          [style.width.%]="shareOf(tenant, 'userCount')"></div>
                   </div>
-                  <span class="text-[10px] tabular text-[color:var(--text-muted)] shrink-0">
+                  <span class="text-[11px] tabular text-[color:var(--text-muted)] shrink-0">
                     {{ shareOf(tenant, 'userCount') }}%
                   </span>
                 </div>

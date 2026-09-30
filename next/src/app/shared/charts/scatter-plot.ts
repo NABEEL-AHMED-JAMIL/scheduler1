@@ -51,13 +51,13 @@ const PAD = 26;
              divides by, and printing it put "1267.19353428047" on an axis in 10px type -- the
              trailing digits an artefact of the CSV reader typing the column as DOUBLE. The two
              label fields beside it were computed for this and rendered nowhere. -->
-        <text [attr.x]="pad" [attr.y]="height() - 6" font-size="10"
+        <text [attr.x]="pad" [attr.y]="height() - 6" font-size="11"
               fill="var(--text-muted)">{{ bounds().lowX }}</text>
-        <text [attr.x]="width - 4" [attr.y]="height() - 6" font-size="10" text-anchor="end"
+        <text [attr.x]="width - 4" [attr.y]="height() - 6" font-size="11" text-anchor="end"
               fill="var(--text-muted)">{{ bounds().highXLabel }}</text>
-        <text x="2" y="12" font-size="10" fill="var(--text-muted)">{{ bounds().highYLabel }}</text>
+        <text x="2" y="12" font-size="11" fill="var(--text-muted)">{{ bounds().highYLabel }}</text>
       </svg>
-      <p class="text-[10px] text-[color:var(--text-muted)] text-center">
+      <p class="text-[11px] text-[color:var(--text-muted)] text-center">
         {{ xLabel() }} across, {{ yLabel() }} up
       </p>
     }

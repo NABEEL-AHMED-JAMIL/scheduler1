@@ -42,7 +42,7 @@ export type Block =
             <hr class="md-hr" />
           }
           @case ('h') {
-            <p class="md-h" [style.font-size]="block.level === 1 ? '0.95rem' : '0.875rem'">
+            <p class="md-h" [class]="block.level === 1 ? 'text-[0.95rem]' : 'text-sm'">
               @for (span of block.spans; track $index) { <ng-container [ngTemplateOutlet]="inline"
                 [ngTemplateOutletContext]="{ $implicit: span }" /> }
             </p>

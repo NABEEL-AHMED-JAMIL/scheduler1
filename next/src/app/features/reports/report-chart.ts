@@ -91,7 +91,7 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
         <line [attr.x1]="line.x1" [attr.x2]="line.x2" [attr.y1]="line.y" [attr.y2]="line.y"
               [attr.stroke]="'var(--border-subtle)'" />
         <text [attr.x]="line.x1 - 8" [attr.y]="line.y + 3" text-anchor="end"
-              [attr.fill]="'var(--text-muted)'" font-size="10">{{ line.label }}</text>
+              [attr.fill]="'var(--text-muted)'" font-size="11">{{ line.label }}</text>
       }
       @for (bar of bars(); track $index) {
         <rect [attr.x]="bar.x" [attr.y]="bar.y" [attr.width]="bar.w" [attr.height]="bar.h"
@@ -116,12 +116,12 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
       }
       @for (label of barLabels(); track $index) {
         <text [attr.x]="label.x" [attr.y]="label.y" text-anchor="middle"
-              [attr.fill]="'var(--text-secondary)'" font-size="10"
+              [attr.fill]="'var(--text-secondary)'" font-size="11"
               font-weight="600">{{ label.text }}</text>
       }
       @for (label of axisLabels(); track $index) {
         <text [attr.x]="label.x" [attr.y]="label.y" [attr.text-anchor]="label.anchor"
-              [attr.fill]="'var(--text-secondary)'" font-size="10">{{ label.text }}
+              [attr.fill]="'var(--text-secondary)'" font-size="11">{{ label.text }}
           <title>{{ label.full }}</title>
         </text>
       }
@@ -129,7 +129,7 @@ interface Bar { x: number; y: number; w: number; h: number; fill: string; hint: 
         <text [attr.x]="W/2" [attr.y]="H/2 - 2" text-anchor="middle"
               [attr.fill]="'var(--text-primary)'" font-size="20" font-weight="600">{{ c.value }}</text>
         <text [attr.x]="W/2" [attr.y]="H/2 + 15" text-anchor="middle"
-              [attr.fill]="'var(--text-muted)'" font-size="10">{{ c.label }}</text>
+              [attr.fill]="'var(--text-muted)'" font-size="11">{{ c.label }}</text>
       }
     </svg>
     }

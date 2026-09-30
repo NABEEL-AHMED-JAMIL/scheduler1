@@ -19,7 +19,7 @@
           @for (s of t.steps; track s.index) {
             <li class="log-tl-item exec-step" [attr.data-step]="s.key">
               <span class="log-tl-rail">
-                <span class="log-tl-dot" [style.background]="tone(s.status)"></span>
+                <span class="log-tl-dot tone-fill" [class]="toneClass(tone(s.status))"></span>
               </span>
               <div class="min-w-0 flex-1">
                 <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -117,7 +117,7 @@
               @for (line of lines; track line.lineNo) {
                 <div class="log-console-line">
                   <span class="log-console-time">[{{ line.loggedAt ? (line.loggedAt | serverTime:'timeSec') : '—' }}]</span>
-                  <span class="shrink-0" [style.color]="levelColor(line.level)">{{ line.level || 'INFO' }}</span>
+                  <span class="shrink-0 tone-text" [class]="toneClass(levelColor(line.level))">{{ line.level || 'INFO' }}</span>
                   <span class="log-message">{{ line.message }}</span>
                 </div>
               } @empty {

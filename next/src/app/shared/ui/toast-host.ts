@@ -1,3 +1,4 @@
+import { toneClass } from './tone';
 import { Component, inject } from '@angular/core';
 import { ToastService } from './toast.service';
 import { Icon } from './icon';
@@ -18,7 +19,7 @@ import { Icon } from './icon';
              [attr.role]="toast.tone === 'crit' ? 'alert' : 'status'"
              [attr.aria-live]="toast.tone === 'crit' ? 'assertive' : 'polite'"
              [class.border-l-4]="true"
-             [style.border-left-color]="borderFor(toast.tone)">
+             [class]="'tone-edge ' + toneClass(borderFor(toast.tone))">
           <span class="flex-1">{{ toast.message }}</span>
           <button type="button" class="text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)]"
                   (click)="toasts.dismiss(toast.id)" aria-label="Dismiss"><app-icon name="close" size="0.9em" /></button>
@@ -28,6 +29,8 @@ import { Icon } from './icon';
   `,
 })
 export class ToastHost {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
   readonly toasts = inject(ToastService);
 
   borderFor(tone: string): string {

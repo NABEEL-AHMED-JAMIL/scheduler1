@@ -45,16 +45,19 @@ const LABEL_PX = 34;
 const VALUE_PX = 22;
 
 /**
- * Width of one character at the 10px type these labels are drawn in.
+ * Width of one character at the 11px type these labels are drawn in.
  *
- * Measured against the rendered font rather than assumed: digits in `tabular` are 6.0px and the
- * mixed-case names on the axis average slightly less, so 6.0 is the honest number for the widest
- * case and errs toward hiding a label rather than toward drawing two on top of each other.
+ * Measured against the rendered font rather than assumed. MIG-257 lifted these labels from 10px to
+ * 11px, the smallest size on the type scale: tabular digits are 6.6px there and the mixed-case
+ * names on the axis average about 6.2. 6.2 with a 6px gutter keeps a ten-character id
+ * ("CUST-00111") on every bar of a roomy chart, as it was at 10px, and the gutter still covers the
+ * difference for an all-digit label up to fifteen characters -- past that the axis is already
+ * thinned to every second label or fewer.
  */
-const CHAR_PX = 6;
+const CHAR_PX = 6.2;
 
 /** Breathing room either side, so two labels never touch even when both just fit. */
-const LABEL_GUTTER = 8;
+const LABEL_GUTTER = 6;
 
 /** The pixels the widest of these strings needs. */
 function widestText(texts: string[]): number {
@@ -115,7 +118,7 @@ const RESERVE_AXIS_ONLY = 18;
                   [title]="bar.hint"
                   (click)="barClicked.emit(bar)">
             @if (showValues()) {
-              <span class="text-[10px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.display }}</span>
+              <span class="text-[11px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.display }}</span>
             }
             <!--
               --chart-0, not bg-brand-500. The accent ramp is monochrome and its 500 step is a
@@ -140,11 +143,10 @@ const RESERVE_AXIS_ONLY = 18;
                    this bar is taller than the scale and has been cut, so a flat rounded cap
                    would claim it is exactly as tall as the tallest real bar. Only the Top-N
                    roll-up reaches this in practice. -->
-              <span class="w-full transition-[height]"
+              <span class="w-full transition-[height] border-t-[color:var(--surface-raised)]"
                     [class.rounded-t]="!bar.clipped"
                     [class.border-t-2]="bar.clipped"
                     [class.border-dashed]="bar.clipped"
-                    [style.borderTopColor]="'var(--surface-raised)'"
                     [style.background]="bar.color || 'var(--chart-0)'"
                     [style.height.px]="bar.px"></span>
             }
@@ -154,7 +156,7 @@ const RESERVE_AXIS_ONLY = 18;
             <!-- Flex, not text-align: a line wider than its box overflows to the right whatever
                  text-align says, so the last label hung off the card by a few px. A flex-end item
                  overflows toward the start instead. -->
-            <span class="flex text-[10px] text-[color:var(--text-muted)] w-full h-3.5
+            <span class="flex text-[11px] text-[color:var(--text-muted)] w-full h-3.5
                          leading-[0.875rem] overflow-visible"
                   [class.justify-center]="bar.align === 'center'"
                   [class.justify-start]="bar.align === 'start'"
@@ -184,7 +186,7 @@ const RESERVE_AXIS_ONLY = 18;
         -->
         <ul class="flex flex-wrap gap-x-3 gap-y-1 mt-2 list-none" aria-hidden="true">
           @for (entry of legend(); track entry.label) {
-            <li class="flex items-center gap-1.5 text-[10px] text-[color:var(--text-muted)]"
+            <li class="flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)]"
                 [title]="title(entry.label)">
               <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0"
                     [style.background]="entry.color"></span>

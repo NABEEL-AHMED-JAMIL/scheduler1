@@ -201,7 +201,7 @@
           @for (log of filtered(); track $index) {
             <li class="log-tl-item">
               <span class="log-tl-rail">
-                <span class="log-tl-dot" [style.background]="toneOf(log.logsDetail)"></span>
+                <span class="log-tl-dot tone-fill" [class]="toneClass(toneOf(log.logsDetail))"></span>
               </span>
               <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap tabular shrink-0 pt-0.5">
                 {{ log.dateCreated ? (log.dateCreated | serverTime:'timeSec') : '—' }}

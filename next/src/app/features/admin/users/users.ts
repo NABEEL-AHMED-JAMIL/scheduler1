@@ -1,3 +1,4 @@
+import { toneClass } from '../../../shared/ui/tone';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
@@ -78,6 +79,8 @@ export interface AppUser {
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
   private readonly http = inject(HttpClient);
   private readonly profilesApi = inject(AccessProfilesService);
   private readonly dialog = inject(Dialog);

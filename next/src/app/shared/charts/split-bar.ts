@@ -44,7 +44,7 @@ export interface SplitRow {
           }
         </ul>
 
-        <div class="mt-2 flex items-center gap-3 text-[10px] text-[color:var(--text-muted)]">
+        <div class="mt-2 flex items-center gap-3 text-[11px] text-[color:var(--text-muted)]">
           <span class="flex items-center gap-1">
             <span class="size-2 rounded-full bg-ok-500"></span>
             {{ positiveLabel() }}

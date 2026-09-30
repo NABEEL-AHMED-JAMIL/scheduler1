@@ -1,3 +1,4 @@
+import { toneClass } from '../../shared/ui/tone';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -52,6 +53,8 @@ interface TenantRequest {
   `],
 })
 export class TenantRequests implements OnInit {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

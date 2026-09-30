@@ -64,7 +64,7 @@
           <article class="card p-0 overflow-hidden flex flex-col">
             <!-- Where the request stands, readable before any text is. Amber is the only one
                  that means "do something", which is the whole job of this screen. -->
-            <div class="h-1 shrink-0" [style.background]="statusAccent(r.status)"></div>
+            <div class="h-1 shrink-0 tone-fill" [class]="toneClass(statusAccent(r.status))"></div>
 
             <div class="p-4 flex flex-col gap-3 flex-1">
               <div class="flex items-start gap-2">
@@ -99,7 +99,7 @@
                    room on the card and can be opened in place rather than hidden behind a
                    tooltip that cannot be selected or reached by touch. -->
               <div class="rounded-lg bg-sunken px-3 py-2.5 flex flex-col gap-1.5">
-                <span class="text-[10px] font-semibold uppercase tracking-wider
+                <span class="text-[11px] font-semibold uppercase tracking-wider
                              text-[color:var(--text-muted)]">Asked for</span>
                 @if (r.purpose) {
                   <p class="text-sm leading-relaxed whitespace-pre-wrap"
@@ -121,7 +121,7 @@
 
               @if (r.status === 'Rejected' && r.decisionNote) {
                 <div class="flex flex-col gap-1">
-                  <span class="text-[10px] font-semibold uppercase tracking-wider
+                  <span class="text-[11px] font-semibold uppercase tracking-wider
                                text-[color:var(--text-muted)]">Reason given</span>
                   <p class="text-xs leading-relaxed whitespace-pre-wrap
                             text-[color:var(--text-secondary)]">{{ r.decisionNote }}</p>

@@ -25,13 +25,12 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
              Padding right and below only: the ring of an edge cell would be clipped, and on the
              left the cells would show past the pinned day names. -->
         <div class="overflow-x-auto overscroll-x-contain pr-1 pb-1">
-          <div class="grid gap-1 w-max min-w-full"
-               [style.grid-template-columns]="'3.25rem repeat(24, minmax(1.5rem, 1fr))'">
+          <div class="grid gap-1 w-max min-w-full grid-cols-[3.25rem_repeat(24,minmax(1.5rem,1fr))]">
             <span class="sticky left-0 z-10 bg-[color:var(--surface-raised)]"></span>
             <!-- Two digits on a 24-hour clock ("06", "22"): a column is about 12px wide on a phone,
                  which "22:00" would overrun. The pill and the drill-down say the full hour. -->
             @for (hour of hours; track hour) {
-              <span class="text-[10px] text-center text-[color:var(--text-muted)] tabular">
+              <span class="text-[11px] text-center text-[color:var(--text-muted)] tabular">
                 @if (hour % 2 === 0) { {{ axisHour(hour) }} }
               </span>
             }
@@ -49,7 +48,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
                      selection affordance at all. The three states now share --focus-ring and
                      separate by weight: a 1px hint on hover, 2px for focus and for selection. -->
                 <button type="button"
-                        class="aspect-square w-full rounded-[3px] relative
+                        class="aspect-square w-full rounded-sm relative
                                ring-offset-1 ring-offset-[color:var(--surface-raised)]
                                ring-[color:var(--focus-ring)]
                                transition-[box-shadow,opacity]
@@ -75,8 +74,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
              the pill off the legend below as well as the grid above. -->
         <div class="h-6 my-2 flex items-center">
           @if (hovered(); as hover) {
-            <span class="text-xs px-2 py-1 rounded-md tabular"
-                  style="background: var(--surface-sunken); color: var(--text-primary);">
+            <span class="text-xs px-2 py-1 rounded-md tabular bg-sunken text-primary">
               <span class="font-medium">{{ hover.day }} {{ hourRange(hover.cell.hour) }}</span>
               <span class="text-[color:var(--text-secondary)]">
                 &middot; {{ hover.cell.value }} run{{ hover.cell.value === 1 ? '' : 's' }}
@@ -90,7 +88,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
         <div class="flex items-center gap-2 text-[11px] text-[color:var(--text-muted)]">
           <span>Less</span>
           @for (step of legend; track step) {
-            <span class="size-3 rounded-[3px]" [style.background]="background(step * max())"></span>
+            <span class="size-3 rounded-sm" [style.background]="background(step * max())"></span>
           }
           <span>More</span>
           <span class="ml-auto">Busiest hour: {{ max() }} run{{ max() === 1 ? '' : 's' }}</span>
