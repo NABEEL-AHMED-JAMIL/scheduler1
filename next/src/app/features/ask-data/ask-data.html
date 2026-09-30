@@ -37,7 +37,7 @@
           <span class="text-xs text-[color:var(--text-muted)] mr-1">Try:</span>
         }
         @for (s of suggestions(); track s) {
-          <button type="button" class="pill pill-neutral hover-brand text-left" [disabled]="asking()" (click)="use(s)">{{ s }}</button>
+          <button type="button" class="pill pill-neutral hover-brand text-left whitespace-normal break-words max-w-full" [disabled]="asking()" (click)="use(s)">{{ s }}</button>
         }
       }
     </div>

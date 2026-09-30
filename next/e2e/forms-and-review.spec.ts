@@ -92,4 +92,11 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     await expect(review.getByRole('button', { name: 'Approve' })).toBeEnabled();
     await expect(review.getByRole('button', { name: 'Reject' })).toBeEnabled();
   });
+  test('Ask your data fits a phone: no suggestion pushes the page sideways', async ({ browser }) => {
+    const page = await pageAs(browser, s, 390);
+    await page.goto('/data/ask');
+    await expect(page.locator('[data-test="suggestions"] button').first()).toBeVisible({ timeout: 30_000 });
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow, 'the page is wider than the phone by').toBeLessThanOrEqual(0);
+  });
 });
