@@ -388,8 +388,9 @@ export class DocumentReview {
     }
   }
 
-  reviewer(id: number | null | undefined): string {
+  /** Who did it, by name: "you", their name, or (someone Identity no longer knows) their number. */
+  reviewer(id: number | null | undefined, name?: string | null): string {
     if (id == null) return 'someone';
-    return id === this.me() ? 'you' : `user ${id}`;
+    return id === this.me() ? 'you' : name || `user ${id}`;
   }
 }

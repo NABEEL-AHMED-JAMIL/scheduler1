@@ -71,7 +71,14 @@ export const LIMITS = { maxTries: 10, maxDelaySeconds: 3600, maxTimeoutSeconds: 
 
 // ---------------------------------------------------------------------------------------------- the server's answers
 
-export interface VersionRow { version: number; pipelineDefinitionId: number; createdBy?: number | null; dateCreated?: string | null; }
+export interface VersionRow {
+  version: number;
+  pipelineDefinitionId: number;
+  createdBy?: number | null;
+  /** Who saved it; absent when Identity no longer knows them. */
+  createdByName?: string | null;
+  dateCreated?: string | null;
+}
 
 /** GET pipeline.json/steps/definition: the latest saved version, or the legacy step every pipeline without one runs as. */
 export interface DefinitionView {

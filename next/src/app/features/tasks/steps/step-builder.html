@@ -153,7 +153,7 @@
                     <tr>
                       <td class="mono text-xs">v{{ v.version }}@if (v.version === meta().version) { <span class="pill pill-brand ml-1.5">Current</span> }</td>
                       <td class="text-xs whitespace-nowrap">{{ v.dateCreated | serverTime:'dateTime' }}</td>
-                      <td class="text-xs">{{ v.createdBy ? 'User #' + v.createdBy : '—' }}</td>
+                      <td class="text-xs">{{ v.createdByName || (v.createdBy ? 'User #' + v.createdBy : '—') }}</td>
                     </tr>
                   }
                 </tbody>

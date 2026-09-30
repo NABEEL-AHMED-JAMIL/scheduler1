@@ -104,16 +104,19 @@ export interface Extraction {
   problems?: string[] | null;
   error?: string | null;
   requestedBy?: number | null;
+  requestedByName?: string | null;
   dateCreated?: string | null;
   dateStarted?: string | null;
   dateFinished?: string | null;
   /** Sent back with every decision: the service refuses one made on a document that has changed since. */
   revision: number;
   claimedBy?: number | null;
+  claimedByName?: string | null;
   claimedAt?: string | null;
   /** Whether the claim is still held (claims lapse). */
   claimActive?: boolean | null;
   reviewedBy?: number | null;
+  reviewedByName?: string | null;
   dateReviewed?: string | null;
   rejectReason?: string | null;
   ruleOverride?: boolean | null;
@@ -162,6 +165,7 @@ export interface CorrectionRow {
   newValue?: string | null;
   oldConfidence?: number | null;
   correctedBy?: number | null;
+  correctedByName?: string | null;
   dateCreated?: string | null;
 }
 

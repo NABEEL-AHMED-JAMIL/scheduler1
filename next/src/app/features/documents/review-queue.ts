@@ -93,7 +93,7 @@ import { ConfidenceBar } from './confidence-bar';
                 <td class="text-xs whitespace-nowrap">
                   @if (e.claimActive && e.claimedBy != null) {
                     <span class="pill" [class.pill-brand]="e.claimedBy === me()" [class.pill-warn]="e.claimedBy !== me()">
-                      <app-icon name="lock" size="0.8em" />{{ e.claimedBy === me() ? 'You' : 'User ' + e.claimedBy }}
+                      <app-icon name="lock" size="0.8em" />{{ e.claimedBy === me() ? 'You' : e.claimedByName || 'User ' + e.claimedBy }}
                     </span>
                   } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                 </td>

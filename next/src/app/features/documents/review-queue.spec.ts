@@ -65,6 +65,12 @@ describe('ReviewQueue', () => {
     expect(rows[1].textContent).toContain('You');
   });
 
+  it('names whose claim it is when Identity knows them', async () => {
+    const { fixture, el } = screenWith(vi.fn(() => ok({ total: 1, page: 0, size: 50, items: [{ ...ITEMS[0], claimedByName: 'Sam Reviewer' }] })));
+    await fixture.whenStable();
+    expect(el.querySelector('tbody tr')!.textContent).toContain('Sam Reviewer');
+  });
+
   it('sends every filter to the service, from the first page again', async () => {
     const { fixture, screen, api } = screenWith();
     await fixture.whenStable();

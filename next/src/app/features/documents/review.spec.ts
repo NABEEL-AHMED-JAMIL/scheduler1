@@ -340,6 +340,15 @@ describe('DocumentReview -- read-only', () => {
     expect(api.queue).not.toHaveBeenCalled();
   });
 
+  it('names who claimed, decided and corrected a document', async () => {
+    const decided = { ...CORRECTED, status: 'Rejected', reviewedBy: 99, reviewedByName: 'Sam Reviewer', rejectReason: 'Blurred',
+      dateReviewed: '2026-09-29T05:04:08.939+00:00' };
+    const { el } = await screenWith({ api: stubApi(decided) });
+    expect(el.querySelector('[data-test="view-only"]')?.textContent).toContain('Rejected by Sam Reviewer');
+    const { el: claimed } = await screenWith({ api: stubApi({ ...INVOICE, claimActive: true, claimedBy: 99, claimedByName: 'Sam Reviewer' }) });
+    expect(claimed.textContent).toContain('Claimed by Sam Reviewer');
+  });
+
   it('reads a document someone else has claimed, and leaves it to them', async () => {
     const { el } = await screenWith({ api: stubApi({ ...INVOICE, claimActive: true, claimedBy: 99, claimedAt: '2026-09-29T05:20:00.000+00:00' }) });
     expect(el.textContent).toContain('Claimed by user 99');

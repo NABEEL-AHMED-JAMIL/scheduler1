@@ -193,6 +193,17 @@ describe('StepBuilder -- the step cards', () => {
 });
 
 describe('StepBuilder -- a draft handed over (MIG-252)', () => {
+  it('names who saved each version, and falls back to the number of someone no longer known', () => {
+    const versions = [
+      { version: 2, pipelineDefinitionId: 1001, createdBy: 4537, createdByName: 'Claude Demo Admin', dateCreated: '2026-09-30T04:14:59.098917Z' },
+      { version: 1, pipelineDefinitionId: 1000, createdBy: 12, dateCreated: '2026-09-29T04:14:59.098917Z' },
+    ];
+    const { tab, el } = build({ view: { ...VIEW, version: 2, versions } });
+    tab('settings');
+    const rows = [...el.querySelectorAll('tbody tr')].filter(r => r.textContent!.includes('v2') || r.textContent!.includes('v1'));
+    expect(rows.map(r => r.lastElementChild!.textContent!.trim())).toEqual(['Claude Demo Admin', 'User #12']);
+  });
+
   it('shows the AI Assistant\'s drafted YAML as typed text, unsaved', () => {
     const { tab, el, builder, api } = build({ offer: { format: 'yaml', text: 'version: 1\nsteps: []\n' } });
     tab('yaml');
