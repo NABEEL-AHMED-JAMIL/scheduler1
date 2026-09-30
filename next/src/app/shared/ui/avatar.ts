@@ -54,7 +54,7 @@ export class Avatar {
       if (current) URL.revokeObjectURL(current);
     });
 
-    effect(() => {
+    effect(onCleanup => {
       const appUserId = this.appUserId();
       const bucket = this.bucket();
       const key = this.key();
@@ -70,11 +70,14 @@ export class Avatar {
         : this.http.get(`${API_BASE}/storage.json/previewObject`,
             { params: { bucket: bucket!, key: key! }, responseType: 'blob' });
 
-      request.subscribe({
+      const loading = request.subscribe({
         next: blob => this.objectUrl.set(URL.createObjectURL(blob)),
         // A missing or unreadable picture falls back to initials rather than a broken image.
         error: () => this.objectUrl.set(''),
       });
+      // MIG-214: a picture that changes, or an avatar that goes, cancels the request still out -- its late answer
+      // would make a URL nothing releases (and could show the old picture).
+      onCleanup(() => loading.unsubscribe());
     });
   }
 }

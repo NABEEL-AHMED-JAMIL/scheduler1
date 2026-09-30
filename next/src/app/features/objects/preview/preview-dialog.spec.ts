@@ -187,3 +187,22 @@ describe('PreviewDialog width', () => {
     expect(open('notes.txt', {}).widthRem()).toBe(60);
   });
 });
+
+/** MIG-214: a picture or document that arrives after the viewer closed is not held for the life of the tab. */
+describe('PreviewDialog after it is closed', () => {
+  it('does not keep a blob URL for bytes that arrive after close', () => {
+    const created: string[] = [];
+    const revoked: string[] = [];
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation(() => { created.push('blob:late'); return 'blob:late'; });
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(url => { revoked.push(url); });
+    const late = new Subject<Blob>();
+    const dialog = open('wound.png', { previewBlob: () => late });
+
+    dialog.close();
+    late.next(new Blob(['x'], { type: 'image/png' }));
+
+    expect(created.filter(url => !revoked.includes(url))).toEqual([]);
+    create.mockRestore();
+    revoke.mockRestore();
+  });
+});

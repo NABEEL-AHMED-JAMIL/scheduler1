@@ -1,4 +1,5 @@
 import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { switchMap } from 'rxjs';
 import { Icon } from '../../../shared/ui/icon';
@@ -53,14 +54,18 @@ export class ReportPreviewDialog implements OnInit {
   readonly url = signal<string | null>(null);
   readonly error = signal('');
 
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor() {
-    inject(DestroyRef).onDestroy(() => { const u = this.url(); if (u) URL.revokeObjectURL(u); });
+    this.destroyRef.onDestroy(() => { const u = this.url(); if (u) URL.revokeObjectURL(u); });
   }
 
   ngOnInit(): void {
     const title = this.data.name.replace(/\.[^.]+$/, '');
     this.service.runDataset(this.data.runDatasetId).pipe(
       switchMap(rows => this.service.render(renderBody({ outputFormat: 'pdf', dataset: rows, options: { ...DEFAULT_OPTIONS, title } }))),
+      // MIG-214: a preview closed before its PDF arrives does not make a URL nothing releases.
+      takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: r => {
         if (r.status === 'SUCCESS' && r.data) this.url.set(URL.createObjectURL(base64ToBlob(r.data.outputBase64, 'application/pdf')));

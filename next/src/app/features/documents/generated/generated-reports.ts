@@ -165,7 +165,12 @@ export class GeneratedReports implements OnInit {
     if (r.origin === 'run-file' && isPdf(r)) {
       // MIG-255: a pipeline's report is a document, not rows -- it opens as the PDF it is, in the browser's own viewer.
       this.service.runDatasetFile(r.runDatasetId!, 'pdf').subscribe({
-        next: blob => window.open(URL.createObjectURL(blob), '_blank', 'noopener'),
+        next: blob => {
+          const url = URL.createObjectURL(blob);
+          window.open(url, '_blank', 'noopener');
+          // MIG-214: the new tab has the PDF by then; the URL would otherwise live as long as this tab.
+          setTimeout(() => URL.revokeObjectURL(url), 60_000);
+        },
         error: () => this.toast.error(`Could not open ${r.name}.`),
       });
       return;

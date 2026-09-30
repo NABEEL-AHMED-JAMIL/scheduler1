@@ -1,4 +1,5 @@
-import { Component, LOCALE_ID, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { DestroyRef, Component, LOCALE_ID, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
@@ -33,6 +34,8 @@ interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit'
   templateUrl: './invoice-detail.html',
 })
 export class InvoicePane implements OnDestroy {
+  /** MIG-214: a blob that arrives after this is gone would make a URL nothing releases. */
+  private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(BillingApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
@@ -140,7 +143,7 @@ export class InvoicePane implements OnDestroy {
 
   private loadQr(number: string): void {
     this.revokeQr();
-    this.api.qrBlob(number, 240).subscribe({ next: b => this.qrUrl.set(URL.createObjectURL(b)), error: () => this.qrUrl.set(null) });
+    this.api.qrBlob(number, 240).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({ next: b => this.qrUrl.set(URL.createObjectURL(b)), error: () => this.qrUrl.set(null) });
   }
   private revokeQr(): void { const u = this.qrUrl(); if (u) URL.revokeObjectURL(u); this.qrUrl.set(null); }
 

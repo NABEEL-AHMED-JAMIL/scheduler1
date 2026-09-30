@@ -134,7 +134,8 @@ export class JobLogs implements OnInit, OnDestroy {
    */
   private arm(): void {
     this.clearTimer();
-    if (!this.autoRefreshing()) return;
+    // MIG-214: an answer that lands after the page is gone must not start the next poll.
+    if (this.destroyed || !this.autoRefreshing()) return;
     this.timer = setTimeout(() => this.refresh(), 5000);
   }
 
@@ -150,7 +151,10 @@ export class JobLogs implements OnInit, OnDestroy {
     });
   }
 
+  private destroyed = false;
+
   ngOnDestroy(): void {
+    this.destroyed = true;
     this.clearTimer();
     this.socket?.unsubscribe();
     this.socket = null;

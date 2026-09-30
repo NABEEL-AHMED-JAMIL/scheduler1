@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { provideRouter } from '@angular/router';
@@ -258,5 +258,36 @@ describe('JobLogs with the run\'s steps', () => {
     const { el } = withSteps(LEGACY);
     expect(el.querySelector('.exec-steps')).toBeNull();
     expect(el.querySelectorAll('.log-timeline li').length).toBe(3);
+  });
+});
+
+/**
+ * MIG-214: a page left while its poll is in flight must not poll again. The answer that arrives after destroy used to
+ * re-arm the 5-second timer, and the gone page kept asking for the run's logs for as long as the tab lived.
+ */
+describe('JobLogs after it is gone', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('does not re-arm the poll from an answer that arrives after destroy', () => {
+    vi.useFakeTimers();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2808');
+    fixture.componentRef.setInput('jobQueueId', '6839');
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    const running = { ...LOGS, sourceJobQueue: { ...LOGS.sourceJobQueue, jobStatus: 'Running', endTime: null } };
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).flush({ status: API_SUCCESS, data: running });
+    http.match(r => r.url.endsWith('/aiPrompt.json/runsForJob')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    fixture.componentInstance.refresh();
+    const inFlight = http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog'));
+
+    fixture.destroy();
+    inFlight.flush({ status: API_SUCCESS, data: running });
+    vi.advanceTimersByTime(30_000);
+
+    expect(http.match(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog'))).toHaveLength(0);
   });
 });

@@ -244,7 +244,7 @@ export class AuthService {
    * 401. An effect defers to after the injector settles, and re-runs whenever the picture
    * changes, so signing in or replacing it refreshes without a manual call.
    */
-  private readonly avatarSync = effect(() => {
+  private readonly avatarSync = effect(onCleanup => {
     const { bucket, key } = this.avatarSource();
 
     const previous = untracked(() => this.avatarObjectUrl());
@@ -252,13 +252,15 @@ export class AuthService {
     this.avatarObjectUrl.set('');
     if (!bucket || !key) return;
 
-    this.http.get(`${API_BASE}/storage.json/previewObject`, {
+    const loading = this.http.get(`${API_BASE}/storage.json/previewObject`, {
       params: { bucket, key },
       responseType: 'blob',
     }).subscribe({
       next: blob => this.avatarObjectUrl.set(URL.createObjectURL(blob)),
       error: () => this.avatarObjectUrl.set(''),
     });
+    // MIG-214: a new picture cancels the request still out for the old one, whose URL nothing would release.
+    onCleanup(() => loading.unsubscribe());
   });
 
   /** Called by the profile screen so the header reflects an edit straight away. */

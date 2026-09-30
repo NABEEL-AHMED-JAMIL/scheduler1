@@ -233,6 +233,8 @@ export class PreviewDialog implements OnInit {
     this.storage.previewDocument(this.data.bucket, this.data.key).subscribe({
       next: blob => {
         this.loading.set(false);
+        // MIG-214: bytes that arrive after the viewer closed would be held for the life of the tab.
+        if (this.released) return;
         this.objectUrl = URL.createObjectURL(blob);
         this.mediaUrl.set(this.objectUrl);
       },
@@ -372,6 +374,8 @@ export class PreviewDialog implements OnInit {
     this.storage.previewBlob(this.data.bucket, this.data.key).subscribe({
       next: blob => {
         this.loading.set(false);
+        // MIG-214: bytes that arrive after the viewer closed would be held for the life of the tab.
+        if (this.released) return;
         this.objectUrl = URL.createObjectURL(blob);
         this.mediaUrl.set(this.objectUrl);
       },
@@ -490,7 +494,10 @@ export class PreviewDialog implements OnInit {
   }
 
   /** Blob URLs leak for the life of the document unless released explicitly. */
+  private released = false;
+
   private releaseUrl(): void {
+    this.released = true;
     if (this.objectUrl) URL.revokeObjectURL(this.objectUrl);
     this.objectUrl = null;
   }

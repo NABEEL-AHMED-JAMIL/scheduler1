@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { DestroyRef, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -24,6 +25,8 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
   templateUrl: './documents.html',
 })
 export class BillingDocuments implements OnInit, OnDestroy {
+  /** MIG-214: a blob that arrives after this is gone would make a URL nothing releases. */
+  private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(BillingApi);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
@@ -95,7 +98,7 @@ export class BillingDocuments implements OnInit, OnDestroy {
     if (this.selectedId() === documentId && this.previewUrl()) return;
     this.selectedId.set(documentId);
     this.revoke(); this.previewLoading.set(true); this.previewError.set('');
-    this.api.documentBlob(documentId).subscribe({
+    this.api.documentBlob(documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.previewLoading.set(false); if (this.selectedId() !== documentId) return; this.previewUrl.set(URL.createObjectURL(b)); },
       error: () => { this.previewLoading.set(false); this.previewError.set('The document could not be read.'); },
     });

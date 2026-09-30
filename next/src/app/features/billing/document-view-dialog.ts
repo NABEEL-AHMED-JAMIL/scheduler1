@@ -1,4 +1,5 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { DestroyRef, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { Icon } from '../../shared/ui/icon';
@@ -56,6 +57,8 @@ export const DOC_VIEW_TITLE_ID = 'doc-view-title';
   `,
 })
 export class DocumentViewDialog implements OnInit, OnDestroy {
+  /** MIG-214: a blob that arrives after this is gone would make a URL nothing releases. */
+  private readonly destroyRef = inject(DestroyRef);
   readonly titleId = DOC_VIEW_TITLE_ID;
   readonly ref = inject<DialogRef<void>>(DialogRef);
   readonly data = inject<DocumentRow>(DIALOG_DATA);
@@ -72,7 +75,7 @@ export class DocumentViewDialog implements OnInit, OnDestroy {
   }
 
   ngOnInit(): void {
-    this.api.documentBlob(this.data.documentId).subscribe({
+    this.api.documentBlob(this.data.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.blob.set(b); this.url.set(URL.createObjectURL(b)); },
       error: () => this.error.set('The document could not be read.'),
     });
