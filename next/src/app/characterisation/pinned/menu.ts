@@ -47,7 +47,8 @@ export const PINNED: Record<string, unknown> = {
     "Administration › Workspace Requests — Asks from outside for a workspace -> /administration/tenant-requests",
     "Administration › Managed service — Which of our staff may work in which workspace -> /administration/managed-service",
     "Administration › Staff activity — Every change our staff made in a customer's workspace -> /administration/staff-activity",
-    "Administration › Work in a workspace — Open a managed session where you hold a grant -> /administration/work-in-workspace"
+    "Administration › Work in a workspace — Open a managed session where you hold a grant -> /administration/work-in-workspace",
+    "Administration › Reliability — Pipeline execution and billing against their 99.99% targets -> /administration/reliability"
   ],
   "the menu for a tenant user with every page": [
     "Dashboard -> /dashboard",

@@ -270,6 +270,8 @@ export class Shell {
           hint: 'Every change our staff made in a customer\'s workspace' },
         { label: 'Work in a workspace', path: '/administration/work-in-workspace', icon: 'external', platformOnly: true,
           hint: 'Open a managed session where you hold a grant' },
+        { label: 'Reliability', path: '/administration/reliability', icon: 'chart', platformOnly: true,
+          hint: 'Pipeline execution and billing against their 99.99% targets' },
         { label: 'Our team\'s activity', path: '/administration/team-activity', icon: 'history', adminOnly: true,
           teamOnly: true, hint: 'Every change our team made in this workspace' },
       ],

@@ -370,6 +370,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       'Administration › Managed service -> /administration/managed-service',
       'Administration › Staff activity -> /administration/staff-activity',
       'Administration › Work in a workspace -> /administration/work-in-workspace',
+      // MIG-196: the reliability objectives.
+      'Administration › Reliability -> /administration/reliability',
     ]);
   });
 
