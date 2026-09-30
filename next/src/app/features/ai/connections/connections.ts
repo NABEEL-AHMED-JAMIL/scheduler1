@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, LOCALE_ID, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DecimalPipe } from '@angular/common';
 import { Dialog } from '@angular/cdk/dialog';
@@ -17,6 +17,8 @@ import { ConnectionDialog } from './connection-dialog';
 import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { Bar, BarChart } from '../../../shared/charts/bar-chart';
+import { statusColor } from '../../../shared/charts/status-color';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -25,7 +27,8 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
  */
 @Component({
   selector: 'app-connections',
-  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner],
+  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner,
+    BarChart],
   templateUrl: './connections.html',
 })
 export class Connections implements OnInit {
@@ -76,6 +79,21 @@ export class Connections implements OnInit {
     };
   });
 
+  /** What the selected connection has been doing: runs per day, its latest runs, the prompts that name it. */
+  readonly activity = signal<ConnectionActivity | null>(null);
+  readonly activityLoading = signal(false);
+  readonly activityError = signal('');
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
+  readonly activityBars = computed<Bar[]>(() => (this.activity()?.days ?? []).map(d => ({
+    name: this.clock.transform(d.day, 'day') ?? d.day,
+    value: d.ok + d.failed,
+    segments: [
+      { label: 'Succeeded', value: d.ok, color: statusColor('Completed') },
+      { label: 'Failed', value: d.failed, color: statusColor('Failed') },
+    ],
+  })));
+  readonly activityRuns = computed(() => (this.activity()?.days ?? []).reduce((n, d) => n + d.ok + d.failed, 0));
+
   constructor() {
     // Land on the linked connection, else the default, else the first, once the list is in --
     // a blank pane says nothing.
@@ -88,6 +106,37 @@ export class Connections implements OnInit {
         this.selectedId.set(pick?.connectionId ?? null);
       });
     });
+    effect(() => {
+      const id = this.selectedId();
+      untracked(() => this.loadActivity(id));
+    });
+  }
+
+  /** The selected connection's activity; a newer pick wins over an answer still on its way. */
+  loadActivity(id: number | null): void {
+    this.activity.set(null);
+    this.activityError.set('');
+    if (id === null) return;
+    this.activityLoading.set(true);
+    this.http.get<ApiResponse<ConnectionActivity>>(`${API_BASE}/aiConnection.json/activity`, { params: { connectionId: id } }).subscribe({
+      next: r => {
+        if (this.selectedId() !== id) return;
+        this.activityLoading.set(false);
+        if (r.status === API_SUCCESS && r.data) this.activity.set(r.data);
+        else this.activityError.set(r.message || 'Could not read what this connection has been doing.');
+      },
+      error: () => {
+        if (this.selectedId() !== id) return;
+        this.activityLoading.set(false);
+        this.activityError.set('Could not read what this connection has been doing.');
+      },
+    });
+  }
+
+  /** A run's time as the list shows it: seconds with one decimal, or milliseconds under a second. */
+  latency(ms: number | null | undefined): string {
+    if (ms == null) return '—';
+    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
   }
 
   ngOnInit(): void {
@@ -173,4 +222,15 @@ export class Connections implements OnInit {
       error: err => this.toast.error(err?.error?.message || 'The connection could not be deleted.'),
     });
   }
+}
+
+/** aiConnection.json/activity: the connection's last 30 days, its latest runs and its prompts. */
+export interface ConnectionActivity {
+  connectionId: number;
+  days: { day: string; ok: number; failed: number; tokens: number }[];
+  recent: {
+    runId: number; at: string; kind: string; promptId?: number | null; promptName?: string | null; model?: string | null;
+    status: string; latencyMs?: number | null; tokensIn?: number | null; tokensOut?: number | null; error?: string | null; jobQueueId?: number | null;
+  }[];
+  prompts: { promptId: number; name: string; status: string }[];
 }
