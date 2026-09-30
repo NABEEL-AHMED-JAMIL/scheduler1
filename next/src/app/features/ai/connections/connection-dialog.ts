@@ -131,16 +131,16 @@ export class ConnectionDialog {
     this.provider().needsKey && !(this.isEdit() && this.data.connection?.apiKeyConfigured));
   private readonly workspaceRequired = !!this.data.tenants?.length && !this.isEdit();
 
-  /**
-   * app-field's [required] only draws the star. The endpoint, key and workspace were checked by
-   * a toast each after the form had already passed as valid, with no field marked; the stars
-   * and the validators now read the same signals, as the Kafka dialog does.
-   */
-  private readonly conditionalValidators = effect(() => {
-    this.require('apiEndpoint', this.endpointRequired());
-    this.require('apiKey', this.keyRequired());
-    this.require('tenantId', this.workspaceRequired);
-  });
+  constructor() {
+    // app-field's [required] only draws the star. The endpoint, key and workspace were checked by
+    // a toast each after the form had already passed as valid, with no field marked; the stars
+    // and the validators now read the same signals, as the Kafka dialog does.
+    effect(() => {
+      this.require('apiEndpoint', this.endpointRequired());
+      this.require('apiKey', this.keyRequired());
+      this.require('tenantId', this.workspaceRequired);
+    });
+  }
 
   private require(name: string, required: boolean): void {
     const control = this.form.get(name)!;

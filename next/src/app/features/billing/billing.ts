@@ -3,7 +3,6 @@ import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
-import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { Combobox } from '../../shared/ui/combobox';
@@ -36,7 +35,6 @@ const FORECAST_WINDOW_DAYS = 7;
 export class Billing implements OnInit {
   private readonly api = inject(BillingApi);
   private readonly auth = inject(AuthService);
-  private readonly toast = inject(ToastService);
   readonly workspaces = inject(WorkspacePicker);
 
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;

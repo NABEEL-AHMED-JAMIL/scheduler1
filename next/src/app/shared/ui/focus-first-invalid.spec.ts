@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { ApplicationRef, Component, Injector, inject, signal } from '@angular/core';
+import { ApplicationRef, Component, Injector, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { focusFirstInvalid } from './focus-first-invalid';

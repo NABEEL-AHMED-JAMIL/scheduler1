@@ -1,6 +1,5 @@
 import { Component, Injector, LOCALE_ID, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { forkJoin, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
@@ -33,8 +32,7 @@ import {
 } from './filter-builder';
 import {
   Aggregation, AnalysisColumn, AnalysisCrumb, AnalysisRequest, AnalysisResult, AnalyticsService,
-  ColumnDistribution,
-  ColumnProfile, Dashboard, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile,
+  ColumnProfile, DatasetColumn, DatasetPreview, DatasetProfile, Drill, ExportFile,
   FilterClause,
   FilterGroup, FilterNode, Grain, PreviewShape, QueryResult, QueryRun, RegisteredDataset,
   SavedAnalysis,

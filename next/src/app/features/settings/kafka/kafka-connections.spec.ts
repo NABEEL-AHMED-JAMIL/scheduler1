@@ -240,7 +240,7 @@ describe('the platform default, as a workspace with no Kafka of its own sees it'
     const http = TestBed.inject(HttpClient) as any;
     const original = http.get;
     http.get = (url: string, options?: any) => { calls.push({ url, options }); return original(url, options); };
-    (screen as any).dialog.open = (component: any, config: any) => { opened.push(config); return { closed: of(false) }; };
+    (screen as any).dialog.open = (_component: any, config: any) => { opened.push(config); return { closed: of(false) }; };
     return screen;
   }
 

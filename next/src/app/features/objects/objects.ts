@@ -7,7 +7,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { AuthService } from '../../core/auth/auth.service';
 import { BucketSummary, ObjectSummary, StorageService } from './storage.service';
-import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { API_SUCCESS } from '../../core/api/api.config';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { copyText } from '../../shared/ui/clipboard.util';

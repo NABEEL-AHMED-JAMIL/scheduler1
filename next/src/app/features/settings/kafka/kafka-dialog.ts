@@ -245,20 +245,20 @@ export class KafkaDialog {
   readonly saslPasswordRequired = computed(() =>
     this.needsSasl() && !this.data.profile?.saslPasswordConfigured);
 
-  /**
-   * app-field's [required] only draws an asterisk -- it never touches the control -- so every
-   * star on this form was decoration. A SASL profile could be saved with no password at all,
-   * and the broker then rejected each publish with an authentication error naming no field.
-   * The stars and the validators read the same signals now, so they cannot drift apart again.
-   */
-  private readonly conditionalValidators = effect(() => {
-    this.require('saslMechanism', this.needsSasl());
-    this.require('saslUsername', this.needsSasl());
-    this.require('saslPassword', this.saslPasswordRequired());
-    // The TLS controls are left to app-kafka-tls-section: what a store's presence turns on is
-    // answered by questions that live inside it, and two effects setting the same validators
-    // from different answers is exactly how the stars and the rules drifted apart before.
-  });
+  constructor() {
+    // app-field's [required] only draws an asterisk -- it never touches the control -- so every
+    // star on this form was decoration. A SASL profile could be saved with no password at all,
+    // and the broker then rejected each publish with an authentication error naming no field.
+    // The stars and the validators read the same signals now, so they cannot drift apart again.
+    effect(() => {
+      this.require('saslMechanism', this.needsSasl());
+      this.require('saslUsername', this.needsSasl());
+      this.require('saslPassword', this.saslPasswordRequired());
+      // The TLS controls are left to app-kafka-tls-section: what a store's presence turns on is
+      // answered by questions that live inside it, and two effects setting the same validators
+      // from different answers is exactly how the stars and the rules drifted apart before.
+    });
+  }
 
   private require(name: string, required: boolean): void {
     const control = this.form.get(name)!;

@@ -417,23 +417,49 @@ export class TaskEdit implements OnInit {
    * since moved off is dropped.
    */
   readonly pipelinesLoading = signal(false);
-  private readonly pipelinesFetched = effect(() => {
-    const topic = this.selectedTopicId();
-    untracked(() => {
-      if (topic == null) { this.pipelines.set([]); return; }
-      this.pipelinesLoading.set(true);
-      this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/listForTopic`,
-        { params: { sourceTaskTypeId: topic } }).subscribe({
-        next: response => {
-          if (this.selectedTopicId() !== topic) return;
-          this.pipelinesLoading.set(false);
-          if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
-        },
-        // Not fatal: the Pipeline field just offers nothing to pick until a retry.
-        error: () => { if (this.selectedTopicId() === topic) this.pipelinesLoading.set(false); },
+
+  constructor() {
+    // The chosen topic's pipelines, fetched as described above pipelinesLoading.
+    effect(() => {
+      const topic = this.selectedTopicId();
+      untracked(() => {
+        if (topic == null) { this.pipelines.set([]); return; }
+        this.pipelinesLoading.set(true);
+        this.http.get<ApiResponse<Pipeline[]>>(`${API_BASE}/pipeline.json/listForTopic`,
+          { params: { sourceTaskTypeId: topic } }).subscribe({
+          next: response => {
+            if (this.selectedTopicId() !== topic) return;
+            this.pipelinesLoading.set(false);
+            if (response.status === API_SUCCESS) this.pipelines.set(response.data ?? []);
+          },
+          // Not fatal: the Pipeline field just offers nothing to pick until a retry.
+          error: () => { if (this.selectedTopicId() === topic) this.pipelinesLoading.set(false); },
+        });
       });
     });
-  });
+    // An edited task's pipeline is read for its steps. The answer decides the page: saved steps open the builder,
+    // the legacy step leaves today's form exactly as it was. A new task has no pipeline to ask about yet.
+    effect(() => {
+      const key = this.isEdit() ? this.stepsPipelineKey() : null;
+      untracked(() => {
+        if (key == null) { this.stepsView.set(null); return; }
+        if (this.stepsView()?.pipelineKey === key) return;
+        this.stepsApi.definition(key).subscribe({
+          next: r => {
+            if (this.stepsPipelineKey() !== key) return;
+            const view = r.status === API_SUCCESS ? r.data : null;
+            // An answer without a definition (an older Core, a refusal) is no steps: the page stays as it was.
+            this.stepsView.set(view && typeof view === 'object' && !Array.isArray(view) && view.definition ? view : null);
+          },
+          error: () => { if (this.stepsPipelineKey() === key) this.stepsView.set(null); },
+        });
+      });
+    });
+    // Once a legacy pipeline's steps are open, Details stays one tab of several (stepsOpened).
+    effect(() => {
+      if (this.stepsView() && BUILDER_TABS.includes(this.requested())) untracked(() => this.stepsOpened.set(true));
+    });
+  }
 
   /** Only the pipelines that publish on the chosen topic; nothing until a topic is chosen. */
   readonly pipelinesForTopic = computed<Pipeline[]>(() => {
@@ -671,27 +697,6 @@ export class TaskEdit implements OnInit {
   /** The pipeline's definition as steps -- its saved steps, or the legacy step it runs as. Null until read. */
   readonly stepsView = signal<DefinitionView | null>(null);
 
-  /**
-   * An edited task's pipeline is read for its steps. The answer decides the page: saved steps open the builder,
-   * the legacy step leaves today's form exactly as it was. A new task has no pipeline to ask about yet.
-   */
-  private readonly stepsFetched = effect(() => {
-    const key = this.isEdit() ? this.stepsPipelineKey() : null;
-    untracked(() => {
-      if (key == null) { this.stepsView.set(null); return; }
-      if (this.stepsView()?.pipelineKey === key) return;
-      this.stepsApi.definition(key).subscribe({
-        next: r => {
-          if (this.stepsPipelineKey() !== key) return;
-          const view = r.status === API_SUCCESS ? r.data : null;
-          // An answer without a definition (an older Core, a refusal) is no steps: the page stays as it was.
-          this.stepsView.set(view && typeof view === 'object' && !Array.isArray(view) && view.definition ? view : null);
-        },
-        error: () => { if (this.stepsPipelineKey() === key) this.stepsView.set(null); },
-      });
-    });
-  });
-
   /** A tab picked on this page, until the address catches up with it. */
   private readonly picked = linkedSignal<string, string | null>({ source: this.tab, computation: () => null });
   private readonly requested = computed(() => this.picked() ?? this.tab() ?? '');
@@ -704,9 +709,6 @@ export class TaskEdit implements OnInit {
   });
   /** Once a legacy pipeline's steps are open, Details is one tab of several rather than the whole page again. */
   private readonly stepsOpened = signal(false);
-  private readonly latchSteps = effect(() => {
-    if (this.stepsView() && BUILDER_TABS.includes(this.requested())) untracked(() => this.stepsOpened.set(true));
-  });
 
   readonly pageTabs = PAGE_TABS;
 

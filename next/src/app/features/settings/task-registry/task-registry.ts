@@ -113,11 +113,13 @@ export class TaskRegistry implements OnInit {
     return { total: steps.length, on: steps.filter(r => r.state === 'On').length, unavailable: steps.filter(r => r.state === 'Unavailable').length };
   });
 
-  /** Any server-side filter asks for the pipelines again. */
-  private readonly reload = effect(() => {
-    this.topicFilter(); this.tenantFilter(); this.onlyMine();
-    untracked(() => this.loadPipelines());
-  });
+  constructor() {
+    // Any server-side filter asks for the pipelines again.
+    effect(() => {
+      this.topicFilter(); this.tenantFilter(); this.onlyMine();
+      untracked(() => this.loadPipelines());
+    });
+  }
 
   ngOnInit(): void {
     const topic = this.route.snapshot.queryParamMap.get('topic');

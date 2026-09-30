@@ -8,7 +8,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 
 /** One picker for every "which file?" in the app: buckets, folders, a filter, a pick. */
 function picker(data: object) {
-  const listObjects = vi.fn((bucket: string, prefix: string) => of({ status: API_SUCCESS, data: { objects: prefix === '' ? [
+  const listObjects = vi.fn((_bucket: string, prefix: string) => of({ status: API_SUCCESS, data: { objects: prefix === '' ? [
     { name: 'zeta.csv', key: 'zeta.csv', folder: false, size: 1200 },
     { name: 'docs', key: 'docs/', folder: true },
     { name: 'alpha.pdf', key: 'alpha.pdf', folder: false, size: 2048 },

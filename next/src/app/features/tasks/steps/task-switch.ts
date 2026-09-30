@@ -32,12 +32,15 @@ export class TaskSwitch {
   readonly name = computed(() => this.task().name || this.task().code);
 
   private readonly box = viewChild<ElementRef<HTMLInputElement>>('box');
-  /** Whenever the task's line or the host's busy changes, the box shows the line again (a refusal changes neither). */
-  private readonly sync = effect(() => {
-    const on = !!this.task().enabled;
-    const box = this.box()?.nativeElement;
-    if (box && !this.busy()) box.checked = on;
-  });
+
+  constructor() {
+    // Whenever the task's line or the host's busy changes, the box shows the line again (a refusal changes neither).
+    effect(() => {
+      const on = !!this.task().enabled;
+      const box = this.box()?.nativeElement;
+      if (box && !this.busy()) box.checked = on;
+    });
+  }
 }
 
 /** A task's state here as the registry and the step builder print it: On, Off or Unavailable, switched here, and why. */

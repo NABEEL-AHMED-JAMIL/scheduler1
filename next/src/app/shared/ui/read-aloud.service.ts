@@ -64,9 +64,9 @@ export class ReadAloudService {
    *
    * Chrome collects an utterance that nothing references while it is still being spoken, and the
    * speech stops partway with no error and no end event. The reference is what prevents that, so
-   * it is deliberate rather than leftover.
+   * it is deliberate rather than leftover: nothing reads it, it only has to be held.
    */
-  private current: SpeechSynthesisUtterance | null = null;
+  private readonly held: { utterance: SpeechSynthesisUtterance | null } = { utterance: null };
 
   /**
    * Reads `passages` in order, starting at `from`.
@@ -136,7 +136,7 @@ export class ReadAloudService {
    */
   private halt(): void {
     if (!this.supported) return;
-    this.current = null;
+    this.held.utterance = null;
     // Cancelling while paused leaves some engines unable to speak again until they are resumed,
     // which presents as a play button that does nothing at all.
     if (window.speechSynthesis.paused) window.speechSynthesis.resume();
@@ -198,7 +198,7 @@ export class ReadAloudService {
       this.toast.error('The reading stopped unexpectedly.');
     };
 
-    this.current = utterance;
+    this.held.utterance = utterance;
     window.speechSynthesis.speak(utterance);
   }
 }

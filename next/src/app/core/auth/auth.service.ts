@@ -237,31 +237,43 @@ export class AuthService {
     },
     { equal: (a, b) => a.bucket === b.bucket && a.key === b.key });
 
-  /**
-   * An effect rather than a constructor call. Fetching from the constructor sent the request
-   * while this service was still being instantiated -- the auth interceptor injects it, so
-   * the interceptor was not in place yet and the call went out with no token and came back
-   * 401. An effect defers to after the injector settles, and re-runs whenever the picture
-   * changes, so signing in or replacing it refreshes without a manual call.
-   */
-  private readonly avatarSync = effect(onCleanup => {
-    const { bucket, key } = this.avatarSource();
+  constructor() {
+    // An effect rather than a direct call. Fetching from the constructor sent the request
+    // while this service was still being instantiated -- the auth interceptor injects it, so
+    // the interceptor was not in place yet and the call went out with no token and came back
+    // 401. An effect defers to after the injector settles, and re-runs whenever the picture
+    // changes, so signing in or replacing it refreshes without a manual call.
+    effect(onCleanup => {
+      const { bucket, key } = this.avatarSource();
 
-    const previous = untracked(() => this.avatarObjectUrl());
-    if (previous) URL.revokeObjectURL(previous);
-    this.avatarObjectUrl.set('');
-    if (!bucket || !key) return;
+      const previous = untracked(() => this.avatarObjectUrl());
+      if (previous) URL.revokeObjectURL(previous);
+      this.avatarObjectUrl.set('');
+      if (!bucket || !key) return;
 
-    const loading = this.http.get(`${API_BASE}/storage.json/previewObject`, {
-      params: { bucket, key },
-      responseType: 'blob',
-    }).subscribe({
-      next: blob => this.avatarObjectUrl.set(URL.createObjectURL(blob)),
-      error: () => this.avatarObjectUrl.set(''),
+      const loading = this.http.get(`${API_BASE}/storage.json/previewObject`, {
+        params: { bucket, key },
+        responseType: 'blob',
+      }).subscribe({
+        next: blob => this.avatarObjectUrl.set(URL.createObjectURL(blob)),
+        error: () => this.avatarObjectUrl.set(''),
+      });
+      // MIG-214: a new picture cancels the request still out for the old one, whose URL nothing would release.
+      onCleanup(() => loading.unsubscribe());
     });
-    // MIG-214: a new picture cancels the request still out for the old one, whose URL nothing would release.
-    onCleanup(() => loading.unsubscribe());
-  });
+
+    // Another tab signed out (it removed the stored session): this tab signs out too instead of carrying on.
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === STORAGE_KEY && event.newValue === null && this.currentUser()) {
+        this.currentUser.set(null);
+        void this.router.navigate(['/login']);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('storage', onStorage);
+      inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', onStorage));
+    }
+  }
 
   /** Called by the profile screen so the header reflects an edit straight away. */
   patchUser(changes: Partial<AuthUser>): void {
@@ -376,21 +388,6 @@ export class AuthService {
       return null;
     }
   }
-
-  /** Another tab signed out (it removed the stored session): this tab signs out too instead of carrying on. */
-  private readonly followOtherTabs = (() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === STORAGE_KEY && event.newValue === null && this.currentUser()) {
-        this.currentUser.set(null);
-        void this.router.navigate(['/login']);
-      }
-    };
-    if (typeof window !== 'undefined') {
-      window.addEventListener('storage', onStorage);
-      inject(DestroyRef).onDestroy(() => window.removeEventListener('storage', onStorage));
-    }
-    return true;
-  })();
 
   get accessToken(): string | null {
     return this.currentUser()?.accessToken ?? null;

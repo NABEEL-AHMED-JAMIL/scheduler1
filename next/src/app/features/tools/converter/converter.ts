@@ -190,38 +190,35 @@ export class Converter implements OnInit {
       });
   }
 
-  /**
-   * A result belongs to the source and target that produced it. Picking another bucket file,
-   * another target or the other mode left the old "Ready to download" card offering the old
-   * output under the new selection.
-   */
-  private readonly clearStaleResult = effect(() => {
-    this.sourceName(); this.outputFormat(); this.mode();
-    untracked(() => this.result.set(null));
-  });
+  constructor() {
+    // A result belongs to the source and target that produced it. Picking another bucket file,
+    // another target or the other mode left the old "Ready to download" card offering the old
+    // output under the new selection.
+    effect(() => {
+      this.sourceName(); this.outputFormat(); this.mode();
+      untracked(() => this.result.set(null));
+    });
+    // Picks a target format whenever the source changes, in either mode. Only the upload
+    // handler used to do this, so choosing a file from a bucket left the format empty while
+    // the select appeared to show one -- Convert stayed disabled with nothing explaining why.
+    effect(() => {
+      const family = this.family();
+      const current = untracked(() => this.outputFormat());
+      if (!family) {
+        if (current) this.outputFormat.set('');
+        return;
+      }
+      if (current && family.outputFormats.includes(current)) return;
+      const own = untracked(() => this.extension());
+      this.outputFormat.set(
+        family.outputFormats.find(f => f !== own) ?? family.outputFormats[0] ?? '');
+    });
+  }
 
   onFile(file: File | null): void {
     this.file.set(file);
     this.result.set(null);
   }
-
-  /**
-   * Picks a target format whenever the source changes, in either mode. Only the upload
-   * handler used to do this, so choosing a file from a bucket left the format empty while
-   * the select appeared to show one -- Convert stayed disabled with nothing explaining why.
-   */
-  private readonly defaultTarget = effect(() => {
-    const family = this.family();
-    const current = untracked(() => this.outputFormat());
-    if (!family) {
-      if (current) this.outputFormat.set('');
-      return;
-    }
-    if (current && family.outputFormats.includes(current)) return;
-    const own = untracked(() => this.extension());
-    this.outputFormat.set(
-      family.outputFormats.find(f => f !== own) ?? family.outputFormats[0] ?? '');
-  });
 
   async convert(): Promise<void> {
     if (!this.outputFormat()) return;

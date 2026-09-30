@@ -895,23 +895,6 @@ export class KafkaTlsSection implements OnInit {
 
   // ---------------------------------------------------------------- the form
 
-  /**
-   * Keeps the profile's own fields pointing at what the screen is showing.
-   *
-   * The bucket and key are the server's answer, not a choice: every upload comes back saying where
-   * it was put, and that is what the profile is saved with. `storePasswordEnc` is carried across
-   * the same way -- it is ciphertext under a key the browser has never seen, so it can only be
-   * moved from one request to the other, never read, and asking somebody to invent a password for
-   * a store the server both wrote and will open would be a password that opens nothing.
-   */
-  private readonly pointProfileAtChosenFiles = effect(() => {
-    if (!this.opened()) {
-      return;
-    }
-    this.applyStore('truststore', this.truststoreWanted());
-    this.applyStore('keystore', this.keystoreWanted());
-  });
-
   private applyStore(id: 'truststore' | 'keystore', wanted: boolean): void {
     const fields = STORE_FIELDS[id];
     const slot = this.slot(id);
@@ -990,21 +973,32 @@ export class KafkaTlsSection implements OnInit {
     }
   }
 
-  /**
-   * The stars and the validators read the same signals, so they cannot say different things.
-   *
-   * The two location controls have no visible input any longer -- they hold whatever the last
-   * upload came back with -- but they are still required, because a profile pointing at no
-   * truststore on a private CA fails at the first connection rather than at the save.
-   */
-  private readonly conditionalValidators = effect(() => {
-    this.require('sslTruststoreLocation', this.truststoreWanted());
-    this.require('sslKeystoreLocation', this.keystoreWanted());
-    this.require('sslTruststorePassword', this.truststorePasswordRequired());
-    this.require('sslKeystorePassword', this.keystorePasswordRequired());
-  });
-
   constructor() {
+    // Keeps the profile's own fields pointing at what the screen is showing.
+    //
+    // The bucket and key are the server's answer, not a choice: every upload comes back saying where
+    // it was put, and that is what the profile is saved with. `storePasswordEnc` is carried across
+    // the same way -- it is ciphertext under a key the browser has never seen, so it can only be
+    // moved from one request to the other, never read, and asking somebody to invent a password for
+    // a store the server both wrote and will open would be a password that opens nothing.
+    effect(() => {
+      if (!this.opened()) {
+        return;
+      }
+      this.applyStore('truststore', this.truststoreWanted());
+      this.applyStore('keystore', this.keystoreWanted());
+    });
+    // The stars and the validators read the same signals, so they cannot say different things.
+    //
+    // The two location controls have no visible input any longer -- they hold whatever the last
+    // upload came back with -- but they are still required, because a profile pointing at no
+    // truststore on a private CA fails at the first connection rather than at the save.
+    effect(() => {
+      this.require('sslTruststoreLocation', this.truststoreWanted());
+      this.require('sslKeystoreLocation', this.keystoreWanted());
+      this.require('sslTruststorePassword', this.truststorePasswordRequired());
+      this.require('sslKeystorePassword', this.keystorePasswordRequired());
+    });
     // This section is created and destroyed by the protocol select. Its validators live on the
     // dialog's controls, which outlive it, so a switch to PLAINTEXT would otherwise leave a
     // required rule on a field nothing can fill in any more.

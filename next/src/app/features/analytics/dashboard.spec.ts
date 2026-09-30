@@ -1266,7 +1266,7 @@ describe('the kinds a result is not allowed to be drawn as', () => {
     const view = analysisView(analysisResult({
       rows: [['jan', '100'], ['feb', '250'], ['mar', '50']], rowCount: 3,
     }), 'SUM', { sortedBy: 'DIMENSION' });
-    const board = bareBoard();
+    bareBoard();
 
     expect(view.issues.cumulative).toBe('');
     expect((chart() as any).cumulativePoints(view).map((p: any) => p.value)).toEqual([100, 350, 400]);
@@ -1636,7 +1636,7 @@ describe('stacked bars and the share within each group', () => {
     // south (where it happens to come first) and chart-1 in north. The legend a reader builds
     // from the first bar is then wrong for every other bar -- worse than no colour, because the
     // chart looks like it encodes something and encodes position.
-    const board = boardWith({ widgets: [widgetOn()] }).board;
+    boardWith({ widgets: [widgetOn()] });
     const bars = (chart() as any).stacks(crossTab());
 
     const colourIn = (name: string, label: string) =>
@@ -1648,7 +1648,7 @@ describe('stacked bars and the share within each group', () => {
   });
 
   it('normalises each bar to its own total for the share view', () => {
-    const board = boardWith({ widgets: [widgetOn()] }).board;
+    boardWith({ widgets: [widgetOn()] });
     const bars = (chart() as any).shareStacks(crossTab());
 
     // Every bar full height, so the eye compares the MIX rather than the size.
@@ -1663,7 +1663,7 @@ describe('stacked bars and the share within each group', () => {
   });
 
   it('leaves a group that sums to nothing alone rather than dividing by it', () => {
-    const board = boardWith({ widgets: [widgetOn()] }).board;
+    boardWith({ widgets: [widgetOn()] });
     const view = analysisView(analysisResult({
       columns: [
         { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
@@ -2175,9 +2175,6 @@ describe('bars side by side', () => {
     ],
   };
 
-  // The suite's own harness, rather than a second way of building the same component.
-  const board = () => boardWith().board;
-
   it('is offered in the picker', () => {
     expect(KIND_IDS).toContain('groupedBar');
   });
@@ -2659,7 +2656,7 @@ describe('Dashboards, audit 09-22', () => {
 });
 
 describe('the dataset registry, audit 09-22', () => {
-  function registry(datasets: object[], open = vi.fn((_c: unknown, _config: any) => ({ closed: of(false) }))) {
+  function registry(_datasets: object[], open = vi.fn((_c: unknown, _config: any) => ({ closed: of(false) }))) {
     TestBed.resetTestingModule();
     const fetch = new Subject<any>();
     TestBed.configureTestingModule({ providers: [

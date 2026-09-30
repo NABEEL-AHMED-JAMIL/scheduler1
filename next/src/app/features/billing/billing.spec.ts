@@ -16,7 +16,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
  */
 function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DAYS) {
   const api = {
-    usageByMeter: vi.fn((q: UsageQuery) => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } })),
+    usageByMeter: vi.fn((_q: UsageQuery) => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } })),
     usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: days } })),
     subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },

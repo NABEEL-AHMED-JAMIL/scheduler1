@@ -217,7 +217,7 @@ describe('AccessProfiles screen', () => {
   it('applies the server\'s answer after a checkbox toggle, and reverts the box on a refusal', () => {
     const operator = profile(1, 'Operator', ['jobs'], true, 1);
     const olivia = { appUserId: 44, fullName: 'Olivia Bennett', username: 'o@a', status: 'Active', pageAccessProfileId: 1, pageAccessProfileName: 'Operator', pageKeys: ['jobs'] as any };
-    const setPageAccess = vi.fn((_id: number, key: string, allowed: boolean) => of(key === 'reports'
+    const setPageAccess = vi.fn((_id: number, key: string, _allowed: boolean) => of(key === 'reports'
       ? { status: 'SUCCESS', message: 'Reports is now open for Olivia Bennett (an exception to their profile).', data: { ...olivia, pageKeys: ['jobs', 'reports'], allowedExceptions: ['reports'], withheldExceptions: [] } }
       : { status: 'ERROR', message: 'Unknown page.' }));
     const { screen, toast } = screenWith([operator], { setPageAccess, people: () => of({ status: 'SUCCESS', message: '', data: [olivia] }) });
