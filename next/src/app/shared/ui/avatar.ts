@@ -15,6 +15,21 @@ import { API_BASE } from '../../core/api/api.config';
  * bearer token the interceptor attaches, and an unauthenticated one is blocked outright. The blob
  * URL is revoked per instance, otherwise a list of users leaks one per row.
  */
+/**
+ * The initials a person is shown by without a picture: the first and last word's first letters, or a one-word name's
+ * first two. A bracketed word is a note, not a name ("Acceptance Test User (synthetic)" read "A("), and a word's
+ * leading punctuation is not its initial. "?" when nothing is left. The one rule for every avatar, the header's too.
+ */
+export function initialsOf(name: string | null | undefined): string {
+  const parts = (name ?? '').trim().split(/\s+/)
+    .filter(word => !/^[([{]/.test(word))
+    .map(word => word.replace(/^[^\p{L}\p{N}]+/u, ''))
+    .filter(Boolean);
+  if (!parts.length) return '?';
+  const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : parts[0].slice(0, 2);
+  return letters.toUpperCase();
+}
+
 @Component({
   selector: 'app-avatar',
   template: `
@@ -39,14 +54,7 @@ export class Avatar {
   private readonly objectUrl = signal('');
   readonly url = this.objectUrl.asReadonly();
 
-  readonly initials = computed(() => {
-    const parts = this.name().trim().split(/\s+/).filter(Boolean);
-    if (!parts.length) return '?';
-    const letters = parts.length > 1
-      ? parts[0][0] + parts[parts.length - 1][0]
-      : parts[0].slice(0, 2);
-    return letters.toUpperCase();
-  });
+  readonly initials = computed(() => initialsOf(this.name()));
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {

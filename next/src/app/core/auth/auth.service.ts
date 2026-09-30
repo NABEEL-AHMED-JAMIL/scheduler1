@@ -1,4 +1,5 @@
 import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
+import { initialsOf } from '../../shared/ui/avatar';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
@@ -284,10 +285,7 @@ export class AuthService {
 
   readonly initials = computed(() => {
     const name = this.displayName();
-    if (!name) return '';
-    const parts = name.split(/\s+/).filter(Boolean);
-    const letters = parts.length > 1 ? parts[0][0] + parts[parts.length - 1][0] : name.slice(0, 2);
-    return letters.toUpperCase();
+    return name ? initialsOf(name) : '';
   });
 
   login(username: string, password: string): Observable<ApiResponse<AuthUser>> {
