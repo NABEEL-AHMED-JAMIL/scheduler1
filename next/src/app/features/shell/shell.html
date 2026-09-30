@@ -2,7 +2,7 @@
   <!-- The header holds a dozen tab stops before the page starts; a keyboard user skips them here. -->
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-default btn-sm">Skip to content</a>
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
-    <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 h-14 flex items-center gap-1">
+    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
 
       <a routerLink="/" class="mr-4 shrink-0">
         <app-brand-mark [hideOnMobile]="true" [hideBesideNav]="true" />
@@ -140,7 +140,7 @@
          Inline, not @defer: that would pull Angular's defer runtime into the initial bundle (+8 kB). -->
     @if (auth.isManagedSession()) {
       <div class="managed-session-bar" role="status" data-managed-session>
-        <div class="mx-auto max-w-[1600px] px-4 sm:px-6 lg:px-8 py-1.5 flex items-center gap-2 text-sm">
+        <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 py-1.5 flex items-center gap-2 text-sm">
           <app-icon name="briefcase" class="shrink-0" />
           <p class="flex-1 min-w-0">
             Managed session: <b>{{ auth.user()?.tenantName || ('workspace ' + auth.user()?.tenantId) }}</b> — every change is audited
@@ -190,7 +190,7 @@
     }
   </header>
 
-  <main id="main" tabindex="-1" class="outline-none flex-1 mx-auto max-w-[1600px] w-full px-4 sm:px-6 lg:px-8 pt-8 pb-12">
+  <main id="main" tabindex="-1" class="outline-none flex-1 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
     <router-outlet />
   </main>
 </div>
