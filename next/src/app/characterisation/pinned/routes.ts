@@ -91,15 +91,6 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/integration/connectors",
-      "title": "Connector Hub",
-      "pageKey": "connector-hub",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
       "path": "/pipelines",
       "title": "Pipelines",
       "pageKey": "tasks",
@@ -319,15 +310,6 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/data/catalog",
-      "title": "Data Catalog",
-      "pageKey": "data-catalog",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
       "path": "/data/analytics",
       "title": "Analytics Studio",
       "pageKey": "analytics",
@@ -358,24 +340,6 @@ export const PINNED: Record<string, unknown> = {
       "path": "/forms/submissions",
       "title": "Submissions",
       "pageKey": "form-submissions",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/workflows/inbox",
-      "title": "Task inbox",
-      "pageKey": "task-inbox",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/workflows/designer",
-      "title": "Workflow designer",
-      "pageKey": "workflow-designer",
       "guards": [
         "pageGuard"
       ],

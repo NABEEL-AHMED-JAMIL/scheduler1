@@ -128,8 +128,6 @@ export const routes: Routes = [
         data: { pageKey: 'sources' },
         canActivate: [pageGuard],
       },
-      comingSoon('integration/connectors', 'Connector Hub', 'connector-hub',
-        'Databases, SaaS apps and files, ready to connect and sync.'),
       // ---------------------------------------------------------------------------------------------
       // Pipelines (was Operations). Pipelines was Source Tasks, Schedules was Source Jobs, Executions
       // was Run history, Run analytics was Reports. Keys unchanged: tasks, jobs, jobs, reports.
@@ -333,8 +331,6 @@ export const routes: Routes = [
         data: { pageKey: 'ask-data' },
         canActivate: [pageGuard],
       },
-      comingSoon('data/catalog', 'Data Catalog', 'data-catalog',
-        'Every dataset, its owner, schema, freshness and sensitive fields.'),
       {
         // Open to TENANT_USER, like the file browser it reads from and for the same reason:
         // which connections a caller may reach is settled per request against each connection's
@@ -370,10 +366,6 @@ export const routes: Routes = [
         'Build forms and share them securely, inside the workspace or by an expiring link.'),
       comingSoon('forms/submissions', 'Submissions', 'form-submissions',
         'Everything a form collected, with its approval state.'),
-      comingSoon('workflows/inbox', 'Task inbox', 'task-inbox',
-        'The approvals and tasks waiting for you.'),
-      comingSoon('workflows/designer', 'Workflow designer', 'workflow-designer',
-        'Who approves what, in which order, and when a step is escalated.'),
       // ---------------------------------------------------------------------------------------------
       // AI (was Assistants)
       // ---------------------------------------------------------------------------------------------
