@@ -57,7 +57,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'document-review': 'Review queue',
   'ask-data': 'Ask your data',
   'data-catalog': 'Data Catalog',
-  'forms': 'Form builder',
+  'forms': 'All forms',
   'form-submissions': 'Submissions',
   'task-inbox': 'Task inbox',
   'workflow-designer': 'Workflow designer',

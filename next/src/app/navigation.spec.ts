@@ -323,7 +323,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     'Data › Saved Analyses -> /data/analytics/dashboards',
   ];
   const FORMS_AND_WORKFLOWS = [
-    'Forms › Form builder -> /forms/builder',
+    'Forms › All forms -> /forms/builder',
     'Forms › Submissions -> /forms/submissions',
   ];
   const CONFIGURATION = [

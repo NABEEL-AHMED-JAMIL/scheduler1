@@ -171,8 +171,8 @@ export class Shell {
     {
       label: 'Forms',
       children: [
-        { label: 'Form builder', path: '/forms/builder', pageKey: 'forms', icon: 'edit',
-          hint: 'Build forms your workspace fills in' },
+        { label: 'All forms', path: '/forms/builder', pageKey: 'forms', icon: 'edit',
+          hint: 'Fill in your workspace\'s forms; admins build them' },
         { label: 'Submissions', path: '/forms/submissions', pageKey: 'form-submissions', icon: 'table',
           hint: 'Everything collected, and the runs it started' },
       ],

@@ -329,7 +329,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/forms/builder",
-      "title": "Form builder",
+      "title": "Forms",
       "pageKey": "forms",
       "guards": [
         "pageGuard"

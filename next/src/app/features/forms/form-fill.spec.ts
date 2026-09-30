@@ -23,7 +23,7 @@ const FORM: FormSummary = { formId: 1000, name: 'Wound intake', description: 'Be
 
 function render(opts: { form?: FormSummary; submit?: unknown; fetchFails?: boolean } = {}) {
   const api = {
-    fetch: vi.fn(() => opts.fetchFails ? throwError(() => ({ status: 403, error: { message: 'Form builder is not part of your access.' } }))
+    fetch: vi.fn(() => opts.fetchFails ? throwError(() => ({ status: 403, error: { message: 'All forms is not part of your access.' } }))
       : of({ status: 'SUCCESS', message: '', data: opts.form ?? FORM })),
     submit: vi.fn(() => of(opts.submit ?? { status: 'SUCCESS', message: 'Thank you: your submission was received and started run #7331.',
       data: { submissionId: 5001, formId: 1000, formVersion: 2, status: 'RunStarted', jobQueueId: 7331, answers: {} } })),
@@ -106,6 +106,6 @@ describe('Form fill', () => {
     const { api, screen } = render({ form: { ...FORM, status: 'Draft' } });
     screen.send();
     expect(api.submit).not.toHaveBeenCalled();
-    expect(render({ fetchFails: true }).screen.error()).toBe('Form builder is not part of your access.');
+    expect(render({ fetchFails: true }).screen.error()).toBe('All forms is not part of your access.');
   });
 });

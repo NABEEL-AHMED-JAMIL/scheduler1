@@ -356,7 +356,7 @@ export const routes: Routes = [
         // Active forms; building them is a workspace administrator's (the page hides it from anyone else, and it is
         // read-only in a MANAGED workspace). Shared inside the workspace only: no public or expiring links yet.
         path: 'forms/builder',
-        title: 'Form builder',
+        title: 'Forms',
         loadComponent: () => import('./features/forms/form-builder').then(m => m.FormBuilder),
         data: { pageKey: 'forms' },
         canActivate: [pageGuard],
