@@ -13,7 +13,7 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
 const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const userToken = process.env['E2E_TENANT_USER_TOKEN'];
-const stamp = new Date().toISOString().slice(5, 16).replace(/[-:T]/g, '');
+const stamp = new Date().toISOString().slice(5, 19).replace(/[-:T]/g, '');
 const NAME = `E2E purchase ${stamp}`;
 const KEY = `e2e-purchase-${stamp}`;
 
@@ -62,6 +62,7 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await page.goto('/workflows/designer');
     await expect(page.getByRole('heading', { level: 1, name: 'Workflow designer' })).toBeVisible();
 
+    await expect(page.locator('[data-workflow]').first()).toBeVisible();
     await page.locator('[data-test="new-workflow"]').click();
     await page.getByLabel('Name', { exact: true }).fill(NAME);
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue(KEY);
@@ -121,7 +122,7 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
 
     // The designer is not Alex's page.
     await page.goto('/workflows/designer');
-    await expect(page.getByRole('heading', { level: 1, name: 'Workflow designer' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Workflow designer isn\'t part of your access' })).toBeVisible();
   });
 
   test('the administrator follows both in My requests', async ({ browser }) => {

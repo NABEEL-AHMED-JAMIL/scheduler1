@@ -45,23 +45,23 @@
         <h2 class="text-base font-semibold">New workflow</h2>
         <div>
           <label class="label" for="wf-name">Name</label>
-          <input id="wf-name" class="input" maxlength="200" [ngModel]="newName()" (ngModelChange)="nameChanged($event)" placeholder="Purchase approval" />
+          <input id="wf-name" class="input" maxlength="200" [value]="newName()" (input)="nameChanged($any($event.target).value)" placeholder="Purchase approval" />
         </div>
         <div class="grid gap-4 md:grid-cols-2">
           <div>
             <label class="label" for="wf-key">Key</label>
-            <input id="wf-key" class="input font-mono" maxlength="64" [ngModel]="newKey()" (ngModelChange)="newKey.set($event)" />
+            <input id="wf-key" class="input font-mono" maxlength="64" [value]="newKey()" (input)="newKey.set($any($event.target).value)" />
             <p class="text-xs text-[color:var(--text-muted)] mt-1">How other screens and the API name it. It cannot change later.</p>
           </div>
           <div>
             <label class="label" for="wf-subject">What it approves</label>
-            <input id="wf-subject" class="input" maxlength="64" [ngModel]="newSubject()" (ngModelChange)="newSubject.set($event)" />
+            <input id="wf-subject" class="input" maxlength="64" [value]="newSubject()" (input)="newSubject.set($any($event.target).value)" />
             <p class="text-xs text-[color:var(--text-muted)] mt-1">A word for the thing requested: request, purchase, form, dataset.</p>
           </div>
         </div>
         <div>
           <label class="label" for="wf-desc">Description</label>
-          <textarea id="wf-desc" class="input resize-y min-h-16" rows="2" maxlength="1000" [ngModel]="newDescription()" (ngModelChange)="newDescription.set($event)"></textarea>
+          <textarea id="wf-desc" class="input resize-y min-h-16" rows="2" maxlength="1000" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)"></textarea>
         </div>
         <div class="flex gap-2">
           <button type="button" class="btn btn-primary" [disabled]="!newName().trim() || !newKey().trim() || busy()" (click)="create()">Create and design</button>
