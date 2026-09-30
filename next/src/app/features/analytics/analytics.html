@@ -17,7 +17,7 @@
   <div class="grid gap-3">
 
     @if (panel()) {
-      <div class="fixed inset-0 z-50 bg-black/40" aria-hidden="true" (click)="panel() === 'files' ? closeFiles() : closeSaved()"></div>
+      <div class="fixed inset-0 z-50 bg-[color:var(--scrim)]" aria-hidden="true" (click)="panel() === 'files' ? closeFiles() : closeSaved()"></div>
     }
     <!-- ── the storage rail ─────────────────────────────────────────────────────────── -->
     <div id="files-panel" role="dialog" aria-modal="true" aria-labelledby="files-panel-title"
@@ -134,7 +134,7 @@
               <app-icon name="file" size="0.9em" class="icon-muted shrink-0" />
               <span class="truncate flex-1">{{ file.name }}</span>
               @if (file.size) {
-                <span class="mono text-[10px] text-[color:var(--text-muted)] shrink-0">
+                <span class="mono text-[11px] text-[color:var(--text-muted)] shrink-0">
                   {{ humanSize(file.size) }}
                 </span>
               }
@@ -270,7 +270,7 @@
          result that held one text box. The shared form-dialog shell, drawn in place so the name
          and the error stay on this screen's own signals. -->
     @if (saveDialogOpen()) {
-      <div class="fixed inset-0 z-[60] bg-black/40 grid place-items-center p-4"
+      <div class="fixed inset-0 z-[60] bg-[color:var(--scrim)] grid place-items-center p-4"
            (click)="$event.target === $event.currentTarget && closeSaveDialog()">
         <app-form-dialog role="dialog" aria-modal="true" aria-label="Save analysis"
                          heading="Save analysis"
@@ -433,7 +433,7 @@
                         (click)="showTab(item.id)">
                   {{ item.label }}
                   @if (item.id === 'quality' && qualityIssueCount()) {
-                    <span class="pill pill-warn text-[10px] px-1.5 py-0 leading-4" aria-hidden="true">{{ qualityIssueCount() }}</span>
+                    <span class="pill pill-warn text-[11px] px-1.5 py-0 leading-4" aria-hidden="true">{{ qualityIssueCount() }}</span>
                     <span class="sr-only">, {{ qualityIssueCount() }} to look at</span>
                   }
                 </button>
@@ -638,7 +638,7 @@
                     <td class="mono text-xs whitespace-nowrap max-w-64 truncate"
                         [title]="row.name">{{ row.name }}</td>
                     <td class="text-xs whitespace-nowrap">
-                      <span class="mono text-[10px] text-[color:var(--text-muted)] border
+                      <span class="mono text-[11px] text-[color:var(--text-muted)] border
                                    border-subtle rounded px-1"
                             [title]="row.type">{{ row.shortType }}</span>
                     </td>
@@ -1480,7 +1480,7 @@
                                          cells under it are written -- a number as a plain decimal
                                          and a DATE as a date -- so it belongs where a reader can
                                          check that decision. -->
-                                    <span class="mono text-[10px] text-[color:var(--text-muted)]">
+                                    <span class="mono text-[11px] text-[color:var(--text-muted)]">
                                       {{ shortType(column.type) }}
                                     </span>
                                   </th>
@@ -1965,7 +1965,7 @@
                           <button type="button" class="btn btn-ghost btn-xs"
                                   (click)="removeSaved(query)">Delete</button>
                         </div>
-                        <p class="mono text-[10px] text-[color:var(--text-muted)] truncate"
+                        <p class="mono text-[11px] text-[color:var(--text-muted)] truncate"
                            [title]="query.datasetPath">
                           {{ query.connectionAlias }}/{{ query.datasetPath }}
                         </p>

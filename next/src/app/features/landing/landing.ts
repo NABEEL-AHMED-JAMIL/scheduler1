@@ -16,6 +16,7 @@ import { ThemeService } from '../../core/theme.service';
 @Component({
   selector: 'app-landing',
   imports: [RouterLink, Icon, BrandMark, ConsolePreview],
+  styleUrls: ['./landing.tokens.css'],
   styles: [`
     :host { display: block; }
 
@@ -24,13 +25,17 @@ import { ThemeService } from '../../core/theme.service';
        would borrow whichever ground happened to sit behind it. */
     .hero {
       background:
-        radial-gradient(70rem 40rem at 12% -20%, rgb(79 70 229 / 0.55), transparent 62%),
-        radial-gradient(55rem 32rem at 88% 4%, rgb(56 189 248 / 0.20), transparent 60%),
-        linear-gradient(180deg, #141833 0%, #0f1220 100%);
-      color: #eef0fd;
+        radial-gradient(70rem 40rem at 12% -20%, color-mix(in srgb, var(--hero-glow-a) 55%, transparent), transparent 62%),
+        radial-gradient(55rem 32rem at 88% 4%, color-mix(in srgb, var(--hero-glow-b) 20%, transparent), transparent 60%),
+        linear-gradient(180deg, var(--hero-top) 0%, var(--hero-bottom) 100%);
+      color: var(--hero-fg);
     }
-    .hero-sub     { color: rgb(238 240 253 / 0.72); }
-    .hero-eyebrow { color: rgb(159 165 243 / 0.95); }
+    .hero-sub     { color: color-mix(in srgb, var(--hero-fg) 72%, transparent); }
+    .hero-eyebrow { color: color-mix(in srgb, var(--hero-eyebrow) 95%, transparent); }
+    /* A ghost button on the hero takes the hero's text colour, not the theme's. */
+    .hero .btn-ghost { color: inherit; }
+    .rise-late { animation-delay: .12s; }
+    .step-marker { background: var(--surface-raised); border: 1px solid var(--border-subtle); color: var(--accent-text); }
 
 
 
@@ -69,9 +74,8 @@ import { ThemeService } from '../../core/theme.service';
           <div class="mx-auto w-full max-w-6xl px-5 h-16 flex items-center gap-3">
             <app-brand-mark />
             <div class="ml-auto flex items-center gap-1.5">
-              <a routerLink="/docs" class="btn btn-ghost btn-sm hidden sm:inline-flex"
-                 style="color: inherit;">Setup guide</a>
-              <button type="button" class="btn btn-ghost btn-icon btn-sm" style="color: inherit;"
+              <a routerLink="/docs" class="btn btn-ghost btn-sm hidden sm:inline-flex">Setup guide</a>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm"
                       [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
                       (click)="theme.toggle()">
                 <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
@@ -118,7 +122,7 @@ import { ThemeService } from '../../core/theme.service';
 
           <!-- The preview is its own component: it is a small app in itself, with three views
                and their data, and the landing page should not carry that. -->
-          <div class="rise" style="animation-delay: .12s;" aria-hidden="true">
+          <div class="rise rise-late" aria-hidden="true">
             <app-console-preview />
           </div>
         </div>
@@ -160,9 +164,7 @@ import { ThemeService } from '../../core/theme.service';
           <ol class="mt-10 relative step-line grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
             @for (step of steps; track step.title; let i = $index) {
               <li class="relative">
-                <div class="size-[2.1rem] rounded-full grid place-items-center text-xs font-semibold relative z-10"
-                     style="background: var(--surface-raised); border: 1px solid var(--border-subtle);
-                            color: var(--accent-text);">
+                <div class="size-[2.1rem] rounded-full grid place-items-center text-xs font-semibold relative z-10 step-marker">
                   {{ i + 1 }}
                 </div>
                 <h3 class="mt-3.5 text-sm font-semibold">{{ step.title }}</h3>

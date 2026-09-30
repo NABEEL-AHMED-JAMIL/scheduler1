@@ -55,6 +55,22 @@ function code(f: Source): string {
 
 const lineAt = (text: string, index: number) => text.slice(0, index).split('\n').length;
 
+/**
+ * Token definition files under src/app: the only places, besides src/styles.css, where a literal
+ * colour may be written -- and there only as the value of a custom property.
+ */
+const TOKEN_FILES = [
+  // The landing hero and its console preview are one deep surface in both themes, so their
+  // palette cannot come from the theme tokens, which flip. Loaded by the landing page alone.
+  /^src\/app\/features\/landing\/landing\.tokens\.css$/,
+];
+
+/** A token file with its custom-property declarations blanked out: whatever is left is a rule. */
+function withoutTokenDefinitions(f: Source): Source {
+  if (!TOKEN_FILES.some(p => p.test(f.path))) return f;
+  return { path: f.path, text: f.text.replace(/--[\w-]+\s*:[^;]*;/g, m => m.replace(/[^\n]/g, ' ')) };
+}
+
 function offenders(files: Source[], pattern: RegExp, keep: (match: RegExpMatchArray, f: Source) => boolean = () => true): string[] {
   const off: string[] = [];
   for (const f of files) {
@@ -82,12 +98,12 @@ describe('design system', () => {
   describe('colour comes from a token', () => {
     it('has no hex colour in feature code', async () => {
       const { files } = await designSources();
-      expect(offenders(files, HEX)).toEqual([]);
+      expect(offenders(files.map(withoutTokenDefinitions), HEX)).toEqual([]);
     });
 
     it('has no rgb(), hsl() or other literal colour function in feature code', async () => {
       const { files } = await designSources();
-      expect(offenders(files, COLOUR_FN)).toEqual([]);
+      expect(offenders(files.map(withoutTokenDefinitions), COLOUR_FN)).toEqual([]);
     });
 
     it('has no raw Tailwind palette colour (red-500, gray-200, white, black) in feature code', async () => {
@@ -132,7 +148,7 @@ describe('design system', () => {
       const { files, css } = await designSources();
       const defined = new Set([...css.matchAll(/(--[\w-]+)\s*:/g)].map(m => m[1]));
       // Set by a component on its own element, not by the stylesheet.
-      for (const local of ['--tone', '--glow', '--data-text-lines', '--spinner-size', '--bar', '--accent']) defined.add(local);
+      for (const local of ['--data-text-lines', '--spinner-size']) defined.add(local);
       for (const f of files) for (const m of code(f).matchAll(/(--[\w-]+)\s*:/g)) defined.add(m[1]);
       const off = offenders(files, /var\((--[a-z][\w-]*[a-z0-9])\)/g, m => !defined.has(m[1]) && !/^--chart-$/.test(m[1]));
       expect(off).toEqual([]);
@@ -144,9 +160,10 @@ describe('design system', () => {
       const { files, css } = await designSources();
       const tooSmall = (value: string, unit: string) =>
         unit === 'px' ? Number(value) < 11 : unit === 'rem' ? Number(value) < 0.6875 : false;
-      const pattern = /(?:text-\[|font-size\s*[:=]\s*"?|\[style\.font-size\.(?:px|rem)\]="\s*)([\d.]+)(px|rem)?/g;
+      // A unitless font-size is an SVG attribute, in px; a unitless text-[...] is not a size.
+      const pattern = /(?:text-\[|font-size\s*[:=]\s*"?)([\d.]+)(px|rem|em)?/g;
       const off = offenders([...files, { path: 'src/styles.css', text: css }], pattern,
-        m => tooSmall(m[1], m[2] ?? 'px'));
+        m => m[0].startsWith('text-[') && !m[2] ? false : tooSmall(m[1], m[2] ?? 'px'));
       expect(off).toEqual([]);
     });
   });
@@ -173,8 +190,8 @@ describe('design system', () => {
      * zoom -- has no class to come from. A colour is allowed only where it IS data: a chart
      * series, whose colour is chosen per category by the caller.
      */
-    const GEOMETRY = /^(?:width|height|min-width|minWidth|max-width|maxWidth|max-height|maxHeight|min-height|left|top|right|bottom|transform|grid-template-columns)(?:\.(?:px|rem|%))?$/;
-    const DATA_COLOUR = /^(?:background|--tone)$/;
+    const GEOMETRY = /^(?:width|height|min-width|minWidth|max-width|maxWidth|max-height|maxHeight|min-height|left|top|right|bottom|transform|font-size)(?:\.(?:px|rem|%))?$/;
+    const DATA_COLOUR = /^background$/;
     /** Files whose colour bindings are a series colour passed in with the data. */
     const SERIES_COLOUR_FILES = [
       /^src\/app\/shared\/charts\//,              // every chart draws the caller's series colour

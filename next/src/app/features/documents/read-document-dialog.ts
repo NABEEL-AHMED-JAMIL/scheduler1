@@ -91,7 +91,7 @@ const STEPS: { id: Stage; label: string }[] = [
               <li class="flex items-center gap-2">
                 @switch (s.state) {
                   @case ('done') { <app-icon name="checkCircle" class="text-ok-500" /> }
-                  @case ('now') { <app-icon name="refresh" class="spin text-[color:var(--intent-info)]" /> }
+                  @case ('now') { <app-icon name="refresh" class="spin text-[color:var(--info-text)]" /> }
                   @case ('failed') { <app-icon name="xCircle" class="text-crit-500" /> }
                   @default { <app-icon name="clock" class="text-[color:var(--text-muted)]" /> }
                 }

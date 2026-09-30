@@ -33,8 +33,8 @@
             <span class="avatar-initials size-28 text-3xl mx-auto">{{ auth.initials() }}</span>
           }
           @if (uploading()) {
-            <span class="absolute inset-0 rounded-full grid place-items-center bg-black/55">
-              <app-icon name="refresh" class="spin text-white" size="1.4em" />
+            <span class="absolute inset-0 rounded-full grid place-items-center bg-[color:var(--scrim-strong)]">
+              <app-icon name="refresh" class="spin text-[color:var(--on-solid)]" size="1.4em" />
             </span>
           }
         </div>
@@ -233,7 +233,7 @@
           <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <!-- A link only when the access profile lets this person open Schedules. -->
             @if (canOpenJobs()) {
-              <a routerLink="/pipelines/schedules" class="group block rounded-[var(--radius-card)]">
+              <a routerLink="/pipelines/schedules" class="group block rounded-card">
                 <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
                                [foot]="activeJobs() + ' active'"
                                class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
@@ -250,7 +250,7 @@
                            [tone]="recentFailures() > 0 ? 'crit' : 'muted'"
                            [foot]="'in ' + windowDays() + ' days'"
                            [class.border-crit-500]="recentFailures() > 0" />
-            <a routerLink="/notifications" class="group block rounded-[var(--radius-card)]">
+            <a routerLink="/notifications" class="group block rounded-card">
               <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="info" foot="notifications"
                              class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
             </a>

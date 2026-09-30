@@ -76,23 +76,25 @@ export interface ViewerBox {
   `,
   styles: [`
     :host { display: block; min-width: 0; }
-    .page-viewer { display: flex; flex-direction: column; border: 1px solid var(--border-subtle); border-radius: 0.75rem;
+    .page-viewer { display: flex; flex-direction: column; border: 1px solid var(--border-subtle); border-radius: var(--radius-card);
       background: var(--surface-sunken); overflow: clip; }
     .page-viewer-bar { display: flex; align-items: center; gap: 0.25rem; padding: 0.375rem 0.5rem;
       border-bottom: 1px solid var(--border-subtle); background: var(--surface-raised); }
     .page-viewer-scroll { overflow: auto; max-height: min(78vh, 60rem); padding: 0.75rem; }
     .page-viewer-sheet { position: relative; margin: 0 auto; min-width: 100%; }
-    .page-viewer-image { display: block; width: 100%; height: auto; background: #fff; border-radius: 0.25rem;
-      box-shadow: 0 1px 3px rgb(0 0 0 / 0.14); }
+    /* The page is paper, white in both themes; the boxes over it are drawn for that ground. */
+    .page-viewer-image { display: block; width: 100%; height: auto; background: var(--paper); border-radius: var(--radius-sm);
+      box-shadow: 0 1px 3px var(--shadow-color); }
     .page-viewer-overlay { position: absolute; inset: 0; }
-    .doc-box { --glow: rgb(37 99 235 / 0.35); position: absolute; padding: 0; border: 1.5px solid #2563eb; background: rgb(37 99 235 / 0.1);
-      border-radius: 3px; cursor: pointer; transition: box-shadow 150ms, background 150ms; }
-    .doc-box-low { --glow: rgb(180 83 9 / 0.35); border-color: #b45309; background: rgb(180 83 9 / 0.12); }
-    .doc-box:hover { background: rgb(37 99 235 / 0.2); }
-    .doc-box-low:hover { background: rgb(180 83 9 / 0.22); }
-    .doc-box-active { border-width: 2.5px; background: rgb(37 99 235 / 0.22); z-index: 1; box-shadow: 0 0 0 4px var(--glow);
+    .doc-box { --box: var(--color-info-600); --glow: color-mix(in srgb, var(--box) 35%, transparent);
+      position: absolute; padding: 0; border: 1.5px solid var(--box); background: color-mix(in srgb, var(--box) 10%, transparent);
+      border-radius: var(--radius-sm); cursor: pointer; transition: box-shadow 150ms, background 150ms; }
+    .doc-box-low { --box: var(--color-warn-500); background: color-mix(in srgb, var(--box) 12%, transparent); }
+    .doc-box:hover { background: color-mix(in srgb, var(--box) 20%, transparent); }
+    .doc-box-low:hover { background: color-mix(in srgb, var(--box) 22%, transparent); }
+    .doc-box-active { border-width: 2.5px; background: color-mix(in srgb, var(--box) 22%, transparent); z-index: 1; box-shadow: 0 0 0 4px var(--glow);
       animation: doc-box-pulse 1.2s ease-out 2; }
-    .doc-box-low.doc-box-active { background: rgb(180 83 9 / 0.24); }
+    .doc-box-low.doc-box-active { background: color-mix(in srgb, var(--box) 24%, transparent); }
     .doc-box:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
     @keyframes doc-box-pulse { from { box-shadow: 0 0 0 12px var(--glow); } to { box-shadow: 0 0 0 4px var(--glow); } }
     @media (prefers-reduced-motion: reduce) { .doc-box-active { animation: none; } }

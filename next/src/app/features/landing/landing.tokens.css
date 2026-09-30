@@ -1,0 +1,36 @@
+/*
+ * The landing page's own palette -- a token definition file (MIG-257).
+ *
+ * The hero and the console preview on it are one deep surface in BOTH themes, so their colours
+ * cannot come from the theme tokens, which flip. They are named here instead, as custom
+ * properties only, and every rule in landing.ts and console-preview.ts reads them through var()
+ * or mixes them with color-mix(). design-system.spec.ts allows literal colours in this file only
+ * as custom-property values, the same rule it holds styles.css to.
+ *
+ * Loaded by the landing page's components alone, so none of it reaches the console's bundle.
+ */
+:host {
+  --hero-glow-a:  #4f46e5;
+  --hero-glow-b:  #38bdf8;
+  --hero-top:     #141833;
+  --hero-bottom:  #0f1220;
+  --hero-fg:      #eef0fd;
+  --hero-eyebrow: #9fa5f3;
+
+  --preview-panel:  #0f172a;
+  --preview-line:   #ffffff;
+  --preview-ink:    #eff6ff;
+  --preview-shadow: #000000;
+  --preview-accent: #bfdbfe;
+  --preview-edge:   #60a5fa;
+  --preview-run:    #2563eb;
+  --preview-bar:    #93c5fd;
+  --preview-ok:      #86efac;
+  --preview-ok-fill: #22c55e;
+  --preview-ok-bar:  #34d399;
+  --preview-fail:      #fda4af;
+  --preview-fail-fill: #f43f5e;
+  --preview-stop:      #fb7185;
+  --preview-warn:      #fcd34d;
+  --preview-warn-fill: #fbbf24;
+}

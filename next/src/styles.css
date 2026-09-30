@@ -80,10 +80,34 @@
   --color-crit-500: #bb2d48;
   --color-crit-400: #f2748c;
 
+  /* MIG-257: information, as its own hue. The one blue outside the charts -- the "edit" row
+     action -- was written as raw #2563eb/#93c5fd with no name, so nothing said it was a colour
+     with a job. It is Tailwind's blue ramp, named for that job; it is NOT the brand, which stays
+     monochrome (icon-info is still the brand ink). 600 is info text on white (5.17:1), 300 on
+     the dark card (9.6:1). */
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-300: #93c5fd;
+  --color-info-400: #60a5fa;
+  --color-info-500: #3b82f6;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
+  /* MIG-257: one radius scale. Tailwind's own sm/md/lg steps, restated so they are this system's
+     named steps rather than defaults that happen to be used, plus the card.
+       sm    4px  an inline mark -- code, a highlighted word, a thin bar, a heat cell
+       md    6px  a control -- button, input, segmented option, menu row
+       lg    8px  a menu, popover, panel, notice or inset group
+       card 10px  a card or tile
+       full       a pill, a dot, an avatar, a circle button */
+  --radius-sm:   0.25rem;
+  --radius-md:   0.375rem;
+  --radius-lg:   0.5rem;
   --radius-card: 0.625rem;
+  --radius-full: 9999px;
 
   /* The semantic roles, registered here so they become real utilities -- bg-raised,
      border-subtle, text-muted -- instead of being reached for as arbitrary values.
@@ -189,12 +213,43 @@
        dark brown. The same pair .text-warn-500 is remapped to. */
     --warn-text: var(--color-warn-600);
 
-    /* The one blue outside the charts: the "edit" row-action circle. Its hover ring, tint and
-       text as tokens, so the dark theme is a second set of values rather than a second rule. */
-    --intent-info:        #2563eb;
-    --intent-info-strong: #1d4ed8;
-    --intent-info-ring:   #2563eb;
-    --intent-info-soft:   color-mix(in oklab, #3b82f6 12%, var(--surface-raised));
+    /* The semantic families as TEXT on a surface. --ok-text and --crit-text were read by the
+       comparison widget's delta and never defined, so an up or down change printed in the
+       inherited colour (MIG-257). */
+    --ok-text:   var(--color-ok-500);
+    --crit-text: var(--color-crit-500);
+    /* ...and as a tint behind that text: a row action's hover. */
+    --ok-soft:   var(--color-ok-100);
+    --crit-soft: var(--color-crit-100);
+
+    /* Information: the one blue outside the charts -- the "edit" row-action circle. Text, the
+       stronger hover text, the ring and the soft tint, so the dark theme is a second set of
+       values rather than a second rule. */
+    --info-text:        var(--color-info-600);
+    --info-text-strong: var(--color-info-700);
+    --info-mark:        var(--color-info-600);
+    --info-soft:        color-mix(in oklab, var(--color-info-500) 12%, var(--surface-raised));
+
+    /* Text on a filled semantic colour -- a solid pill, the danger button, the bell's count. */
+    --on-solid: #ffffff;
+    /* The same, at half strength: a footnote on the always-dark sign-in panel. */
+    --on-solid-dim: rgb(255 255 255 / 0.5);
+    --btn-danger-bg: var(--color-crit-500);
+    --btn-danger-fg: var(--on-solid);
+
+    /* A read-along highlighter is dark ink on yellow in both themes -- inverting it for dark
+       mode would make the one thing meant to draw the eye the dimmest thing on the line. */
+    --highlight:         #fde047;
+    --highlight-fg:      #1c1917;
+    --highlight-passage: color-mix(in srgb, var(--highlight) 14%, transparent);
+
+    /* Paper: a scanned page, a QR code or a rendered PDF is white in both themes, because that
+       is what it is. Not --surface-raised, which turns navy in dark. */
+    --paper: #ffffff;
+    /* The dim laid over content under a modal-ish overlay, and the drop shadow of a panel. */
+    --scrim:        rgb(0 0 0 / 0.4);
+    --scrim-strong: rgb(0 0 0 / 0.55);
+    --shadow-color: rgb(0 0 0 / 0.18);
 
     /* The pill family. neutral and brand are a binary in several places -- kafka-tls-section
        swaps one class for the other to mean off/on -- so they must never share a background.
@@ -206,6 +261,28 @@
     --pill-brand-bg:       var(--color-ink-200);
     --pill-brand-fg:       var(--color-ink-900);
     --pill-brand-border:   var(--color-ink-400);
+    /* The soft tones. warn-500 on warn-100 measures 4.47:1 -- under the line -- so the warn
+       pill's text is warn-600. */
+    --pill-ok-bg:          var(--color-ok-100);
+    --pill-ok-fg:          var(--color-ok-500);
+    --pill-warn-bg:        var(--color-warn-100);
+    --pill-warn-fg:        var(--color-warn-600);
+    --pill-crit-bg:        var(--color-crit-100);
+    --pill-crit-fg:        var(--color-crit-500);
+    --pill-info-bg:        var(--color-info-100);
+    --pill-info-fg:        var(--color-info-700);
+    /* Filled chips separate the second status in a family from the first: Running from Start,
+       Failed from Interrupt, Missed from Skip. White on each clears 4.5:1. */
+    --pill-solid-brand-bg:   var(--btn-primary-bg);
+    --pill-solid-brand-fg:   var(--btn-primary-fg);
+    --pill-solid-ok-bg:      var(--color-ok-500);
+    --pill-solid-ok-fg:      var(--on-solid);
+    --pill-solid-warn-bg:    var(--color-warn-600);
+    --pill-solid-warn-fg:    var(--on-solid);
+    --pill-solid-crit-bg:    var(--color-crit-500);
+    --pill-solid-crit-fg:    var(--on-solid);
+    --pill-solid-neutral-bg: var(--color-ink-600);
+    --pill-solid-neutral-fg: var(--on-solid);
   }
 
   html.dark {
@@ -276,10 +353,18 @@
 
     --warn-text: var(--color-warn-400);
 
-    --intent-info:        #93c5fd;
-    --intent-info-strong: #bfdbfe;
-    --intent-info-ring:   #60a5fa;
-    --intent-info-soft:   color-mix(in oklab, #60a5fa 18%, transparent);
+    --ok-text:   var(--color-ok-400);
+    --crit-text: var(--color-crit-400);
+    --ok-soft:   color-mix(in oklab, var(--color-ok-500) 18%, transparent);
+    --crit-soft: color-mix(in oklab, var(--color-crit-500) 18%, transparent);
+
+    --info-text:        var(--color-info-300);
+    --info-text-strong: var(--color-info-200);
+    --info-mark:        var(--color-info-400);
+    --info-soft:        color-mix(in oklab, var(--color-info-400) 18%, transparent);
+
+    --highlight: #facc15;
+    --highlight-passage: color-mix(in srgb, var(--highlight) 16%, transparent);
 
     /* Same pair, inverted. neutral used --surface-sunken here, which on this theme is the page
        colour itself, so a neutral pill had no chip shape at all -- it was text on the page.
@@ -289,6 +374,32 @@
     --pill-brand-bg:       var(--color-ink-700);
     --pill-brand-fg:       var(--color-ink-50);
     --pill-brand-border:   var(--color-ink-500);
+    --pill-ok-bg:          color-mix(in oklab, var(--color-ok-500) 22%, transparent);
+    --pill-ok-fg:          var(--color-ok-400);
+    --pill-warn-bg:        color-mix(in oklab, var(--color-warn-500) 22%, transparent);
+    --pill-warn-fg:        var(--color-warn-400);
+    --pill-crit-bg:        color-mix(in oklab, var(--color-crit-500) 22%, transparent);
+    --pill-crit-fg:        var(--color-crit-400);
+    --pill-info-bg:        color-mix(in oklab, var(--color-info-500) 22%, transparent);
+    --pill-info-fg:        var(--color-info-300);
+    /* Dark keeps the filled chips filled -- that contrast against the soft ones is the whole
+       point -- but lifts each fill so it reads against a navy row rather than sinking into it,
+       with near-black text of the same hue on it.
+
+       Brand is inverted, for the same reason the primary button is: brand-500 is a near-black,
+       which collides exactly with .pill-neutral's dark background -- Running would have been
+       indistinguishable from a neutral chip beside it. ink-300 keeps the "filled, louder than
+       its soft partner" relationship without going full white. */
+    --pill-solid-brand-bg:   var(--color-ink-300);
+    --pill-solid-brand-fg:   var(--color-ink-950);
+    --pill-solid-ok-bg:      var(--color-ok-400);
+    --pill-solid-ok-fg:      #05200f;
+    --pill-solid-warn-bg:    var(--color-warn-400);
+    --pill-solid-warn-fg:    #241202;
+    --pill-solid-crit-bg:    #d24a63;
+    --pill-solid-crit-fg:    #1a0508;
+    --pill-solid-neutral-bg: var(--color-ink-400);
+    --pill-solid-neutral-fg: #0b0e17;
   }
 
   html, body {
@@ -325,7 +436,7 @@
   :focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
-    border-radius: 3px;
+    border-radius: var(--radius-sm);
   }
 }
 
@@ -391,7 +502,9 @@
            hover:text-[color:var(--text-primary)];
   }
   .btn-danger {
-    @apply bg-crit-500 text-white hover:brightness-110;
+    background: var(--btn-danger-bg);
+    color: var(--btn-danger-fg);
+    @apply hover:brightness-110;
   }
   .btn-sm { @apply px-2.5 py-1 text-xs; }
   /* For a panel toolbar, where btn-sm still wraps onto a second row. */
@@ -412,11 +525,6 @@
     background: var(--surface-sunken);
   }
   .btn-circle:disabled { @apply opacity-40 cursor-not-allowed; }
-  .btn-circle-danger:hover:not(:disabled) {
-    border-color: var(--color-crit-500);
-    color: var(--color-crit-500);
-  }
-  html.dark .btn-circle-danger:hover:not(:disabled) { color: var(--color-crit-400); }
   .btn-icon { @apply px-2 py-1.5; }
 
   /* KPI tiles were p-3.5 while every other card was p-4 -- a 2px difference that reads as
@@ -425,7 +533,7 @@
     background: var(--surface-raised);
     border-color: var(--border-subtle);
     container-type: inline-size;
-    @apply border rounded-[var(--radius-card)] p-4;
+    @apply border rounded-card p-4;
   }
   .stat-label { @apply text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]; }
   /* Sized to the tile, not the page: a long figure such as 103,909,527.58 has nowhere to break,
@@ -470,7 +578,7 @@
   .stat-strip.is-md .stat-strip-value { font-size: 1.125rem; }
   .stat-strip-value.is-quiet { color: var(--text-muted); }
   .stat-strip-label {
-    font-size: 10px; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.025em;
+    font-size: 11px; line-height: 1.25; text-transform: uppercase; letter-spacing: 0.025em;
     color: var(--text-muted); overflow-wrap: anywhere;
   }
   .stat-strip-foot { font-size: 11px; line-height: 1.25; color: var(--text-muted); overflow-wrap: anywhere; }
@@ -528,13 +636,6 @@
     max-height: max(20rem, calc(100dvh - 13rem));
     @apply overflow-auto;
   }
-  /* The same problem for the Document Converter's folder picker, which is a wrapping row of
-     buttons rather than a table: etl-avatar lists one folder per user id, so a level could run
-     to hundreds of buttons and push Supported formats and Recent conversions off the screen. */
-  .folder-picker {
-    max-height: 13rem;
-    @apply overflow-y-auto;
-  }
   .scroll-table thead th {
     position: sticky;
     top: 0;
@@ -585,26 +686,20 @@
      the one thing meant to draw the eye the dimmest thing on the line. The surrounding text is
      light there, so the mark pops rather than clashing. */
   .read-mark {
-    background: #fde047;
-    color: #1c1917;
+    background: var(--highlight);
+    color: var(--highlight-fg);
     /* Cloned so a word broken across two lines is boxed on both, instead of the second half
        losing its background entirely. */
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
-    @apply rounded-[3px] px-px;
+    @apply rounded-sm px-px;
   }
-  html.dark .read-mark { background: #facc15; }
 
   /* The passage being read, tinted so it stays findable in the gap between words and while
      paused -- the mark alone disappears at both. Kept faint: it is a place-keeper, not a
      second highlight competing with the first. */
-  .ts-reading { background: color-mix(in srgb, #fde047 14%, transparent); }
-  html.dark .ts-reading { background: color-mix(in srgb, #facc15 16%, transparent); }
-  tr.ts-reading > td { background: color-mix(in srgb, #fde047 14%, transparent); }
-  html.dark tr.ts-reading > td { background: color-mix(in srgb, #facc15 16%, transparent); }
+  .ts-reading, tr.ts-reading > td { background: var(--highlight-passage); }
 
-  .upload-row { @apply flex flex-wrap items-center gap-2; }
-  .upload-row input[type="file"] { @apply flex-1 min-w-48 text-xs py-1; }
 
   /* Inline instructions: a short procedure, not a wall of prose. */
   .guide {
@@ -628,11 +723,6 @@
     background: var(--surface-raised);
     @apply rounded px-1 py-0.5 font-mono text-[11px];
   }
-  .guide-note {
-    @apply flex items-start gap-1.5 mt-3 pt-3 border-t text-[11px] leading-relaxed;
-    border-color: var(--border-subtle);
-    color: var(--text-muted);
-  }
 
   /* Segmented control: one control with three states rather than three buttons that happen
      to be adjacent, so the current view is unambiguous. */
@@ -651,10 +741,9 @@
   .seg-btn:disabled { @apply opacity-40 cursor-not-allowed; }
   .seg-on {
     background: var(--surface-raised);
-    color: var(--color-brand-600);
+    color: var(--accent-text);
     @apply shadow-sm;
   }
-  html.dark .seg-on { color: var(--accent-text); }
   /* A segmented control with more options than a phone's width holds wraps onto a second row (MIG-253). */
   .seg-wrap .seg { flex-wrap: wrap; }
 
@@ -740,7 +829,6 @@
     color: var(--accent-text);
     @apply inline-flex items-center gap-1 hover:underline;
   }
-  html.dark .link-inline { color: var(--accent-text); }
 
   .stat-glyph {
     background: var(--surface-sunken);
@@ -763,7 +851,7 @@
   .card {
     background: var(--surface-raised);
     border-color: var(--border-strong);
-    @apply border rounded-[var(--radius-card)];
+    @apply border rounded-card;
   }
 
   /*
@@ -936,19 +1024,18 @@
     color: var(--pill-brand-fg);
     border-color: var(--pill-brand-border);
   }
-  .pill-ok      { @apply bg-ok-100 text-ok-500; }
-  /* warn-500 on warn-100 measures 4.47:1 -- the one pill under the line. */
-  .pill-warn    { @apply bg-warn-100; color: var(--color-warn-600); }
-  .pill-crit    { @apply bg-crit-100 text-crit-500; }
-  /* Filled chips separate the second status in a family from the first: Running from Start,
-     Failed from Interrupt, Missed from Skip. White text on each of these measures 6.29, 5.86
-     and 7.63 against white, so all three clear 4.5 for small text. */
-  /* The primary button's own inversion: a near-black chip on the dark card had no edge. */
-  .pill-solid-brand { background: var(--btn-primary-bg); color: var(--btn-primary-fg); }
-  .pill-solid-crit  { background: var(--color-crit-500);  color: #ffffff; }
-  .pill-solid-warn  { background: var(--color-warn-600);  color: #ffffff; }
-  .pill-solid-ok    { background: var(--color-ok-500);    color: #ffffff; }
-  .pill-solid-neutral { background: var(--color-ink-600); color: #ffffff; }
+  /* Every tone reads its pair from the --pill-* tokens, so the dark theme is a second set of
+     values in html.dark rather than a second set of rules (MIG-257). contrast.spec.ts measures
+     each pair in both themes. */
+  .pill-ok      { background: var(--pill-ok-bg);   color: var(--pill-ok-fg); }
+  .pill-warn    { background: var(--pill-warn-bg); color: var(--pill-warn-fg); }
+  .pill-crit    { background: var(--pill-crit-bg); color: var(--pill-crit-fg); }
+  .pill-info    { background: var(--pill-info-bg); color: var(--pill-info-fg); }
+  .pill-solid-brand   { background: var(--pill-solid-brand-bg);   color: var(--pill-solid-brand-fg); }
+  .pill-solid-crit    { background: var(--pill-solid-crit-bg);    color: var(--pill-solid-crit-fg); }
+  .pill-solid-warn    { background: var(--pill-solid-warn-bg);    color: var(--pill-solid-warn-fg); }
+  .pill-solid-ok      { background: var(--pill-solid-ok-bg);      color: var(--pill-solid-ok-fg); }
+  .pill-solid-neutral { background: var(--pill-solid-neutral-bg); color: var(--pill-solid-neutral-fg); }
 
   /* The quiet form of a status: a dot and plain text, for a column where one value is the
      norm. It has to still read as a status, so the dot keeps the tone's colour. */
@@ -957,9 +1044,8 @@
     color: var(--text-secondary);
   }
   .status-dot { @apply w-1.5 h-1.5 rounded-full shrink-0; }
-  .dot-ok      { background: var(--color-ok-500); }
+  .dot-ok      { background: var(--ok-text); }
   .dot-neutral { background: var(--color-ink-400); }
-  html.dark .dot-ok      { background: var(--color-ok-400); }
   html.dark .dot-neutral { background: var(--color-ink-500); }
 
   /* Tabs share the pill vocabulary rather than inventing a third selected-state look. */
@@ -1043,7 +1129,7 @@
     background: var(--surface-sunken);
     border-color: var(--border-subtle);
     @apply flex items-center justify-between gap-2 border-b px-2 py-1
-           text-[10px] uppercase tracking-wide text-[color:var(--text-muted)];
+           text-[11px] uppercase tracking-wide text-[color:var(--text-muted)];
   }
   .md-code pre {
     background: var(--surface-raised);
@@ -1198,7 +1284,7 @@
     opacity: 0;
     background: linear-gradient(90deg, var(--accent-mark), var(--accent-mark-strong));
     box-shadow: 0 0 10px color-mix(in oklab, var(--accent-mark) 65%, transparent);
-    border-radius: 0 2px 2px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
     transition: width 220ms ease-out, opacity 300ms ease;
     will-change: width, opacity;
   }
@@ -1212,23 +1298,8 @@
   .mono { font-family: var(--font-mono); @apply text-xs; }
 }
 
-/* .pill-brand and .pill-neutral are theme-aware through their own tokens now, so the
-   hand-written dark override they used to need is gone. */
-html.dark .pill-ok    { background: color-mix(in oklab, var(--color-ok-500) 22%, transparent); @apply text-ok-400; }
-html.dark .pill-warn  { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); @apply text-warn-400; }
-html.dark .pill-crit  { background: color-mix(in oklab, var(--color-crit-500) 22%, transparent); @apply text-crit-400; }
-/* Dark keeps the filled chips filled -- that contrast against the soft ones is the whole
-   point -- but lifts each fill so it reads against a navy row rather than sinking into it. */
-/* Inverted on this theme, for the same reason the primary button is: brand-500 is a
-   near-black, which now collides exactly with .pill-neutral's dark background (both ink-800)
-   -- Running would have been indistinguishable from a neutral chip beside it. ink-300 keeps
-   the "filled, louder than its soft partner" relationship without going full white, which is
-   too loud for a status in a dense table. */
-html.dark .pill-solid-brand { background: var(--color-ink-300); color: var(--color-ink-950); }
-html.dark .pill-solid-crit  { background: #d24a63; color: #1a0508; }
-html.dark .pill-solid-warn  { background: var(--color-warn-400); color: #241202; }
-html.dark .pill-solid-ok    { background: var(--color-ok-400); color: #05200f; }
-html.dark .pill-solid-neutral { background: var(--color-ink-400); color: #0b0e17; }
+/* Every pill is theme-aware through its own --pill-* tokens now (MIG-257), so the hand-written
+   dark overrides the tones used to need are gone. */
 
 /* The -500/-600 semantic steps are mixed for white surfaces. Used as foreground on a dark
    one they fall to 2.2-3.4:1 -- "Expired" in warn-500 and topic names in brand-600 were the
@@ -1238,31 +1309,19 @@ html.dark .pill-solid-neutral { background: var(--color-ink-400); color: #0b0e17
    against its own light background and is unaffected by this. */
 html:not(.dark) .text-warn-500 { color: var(--color-warn-600); }
 
-html.dark .text-brand-500,
-html.dark .text-brand-600,
-html.dark .text-brand-700 { color: var(--accent-text); }
 html.dark .text-ok-500    { color: var(--color-ok-400); }
 html.dark .text-warn-500  { color: var(--color-warn-400); }
 html.dark .text-crit-500  { color: var(--color-crit-400); }
 
-html.dark .icon-ok   { color: var(--color-ok-400); }
 html.dark .icon-warn { color: var(--color-warn-400); }
-html.dark .icon-crit { color: var(--color-crit-400); }
 html.dark .icon-info { color: var(--accent-text); }
 
 /* The calendar/clock glyph inside a date or time field is drawn by the browser in near-black
    and ignores currentColor, so on the dark theme it sat invisible against the field. */
 html.dark .input::-webkit-calendar-picker-indicator { filter: invert(1); }
-html.dark .nav-child-active { color: var(--accent-text); }
-html.dark .nav-child:hover .nav-child-icon,
-html.dark .nav-child-active .nav-child-icon { color: var(--accent-text); }
 
 html.dark .btn-intent-warn:hover app-icon,
 html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
-html.dark .btn-intent-ok:hover app-icon,
-html.dark .btn-intent-ok:focus app-icon { color: var(--color-ok-400); }
-html.dark .btn-intent-crit:hover app-icon,
-html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
 
 @layer components {
   /* Icons sit inline with the label at a consistent gap, so a button with one and a button
@@ -1286,14 +1345,31 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   .btn-intent-warn:focus app-icon { color: var(--color-warn-500); opacity: 1; }
   .btn-intent-ok:hover app-icon,
   .btn-intent-ok:focus-visible app-icon,
-  .btn-intent-ok:focus app-icon { color: var(--color-ok-500); opacity: 1; }
+  .btn-intent-ok:focus app-icon { color: var(--ok-text); opacity: 1; }
   .btn-intent-crit:hover app-icon,
   .btn-intent-crit:focus-visible app-icon,
-  .btn-intent-crit:focus app-icon { color: var(--color-crit-500); opacity: 1; }
+  .btn-intent-crit:focus app-icon { color: var(--crit-text); opacity: 1; }
 
-  .icon-ok    { color: var(--color-ok-500); }
+  /* A tone as a class (MIG-257): the tone-* class sets --tone from a token, and tone-fill,
+     tone-text, tone-ring or tone-edge paints it. Replaces per-row [style.background] bindings;
+     see shared/ui/tone.ts. */
+  .tone-ok      { --tone: var(--color-ok-500); }
+  .tone-warn    { --tone: var(--color-warn-500); }
+  .tone-crit    { --tone: var(--color-crit-500); }
+  .tone-brand   { --tone: var(--accent-mark); }
+  .tone-pending { --tone: var(--series-warn); }
+  .tone-log     { --tone: var(--color-ink-400); }
+  .tone-muted   { --tone: var(--text-muted); }
+  .tone-strong  { --tone: var(--border-strong); }
+  .tone-quiet   { --tone: var(--border-subtle); }
+  .tone-fill { background: var(--tone); }
+  .tone-text { color: var(--tone); }
+  .tone-ring { box-shadow: 0 0 0 2px var(--tone); }
+  .tone-edge { border-left-color: var(--tone); }
+
+  .icon-ok    { color: var(--ok-text); }
   .icon-warn  { color: var(--color-warn-500); }
-  .icon-crit  { color: var(--color-crit-500); }
+  .icon-crit  { color: var(--crit-text); }
   .icon-info  { color: var(--color-brand-500); }
   .icon-muted { color: var(--text-muted); }
 
@@ -1308,13 +1384,13 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   .nav-child:hover .nav-child-icon { color: var(--accent-text); }
   .nav-child-active {
     background: var(--surface-sunken);
-    @apply text-brand-600;
+    color: var(--accent-text);
   }
   .nav-child-active .nav-child-icon { color: var(--accent-text); }
 
   /* Compact key/value pairs for the context panels. */
   .detail-head {
-    @apply text-[10px] font-semibold uppercase tracking-wider mb-1.5
+    @apply text-[11px] font-semibold uppercase tracking-wider mb-1.5
            text-[color:var(--text-muted)];
   }
   .detail-list { @apply grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs items-baseline; }
@@ -1352,7 +1428,9 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
 
   .bell-badge {
     @apply absolute -top-0.5 -right-0.5 min-w-4 h-4 px-1 rounded-full
-           bg-crit-500 text-white text-[10px] font-semibold leading-4 text-center;
+           text-[11px] font-semibold leading-4 text-center;
+    background: var(--btn-danger-bg);
+    color: var(--on-solid);
   }
 
   .notify-row {
@@ -1361,7 +1439,7 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
   }
 
   .menu-item {
-    @apply w-full text-left px-3 py-1.5 rounded-sm inline-flex items-center gap-2
+    @apply w-full text-left px-3 py-1.5 rounded-md inline-flex items-center gap-2
            text-[color:var(--text-secondary)]
            hover:bg-[color:var(--surface-sunken)] hover:text-[color:var(--text-primary)]
            focus:bg-[color:var(--surface-sunken)] focus:outline-none;
@@ -1379,7 +1457,9 @@ html.dark .btn-intent-crit:focus app-icon { color: var(--color-crit-400); }
      settles it by taking the available width. That is why row menus rendered 500-718px wide
      instead of hugging their labels. max-content breaks the cycle, leaving min-w-* as the
      floor and the longest label as the width. */
-  .cdk-menu { width: max-content; max-width: min(22rem, calc(100vw - 2rem)); }
+  /* A menu is on the lg step of the radius scale, like the top bar's dropdowns (MIG-257): row
+     menus are drawn with .card, whose card radius read as a different component beside them. */
+  .cdk-menu { width: max-content; max-width: min(22rem, calc(100vw - 2rem)); border-radius: var(--radius-lg); }
 }
 
 /*
@@ -1658,7 +1738,7 @@ html.dark {
   .data-text-more {
     flex: none;
     font-family: var(--font-sans, inherit);
-    font-size: 10px;
+    font-size: 11px;
     line-height: inherit;
     white-space: nowrap;
     color: var(--accent-text);
@@ -1727,7 +1807,7 @@ html.dark {
 /* Band one: the menu sections. A hairline under the whole row, blank left cells included. */
 .access-grid .access-grid-head-sections th {
   height: 1.9rem; padding: 0 0.5rem; border-bottom: 1px solid var(--border-subtle);
-  font-size: 10px; letter-spacing: .1em; color: var(--text-muted);
+  font-size: 11px; letter-spacing: .1em; color: var(--text-muted);
 }
 .access-grid .access-grid-section { text-align: center; border-left: 1px solid var(--border-subtle); }
 /* Band two: every column's name, one height, labels allowed two lines. */
@@ -1747,7 +1827,7 @@ html.dark {
 .access-cell-exception { background: color-mix(in oklab, var(--color-warn-500) 10%, transparent); }
 .access-exception-dot { display: inline-block; width: 0.45rem; height: 0.45rem; border-radius: 999px; background: var(--color-warn-500); }
 .access-cell .access-exception-dot { position: absolute; top: 0.45rem; right: 0.6rem; }
-.access-mark { display: inline-flex; align-items: center; justify-content: center; width: 1.35rem; height: 1.35rem; border-radius: 0.375rem; }
+.access-mark { display: inline-flex; align-items: center; justify-content: center; width: 1.35rem; height: 1.35rem; border-radius: var(--radius-md); }
 .access-mark-on  { background: var(--color-ok-100); color: var(--color-ok-500); }
 .access-mark-off { background: transparent; color: var(--border-strong); }
 .access-legend-sample { pointer-events: none; }
@@ -1763,7 +1843,7 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
 /* Kafka profile environment chip: a small "env" key before the value, so a coloured word under
    a profile name reads as "environment: prod" rather than as a status. */
 .env-pill { text-transform: none; }
-.env-pill .env-pill-k { font-size: 9px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-right: 0.1rem; }
+.env-pill .env-pill-k { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-right: 0.1rem; }
 
 /* A key/value cell (Kafka's profile and topic rows): the text takes the room, icons never wrap under it. */
 .lookup-value { display: flex; align-items: center; gap: 0.35rem; min-width: 0; }
@@ -1783,13 +1863,13 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
   position: sticky; top: calc(3.5rem + 1px); align-self: start; max-height: calc(100vh - 3.5rem - 1px); }
 .lookup-rail-tools { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle); }
 .lookup-rail-list { list-style: none; margin: 0; padding: 0.375rem; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
-.lookup-rail-item { width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: 0.5rem; text-align: left; color: var(--text-primary); }
+.lookup-rail-item { width: 100%; display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: var(--radius-lg); text-align: left; color: var(--text-primary); }
 .lookup-rail-item:hover { background: var(--surface-sunken); }
 .lookup-rail-item:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 .lookup-rail-item.is-selected { background: var(--pill-brand-bg); }
 .lookup-rail-item.is-selected .lookup-rail-key { color: var(--pill-brand-fg); }
 .lookup-rail-item.is-selected .lookup-rail-chev { opacity: 1; }
-.lookup-rail-glyph { flex: none; width: 1.75rem; height: 1.75rem; border-radius: 0.45rem; display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--text-muted); }
+.lookup-rail-glyph { flex: none; width: 1.75rem; height: 1.75rem; border-radius: var(--radius-md); display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--text-muted); }
 .lookup-rail-glyph.is-list { background: var(--pill-brand-bg); color: var(--pill-brand-fg); }
 .lookup-rail-glyph.is-managed { background: var(--color-warn-100); color: var(--color-warn-600); }
 html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--color-warn-500) 22%, transparent); color: var(--color-warn-400); }
@@ -1832,26 +1912,19 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .kafka-rail-dot.ok { background: var(--color-ok-500); }
 .kafka-rail-dot.crit { background: var(--color-crit-500); }
 .kafka-rail-env { font-weight: 600; }
-.kafka-rail-env-crit { color: var(--color-crit-500); }
+.kafka-rail-env-crit { color: var(--crit-text); }
 .kafka-rail-env-warn { color: var(--warn-text); }
-html.dark .kafka-rail-env-crit { color: var(--color-crit-400); }
 .kafka-test-ok { background: color-mix(in oklab, var(--color-ok-500) 7%, var(--surface-inset)); }
 .kafka-test-crit { background: color-mix(in oklab, var(--color-crit-500) 8%, var(--surface-inset)); }
-.kafka-detail-section { padding: 1rem 1.25rem; min-width: 0; }
-.kafka-detail-section + .kafka-detail-section { border-left: 1px solid var(--border-subtle); }
-.kafka-detail-section .section-title { margin: 0 0 0.6rem; }
 .kafka-dl { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.5rem 0.75rem; font-size: 13px; margin: 0; }
 .kafka-dl dt { color: var(--text-muted); font-size: 12px; padding-top: 0.1rem; }
 .kafka-dl dd { margin: 0; min-width: 0; }
-.kafka-props { margin: 0; font-family: var(--font-mono); font-size: 11px; background: var(--surface-sunken); border-radius: 0.375rem; padding: 0.5rem 0.6rem; white-space: pre-wrap; word-break: break-all; }
-@media (max-width: 900px) {
-  .kafka-detail-section + .kafka-detail-section { border-left: 0; border-top: 1px solid var(--border-subtle); }
-}
+.kafka-props { margin: 0; font-family: var(--font-mono); font-size: 11px; background: var(--surface-sunken); border-radius: var(--radius-md); padding: 0.5rem 0.6rem; white-space: pre-wrap; word-break: break-all; }
 .kafka-topics { padding-top: 0.75rem; }
 .kafka-topics .lookup-entries-head { padding-right: 1rem; }
 
 /* A pipeline card's full field list, opened from the "+n more" pill. */
-.pipeline-fields { list-style: none; margin: 0.25rem 0 0; padding: 0; border: 1px solid var(--border-subtle); border-radius: 0.5rem; max-height: 16rem; overflow-y: auto; font-size: 12px; }
+.pipeline-fields { list-style: none; margin: 0.25rem 0 0; padding: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); max-height: 16rem; overflow-y: auto; font-size: 12px; }
 .pipeline-fields li { display: grid; grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr) auto; gap: 0.5rem; align-items: baseline; padding: 0.35rem 0.6rem; border-top: 1px solid var(--border-subtle); }
 .pipeline-fields li:first-child { border-top: 0; }
 .pipeline-fields .mono { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1861,7 +1934,7 @@ html.dark .kafka-rail-env-crit { color: var(--color-crit-400); }
 /* The Kafka pane's summary strip: last test on one line, brokers and security on the next. */
 .kafka-strip { padding: 0.6rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-inset); display: flex; flex-direction: column; gap: 0.4rem; font-size: 13px; }
 .kafka-strip-row { display: flex; align-items: center; gap: 0.6rem; min-width: 0; flex-wrap: wrap; }
-.kafka-strip-k { flex: none; width: 4.5rem; font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
+.kafka-strip-k { flex: none; width: 4.5rem; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); }
 .kafka-strip-dot { flex: none; width: 0.55rem; height: 0.55rem; border-radius: 999px; background: var(--border-strong); }
 .kafka-strip-dot.ok { background: var(--color-ok-500); }
 .kafka-strip-dot.crit { background: var(--color-crit-500); }
@@ -1872,22 +1945,18 @@ html.dark .kafka-rail-env-crit { color: var(--color-crit-400); }
 /* A topic row's unfolded pipelines: name, id, size -- each line a link to the Pipelines page. */
 
 /* The pipeline's public id beside its name: a chip in mono, dark enough to read at a glance. */
-.pipeline-id-chip { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 1.5; padding: 0.05rem 0.45rem; border-radius: 0.375rem; background: var(--surface-sunken); color: var(--text-primary); border: 1px solid var(--border-subtle); letter-spacing: 0.01em; }
+.pipeline-id-chip { display: inline-block; font-family: var(--font-mono); font-size: 11px; font-weight: 600; line-height: 1.5; padding: 0.05rem 0.45rem; border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--text-primary); border: 1px solid var(--border-subtle); letter-spacing: 0.01em; }
 
 /* Row-action circles: the ring stays neutral; only the icon carries the intent -- green to test
    or open, blue to edit, red to delete. A tinted disc per button was loud in a table of a
    hundred rows; a coloured glyph on a quiet ring reads the same and stays out of the way.
    Hover brings the ring to the same colour. */
-.btn-circle-ok     { color: var(--color-ok-500); }
-.btn-circle-info   { color: var(--intent-info); }
-.btn-circle-danger { color: var(--color-crit-500); }
-.btn-circle-ok:hover:not(:disabled)     { border-color: var(--color-ok-500);   color: var(--color-ok-500);   background: var(--color-ok-100); }
-.btn-circle-info:hover:not(:disabled)   { border-color: var(--intent-info-ring); color: var(--intent-info-strong); background: var(--intent-info-soft); }
-.btn-circle-danger:hover:not(:disabled) { border-color: var(--color-crit-500); color: var(--color-crit-500); background: var(--color-crit-100); }
-html.dark .btn-circle-ok     { color: var(--color-ok-400); }
-html.dark .btn-circle-danger { color: var(--color-crit-400); }
-html.dark .btn-circle-ok:hover:not(:disabled)     { background: color-mix(in oklab, var(--color-ok-500) 18%, transparent); }
-html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in oklab, var(--color-crit-500) 18%, transparent); }
+.btn-circle-ok     { color: var(--ok-text); }
+.btn-circle-info   { color: var(--info-text); }
+.btn-circle-danger { color: var(--crit-text); }
+.btn-circle-ok:hover:not(:disabled)     { border-color: var(--color-ok-500);   color: var(--ok-text);   background: var(--ok-soft); }
+.btn-circle-info:hover:not(:disabled)   { border-color: var(--info-mark); color: var(--info-text-strong); background: var(--info-soft); }
+.btn-circle-danger:hover:not(:disabled) { border-color: var(--color-crit-500); color: var(--crit-text); background: var(--crit-soft); }
 
 /* Blur loader: the content stays, softened, under a veil with a spinner while a refresh is
    in flight. Blurring costs a repaint of the whole box, so it is only applied while active. */
@@ -1905,7 +1974,7 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .side-panel-host > * { height: 100%; display: block; }
 /* An editor with a table in it -- a rate card's eighteen meters -- needs the room a list does not. */
 .side-panel-host.side-panel-wide { width: min(58rem, 100vw); }
-.side-panel { height: 100%; display: flex; flex-direction: column; background: var(--surface-raised); border-left: 1px solid var(--border-subtle); box-shadow: -12px 0 32px rgb(0 0 0 / 0.18); animation: side-panel-in 180ms ease-out; }
+.side-panel { height: 100%; display: flex; flex-direction: column; background: var(--surface-raised); border-left: 1px solid var(--border-subtle); box-shadow: -12px 0 32px var(--shadow-color); animation: side-panel-in 180ms ease-out; }
 .side-panel-head { display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
 .side-panel-body { flex: 1; min-height: 0; overflow-y: auto; padding: 1rem 1.25rem; }
 .side-panel-foot { padding: 0.75rem 1.25rem; border-top: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.5rem; }
@@ -1927,20 +1996,20 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .prompt-editor { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
 @media (max-width: 1100px) { .prompt-editor { grid-template-columns: 1fr; } }
 .prompt-try { position: sticky; top: 1rem; }
-.prompt-out { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.7rem 0.85rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 24rem; overflow: auto; margin: 0; }
+.prompt-out { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 0.7rem 0.85rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; white-space: pre-wrap; word-break: break-word; max-height: 24rem; overflow: auto; margin: 0; }
 /* An AI step's answer as the model wrote it: prose, so it reads in the text face, not code's. */
 .prompt-out.ai-step-md { white-space: normal; font-family: inherit; font-size: 12.5px; line-height: 1.55; }
 .prompt-vars td { padding-top: 0.35rem; padding-bottom: 0.35rem; }
 .prompt-vars .input { padding-top: 0.3rem; padding-bottom: 0.3rem; }
 
 /* An AI step's line in the pipeline editor: what it runs, opened in the drawer. */
-.ai-step-line { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
+.ai-step-line { display: flex; align-items: center; gap: 0.75rem; padding: 0.6rem 0.75rem; border-radius: var(--radius-lg); background: var(--surface-inset); border: 1px dashed var(--border-strong); }
 .icon-brand { color: var(--accent-text); }
-.ai-step-card { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 0.85rem; border-radius: 8px; background: var(--surface-inset); border: 1px dashed var(--border-strong); }
+.ai-step-card { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.7rem 0.85rem; border-radius: var(--radius-lg); background: var(--surface-inset); border: 1px dashed var(--border-strong); }
 
 /* MIG-249: the step builder. A step is a row of the ordered list: handle, number, what it runs, its controls. */
 .step-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-.step-card { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.65rem 0.75rem; border-radius: 8px; background: var(--surface-raised); border: 1px solid var(--border-subtle); min-width: 0; }
+.step-card { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.65rem 0.75rem; border-radius: var(--radius-lg); background: var(--surface-raised); border: 1px solid var(--border-subtle); min-width: 0; }
 .step-card.is-selected { border-color: var(--accent-mark-strong); }
 .step-card.has-problems { border-color: var(--color-crit-500); }
 .step-card.is-dragging { opacity: 0.5; }
@@ -1949,11 +2018,11 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .step-handle:active { cursor: grabbing; }
 .step-index { display: inline-flex; align-items: center; justify-content: center; min-width: 1.6rem; height: 1.6rem; border-radius: 999px; background: var(--surface-sunken); font-size: 12px; font-weight: 600; color: var(--text-secondary); }
 .step-open { text-align: left; min-width: 0; flex: 1 1 auto; background: none; border: 0; padding: 0; color: inherit; font: inherit; cursor: pointer; }
-.step-open:focus-visible { outline: 2px solid var(--accent-mark-strong); outline-offset: 2px; border-radius: 4px; }
+.step-open:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }
 /* On a phone the controls drop under the step's text instead of squeezing it to a few letters. */
 @media (max-width: 640px) { .step-card { flex-wrap: wrap; } .step-card .step-controls { width: 100%; justify-content: flex-end; } }
 .step-editor { width: 100%; min-height: 22rem; resize: vertical; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; tab-size: 2; }
-.step-notice { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.75rem; border-radius: 8px; font-size: 13px; border: 1px solid var(--border-subtle); background: var(--surface-inset); }
+.step-notice { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.6rem 0.75rem; border-radius: var(--radius-lg); font-size: 13px; border: 1px solid var(--border-subtle); background: var(--surface-inset); }
 .step-notice-warn { border-color: color-mix(in oklab, var(--color-warn-500) 45%, transparent); background: color-mix(in oklab, var(--color-warn-500) 10%, transparent); }
 .step-notice-crit { border-color: color-mix(in oklab, var(--color-crit-500) 45%, transparent); background: color-mix(in oklab, var(--color-crit-500) 8%, transparent); }
 .step-notice-ok { border-color: color-mix(in oklab, var(--color-ok-500) 45%, transparent); background: color-mix(in oklab, var(--color-ok-500) 8%, transparent); }
@@ -1963,15 +2032,15 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .managed-session-bar { border-top: 1px solid color-mix(in oklab, var(--color-warn-500) 45%, transparent);
   background: color-mix(in oklab, var(--color-warn-500) 14%, var(--surface-raised)); color: var(--text-primary); }
 .managed-session-bar > div > app-icon { color: var(--color-warn-500); }
-.schema-group { border: 1px solid var(--border-subtle); border-radius: 8px; padding: 0.6rem 0.75rem; }
+.schema-group { border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 0.6rem 0.75rem; }
 .schema-row { border-top: 1px dashed var(--border-subtle); padding-top: 0.5rem; margin-top: 0.5rem; }
 .run-step { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.6rem; align-items: start; padding: 0.6rem 0; border-top: 1px solid var(--border-subtle); }
 .run-step:first-child { border-top: 0; }
-.run-log { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: 6px; padding: 0.5rem 0.65rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; max-height: 16rem; overflow: auto; }
+.run-log { background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.5rem 0.65rem; font-family: var(--font-mono, ui-monospace, monospace); font-size: 12px; line-height: 1.5; max-height: 16rem; overflow: auto; }
 
 /* Reports: failures by reason -- one row per distinct message, a bar for its share. */
 .reason-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
-.reason-row { display: grid; grid-template-columns: 3rem 6rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
+.reason-row { display: grid; grid-template-columns: 3rem 6rem minmax(0, 1fr) auto; gap: 0.75rem; align-items: center; width: 100%; text-align: left; padding: 0.35rem 0.5rem; border-radius: var(--radius-md); border: 1px solid transparent; background: none; color: inherit; font: inherit; cursor: pointer; }
 .reason-row:hover { background: var(--surface-sunken); }
 .reason-row.is-on { border-color: var(--accent-mark-strong); background: var(--surface-sunken); }
 /* At phone width four columns left the message a few characters wide: the count and its bar
@@ -1988,7 +2057,7 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .pill.is-on { outline: 2px solid var(--accent-mark-strong); outline-offset: 1px; }
 
 /* Object picker: one row per folder or file, the whole row is the control. */
-.object-picker-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border-subtle); border-radius: 0.5rem; overflow: hidden; }
+.object-picker-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); overflow: hidden; }
 .object-picker-list li + li { border-top: 1px solid var(--border-subtle); }
 .object-picker-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; text-align: left; font-size: 0.85rem; background: transparent; border: 0; cursor: pointer; color: var(--text-primary); }
 .object-picker-row:hover:not(:disabled) { background: var(--surface-sunken); }
@@ -2005,13 +2074,12 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .preview-grid thead th { position: sticky; top: 0; background: var(--surface-raised); z-index: 1; }
 
 /* Billing: an invoice drawn as the document it will be, and a document row in a card. */
-.invoice-paper { font-size: 13px; }
 /* The billing panes (invoice, document, rate card) inside the rail + pane split. */
 .bill-facts { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 0.9rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
 .bill-facts-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr)); gap: 0.75rem 1.5rem; flex: 1; min-width: 0; }
-.bill-facts .eyebrow { display: block; font-size: 10px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
+.bill-facts .eyebrow { display: block; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 2px; }
 .bill-qr { flex: none; display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 0; }
-.bill-qr img, .bill-qr-blank { width: 88px; height: 88px; border-radius: 4px; background: #fff; border: 1px solid var(--border-subtle); image-rendering: pixelated; }
+.bill-qr img, .bill-qr-blank { width: 88px; height: 88px; border-radius: var(--radius-sm); background: var(--paper); border: 1px solid var(--border-subtle); image-rendering: pixelated; }
 /* The code itself stays on white so a phone can scan it; the empty placeholder has nothing to
    scan and sat as a glaring white square on the dark pane. */
 .bill-qr-blank { background: var(--surface-raised); }
@@ -2021,11 +2089,11 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
    inline style on the element. */
 .login-grid-lines {
   background-image:
-    linear-gradient(to right, #fff 1px, transparent 1px),
-    linear-gradient(to bottom, #fff 1px, transparent 1px);
+    linear-gradient(to right, var(--on-solid) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--on-solid) 1px, transparent 1px);
   background-size: 44px 44px;
 }
-.bill-qr figcaption { font-size: 10px; color: var(--text-muted); }
+.bill-qr figcaption { font-size: 11px; color: var(--text-muted); }
 .bill-form { display: flex; align-items: flex-end; gap: 0.5rem; flex-wrap: wrap; padding: 0.75rem 1.25rem; border-bottom: 1px solid var(--border-subtle); background: var(--surface-sunken); }
 .bill-totals { display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 0.2rem 2rem; padding: 0.6rem 1.25rem 0.4rem; font-size: 13px; }
 .bill-totals > div { display: contents; }
@@ -2043,7 +2111,6 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .widget-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
 @media (min-width: 1536px) { .widget-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 /* A board: one widget per row at every width, so a table or a wide chart has the whole pane. */
-.widget-grid-rows, .widget-grid-rows.widget-grid { grid-template-columns: minmax(0, 1fr); }
 /* A dashboard: twelve columns from sm up, one on a phone. Each widget says its own span (a figure
    3, a chart 6, a table 12; see SPAN_CLASSES in dashboard.ts), and the tiles of one row stretch to
    the tallest so the row reads as a row, with each foot on the bottom edge. */
@@ -2064,7 +2131,7 @@ html.dark .btn-circle-danger:hover:not(:disabled) { background: color-mix(in okl
 .bill-preview img { max-width: 100%; max-height: 100%; object-fit: contain; margin: auto; }
 .doc-row { display: flex; align-items: center; gap: .6rem; padding: .45rem 0; border-bottom: 1px solid var(--border-subtle); }
 .doc-row:last-child { border-bottom: 0; }
-.doc-ic { width: 26px; height: 32px; border: 1px solid var(--border-strong); border-radius: 3px; display: grid; place-items: center; font-family: var(--font-mono, ui-monospace, monospace); font-size: 9px; color: var(--text-muted); flex-shrink: 0; }
+.doc-ic { min-width: 26px; width: auto; padding: 0 3px; height: 32px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); display: grid; place-items: center; font-family: var(--font-mono, ui-monospace, monospace); font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
 
 /* Configuration values: a secret is shown as a mask and never as its value. */
 .secret-mask { letter-spacing: 0.12em; color: var(--text-muted); user-select: none; }

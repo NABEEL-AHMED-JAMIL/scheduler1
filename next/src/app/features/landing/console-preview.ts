@@ -16,30 +16,43 @@ type View = 'dashboard' | 'jobs' | 'reports';
 @Component({
   selector: 'app-console-preview',
   imports: [Icon],
+  styleUrls: ['./landing.tokens.css'],
   styles: [`
     :host { display: block; }
-    .panel      { background: #0f172a; border: 1px solid rgb(255 255 255 / 0.09);
-                  box-shadow: 0 24px 60px -20px rgb(0 0 0 / 0.55); }
-    .panel-head { background: rgb(255 255 255 / 0.035); border-bottom: 1px solid rgb(255 255 255 / 0.07); }
-    .panel-row  { border-bottom: 1px solid rgb(255 255 255 / 0.05); }
-    .dim        { color: rgb(239 246 255 / 0.55); }
-    .key        { color: rgb(239 246 255 / 0.92); }
+    /* Every colour is a token from landing.tokens.css; the alphas are the old rgb() ones. */
+    .panel      { background: var(--preview-panel);
+                  border: 1px solid color-mix(in srgb, var(--preview-line) 9%, transparent);
+                  box-shadow: 0 24px 60px -20px color-mix(in srgb, var(--preview-shadow) 55%, transparent); }
+    .panel-head { background: color-mix(in srgb, var(--preview-line) 3.5%, transparent);
+                  border-bottom: 1px solid color-mix(in srgb, var(--preview-line) 7%, transparent); }
+    .panel-row  { border-bottom: 1px solid color-mix(in srgb, var(--preview-line) 5%, transparent); }
+    .frame      { border: 1px solid color-mix(in srgb, var(--preview-line) 8%, transparent); }
+    .frame-head { background: color-mix(in srgb, var(--preview-line) 3%, transparent); }
+    .dim        { color: color-mix(in srgb, var(--preview-ink) 55%, transparent); }
+    .key        { color: color-mix(in srgb, var(--preview-ink) 92%, transparent); }
+    .live       { background: var(--preview-ok-bar); }
+    .is-ok      { color: var(--preview-ok); }
+    .is-crit    { color: var(--preview-fail); }
+    .is-warn    { color: var(--preview-warn); }
 
-    .tab        { color: rgb(239 246 255 / 0.6); border-bottom: 2px solid transparent; }
-    .tab:hover  { color: rgb(239 246 255 / 0.85); }
-    .tab.on     { color: #bfdbfe; border-bottom-color: #60a5fa; }
+    .tab        { color: color-mix(in srgb, var(--preview-ink) 60%, transparent); border-bottom: 2px solid transparent; }
+    .tab:hover  { color: color-mix(in srgb, var(--preview-ink) 85%, transparent); }
+    .tab.on     { color: var(--preview-accent); border-bottom-color: var(--preview-edge); }
 
-    .chip-ok    { background: rgb(34 197 94 / 0.16);   color: #86efac; }
-    .chip-run   { background: rgb(37 99 235 / 0.30);   color: #bfdbfe; }
-    .chip-wait  { background: rgb(255 255 255 / 0.09); color: rgb(239 246 255 / 0.72); }
-    .chip-fail  { background: rgb(244 63 94 / 0.18);   color: #fda4af; }
+    .chip-ok    { background: color-mix(in srgb, var(--preview-ok-fill) 16%, transparent);   color: var(--preview-ok); }
+    .chip-run   { background: color-mix(in srgb, var(--preview-run) 30%, transparent);       color: var(--preview-accent); }
+    .chip-wait  { background: color-mix(in srgb, var(--preview-line) 9%, transparent);
+                  color: color-mix(in srgb, var(--preview-ink) 72%, transparent); }
+    .chip-fail  { background: color-mix(in srgb, var(--preview-fail-fill) 18%, transparent); color: var(--preview-fail); }
 
-    .bar        { background: rgb(147 197 253 / 0.85); border-radius: 2px; }
-    .bar-idle   { background: rgb(255 255 255 / 0.14); border-radius: 2px; }
-    .bar-ok     { background: rgb(52 211 153 / 0.8);   border-radius: 2px; }
-    .bar-fail   { background: rgb(244 63 94 / 0.55);   border-radius: 2px; }
-    .bar-stop   { background: rgb(251 113 133 / 0.35); border-radius: 2px; }
-    .bar-skip   { background: rgb(251 191 36 / 0.55);  border-radius: 2px; }
+    .bar, .bar-idle, .bar-ok, .bar-fail, .bar-stop, .bar-skip { border-radius: var(--radius-sm); }
+    .bar        { background: color-mix(in srgb, var(--preview-bar) 85%, transparent); }
+    .bar-idle   { background: color-mix(in srgb, var(--preview-line) 14%, transparent); }
+    .bar-ok     { background: color-mix(in srgb, var(--preview-ok-bar) 80%, transparent); }
+    .bar-fail   { background: color-mix(in srgb, var(--preview-fail-fill) 55%, transparent); }
+    .bar-stop   { background: color-mix(in srgb, var(--preview-stop) 35%, transparent); }
+    .bar-skip   { background: color-mix(in srgb, var(--preview-warn-fill) 55%, transparent); }
+    .bars       { height: 44px; }
 
     /* Swapping views should feel like the screen changed, not like the page reloaded. */
     .view { animation: fade .28s ease both; }
@@ -47,14 +60,14 @@ type View = 'dashboard' | 'jobs' | 'reports';
     @media (prefers-reduced-motion: reduce) { .view { animation: none; } }
   `],
   template: `
-    <div class="panel rounded-xl overflow-hidden">
+    <div class="panel rounded-card overflow-hidden">
       <div class="panel-head px-4 pt-3 flex items-center gap-2">
-        <span class="size-2 rounded-full" style="background: #34d399;"></span>
+        <span class="size-2 rounded-full live"></span>
         <span class="text-xs key font-medium">ETL Console</span>
         <span class="text-[11px] dim ml-auto mono">preview</span>
       </div>
 
-      <div class="px-4 flex items-center gap-4 panel-head" style="border-bottom-width: 1px;">
+      <div class="px-4 flex items-center gap-4 panel-head">
         @for (t of tabs; track t.id) {
           <button type="button" class="tab text-xs py-2.5 transition-colors"
                   [class.on]="view() === t.id" (click)="view.set(t.id)">{{ t.label }}</button>
@@ -69,7 +82,7 @@ type View = 'dashboard' | 'jobs' | 'reports';
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-x-3 gap-y-3">
               @for (tile of tiles; track tile.label) {
                 <div>
-                  <div class="text-[10px] dim uppercase tracking-wider">{{ tile.label }}</div>
+                  <div class="text-[11px] dim uppercase tracking-wider">{{ tile.label }}</div>
                   <div class="text-xl font-semibold key mt-0.5">{{ tile.value }}</div>
                 </div>
               }
@@ -85,11 +98,11 @@ type View = 'dashboard' | 'jobs' | 'reports';
             </div>
             <div class="mt-4 flex items-center gap-4 text-[11px] dim">
               <span class="flex items-center gap-1.5">
-                <span class="size-2 rounded-sm" style="background: rgb(52 211 153 / .8);"></span>
+                <span class="size-2 rounded-sm bar-ok"></span>
                 Completed 96%
               </span>
               <span class="flex items-center gap-1.5">
-                <span class="size-2 rounded-sm" style="background: rgb(244 63 94 / .55);"></span>
+                <span class="size-2 rounded-sm bar-fail"></span>
                 Failed 4%
               </span>
             </div>
@@ -127,9 +140,8 @@ type View = 'dashboard' | 'jobs' | 'reports';
               <span class="mono">columns: outcome</span>
               <span class="mono ml-auto">measure: count</span>
             </div>
-            <div class="overflow-hidden rounded" style="border: 1px solid rgb(255 255 255 / .08);">
-              <div class="px-3 py-2 flex items-center gap-3 text-[10px] dim uppercase tracking-wider"
-                   style="background: rgb(255 255 255 / .03);">
+            <div class="overflow-hidden rounded-sm frame">
+              <div class="px-3 py-2 flex items-center gap-3 text-[11px] dim uppercase tracking-wider frame-head">
                 <span class="flex-1">Task</span>
                 <!-- The same five outcome columns the real report has -- one per JobStatus that
                      ends a run -- so the preview does not promise a simpler table than the one
@@ -145,11 +157,11 @@ type View = 'dashboard' | 'jobs' | 'reports';
               @for (row of reportRows; track row.task) {
                 <div class="px-3 py-2 flex items-center gap-3 text-[12px] panel-row">
                   <span class="flex-1 key truncate">{{ row.task }}</span>
-                  <span class="w-12 text-right mono" style="color:#86efac;">{{ row.done }}</span>
-                  <span class="w-10 text-right mono" [style.color]="row.failed ? '#fda4af' : null" [class.dim]="!row.failed">{{ row.failed }}</span>
-                  <span class="w-10 text-right mono" [style.color]="row.stopped ? '#fda4af' : null" [class.dim]="!row.stopped">{{ row.stopped }}</span>
-                  <span class="w-10 text-right mono" [style.color]="row.skipped ? '#fcd34d' : null" [class.dim]="!row.skipped">{{ row.skipped }}</span>
-                  <span class="w-10 text-right mono" [style.color]="row.missed ? '#fcd34d' : null" [class.dim]="!row.missed">{{ row.missed }}</span>
+                  <span class="w-12 text-right mono is-ok">{{ row.done }}</span>
+                  <span class="w-10 text-right mono" [class.is-crit]="!!row.failed" [class.dim]="!row.failed">{{ row.failed }}</span>
+                  <span class="w-10 text-right mono" [class.is-crit]="!!row.stopped" [class.dim]="!row.stopped">{{ row.stopped }}</span>
+                  <span class="w-10 text-right mono" [class.is-warn]="!!row.skipped" [class.dim]="!row.skipped">{{ row.skipped }}</span>
+                  <span class="w-10 text-right mono" [class.is-warn]="!!row.missed" [class.dim]="!row.missed">{{ row.missed }}</span>
                   <span class="w-10 text-right mono key">{{ total(row) }}</span>
                 </div>
               }
@@ -157,7 +169,7 @@ type View = 'dashboard' | 'jobs' | 'reports';
             <!-- Scaled against the largest column rather than by a fixed divisor: at done/2 a
                  96 became 48px inside a 40px box, so every bar overflowed and they all looked
                  the same height. -->
-            <div class="mt-3 flex items-end gap-1.5" style="height: 44px;">
+            <div class="mt-3 flex items-end gap-1.5 bars">
               @for (row of reportRows; track row.task) {
                 <div class="flex-1 flex flex-col justify-end gap-px">
                   <div class="bar-skip" [style.height.px]="barPx(row.skipped + row.missed)"></div>

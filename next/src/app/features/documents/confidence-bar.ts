@@ -17,7 +17,7 @@ import { percent } from './documents.model';
     :host { display: inline-flex; }
     .conf { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.6875rem; color: var(--text-secondary);
       white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .conf-track { display: block; width: 2rem; height: 5px; border-radius: 3px; background: var(--border-subtle); overflow: hidden; }
+    .conf-track { display: block; width: 2rem; height: 5px; border-radius: var(--radius-full); background: var(--border-subtle); overflow: hidden; }
     .conf-fill { display: block; height: 100%; background: var(--color-ok-500); }
     .conf-low .conf-fill { background: var(--color-warn-500); }
     .conf-low .conf-text { color: var(--warn-text); }

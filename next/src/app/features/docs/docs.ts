@@ -45,8 +45,8 @@ interface Step {
        the page. max-width keeps a wide capture inside the column on a narrow viewport. */
     .doc-shot {
       display: block; width: 100%; max-width: 100%; height: auto;
-      border-radius: 10px; border: 1px solid var(--border-subtle);
-      box-shadow: 0 10px 30px -12px rgb(0 0 0 / 0.28);
+      border-radius: var(--radius-card); border: 1px solid var(--border-subtle);
+      box-shadow: 0 10px 30px -12px var(--shadow-color);
       background: var(--surface-raised);
     }
     .num {

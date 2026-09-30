@@ -54,23 +54,23 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
       .review-viewer { position: sticky; top: 4.5rem; }
     }
     .doc-field { display: grid; grid-template-columns: minmax(0, 9rem) minmax(0, 1fr) 4.5rem; gap: 0.5rem; align-items: center;
-      padding: 0.375rem 0.5rem; margin: 0 -0.5rem; border-radius: 0.5rem; cursor: pointer; }
+      padding: 0.375rem 0.5rem; margin: 0 -0.5rem; border-radius: var(--radius-lg); cursor: pointer; }
     .doc-field:hover { background: var(--surface-sunken); }
-    .doc-field-active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--intent-info); }
+    .doc-field-active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--info-mark); }
     .doc-field-active:hover { background: var(--accent-soft); }
     .doc-field-name { text-align: left; font-size: 0.75rem; color: var(--text-secondary); overflow-wrap: anywhere; }
     .doc-field-low .input, .input.doc-field-low { border-color: var(--color-warn-500);
       background: color-mix(in oklab, var(--color-warn-500) 9%, var(--surface-raised)); }
-    .note-bar { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.8125rem;
+    .note-bar { display: flex; gap: 0.5rem; align-items: flex-start; padding: 0.5rem 0.75rem; border-radius: var(--radius-lg); font-size: 0.8125rem;
       border: 1px solid var(--border-subtle); background: var(--surface-sunken); color: var(--text-secondary); }
     .note-bar app-icon { margin-top: 0.15rem; flex: none; }
     .note-bar-warn { border-color: color-mix(in oklab, var(--color-warn-500) 45%, transparent); color: var(--warn-text);
       background: color-mix(in oklab, var(--color-warn-500) 10%, var(--surface-raised)); }
-    .kbd { font-family: ui-monospace, monospace; font-size: 0.625rem; padding: 0 0.25rem; border-radius: 0.25rem;
+    .kbd { font-family: ui-monospace, monospace; font-size: 0.6875rem; padding: 0 0.25rem; border-radius: var(--radius-sm);
       border: 1px solid var(--border-strong); border-bottom-width: 2px; color: var(--text-secondary); }
     .doc-field .input { min-height: 0; padding-top: 0.3rem; padding-bottom: 0.3rem; }
     .doc-cell { min-width: 8.5rem; }
-    .doc-cell-active .input { box-shadow: 0 0 0 2px var(--intent-info); }
+    .doc-cell-active .input { box-shadow: 0 0 0 2px var(--info-mark); }
     @media (max-width: 640px) { .doc-field { grid-template-columns: minmax(0, 1fr) 4.25rem; } .doc-field-name { grid-column: 1 / -1; } }
   `],
 })

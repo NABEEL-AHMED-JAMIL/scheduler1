@@ -47,7 +47,7 @@ import { FIELD_TYPES, TypeField, blankField, listText, textList } from './docume
     </div>
   `,
   styles: [`
-    .field-row { display: grid; gap: 0.375rem; align-items: center; padding: 0.5rem; border: 1px solid var(--border-subtle); border-radius: 0.5rem;
+    .field-row { display: grid; gap: 0.375rem; align-items: center; padding: 0.5rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
       grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 6.5rem auto auto; }
     .field-row-wide { grid-column: 1 / -1; }
     @media (max-width: 640px) { .field-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }

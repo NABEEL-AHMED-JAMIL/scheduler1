@@ -54,7 +54,7 @@
         <app-stat-tile label="Last run failed" [value]="errors().running ? '—' : failed()" foot="jobs" icon="xCircle" tone="crit" />
         <!-- h-full on the link and the tile: the other tiles are grid items and stretch to the row,
              this one sits inside a link and stayed at its own height, shorter than its neighbours. -->
-        <a routerLink="/notifications" class="block h-full rounded-[var(--radius-card)] hover:shadow-md transition-shadow"
+        <a routerLink="/notifications" class="block h-full rounded-card hover:shadow-md transition-shadow"
            [attr.aria-label]="unread() + ' unread notifications'">
           <app-stat-tile class="h-full" label="Unread" [value]="unread()" icon="bell" tone="warn" />
         </a>
