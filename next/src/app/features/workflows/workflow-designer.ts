@@ -143,7 +143,8 @@ export class WorkflowDesigner implements OnInit {
           this.selected.set(0);
           this.dirty.set(true);
         }
-        this.view.set('steps');
+        // A background (quiet) open never takes the reader off a New workflow form they opened meanwhile.
+        if (!quiet || this.view() !== 'new') this.view.set('steps');
         this.testStarted.set(null);
         this.router.navigate([], { relativeTo: this.route, queryParams: { key }, replaceUrl: true });
       },
@@ -318,6 +319,7 @@ export class WorkflowDesigner implements OnInit {
         this.busy.set(false);
         if (r.status === API_SUCCESS) {
           this.toast.success(r.message);
+          this.view.set('steps');
           this.loadList(key);
         } else {
           this.toast.error(r.message);

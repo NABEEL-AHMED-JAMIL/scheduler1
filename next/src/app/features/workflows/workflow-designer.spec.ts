@@ -149,6 +149,15 @@ describe('Workflow designer -- the screen', () => {
     expect((el.querySelector('[data-test="step-panel"] fieldset') as HTMLFieldSetElement).disabled).toBe(true);
   });
 
+  it('keeps a New workflow form open when a background load lands after it', () => {
+    const { screen } = screenWith();
+    screen.startNew();
+    screen.open('purchase', true);
+    expect(screen.view()).toBe('new');
+    screen.open('purchase');
+    expect(screen.view()).toBe('steps');
+  });
+
   it('starts a test request and links to it', () => {
     const { api, screen, fixture, el } = screenWith();
     screen.view.set('test');
