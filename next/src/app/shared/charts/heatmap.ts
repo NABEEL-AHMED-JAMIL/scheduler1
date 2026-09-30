@@ -48,7 +48,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
                      selection affordance at all. The three states now share --focus-ring and
                      separate by weight: a 1px hint on hover, 2px for focus and for selection. -->
                 <button type="button"
-                        class="aspect-square w-full rounded-sm relative
+                        class="aspect-square w-full max-h-8 rounded-sm relative
                                ring-offset-1 ring-offset-[color:var(--surface-raised)]
                                ring-[color:var(--focus-ring)]
                                transition-[box-shadow,opacity]

@@ -39,6 +39,8 @@ const TERMINAL = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
   selector: 'app-run-steps',
   imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RunReview],
   templateUrl: './run-steps.html',
+  // Its cards (the review, the steps) stand apart as the page's own cards do; a legacy run draws nothing and takes no room.
+  host: { class: 'flex flex-col gap-5 empty:hidden' },
 })
 export class RunSteps {
   /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */

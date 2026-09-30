@@ -43,6 +43,8 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
 @Component({
   selector: 'app-run-review',
   imports: [Icon, ServerTimePipe],
+  // No box of its own: its card is one of the run's stacked cards, and nothing at all when no review is required.
+  host: { class: 'contents' },
   template: `
     @if (review(); as r) {
       @if (r.reviewStatus !== 'NOT_REQUIRED') {
