@@ -24,7 +24,9 @@ const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
 const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 
-const ENGINE = { job: Number(process.env['E2E_ENGINE_JOB'] ?? 2849), run: Number(process.env['E2E_ENGINE_RUN'] ?? 7396) };
+// The run is found, not fixed: the pipeline keeps its datasets for 24 hours, so a pinned run (7396) lost its step
+// outputs a day later and this failed on a correct expiry. Unless named, it is the recent run FILES finds below.
+const ENGINE = { job: Number(process.env['E2E_ENGINE_JOB'] ?? 2849), run: Number(process.env['E2E_ENGINE_RUN'] ?? 0) };
 const LEGACY = { job: Number(process.env['E2E_LEGACY_JOB'] ?? 2834), run: Number(process.env['E2E_LEGACY_RUN'] ?? 7383) };
 /** The inbox job and, unless E2E_INBOX_RUN pins one, the run its latest started arrival made (found at start). */
 const INBOX = { job: Number(process.env['E2E_INBOX_JOB'] ?? 2848), run: Number(process.env['E2E_INBOX_RUN'] ?? 0) };
@@ -88,6 +90,7 @@ test.describe('Executions', () => {
       }
       expect(FILES.run, `job ${FILES.job} has a recent run that still keeps customers-clean.json (Run now once)`).toBeGreaterThan(0);
     }
+    if (!ENGINE.run && ENGINE.job === FILES.job) ENGINE.run = FILES.run;
     const engine = await (await request.get(`${api}/sourceJob.json/stepExecutions?jobQueueId=${ENGINE.run}`, { headers })).json();
     expect(engine.data?.legacy, `run ${ENGINE.run} is a step-engine run`).toBe(false);
     expect(engine.data?.steps?.map((step: { key: string }) => step.key)).toEqual(STEPS);

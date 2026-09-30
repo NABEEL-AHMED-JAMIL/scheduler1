@@ -61,10 +61,10 @@
       <thead>
         <tr>
           <th>Tool</th>
-          <th>Service</th>
-          <th>Input → output</th>
+          <th class="hidden xl:table-cell">Service</th>
+          <th class="hidden xl:table-cell">Input → output</th>
           <th>Permission</th>
-          <th>Asks first</th>
+          <th class="hidden lg:table-cell">Asks first</th>
           <th>Enabled</th>
           <th>Last used</th>
         </tr>
@@ -78,13 +78,13 @@
               <div class="mono font-medium truncate" [title]="t.name">{{ t.name }}</div>
               <div class="text-xs text-[color:var(--text-muted)] line-clamp-2" [title]="tip(t.description)">{{ t.title }}</div>
             </td>
-            <td class="whitespace-nowrap">{{ service(t) }}</td>
-            <td class="max-w-64"><span class="mono text-xs break-words">{{ flow.input }} → {{ flow.output }}</span></td>
+            <td class="hidden xl:table-cell whitespace-nowrap">{{ service(t) }}</td>
+            <td class="hidden xl:table-cell max-w-64"><span class="mono text-xs break-words">{{ flow.input }} → {{ flow.output }}</span></td>
             <td class="text-xs whitespace-nowrap">
               <div>{{ role(t) }}</div>
               <div class="text-[color:var(--text-muted)]">{{ t.kind === 'write' ? 'Writes' : 'Reads' }}</div>
             </td>
-            <td>
+            <td class="hidden lg:table-cell">
               @if (t.requiresConfirmation) { <span class="pill pill-warn">Asks first</span> } @else { <span class="text-[color:var(--text-muted)]">—</span> }
             </td>
             <td class="max-w-72">

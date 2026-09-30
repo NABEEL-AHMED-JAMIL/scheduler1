@@ -275,10 +275,10 @@
             { key: 'fullName',    label: 'Person' },
             { key: 'userRole',    label: 'Role' },
             { key: 'pageAccessProfileName', label: 'Access' },
-            { key: 'tenantName',  label: 'Tenant' },
-            { key: 'lastLoginAt', label: 'Last sign-in' }
+            { key: 'tenantName',  label: 'Tenant', hide: 'hidden xl:table-cell' },
+            { key: 'lastLoginAt', label: 'Last sign-in', hide: 'hidden lg:table-cell' }
           ]; track column.key) {
-            <th>
+            <th [class]="column.hide ?? ''">
               <button type="button" class="th-sort"
                       [class.th-sort-active]="sort.key() === column.key"
                       (click)="sort.toggle(column.key)">
@@ -288,11 +288,11 @@
               </button>
             </th>
           }
-          <th class="text-right">Workload</th>
+          <th class="text-right hidden xl:table-cell">Workload</th>
           @for (column of [
             { key: 'dateCreated', label: 'Added' }
           ]; track column.key) {
-            <th>
+            <th class="hidden xl:table-cell">
               <button type="button" class="th-sort"
                       [class.th-sort-active]="sort.key() === column.key"
                       (click)="sort.toggle(column.key)">
@@ -384,7 +384,7 @@
               }
             </td>
 
-            <td class="text-[color:var(--text-secondary)] max-w-44">
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44">
               @if (user.tenantName) {
                 <span class="truncate block" [title]="user.tenantName">{{ user.tenantName }}</span>
                 @if (user.tenantActive === false) {
@@ -397,7 +397,7 @@
               } @else { — }
             </td>
 
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="hidden lg:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (user.lastLoginAt) {
                 {{ user.lastLoginAt | serverTime:'date' }}
                 <div class="text-xs text-[color:var(--text-muted)]">
@@ -410,7 +410,7 @@
 
             <!-- Jobs and runs answer one question -- how much is this person carrying -- so they
                  read as one figure with its detail beneath, not two columns to cross-reference. -->
-            <td class="text-right whitespace-nowrap">
+            <td class="hidden xl:table-cell text-right whitespace-nowrap">
               @if (statFor(user); as stat) {
                 @if (stat.jobCount || stat.runCount) {
                   <div class="tabular">
@@ -436,7 +436,7 @@
 
             <!-- When, and by whom, in one cell. The editor line appears only when it was somebody
                  other than the author -- otherwise it restates the line above it. -->
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ user.dateCreated ? (user.dateCreated | serverTime:'date') : '—' }}
               @if (user.createdByName) {
                 <div class="text-xs text-[color:var(--text-muted)]">by {{ user.createdByName }}</div>

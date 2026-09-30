@@ -53,7 +53,12 @@ test.describe('Inbox (live storage-service)', () => {
     await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
     await expect(page.getByText('UI-REVIEW LocalStack S3 (fake keys)')).toBeVisible();
     await expect(page.getByText(/Up to \d+ MB a file/).first()).toBeVisible();
-    await expect(page.getByRole('table').getByText('live-customers.csv')).toBeVisible();
+    // The newest arrival the service reports, whatever put it there: a fixed name (live-customers.csv) fell off the
+    // list once a soak run uploaded a file every five minutes, and the page is right to show the newest first.
+    const newest = (await (await request.get(`${api}/storage.json/inbox/files?limit=1`,
+      { headers: { Authorization: `Bearer ${token}` } })).json())?.data?.[0];
+    expect(newest?.fileName, 'the inbox has at least one arrival').toBeTruthy();
+    await expect(page.getByRole('table').getByText(newest.fileName).first()).toBeVisible();
     await shot(page, info, 'inbox-1440');
   });
 

@@ -635,6 +635,15 @@
      */
     max-height: max(20rem, calc(100dvh - 13rem));
     @apply overflow-auto;
+    /*
+     * A shadow at the bottom edge while there is more below, and none at the end: the "local" cover travels with the
+     * rows and hides the "scroll" shadow once the last row is in view. Without it a box that happened to cut a row in
+     * half read as the whole list, with nothing saying there was more.
+     */
+    background:
+      linear-gradient(to bottom, transparent, var(--surface-raised) 70%) bottom / 100% 1.5rem no-repeat local,
+      radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--text-primary) 16%, transparent), transparent)
+        bottom / 100% 0.65rem no-repeat scroll;
   }
   .scroll-table thead th {
     position: sticky;
@@ -1612,6 +1621,9 @@ html.dark {
   .field-note { @apply mt-1.5 text-xs leading-snug; }
 
   .form-stack > * + * { margin-top: 1.25rem; }
+  /* The managed-workspace lock (a fieldset round the whole form) is invisible to the layout: its children keep the
+     form's rhythm. Without this the prompt editor's hints ran straight into the next field's label. */
+  .form-stack > .form-lock > * + * { margin-top: 1.25rem; }
 
   .form-grid { @apply grid gap-x-5; row-gap: 1.25rem; }
 
@@ -1660,7 +1672,9 @@ html.dark {
   /* ...and its own row of actions wraps rather than running off a phone: Access profiles' picker
      plus two buttons pushed "New profile" 27px past the edge of a 390px screen. */
   .page-head > :last-child:not(:first-child) { flex-wrap: wrap; justify-content: flex-end; }
-  .page-head > :first-child { max-width: 64rem; min-width: 0; }
+  /* The title block shrinks to 28rem before the actions give up their place beside it: at 1024 px the whole block
+     claimed the row and every page's buttons dropped onto a line of their own under the subtitle. */
+  .page-head > :first-child { max-width: 64rem; min-width: 0; flex: 1 1 28rem; }
   /* A heading's actions are .btn-sm; a field among them (workspace picker, date range, search)
      took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
      line and border as .btn-sm, so the row lines up by construction (vertical only: horizontal
@@ -1670,6 +1684,9 @@ html.dark {
      row. Every control there is the view toggle's height, and the filters take the compact type. */
   /* Height and type only: horizontal padding is the field's own (a search box keeps pl-8 for its
      icon; setting px here slid the placeholder under the magnifier). */
+  /* When the toolbar wraps (tablet), what wraps lines up under the controls on the right instead of stranding one
+     or two of them flush left; the heading keeps the left with its mr-auto. */
+  .table-toolbar > div[toolbar] { justify-content: flex-end; }
   .table-toolbar .input { min-height: 1.875rem; @apply py-1 text-xs; }
   .table-toolbar .btn-sm { min-height: 1.875rem; }
   /* A toolbar combobox's list follows its compact 12px box, as a form's follows its 14px one. */

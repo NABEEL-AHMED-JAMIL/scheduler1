@@ -43,7 +43,7 @@ export interface Slice { name: string; value: number; }
           </div>
         </div>
 
-        <ul class="min-w-0 flex-1 space-y-1">
+        <ul class="min-w-0 flex-1 max-w-80 space-y-1">
           @for (segment of segments(); track segment.name) {
             <li class="flex items-center gap-2 text-[11px] leading-none"
                 [title]="segment.title + ': ' + segment.display">

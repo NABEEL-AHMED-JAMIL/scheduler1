@@ -18,7 +18,7 @@
   </div>
 
   @if (job() || run(); as _) {
-    <div class="card">
+    <div class="card overflow-clip">
       <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
               [attr.aria-expanded]="showDetail()"
               (click)="showDetail.set(!showDetail())">

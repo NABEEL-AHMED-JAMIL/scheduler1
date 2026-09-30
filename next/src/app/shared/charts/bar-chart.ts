@@ -95,7 +95,9 @@ const RESERVE_AXIS_ONLY = 18;
            to zero width and the row still overflowed, pushing a horizontal scrollbar onto the
            whole page. Below ~9px of pitch the separation has to come from the bar edges, not
            from space between them. -->
-      <div class="flex items-end min-w-0" [class.gap-1]="gap() === 4"
+      <!-- justify-around: bars stop at BAR_MAX_PX, so a week in a wide card would bunch at the left and leave the
+           rest of the card empty; spread, the chart fills its card. Bars that are not capped fill the row anyway. -->
+      <div class="flex items-end justify-around min-w-0" [class.gap-1]="gap() === 4"
            [class.gap-px]="gap() === 1" [style.height.px]="height()"
            [attr.role]="clickable() ? null : 'img'"
            [attr.aria-label]="clickable() ? null : summary()">
@@ -423,6 +425,7 @@ export class BarChart {
      * `every`, whatever the bar count.
      */
     const last = starts[starts.length - 1];
+    const roomy = this.pitch() >= BAR_MAX_PX;
     const chosen = new Set<number>([starts[0], last]);
     let previous = starts[0];
     for (const at of starts) {
@@ -458,7 +461,8 @@ export class BarChart {
         labelled,
         // The two outermost labels are pulled inward so they sit over the plot rather than
         // hanging 10px into the card's padding, pointing at nothing.
-        align: !labelled ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
+        // At full bar width a label fits over its own bar, so it stays centred under it.
+        align: !labelled || roomy ? 'center' : index === starts[0] ? 'start' : index === last ? 'end' : 'center',
         short: shortLabel(bar.name),
         display: (this.valueFormat() ?? format)(bar.value),
         hint: this.hintFor(bar, this.hintFormat()),

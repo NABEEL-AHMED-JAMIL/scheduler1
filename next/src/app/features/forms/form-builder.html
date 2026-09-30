@@ -184,11 +184,11 @@
           <tr>
             <th>Form</th>
             <th>Status</th>
-            <th class="text-right">Fields</th>
+            <th class="hidden xl:table-cell text-right">Fields</th>
             @if (isAdmin()) {
               <th>Starts</th>
               <th class="text-right">Submissions</th>
-              <th>Updated</th>
+              <th class="hidden xl:table-cell">Updated</th>
             }
             <th class="text-right">Actions</th>
           </tr>
@@ -201,13 +201,13 @@
                 @if (f.description) { <span class="block text-xs text-[color:var(--text-muted)] truncate">{{ f.description }}</span> }
               </td>
               <td><span class="pill" [class]="'pill-' + tone(f.status)">{{ f.status }}</span></td>
-              <td class="text-right tabular">{{ f.fieldCount }}</td>
+              <td class="hidden xl:table-cell text-right tabular">{{ f.fieldCount }}</td>
               @if (isAdmin()) {
                 <td class="text-sm">
                   @if (f.startsJob) { {{ f.jobName || 'Job #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                 </td>
                 <td class="text-right tabular">{{ f.submissions ?? 0 }}</td>
-                <td class="text-xs whitespace-nowrap">@if (f.dateUpdated) { {{ f.dateUpdated | serverTime: 'dateTime' }} }</td>
+                <td class="hidden xl:table-cell text-xs whitespace-nowrap">@if (f.dateUpdated) { {{ f.dateUpdated | serverTime: 'dateTime' }} }</td>
               }
               <td class="text-right whitespace-nowrap">
                 @if (f.status === 'Active') {
