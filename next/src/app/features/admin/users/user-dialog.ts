@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Combobox } from '../../../shared/ui/combobox';
+import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -34,7 +34,10 @@ const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
 })
 export class UserDialog {
   readonly ref = inject<DialogRef<boolean>>(DialogRef);
-  readonly data = inject<{ user?: any; tenants: any[]; canPickTenant: boolean; accessProfiles?: AccessProfile[] }>(DIALOG_DATA);
+  readonly data = inject<{ user?: any; tenants: any[]; canPickTenant: boolean; accessProfiles?: AccessProfile[];
+    /** The people the list holds: who may be picked as the manager (MIG-274). */
+    people?: { appUserId: number; fullName?: string | null; username: string; tenantId?: number | null; userRole: string;
+      status?: string | null; position?: string | null }[] }>(DIALOG_DATA);
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
@@ -119,6 +122,19 @@ export class UserDialog {
   readonly defaultProfileName = computed(() =>
     this.accessProfiles().find(p => p.defaultProfile)?.profileName ?? '');
 
+  /** The workspace the form is for: the person's, or the one a platform administrator picks. */
+  private readonly tenant = signal<number | null>(this.data.user?.tenantId ?? null);
+
+  /**
+   * Who can be the manager: an active person of the same workspace who is not a platform administrator and not the
+   * person themself (the server also refuses a loop up the chain, which only it can see whole).
+   */
+  readonly managerOptions = computed<ComboboxOption[]>(() => (this.data.people ?? [])
+    .filter(p => p.status === 'Active' && p.userRole !== 'PLATFORM_ADMIN' && p.appUserId !== this.data.user?.appUserId
+      && (this.tenant() == null || p.tenantId === this.tenant()))
+    .map(p => ({ value: String(p.appUserId), label: p.fullName || p.username, hint: p.position || p.username }))
+    .sort((a, b) => a.label.localeCompare(b.label)));
+
   /** A platform administrator spans every tenant, so a tenant choice would be meaningless. */
   readonly needsTenant = computed(() => this.role() !== 'PLATFORM_ADMIN');
   readonly roleHint = computed(() => ROLES.find(r => r.value === this.role())?.hint ?? '');
@@ -141,6 +157,9 @@ export class UserDialog {
                  disabled: !!this.data.user && this.data.user.tenantId != null }],
     // Null is "the workspace default", which is also what the server reads an absent id as.
     pageAccessProfileId: [this.data.user?.pageAccessProfileId ?? null],
+    // MIG-274: whom their workflow approvals and escalations go to. Null is "no manager"; the form is sent whole, so
+    // clearing the picker clears it.
+    managerId: [this.data.user?.managerId ?? null],
     // No status here. addUser always creates an Active account and updateUser never reads the
     // field, so the picker this form used to carry saved nothing -- an administrator could set
     // Inactive, press Save, and watch the row stay Active. Activate/Deactivate on the row is the
@@ -151,6 +170,7 @@ export class UserDialog {
   constructor() {
     // The select is fed from ROLES, so the only values it can emit are the three role literals.
     this.form.get('userRole')!.valueChanges.subscribe((value: UserRole) => this.role.set(value));
+    this.form.get('tenantId')!.valueChanges.subscribe((value: number | null) => this.tenant.set(value ?? null));
     if (this.data.canPickTenant) {
       const load = (tenantId: number | null) => {
         if (!tenantId) { this.accessProfiles.set([]); return; }

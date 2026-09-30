@@ -36,6 +36,14 @@
         </datalist>
       </app-field>
 
+      @if (role() !== 'PLATFORM_ADMIN') {
+        <app-field label="Manager" for="managerId" class="sm:col-span-2"
+                   hint="Whom their workflow approvals go to when a step says &quot;their manager&quot;, and whom overdue tasks escalate to.">
+          <app-combobox id="managerId" formControlName="managerId" [numeric]="true" placeholder="Search people…"
+                        clearLabel="No manager" [options]="managerOptions()" />
+        </app-field>
+      }
+
       <app-field label="Phone" for="phoneNumber" class="sm:col-span-2"
                  hint="Pick the country, then the number as it is written there.">
         <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="submitted()" />

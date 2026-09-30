@@ -358,6 +358,10 @@
                 <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5"
                      [title]="user.position">{{ user.position }}</div>
               }
+              @if (user.managerName) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5" data-test="reports-to"
+                     [title]="'Reports to ' + user.managerName">Reports to {{ user.managerName }}</div>
+              }
             </td>
 
             <!-- What the person can open: the profile (or the default) and what it comes to, with

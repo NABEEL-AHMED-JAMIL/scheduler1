@@ -56,6 +56,9 @@ export interface AppUser {
   fullName?: string;
   /** Job title. Separate from userRole, which is the permission level. */
   position?: string | null;
+  /** MIG-274: their manager in the workspace, and the manager's name. */
+  managerId?: number | null;
+  managerName?: string | null;
   pageAccessProfileId?: number | null;
   pageAccessProfileName?: string | null;
   /** From the server's batched summary: pages the person opens, exceptions they carry. */
@@ -308,13 +311,13 @@ export class Users implements OnInit {
 
   create(): void {
     this.withAccessProfiles(accessProfiles => this.dialog.open<boolean>(UserDialog, {
-      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles }, hasBackdrop: true,
+      data: { tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles, people: this.users() }, hasBackdrop: true,
     }).closed.subscribe(saved => { if (saved) this.load(); }));
   }
 
   edit(user: AppUser): void {
     this.withAccessProfiles(accessProfiles => this.dialog.open<boolean>(UserDialog, {
-      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles }, hasBackdrop: true,
+      data: { user, tenants: this.tenants(), canPickTenant: this.canPickTenant(), accessProfiles, people: this.users() }, hasBackdrop: true,
     }).closed.subscribe(saved => { if (saved) this.load(); }));
   }
 
