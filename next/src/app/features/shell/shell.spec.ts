@@ -220,10 +220,14 @@ describe('shell navigation', () => {
       const { fixture, shell: s, el } = await rendered();
       s.toggleMenu('Data');
       await fixture.whenStable();
-      const soon = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/ask"]')!;
-      const built = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/analytics"]')!;
-      expect(soon.querySelector('.pill')?.textContent?.trim()).toBe('Soon');
-      expect(built.querySelector('.pill')).toBeNull();
+      // Every Data entry is marked exactly when its page is not built; Ask your data is built (Wave 5).
+      const data = s.nav().find(item => item.label === 'Data')!.children ?? [];
+      expect(data.find(c => c.path === '/data/ask')?.soon).toBeFalsy();
+      for (const entry of data) {
+        const link = el.querySelector<HTMLElement>(`[data-nav-menu="Data"] a[href="${entry.path}"]`)!;
+        if (entry.soon) expect(link.querySelector('.pill')?.textContent?.trim(), entry.path).toBe('Soon');
+        else expect(link.querySelector('.pill'), entry.path).toBeNull();
+      }
     });
 
     it('offers a skip link to the main content', async () => {
