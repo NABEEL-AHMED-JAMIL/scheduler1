@@ -14,7 +14,7 @@ import { useMemoryStorage } from './shared/testing/memory-storage';
 /**
  * MIG-246 (Wave 4) and MIG-267 (Wave 5): the console's top navigation after the MIG-218 renames.
  *
- * Menu groups: Dashboard, Integration, Pipelines, Documents, Data, Forms, Workflows, AI,
+ * Menu groups: Dashboard, Integration, Pipelines, Documents, Data, Forms, AI,
  * Configuration, Billing, Administration. The renames are UI labels only -- database and API names
  * and the access-profile page keys keep their meaning -- and every address the console ever had
  * still lands on its page: a bookmark, a document link or a stored notification link never ends on
@@ -240,13 +240,9 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
   const SOON: [string, string, string][] = [
-    ['/integration/connectors', 'Connector Hub', 'connector-hub'],
     ['/data/ask', 'Ask your data', 'ask-data'],
-    ['/data/catalog', 'Data Catalog', 'data-catalog'],
     ['/forms/builder', 'Form builder', 'forms'],
     ['/forms/submissions', 'Submissions', 'form-submissions'],
-    ['/workflows/inbox', 'Task inbox', 'task-inbox'],
-    ['/workflows/designer', 'Workflow designer', 'workflow-designer'],
   ];
   for (const [path, title, key] of SOON) {
     it(`${path} is titled, gated by '${key}', and says it is coming`, () => {
@@ -300,7 +296,6 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   const DASHBOARD = ['Dashboard -> /dashboard'];
   const INTEGRATION_SOON = [
-    'Integration › Connector Hub (soon) -> /integration/connectors',
     'Integration › API Collections -> /integration/api-collections',
     'Integration › Sources -> /integration/sources',
   ];
@@ -323,7 +318,6 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   ];
   const DATA_SOON = [
     'Data › Ask your data (soon) -> /data/ask',
-    'Data › Data Catalog (soon) -> /data/catalog',
   ];
   const DATA = [
     'Data › Analytics Studio -> /data/analytics',
@@ -332,8 +326,6 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const FORMS_AND_WORKFLOWS = [
     'Forms › Form builder (soon) -> /forms/builder',
     'Forms › Submissions (soon) -> /forms/submissions',
-    'Workflows › Task inbox (soon) -> /workflows/inbox',
-    'Workflows › Workflow designer (soon) -> /workflows/designer',
   ];
   const CONFIGURATION = [
     'Configuration › Task Registry -> /configuration/task-registry',
