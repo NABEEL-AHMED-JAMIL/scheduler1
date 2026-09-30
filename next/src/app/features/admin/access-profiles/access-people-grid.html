@@ -10,13 +10,13 @@
           <th class="access-grid-person" aria-hidden="true"></th>
           <th class="access-grid-profile" aria-hidden="true"></th>
           @for (group of groupsOfColumns(); track group.section) {
-            <th class="access-grid-section" [attr.colspan]="group.pages.length">{{ group.section }}</th>
+            <th class="access-grid-section" [attr.colspan]="group.pages.length" [title]="group.section">{{ group.section }}</th>
           }
         </tr>
         <tr class="access-grid-head-columns">
           <th class="access-grid-person">Person</th>
           <th class="access-grid-profile">Profile</th>
-          @for (page of pages(); track page.key) {
+          @for (page of columns(); track page.key) {
             <th class="access-grid-page" [class.access-grid-first]="isFirstOfSection($index)">
               <span>{{ page.label }}</span>
             </th>
@@ -92,7 +92,7 @@
           }
         }
         @if (shown() === 0) {
-          <tr><td [attr.colspan]="pages().length + 2" class="text-center text-[color:var(--text-muted)] py-10">
+          <tr><td [attr.colspan]="columns().length + 2" class="text-center text-[color:var(--text-muted)] py-10">
             @if (search()) { Nobody matches “{{ search() }}”. } @else { No tenant users in this workspace yet. }
           </td></tr>
         }

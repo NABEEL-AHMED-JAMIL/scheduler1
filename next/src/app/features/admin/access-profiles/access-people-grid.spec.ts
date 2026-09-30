@@ -46,6 +46,35 @@ describe('AccessPeopleGrid', () => {
     expect([0, 1, 2, 3, 4].map(i => g.isFirstOfSection(i))).toEqual([false, false, false, true, true]);
   });
 
+  // The live catalogue interleaves sections (Documents, Data, Documents, AI, Integration, Documents...): each section is
+  // one header over all its pages, in the order sections first appear, and every row's cells follow the same order.
+  it('keeps each section in one group when the catalogue interleaves them', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting()] });
+    const fixture = TestBed.createComponent(AccessPeopleGrid);
+    const mixed: PageCatalogueEntry[] = [
+      { key: 'jobs', label: 'Schedules', section: 'Pipelines', route: '/a' },
+      { key: 'objects', label: 'Browse files', section: 'Documents', route: '/b' },
+      { key: 'analytics', label: 'Analytics Studio', section: 'Data', route: '/c' },
+      { key: 'tools-converter', label: 'Document Converter', section: 'Documents', route: '/d' },
+      { key: 'queue', label: 'Queue', section: 'Pipelines', route: '/e' },
+    ];
+    fixture.componentRef.setInput('people', [person(45, 'Ava Patel', null, null, ['jobs', 'tools-converter'])]);
+    fixture.componentRef.setInput('profiles', [OPERATOR]);
+    fixture.componentRef.setInput('pages', mixed);
+    fixture.componentRef.setInput('search', '');
+    const g = fixture.componentInstance;
+
+    expect(g.groupsOfColumns().map(c => [c.section, c.pages.map(p => p.key)])).toEqual([
+      ['Pipelines', ['jobs', 'queue']], ['Documents', ['objects', 'tools-converter']], ['Data', ['analytics']]]);
+    expect(g.columns().map(p => p.key)).toEqual(['jobs', 'queue', 'objects', 'tools-converter', 'analytics']);
+    expect(g.groups()[0].rows[0].cells.map(c => c.page.key)).toEqual(['jobs', 'queue', 'objects', 'tools-converter', 'analytics']);
+    expect(g.groups()[0].rows[0].cells.map(c => c.open)).toEqual([true, false, false, true, false]);
+    fixture.detectChanges();
+    const headers = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.access-grid-page')).map(th => th.textContent!.trim());
+    expect(headers).toEqual(['Schedules', 'Queue', 'Browse files', 'Document Converter', 'Analytics Studio']);
+  });
+
   it('groups people under their profile, default group first, with the profile\'s own pattern on the header', () => {
     const g = grid([
       person(44, 'Olivia Bennett', 2, 'Analyst', ['jobs', 'queue', 'reports']),

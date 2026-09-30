@@ -65,15 +65,22 @@ export class AccessPeopleGrid {
   /** Drop every exception a person carries. */
   readonly reset = output<AccessPerson>();
 
+  /**
+   * Each section's pages under one header, sections in the order they first appear. The catalogue interleaves them
+   * (Documents, Data, Documents, AI...), and grouping only neighbours drew one narrow header per page, overlapping.
+   */
   readonly groupsOfColumns = computed<ColumnGroup[]>(() => {
-    const groups: ColumnGroup[] = [];
+    const bySection = new Map<string, ColumnGroup>();
     for (const page of this.pages()) {
-      const last = groups[groups.length - 1];
-      if (last && last.section === page.section) last.pages.push(page);
-      else groups.push({ section: page.section, pages: [page] });
+      const group = bySection.get(page.section);
+      if (group) group.pages.push(page);
+      else bySection.set(page.section, { section: page.section, pages: [page] });
     }
-    return groups;
+    return [...bySection.values()];
   });
+
+  /** The columns in the order the header draws them: section by section. */
+  readonly columns = computed<PageCatalogueEntry[]>(() => this.groupsOfColumns().flatMap(group => group.pages));
 
   readonly defaultProfile = computed(() => this.profiles().find(p => p.defaultProfile) ?? null);
 
@@ -85,7 +92,7 @@ export class AccessPeopleGrid {
   });
 
   readonly groups = computed<ProfileGroup[]>(() => {
-    const pages = this.pages();
+    const pages = this.columns();
     const profiles = this.profiles();
     const fallback = this.defaultProfile();
     const byProfile = new Map<string, ProfileGroup>();
