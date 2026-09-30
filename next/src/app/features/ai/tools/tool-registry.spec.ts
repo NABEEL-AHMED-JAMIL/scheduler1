@@ -22,7 +22,7 @@ const TOOLS = [
   tool({ name: 'get_reports', title: 'Run report', page: 'reports', enabledInWorkspace: false, switchedInWorkspace: true }),
 ];
 
-function render(opts: { admin?: boolean; setEnabled?: () => Observable<any> } = {}) {
+function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => Observable<any> } = {}) {
   const api = {
     tools: vi.fn(() => of({ status: 'SUCCESS', data: structuredClone(TOOLS) })),
     runs: vi.fn(() => of({ status: 'SUCCESS', data: [{ toolRunId: 1004, status: 'answered' }, { toolRunId: 1003, status: 'answered' }] })),
@@ -30,6 +30,7 @@ function render(opts: { admin?: boolean; setEnabled?: () => Observable<any> } = 
       ? [{ callId: 1, toolRunId: 1004, seq: 1, toolName: 'get_jobs', outcome: 'allowed', dateCreated: '2026-09-28T16:57:55.926+00:00' }]
       : [{ callId: 2, toolRunId: 1003, seq: 1, toolName: 'run_pipeline', outcome: 'confirmed', dateCreated: '2026-09-28T11:05:00.000+00:00' }] } })),
     setEnabled: vi.fn(opts.setEnabled ?? ((name: string, enabled: boolean) => of({ status: 'SUCCESS', message: `${name} is ${enabled ? 'on' : 'off'} in this workspace.` }))),
+    workspaces: vi.fn(() => of({ status: 'SUCCESS', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }, { tenantId: 2900, tenantName: 'Default' }] })),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const admin = opts.admin ?? true;
@@ -41,7 +42,7 @@ function render(opts: { admin?: boolean; setEnabled?: () => Observable<any> } = 
       provideRouter([]),
       { provide: AssistantApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { canManageAgents: () => admin, isTenantAdmin: () => admin } },
+      { provide: AuthService, useValue: { canManageAgents: () => admin, isTenantAdmin: () => admin, isPlatformAdmin: () => !!opts.platform } },
     ],
   });
   const fixture = TestBed.createComponent(ToolRegistry);
@@ -119,5 +120,26 @@ describe('Tool Registry', () => {
     screen.stateFilter.set('');
     screen.search.set('pipeline');
     expect(screen.filtered().map(t => t.name)).toEqual(['get_jobs', 'run_pipeline']);
+  });
+  // A platform administrator has no workspace of its own: tools/list refused it ("names none") and the page showed
+  // an empty registry. It now picks the workspace first, the way Access profiles does.
+  it('a platform administrator picks a workspace before any tool is read', () => {
+    const { el, api } = render({ platform: true });
+    expect(api.workspaces).toHaveBeenCalled();
+    expect(api.tools).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-testid="tool-tenant-picker"]')).not.toBeNull();
+    expect(el.textContent).toContain('Choose a workspace to see its tools.');
+  });
+
+  it('reads and switches the picked workspace\'s tools', () => {
+    const { screen, api, fixture, row } = render({ platform: true });
+    screen.pickTenant('2924');
+    fixture.detectChanges();
+    expect(api.tools).toHaveBeenCalledWith(2924);
+    expect(api.runs).toHaveBeenCalledWith(25, 2924);
+    const box = row('get_jobs').querySelector<HTMLInputElement>('input[role="switch"]')!;
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    expect(api.setEnabled).toHaveBeenCalledWith('get_jobs', false, 2924);
   });
 });

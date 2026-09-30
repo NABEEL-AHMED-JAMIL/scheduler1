@@ -210,51 +210,27 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/tools/list",
-      "GET /aiPrompt.json/tools/runs?limit=25",
-      "GET /aiPrompt.json/tools/trace?toolRunId=1004"
+      "GET /tenant.json/listTenants"
     ],
     "headings": [
       "Tool Registry",
-      "Tools (6 of 6)"
+      "Tools (0 of 0)"
     ],
     "buttons": [
-      "Columns",
       "Refresh"
     ],
-    "columns": [
-      [
-        "Tool",
-        "Service",
-        "Input → output",
-        "Permission",
-        "Asks first",
-        "Enabled",
-        "Last used"
-      ]
-    ],
+    "columns": [],
     "fields": [
+      "Choose a workspace…",
       "Kind",
       "Search tools",
       "State",
-      "Switch call_api on in this workspace",
-      "Switch delete_file on in this workspace",
-      "Switch get_jobs on in this workspace",
-      "Switch get_sources on in this workspace",
-      "Switch join_data on in this workspace",
-      "Switch run_pipeline on in this workspace"
+      "Workspace"
     ],
     "links": [
       "/ai/assistant"
     ],
-    "rows": [
-      "get_sourcesData sources | Sources | search?, page?, limit? → list | Tenant userReads | — | Enabled | Never",
-      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Tenant administratorReads | — | Enabled | Never",
-      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Tenant userReads | — | Enabled | 29 Sep, 06:57",
-      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Tenant userWrites | Asks first | Enabled | 29 Sep, 06:58",
-      "delete_fileDelete a file | Storage | bucket, key → result | Tenant userWrites | Asks first | Enabled | Never",
-      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Tenant userReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
-    ]
+    "rows": []
   },
   "the tool registry, as a tenant user with every page": {
     "url": "/ai/tools",

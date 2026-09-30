@@ -4,6 +4,7 @@ import { catchError, forkJoin, map, of } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { roleLabel } from '../../../core/auth/auth.models';
+import { Combobox } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -22,10 +23,13 @@ const RUNS_READ = 25;
  * whether it asks first, whether it is on here -- Blocked with the reason when the platform or the
  * person's role rules it out -- and when it was last called. A workspace administrator switches a
  * tool on or off for the workspace (tools/setEnabled); a blocked tool's switch cannot move.
+ *
+ * Tools are switched per workspace, and a platform administrator has none of its own: it picks the workspace first
+ * (as on Access profiles), and every call names it. Without that, tools/list refused it and the page looked empty.
  */
 @Component({
   selector: 'app-tool-registry',
-  imports: [Icon, TableShell, StatTile, ServerTimePipe, RouterLink],
+  imports: [Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox],
   templateUrl: './tool-registry.html',
 })
 export class ToolRegistry implements OnInit {
@@ -43,6 +47,12 @@ export class ToolRegistry implements OnInit {
   readonly kindFilter = signal('');
   readonly stateFilter = signal('');
   readonly canSwitch = computed(() => this.auth.canManageAgents());
+
+  readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
+  readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
+  readonly tenantId = signal<number | null>(null);
+  readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
+  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
 
   readonly filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
@@ -63,12 +73,31 @@ export class ToolRegistry implements OnInit {
     };
   });
 
-  ngOnInit(): void { this.load(); }
+  ngOnInit(): void {
+    if (this.canPickTenant()) {
+      this.loading.set(false);
+      this.api.workspaces().subscribe({
+        next: r => this.tenants.set(r.status === API_SUCCESS ? r.data ?? [] : []),
+        error: () => this.tenants.set([]),
+      });
+      return;
+    }
+    this.load();
+  }
+
+  pickTenant(value: string): void {
+    const id = Number(value);
+    this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
+    this.tools.set([]);
+    this.lastUsed.set({});
+    if (this.tenantId()) this.load();
+  }
 
   load(): void {
+    if (this.needsWorkspace()) return;
     this.loading.set(true);
     this.error.set('');
-    this.api.tools().subscribe({
+    this.api.tools(this.tenantId() ?? undefined).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
@@ -81,12 +110,13 @@ export class ToolRegistry implements OnInit {
 
   /** The newest runs' traces, read side by side; a trace that fails to load just says nothing. */
   private loadLastUsed(): void {
-    this.api.runs(RUNS_READ).pipe(
+    const tenant = this.tenantId() ?? undefined;
+    this.api.runs(RUNS_READ, tenant).pipe(
       map(r => (r.status === API_SUCCESS ? r.data ?? [] : [])),
       catchError(() => of([])),
     ).subscribe(runs => {
       if (!runs.length) return;
-      forkJoin(runs.map(run => this.api.trace(run.toolRunId).pipe(
+      forkJoin(runs.map(run => this.api.trace(run.toolRunId, tenant).pipe(
         map(r => (r.status === API_SUCCESS ? r.data?.calls ?? [] : []) as ToolCall[]),
         catchError(() => of([] as ToolCall[])),
       ))).subscribe(traces => this.lastUsed.set(lastUsedByTool(traces)));
@@ -99,7 +129,8 @@ export class ToolRegistry implements OnInit {
   toggle(t: ToolDef, box: HTMLInputElement): void {
     const enabled = box.checked;
     this.busy.set(t.name);
-    this.api.setEnabled(t.name, enabled).subscribe({
+    const tenant = this.tenantId();
+    (tenant ? this.api.setEnabled(t.name, enabled, tenant) : this.api.setEnabled(t.name, enabled)).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status !== API_SUCCESS) { box.checked = !enabled; this.toast.error(r.message); return; }

@@ -51,20 +51,26 @@ export class AssistantApi {
     return this.http.delete<ApiResponse>(`${BASE()}/assistant/delete`, { params: { conversationId } });
   }
 
-  tools(): Observable<ApiResponse<ToolDef[]>> {
-    return this.http.get<ApiResponse<ToolDef[]>>(`${BASE()}/tools/list`);
+  /** `tenantId`: the workspace a platform administrator is looking at (it has none of its own); others leave it out. */
+  tools(tenantId?: number | null): Observable<ApiResponse<ToolDef[]>> {
+    return this.http.get<ApiResponse<ToolDef[]>>(`${BASE()}/tools/list`, { params: withTenant({}, tenantId) });
   }
 
-  setEnabled(toolName: string, enabled: boolean): Observable<ApiResponse> {
-    return this.http.post<ApiResponse>(`${BASE()}/tools/setEnabled`, { toolName, enabled });
+  setEnabled(toolName: string, enabled: boolean, tenantId?: number | null): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${BASE()}/tools/setEnabled`, { toolName, enabled }, { params: withTenant({}, tenantId) });
   }
 
-  trace(toolRunId: number): Observable<ApiResponse<ToolTrace>> {
-    return this.http.get<ApiResponse<ToolTrace>>(`${BASE()}/tools/trace`, { params: { toolRunId } });
+  trace(toolRunId: number, tenantId?: number | null): Observable<ApiResponse<ToolTrace>> {
+    return this.http.get<ApiResponse<ToolTrace>>(`${BASE()}/tools/trace`, { params: withTenant({ toolRunId }, tenantId) });
   }
 
-  runs(limit = 20): Observable<ApiResponse<ToolRun[]>> {
-    return this.http.get<ApiResponse<ToolRun[]>>(`${BASE()}/tools/runs`, { params: { limit } });
+  runs(limit = 20, tenantId?: number | null): Observable<ApiResponse<ToolRun[]>> {
+    return this.http.get<ApiResponse<ToolRun[]>>(`${BASE()}/tools/runs`, { params: withTenant({ limit }, tenantId) });
+  }
+
+  /** The workspaces a platform administrator may pick from (Identity's tenant.json/listTenants). */
+  workspaces(): Observable<ApiResponse<{ tenantId: number; tenantName: string }[]>> {
+    return this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`);
   }
 
   dataset(datasetRef: string, offset = 0, limit = 50): Observable<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>> {
@@ -82,4 +88,9 @@ export class AssistantApi {
       }),
     );
   }
+}
+
+/** The query parameters, plus tenantId when one is given. */
+function withTenant(params: Record<string, string | number>, tenantId?: number | null): Record<string, string | number> {
+  return tenantId ? { ...params, tenantId } : params;
 }

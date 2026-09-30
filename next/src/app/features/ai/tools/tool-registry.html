@@ -8,7 +8,13 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+      @if (canPickTenant()) {
+        <div class="w-56" data-testid="tool-tenant-picker">
+          <app-combobox id="tools-tenant" ariaLabel="Workspace" [selected]="tenantId() ? '' + tenantId() : ''" (selectedChange)="pickTenant($event)"
+                        placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
+        </div>
+      }
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || needsWorkspace()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
       <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
@@ -28,7 +34,7 @@
 
   <app-table-shell heading="Tools" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tools().length"
-                   [emptyMessage]="hasFilters() ? 'No tool matches the current filters.' : 'No tools registered.'"
+                   [emptyMessage]="needsWorkspace() ? 'Choose a workspace to see its tools.' : hasFilters() ? 'No tool matches the current filters.' : 'No tools registered.'"
                    emptyIcon="plug" (retry)="load()">
     <ng-container toolbar>
       <select class="input max-w-32" aria-label="Kind" [value]="kindFilter()" (change)="kindFilter.set($any($event.target).value)">
