@@ -35,6 +35,13 @@ const PAD = 26;
     @if (!data().length) {
       <p class="field-note text-[color:var(--text-muted)]">{{ emptyMessage() }}</p>
     } @else {
+      <!-- The FORMATTED bounds, not the raw ones. bounds().highX is the number the geometry
+           divides by, and printing it put "1267.19353428047" on an axis -- the trailing digits an
+           artefact of the CSV reader typing the column as DOUBLE.
+
+           HTML, not <text> inside the svg (MIG-257): the drawing is 600 units wide and scaled to
+           its card, so an 11-unit label came out at 5-6px in a 300px dashboard tile. -->
+      <span class="scatter-axis block text-[11px] text-[color:var(--text-muted)] tabular">{{ bounds().highYLabel }}</span>
       <svg [attr.viewBox]="'0 0 ' + width + ' ' + height()" class="w-full"
            [style.height.px]="height()" role="img" [attr.aria-label]="summary()">
         <line [attr.x1]="pad" [attr.y1]="height() - pad" [attr.x2]="width - 4"
@@ -47,16 +54,11 @@ const PAD = 26;
             <title>{{ dot.title }}: {{ dot.shownX }}, {{ dot.shownY }}</title>
           </circle>
         }
-        <!-- The FORMATTED bounds, not the raw ones. bounds().highX is the number the geometry
-             divides by, and printing it put "1267.19353428047" on an axis in 10px type -- the
-             trailing digits an artefact of the CSV reader typing the column as DOUBLE. The two
-             label fields beside it were computed for this and rendered nowhere. -->
-        <text [attr.x]="pad" [attr.y]="height() - 6" font-size="11"
-              fill="var(--text-muted)">{{ bounds().lowX }}</text>
-        <text [attr.x]="width - 4" [attr.y]="height() - 6" font-size="11" text-anchor="end"
-              fill="var(--text-muted)">{{ bounds().highXLabel }}</text>
-        <text x="2" y="12" font-size="11" fill="var(--text-muted)">{{ bounds().highYLabel }}</text>
       </svg>
+      <div class="flex justify-between text-[11px] text-[color:var(--text-muted)] tabular">
+        <span class="scatter-axis">{{ bounds().lowX }}</span>
+        <span class="scatter-axis">{{ bounds().highXLabel }}</span>
+      </div>
       <p class="text-[11px] text-[color:var(--text-muted)] text-center">
         {{ xLabel() }} across, {{ yLabel() }} up
       </p>

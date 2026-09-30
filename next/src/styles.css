@@ -1447,7 +1447,9 @@ html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
   /* The row a keyboard has reached in a list the focus does not enter (a combobox's options:
      the focus stays in the box and aria-activedescendant names the row). Was an inline style. */
   .menu-item.is-active { background: var(--surface-sunken); color: var(--text-primary); }
-  .menu-item-danger { @apply text-crit-500 hover:text-crit-500; }
+  /* --crit-text, not @apply text-crit-500: an applied utility skips the dark remap, so Delete sat at
+     crit-500 on the dark menu (about 3:1). */
+  .menu-item-danger, .menu-item-danger:hover { color: var(--crit-text); }
   /* A row that cannot be chosen now (Run now on a job already running, Delete on a task still
      in use) looked exactly like one that could -- worse on a red Delete. */
   .menu-item:disabled { @apply opacity-45 cursor-not-allowed; background: none; }

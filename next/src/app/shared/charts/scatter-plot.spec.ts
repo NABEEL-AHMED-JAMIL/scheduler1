@@ -28,10 +28,12 @@ describe('scatter plot axis labels', () => {
     return fixture;
   }
 
-  /** The three axis labels, which are the only <text> children the svg has. */
+  /** The three axis labels (HTML beside the svg since MIG-257, so they are not scaled with it). */
   function axisText(fixture: ComponentFixture<ScatterPlot>): string[] {
-    return Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('svg > text'))
+    // In the DOM the y bound comes first, above the plot; returned x-low, x-high, y as before.
+    const [y, low, high] = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('.scatter-axis'))
       .map(node => (node.textContent ?? '').trim());
+    return [low, high, y];
   }
 
   /** The hover text on each dot, which was always formatted. */

@@ -32,11 +32,11 @@ export interface SplitRow {
               <div class="mt-1 flex h-1.5 rounded-full overflow-hidden bg-sunken"
                   >
                 @if (row.positive) {
-                  <span class="h-full bg-ok-500" [style.width.%]="row.positiveWidth"
+                  <span class="h-full bg-[color:var(--ok-text)]" [style.width.%]="row.positiveWidth"
                        ></span>
                 }
                 @if (row.negative) {
-                  <span class="h-full bg-crit-500" [style.width.%]="row.negativeWidth"
+                  <span class="h-full bg-[color:var(--crit-text)]" [style.width.%]="row.negativeWidth"
                        ></span>
                 }
               </div>
@@ -46,11 +46,11 @@ export interface SplitRow {
 
         <div class="mt-2 flex items-center gap-3 text-[11px] text-[color:var(--text-muted)]">
           <span class="flex items-center gap-1">
-            <span class="size-2 rounded-full bg-ok-500"></span>
+            <span class="size-2 rounded-full bg-[color:var(--ok-text)]"></span>
             {{ positiveLabel() }}
           </span>
           <span class="flex items-center gap-1">
-            <span class="size-2 rounded-full bg-crit-500"></span>
+            <span class="size-2 rounded-full bg-[color:var(--crit-text)]"></span>
             {{ negativeLabel() }}
           </span>
         </div>
