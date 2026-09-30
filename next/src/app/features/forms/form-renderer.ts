@@ -18,7 +18,7 @@ export interface AnswerChange {
   imports: [Field],
   template: `
     <div class="flex flex-col gap-4 min-w-0">
-      @for (f of fields(); track f.key; let i = $index) {
+      @for (f of fields(); track $index; let i = $index) {
         <app-field [label]="f.label" [for]="idPrefix() + '-' + i" [required]="f.required" [hint]="f.help || ''"
                    [error]="problems()[f.key] || ''">
           @switch (f.type) {
