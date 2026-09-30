@@ -133,6 +133,12 @@ export class Connections implements OnInit {
     });
   }
 
+  /** What ran, for a run with no prompt of its own to name. */
+  kindLabel(kind: string): string {
+    return ({ document: 'Document Intelligence', ask: 'Ask your data', try: 'Try it', tool: 'Assistant tool', run: 'Pipeline step' } as Record<string, string>)[kind]
+      ?? kind;
+  }
+
   /** A run's time as the list shows it: seconds with one decimal, or milliseconds under a second. */
   latency(ms: number | null | undefined): string {
     if (ms == null) return '—';

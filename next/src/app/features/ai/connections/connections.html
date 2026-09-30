@@ -219,7 +219,7 @@
                             <td class="min-w-0">
                               @if (r.promptId) {
                                 <a class="link-inline" [routerLink]="['/ai/prompts', r.promptId, 'edit']">{{ r.promptName || 'Prompt ' + r.promptId }}</a>
-                              } @else { <span class="text-[color:var(--text-secondary)]">{{ r.kind }}</span> }
+                              } @else { <span class="text-[color:var(--text-secondary)]">{{ kindLabel(r.kind) }}</span> }
                               @if (r.error) { <div class="text-xs text-crit-500 truncate max-w-[28rem]" [title]="r.error">{{ r.error }}</div> }
                             </td>
                             <td class="hidden xl:table-cell mono text-xs">{{ r.model || '—' }}</td>
@@ -241,7 +241,7 @@
                   <ul class="side-panel-list" data-test="connection-prompts">
                     @for (p of a.prompts; track p.promptId) {
                       <li>
-                        <a class="link-inline truncate" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a>
+                        <a class="link-inline truncate text-sm" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a>
                         <app-status [label]="p.status" [quiet]="true" />
                       </li>
                     }

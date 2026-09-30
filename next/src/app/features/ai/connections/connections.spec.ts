@@ -97,4 +97,11 @@ describe('Model connections -- what the selected connection has been doing', () 
     expect(screen.latency(380)).toBe('380 ms');
     expect(screen.latency(null)).toBe('—');
   });
+
+  it('names what ran when a run has no prompt of its own', () => {
+    const { screen } = screenAt(null);
+    expect(screen.kindLabel('document')).toBe('Document Intelligence');
+    expect(screen.kindLabel('ask')).toBe('Ask your data');
+    expect(screen.kindLabel('something-new')).toBe('something-new');
+  });
 });
