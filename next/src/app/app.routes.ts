@@ -359,10 +359,31 @@ export const routes: Routes = [
       // ---------------------------------------------------------------------------------------------
       // Forms and Workflows (Wave 5)
       // ---------------------------------------------------------------------------------------------
-      comingSoon('forms/builder', 'Form builder', 'forms',
-        'Build forms and share them securely, inside the workspace or by an expiring link.'),
-      comingSoon('forms/submissions', 'Submissions', 'form-submissions',
-        'Everything a form collected, with its approval state.'),
+      {
+        // Wave 5 Forms (lite): Core's /form.json, page 'forms'. Every member holding the page fills in the workspace's
+        // Active forms; building them is a workspace administrator's (the page hides it from anyone else, and it is
+        // read-only in a MANAGED workspace). Shared inside the workspace only: no public or expiring links yet.
+        path: 'forms/builder',
+        title: 'Form builder',
+        loadComponent: () => import('./features/forms/form-builder').then(m => m.FormBuilder),
+        data: { pageKey: 'forms' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'forms/:formId/fill',
+        title: 'Fill in a form',
+        loadComponent: () => import('./features/forms/form-fill').then(m => m.FormFill),
+        data: { pageKey: 'forms' },
+        canActivate: [pageGuard],
+      },
+      {
+        // What the forms collected (/formSubmission.json), page 'form-submissions': who, when, and the run each started.
+        path: 'forms/submissions',
+        title: 'Submissions',
+        loadComponent: () => import('./features/forms/form-submissions').then(m => m.FormSubmissions),
+        data: { pageKey: 'form-submissions' },
+        canActivate: [pageGuard],
+      },
       comingSoon('workflows/inbox', 'Task inbox', 'task-inbox',
         'The approvals and tasks waiting for you.'),
       comingSoon('workflows/designer', 'Workflow designer', 'workflow-designer',

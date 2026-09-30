@@ -243,8 +243,6 @@ describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', (
     ['/integration/connectors', 'Connector Hub', 'connector-hub'],
     ['/data/ask', 'Ask your data', 'ask-data'],
     ['/data/catalog', 'Data Catalog', 'data-catalog'],
-    ['/forms/builder', 'Form builder', 'forms'],
-    ['/forms/submissions', 'Submissions', 'form-submissions'],
     ['/workflows/inbox', 'Task inbox', 'task-inbox'],
     ['/workflows/designer', 'Workflow designer', 'workflow-designer'],
   ];
@@ -330,8 +328,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     'Data › Saved Analyses -> /data/analytics/dashboards',
   ];
   const FORMS_AND_WORKFLOWS = [
-    'Forms › Form builder (soon) -> /forms/builder',
-    'Forms › Submissions (soon) -> /forms/submissions',
+    'Forms › Form builder -> /forms/builder',
+    'Forms › Submissions -> /forms/submissions',
     'Workflows › Task inbox (soon) -> /workflows/inbox',
     'Workflows › Workflow designer (soon) -> /workflows/designer',
   ];

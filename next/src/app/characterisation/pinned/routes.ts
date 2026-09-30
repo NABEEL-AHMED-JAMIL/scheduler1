@@ -355,6 +355,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/forms/:formId/fill",
+      "title": "Fill in a form",
+      "pageKey": "forms",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/forms/submissions",
       "title": "Submissions",
       "pageKey": "form-submissions",
