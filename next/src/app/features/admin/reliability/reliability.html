@@ -1,0 +1,163 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Reliability</h1>
+      <p class="page-subtitle">Pipeline execution and billing against their 99.99% targets, from stored rows.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="range()" (valueChange)="setRange($event)" />
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()"><app-icon name="refresh" />Refresh</button>
+    </div>
+  </div>
+
+  @if (firing().length) {
+    <div class="card p-4 mb-4" role="alert" data-testid="burn-alert">
+      <div class="flex items-start gap-2">
+        <app-icon name="alert" class="icon-crit" />
+        <div class="text-sm">
+          @for (b of firing(); track b.sli + b.rule) {
+            <p><strong>{{ sliLabel(b.sli) }}</strong> is burning its error budget at {{ burnText(b.long?.burnRate) }}
+              over {{ b.long?.window }} ({{ ruleLabel(b.rule) }}, {{ b.severity }}).</p>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  <!-- Pipeline execution -->
+  <section class="card p-4" data-testid="slo-runs" aria-labelledby="slo-runs-title">
+    <h2 id="slo-runs-title" class="font-semibold text-sm">Pipeline execution</h2>
+    <p class="text-xs text-[color:var(--text-muted)] mb-3">
+      Runs that ended Completed, out of runs that ended. A retried run counts once. Skips, missed slots, refusals,
+      AI step failures and runs closed by a person are left out.
+    </p>
+    @if (runsLoading()) {
+      <div class="p-8 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
+    } @else if (runsError()) {
+      <div class="p-6 text-center"><p class="text-sm text-crit-500">{{ runsError() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadRuns()"><app-icon name="refresh" />Try again</button></div>
+    } @else if (runs(); as r) {
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <app-stat-tile label="Success rate" [value]="formatRate(r.successRate)" icon="check" [tone]="runsTone()"
+          [foot]="'target ' + formatRate(r.target)" />
+        <app-stat-tile label="Error budget left" [value]="runsBudget().value" icon="shield" [tone]="runsBudget().tone"
+          [foot]="r.bad + ' bad of ' + (r.errorBudgetRuns | number: '1.0-2') + ' allowed'" />
+        <app-stat-tile label="Runs counted" [value]="(r.numerator | number) + ' / ' + (r.denominator | number)" icon="play" tone="info"
+          foot="completed / ended" />
+        <app-stat-tile label="Left out" [value]="(r.excluded | number) ?? ''" icon="skip" tone="muted" foot="skips, refusals, closed by a person" />
+      </div>
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] mt-4">
+        <div class="min-w-0">
+          <h3 class="font-semibold text-xs mb-2">Runs by day</h3>
+          <app-bar-chart [data]="runBars()" [height]="120" emptyMessage="No run ended in this range." />
+        </div>
+        <div class="min-w-0 overflow-x-auto">
+          <table class="table-modern">
+            <thead><tr><th>Ended</th><th>Why</th><th>Counts as</th><th class="text-right">Runs</th></tr></thead>
+            <tbody>
+              @for (g of runGroups(); track g.outcome + g.reason) {
+                <tr [attr.data-group]="g.outcome + '/' + g.reason">
+                  <td>{{ g.outcome }}</td>
+                  <td>{{ reasonLabel(g.reason) }}</td>
+                  <td><span class="pill" [class.pill-ok]="g.slo === 'good'" [class.pill-crit]="g.slo === 'bad'"
+                    [class.pill-neutral]="g.slo === 'excluded'">{{ sloLabel(g.slo) }}</span></td>
+                  <td class="text-right tabular">{{ g.runs | number }}</td>
+                </tr>
+              }
+              @if (!runGroups().length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-4">No run ended in this range.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  </section>
+
+  <!-- Billing -->
+  <section class="card p-4 mt-4" data-testid="slo-billing" aria-labelledby="slo-billing-title">
+    <h2 id="slo-billing-title" class="font-semibold text-sm">Billing</h2>
+    <p class="text-xs text-[color:var(--text-muted)] mb-3">
+      Usage events priced into their day's bill, out of events accepted. A redelivered event counts once; events still
+      waiting for the rollup (under five minutes) are not counted yet.
+    </p>
+    @if (billingLoading()) {
+      <div class="p-8 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
+    } @else if (billingError()) {
+      <div class="p-6 text-center"><p class="text-sm text-crit-500">{{ billingError() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadBilling()"><app-icon name="refresh" />Try again</button></div>
+    } @else if (billing(); as b) {
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <app-stat-tile label="Success rate" [value]="formatRate(b.successRate)" icon="check" [tone]="billingTone()"
+          [foot]="'target ' + formatRate(b.target)" />
+        <app-stat-tile label="Error budget left" [value]="billingBudget().value" icon="shield" [tone]="billingBudget().tone"
+          [foot]="b.bad + ' bad of ' + (b.errorBudgetEvents | number: '1.0-2') + ' allowed'" />
+        <app-stat-tile label="Events counted" [value]="(b.numerator | number) + ' / ' + (b.denominator | number)" icon="database" tone="info"
+          foot="priced / accepted" />
+        <app-stat-tile label="Not priced" [value]="(b.unpriced | number) + ' · ' + (b.unrolled | number)" icon="alert"
+          [tone]="b.bad > 0 ? 'crit' : 'muted'" [foot]="'no rate · not rolled up; ' + b.pending + ' pending'" />
+      </div>
+      <div class="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] mt-4">
+        <div class="min-w-0">
+          <h3 class="font-semibold text-xs mb-2">Events by day</h3>
+          <app-bar-chart [data]="billingBars()" [height]="120" emptyMessage="No usage event arrived in this range." />
+        </div>
+        <div class="min-w-0 overflow-x-auto">
+          <table class="table-modern">
+            <thead><tr><th>Meter</th><th class="text-right">Accepted</th><th class="text-right">No rate</th><th class="text-right">Not rolled up</th></tr></thead>
+            <tbody>
+              @for (m of meters(); track m.meter) {
+                <tr [attr.data-meter]="m.meter">
+                  <td>{{ m.meter }}</td>
+                  <td class="text-right tabular">{{ m.accepted | number }}</td>
+                  <td class="text-right tabular" [class.text-crit-500]="m.unpriced > 0">{{ m.unpriced | number }}</td>
+                  <td class="text-right tabular" [class.text-crit-500]="m.unrolled > 0">{{ m.unrolled | number }}</td>
+                </tr>
+              }
+              @if (!meters().length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-4">No usage event arrived in this range.</td></tr> }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  </section>
+
+  <!-- Burn rates -->
+  <section class="card p-4 mt-4" data-testid="slo-burn" aria-labelledby="slo-burn-title">
+    <h2 id="slo-burn-title" class="font-semibold text-sm">Error budget burn, now</h2>
+    <p class="text-xs text-[color:var(--text-muted)] mb-3">
+      How many times faster than the 28-day budget allows each objective is failing. A rule fires when both its windows
+      burn faster than its threshold over at least ten counted operations, and then notifies every platform
+      administrator once per long window: a page as an error, a ticket as a warning.
+    </p>
+    @if (burnLoading()) {
+      <div class="p-6 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3"></div>Reading…</div>
+    } @else if (burnError()) {
+      <div class="p-6 text-center"><p class="text-sm text-crit-500">{{ burnError() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadBurn()"><app-icon name="refresh" />Try again</button></div>
+    } @else {
+      <div class="overflow-x-auto">
+        <table class="table-modern">
+          <thead><tr><th>Objective</th><th>Rule</th><th class="text-right">Threshold</th><th class="text-right">Long window</th>
+            <th class="text-right">Short window</th><th>State</th></tr></thead>
+          <tbody>
+            @for (b of burn(); track b.sli + b.rule) {
+              <tr [attr.data-burn]="b.sli + '/' + b.rule">
+                <td>{{ sliLabel(b.sli) }}</td>
+                <td>{{ ruleLabel(b.rule) }} <span class="text-xs text-[color:var(--text-muted)]">({{ b.severity }})</span></td>
+                <td class="text-right tabular">{{ burnText(b.threshold) }}</td>
+                @if (b.unmeasured) {
+                  <td colspan="2" class="text-right text-[color:var(--text-muted)]">{{ b.unmeasured }}</td>
+                } @else {
+                  <td class="text-right tabular">{{ burnText(b.long?.burnRate) }} <span class="text-xs text-[color:var(--text-muted)]">{{ b.long?.window }}, {{ b.long?.bad }}/{{ (b.long?.good ?? 0) + (b.long?.bad ?? 0) }}</span></td>
+                  <td class="text-right tabular">{{ burnText(b.short?.burnRate) }} <span class="text-xs text-[color:var(--text-muted)]">{{ b.short?.window }}, {{ b.short?.bad }}/{{ (b.short?.good ?? 0) + (b.short?.bad ?? 0) }}</span></td>
+                }
+                <td><span class="pill" [class.pill-crit]="b.firing" [class.pill-ok]="!b.firing && !b.unmeasured"
+                  [class.pill-neutral]="!!b.unmeasured">{{ b.firing ? 'Firing' : (b.unmeasured ? 'Not measured' : 'OK') }}</span></td>
+              </tr>
+            }
+            @if (!burn().length) { <tr><td colspan="6" class="text-center text-[color:var(--text-muted)] py-4">No burn rate measured.</td></tr> }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>

@@ -594,6 +594,15 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // MIG-196: the 99.99% objectives for pipeline execution and billing, their error budgets and burn rates.
+        // Platform-wide: every call behind it is PLATFORM_ADMIN (process /reliability.json, billing /billing.json/reliability).
+        path: 'administration/reliability',
+        title: 'Reliability',
+        loadComponent: () => import('./features/admin/reliability/reliability').then(m => m.Reliability),
+        data: { minRole: 'PLATFORM_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'administration/team-activity',
         title: "Our team's activity",
         loadComponent: () =>
