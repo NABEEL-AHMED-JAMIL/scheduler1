@@ -265,7 +265,6 @@ export class JobHistory {
     });
   }
 
-
   readonly outcomeMix = computed(() =>
     this.summary().map(s => ({ name: s.status, value: s.count })));
 

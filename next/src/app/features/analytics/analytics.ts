@@ -685,7 +685,6 @@ export class Analytics implements OnInit {
     this.closePanel();
   }
 
-
   private readonly storage = inject(StorageService);
   /** Server times, read and written as the rest of the console does. */
   private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
@@ -1122,7 +1121,6 @@ export class Analytics implements OnInit {
     this.gridFilters.set(filters);
     this.loadPage(0);
   }
-
 
   private clearGridState(): void {
     this.gridSort.set(null);

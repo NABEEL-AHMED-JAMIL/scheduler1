@@ -33,7 +33,6 @@ const REGISTRY_TASKS = { status: "SUCCESS", message: "17 step task(s) and 2 lega
   {"code": "legacy", "name": "Legacy: Reference: CSV check and summarise", "kind": "Legacy", "description": "An existing pipeline, run by its worker exactly as before (the task's XML payload over Kafka).", "configSchema": {"type": "object", "properties": {"pipelineId": {"type": "string", "title": "Pipeline", "format": "pipeline", "description": "The existing pipeline (its pipelineId on the worker) this step is."}}, "additionalProperties": false}, "backingService": "worker", "retry": {"maxAttempts": 1, "delaySeconds": 0}, "timeoutSeconds": null, "requiredPermission": "TENANT_USER", "enabledByDefault": true, "overridable": false, "runsInEngine": false, "enabled": true, "overridden": false, "available": true, "disabledReason": null, "pipelineKey": 100167, "pipelineId": "REF_CSV_CHECK_V1", "config": {"pipelineId": "REF_CSV_CHECK_V1"}},
 ] };
 
-
 /** The schemas cut above, put back in their live shape: rows in (none for a Read task), rows out (none for Legacy). */
 const ROWS = { type: 'array', items: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean', 'null'] } } };
 const WITH_SCHEMAS = { ...REGISTRY_TASKS, data: REGISTRY_TASKS.data.map((t: any) => ({ ...t,

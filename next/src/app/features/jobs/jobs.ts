@@ -561,7 +561,6 @@ export class Jobs implements OnInit {
 
   readonly recentRunBars = RECENT_RUN_BARS;
 
-
   /** "24 Sep 2026" for the schedule's start and end days, which the API sends as "2026-09-24". */
   readonly dayLabel = dayLabel;
 

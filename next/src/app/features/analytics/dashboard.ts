@@ -70,7 +70,6 @@ export interface Mark {
   inert?: boolean;
 }
 
-
 /**
  * The half of a tile that is about presentation rather than about which question it asks.
  *
@@ -1032,7 +1031,6 @@ interface SavedAnalysisConfig {
   sort?: AnalysisSort | null;
 }
 
-
 /** Below this many groups a histogram is a bar chart with the labels taken off. */
 const HISTOGRAM_FLOOR = 8;
 
@@ -1152,7 +1150,6 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly heightMin = WIDGET_HEIGHT_MIN;
   readonly heightMax = WIDGET_HEIGHT_MAX;
   readonly searchFrom = SEARCH_FROM;
-
 
   /**
    * A chart's value label, formatted the way the table formats a cell.
@@ -1348,28 +1345,6 @@ export class Dashboards implements OnInit, OnDestroy {
     this.filterOpen.set(true);
     this.runAll();
   }
-
-
-  // ---- turning one result into whatever the chosen kind needs -------------------------------
-  //
-  // Every one of these reads the SAME view. A widget kind is a way of looking at one answer, not
-  // a different question, and a tile that re-queried when its picker moved would let two kinds of
-  // the same analysis disagree.
-
-  /** The measure column's name, humanised: amount_sum reads as "amount sum". */
-
-
-
-
-
-
-
-
-
-
-
-
-
 
   readonly dashboards = signal<Dashboard[]>([]);
   readonly loading = signal(false);
@@ -2158,7 +2133,6 @@ export class Dashboards implements OnInit, OnDestroy {
     });
   }
 
-
   /**
    * The rows the tile itself draws.
    *
@@ -2506,8 +2480,6 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   // ---- small renderings -------------------------------------------------------------------
-
-
 
   /**
    * A saved time as the console writes one: "19 Sep 2026, 09:53". The server sends Chicago

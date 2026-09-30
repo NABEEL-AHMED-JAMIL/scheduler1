@@ -158,7 +158,6 @@ describe('InvoicePane, switching and adding', () => {
   });
 });
 
-
 /**
  * An answer that is not one invoice object, or one missing its lists, crashed the pane on the first
  * field it lacked (the old administration/billing/invoices/:number address, once it stopped landing

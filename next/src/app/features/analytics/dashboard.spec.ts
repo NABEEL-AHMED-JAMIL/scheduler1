@@ -1474,7 +1474,6 @@ describe('finding a report among many', () => {
   });
 });
 
-
 /**
  * The board filter: one set of conditions over every widget that reads the same dataset.
  *

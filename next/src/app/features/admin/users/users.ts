@@ -162,7 +162,6 @@ export class Users implements OnInit {
 
   readonly onlyMine = signal(false);
 
-
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const role = this.roleFilter();

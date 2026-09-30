@@ -116,7 +116,6 @@ export class TaskTypeDialog {
   readonly submitted = signal(false);
   readonly isEdit = computed(() => !!this.data.type?.sourceTaskTypeId);
 
-
   /**
    * The server refuses a platform administrator's new topic without a workspace (validateTaskTypeOwner):
    * a platform administrator has no tenant of their own to file it under. Asked only when the caller

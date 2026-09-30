@@ -5304,8 +5304,6 @@ describe('clicking the dataset that is already open', () => {
   });
 });
 
-
-
 /**
  * Compact rows open into the card the Columns tab used to hold.
  *
@@ -5618,7 +5616,6 @@ describe('ColumnCard, audit 09-22', () => {
     expect(el.querySelector('table')!.classList).toContain('table-modern');
   });
 });
-
 
 // ---------------------------------------------------------------------------------------------
 

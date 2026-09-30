@@ -106,7 +106,6 @@ export class StorageConnections implements OnInit {
 
   readonly onlyMine = signal(false);
 
-
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const provider = this.providerFilter();

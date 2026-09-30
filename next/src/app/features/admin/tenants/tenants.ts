@@ -172,7 +172,6 @@ export class Tenants implements OnInit {
 
   readonly onlyMine = signal(false);
 
-
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
     const status = this.statusFilter();

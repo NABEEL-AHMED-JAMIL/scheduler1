@@ -64,7 +64,6 @@ const IN_FLIGHT = new Set(['Queue', 'Start', 'Running']);
 // could not measure, so the two files exchange the sentinel, and two private copies of a value
 // that has to agree is how they eventually stop agreeing.
 
-
 interface TaskHealth {
   task: string;
   runs: number;

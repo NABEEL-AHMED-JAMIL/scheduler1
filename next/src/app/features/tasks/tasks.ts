@@ -82,7 +82,6 @@ export class Tasks implements OnInit {
 
   readonly onlyMine = signal(false);
 
-
   /** Narrow by topic, then by one of that topic's pipelines. Options come from the tasks themselves. */
   readonly topicFilter = signal('');
   readonly pipelineFilter = signal('');
@@ -210,7 +209,6 @@ export class Tasks implements OnInit {
       },
     });
   }
-
 
   readonly busyTask = signal<number | null>(null);
 

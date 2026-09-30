@@ -77,7 +77,6 @@ describe('ShareDialog address check', () => {
   });
 });
 
-
 /** Audit 09-22 (deferred): the share dialog is the shared shell, saying Sending... while it sends. */
 describe('ShareDialog shell', () => {
   it('is app-form-dialog, with Send / Sending… and fields in app-field', () => {

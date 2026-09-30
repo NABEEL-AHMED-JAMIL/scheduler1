@@ -244,7 +244,6 @@ export class TaskEdit implements OnInit {
     // A new task has no workspace yet to ask for; an edited one asks once loadTask knows its tenant.
     if (!this.isEdit()) this.loadReferences(null);
 
-
     // A pipeline chosen by hand loads its form straight away. Editing an existing task goes
     // through loadTask instead, which has to wait for the tags before it can prefill.
     this.form.get('pipelineId')!.valueChanges.subscribe(pipelineId => {

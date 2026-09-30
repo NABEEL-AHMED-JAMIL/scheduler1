@@ -37,10 +37,6 @@ import { ThemeService } from '../../core/theme.service';
     .rise-late { animation-delay: .12s; }
     .step-marker { background: var(--surface-raised); border: 1px solid var(--border-subtle); color: var(--accent-text); }
 
-
-
-
-
     /* The capabilities are one ruled block rather than nine cards, so they read as a table of
        contents instead of nine boxes competing for attention. */
     .cap { border-color: var(--border-subtle); }
