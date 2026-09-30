@@ -349,6 +349,18 @@ export class StepBuilder {
     this.draft.update(d => updateSettings(d, { [field]: value }));
   }
 
+  /** Whether the results wait for this party's review (settings.review.required). */
+  reviewRequires(party: 'internal' | 'customer'): boolean {
+    return !!this.draft().settings?.review?.required?.includes(party);
+  }
+
+  /** MIG-237: tick or untick a party; nobody ticked drops the setting (no review). */
+  setReviewRequired(party: 'internal' | 'customer', on: boolean): void {
+    const now = (this.draft().settings?.review?.required ?? []).filter(p => p !== party);
+    const required = on ? [...now, party].sort() as ('internal' | 'customer')[] : now;
+    this.draft.update(d => updateSettings(d, { review: required.length ? { required } : undefined }));
+  }
+
   settingProblem(path: string): string {
     return this.grouped().other.filter(p => p.path === path).map(p => p.message).join(' · ');
   }

@@ -500,3 +500,21 @@ describe('StepBuilder -- the Task Registry', () => {
     expect(el.querySelectorAll('[data-task]')).toHaveLength(0);
   });
 });
+
+/** MIG-237: a pipeline says whose review its results wait for; the customer's waits for customer integration. */
+describe('StepBuilder -- the review setting', () => {
+  it('writes settings.review.required, and drops it when nobody is ticked', () => {
+    const { builder, fixture, el, tab } = build();
+    tab('settings');
+    const internal = el.querySelector<HTMLInputElement>('#reviewInternal')!;
+    const customer = el.querySelector<HTMLInputElement>('#reviewCustomer')!;
+    expect(internal.checked).toBe(false);
+    expect(customer.disabled).toBe(true);
+    internal.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toEqual({ required: ['internal'] });
+    internal.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toBeUndefined();
+  });
+});

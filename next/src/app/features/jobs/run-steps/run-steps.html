@@ -1,4 +1,6 @@
 @if (timeline(); as t) {
+  <!-- MIG-237: the run's result review, when its pipeline requires one (nothing is drawn otherwise). -->
+  <app-run-review [jobQueueId]="jobQueueId()" />
   <section class="card exec-steps overflow-clip" aria-labelledby="run-steps-heading">
     <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle">
       <app-icon name="layers" class="icon-info shrink-0" />

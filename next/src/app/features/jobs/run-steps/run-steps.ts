@@ -1,4 +1,5 @@
 import { toneClass } from '../../../shared/ui/tone';
+import { RunReview } from './run-review';
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
@@ -36,7 +37,7 @@ const TERMINAL = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
  */
 @Component({
   selector: 'app-run-steps',
-  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RunReview],
   templateUrl: './run-steps.html',
 })
 export class RunSteps {

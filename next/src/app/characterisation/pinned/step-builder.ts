@@ -99,7 +99,9 @@ export const PINNED: Record<string, unknown> = {
       "If a step fails",
       "Kafka connection",
       "Keep datasets (hours)",
+      "Our team",
       "Pipeline",
+      "Results need review by",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
@@ -124,6 +126,7 @@ export const PINNED: Record<string, unknown> = {
       "Switch Validate on in this workspace",
       "Switch Write Database on in this workspace",
       "Task name *(required)",
+      "The customer (later)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],

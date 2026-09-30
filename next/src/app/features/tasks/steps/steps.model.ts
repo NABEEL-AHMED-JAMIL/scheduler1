@@ -40,6 +40,8 @@ export interface Settings {
   defaultOnError?: string;
   /** MIG-243: public, internal or sensitive -- the level of the data the pipeline handles; the data policy for it applies. */
   sensitivity?: string;
+  /** MIG-237: whose review the run's results wait for (internal, customer); absent means no review. */
+  review?: { required?: ('internal' | 'customer')[] };
 }
 
 export interface Source { type?: string; config?: Record<string, unknown>; }
@@ -220,7 +222,7 @@ export function runFinished(status: string | null | undefined): boolean {
 const DEFINITION_ORDER = ['version', 'source', 'steps', 'settings'];
 const STEP_ORDER = ['key', 'name', 'task', 'input', 'config', 'retry', 'timeoutSeconds', 'onError'];
 const RETRY_ORDER = ['maxAttempts', 'delaySeconds'];
-const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity'];
+const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'review'];
 const SOURCE_ORDER = ['type', 'config'];
 
 const blank = (value: unknown) => value === undefined || value === null || value === '';
