@@ -7,7 +7,8 @@ import { join } from 'path';
  * Storage's file details, as workspace 2924's administrator (4537), against the live media-service render (MIG-232)
  * and Core's run outputs.
  *
- * Live data it reads: schedule 2849 "UI-CHECK registry chain job 0929", its run 7405, which kept dataset 1051 (3 rows,
+ * Live data it reads: schedule 2849 "UI-CHECK registry chain job 0929" and its latest run that still keeps
+ * customers-clean.json (found at start through the API, or E2E_FILES_RUN), which kept a 3-row dataset (3 rows,
  * customers-clean.json) and uploaded ui-review-s3/registry-live-check/customers-clean.json. What it writes, and leaves:
  * one PDF, ui-review-s3/reports/UI-CHECK run 7405 e2e.pdf (overwritten on each run). Nothing else is saved.
  *
@@ -21,6 +22,23 @@ const SCHEDULE = 'UI-CHECK registry chain job 0929';
 const SAVED = 'UI-CHECK run 7405 e2e';
 
 interface Session { data: Record<string, unknown>; }
+
+/** The schedule's latest completed run that still keeps customers-clean.json, and that dataset's id. */
+let RUN = 0;
+let DATASET = 0;
+
+async function keptRun(request: APIRequestContext): Promise<{ run: number; dataset: number }> {
+  const headers = { Authorization: `Bearer ${token}` };
+  const pinned = Number(process.env['E2E_FILES_RUN'] ?? 0);
+  const runs = pinned ? [{ jobQueueId: pinned, jobStatus: 'Completed' }]
+    : (await (await request.get(`${api}/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849`, { headers })).json())?.data?.jobQueues ?? [];
+  for (const run of runs.filter((r: { jobStatus: string }) => r.jobStatus === 'Completed').slice(0, 3)) {
+    const outputs = (await (await request.get(`${api}/sourceJob.json/runOutputs?jobQueueId=${run.jobQueueId}`, { headers })).json())?.data?.outputs ?? [];
+    const kept = outputs.find((o: { kind: string; name: string; expired?: boolean }) => o.kind === 'file' && o.name === 'customers-clean.json' && !o.expired);
+    if (kept) return { run: run.jobQueueId, dataset: kept.runDatasetId };
+  }
+  throw new Error('Schedule 2849 has no recent run that still keeps customers-clean.json: run it once (Run now), then run this spec.');
+}
 
 async function session(request: APIRequestContext): Promise<Session> {
   const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
@@ -90,7 +108,14 @@ async function expectPdfPreview(page: Page): Promise<void> {
 test.describe('Documents: converter, Reports and file details (live)', () => {
   test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => {
+    s = await session(request);
+    // The run is found, not pinned: Reports reads each schedule's latest runs, so a pinned run drops out of it as soon
+    // as the schedule runs a few more times (run 7405 did on 2026-09-29).
+    const kept = await keptRun(request);
+    RUN = kept.run;
+    DATASET = kept.dataset;
+  });
 
   test('Dataset → PDF: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
@@ -118,22 +143,22 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     expect(readFileSync((await file.path())!).subarray(0, 5).toString()).toBe('%PDF-');
   });
 
-  /** Schedule 2849 → run 7405 → its one kept dataset (1051), picked in the converter. */
-  async function pickRun7405(page: Page): Promise<void> {
+  /** Schedule 2849 → its latest kept run → that run's one kept dataset, picked in the converter. */
+  async function pickKeptRun(page: Page): Promise<void> {
     await page.goto('/documents/converter');
     await page.getByRole('button', { name: 'From an execution' }).click();
     await page.locator('#render-schedule').fill('registry chain');
     await page.getByRole('option', { name: new RegExp(`^${SCHEDULE}`) }).click();
-    await page.locator('#render-run').selectOption('7405');
+    await page.locator('#render-run').selectOption(String(RUN));
     // The run kept one dataset, so it is picked without asking.
-    await expect(page.locator('#render-dataset')).toHaveValue('1051');
-    await expect(page.getByText('3 rows from run #7405, ready to render.')).toBeVisible();
+    await expect(page.locator('#render-dataset')).toHaveValue(String(DATASET));
+    await expect(page.getByText(`3 rows from run #${RUN}, ready to render.`)).toBeVisible();
   }
 
-  test('From an execution: run 7405\'s dataset previewed as a PDF', async ({ browser }, info) => {
+  test('From an execution: the kept run\'s dataset previewed as a PDF', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
-    await pickRun7405(page);
+    await pickKeptRun(page);
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     const preview = await nextRender(renders, 0);
     expect(preview.status).toBe('SUCCESS');
@@ -142,11 +167,11 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await shot(page, info, 'documents-execution-preview');
   });
 
-  test('From an execution: run 7405\'s PDF saved to ui-review-s3/reports/', async ({ browser }) => {
+  test('From an execution: the kept run\'s PDF saved to ui-review-s3/reports/', async ({ browser }) => {
     const page = await pageAs(browser, s);
     test.skip(!(await bucketReadable(page.request)), 'ui-review-s3 cannot be listed (LocalStack down): saving is not checked.');
     const renders = await recordRenders(page);
-    await pickRun7405(page);
+    await pickKeptRun(page);
     await page.locator('#render-name').fill(SAVED);
     await page.getByText('Save the file to a bucket').click();
     await page.locator('#render-bucket').fill('ui-review');
@@ -158,37 +183,37 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expect(page.locator('[data-render-result]').getByRole('link', { name: 'Open in storage' })).toBeVisible();
   });
 
-  test('Reports lists run 7405\'s outputs and the saved PDF, and previews the run\'s dataset', async ({ browser }, info) => {
+  test('Reports lists the kept run\'s outputs and the saved PDF, and previews the run\'s dataset', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     const bucket = await bucketReadable(page.request);
     await page.goto('/documents/reports');
     const rows = page.locator('table tbody tr');
-    const run = rows.filter({ has: page.getByRole('link', { name: 'Run #7405' }) });
+    const run = rows.filter({ has: page.getByRole('link', { name: `Run #${RUN}` }) });
     await expect(run.first()).toBeVisible();
     expect(await run.count()).toBeGreaterThanOrEqual(2);
-    await expect(run.filter({ hasText: 'Kept by run #7405' })).toContainText('Ready');
-    await expect(run.filter({ hasText: 'Kept by run #7405' })).toContainText('UI-CHECK registry chain task 0929');
+    await expect(run.filter({ hasText: `Kept by run #${RUN}` })).toContainText('Ready');
+    await expect(run.filter({ hasText: `Kept by run #${RUN}` })).toContainText('UI-CHECK registry chain task 0929');
     await expect(run.filter({ hasText: 'ui-review-s3/registry-live-check/customers-clean.json' })).toContainText('In storage');
     if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
     else await expect(page.getByRole('alert')).toContainText('ui-review-s3/reports/ could not be read');
     await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
     await shot(page, info, 'documents-reports');
 
-    await run.filter({ hasText: 'Kept by run #7405' }).getByRole('button', { name: 'Preview customers-clean.json' }).click();
+    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: 'Preview customers-clean.json' }).click();
     expect((await nextRender(renders, 0)).status).toBe('SUCCESS');
     const dialog = page.getByRole('dialog', { name: 'Preview of customers-clean.json' });
     await expect(dialog.locator('canvas').first()).toBeVisible();
   });
 
-  test('Storage: the details of a file run 7405 uploaded name the run and pipeline', async ({ browser }, info) => {
+  test('Storage: the details of a file the kept run uploaded name the run and pipeline', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     test.skip(!(await bucketReadable(page.request)), 'ui-review-s3 cannot be listed (LocalStack down).');
     await page.goto('/documents/files?bucket=ui-review-s3&prefix=registry-live-check/');
     await page.getByRole('button', { name: 'Actions for customers-clean.json' }).click();
     await page.getByRole('menuitem', { name: 'Details' }).click();
     const panel = page.getByRole('dialog', { name: 'customers-clean.json' });
-    await expect(panel.getByRole('link', { name: 'Run #7405' })).toBeVisible();
+    await expect(panel.getByRole('link', { name: `Run #${RUN}` })).toBeVisible();
     await expect(panel).toContainText('UI-CHECK registry chain task 0929');
     await expect(panel).toContainText('No policy');
     await expect(panel).toContainText('169 B');

@@ -26,9 +26,11 @@ const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env
 
 const ENGINE = { job: Number(process.env['E2E_ENGINE_JOB'] ?? 2849), run: Number(process.env['E2E_ENGINE_RUN'] ?? 7396) };
 const LEGACY = { job: Number(process.env['E2E_LEGACY_JOB'] ?? 2834), run: Number(process.env['E2E_LEGACY_RUN'] ?? 7383) };
-const INBOX = { job: Number(process.env['E2E_INBOX_JOB'] ?? 2848), run: Number(process.env['E2E_INBOX_RUN'] ?? 7387) };
+/** The inbox job and, unless E2E_INBOX_RUN pins one, the run its latest started arrival made (found at start). */
+const INBOX = { job: Number(process.env['E2E_INBOX_JOB'] ?? 2848), run: Number(process.env['E2E_INBOX_RUN'] ?? 0) };
 /** Wave 4: a run that recorded its outputs -- save_file kept customers-clean.json (3 rows), upload_bucket put it in ui-review-s3. */
-const FILES = { job: Number(process.env['E2E_FILES_JOB'] ?? 2849), run: Number(process.env['E2E_FILES_RUN'] ?? 7405) };
+/** Unless E2E_FILES_RUN pins one, the schedule's latest run whose kept file has not expired (found at start). */
+const FILES = { job: Number(process.env['E2E_FILES_JOB'] ?? 2849), run: Number(process.env['E2E_FILES_RUN'] ?? 0) };
 const STEPS = ['read', 'check', 'shape', 'out', 'publish'];
 const TASKS = ['read_file', 'validate', 'transform', 'save_file', 'upload_bucket'];
 
@@ -66,6 +68,26 @@ test.describe('Executions', () => {
     s = await session(request);
     // The fixtures this reads must be what the spec says they are: an engine run with five steps, and a legacy one.
     const headers = { Authorization: `Bearer ${s.token}` };
+    // Found, not pinned: a schedule's latest arrival and its kept files move on every time it runs (7387 and 7405
+    // were overtaken on 2026-09-29, and a kept file expires after its pipeline's datasetRetentionHours).
+    if (!INBOX.run) {
+      const arrivals = (await (await request.get(`${api}/sourceJob.json/inboxArrivals?jobId=${INBOX.job}`, { headers })).json())?.data ?? [];
+      INBOX.run = arrivals.find((a: { outcome: string; jobQueueId?: number }) => a.outcome === 'Started' && a.jobQueueId)?.jobQueueId ?? 0;
+      expect(INBOX.run, `job ${INBOX.job} has an inbox arrival that started a run`).toBeGreaterThan(0);
+    }
+    if (!FILES.run) {
+      const runs = (await (await request.get(`${api}/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=${FILES.job}`, { headers })).json())
+        ?.data?.jobQueues ?? [];
+      for (const run of runs.filter((r: { jobStatus: string }) => r.jobStatus === 'Completed').slice(0, 3)) {
+        const outputs = (await (await request.get(`${api}/sourceJob.json/runOutputs?jobQueueId=${run.jobQueueId}`, { headers })).json())
+          ?.data?.outputs ?? [];
+        if (outputs.some((o: { kind: string; name: string; expired?: boolean }) => o.kind === 'file' && o.name === 'customers-clean.json' && !o.expired)) {
+          FILES.run = run.jobQueueId;
+          break;
+        }
+      }
+      expect(FILES.run, `job ${FILES.job} has a recent run that still keeps customers-clean.json (Run now once)`).toBeGreaterThan(0);
+    }
     const engine = await (await request.get(`${api}/sourceJob.json/stepExecutions?jobQueueId=${ENGINE.run}`, { headers })).json();
     expect(engine.data?.legacy, `run ${ENGINE.run} is a step-engine run`).toBe(false);
     expect(engine.data?.steps?.map((step: { key: string }) => step.key)).toEqual(STEPS);
