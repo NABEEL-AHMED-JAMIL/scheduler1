@@ -343,7 +343,7 @@
             <div class="flex items-center gap-3 flex-wrap">
               <button type="button" class="btn btn-primary" [disabled]="busy() || wf.status !== 'Active'" (click)="testRun()" data-test="start-test"><app-icon name="play" />Start test request</button>
               @if (testStarted(); as t) {
-                <a class="text-sm text-accent hover:underline" [routerLink]="['/workflows/requests']" [queryParams]="{ id: t.id }" data-test="test-link">Request #{{ t.id }} is {{ t.state.toLowerCase() }} — open it</a>
+                <a class="text-sm text-accent hover:underline" [routerLink]="['/workflows/requests']" [queryParams]="{ id: t.id }" data-test="test-link">{{ t.title }} · request #{{ t.id }} is {{ t.state.toLowerCase() }} — open it</a>
               }
             </div>
           </section>

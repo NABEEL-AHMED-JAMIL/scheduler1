@@ -342,6 +342,7 @@ export class WorkflowDesigner implements OnInit {
       return;
     }
     const subjectId = this.testSubjectId().trim() || `test-${Date.now()}`;
+    this.testStarted.set(null);
     this.busy.set(true);
     this.api.start({ definitionKey: wf.key, subjectId, title: this.testTitle().trim() || `Test of ${wf.name}`, subject },
       `${wf.key}:test:${subjectId}`).subscribe({

@@ -41,7 +41,7 @@ async function startTest(page: Page, reference: string, amount: number): Promise
   await page.getByLabel('The request\'s fields (JSON)').fill(JSON.stringify({ amount, vendor: 'Acme' }));
   await page.locator('[data-test="start-test"]').click();
   const link = page.locator('[data-test="test-link"]');
-  await expect(link).toContainText(/Request #\d+/);
+  await expect(link).toContainText(`Purchase ${reference}`);
   return Number(/#(\d+)/.exec((await link.textContent())!)![1]);
 }
 

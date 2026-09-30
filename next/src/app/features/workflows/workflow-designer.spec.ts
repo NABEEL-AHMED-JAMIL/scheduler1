@@ -166,6 +166,6 @@ describe('Workflow designer -- the screen', () => {
     fixture.detectChanges();
     expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ definitionKey: 'purchase', subjectId: 'po-1', subject: { amount: 1200 } }),
       'purchase:test:po-1');
-    expect(el.querySelector('[data-test="test-link"]')!.textContent).toContain('Request #1010 is running');
+    expect(el.querySelector('[data-test="test-link"]')!.textContent).toContain('request #1010 is running');
   });
 });
