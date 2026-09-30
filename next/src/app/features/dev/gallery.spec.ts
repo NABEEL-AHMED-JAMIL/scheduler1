@@ -7,6 +7,16 @@ import { GALLERY_STATUSES, Gallery } from './gallery';
 
 describe('the component gallery (MIG-257)', () => {
   useMemoryStorage();
+  // ThemeService asks the OS for its colour preference; the test environment has no matchMedia. Stubbed here, not
+  // inherited from whichever spec ran before (on 2026-09-30 a different run order left it undefined here).
+  beforeEach(() => {
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: false, media: query, onchange: null,
+      addEventListener: () => {}, removeEventListener: () => {},
+      addListener: () => {}, removeListener: () => {}, dispatchEvent: () => false,
+    }));
+  });
+  afterEach(() => vi.unstubAllGlobals());
 
   function render() {
     TestBed.configureTestingModule({ imports: [Gallery], providers: [provideRouter([])] });
