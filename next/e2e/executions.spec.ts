@@ -27,6 +27,8 @@ const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env
 // The run is found, not fixed: the pipeline keeps its datasets for 24 hours, so a pinned run (7396) lost its step
 // outputs a day later and this failed on a correct expiry. Unless named, it is the recent run FILES finds below.
 const ENGINE = { job: Number(process.env['E2E_ENGINE_JOB'] ?? 2849), run: Number(process.env['E2E_ENGINE_RUN'] ?? 0) };
+// A run of the same job from before runs recorded their files (MIG-236): it has no Files to show, and never will.
+const NO_FILES = { job: 2849, run: Number(process.env['E2E_NO_FILES_RUN'] ?? 7396) };
 const LEGACY = { job: Number(process.env['E2E_LEGACY_JOB'] ?? 2834), run: Number(process.env['E2E_LEGACY_RUN'] ?? 7383) };
 /** The inbox job and, unless E2E_INBOX_RUN pins one, the run its latest started arrival made (found at start). */
 const INBOX = { job: Number(process.env['E2E_INBOX_JOB'] ?? 2848), run: Number(process.env['E2E_INBOX_RUN'] ?? 0) };
@@ -167,7 +169,7 @@ test.describe('Executions', () => {
     expect(jsonl.suggestedFilename()).toMatch(/\.jsonl$/);
 
     // An older run of the same job recorded no outputs.
-    await page.goto(`/pipelines/schedules/${ENGINE.job}/runs/${ENGINE.run}/logs`);
+    await page.goto(`/pipelines/schedules/${NO_FILES.job}/runs/${NO_FILES.run}/logs`);
     await expect(page.locator('.exec-files')).toContainText('No files were recorded for this run.');
     await page.context().close();
   });
