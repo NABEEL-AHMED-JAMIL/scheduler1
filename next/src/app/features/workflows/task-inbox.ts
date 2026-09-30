@@ -123,7 +123,7 @@ export class TaskInbox implements OnInit {
     }));
     this.api.groups().subscribe(take<InboxTask>(rows => this.groups.set(rows)));
     this.api.done().subscribe(take<InboxTask>(rows => this.done.set(rows)));
-    this.api.requests(true).subscribe(take<RequestRow>(rows => this.requests.set(rows)));
+    this.api.requests().subscribe(take<RequestRow>(rows => this.requests.set(rows)));
     this.badge.refresh();
   }
 

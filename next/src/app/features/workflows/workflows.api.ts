@@ -141,19 +141,18 @@ export class WorkflowsApi {
     return this.http.post<ApiResponse<RequestRow>>(`${this.workflows}/start`, body, { headers: { 'Idempotency-Key': key } });
   }
 
-  requests(mine: boolean, workflow?: string): Observable<ApiResponse<RequestRow[]>> {
-    const params: Record<string, string> = { mine: String(mine) };
-    if (workflow) params['key'] = workflow;
-    return this.http.get<ApiResponse<RequestRow[]>>(`${this.workflows}/instances`, { params });
+  /** My requests: what the reader started. Under the task inbox, so a requester needs no other page to follow them. */
+  requests(): Observable<ApiResponse<RequestRow[]>> {
+    return this.http.get<ApiResponse<RequestRow[]>>(`${this.inbox}/requests`);
   }
 
   request(id: number): Observable<ApiResponse<RequestDetail>> {
-    return this.http.get<ApiResponse<RequestDetail>>(`${this.workflows}/instance`, { params: { id } });
+    return this.http.get<ApiResponse<RequestDetail>>(`${this.inbox}/request`, { params: { id } });
   }
 
   cancel(id: number, reason: string | null, key: string): Observable<ApiResponse<RequestRow>> {
     const params: Record<string, string | number> = { id };
     if (reason) params['reason'] = reason;
-    return this.http.post<ApiResponse<RequestRow>>(`${this.workflows}/cancel`, null, { params, headers: { 'Idempotency-Key': key } });
+    return this.http.post<ApiResponse<RequestRow>>(`${this.inbox}/cancel`, null, { params, headers: { 'Idempotency-Key': key } });
   }
 }
