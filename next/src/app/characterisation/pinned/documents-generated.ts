@@ -21,6 +21,7 @@ export const PINNED: Record<string, unknown> = {
   "Reports, as a workspace administrator": {
     "url": "/documents/reports",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/buckets",

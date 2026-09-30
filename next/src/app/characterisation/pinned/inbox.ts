@@ -22,6 +22,7 @@ export const PINNED: Record<string, unknown> = {
   "no inbox yet, as a workspace administrator": {
     "url": "/documents/inbox",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/inbox",
@@ -96,6 +97,7 @@ export const PINNED: Record<string, unknown> = {
   "the inbox, as a workspace administrator": {
     "url": "/documents/inbox",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/inbox",

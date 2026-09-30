@@ -21,6 +21,7 @@ export const PINNED: Record<string, unknown> = {
   "storage connections, as a platform administrator": {
     "url": "/integration/storage-connections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storageConnection.json/fetchAllConnections",
@@ -88,6 +89,7 @@ export const PINNED: Record<string, unknown> = {
   "storage connections, as a workspace administrator": {
     "url": "/integration/storage-connections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storageConnection.json/fetchAllConnections"
@@ -183,6 +185,7 @@ export const PINNED: Record<string, unknown> = {
   "the notifications page": {
     "url": "/notifications",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /notification.json/list?limit=1000&page=1"

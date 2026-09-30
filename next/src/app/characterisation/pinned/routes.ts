@@ -355,6 +355,33 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/workflows/inbox",
+      "title": "Task inbox",
+      "pageKey": "task-inbox",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/workflows/requests",
+      "title": "My requests",
+      "pageKey": "task-inbox",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/workflows/designer",
+      "title": "Workflow designer",
+      "pageKey": "workflow-designer",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/ai/prompts",
       "title": "Prompts",
       "pageKey": "ai-prompts",

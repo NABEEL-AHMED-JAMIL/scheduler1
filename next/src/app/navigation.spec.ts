@@ -239,8 +239,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 });
 
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
-  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data and Forms are built; Connector Hub, Data
-  // Catalog and Workflows were taken off the menu and the routes until they are.
+  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data, Forms and Workflows (MIG-276) are built;
+  // Connector Hub and Data Catalog were taken off the menu and the routes until they are.
   it('no route is a coming-soon placeholder any more', () => {
     expect(flatten(routes).filter(e => e.route.data?.['comingSoon']).map(e => e.path)).toEqual([]);
   });
@@ -325,6 +325,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const FORMS_AND_WORKFLOWS = [
     'Forms › All forms -> /forms/builder',
     'Forms › Submissions -> /forms/submissions',
+    'Workflows › Task inbox -> /workflows/inbox',
+    'Workflows › Workflow designer -> /workflows/designer',
   ];
   const CONFIGURATION = [
     'Configuration › Task Registry -> /configuration/task-registry',

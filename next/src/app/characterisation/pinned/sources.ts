@@ -119,6 +119,7 @@ export const PINNED: Record<string, unknown> = {
   "the data contracts, as a workspace administrator": {
     "url": "/integration/sources?tab=contracts",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /dataContract.json/list"
@@ -154,6 +155,7 @@ export const PINNED: Record<string, unknown> = {
   "the database connections, as a workspace administrator": {
     "url": "/integration/sources?tab=connections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /dataSource.json/connection/list"
@@ -189,6 +191,7 @@ export const PINNED: Record<string, unknown> = {
   "the sources, as a platform administrator": {
     "url": "/integration/sources",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /dataSource.json/list?limit=50&page=1",
@@ -289,6 +292,7 @@ export const PINNED: Record<string, unknown> = {
   "the sources, as a workspace administrator": {
     "url": "/integration/sources",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /dataSource.json/list?limit=50&page=1"

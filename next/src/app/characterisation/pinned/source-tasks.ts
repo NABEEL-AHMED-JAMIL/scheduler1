@@ -3,6 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "a new task": {
     "url": "/pipelines/new",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",
@@ -97,6 +98,7 @@ export const PINNED: Record<string, unknown> = {
   "bulk tasks": {
     "url": "/pipelines/bulk",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
@@ -120,6 +122,7 @@ export const PINNED: Record<string, unknown> = {
   "editing a task": {
     "url": "/pipelines/1854/edit",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",
@@ -280,6 +283,7 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a workspace administrator": {
     "url": "/pipelines",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}"

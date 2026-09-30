@@ -250,6 +250,7 @@ export const PINNED: Record<string, unknown> = {
   "a legacy pipeline asked for its steps": {
     "url": "/pipelines/1854/edit?tab=steps",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",
@@ -316,6 +317,7 @@ export const PINNED: Record<string, unknown> = {
   "a pipeline with steps opens on them": {
     "url": "/pipelines/1864/edit",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",

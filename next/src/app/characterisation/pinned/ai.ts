@@ -3,6 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "a new prompt": {
     "url": "/ai/prompts/new",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list"
@@ -65,6 +66,7 @@ export const PINNED: Record<string, unknown> = {
   "editing a prompt": {
     "url": "/ai/prompts/1049/edit",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
@@ -140,16 +142,21 @@ export const PINNED: Record<string, unknown> = {
   "model connections, as a platform administrator": {
     "url": "/ai/connections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
-      "GET /tenant.json/listTenants"
+      "GET /tenant.json/listTenants",
+      "GET /aiConnection.json/activity?connectionId=1047"
     ],
     "headings": [
       "Model connections",
       "Local Ollama",
       "Models",
-      "Usage · last 30 days"
+      "Usage · last 30 days",
+      "Runs · last 30 days",
+      "Recent runs",
+      "Prompts on this connection"
     ],
     "buttons": [
       "Actions for Local Ollama",
@@ -192,15 +199,20 @@ export const PINNED: Record<string, unknown> = {
   "model connections, as a workspace administrator": {
     "url": "/ai/connections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiConnection.json/list"
+      "GET /aiConnection.json/list",
+      "GET /aiConnection.json/activity?connectionId=1047"
     ],
     "headings": [
       "Model connections",
       "Local Ollama",
       "Models",
-      "Usage · last 30 days"
+      "Usage · last 30 days",
+      "Runs · last 30 days",
+      "Recent runs",
+      "Prompts on this connection"
     ],
     "buttons": [
       "Actions for Local Ollama",
@@ -281,6 +293,7 @@ export const PINNED: Record<string, unknown> = {
   "prompts, as a workspace administrator": {
     "url": "/ai/prompts",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/list"

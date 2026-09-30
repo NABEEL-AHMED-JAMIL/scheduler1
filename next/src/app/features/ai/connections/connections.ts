@@ -122,7 +122,8 @@ export class Connections implements OnInit {
       next: r => {
         if (this.selectedId() !== id) return;
         this.activityLoading.set(false);
-        if (r.status === API_SUCCESS && r.data) this.activity.set(r.data);
+        // Each list defaults to empty: an older ai-service (or a partial answer) must not break the panel.
+        if (r.status === API_SUCCESS && r.data) this.activity.set({ ...r.data, days: r.data.days ?? [], recent: r.data.recent ?? [], prompts: r.data.prompts ?? [] });
         else this.activityError.set(r.message || 'Could not read what this connection has been doing.');
       },
       error: () => {

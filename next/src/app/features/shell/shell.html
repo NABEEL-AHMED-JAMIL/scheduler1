@@ -46,7 +46,7 @@
                        class="nav-child">
                       <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                       <span class="min-w-0">
-                        <span class="block text-sm leading-tight">{{ child.label }}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+                        <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
                         @if (child.hint) {
                           <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
                             {{ child.hint }}
@@ -174,7 +174,7 @@
                    [routerLinkActiveOptions]="{ exact: !!child.exact }" class="nav-child">
                   <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                   <span class="min-w-0">
-                    <span class="block text-sm leading-tight">{{ child.label }}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+                    <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
                     @if (child.hint) {
                       <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
                         {{ child.hint }}

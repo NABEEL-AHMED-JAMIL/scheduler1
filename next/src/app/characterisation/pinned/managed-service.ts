@@ -3,6 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "managed service, as a platform administrator": {
     "url": "/administration/managed-service",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /managedService.json/listGrants",
@@ -41,6 +42,7 @@ export const PINNED: Record<string, unknown> = {
   "our team's activity, as a MANAGED workspace's administrator": {
     "url": "/administration/team-activity",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /managedService.json/actions?limit=50"
@@ -69,6 +71,7 @@ export const PINNED: Record<string, unknown> = {
   "pipelines, in a MANAGED workspace": {
     "url": "/pipelines",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}"
@@ -112,6 +115,7 @@ export const PINNED: Record<string, unknown> = {
   "staff activity, as a platform administrator": {
     "url": "/administration/staff-activity",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /managedService.json/actions?limit=50",
@@ -146,6 +150,7 @@ export const PINNED: Record<string, unknown> = {
   "work in a workspace, as a platform administrator": {
     "url": "/administration/work-in-workspace",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /managedService.json/myWorkspaces"

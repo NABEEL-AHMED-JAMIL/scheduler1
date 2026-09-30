@@ -76,6 +76,7 @@ export const PINNED: Record<string, unknown> = {
   "a document in review": {
     "url": "/documents/review/1005",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentReview.json/fetchById?extractionId=1005",
@@ -150,6 +151,7 @@ export const PINNED: Record<string, unknown> = {
   "an approved document, read-only": {
     "url": "/documents/review/1000",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentReview.json/fetchById?extractionId=1000",
@@ -209,6 +211,7 @@ export const PINNED: Record<string, unknown> = {
   "the dataset, as a workspace administrator": {
     "url": "/documents/intelligence?tab=dataset",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentExtraction.json/stats?days=30",
@@ -251,6 +254,7 @@ export const PINNED: Record<string, unknown> = {
   "the document types, as a workspace administrator": {
     "url": "/documents/intelligence?tab=types",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentExtraction.json/stats?days=30",
@@ -354,6 +358,7 @@ export const PINNED: Record<string, unknown> = {
   "the overview, as a workspace administrator": {
     "url": "/documents/intelligence",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentExtraction.json/stats?days=30",
@@ -421,6 +426,7 @@ export const PINNED: Record<string, unknown> = {
   "the review queue, as a workspace administrator": {
     "url": "/documents/review",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentReview.json/queue?page=0&size=50&status=Review",

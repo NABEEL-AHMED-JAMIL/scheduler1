@@ -76,6 +76,7 @@ export const PINNED: Record<string, unknown> = {
   "a job's run history": {
     "url": "/pipelines/schedules/2833/executions",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob",
@@ -122,6 +123,7 @@ export const PINNED: Record<string, unknown> = {
   "a new job": {
     "url": "/pipelines/schedules/new",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}"
@@ -167,6 +169,7 @@ export const PINNED: Record<string, unknown> = {
   "a run's logs": {
     "url": "/pipelines/schedules/2833/runs/7331/logs",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/findSourceJobAuditLog?jobId=2833&jobQueueId=7331",
@@ -197,6 +200,7 @@ export const PINNED: Record<string, unknown> = {
   "bulk jobs": {
     "url": "/pipelines/schedules/bulk",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
@@ -220,6 +224,7 @@ export const PINNED: Record<string, unknown> = {
   "editing a job": {
     "url": "/pipelines/schedules/2833/edit",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /sourceTask.json/listSourceTask?limit=1000 {}",
@@ -261,6 +266,7 @@ export const PINNED: Record<string, unknown> = {
   "every job's run history": {
     "url": "/pipelines/executions",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob"
@@ -284,6 +290,7 @@ export const PINNED: Record<string, unknown> = {
   "the job assistant": {
     "url": "/pipelines/schedules/2833/assistant",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiAgent.json/fetchAllAgents",
@@ -367,6 +374,7 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a workspace administrator": {
     "url": "/pipelines/schedules",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob"

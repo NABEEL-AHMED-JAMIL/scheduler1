@@ -53,7 +53,7 @@ describe('shell navigation', () => {
       '/documents/converter', '/documents/files', '/documents/inbox', '/documents/intelligence', '/documents/reports', '/documents/review',
       '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
       '/integration/sources', '/pipelines', '/pipelines/queue', '/pipelines/run-analytics',
-      '/pipelines/schedules',
+      '/pipelines/schedules', '/workflows/designer', '/workflows/inbox',
     ]);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
   });

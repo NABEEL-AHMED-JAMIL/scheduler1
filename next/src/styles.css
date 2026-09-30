@@ -2220,3 +2220,49 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
   .link-inline:hover { text-decoration-color: currentColor; }
   button.link-inline { cursor: pointer; }
 }
+
+/* ---- Workflows (MIG-276): the task inbox, as the design preview draws it ---------------------------------------- */
+/* The list beside the task; one column on a tablet in portrait. */
+.inbox-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .inbox-grid { grid-template-columns: 380px minmax(0, 1fr); } }
+.inbox-row { display: flex; align-items: flex-start; gap: 0.75rem; width: 100%; text-align: left; padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border-subtle); background: transparent; }
+.inbox-row:last-child { border-bottom: 0; }
+.inbox-row:hover { background: var(--surface-sunken); }
+.inbox-row.is-on { background: var(--surface-sunken); box-shadow: inset 3px 0 0 var(--accent-text); }
+.inbox-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+/* The request's fields: label above value, as many columns as fit. */
+.inbox-fields { display: grid; gap: 0.75rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); margin: 0; }
+.inbox-fields dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; }
+.inbox-fields dd { margin: 0.15rem 0 0; font-size: 0.875rem; overflow-wrap: anywhere; }
+/* History: a line and a dot per event, coloured by what it was. */
+.inbox-timeline { list-style: none; margin: 0; padding: 0 0 0 1rem; border-left: 2px solid var(--border-subtle); display: flex; flex-direction: column; gap: 0.55rem; }
+.inbox-timeline > li { position: relative; font-size: 0.875rem; line-height: 1.4; }
+.inbox-timeline > li::before { content: ''; position: absolute; left: -1.4rem; top: 0.35rem; width: 0.6rem; height: 0.6rem; border-radius: 999px;
+  background: var(--border-strong); box-shadow: 0 0 0 3px var(--surface-raised); }
+.inbox-timeline > li.is-ok::before { background: var(--series-ok); }
+.inbox-timeline > li.is-bad::before { background: var(--series-crit); }
+.inbox-timeline > li.is-warn::before { background: var(--series-warn); }
+.inbox-timeline > li.is-now::before { background: var(--accent-text); }
+
+/* Workflow designer (MIG-276): the workflows, then the chain of steps with the step's panel beside it. */
+.designer-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1024px) { .designer-grid { grid-template-columns: 300px minmax(0, 1fr); } }
+.designer-body { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1280px) { .designer-body { grid-template-columns: minmax(0, 1fr) 380px; } }
+@media (min-width: 1280px) { .designer-panel { position: sticky; top: 1rem; } }
+.designer-end { align-self: center; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.85rem; border-radius: 999px;
+  font-size: 0.78rem; color: var(--text-secondary); background: var(--surface-sunken); border: 1px solid var(--border-subtle); }
+.designer-link { align-self: center; width: 2px; height: 1.1rem; background: var(--border-strong); }
+.designer-step { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; padding: 0.75rem 0.85rem; width: 100%; max-width: 40rem;
+  align-self: center; border-left: 3px solid transparent; }
+.designer-step.is-on { border-left-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text); }
+.designer-step.has-problem { border-left-color: var(--series-crit); }
+.designer-step-main { display: flex; align-items: flex-start; gap: 0.75rem; flex: 1; min-width: 0; background: transparent; text-align: left; }
+.designer-step-main:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }
+.designer-step-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; flex-shrink: 0;
+  border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--accent-text); }
+.designer-problem { flex-basis: 100%; display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.78rem; color: var(--series-crit); margin: 0; }
+.designer-add { display: grid; gap: 0.25rem; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); width: 100%; max-width: 40rem; align-self: center; }
+.designer-add-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.55rem 0.65rem; border-radius: var(--radius-md); background: transparent; }
+.designer-add-item:hover, .designer-add-item:focus-visible { background: var(--surface-sunken); }

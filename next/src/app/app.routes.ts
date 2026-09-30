@@ -376,6 +376,30 @@ export const routes: Routes = [
         data: { pageKey: 'form-submissions' },
         canActivate: [pageGuard],
       },
+      {
+        // Wave 5 Workflows (MIG-276): the approvals and tasks waiting for the reader, page 'task-inbox'. My requests is
+        // the same screen on its own tab, where a requester follows what they started.
+        path: 'workflows/inbox',
+        title: 'Task inbox',
+        loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
+        data: { pageKey: 'task-inbox' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'workflows/requests',
+        title: 'My requests',
+        loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
+        data: { pageKey: 'task-inbox' },
+        canActivate: [pageGuard],
+      },
+      {
+        // The workflows' steps, page 'workflow-designer': an administrator edits and publishes, everyone else reads.
+        path: 'workflows/designer',
+        title: 'Workflow designer',
+        loadComponent: () => import('./features/workflows/workflow-designer').then(m => m.WorkflowDesigner),
+        data: { pageKey: 'workflow-designer' },
+        canActivate: [pageGuard],
+      },
       // ---------------------------------------------------------------------------------------------
       // AI (was Assistants)
       // ---------------------------------------------------------------------------------------------

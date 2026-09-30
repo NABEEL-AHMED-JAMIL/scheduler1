@@ -3,6 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "a new chat, as a workspace administrator": {
     "url": "/ai/assistant",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
@@ -60,6 +61,7 @@ export const PINNED: Record<string, unknown> = {
   "conversation 1000, confirmed and run, with its tool calls": {
     "url": "/ai/assistant?c=1000",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
@@ -208,6 +210,7 @@ export const PINNED: Record<string, unknown> = {
   "the tool registry, as a platform administrator": {
     "url": "/ai/tools",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants"
@@ -280,6 +283,7 @@ export const PINNED: Record<string, unknown> = {
   "the tool registry, as a workspace administrator": {
     "url": "/ai/tools",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/tools/list",

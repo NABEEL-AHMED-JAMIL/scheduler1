@@ -142,6 +142,7 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a platform administrator": {
     "url": "/configuration/task-registry",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
@@ -204,6 +205,7 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a workspace administrator": {
     "url": "/configuration/task-registry",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pipeline.json/steps/tasks",
@@ -248,6 +250,7 @@ export const PINNED: Record<string, unknown> = {
   "the old forms address": {
     "url": "/configuration/task-registry",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pipeline.json/steps/tasks",

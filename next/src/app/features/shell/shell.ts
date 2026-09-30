@@ -10,6 +10,7 @@ import { PageKey } from '../../core/auth/page-keys';
 import { NotificationBell } from './notification-bell';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
+import { TaskCountService } from '../workflows/task-count.service';
 
 interface NavChild {
   label: string;
@@ -37,6 +38,8 @@ interface NavChild {
    * MANAGED, or once it is known our team has acted in it (a workspace that went back to SELF keeps its history).
    */
   teamOnly?: boolean;
+  /** MIG-276: the entry shows the reader's open task count beside its label. */
+  badge?: 'tasks';
 }
 
 interface NavItem {
@@ -55,6 +58,7 @@ interface NavItem {
 export class Shell {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
+  readonly tasks = inject(TaskCountService);
   private readonly router = inject(Router);
   // HttpClient rather than ManagedServiceApi: the shell is in the initial bundle, the admin pages' client is not.
   private readonly http = inject(HttpClient);
@@ -96,8 +100,8 @@ export class Shell {
    * An entry marked `soon` is a page that is not built yet: its route is a "coming soon" page that
    * calls nothing, gated by the page's key so the gate is in place before the screen is.
    */
-  // Owner decision 2026-09-30: Connector Hub, Data Catalog and Workflows (Task inbox, Workflow designer) come after the
-  // demo -- off the menu and the routes until they are built (identity's catalogue leaves their keys out too).
+  // Owner decision 2026-09-30: Connector Hub and Data Catalog come after the demo -- off the menu and the routes until
+  // they are built (identity's catalogue leaves their keys out too). Workflows is built (MIG-276).
   private readonly allNav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'chart' },
     {
@@ -175,6 +179,15 @@ export class Shell {
           hint: 'Fill in your workspace\'s forms; admins build them' },
         { label: 'Submissions', path: '/forms/submissions', pageKey: 'form-submissions', icon: 'table',
           hint: 'Everything collected, and the runs it started' },
+      ],
+    },
+    {
+      label: 'Workflows',
+      children: [
+        { label: 'Task inbox', path: '/workflows/inbox', pageKey: 'task-inbox', icon: 'inbox', badge: 'tasks',
+          hint: 'Approvals and tasks waiting for you or your groups' },
+        { label: 'Workflow designer', path: '/workflows/designer', pageKey: 'workflow-designer', icon: 'layers',
+          hint: 'Who approves what, and what runs after' },
       ],
     },
     {

@@ -108,6 +108,7 @@ export const PINNED: Record<string, unknown> = {
   "one collection, as a workspace administrator": {
     "url": "/integration/api-collections/1000",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /apiCollection.json/get?collectionId=1000",
@@ -170,6 +171,7 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a platform administrator": {
     "url": "/integration/api-collections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /apiCollection.json/list?limit=50&page=1",
@@ -268,6 +270,7 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a workspace administrator": {
     "url": "/integration/api-collections",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /apiCollection.json/list?limit=50&page=1"

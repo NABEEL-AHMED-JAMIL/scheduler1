@@ -121,6 +121,7 @@ export const PINNED: Record<string, unknown> = {
   "the converter, as a workspace administrator": {
     "url": "/documents/converter",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentConverter.json/fetchAllTasks",
@@ -208,6 +209,7 @@ export const PINNED: Record<string, unknown> = {
   "the object browser, in a bucket": {
     "url": "/documents/files?bucket=ui-review-s3",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/buckets",
@@ -253,6 +255,7 @@ export const PINNED: Record<string, unknown> = {
   "the object browser, no bucket chosen": {
     "url": "/documents/files",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/buckets"

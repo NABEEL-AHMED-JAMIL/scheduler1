@@ -3,6 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "data policies, as a platform administrator before a workspace is picked": {
     "url": "/administration/data-policies",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants"
@@ -114,6 +115,7 @@ export const PINNED: Record<string, unknown> = {
   "the defaults, as a workspace administrator": {
     "url": "/administration/data-policies",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/dataPolicy",

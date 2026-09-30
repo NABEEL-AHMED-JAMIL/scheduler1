@@ -73,6 +73,7 @@ export const PINNED: Record<string, unknown> = {
   "Analytics Studio, as a workspace administrator": {
     "url": "/data/analytics",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/buckets",
@@ -103,6 +104,7 @@ export const PINNED: Record<string, unknown> = {
   "a dashboard, opened": {
     "url": "/data/analytics/dashboards?board=1378",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /analyticsWorkspace.json/fetchAllDashboards",
@@ -125,6 +127,7 @@ export const PINNED: Record<string, unknown> = {
   "saved analyses and dashboards": {
     "url": "/data/analytics/dashboards",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /analyticsWorkspace.json/fetchAllDashboards",

@@ -104,6 +104,7 @@ export const PINNED: Record<string, unknown> = {
   "reports, as a workspace administrator": {
     "url": "/pipelines/run-analytics",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /report.json/runs?endDate=<date>&startDate=<date>",
@@ -301,6 +302,7 @@ export const PINNED: Record<string, unknown> = {
   "the queue, as a workspace administrator": {
     "url": "/pipelines/queue",
     "requests": [
+      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "POST /message.json/fetchLogs {fromDate,toDate}",
