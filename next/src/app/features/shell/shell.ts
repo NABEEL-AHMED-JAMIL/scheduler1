@@ -156,7 +156,7 @@ export class Shell {
     {
       label: 'Data',
       children: [
-        { label: 'Ask your data', path: '/data/ask', pageKey: 'ask-data', icon: 'chat', soon: true,
+        { label: 'Ask your data', path: '/data/ask', pageKey: 'ask-data', icon: 'chat',
           hint: 'Questions in plain language, with sources' },
         { label: 'Data Catalog', path: '/data/catalog', pageKey: 'data-catalog', icon: 'database', soon: true,
           hint: 'Every dataset, owner, schema and sensitive field' },

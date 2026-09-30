@@ -241,7 +241,6 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
   const SOON: [string, string, string][] = [
     ['/integration/connectors', 'Connector Hub', 'connector-hub'],
-    ['/data/ask', 'Ask your data', 'ask-data'],
     ['/data/catalog', 'Data Catalog', 'data-catalog'],
     ['/forms/builder', 'Form builder', 'forms'],
     ['/forms/submissions', 'Submissions', 'form-submissions'],
@@ -259,6 +258,16 @@ describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', (
       expect((PAGE_LABELS as Record<string, string>)[key]).toBe(title);
     });
   }
+
+  it('/data/ask is the built page now: titled, gated by ask-data, and not coming soon', () => {
+    const route = byPath('/data/ask');
+    expect(route).toBeDefined();
+    expect(route!.title).toBe('Ask your data');
+    expect(route!.data?.['pageKey']).toBe('ask-data');
+    expect(route!.data?.['comingSoon']).toBeUndefined();
+    expect(route!.canActivate).toContain(pageGuard);
+    expect(route!.loadComponent).toBeDefined();
+  });
 
   it('names the renamed pages as the menu does when a page is refused', () => {
     expect(PAGE_LABELS['jobs']).toBe('Schedules');
@@ -322,7 +331,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     'Documents › Audio Transcript -> /documents/transcript',
   ];
   const DATA_SOON = [
-    'Data › Ask your data (soon) -> /data/ask',
+    'Data › Ask your data -> /data/ask',
     'Data › Data Catalog (soon) -> /data/catalog',
   ];
   const DATA = [

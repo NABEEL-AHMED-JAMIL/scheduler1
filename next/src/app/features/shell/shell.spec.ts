@@ -220,10 +220,13 @@ describe('shell navigation', () => {
       const { fixture, shell: s, el } = await rendered();
       s.toggleMenu('Data');
       await fixture.whenStable();
-      const soon = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/ask"]')!;
+      const soon = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/catalog"]')!;
       const built = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/analytics"]')!;
+      const ask = el.querySelector<HTMLElement>('[data-nav-menu="Data"] a[href="/data/ask"]')!;
       expect(soon.querySelector('.pill')?.textContent?.trim()).toBe('Soon');
       expect(built.querySelector('.pill')).toBeNull();
+      // Ask your data is built (Wave 5): no longer coming.
+      expect(ask.querySelector('.pill')).toBeNull();
     });
 
     it('offers a skip link to the main content', async () => {

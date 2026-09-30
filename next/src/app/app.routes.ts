@@ -324,8 +324,15 @@ export const routes: Routes = [
       // ---------------------------------------------------------------------------------------------
       // Data (Wave 5; Analytics Studio and Saved Analyses moved here from Object Browser)
       // ---------------------------------------------------------------------------------------------
-      comingSoon('data/ask', 'Ask your data', 'ask-data',
-        'Questions in plain language, answered from your documents and datasets, with their sources.'),
+      {
+        // Wave 5: plain-language questions answered only from the workspace's documents and pipeline results, with
+        // numbered sources (ai-service /askData.json, gated by ask-data at the gateway). Every member holding the page asks.
+        path: 'data/ask',
+        title: 'Ask your data',
+        loadComponent: () => import('./features/ask-data/ask-data').then(m => m.AskData),
+        data: { pageKey: 'ask-data' },
+        canActivate: [pageGuard],
+      },
       comingSoon('data/catalog', 'Data Catalog', 'data-catalog',
         'Every dataset, its owner, schema, freshness and sensitive fields.'),
       {
