@@ -392,9 +392,11 @@ export class BarChart {
     // along the bottom of a Top-10 chart was.
     // The SHORTENED name, because that is what is drawn: measured on the whole value, one
     // 20,000-character category asked for 120,000px and left only the two ends labelled.
-    const needed = Math.max(LABEL_PX, widestText(this.data().map(bar => shortLabel(bar.name))));
-    return Math.max(1, Math.ceil(needed / pitch));
+    return Math.max(1, Math.ceil(this.labelWidth() / pitch));
   });
+
+  /** The px the widest drawn (shortened) label needs, with its gutter. */
+  private readonly labelWidth = computed(() => Math.max(LABEL_PX, widestText(this.data().map(bar => shortLabel(bar.name)))));
 
   readonly bars = computed(() => {
     const data = this.data();
@@ -426,10 +428,18 @@ export class BarChart {
      */
     const last = starts[starts.length - 1];
     const roomy = this.pitch() >= BAR_MAX_PX;
+    /*
+     * The two end labels are anchored to the edges (see align below), so each reaches a whole
+     * label in from its end where a centred one reaches half. Spacing the label beside an end by
+     * `every` alone let them meet: "31 Aug5 Sep" and "25 Sep30 Sep" on a 31-day card at tablet
+     * width. Beside an end the gap is the end label's whole width plus half of the next one's.
+     */
+    const pitch = this.pitch();
+    const edge = roomy || !pitch ? every : Math.max(every, Math.ceil((1.5 * this.labelWidth() - pitch / 2) / pitch));
     const chosen = new Set<number>([starts[0], last]);
     let previous = starts[0];
     for (const at of starts) {
-      if (at - previous >= every && last - at >= every) {
+      if (at - previous >= (previous === starts[0] ? edge : every) && last - at >= edge) {
         chosen.add(at);
         previous = at;
       }

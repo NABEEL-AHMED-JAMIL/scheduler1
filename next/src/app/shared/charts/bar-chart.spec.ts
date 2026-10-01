@@ -115,6 +115,36 @@ describe('BarChart axis labels', () => {
     }
   });
 
+  /**
+   * The end labels are anchored to the edges, so they reach a whole label inward; the label
+   * beside each end must clear that, not just half of it. Run analytics' 31-day card at tablet
+   * width drew "31 Aug5 Sep" and "25 Sep30 Sep".
+   */
+  it('keeps the label beside each anchored end clear of it, at any measured width', () => {
+    const named = Array.from({ length: 31 }, (_, i) => ({ name: `${i + 1} Sep`, value: i }));
+    for (const width of [180, 260, 300, 420, 640]) {
+      TestBed.resetTestingModule();
+      const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+      fixture.componentInstance.data.set(named);
+      fixture.detectChanges();
+      const chart = fixture.debugElement.children[0].componentInstance as BarChart;
+      (chart as unknown as { measured: { set(v: number): void } }).measured.set(width);
+      const bars = chart.bars();
+      const pitch = width / bars.length;
+      // A label's extent, at 6.2px a character plus its 6px gutter, as the chart measures it.
+      const extent = (index: number) => {
+        const w = Math.max(34, bars[index].short.length * 6.2 + 6);
+        const left = bars[index].align === 'start' ? index * pitch
+          : bars[index].align === 'end' ? (index + 1) * pitch - w : index * pitch + pitch / 2 - w / 2;
+        return [left, left + w];
+      };
+      const at = bars.map((b, i) => (b.labelled ? i : -1)).filter(i => i >= 0);
+      for (let k = 1; k < at.length; k++) {
+        expect(extent(at[k])[0], `${width}px: label ${at[k - 1]} and ${at[k]}`).toBeGreaterThanOrEqual(extent(at[k - 1])[1] - 0.5);
+      }
+    }
+  });
+
   it('anchors the outer labels inward so they do not hang off the card', () => {
     const bars = barsFor(days(31));
     expect(bars[0].align).toBe('start');
