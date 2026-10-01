@@ -1583,6 +1583,12 @@ html.dark {
      across a 1244px page, and viewport breakpoints would give the dialog three 154px columns.
      The container must be an ancestor -- an element cannot query itself -- so the form owns it. */
   form, .form-section { container-type: inline-size; }
+  /* A form that wraps a whole dialog takes its width FROM the dialog: as a container its own
+     width ignores its content, so the overlay shrink-wrapped it to 0px and the dialog grew right
+     from the centre point instead of sitting on it (Save to bucket, Share). The dialog's body,
+     whose width the card fixes, is the container there instead (.form-dialog-body). */
+  .cdk-dialog-container form:has(> app-form-dialog) { container-type: normal; }
+  .form-dialog-body { container-type: inline-size; }
 
   /* Whether the columns rail fits beside the rows is a question about THIS column's width, not
      the window's: the storage rail takes 260px off the left before the dataset column exists, so

@@ -23,7 +23,7 @@ import { focusFirstInvalid } from './focus-first-invalid';
         }
       </div>
 
-      <div class="flex-1 overflow-y-auto px-5 py-5 min-h-0">
+      <div class="form-dialog-body flex-1 overflow-y-auto px-5 py-5 min-h-0">
         <ng-content />
       </div>
 
