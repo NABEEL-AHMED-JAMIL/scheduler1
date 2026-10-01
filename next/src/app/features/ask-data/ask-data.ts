@@ -5,7 +5,8 @@ import { Subscription, TimeoutError } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, AskSourceRef, AskTurn, QUESTION_MAX, Searched, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, chartItems, csvOf, refusalText, searchedText, segments } from './ask-data.model';
+import { RankedBar } from '../../shared/charts/ranked-bar';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
@@ -15,7 +16,7 @@ import { AskAnswer, AskSourceRef, AskTurn, QUESTION_MAX, Searched, refusalText, 
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [RouterLink, Icon],
+  imports: [RouterLink, Icon, RankedBar],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {
@@ -135,6 +136,26 @@ export class AskData implements OnInit {
     this.highlighted.set(id);
     if (this.highlightTimer) clearTimeout(this.highlightTimer);
     this.highlightTimer = setTimeout(() => this.highlighted.set(null), 1600);
+  }
+
+  /** MIG-283: a query answer's chart, rows shown (the first 20) and the way to keep working on it. */
+  readonly chartItems = chartItems;
+
+  shownRows(q: AskQuery): (string | null)[][] {
+    return q.rows.slice(0, 20);
+  }
+
+  analyticsParams(q: AskQuery): Record<string, string> {
+    return { connection: q.dataset.connection, path: q.dataset.path, name: q.dataset.name, sql: q.sql };
+  }
+
+  downloadCsv(q: AskQuery): void {
+    const url = URL.createObjectURL(new Blob([csvOf(q)], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${q.dataset.name.replace(/[^\w.-]+/g, '-').toLowerCase()}-answer.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   searchedOf(answer: AskAnswer): string {

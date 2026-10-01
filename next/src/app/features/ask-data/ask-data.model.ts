@@ -16,14 +16,31 @@ export interface AskSourceRef {
 }
 
 export interface Searched {
-  documents: number;
-  runOutputs: number;
+  documents?: number;
+  runOutputs?: number;
+  /** MIG-283: a question answered by a query read one dataset. */
+  datasets?: number;
   /** MIG-279: forms whose submissions were read (absent from an older ai-service). */
   forms?: number;
 }
 
+/** MIG-283: the query a question about numbers was answered with -- always shown with its answer. */
+export interface AskQuery {
+  sql: string;
+  dataset: { datasetId: number; name: string; connection: string; path: string };
+  columns: string[];
+  rows: (string | null)[][];
+  rowCount: number;
+  truncated: boolean;
+  /** A bar chart of one label column and one number column, when the rows make one. */
+  chart: { type: 'bar'; label: string; value: string } | null;
+}
+
 export interface AskAnswer {
   question: string;
+  /** "query" when a query answered it (MIG-283); absent for an answer from documents. */
+  kind?: 'query';
+  query?: AskQuery;
   answer: string;
   notFound: boolean;
   sources: AskSourceRef[];
@@ -75,7 +92,8 @@ export function segments(answer: string, known: ReadonlySet<number>): Segment[] 
 export function searchedText(s: Searched | null | undefined): string {
   if (!s) return '';
   const part = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  const parts = [part(s.documents, 'document', 'documents'), part(s.runOutputs, 'pipeline result', 'pipeline results')];
+  if (s.datasets && s.documents == null) return part(s.datasets, 'dataset', 'datasets');
+  const parts = [part(s.documents ?? 0, 'document', 'documents'), part(s.runOutputs ?? 0, 'pipeline result', 'pipeline results')];
   if (s.forms) parts.push(part(s.forms, 'form', 'forms'));
   return parts.length === 2 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
@@ -88,4 +106,22 @@ export function refusalText(status: number, message: string | null | undefined):
   if (status === 429) return 'Too many questions at once. Wait a moment and ask again.';
   if (status === 504 || status === 408) return 'The answer took too long. Try a shorter or more specific question.';
   return 'The question could not be answered. Try again.';
+}
+
+/** The query's chart as bars: its label column against its number column, in the order the query gave. */
+export function chartItems(q: AskQuery | null | undefined): { name: string; value: number }[] {
+  if (!q?.chart) return [];
+  const label = q.columns.indexOf(q.chart.label);
+  const value = q.columns.indexOf(q.chart.value);
+  if (label < 0 || value < 0) return [];
+  return q.rows.map(r => ({ name: r[label] ?? '—', value: Number(r[value]) })).filter(i => Number.isFinite(i.value));
+}
+
+/** The query's rows as CSV (RFC 4180 quoting), header first. */
+export function csvOf(q: AskQuery): string {
+  const cell = (v: string | null) => {
+    const text = v ?? '';
+    return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  return [q.columns.map(cell).join(','), ...q.rows.map(r => r.map(cell).join(','))].join('\r\n') + '\r\n';
 }

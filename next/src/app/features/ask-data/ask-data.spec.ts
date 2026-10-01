@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, chartItems, csvOf, refusalText, searchedText, segments } from './ask-data.model';
 import { AskData } from './ask-data';
 
 const SEARCHED = { documents: 1, runOutputs: 2 };
@@ -172,3 +172,33 @@ describe('Ask your data -- as drawn', () => {
     expect(api.ask).not.toHaveBeenCalled();
   });
 });
+
+describe('Ask your data -- a question answered by a query (MIG-283)', () => {
+  const QUERY = {
+    sql: 'SELECT city, sum(amount) AS total FROM dataset GROUP BY city ORDER BY total DESC\nLIMIT 200',
+    dataset: { datasetId: 1002, name: 'Customers small', connection: 's3', path: 'customers.csv' },
+    columns: ['city', 'total'], rows: [['Austin', '120.5'], ['Paris, FR', '80']], rowCount: 2, truncated: false,
+    chart: { type: 'bar' as const, label: 'city', value: 'total' },
+  };
+
+  it('shows the sentence, the chart, the rows and the query it ran -- and hands the query to Analytics Studio', () => {
+    const { screen, fixture, q } = render({ ask: (question: string) => of({ status: 'SUCCESS', data: {
+      question, kind: 'query', answer: '2 rows; the first: Austin, 120.5.', notFound: false, sources: [], query: QUERY,
+      model: 'gemma3:1b', connection: 'Local Ollama', runId: 9, latencyMs: 2100, searched: { datasets: 1 }, warnings: [] } }) });
+    screen.ask('Total amount by city');
+    fixture.detectChanges();
+    expect(q('[data-test="query-answer"] [data-test="answer"]')?.textContent).toContain('2 rows; the first: Austin, 120.5.');
+    expect(q('[data-test="query-chart"]')?.textContent).toContain('Austin');
+    expect(q('[data-test="query-rows"]')?.textContent).toContain('Paris, FR');
+    expect(q('[data-test="query-sql"]')?.textContent).toContain('GROUP BY city');
+    expect(q('[data-test="open-analytics"]')?.getAttribute('href')).toContain('sql=SELECT');
+    expect(q('[data-test="meta"]')?.textContent).toContain('1 dataset');
+  });
+
+  it('turns the rows into CSV and the chart into bars', () => {
+    expect(csvOf(QUERY)).toBe('city,total\r\nAustin,120.5\r\n"Paris, FR",80\r\n');
+    expect(chartItems(QUERY)).toEqual([{ name: 'Austin', value: 120.5 }, { name: 'Paris, FR', value: 80 }]);
+    expect(chartItems({ ...QUERY, chart: null })).toEqual([]);
+  });
+});
+

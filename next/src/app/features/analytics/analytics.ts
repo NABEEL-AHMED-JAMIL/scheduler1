@@ -1147,6 +1147,13 @@ export class Analytics implements OnInit {
         const connection = asked?.get('connection');
         const path = asked?.get('path');
         if (connection && path) {
+          // MIG-283: Ask your data hands over the query it ran, to be read, changed and saved here -- the dataset opens
+          // on SQL with it, whether it loads now or after its folder is read.
+          const sql = asked?.get('sql');
+          if (sql) {
+            this.sql.set(sql);
+            this.openOnTab = 'sql';
+          }
           this.openRegistered({ connectionAlias: connection, datasetPath: path, datasetName: asked?.get('name') || path } as RegisteredDataset);
           return;
         }
@@ -1316,11 +1323,15 @@ export class Analytics implements OnInit {
    */
   private pageEpoch = 0;
 
+  /** A tab the next dataset opens on (a query handed over by Ask your data opens on SQL); overview otherwise. */
+  private openOnTab: Tab | null = null;
+
   private load(path: string): void {
     this.path.set(path);
     // Anything already in flight for the previous dataset is now superseded, rows included.
     this.pageEpoch++;
-    this.tab.set('overview');
+    this.tab.set(this.openOnTab ?? 'overview');
+    this.openOnTab = null;
     this.loading.set(true);
     this.error.set('');
     this.columns.set([]);

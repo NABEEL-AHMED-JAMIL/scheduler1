@@ -75,7 +75,43 @@
           }
           @case ('answered') {
             @if (t.answer; as a) {
-              @if (a.notFound) {
+              @if (a.query; as q) {
+                <div class="flex flex-col gap-3" data-test="query-answer">
+                  <p class="text-sm leading-relaxed" data-test="answer">{{ a.answer }}</p>
+                  @if (chartItems(q).length) {
+                    <div class="card p-4" data-test="query-chart">
+                      <p class="text-xs text-[color:var(--text-muted)] mb-2">{{ q.chart!.value }} by {{ q.chart!.label }}</p>
+                      <app-ranked-bar [data]="chartItems(q)" [sorted]="false" [max]="12" [showPercent]="false" />
+                    </div>
+                  }
+                  @if (q.rows.length) {
+                    <div class="overflow-x-auto">
+                      <table class="table-modern" data-test="query-rows">
+                        <thead><tr>@for (c of q.columns; track $index) { <th>{{ c }}</th> }</tr></thead>
+                        <tbody>
+                          @for (r of shownRows(q); track $index) {
+                            <tr>@for (v of r; track $index) { <td class="text-xs">{{ v ?? '—' }}</td> }</tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    @if (q.rows.length > 20 || q.truncated) {
+                      <p class="text-xs text-[color:var(--text-muted)]">The first {{ shownRows(q).length }} of {{ q.rowCount }} rows{{ q.truncated ? ' (more were cut at the row limit)' : '' }}.</p>
+                    }
+                  }
+                  <div class="flex flex-col gap-1">
+                    <p class="text-xs font-medium">The query, run as you over "{{ q.dataset.name }}"</p>
+                    <pre class="mono text-xs whitespace-pre-wrap break-words card p-4" data-test="query-sql">{{ q.sql }}</pre>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <a class="btn btn-default btn-sm" routerLink="/data/analytics" [queryParams]="analyticsParams(q)" data-test="open-analytics">
+                      <app-icon name="chart" />Open in Analytics Studio</a>
+                    @if (q.rows.length) {
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="downloadCsv(q)" data-test="download-csv"><app-icon name="download" />Download CSV</button>
+                    }
+                  </div>
+                </div>
+              } @else if (a.notFound) {
                 <div class="rounded-lg px-3 py-2 text-sm bg-accent-soft flex items-start gap-2" data-test="not-found">
                   <app-icon name="info" class="mt-0.5 shrink-0" size="0.9em" />
                   <div>
