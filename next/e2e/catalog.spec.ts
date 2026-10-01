@@ -1,0 +1,84 @@
+import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { join } from 'path';
+
+/**
+ * MIG-288: Data › Data Catalog against analytics-service for workspace 2924 -- the strip, the list with its sensitive
+ * fields, an asset's panel with columns, tags and lineage -- at a wide screen and a tablet; and the prompt editor's
+ * file picker naming its variable plainly (no {{ }} in its heading).
+ *
+ * Sign-in: E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh 4537 900); E2E_SHOTS optional.
+ * Reads only: nothing is created or changed.
+ */
+const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
+const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
+
+async function sessionOf(request: APIRequestContext, token: string): Promise<Record<string, unknown>> {
+  const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
+  return { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
+    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys ?? null };
+}
+
+async function pageAs(browser: Browser, session: Record<string, unknown>, width = 1920, height = 1080): Promise<Page> {
+  const context = await browser.newContext({ viewport: { width, height } });
+  const page = await context.newPage();
+  await page.goto('/');
+  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session);
+  return page;
+}
+
+async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
+  await page.screenshot({ path: info.outputPath(`${name}.png`), fullPage: true });
+  const extra = process.env['E2E_SHOTS'];
+  if (extra) await page.screenshot({ path: join(extra, `${name}.png`), fullPage: true });
+}
+
+test.describe('Data Catalog', () => {
+  test.skip(!adminToken, 'needs E2E_TENANT_ADMIN_TOKEN');
+
+  for (const [width, height, label] of [[1920, 1080, 'wide'], [1024, 768, 'tablet']] as const) {
+    test(`the list, the strip and an asset's panel (${label})`, async ({ browser, request }, info) => {
+      const page = await pageAs(browser, await sessionOf(request, adminToken!), width, height);
+      await page.goto('/data/catalog');
+      await page.getByRole('heading', { name: 'Data Catalog' }).waitFor();
+      await expect(page.getByText('With sensitive fields')).toBeVisible();
+      await page.locator('#catalogSearch').fill('MIG286-customers');
+      const row = page.locator('tr[data-asset]').filter({ hasText: 'MIG286-customers.csv' });
+      await expect(row).toBeVisible();
+      await expect(row).toContainText('Restricted');
+      await expect(row).toContainText('card number');
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no page-wide horizontal scroll').toBe(true);
+      await shot(page, info, `catalog-list-${label}`);
+
+      await row.click();
+      const panel = page.locator('[data-catalog-panel]');
+      await expect(panel).toBeVisible();
+      await expect(panel.locator('tr[data-column="email"]')).toBeVisible();
+      await expect(panel.locator('[data-sensitivity]')).toHaveText('Restricted');
+      await shot(page, info, `catalog-panel-${label}`);
+      await page.getByRole('button', { name: 'Close' }).click();
+
+      await page.locator('#catalogSearch').fill('MIG-287 clean customers');
+      await page.locator('tr[data-asset]').filter({ hasText: 'MIG-287 clean customers' }).first().click();
+      const lineage = page.locator('[data-lineage]');
+      await expect(lineage).toContainText('live-customers.csv');
+      await expect(lineage).toContainText('UI-CHECK registry chain job 0929');
+      await expect(lineage).toContainText('MIG-287 customer health');
+      await shot(page, info, `catalog-lineage-${label}`);
+      await page.context().close();
+    });
+  }
+
+  test('the prompt editor names the variable a file fills, without template braces', async ({ browser, request }, info) => {
+    const page = await pageAs(browser, await sessionOf(request, adminToken!));
+    await page.goto('/ai/prompts/new');
+    await page.getByRole('heading', { name: 'New prompt' }).waitFor();
+    await page.locator('#pTemplate').fill('Summarise {{file_name}}');
+    await page.locator('.prompt-vars tbody tr').first().getByRole('button', { name: 'Fill from a file' }).click();
+    const heading = page.locator('.side-panel-head h2');
+    await expect(heading).toHaveText('Choose a file for file_name');
+    await expect(heading).not.toContainText('{{');
+    await shot(page, info, 'prompt-file-picker-heading');
+    await page.context().close();
+  });
+});
