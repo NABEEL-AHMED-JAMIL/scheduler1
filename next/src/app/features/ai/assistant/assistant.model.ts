@@ -58,6 +58,8 @@ export interface PipelineDraft {
   format?: 'yaml' | 'json' | string;
   text: string;
   pipelineKey?: number | null;
+  /** A task on the pipeline, whose edit page holds the step builder (MIG-317); absent on drafts kept before it. */
+  taskDetailId?: number | null;
   valid?: boolean;
   problems?: (string | { message?: string; path?: string })[] | null;
   saved?: boolean;
@@ -134,6 +136,11 @@ export interface ToolDef {
   enabledInWorkspace: boolean;
   switchedInWorkspace: boolean;
   youMayUse: boolean;
+  /** MIG-317: the newest call -- the person's own, an administrator's the workspace's -- ISO with offset; null for never. */
+  lastUsedAt?: string | null;
+  /** MIG-317: the part of the platform the call reaches, and what it hands back, as ai-service says. */
+  service?: string | null;
+  output?: string | null;
 }
 
 // ------------------------------------------------------------------------------------------ content
@@ -265,19 +272,6 @@ export function outcomeLook(outcome: string | null | undefined): { label: string
   return OUTCOMES[(outcome ?? '').toLowerCase()] ?? { label: sentence(outcome ?? ''), tone: 'neutral' };
 }
 
-/** Each tool's newest call among the traces read: the registry's "Last used". */
-export function lastUsedByTool(traces: readonly (readonly ToolCall[])[]): Record<string, string> {
-  const last: Record<string, string> = {};
-  for (const calls of traces) {
-    for (const call of calls) {
-      if (!call.dateCreated) continue;
-      const seen = last[call.toolName];
-      if (!seen || (instantMs(call.dateCreated) ?? 0) > (instantMs(seen) ?? 0)) last[call.toolName] = call.dateCreated;
-    }
-  }
-  return last;
-}
-
 // ---------------------------------------------------------------------------------------- registry
 
 /**
@@ -310,18 +304,22 @@ const SERVICES: Record<string, string> = {
   reports: 'Run analytics', 'tools-converter': 'Document converter',
 };
 
-/** The service a tool calls, as the console names its pages; a step task with no page runs in the pipeline engine. */
+/**
+ * The service a tool calls: ai-service's name for it (MIG-317), else as the console names its pages; a step task with no
+ * page runs in the pipeline engine.
+ */
 export function serviceOf(t: ToolDef): string {
+  if (t.service) return t.service;
   if (t.page) return SERVICES[t.page] ?? t.page;
   return t.coreTask ? 'Pipeline engine' : '—';
 }
 
-/** Input → output: its parameters (required first, an optional one marked ?) and what comes back. */
+/** Input → output: its parameters (required first, an optional one marked ?) and what comes back -- ai-service's words when it says. */
 export function ioOf(t: ToolDef): { input: string; output: string } {
   const props = Object.keys(t.parameters?.properties ?? {});
   const required = new Set(t.parameters?.required ?? []);
   const names = [...props.filter(p => required.has(p)), ...props.filter(p => !required.has(p)).map(p => `${p}?`)];
-  const output = t.returnsDatasetReference ? 'dataset ref' : t.kind === 'write' ? 'result' : 'list';
+  const output = t.output || (t.returnsDatasetReference ? 'dataset ref' : t.kind === 'write' ? 'result' : 'list');
   return { input: names.length ? names.join(', ') : 'none', output };
 }
 

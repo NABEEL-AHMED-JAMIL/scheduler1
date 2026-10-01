@@ -1,6 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { catchError, forkJoin, map, of } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { roleLabel } from '../../../core/auth/auth.models';
@@ -12,17 +11,15 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { capTitle } from '../../../shared/ui/long-text';
 import { AssistantApi } from '../assistant/assistant.api';
-import { ToolCall, ToolDef, allowedTools, ioOf, lastUsedByTool, serviceOf, toolState } from '../assistant/assistant.model';
-
-/** How many of the newest runs are read for "Last used": tools/list does not say, so their traces do. */
-const RUNS_READ = 25;
+import { ToolDef, allowedTools, ioOf, serviceOf, toolState } from '../assistant/assistant.model';
 
 /**
  * AI › Tool Registry (MIG-252): the only operations the AI Assistant may request (ai-service's
  * tools/list). Each row says which service it calls, what goes in and comes out, who may use it,
  * whether it asks first, whether it is on here -- Blocked with the reason when the platform or the
- * person's role rules it out -- and when it was last called. A workspace administrator switches a
- * tool on or off for the workspace (tools/setEnabled); a blocked tool's switch cannot move.
+ * person's role rules it out -- and when it was last called (tools/list says, MIG-317). A workspace
+ * administrator switches a tool on or off for the workspace (tools/setEnabled), or puts a switched
+ * tool back to its default; a blocked tool's switch cannot move.
  *
  * Tools are switched per workspace, and a platform administrator has none of its own: it picks the workspace first
  * (as on Access profiles), and every call names it. Without that, tools/list refused it and the page looked empty.
@@ -40,7 +37,6 @@ export class ToolRegistry implements OnInit {
   readonly tools = signal<ToolDef[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly lastUsed = signal<Record<string, string>>({});
   readonly busy = signal<string | null>(null);
 
   readonly search = signal('');
@@ -89,7 +85,6 @@ export class ToolRegistry implements OnInit {
     const id = Number(value);
     this.tenantId.set(Number.isFinite(id) && id > 0 ? id : null);
     this.tools.set([]);
-    this.lastUsed.set({});
     if (this.tenantId()) this.load();
   }
 
@@ -104,22 +99,6 @@ export class ToolRegistry implements OnInit {
         this.tools.set(r.data ?? []);
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the tools.'); },
-    });
-    this.loadLastUsed();
-  }
-
-  /** The newest runs' traces, read side by side; a trace that fails to load just says nothing. */
-  private loadLastUsed(): void {
-    const tenant = this.tenantId() ?? undefined;
-    this.api.runs(RUNS_READ, tenant).pipe(
-      map(r => (r.status === API_SUCCESS ? r.data ?? [] : [])),
-      catchError(() => of([])),
-    ).subscribe(runs => {
-      if (!runs.length) return;
-      forkJoin(runs.map(run => this.api.trace(run.toolRunId, tenant).pipe(
-        map(r => (r.status === API_SUCCESS ? r.data?.calls ?? [] : []) as ToolCall[]),
-        catchError(() => of([] as ToolCall[])),
-      ))).subscribe(traces => this.lastUsed.set(lastUsedByTool(traces)));
     });
   }
 
@@ -138,6 +117,21 @@ export class ToolRegistry implements OnInit {
         this.toast.success(r.message);
       },
       error: err => { this.busy.set(null); box.checked = !enabled; this.toast.error(err?.error?.message || 'The tool could not be switched.'); },
+    });
+  }
+
+  /** Takes the workspace's switch away: the tool is on by default again. */
+  reset(t: ToolDef): void {
+    this.busy.set(t.name);
+    const tenant = this.tenantId();
+    (tenant ? this.api.setEnabled(t.name, null, tenant) : this.api.setEnabled(t.name, null)).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; }
+        this.tools.update(list => list.map(x => (x.name === t.name ? { ...x, enabledInWorkspace: true, switchedInWorkspace: false } : x)));
+        this.toast.success(r.message);
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'The tool could not be put back to its default.'); },
     });
   }
 

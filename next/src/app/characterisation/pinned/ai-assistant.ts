@@ -240,9 +240,7 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/tools/list",
-      "GET /aiPrompt.json/tools/runs?limit=25",
-      "GET /aiPrompt.json/tools/trace?toolRunId=1004"
+      "GET /aiPrompt.json/tools/list"
     ],
     "headings": [
       "Tool Registry",
@@ -286,9 +284,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/tools/list",
-      "GET /aiPrompt.json/tools/runs?limit=25",
-      "GET /aiPrompt.json/tools/trace?toolRunId=1004"
+      "GET /aiPrompt.json/tools/list"
     ],
     "headings": [
       "Tool Registry",

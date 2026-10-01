@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  AssistantMessage, ToolCall, ToolDef, allowedTools, askFirstNames, cardView, confirmLabel, contentBlocks, filesLink,
-  ioOf, lastUsedByTool, mergeMessages, outcomeLook, runLink, serviceOf, toolState, traceOwners, withDecision,
+  AssistantMessage, ToolDef, allowedTools, askFirstNames, cardView, confirmLabel, contentBlocks, filesLink,
+  ioOf, mergeMessages, outcomeLook, runLink, serviceOf, toolState, traceOwners, withDecision,
 } from './assistant.model';
 
 const msg = (m: Partial<AssistantMessage>): AssistantMessage => ({
@@ -70,6 +70,11 @@ describe('assistant model -- the confirmation card', () => {
     expect(v.args).toEqual([['jobId', '2848'], ['note', 'x']]);
   });
 
+  it('reads an expiry with its offset, as ai-service now sends it (MIG-317)', () => {
+    expect(cardView({ ...base, expiresAt: '2026-09-29T07:13:05.974-05:00', state: 'pending' }, NOW).open).toBe(true);
+    expect(cardView({ ...base, expiresAt: '2026-09-29T06:59:00-05:00', state: 'pending' }, NOW).state).toBe('Expired');
+  });
+
   it('treats a pending card past its expiry as expired', () => {
     const v = cardView({ ...base, expiresAt: '2026-09-29T06:59:00', state: 'pending' }, NOW);
     expect(v.open).toBe(false);
@@ -117,16 +122,6 @@ describe('assistant model -- the trace', () => {
     expect(outcomeLook('expired')).toEqual({ label: 'Expired', tone: 'neutral' });
     expect(outcomeLook('odd')).toEqual({ label: 'Odd', tone: 'neutral' });
   });
-
-  it('finds each tool\'s newest call across runs', () => {
-    const call = (toolName: string, dateCreated: string): ToolCall => ({ callId: 1, toolRunId: 1, seq: 1, toolName, toolKind: 'read',
-      arguments: '{}', outcome: 'allowed', dateCreated } as ToolCall);
-    const last = lastUsedByTool([
-      [call('get_jobs', '2026-09-29T11:57:55.926+00:00'), call('run_pipeline', '2026-09-29T11:58:05.974+00:00')],
-      [call('get_jobs', '2026-09-29T06:05:00.000+00:00')],
-    ]);
-    expect(last).toEqual({ get_jobs: '2026-09-29T11:57:55.926+00:00', run_pipeline: '2026-09-29T11:58:05.974+00:00' });
-  });
 });
 
 describe('assistant model -- the registry', () => {
@@ -151,6 +146,7 @@ describe('assistant model -- the registry', () => {
     expect(serviceOf(tool({ page: 'tools-converter' }))).toBe('Document converter');
     expect(serviceOf(tool({ page: null, coreTask: 'transform_rows' }))).toBe('Pipeline engine');
     expect(serviceOf(tool({ page: 'mystery' }))).toBe('mystery');
+    expect(serviceOf(tool({ page: 'objects', service: 'Object storage' }))).toBe('Object storage');
   });
 
   it('writes input to output from the parameters, required first', () => {
@@ -158,5 +154,6 @@ describe('assistant model -- the registry', () => {
     expect(ioOf(t)).toEqual({ input: 'jobId, note?', output: 'result' });
     expect(ioOf(tool({ returnsDatasetReference: true, parameters: { type: 'object', properties: {} } }))).toEqual({ input: 'none', output: 'dataset ref' });
     expect(ioOf(tool({ kind: 'read' })).output).toBe('list');
+    expect(ioOf(tool({ kind: 'read', output: 'A page of data sources' })).output).toBe('A page of data sources');
   });
 });

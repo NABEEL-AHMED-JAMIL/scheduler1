@@ -15,21 +15,22 @@ const tool = (t: Partial<ToolDef>): ToolDef => ({ name: 'get_jobs', title: 'Pipe
   enabledInWorkspace: true, switchedInWorkspace: false, youMayUse: true, ...t });
 
 const TOOLS = [
-  tool({}),
-  tool({ name: 'run_pipeline', title: 'Run a pipeline job', kind: 'write', requiresConfirmation: true, parameters: { type: 'object', required: ['jobId'], properties: { jobId: { type: 'integer' } } } }),
+  tool({ lastUsedAt: '2026-09-28T11:57:55.926-05:00' }),
+  tool({ name: 'run_pipeline', title: 'Run a pipeline job', kind: 'write', requiresConfirmation: true, parameters: { type: 'object', required: ['jobId'], properties: { jobId: { type: 'integer' } } },
+    lastUsedAt: '2026-09-28T06:05:00-05:00' }),
   tool({ name: 'call_api', title: 'Call a saved API request', requiredRole: 'TENANT_ADMIN', page: 'api-collections', returnsDatasetReference: true, youMayUse: false }),
   tool({ name: 'join_data', title: 'Join datasets', page: null, coreTask: 'join_datasets', available: false, unavailableReason: 'No user-facing endpoint.', youMayUse: false }),
   tool({ name: 'get_reports', title: 'Run report', page: 'reports', enabledInWorkspace: false, switchedInWorkspace: true }),
+  tool({ name: 'read_s3', title: 'Read storage', page: 'objects', service: 'Object storage', output: 'A file\'s rows as a dataset reference' }),
 ];
 
 function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => Observable<any> } = {}) {
   const api = {
     tools: vi.fn(() => of({ status: 'SUCCESS', data: structuredClone(TOOLS) })),
-    runs: vi.fn(() => of({ status: 'SUCCESS', data: [{ toolRunId: 1004, status: 'answered' }, { toolRunId: 1003, status: 'answered' }] })),
-    trace: vi.fn((id: number) => of({ status: 'SUCCESS', data: { run: { toolRunId: id, status: 'answered' }, calls: id === 1004
-      ? [{ callId: 1, toolRunId: 1004, seq: 1, toolName: 'get_jobs', outcome: 'allowed', dateCreated: '2026-09-28T16:57:55.926+00:00' }]
-      : [{ callId: 2, toolRunId: 1003, seq: 1, toolName: 'run_pipeline', outcome: 'confirmed', dateCreated: '2026-09-28T11:05:00.000+00:00' }] } })),
-    setEnabled: vi.fn(opts.setEnabled ?? ((name: string, enabled: boolean) => of({ status: 'SUCCESS', message: `${name} is ${enabled ? 'on' : 'off'} in this workspace.` }))),
+    runs: vi.fn(),
+    trace: vi.fn(),
+    setEnabled: vi.fn(opts.setEnabled ?? ((name: string, enabled: boolean | null) => of({ status: 'SUCCESS', message: enabled === null
+      ? `${name} is back to its default in this workspace: on.` : `${name} is ${enabled ? 'on' : 'off'} in this workspace.` }))),
     workspaces: vi.fn(() => of({ status: 'SUCCESS', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }, { tenantId: 2900, tenantName: 'Default' }] })),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
@@ -70,6 +71,12 @@ describe('Tool Registry', () => {
     expect(cells('get_reports')[6]).toBe('Never');
   });
 
+  it('says the service and the output in ai-service\'s words when it gives them', () => {
+    const { cells } = render();
+    expect(cells('read_s3')[1]).toBe('Object storage');
+    expect(cells('read_s3')[2]).toBe('search? → A file\'s rows as a dataset reference');
+  });
+
   it('shows a blocked tool as blocked, with why, and its switch cannot be moved', () => {
     const { row, cells } = render();
     expect(cells('join_data')[5]).toContain('Blocked');
@@ -80,10 +87,28 @@ describe('Tool Registry', () => {
     expect(cells('get_reports')[5]).toContain('Off');
   });
 
-  it('reads "last used" from the newest runs\' traces', () => {
+  it('reads "last used" from tools/list alone, no run or trace (MIG-317)', () => {
     const { api } = render();
-    expect(api.runs).toHaveBeenCalled();
-    expect(api.trace.mock.calls.map(c => c[0])).toEqual([1004, 1003]);
+    expect(api.tools).toHaveBeenCalledTimes(1);
+    expect(api.runs).not.toHaveBeenCalled();
+    expect(api.trace).not.toHaveBeenCalled();
+  });
+
+  it('an administrator puts a switched tool back to its default', () => {
+    const { row, api, toast, fixture, cells } = render();
+    expect(row('get_jobs').querySelector('button[aria-label^="Put"]')).toBeNull();
+    row('get_reports').querySelector<HTMLButtonElement>('button[aria-label="Put get_reports back to its default"]')!.click();
+    fixture.detectChanges();
+    expect(api.setEnabled).toHaveBeenCalledWith('get_reports', null);
+    expect(toast.success).toHaveBeenCalledWith('get_reports is back to its default in this workspace: on.');
+    expect(cells('get_reports')[5]).toContain('Enabled');
+    expect(cells('get_reports')[5]).not.toContain('switched here');
+    expect(row('get_reports').querySelector('button[aria-label^="Put"]')).toBeNull();
+  });
+
+  it('a tenant user cannot reset a switch', () => {
+    const { row } = render({ admin: false });
+    expect(row('get_reports').querySelector('button[aria-label^="Put"]')).toBeNull();
   });
 
   it('an administrator switches a tool off in the workspace', () => {
@@ -136,7 +161,6 @@ describe('Tool Registry', () => {
     screen.pickTenant('2924');
     fixture.detectChanges();
     expect(api.tools).toHaveBeenCalledWith(2924);
-    expect(api.runs).toHaveBeenCalledWith(25, 2924);
     const box = row('get_jobs').querySelector<HTMLInputElement>('input[role="switch"]')!;
     box.checked = false;
     box.dispatchEvent(new Event('change'));

@@ -441,7 +441,8 @@ export class Assistant implements OnInit {
    */
   async openDraft(draft: PipelineDraft): Promise<void> {
     const format = draft.format === 'json' ? 'json' : 'yaml';
-    const taskDetailId = draft.pipelineKey != null ? await this.taskFor(draft.pipelineKey) : null;
+    // ai-service names a task on the pipeline (MIG-317); a draft kept before that is looked up as it always was.
+    const taskDetailId = draft.taskDetailId ?? (draft.pipelineKey != null ? await this.taskFor(draft.pipelineKey) : null);
     if (taskDetailId == null) {
       this.toast.info('No pipeline task uses this pipeline yet, so there is no step builder to open. Copy the draft instead.');
       return;

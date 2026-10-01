@@ -56,7 +56,8 @@ export class AssistantApi {
     return this.http.get<ApiResponse<ToolDef[]>>(`${BASE()}/tools/list`, { params: withTenant({}, tenantId) });
   }
 
-  setEnabled(toolName: string, enabled: boolean, tenantId?: number | null): Observable<ApiResponse> {
+  /** enabled null takes the workspace's switch away: the tool is back to its default (MIG-317). */
+  setEnabled(toolName: string, enabled: boolean | null, tenantId?: number | null): Observable<ApiResponse> {
     return this.http.post<ApiResponse>(`${BASE()}/tools/setEnabled`, { toolName, enabled }, { params: withTenant({}, tenantId) });
   }
 

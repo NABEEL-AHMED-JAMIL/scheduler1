@@ -223,6 +223,16 @@ describe('AI Assistant -- a drafted pipeline', () => {
     expect(handoff.take(100175)).toBeNull();
   });
 
+  it('opens the task ai-service names on the draft, with no lookup (MIG-317)', async () => {
+    const { screen, navigate, get, post } = screenWith();
+    get.mockClear();
+    post.mockClear();
+    await screen.openDraft({ kind: 'pipeline-draft', format: 'json', text: '{}', pipelineKey: 100175, taskDetailId: 5009 });
+    expect(navigate).toHaveBeenCalledWith(['/pipelines', 5009, 'edit'], { queryParams: { tab: 'json' } });
+    expect(get.mock.calls.some(c => String(c[0]).endsWith('/pipeline.json/list'))).toBe(false);
+    expect(post.mock.calls.some(c => String(c[0]).endsWith('/sourceTask.json/listSourceTask'))).toBe(false);
+  });
+
   it('says so when no pipeline task can open the builder', async () => {
     const { screen, navigate, toast } = screenWith();
     await screen.openDraft({ kind: 'pipeline-draft', format: 'yaml', text: 'steps: []', pipelineKey: 999 });

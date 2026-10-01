@@ -17,8 +17,10 @@ const TOOLS = { status: 'SUCCESS', message: '6 tool(s).', data: [
   { ...TOOL, name: 'get_sources', title: 'Data sources', page: 'sources', parameters: P(['search', 'page', 'limit']) },
   { ...TOOL, name: 'call_api', title: 'Call a saved API request', page: 'api-collections', coreTask: 'read_api', returnsDatasetReference: true,
     requiredRole: 'TENANT_ADMIN', parameters: P(['requestId', 'environmentId', 'variables'], ['requestId']) },
-  { ...TOOL, name: 'get_jobs', title: 'Pipeline jobs', page: 'jobs', parameters: P(['search', 'limit']) },
-  { ...TOOL, name: 'run_pipeline', title: 'Run a pipeline job', page: 'jobs', kind: 'write', requiresConfirmation: true, parameters: P(['jobId'], ['jobId']) },
+  // MIG-317: tools/list says when each was last called (tool run 1004's two calls), so the page reads no run or trace.
+  { ...TOOL, name: 'get_jobs', title: 'Pipeline jobs', page: 'jobs', parameters: P(['search', 'limit']), lastUsedAt: '2026-09-29T06:57:55.926-05:00' },
+  { ...TOOL, name: 'run_pipeline', title: 'Run a pipeline job', page: 'jobs', kind: 'write', requiresConfirmation: true, parameters: P(['jobId'], ['jobId']),
+    lastUsedAt: '2026-09-29T06:58:05.974-05:00' },
   { ...TOOL, name: 'delete_file', title: 'Delete a file', page: 'objects', kind: 'write', requiresConfirmation: true, parameters: P(['bucket', 'key'], ['bucket', 'key']) },
   { ...TOOL, name: 'join_data', title: 'Join datasets', page: null, coreTask: 'join_datasets', available: false, youMayUse: false,
     unavailableReason: 'No user-facing endpoint runs a pipeline step on rows outside a pipeline run.', parameters: P(['datasetRef', 'config'], ['datasetRef']) },
