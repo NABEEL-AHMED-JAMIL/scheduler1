@@ -9,13 +9,15 @@ import { Combobox } from '../../shared/ui/combobox';
 import { TableShell } from '../../shared/ui/data-table';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
-import { BillingApi, DayRow, MeterLine, PricedWith, SERVICES, SubjectRow, UsageQuery } from './billing.service';
+import { BillingApi, DayRow, MeterLine, PricedWith, RunRow, SERVICES, SubjectRow, UsageQuery } from './billing.service';
 import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
 const SUBJECTS_SHOWN = 25;
+/** How many runs the Cost per run table reads at a time. */
+const RUNS_PAGE = 25;
 /** The forecast paces the rest of the month at the last week's daily average. */
 const FORECAST_WINDOW_DAYS = 7;
 
@@ -135,6 +137,16 @@ export class Billing implements OnInit {
   /** A drill-down that could not be read says so, rather than "No subject recorded". */
   readonly subjectsError = signal('');
 
+  // ---- cost per run (MIG-308) ----
+  readonly runs = signal<RunRow[]>([]);
+  readonly runsTotal = signal(0);
+  readonly runsLoading = signal(false);
+  readonly runsError = signal('');
+  private runsPage = 0;
+  /** The precision the run Cost column shares, as the lines' Amount does. */
+  readonly runDigits = computed(() => moneyDigits(this.runs().map(r => r.amount)));
+  readonly moreRuns = computed(() => this.runs().length < this.runsTotal());
+
   ngOnInit(): void {
     this.workspaces.ready(() => this.load());
   }
@@ -158,6 +170,7 @@ export class Billing implements OnInit {
 
   load(): void {
     this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null);
+    this.runs.set([]); this.runsTotal.set(0); this.runsPage = 0; this.loadRuns();
     const before = new Date(this.month() + 'T00:00:00'); before.setMonth(before.getMonth() - 1);
     this.api.usageByMeter(this.query(firstOfMonth(before))).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.previousTotal.set((r.data?.rows ?? []).reduce((n, l) => n + Number(l.amount), 0)); },
@@ -184,6 +197,46 @@ export class Billing implements OnInit {
       error: err => { this.loading.set(false); this.failed(err?.error?.message); },
     });
   }
+
+  /** The next page of the month's model-call runs, each at its own model's rate. */
+  loadRuns(): void {
+    this.runsLoading.set(true); this.runsError.set('');
+    const page = this.runsPage + 1;
+    this.api.runs(this.query(), page, RUNS_PAGE).subscribe({
+      next: r => {
+        this.runsLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.runsError.set(r.message || 'The runs could not be read.'); return; }
+        this.runsPage = page;
+        this.runsTotal.set(Number(r.data?.total ?? 0));
+        this.runs.update(list => [...list, ...(r.data?.rows ?? []).map(x => ({
+          ...x, tokens_in: Number(x.tokens_in), tokens_out: Number(x.tokens_out), amount: Number(x.amount),
+          lines: (x.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), per: Number(l.per), unit_price: Number(l.unit_price), amount: Number(l.amount) })),
+        }))]);
+      },
+      error: err => { this.runsLoading.set(false); this.runsError.set(err?.error?.message || 'The runs could not be read.'); },
+    });
+  }
+
+  /** After a failed read: the month's runs from the first page. */
+  retryRuns(): void { this.runs.set([]); this.runsTotal.set(0); this.runsPage = 0; this.loadRuns(); }
+
+  /** What a run was: the prompt, the document step, the tool run, the question, or a console call. */
+  runLabel(r: RunRow): string {
+    switch (r.subject_type) {
+      case 'prompt': return r.subject_id && r.subject_id !== 'prompt' ? `Prompt ${r.subject_id}` : 'Prompt';
+      case 'document': return 'Document extraction';
+      case 'tool_run': return 'Tool run';
+      case 'ask': return 'Question';
+      case 'ad-hoc': return 'Console call';
+      default: return r.subject_type || 'Model call';
+    }
+  }
+  /** Each priced line of a run as "2,000 tokens in at $0.40 / 1,000". */
+  runRates(r: RunRow): string {
+    return r.lines.map(l => `${Math.round(l.quantity).toLocaleString()} ${l.meter.startsWith('ai.tokens.in') ? 'in' : 'out'} at ${this.fmtUnitPrice(l.unit_price, l.per, l.unit)}`).join(' · ');
+  }
+  fmtRunAmount(value: number): string { return formatMoney(value, this.currency(), this.runDigits()); }
+  runActor(r: RunRow): string { return r.actor_name || (r.actor_user_id ? `User #${r.actor_user_id}` : 'Pipeline'); }
 
   private failed(message?: string): void {
     if ((message || '').includes('not configured')) { this.notConfigured.set(true); return; }

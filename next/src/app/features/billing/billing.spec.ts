@@ -21,6 +21,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
     subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },
     ] } })),
+    runs: vi.fn((_q: UsageQuery, page: number) => of({ status: API_SUCCESS, data: { total: 3, page, limit: 25, rows: page === 1 ? RUNS.slice(0, 2) : RUNS.slice(2) } })),
     refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
     refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
   };
@@ -52,6 +53,17 @@ const LINES = [
   { meter: 'storage.gb_hours', label: 'Storage kept', service: 'Storage', unit: 'GB-hour', per: 1, unitPrice: '0.000032', quantity: '50880', amount: '1.62816', days: 10 },
   { meter: 'ai.tokens.in', label: 'Model tokens in', service: 'Model calls', unit: 'token', per: 1000, unitPrice: '0.05', quantity: '42100', amount: '2.105', days: 4,
     includedQuantity: '1000', billableQuantity: '41100', hasTiers: true, tiers: [{ from: '0', to: '1500', units: '1500', unit_price: '0.05' }, { from: '1500', to: null, units: '39600', unit_price: '0.02' }] },
+];
+const RUNS = [
+  { run: 'ai-run#2', subject_type: 'prompt', subject_id: '12', model: 'llama3.2:3b', job_queue_id: 7002, actor_user_id: null, source: 'runner',
+    first: '2026-09-18T10:00:00Z', last: '2026-09-18T10:00:00Z', tokens_in: '2000', tokens_out: '500', amount: '0.175',
+    lines: [{ meter: 'ai.tokens.in', label: 'Model tokens in', quantity: '2000', unit: 'token', per: 1000, unit_price: '0.05', amount: '0.1' },
+      { meter: 'ai.tokens.out', label: 'Model tokens out', quantity: '500', unit: 'token', per: 1000, unit_price: '0.15', amount: '0.075' }] },
+  { run: 'ai-run#1', subject_type: 'document', subject_id: 'document#4#extract', model: 'qwen2.5:7b', job_queue_id: null, actor_user_id: 4385, actor_name: 'Alex Tenant', source: 'runner',
+    first: '2026-09-18T09:00:00Z', last: '2026-09-18T09:00:00Z', tokens_in: '2000', tokens_out: '500', amount: '1.4',
+    lines: [{ meter: 'ai.tokens.in@qwen2.5:7b', label: 'Model tokens in (qwen2.5:7b)', quantity: '2000', unit: 'token', per: 1000, unit_price: '0.4', amount: '0.8' }] },
+  { run: 'ai-adhoc#9', subject_type: 'ad-hoc', subject_id: 'llama3.2:3b', model: 'llama3.2:3b', job_queue_id: null, actor_user_id: 4537, source: 'console',
+    first: '2026-09-17T09:00:00Z', last: '2026-09-17T09:00:00Z', tokens_in: '10', tokens_out: '5', amount: '0.00125', lines: [] },
 ];
 const DAYS = [
   { day: '2026-09-16', amount: '5.0', byService: { Seats: '4.62', Storage: '0.38' } },
@@ -166,7 +178,7 @@ describe('Billing', () => {
     const off = () => of({ status: 'ERROR', message: 'Metering is not configured on this console.' });
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
-      { provide: BillingApi, useValue: { usageByMeter: off, usageByDay: off, subjects: off, refreshUsage: off } },
+      { provide: BillingApi, useValue: { usageByMeter: off, usageByDay: off, subjects: off, runs: off, refreshUsage: off } },
       { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
@@ -214,6 +226,7 @@ describe('Billing, rendered', () => {
       usageByMeter: vi.fn(() => of({ status: API_SUCCESS, data: { rows: LINES, rateCard: { version: 2, name: 'Standard', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } })),
       usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: DAYS } })),
       subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [] } })),
+      runs: vi.fn(() => of({ status: API_SUCCESS, data: { total: 0, page: 1, limit: 25, rows: [] } })),
       refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
       refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
       ...over,
@@ -279,3 +292,37 @@ describe('Billing, rendered', () => {
   });
 });
 
+// MIG-308: Cost & usage shows what each model call cost, at its own model's rate.
+describe('Billing, cost per run', () => {
+  it('reads the month\'s runs a page at a time, newest first, and says what each was and cost', () => {
+    const { component, api } = page();
+    expect(api.runs).toHaveBeenCalledTimes(1);
+    expect((api.runs.mock.calls[0] as unknown[])[1]).toBe(1);
+    expect(component.runs().map(r => r.run)).toEqual(['ai-run#2', 'ai-run#1']);
+    expect(component.runsTotal()).toBe(3);
+    expect(component.moreRuns()).toBe(true);
+    const [small, big] = component.runs();
+    expect(small.amount).toBe(0.175);
+    expect(component.runLabel(small)).toBe('Prompt 12');
+    expect(component.runLabel(big)).toBe('Document extraction');
+    expect(component.runActor(small)).toBe('Pipeline');
+    expect(component.runActor(big)).toBe('Alex Tenant');
+    expect(component.runRates(small)).toBe('2,000 in at ' + component.fmtUnitPrice(0.05, 1000, 'token') + ' · 500 out at ' + component.fmtUnitPrice(0.15, 1000, 'token'));
+    component.loadRuns();
+    expect((api.runs.mock.calls[1] as unknown[])[1]).toBe(2);
+    expect(component.runs().map(r => r.run)).toEqual(['ai-run#2', 'ai-run#1', 'ai-adhoc#9']);
+    expect(component.moreRuns()).toBe(false);
+    expect(component.runLabel(component.runs()[2])).toBe('Console call');
+  });
+
+  it('starts the runs again with the month, and says so when they cannot be read', () => {
+    const { component, api } = page(true);
+    api.runs.mockReturnValueOnce(of({ status: 'ERROR', message: 'Pick a workspace first.' }) as unknown as ReturnType<typeof api.runs>);
+    component.shiftMonth(-1);
+    expect(component.runs()).toEqual([]);
+    expect(component.runsError()).toBe('Pick a workspace first.');
+    component.retryRuns();
+    expect(component.runsError()).toBe('');
+    expect(component.runs()).toHaveLength(2);
+  });
+});

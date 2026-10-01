@@ -41,6 +41,8 @@ export interface RateCard {
 export interface RateCardDraft {
   name: string; tenant_id: number | null; effective_from: string; currency: string; based_on_version: number | null; note: string;
   items: { meter: string; unit: string; per: number; unit_price: number; included_quantity: number; tiers: RateTier[] }[];
+  /** Per-model items of the card it is drafted from to leave out (MIG-308). */
+  removed?: string[];
 }
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
@@ -67,6 +69,17 @@ export interface MeterLine {
 export interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
 export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
 export interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
+/** One priced line of a run: what its tokens were priced as (a model's own item, or the meter's). */
+export interface RunLine { meter: string; label: string; quantity: number; unit: string; per: number; unit_price: number; amount: number; }
+/**
+ * billing.json/runs (MIG-308): one model-call run -- a prompt, a document's extraction, a tool run, a question, a
+ * console call -- with its model and what it cost at that model's rate, before monthly allowances and tiers.
+ */
+export interface RunRow {
+  run: string; subject_type: string | null; subject_id: string | null; model: string; job_queue_id: number | null;
+  actor_user_id: number | null; actor_name?: string | null; source: string | null; first: string; last: string;
+  tokens_in: number; tokens_out: number; amount: number; lines: RunLine[];
+}
 /** What every usage read names: a range, a workspace for a platform administrator, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
@@ -135,6 +148,11 @@ export class BillingApi {
   subjects(q: UsageQuery, meter: string, limit: number): Observable<ApiResponse<{ rows: SubjectRow[] }>> {
     return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });
   }
+  /** Cost per run (MIG-308): the month's model-call runs, newest first, a page at a time. */
+  runs(q: UsageQuery, page: number, limit: number): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[] }>> {
+    return this.http.get<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[] }>>(`${this.base}/runs`, {
+      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
+  }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
   refreshUsage(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refresh`, null); }
   /** Rolls the signed-in workspace's today and yesterday again: a workspace administrator's refresh. */
@@ -176,6 +194,13 @@ export function paymentMethodLabel(method: string): string {
 }
 /** The services a meter rolls up under, in the order the screens list them. */
 export const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & tools', 'Other'];
+/** The meters a card may price per model, as `<meter>@<model>` items (MIG-308). */
+export const MODEL_PRICED_METERS = ['ai.tokens.in', 'ai.tokens.out'];
+/** The model a per-model item names; null for a meter's own item. */
+export function modelOfMeter(meter: string): string | null {
+  const at = meter.indexOf('@');
+  return at > 0 && MODEL_PRICED_METERS.includes(meter.slice(0, at)) ? meter.slice(at + 1) : null;
+}
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', issued: 'Issued', partially_paid: 'Partially paid', paid: 'Paid', overdue: 'Overdue', void: 'Void',

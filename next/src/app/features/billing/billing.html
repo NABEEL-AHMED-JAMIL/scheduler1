@@ -165,6 +165,51 @@
       </app-table-shell>
     </div>
 
+    <div class="mt-4">
+      <app-table-shell heading="Cost per run" [shown]="runs().length" [total]="runsTotal()" [loading]="runsLoading() && !runs().length"
+                       [isEmpty]="!runs().length" [error]="runsError()" (retry)="retryRuns()" emptyMessage="No model calls in this month yet." emptyIcon="chart">
+        <ng-container toolbar>
+          <span class="text-xs text-[color:var(--text-muted)]">Each model call at its own model's rate — before the month's allowances and tiers, which the lines above apply.</span>
+        </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Run</th>
+              <th>Model</th>
+              <th class="text-right">Tokens in</th>
+              <th class="text-right">Tokens out</th>
+              <th class="hidden xl:table-cell">Priced at</th>
+              <th class="hidden lg:table-cell">By</th>
+              <th class="text-right">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of runs(); track r.run) {
+              <tr>
+                <td class="text-xs tabular whitespace-nowrap">{{ r.last | serverTime: 'recent' }}</td>
+                <td>
+                  <div class="font-medium">{{ runLabel(r) }}</div>
+                  <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}@if (r.job_queue_id) { · run {{ r.job_queue_id }} }</div>
+                </td>
+                <td class="mono text-xs">{{ r.model || '—' }}</td>
+                <td class="text-right tabular">{{ r.tokens_in | number: '1.0-0' }}</td>
+                <td class="text-right tabular">{{ r.tokens_out | number: '1.0-0' }}</td>
+                <td class="hidden xl:table-cell text-xs text-[color:var(--text-muted)]">{{ runRates(r) }}</td>
+                <td class="hidden lg:table-cell text-xs text-[color:var(--text-muted)]">{{ runActor(r) }}</td>
+                <td class="text-right tabular font-medium">{{ fmtRunAmount(r.amount) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (moreRuns()) {
+          <div class="p-3 text-center">
+            <button type="button" class="btn btn-default btn-sm" (click)="loadRuns()" [disabled]="runsLoading()">{{ runsLoading() ? 'Reading…' : 'Show more runs' }}</button>
+          </div>
+        }
+      </app-table-shell>
+    </div>
+
     <p class="text-xs text-[color:var(--text-muted)] mt-3 max-w-3xl">
       Deleting data is counted: each delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00.
     </p>

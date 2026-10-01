@@ -186,6 +186,34 @@ describe('RateCardEditor', () => {
     expect((el.querySelector('#rcNote') as HTMLInputElement).placeholder).toBe('Why — the agreement, the ticket, the reason');
   });
 
+  // MIG-308: a model priced on its own is a `<meter>@<model>` item next to its meter; removing one sends it as removed.
+  it('prices a model on its own next to its meter, refuses a bad name, and removes a saved one', () => {
+    const base = RateCards.numeric({ ...CARDS[3], items: [ITEMS[0], ITEMS[1], { ...ITEMS[1], meter: 'ai.tokens.in@qwen2.5:7b', label: 'Model tokens in (qwen2.5:7b)', tiers: [], included_quantity: '0', unit_price: '0.4' }, ITEMS[2]] } as unknown as RateCard);
+    const { component } = editor(base);
+    component.name.set('Per-model AI');
+    component.addModel();
+    expect(component.modelError()).toBe('Name the model.');
+    component.modelName.set('a@b'); component.addModel();
+    expect(component.modelError()).toBe('A model name cannot contain @.');
+    component.modelName.set('qwen2.5:7b'); component.addModel();
+    expect(component.modelError()).toBe('That model already has its own price here.');
+    component.modelName.set(' llama3.2:3b '); component.modelPrice.set('0.02'); component.addModel();
+    expect(component.modelError()).toBe('');
+    expect(component.items().map(i => i.meter)).toEqual(['seats.user_days', 'ai.tokens.in', 'ai.tokens.in@qwen2.5:7b', 'ai.tokens.in@llama3.2:3b', 'storage.bytes.deleted']);
+    const added = component.items()[3];
+    expect(added).toMatchObject({ label: 'Model tokens in (llama3.2:3b)', unit: 'token', per: 1000, unit_price: '0.02', included_quantity: '', tiers: [] });
+    expect(component.changed().has('ai.tokens.in@llama3.2:3b')).toBe(true);
+    // A meter's own item has no remove; a saved model price does, and goes as removed.
+    component.removeItem(1);
+    expect(component.items()).toHaveLength(5);
+    component.removeItem(2);
+    const draft = component.draft();
+    if (typeof draft === 'string') throw new Error(draft);
+    expect(draft.removed).toEqual(['ai.tokens.in@qwen2.5:7b']);
+    expect(draft.items.map(i => i.meter)).toContain('ai.tokens.in@llama3.2:3b');
+    expect(draft.items.find(i => i.meter === 'ai.tokens.in@llama3.2:3b')).toMatchObject({ unit_price: 0.02, per: 1000 });
+  });
+
   it('saves for a workspace and closes with the version the meter assigned', () => {
     const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
     const { component, api, ref } = editor(base);

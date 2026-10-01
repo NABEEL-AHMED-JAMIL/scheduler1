@@ -6,7 +6,7 @@ import { SidePanel } from '../../shared/ui/side-panel';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../shared/ui/combobox';
-import { BillingApi, RateCard, RateCardDraft, RateItem, RateTier } from './billing.service';
+import { BillingApi, MODEL_PRICED_METERS, RateCard, RateCardDraft, RateItem, RateTier, modelOfMeter } from './billing.service';
 import { firstOfMonth } from './billing-format';
 
 /** One item as it is being edited: strings in the inputs, numbers on save. */
@@ -38,7 +38,7 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
       </div>
 
       <div class="flex items-center justify-between mb-2">
-        <span class="text-sm text-[color:var(--text-secondary)]">{{ items().length }} meters · {{ changed().size }} changed</span>
+        <span class="text-sm text-[color:var(--text-secondary)]">{{ items().length }} meters · {{ changed().size + removed().length }} changed</span>
         <span class="text-xs text-[color:var(--text-muted)]">{{ data.base.currency }}</span>
       </div>
       <table class="table-modern rate-edit lookup-entry-table">
@@ -46,7 +46,9 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
         <tbody>
           @for (it of items(); track it.meter; let i = $index) {
             <tr [class.is-changed]="changed().has(it.meter)">
-              <td><div class="font-medium">{{ it.label }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ it.meter }} · {{ it.unit }}</div></td>
+              <td><div class="font-medium flex items-center gap-1">{{ it.label }}
+                    @if (isModelItem(it)) { <button type="button" class="btn btn-ghost btn-icon btn-xs" (click)="removeItem(i)" [attr.aria-label]="'Remove ' + it.label"><app-icon name="close" size="0.8em" /></button> }</div>
+                  <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ it.meter }} · {{ it.unit }}</div></td>
               <td class="text-right"><input class="input py-1 text-xs w-24 text-right mono" type="number" min="0" step="any" [value]="it.unit_price" (input)="set(i, 'unit_price', $any($event.target).value)" [attr.aria-label]="it.label + ' price'" /></td>
               <td class="text-right">
                 @if (it.unit === 'byte') { <span class="text-xs text-[color:var(--text-muted)] pr-2" title="Bytes are priced per GB">GB</span> }
@@ -69,6 +71,22 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
           }
         </tbody>
       </table>
+      <div class="card p-4 mt-3">
+        <h3 class="text-sm font-semibold">Price a model on its own</h3>
+        <p class="text-xs text-[color:var(--text-muted)] mb-2">Tokens of a model with its own price are billed on their own line at that price; every other model stays on the meter's price.</p>
+        <div class="flex flex-wrap items-end gap-2">
+          <app-field label="Meter" for="rcModelMeter">
+            <select id="rcModelMeter" class="input py-1 text-xs" [value]="modelMeter()" (change)="modelMeter.set($any($event.target).value)">
+              @for (m of modelMeters; track m) { <option [value]="m">{{ labelOf(m) }}</option> }
+            </select></app-field>
+          <app-field label="Model" for="rcModelName" hint="As its connection names it, e.g. llama3.2:3b">
+            <input id="rcModelName" class="input py-1 text-xs mono w-48" [value]="modelName()" (input)="modelName.set($any($event.target).value)" placeholder="llama3.2:3b" /></app-field>
+          <app-field label="Price" for="rcModelPrice">
+            <input id="rcModelPrice" class="input py-1 text-xs w-24 text-right mono" type="number" min="0" step="any" [value]="modelPrice()" (input)="modelPrice.set($any($event.target).value)" /></app-field>
+          <button type="button" class="btn btn-default btn-sm" (click)="addModel()"><app-icon name="plus" size="0.8em" />Add</button>
+        </div>
+        @if (modelError()) { <p class="text-xs text-crit-500 mt-1" role="alert">{{ modelError() }}</p> }
+      </div>
       <p class="text-xs text-[color:var(--text-muted)] mt-3">
         A period's quantity is priced after the allowance; with tiers, each band prices the units that fall in it (the first band starts at 0 with the price above unless a band says otherwise).
       </p>
@@ -96,6 +114,15 @@ export class RateCardEditor {
   readonly error = signal('');
   readonly forOptions: ComboboxOption[] = [{ value: '', label: 'Every workspace (default card)' }, ...this.data.workspaces];
 
+  // ---- per-model prices (MIG-308) ----
+  readonly modelMeters = MODEL_PRICED_METERS;
+  readonly modelMeter = signal(MODEL_PRICED_METERS[0]);
+  readonly modelName = signal('');
+  readonly modelPrice = signal('');
+  readonly modelError = signal('');
+  /** Per-model items of the base card this version leaves out. */
+  readonly removed = signal<string[]>([]);
+
   /** Meters whose calculation differs from the card this one is drafted from. */
   readonly changed = computed(() => {
     const base = new Map(this.data.base.items.map(i => [i.meter, RateCardEditor.editable(i)]));
@@ -106,6 +133,41 @@ export class RateCardEditor {
     }
     return out;
   });
+
+  isModelItem(it: EditItem): boolean { return modelOfMeter(it.meter) !== null; }
+  labelOf(meter: string): string { return this.items().find(it => it.meter === meter)?.label ?? meter; }
+
+  /** A price of a model's own, drafted from its meter's item: same unit and per, the price given (else the meter's). */
+  addModel(): void {
+    const model = this.modelName().trim();
+    const meter = this.modelMeter();
+    const name = `${meter}@${model}`;
+    const base = this.items().find(it => it.meter === meter);
+    if (!model) { this.modelError.set('Name the model.'); return; }
+    if (model.includes('@')) { this.modelError.set('A model name cannot contain @.'); return; }
+    if (name.length > 64) { this.modelError.set('That model name is too long to price on its own (48 characters at most).'); return; }
+    if (this.items().some(it => it.meter === name)) { this.modelError.set('That model already has its own price here.'); return; }
+    if (!base) { this.modelError.set('This card does not price that meter.'); return; }
+    const price = this.modelPrice().trim() === '' ? base.unit_price : this.modelPrice().trim();
+    if (Number.isNaN(Number(price)) || Number(price) < 0) { this.modelError.set('The price must be a number, not negative.'); return; }
+    this.modelError.set('');
+    const item: EditItem = { ...base, meter: name, label: `${base.label} (${model})`, unit_price: price, included_quantity: '', tiers: [] };
+    // Next to its meter and the meter's other models, not at the bottom of the list.
+    this.items.update(list => {
+      let after = list.length - 1;
+      list.forEach((it, k) => { if (it.meter === meter || it.meter.startsWith(meter + '@')) after = k; });
+      return [...list.slice(0, after + 1), item, ...list.slice(after + 1)];
+    });
+    this.removed.update(list => list.filter(m => m !== name));
+    this.modelName.set(''); this.modelPrice.set('');
+  }
+  /** Leaves a model's own price out: its tokens go back to the meter's price. A meter's own item stays. */
+  removeItem(i: number): void {
+    const it = this.items()[i];
+    if (!it || !this.isModelItem(it)) return;
+    if (this.data.base.items.some(b => b.meter === it.meter)) this.removed.update(list => [...list, it.meter]);
+    this.items.update(list => list.filter((_, k) => k !== i));
+  }
 
   set(i: number, key: 'unit_price' | 'included_quantity', value: string): void {
     this.items.update(list => list.map((it, k) => k === i ? { ...it, [key]: value } : it));
@@ -136,6 +198,7 @@ export class RateCardEditor {
     return {
       name: this.name().trim(), tenant_id: this.tenantId() ? Number(this.tenantId()) : null, effective_from: this.effectiveFrom(),
       currency: this.data.base.currency, based_on_version: this.data.base.version, note: this.note().trim(), items,
+      ...(this.removed().length ? { removed: this.removed() } : {}),
     };
   }
 
