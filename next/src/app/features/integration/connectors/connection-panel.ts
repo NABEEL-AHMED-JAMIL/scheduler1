@@ -112,7 +112,7 @@ export interface ConnectionPanelData {
                         <td class="whitespace-nowrap">{{ scheduleText(s.scheduleMinutes) }}@if (s.runRequested) { <span class="pill pill-brand">Queued</span> }</td>
                         <td class="text-right tabular">{{ countText(s.rowsTotal) }}</td>
                         <td class="whitespace-nowrap">{{ ago(s.lastSyncAt) }}</td>
-                        <td class="text-right tabular">{{ lagText(s.lagSeconds) }}</td>
+                        <td class="text-right tabular whitespace-nowrap">{{ lagText(s.lagSeconds) }}</td>
                         <td>
                           @for (t of s.sensitiveColumns ?? []; track t.column) { <span class="pill pill-warn" [title]="t.level">{{ t.column }}</span> }
                           @if (!(s.sensitiveColumns ?? []).length) { <span class="text-[color:var(--text-muted)]">—</span> }

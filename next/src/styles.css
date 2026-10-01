@@ -2312,7 +2312,7 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 
 /* Connector Hub (MIG-292): the gallery of connectors, the connect stepper, a callout with a cause and its fix, a connection's
    health row -- as modules.html draws them, on the console's tokens and radius scale. The gallery uses a wide screen fully. */
-.connector-gallery { display: grid; gap: 0.625rem; grid-template-columns: repeat(auto-fill, minmax(15.5rem, 1fr)); }
+.connector-gallery { display: grid; gap: 0.625rem; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); }
 .connector-card { display: flex; align-items: center; gap: 0.625rem; min-width: 0; padding: 0.75rem; background: var(--surface-raised);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
 button.connector-card:hover { border-color: var(--focus-ring); }

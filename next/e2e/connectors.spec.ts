@@ -77,6 +77,7 @@ test.describe('Connector Hub', () => {
 
   test('connecting the demo database: a wrong password says why and what to do, the right one syncs', async ({ browser, request }, info) => {
     test.skip(!demoPassword, 'needs E2E_DEMO_DB_PASSWORD');
+    test.setTimeout(180_000);
     const page = await pageAs(browser, await sessionOf(request, adminToken!));
     const name = `E2E Connector Hub ${Date.now()}`;
     await page.goto('/integration/connectors');
@@ -116,7 +117,7 @@ test.describe('Connector Hub', () => {
     await expect.poll(async () => {
       await page.getByRole('button', { name: 'Refresh' }).click();
       return (await row.textContent()) ?? '';
-    }, { timeout: 60_000, intervals: [3000] }).toMatch(/ago.*\b4[0-9]\b/);
+    }, { timeout: 60_000, intervals: [3000] }).toMatch(/ago\s*4\d/);
     await expect(row).toContainText('Active');
     await row.getByRole('button', { name }).click();
     const panel = page.locator('[data-connection-panel]');

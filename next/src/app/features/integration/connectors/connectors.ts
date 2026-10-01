@@ -59,7 +59,7 @@ export class Connectors implements OnInit {
   readonly chips = computed<SegmentOption<Chip>[]>(() => {
     const cards = this.cards();
     return CATEGORIES.map(c => {
-      const n = c.id === '' ? cards.length : c.id === 'connected' ? cards.filter(x => x.connections > 0).length
+      const n = c.id === '' ? cards.length : c.id === 'connected' ? cards.filter(x => this.isConnected(x)).length
         : cards.filter(x => x.spec.category === c.id).length;
       return { id: c.id, label: `${c.label} (${n})` };
     });
@@ -68,7 +68,7 @@ export class Connectors implements OnInit {
   readonly shownCards = computed(() => {
     const chip = this.chip();
     const q = this.search().trim().toLowerCase();
-    return this.cards().filter(c => (chip === '' || (chip === 'connected' ? c.connections > 0 : c.spec.category === chip))
+    return this.cards().filter(c => (chip === '' || (chip === 'connected' ? this.isConnected(c) : c.spec.category === chip))
       && (!q || `${c.spec.label} ${c.spec.summary} ${c.spec.key}`.toLowerCase().includes(q)));
   });
 
@@ -149,6 +149,11 @@ export class Connectors implements OnInit {
       },
       error: () => { this.loading.set(false); this.error.set('Connector Hub could not be reached.'); },
     });
+  }
+
+  /** A connector the workspace has a connection of, that can run here (not one waiting on the owner's OAuth app). */
+  isConnected(card: ConnectorCard): boolean {
+    return card.connections > 0 && !this.blocked(card);
   }
 
   /** Why a card cannot be connected now, or null when it can. */

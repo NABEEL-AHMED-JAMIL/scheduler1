@@ -37,7 +37,7 @@
         <div class="connector-card" [class.is-unavailable]="!!blocked(c)" [attr.data-connector]="c.spec.key">
           <span class="connector-logo" aria-hidden="true"><app-icon [name]="categoryIcon(c.spec.category)" /></span>
           <div class="min-w-0 flex-1">
-            <div class="font-medium truncate">{{ c.spec.label }}</div>
+            <div class="font-medium">{{ c.spec.label }}</div>
             <div class="text-xs text-[color:var(--text-muted)] truncate" [title]="c.spec.summary">{{ c.spec.summary }}</div>
           </div>
           @if (!c.spec.available) {
