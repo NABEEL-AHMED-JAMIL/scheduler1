@@ -27,7 +27,7 @@ test.describe('Forms: approval and dataset (live, read-only)', () => {
   test('the approval shows on Submissions, and the rows open in Analytics Studio', async ({ browser, request }) => {
     const page = await pageAs(browser, request);
     await page.goto('/forms/submissions?formId=1001');
-    await expect(page.locator('[data-submission="1004"] [data-approval]')).toHaveText('Approved');
+    await expect(page.locator('[data-submission="1004"] [data-approval] .pill')).toHaveText('Approved');
 
     await page.locator('[data-open-analytics]').click();
     await expect(page).toHaveURL(/\/data\/analytics\?connection=/);
@@ -38,6 +38,8 @@ test.describe('Forms: approval and dataset (live, read-only)', () => {
     const page = await pageAs(browser, request);
     await page.goto('/forms/builder');
     await page.getByRole('button', { name: 'Edit MIG-277 visit check (synthetic)' }).click();
+    await expect(page.locator('[data-form-editor]')).toContainText('starts workflow "MIG-279 visit approval (synthetic)"');
+    await page.locator('[data-tab="settings"]').click();
     await expect(page.locator('#formWorkflow')).toHaveValue('mig279-visit-approval');
   });
 });

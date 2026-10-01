@@ -71,12 +71,12 @@ export function segments(answer: string, known: ReadonlySet<number>): Segment[] 
   return out;
 }
 
-/** "3 documents and 4 pipeline results" (and "2 forms' submissions") -- what a question is answered from. */
+/** "3 documents and 4 pipeline results" (and "2 forms") -- what a question is answered from. */
 export function searchedText(s: Searched | null | undefined): string {
   if (!s) return '';
   const part = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
   const parts = [part(s.documents, 'document', 'documents'), part(s.runOutputs, 'pipeline result', 'pipeline results')];
-  if (s.forms) parts.push(part(s.forms, 'form\'s submissions', 'forms\' submissions'));
+  if (s.forms) parts.push(part(s.forms, 'form', 'forms'));
   return parts.length === 2 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 

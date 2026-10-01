@@ -116,7 +116,7 @@ describe('Forms -- approval and dataset', () => {
   });
 
   it('says when Ask your data read forms\' submissions', () => {
-    expect(searchedText({ documents: 1, runOutputs: 2, forms: 1 })).toBe('1 document, 2 pipeline results and 1 form\'s submissions');
+    expect(searchedText({ documents: 1, runOutputs: 2, forms: 1 })).toBe('1 document, 2 pipeline results and 1 form');
     expect(searchedText({ documents: 1, runOutputs: 2, forms: 0 })).toBe('1 document and 2 pipeline results');
   });
 });
