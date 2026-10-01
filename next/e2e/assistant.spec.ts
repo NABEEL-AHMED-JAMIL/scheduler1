@@ -265,3 +265,37 @@ test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
     await page.context().close();
   });
 });
+
+/**
+ * MIG-317, live: the registry reads "last used" from tools/list alone, and an administrator puts a switched tool back to
+ * its default. The test switches validate_data off itself (through the API) and the page's Reset puts it back on, so the
+ * workspace ends as it began.
+ */
+test.describe('Tool Registry: last used and Reset (live, restores what it changes)', () => {
+  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+
+  let s: Session;
+  test.beforeAll(async ({ request }) => { s = await session(request); });
+
+  test('no run or trace is read, and Reset puts a switch back to its default', async ({ browser, request }, info) => {
+    const off = await request.post(`${api}/aiPrompt.json/tools/setEnabled`, { headers: { Authorization: `Bearer ${s.token}` },
+      data: { toolName: 'validate_data', enabled: false } });
+    expect((await off.json()).status).toBe('SUCCESS');
+    const page = await pageAs(browser, s);
+    const read: string[] = [];
+    page.on('request', req => { if (/aiPrompt\.json\/tools\/(runs|trace)/.test(req.url())) read.push(req.url()); });
+    await page.goto('/ai/tools');
+    const row = page.locator('tr[data-row="validate_data"]');
+    await expect(row).toHaveAttribute('data-state', 'Off');
+    await expect(row).toContainText('switched here');
+    await expect(page.locator('tr[data-row="get_jobs"] td').last()).not.toHaveText('Never');
+    await expect(page.locator('tr[data-row="get_sources"] td').nth(1)).toHaveText('Sources');
+    await row.getByRole('button', { name: 'Put validate_data back to its default' }).click();
+    await expect(row).toHaveAttribute('data-state', 'Enabled');
+    await expect(row).not.toContainText('switched here');
+    await shot(page, info, 'tools-reset-1440');
+    expect(read).toEqual([]);
+    await page.context().close();
+  });
+});
+

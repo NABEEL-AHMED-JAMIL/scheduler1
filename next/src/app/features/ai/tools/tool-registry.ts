@@ -102,6 +102,17 @@ export class ToolRegistry implements OnInit {
     });
   }
 
+  /**
+   * The list again, quietly, after a switch moved: whether the person may use a tool (youMayUse) is the server's to say,
+   * and a tool switched back on was "Blocked" until the page was reloaded.
+   */
+  private refresh(): void {
+    this.api.tools(this.tenantId() ?? undefined).subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.tools.set(r.data ?? []); },
+      error: () => undefined,
+    });
+  }
+
   clearFilters(): void { this.search.set(''); this.kindFilter.set(''); this.stateFilter.set(''); }
 
   /** Switches a tool here; a refusal puts the box back where it was. */
@@ -115,6 +126,7 @@ export class ToolRegistry implements OnInit {
         if (r.status !== API_SUCCESS) { box.checked = !enabled; this.toast.error(r.message); return; }
         this.tools.update(list => list.map(x => (x.name === t.name ? { ...x, enabledInWorkspace: enabled, switchedInWorkspace: true } : x)));
         this.toast.success(r.message);
+        this.refresh();
       },
       error: err => { this.busy.set(null); box.checked = !enabled; this.toast.error(err?.error?.message || 'The tool could not be switched.'); },
     });
@@ -130,6 +142,7 @@ export class ToolRegistry implements OnInit {
         if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; }
         this.tools.update(list => list.map(x => (x.name === t.name ? { ...x, enabledInWorkspace: true, switchedInWorkspace: false } : x)));
         this.toast.success(r.message);
+        this.refresh();
       },
       error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'The tool could not be put back to its default.'); },
     });

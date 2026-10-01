@@ -20,17 +20,26 @@ const TOOLS = [
     lastUsedAt: '2026-09-28T06:05:00-05:00' }),
   tool({ name: 'call_api', title: 'Call a saved API request', requiredRole: 'TENANT_ADMIN', page: 'api-collections', returnsDatasetReference: true, youMayUse: false }),
   tool({ name: 'join_data', title: 'Join datasets', page: null, coreTask: 'join_datasets', available: false, unavailableReason: 'No user-facing endpoint.', youMayUse: false }),
-  tool({ name: 'get_reports', title: 'Run report', page: 'reports', enabledInWorkspace: false, switchedInWorkspace: true }),
+  tool({ name: 'get_reports', title: 'Run report', page: 'reports', enabledInWorkspace: false, switchedInWorkspace: true, youMayUse: false }),
   tool({ name: 'read_s3', title: 'Read storage', page: 'objects', service: 'Object storage', output: 'A file\'s rows as a dataset reference' }),
 ];
 
 function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => Observable<any> } = {}) {
+  // ai-service as it answers: a switch moves its tool, and whether you may use it follows (youMayUse is the server's).
+  const server = structuredClone(TOOLS);
+  const switched = (name: string, enabled: boolean | null) => {
+    const t = server.find(x => x.name === name);
+    if (t) Object.assign(t, { enabledInWorkspace: enabled ?? true, switchedInWorkspace: enabled !== null, youMayUse: t.available && (enabled ?? true) });
+  };
   const api = {
-    tools: vi.fn(() => of({ status: 'SUCCESS', data: structuredClone(TOOLS) })),
+    tools: vi.fn(() => of({ status: 'SUCCESS', data: structuredClone(server) })),
     runs: vi.fn(),
     trace: vi.fn(),
-    setEnabled: vi.fn(opts.setEnabled ?? ((name: string, enabled: boolean | null) => of({ status: 'SUCCESS', message: enabled === null
-      ? `${name} is back to its default in this workspace: on.` : `${name} is ${enabled ? 'on' : 'off'} in this workspace.` }))),
+    setEnabled: vi.fn(opts.setEnabled ?? ((name: string, enabled: boolean | null) => {
+      switched(name, enabled);
+      return of({ status: 'SUCCESS', message: enabled === null
+        ? `${name} is back to its default in this workspace: on.` : `${name} is ${enabled ? 'on' : 'off'} in this workspace.` });
+    })),
     workspaces: vi.fn(() => of({ status: 'SUCCESS', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }, { tenantId: 2900, tenantName: 'Default' }] })),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
@@ -104,6 +113,14 @@ describe('Tool Registry', () => {
     expect(cells('get_reports')[5]).toContain('Enabled');
     expect(cells('get_reports')[5]).not.toContain('switched here');
     expect(row('get_reports').querySelector('button[aria-label^="Put"]')).toBeNull();
+  });
+
+  it('reads the list again after a switch moves, so whether you may use the tool is the server\'s word', () => {
+    const { row, api, fixture, cells } = render();
+    row('get_reports').querySelector<HTMLButtonElement>('button[aria-label="Put get_reports back to its default"]')!.click();
+    fixture.detectChanges();
+    expect(api.tools).toHaveBeenCalledTimes(2);
+    expect(cells('get_reports')[5]).toContain('Enabled');
   });
 
   it('a tenant user cannot reset a switch', () => {
