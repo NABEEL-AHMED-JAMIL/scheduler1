@@ -42,7 +42,8 @@ export class Connectors implements OnInit {
   /** ?connection= opens that connection's panel. */
   readonly connectionParam = input<string | undefined>(undefined, { alias: 'connection' });
 
-  readonly canBuild = computed(() => this.auth.canBuild());
+  /** A connection belongs to a workspace: a platform administrator reads every workspace's here and makes none. */
+  readonly canBuild = computed(() => this.auth.canBuild() && !this.auth.isPlatformAdmin());
   readonly isAdmin = computed(() => this.auth.isTenantAdmin());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
 
@@ -132,10 +133,6 @@ export class Connectors implements OnInit {
       },
       error: () => this.galleryError.set('Connector Hub could not be reached.'),
     });
-    if (this.isPlatformAdmin()) {
-      this.loading.set(false);
-      return;
-    }
     this.loading.set(true);
     this.error.set('');
     this.api.connections().subscribe({
