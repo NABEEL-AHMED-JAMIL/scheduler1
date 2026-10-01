@@ -81,4 +81,24 @@ test.describe('Data Catalog', () => {
     await shot(page, info, 'prompt-file-picker-heading');
     await page.context().close();
   });
+
+  test('Ask your data answers a question about numbers with a query it shows, and hands it to Analytics Studio (MIG-283)',
+    async ({ browser, request }, info) => {
+      test.setTimeout(300_000);
+      const page = await pageAs(browser, await sessionOf(request, adminToken!));
+      await page.goto('/data/ask');
+      await page.locator('[data-test="question"]').fill('Which city has the largest total amount among UI-REVIEW customers?');
+      await page.locator('[data-test="ask"]').click();
+      const answer = page.locator('[data-test="query-answer"]');
+      await expect(answer).toBeVisible({ timeout: 240_000 });
+      await expect(answer.locator('[data-test="query-sql"]')).toContainText('GROUP BY');
+      await expect(answer.locator('[data-test="query-rows"]')).toContainText('Nairobi');
+      await shot(page, info, 'ask-query-answer');
+      await answer.locator('[data-test="open-analytics"]').click();
+      await expect(page).toHaveURL(/\/data\/analytics\?/);
+      await expect(page.locator('app-sql-editor')).toContainText('GROUP BY', { timeout: 30_000 });
+      await shot(page, info, 'ask-query-in-analytics');
+      await page.context().close();
+    });
 });
+
