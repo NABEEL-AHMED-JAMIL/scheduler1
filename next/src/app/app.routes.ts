@@ -117,6 +117,24 @@ export const routes: Routes = [
         data: { pageKey: 'sources' },
         canActivate: [pageGuard],
       },
+      {
+        // Wave 5 (MIG-292): Connector Hub -- the gallery, connecting a database, SaaS app or folder, and every connection's
+        // sync health, from integration-service's /connectorHub.json, gated by connector-hub at the gateway. Every member
+        // holding the page reads; connecting and changing are a workspace administrator's (the page hides them otherwise).
+        path: 'integration/connectors',
+        title: 'Connector Hub',
+        loadComponent: () => import('./features/integration/connectors/connectors').then(m => m.Connectors),
+        data: { pageKey: 'connector-hub' },
+        canActivate: [pageGuard],
+      },
+      {
+        // Where an OAuth provider sends the browser back with code and state (INTEGRATION_CONNECTORS_OAUTH_REDIRECT_URL).
+        path: 'integration/connectors/oauth/callback',
+        title: 'Connecting',
+        loadComponent: () => import('./features/integration/connectors/oauth-callback').then(m => m.OAuthCallback),
+        data: { pageKey: 'connector-hub' },
+        canActivate: [pageGuard],
+      },
       // ---------------------------------------------------------------------------------------------
       // Pipelines (was Operations). Pipelines was Source Tasks, Schedules was Source Jobs, Executions
       // was Run history, Run analytics was Reports. Keys unchanged: tasks, jobs, jobs, reports.

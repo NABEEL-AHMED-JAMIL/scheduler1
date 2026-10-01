@@ -198,6 +198,9 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/integration/api-collections/:collectionId', 'API collection', 'api-collections', undefined],
     // MIG-248: built. Sources, database connections and data contracts, on the one page key Identity serves.
     ['/integration/sources', 'Sources', 'sources', undefined],
+    // MIG-292: built. Connector Hub, and the page an OAuth provider sends the browser back to.
+    ['/integration/connectors', 'Connector Hub', 'connector-hub', undefined],
+    ['/integration/connectors/oauth/callback', 'Connecting', 'connector-hub', undefined],
     // MIG-272: built. Every member holding the page reads, extracts and reviews; a type's editor hides its save.
     ['/documents/intelligence', 'Document Intelligence', 'document-intelligence', undefined],
     ['/documents/review', 'Review queue', 'document-review', undefined],
@@ -239,8 +242,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 });
 
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
-  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data, Forms, Workflows (MIG-276) and the Data
-  // Catalog (MIG-288) are built; Connector Hub was taken off the menu and the routes until it is.
+  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data, Forms, Workflows (MIG-276), the Data
+  // Catalog (MIG-288) and Connector Hub (MIG-292) are built.
   it('no route is a coming-soon placeholder any more', () => {
     expect(flatten(routes).filter(e => e.route.data?.['comingSoon']).map(e => e.path)).toEqual([]);
   });
@@ -253,6 +256,13 @@ describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', (
     expect(route!.data?.['comingSoon']).toBeUndefined();
     expect(route!.canActivate).toContain(pageGuard);
     expect(route!.loadComponent).toBeDefined();
+  });
+
+  it('/integration/connectors is the built Connector Hub: titled and gated by connector-hub', () => {
+    const route = byPath('/integration/connectors');
+    expect(route?.title).toBe('Connector Hub');
+    expect(route?.data?.['pageKey']).toBe('connector-hub');
+    expect(route?.canActivate).toContain(pageGuard);
   });
 
   it('/data/catalog is the built Data Catalog: titled and gated by data-catalog', () => {
@@ -302,6 +312,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   const DASHBOARD = ['Dashboard -> /dashboard'];
   const INTEGRATION_SOON = [
+    'Integration › Connector Hub -> /integration/connectors',
     'Integration › API Collections -> /integration/api-collections',
     'Integration › Sources -> /integration/sources',
   ];

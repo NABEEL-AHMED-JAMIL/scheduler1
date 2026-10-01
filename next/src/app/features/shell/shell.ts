@@ -100,14 +100,15 @@ export class Shell {
    * An entry marked `soon` is a page that is not built yet: its route is a "coming soon" page that
    * calls nothing, gated by the page's key so the gate is in place before the screen is.
    */
-  // Owner decision 2026-09-30: Connector Hub comes after the demo -- off the menu and the routes until it is built
-  // (identity's catalogue leaves its key out too). Workflows is built (MIG-276), the Data Catalog too (MIG-288).
+  // Every Wave 5 module is built: Workflows (MIG-276), the Data Catalog (MIG-288) and Connector Hub (MIG-292).
   private readonly allNav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'chart' },
     {
       // Where data comes from and goes to. Storage Connections moved here from Configuration.
       label: 'Integration',
       children: [
+        { label: 'Connector Hub', path: '/integration/connectors', pageKey: 'connector-hub', icon: 'plug',
+          hint: 'Databases, SaaS apps and files, ready to connect' },
         { label: 'API Collections', path: '/integration/api-collections', pageKey: 'api-collections', icon: 'code',
           hint: 'Which APIs exist, tested and versioned' },
         { label: 'Sources', path: '/integration/sources', pageKey: 'sources', icon: 'database',

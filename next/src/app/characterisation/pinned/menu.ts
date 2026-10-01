@@ -2,6 +2,7 @@
 export const PINNED: Record<string, unknown> = {
   "the menu for a platform administrator": [
     "Dashboard -> /dashboard",
+    "Integration › Connector Hub — Databases, SaaS apps and files, ready to connect -> /integration/connectors",
     "Integration › API Collections — Which APIs exist, tested and versioned -> /integration/api-collections",
     "Integration › Sources — APIs, files and databases a pipeline reads -> /integration/sources",
     "Integration › Storage Connections — S3, Azure, MinIO, FTP -> /integration/storage-connections",
@@ -82,6 +83,7 @@ export const PINNED: Record<string, unknown> = {
   ],
   "the menu for a workspace administrator": [
     "Dashboard -> /dashboard",
+    "Integration › Connector Hub — Databases, SaaS apps and files, ready to connect -> /integration/connectors",
     "Integration › API Collections — Which APIs exist, tested and versioned -> /integration/api-collections",
     "Integration › Sources — APIs, files and databases a pipeline reads -> /integration/sources",
     "Integration › Storage Connections — S3, Azure, MinIO, FTP -> /integration/storage-connections",
