@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
-import { FormDraft, FormStatus, FormSummary, LinkableJob, Submission } from './forms.model';
+import { FormDraft, FormStatus, FormSummary, LinkableJob, Submission, UploadRef } from './forms.model';
 
 /**
  * Core's forms (Wave 5 Forms lite). /form.json is the page 'forms' (build, read, fill in); /formSubmission.json the page
@@ -38,6 +38,15 @@ export class FormsApi {
   /** A refusal of the answers comes back as ERROR with `data.problems`, a sentence per field key. */
   submit(formId: number, answers: Record<string, unknown>): Observable<ApiResponse<Submission | { problems: Record<string, string> }>> {
     return this.http.post<ApiResponse<Submission | { problems: Record<string, string> }>>(`${this.forms}/submit`, { formId, answers });
+  }
+
+  /** A file or drawn signature for a form's field, before the form is sent (MIG-277); the answer names it by uploadId. */
+  upload(formId: number, field: string, file: Blob, name: string): Observable<ApiResponse<UploadRef>> {
+    const body = new FormData();
+    body.append('formId', String(formId));
+    body.append('field', field);
+    body.append('file', file, name);
+    return this.http.post<ApiResponse<UploadRef>>(`${this.forms}/upload`, body);
   }
 
   submissionsOf(formId: number, limit = 200): Observable<ApiResponse<Submission[]>> {

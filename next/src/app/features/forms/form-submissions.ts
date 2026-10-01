@@ -6,7 +6,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { LoadError } from '../../shared/ui/load-error';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
-import { FormSummary, Submission, answerText, formsOf, submissionStatusText, submissionTone, submissionsOf } from './forms.model';
+import { FormField, FormSummary, Submission, answerText, formsOf, submissionStatusText, submissionTone, submissionsOf } from './forms.model';
 import { FormsApi } from './forms.service';
 
 /**
@@ -15,6 +15,12 @@ import { FormsApi } from './forms.service';
  * started (why: the job was busy, paused, the workspace has no inbox ...). One submission opens with its answers; the
  * whole list exports as CSV. The form is chosen here, or arrives as ?formId= from the builder.
  */
+interface AnswerRow {
+  label: string;
+  value: string;
+  table?: { columns: FormField[]; rows: Record<string, unknown>[] };
+}
+
 @Component({
   selector: 'app-form-submissions',
   imports: [Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
@@ -89,14 +95,27 @@ export class FormSubmissions implements OnInit {
     this.open.update(o => (o === submissionId ? null : submissionId));
   }
 
-  /** The answers of a submission, in the form's order, then any to fields removed since (by key). */
-  answerRows(s: Submission): { label: string; value: string }[] {
-    const fields = this.form()?.fields ?? [];
-    const rows = fields.map(f => ({ label: f.label, value: answerText(f, s.answers[f.key]) }));
+  /**
+   * The answers of a submission, in the order of the version it answered (MIG-277: that version's fields, when it is
+   * not the form's current one), then any to fields not in it (by key). A table's rows come with its columns.
+   */
+  answerRows(s: Submission): AnswerRow[] {
+    const fields = s.fields ?? this.form()?.fields ?? [];
+    const rows: AnswerRow[] = fields.map(f => {
+      const value = s.answers[f.key];
+      if (f.type === 'table' && Array.isArray(value) && value.length) {
+        return { label: f.label, value: answerText(f, value), table: { columns: f.columns ?? [], rows: value as Record<string, unknown>[] } };
+      }
+      return { label: f.label, value: answerText(f, value) };
+    });
     for (const key of Object.keys(s.answers)) {
       if (!fields.some(f => f.key === key)) rows.push({ label: key, value: answerText(undefined, s.answers[key]) });
     }
     return rows;
+  }
+
+  cell(column: FormField, value: unknown): string {
+    return answerText(column, value);
   }
 
   submitter(s: Submission): string {

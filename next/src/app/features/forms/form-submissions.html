@@ -88,9 +88,25 @@
                   <dl class="grid gap-x-4 gap-y-1.5 sm:grid-cols-[14rem_1fr] text-sm py-1" [attr.aria-label]="'Answers of submission ' + s.submissionId">
                     @for (row of answerRows(s); track row.label) {
                       <dt class="text-[color:var(--text-muted)]">{{ row.label }}</dt>
-                      <dd class="break-words whitespace-pre-line">{{ row.value }}</dd>
+                      @if (row.table; as t) {
+                        <dd class="min-w-0 overflow-x-auto">
+                          <table class="table-modern text-xs" [attr.aria-label]="row.label">
+                            <thead><tr>@for (c of t.columns; track c.key) { <th>{{ c.label }}</th> }</tr></thead>
+                            <tbody>
+                              @for (r of t.rows; track $index) {
+                                <tr>@for (c of t.columns; track c.key) { <td>{{ cell(c, r[c.key]) }}</td> }</tr>
+                              }
+                            </tbody>
+                          </table>
+                        </dd>
+                      } @else {
+                        <dd class="break-words whitespace-pre-line">{{ row.value }}</dd>
+                      }
                     }
                   </dl>
+                  @if (s.fields) {
+                    <p class="text-xs text-[color:var(--text-muted)] mt-1">Answered version {{ s.formVersion }} of the form; shown with that version's fields.</p>
+                  }
                 </td>
               </tr>
             }

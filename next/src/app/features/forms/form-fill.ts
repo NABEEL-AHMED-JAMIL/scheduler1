@@ -4,8 +4,8 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { LoadError } from '../../shared/ui/load-error';
-import { AnswerChange, FormRenderer } from './form-renderer';
-import { Answers, FormSummary, Submission, answerProblems, answersForSubmit, submissionStatusText } from './forms.model';
+import { AnswerChange, FormRenderer, UploadWanted } from './form-renderer';
+import { Answers, FormSummary, Submission, UploadRef, answerProblems, answersForSubmit, submissionStatusText } from './forms.model';
 import { FormsApi } from './forms.service';
 
 /**
@@ -62,10 +62,12 @@ import { FormsApi } from './forms.service';
               </p>
             }
             <app-form-renderer [fields]="f.fields ?? []" [answers]="answers()" [problems]="problems()" [disabled]="sending()"
-                               idPrefix="fill" (answerChange)="change($event)" />
+                               [lookupValues]="f.lookupValues ?? {}" [uploading]="uploading()" idPrefix="fill"
+                               (answerChange)="change($event)" (uploadWanted)="uploadFiles($event)"
+                               (signatureDrawn)="uploadSignature($event.key, $event.png)" />
             @if (message()) { <p class="text-sm text-crit-500" role="alert">{{ message() }}</p> }
             <div class="flex items-center gap-2 border-t border-subtle pt-4">
-              <button type="submit" class="btn btn-primary" [disabled]="sending() || f.status !== 'Active'">
+              <button type="submit" class="btn btn-primary" [disabled]="sending() || busyUploading() || f.status !== 'Active'">
                 <app-icon name="send" />{{ sending() ? 'Sending…' : 'Submit' }}
               </button>
               @if (f.startsJob) {
@@ -93,6 +95,9 @@ export class FormFill implements OnInit {
   readonly message = signal('');
   readonly sending = signal(false);
   readonly done = signal<Submission | null>(null);
+  /** Fields whose file or signature is being uploaded. */
+  readonly uploading = signal<Record<string, boolean>>({});
+  readonly busyUploading = computed(() => Object.values(this.uploading()).some(v => v));
   readonly doneMessage = signal('');
   readonly canSeeSubmissions = computed(() => this.auth.canOpen('form-submissions'));
   readonly statusText = submissionStatusText;
@@ -131,7 +136,7 @@ export class FormFill implements OnInit {
     const form = this.form();
     if (!form || this.sending() || form.status !== 'Active') return;
     const fields = form.fields ?? [];
-    const problems = answerProblems(fields, this.answers());
+    const problems = answerProblems(fields, this.answers(), form.lookupValues ?? {});
     this.problems.set(problems);
     if (Object.keys(problems).length) {
       this.message.set(Object.keys(problems).length === 1 ? 'One answer needs attention.' : `${Object.keys(problems).length} answers need attention.`);
@@ -155,10 +160,79 @@ export class FormFill implements OnInit {
     });
   }
 
+  // ---- uploads (MIG-277) -------------------------------------------------------------------------------------
+
+  /** Each chosen file is uploaded now; the answer keeps the ones Core took, up to the field's count. */
+  uploadFiles(event: UploadWanted): void {
+    const form = this.form();
+    const field = form?.fields?.find(f => f.key === event.key);
+    if (!form || !field) return;
+    const room = (field.maxFiles ?? 1) - this.current(event.key).length;
+    const files = event.files.slice(0, Math.max(0, room));
+    const overflow = event.files.length > files.length ? `${field.label} takes at most ${field.maxFiles ?? 1} file(s).` : '';
+    let pending = files.length;
+    if (!pending) { if (overflow) this.setProblem(event.key, overflow); return; }
+    const settle = () => {
+      if (--pending > 0) return;
+      this.uploading.update(u => ({ ...u, [event.key]: false }));
+      if (overflow) this.setProblem(event.key, overflow);
+    };
+    this.uploading.update(u => ({ ...u, [event.key]: true }));
+    for (const file of files) {
+      this.api.upload(form.formId, event.key, file, file.name).subscribe({
+        next: r => {
+          if (r.status === API_SUCCESS && r.data) {
+            const kept = r.data;
+            this.answers.update(a => ({ ...a, [event.key]: [...this.current(event.key), kept] }));
+            this.clearProblem(event.key);
+          } else {
+            this.setProblem(event.key, r.message || `${file.name} was not uploaded.`);
+          }
+          settle();
+        },
+        error: err => {
+          this.setProblem(event.key, err?.error?.message || `${file.name} was not uploaded. Try again.`);
+          settle();
+        },
+      });
+    }
+  }
+
+  uploadSignature(key: string, png: Blob): void {
+    const form = this.form();
+    if (!form) return;
+    this.uploading.update(u => ({ ...u, [key]: true }));
+    this.api.upload(form.formId, key, png, 'signature.png').subscribe({
+      next: r => {
+        this.uploading.update(u => ({ ...u, [key]: false }));
+        if (r.status === API_SUCCESS && r.data) { this.answers.update(a => ({ ...a, [key]: r.data! })); this.clearProblem(key); }
+        else this.setProblem(key, r.message || 'The signature was not kept. Sign again.');
+      },
+      error: err => {
+        this.uploading.update(u => ({ ...u, [key]: false }));
+        this.setProblem(key, err?.error?.message || 'The signature was not kept. Sign again.');
+      },
+    });
+  }
+
+  private current(key: string): UploadRef[] {
+    const value = this.answers()[key];
+    return Array.isArray(value) ? value as UploadRef[] : [];
+  }
+
+  private setProblem(key: string, problem: string): void {
+    this.problems.update(p => ({ ...p, [key]: problem }));
+  }
+
+  private clearProblem(key: string): void {
+    if (this.problems()[key]) this.problems.update(p => { const next = { ...p }; delete next[key]; return next; });
+  }
+
   again(): void {
     this.done.set(null);
     this.answers.set({});
     this.problems.set({});
     this.message.set('');
+    this.uploading.set({});
   }
 }

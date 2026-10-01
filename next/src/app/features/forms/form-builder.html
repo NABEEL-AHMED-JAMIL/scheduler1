@@ -119,6 +119,118 @@
                                   (change)="setOptions(i, $any($event.target).value)"></textarea>
                       </div>
                     }
+                    @if (f.type === 'table') {
+                      <div class="field sm:col-span-2" [attr.data-columns]="i">
+                        <span class="label">Columns</span>
+                        <div class="flex flex-col gap-2">
+                          @for (c of f.columns ?? []; track $index; let ci = $index) {
+                            <div class="grid gap-2 sm:grid-cols-[1fr_9rem_8rem_auto_auto] items-center">
+                              <input class="input input-sm" [value]="c.label" placeholder="Column label" [attr.aria-label]="'Column ' + (ci + 1) + ' label'"
+                                     (input)="setColumn(i, ci, { label: $any($event.target).value })" />
+                              <input class="input input-sm mono text-xs" [value]="c.key" [attr.aria-label]="'Column ' + (ci + 1) + ' key'"
+                                     (input)="setColumn(i, ci, { key: $any($event.target).value })" />
+                              <select class="input input-sm" [attr.aria-label]="'Column ' + (ci + 1) + ' type'"
+                                      (change)="setColumn(i, ci, { type: $any($event.target).value })">
+                                @for (t of columnTypes; track t.value) { <option [value]="t.value" [selected]="c.type === t.value">{{ t.label }}</option> }
+                              </select>
+                              <label class="flex items-center gap-1.5 text-xs"><input type="checkbox" class="checkbox" [checked]="c.required"
+                                     (change)="setColumn(i, ci, { required: $any($event.target).checked })" />Required</label>
+                              <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="(f.columns ?? []).length <= 1"
+                                      [attr.aria-label]="'Remove column ' + (ci + 1)" (click)="removeColumn(i, ci)"><app-icon name="trash" /></button>
+                              @if (c.type === 'choice') {
+                                <textarea class="input input-sm sm:col-span-5" rows="2" placeholder="Options, one per line" [value]="(c.options ?? []).join('\n')"
+                                          [attr.aria-label]="'Column ' + (ci + 1) + ' options'"
+                                          (change)="setColumn(i, ci, { options: optionsFromText($any($event.target).value) })"></textarea>
+                              }
+                            </div>
+                          }
+                          <div class="flex items-center gap-3 flex-wrap">
+                            <button type="button" class="btn btn-default btn-sm" [disabled]="(f.columns ?? []).length >= 20" (click)="addColumn(i)">
+                              <app-icon name="plus" />Add column</button>
+                            <label class="flex items-center gap-2 text-sm">At most
+                              <input class="input input-sm w-20" type="number" min="1" max="200" [value]="f.maxRows ?? 20"
+                                     (input)="setField(i, { maxRows: numberOr($any($event.target).value, 20) })" />rows</label>
+                          </div>
+                        </div>
+                      </div>
+                    }
+                    @if (f.type === 'file') {
+                      <div class="field sm:col-span-2">
+                        <label class="label" [for]="'fieldAccept' + i">Accepted file types</label>
+                        <input class="input mono text-xs" [id]="'fieldAccept' + i" [value]="(f.accept ?? []).join(', ')"
+                               (change)="setAccept(i, $any($event.target).value)" />
+                        <p class="field-note text-[color:var(--text-muted)]">Extensions, comma-separated, from {{ allowedExtensions.join(', ') }}.</p>
+                      </div>
+                      <div class="field">
+                        <label class="label" [for]="'fieldSize' + i">Largest file (MB)</label>
+                        <input class="input" type="number" min="1" max="25" [id]="'fieldSize' + i" [value]="f.maxSizeMb ?? 10"
+                               (input)="setField(i, { maxSizeMb: numberOr($any($event.target).value, 10) })" />
+                      </div>
+                      <div class="field">
+                        <label class="label" [for]="'fieldFiles' + i">How many files</label>
+                        <input class="input" type="number" min="1" max="10" [id]="'fieldFiles' + i" [value]="f.maxFiles ?? 1"
+                               (input)="setField(i, { maxFiles: numberOr($any($event.target).value, 1) })" />
+                      </div>
+                    }
+                    @if (f.type === 'lookup') {
+                      <div class="field">
+                        <label class="label" [for]="'lookupForm' + i">Offers the answers of</label>
+                        <select class="input" [id]="'lookupForm' + i" (change)="setLookupForm(i, $any($event.target).value)">
+                          <option value="" [selected]="!f.lookup?.formId">Pick a form…</option>
+                          @for (o of otherForms(); track o.formId) {
+                            <option [value]="o.formId" [selected]="f.lookup?.formId === o.formId">{{ o.name }}</option>
+                          }
+                        </select>
+                      </div>
+                      <div class="field">
+                        <label class="label" [for]="'lookupField' + i">Field</label>
+                        <select class="input" [id]="'lookupField' + i" [disabled]="!f.lookup?.formId"
+                                (change)="setField(i, { lookup: { formId: f.lookup?.formId ?? null, field: $any($event.target).value } })">
+                          <option value="" [selected]="!f.lookup?.field">Pick a field…</option>
+                          @for (o of sourceFields(f.lookup?.formId); track o.key) {
+                            <option [value]="o.key" [selected]="f.lookup?.field === o.key">{{ o.label }}</option>
+                          }
+                        </select>
+                      </div>
+                    }
+                    @if (i > 0) {
+                      @for (which of ruleKinds; track which.key) {
+                        <div class="field sm:col-span-2" [attr.data-rule]="which.key">
+                          <span class="label">{{ which.label }}</span>
+                          <div class="grid gap-2 sm:grid-cols-[1fr_10rem_1fr] items-center">
+                            <select class="input input-sm" [attr.aria-label]="which.label + ': field'"
+                                    (change)="setRule(i, which.key, { field: $any($event.target).value })">
+                              <option value="" [selected]="!ruleOf(f, which.key)">{{ which.none }}</option>
+                              @for (e of d.fields.slice(0, i); track e.key) {
+                                <option [value]="e.key" [selected]="ruleOf(f, which.key)?.field === e.key">{{ e.label || e.key }}</option>
+                              }
+                            </select>
+                            @if (ruleOf(f, which.key); as r) {
+                              <select class="input input-sm" [attr.aria-label]="which.label + ': test'"
+                                      (change)="setRule(i, which.key, { op: $any($event.target).value })">
+                                @for (o of ruleOps; track o.value) { <option [value]="o.value" [selected]="r.op === o.value">{{ o.label }}</option> }
+                              </select>
+                              @if (needsValue(r)) {
+                                @switch (targetOf(d.fields, r)?.type) {
+                                  @case ('yesNo') {
+                                    <select class="input input-sm" [attr.aria-label]="which.label + ': value'"
+                                            (change)="setRule(i, which.key, { value: $any($event.target).value === 'true' })">
+                                      <option value="true" [selected]="r.value === true || r.value === 'true'">Yes</option>
+                                      <option value="false" [selected]="r.value === false || r.value === 'false'">No</option>
+                                    </select>
+                                  }
+                                  @default {
+                                    <input class="input input-sm" [value]="ruleValueText(r)" [attr.aria-label]="which.label + ': value'"
+                                           [placeholder]="r.op === 'in' ? 'a, b, c' : 'value'"
+                                           (input)="setRule(i, which.key, { value: $any($event.target).value })" />
+                                  }
+                                }
+                              }
+                            }
+                          </div>
+                        </div>
+                      }
+                    }
                   </div>
                   @if (attempted() && problems()[i + '']) {
                     <p class="text-sm text-crit-500" role="alert">{{ problems()[i + ''] }}</p>
@@ -164,7 +276,8 @@
           <p class="text-lg font-semibold">{{ d.name || 'Untitled form' }}</p>
           @if (d.description) { <p class="text-sm text-[color:var(--text-secondary)] whitespace-pre-line">{{ d.description }}</p> }
         </div>
-        <app-form-renderer [fields]="d.fields" [answers]="previewAnswers()" idPrefix="preview" (answerChange)="previewChange($event)" />
+        <app-form-renderer [fields]="d.fields" [answers]="previewAnswers()" idPrefix="preview" [lookupValues]="previewLookups()"
+                           (answerChange)="previewChange($event)" />
       </section>
     </div>
   } @else {

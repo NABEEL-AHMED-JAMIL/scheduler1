@@ -9,9 +9,12 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AnswerChange, FormRenderer } from './form-renderer';
 import {
-  Answers, FIELD_TYPES, FORM_STATUSES, FieldType, FormDraft, FormField, FormStatus, FormSummary, LinkableJob, MAX_FIELDS, blankField,
-  definitionProblems, draftForSave, formTone, formsOf, optionsFromText, typeLabel, uniqueKey,
+  ALLOWED_EXTENSIONS, Answers, COLUMN_TYPES, FIELD_TYPES, FORM_STATUSES, FieldRule, FieldType, FormDraft, FormField, FormStatus, FormSummary,
+  LinkableJob, MAX_FIELDS, RULE_OPS, blankField, definitionProblems, draftForSave, formTone, formsOf, lookupSources, optionsFromText,
+  typeDefaults, typeLabel, uniqueKey,
 } from './forms.model';
+
+type RuleKind = 'showWhen' | 'requiredWhen';
 import { FormsApi } from './forms.service';
 
 /** A field while it is being built: whether its key still follows its label (a new field's does, a saved one's never). */
@@ -65,6 +68,20 @@ export class FormBuilder implements OnInit {
   readonly maxFields = MAX_FIELDS;
   readonly typeLabel = typeLabel;
   readonly tone = formTone;
+  readonly columnTypes = COLUMN_TYPES;
+  readonly ruleOps = RULE_OPS;
+  readonly allowedExtensions = ALLOWED_EXTENSIONS;
+  readonly optionsFromText = optionsFromText;
+  readonly ruleKinds: { key: RuleKind; label: string; none: string }[] = [
+    { key: 'showWhen', label: 'Show only when', none: 'Always shown' },
+    { key: 'requiredWhen', label: 'Also required when', none: 'No extra rule' },
+  ];
+  /** Other forms' fields, fetched when a lookup names the form (by id). */
+  readonly sourceForms = signal<Record<number, FormSummary>>({});
+  /** The forms a lookup may read: every other form of the workspace. */
+  readonly otherForms = computed(() => this.forms().filter(f => f.formId !== this.draft()?.formId));
+  /** The preview's lookups: what the saved form's lookups offer now (a new or changed lookup shows its values once saved). */
+  readonly previewLookups = signal<Record<string, string[]>>({});
 
   ngOnInit(): void {
     this.load();
@@ -110,6 +127,7 @@ export class FormBuilder implements OnInit {
         this.editorLoading.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message || 'The form could not be opened.'); return; }
         const f = r.data;
+        this.previewLookups.set(f.lookupValues ?? {});
         this.open({
           formId: f.formId, name: f.name, description: f.description ?? '', status: f.status, jobId: f.jobId ?? null,
           fields: (f.fields ?? []).map(field => ({ ...field, help: field.help ?? '', autoKey: false })),
@@ -121,6 +139,7 @@ export class FormBuilder implements OnInit {
 
   private open(draft: BuilderDraft): void {
     this.draft.set(draft);
+    for (const f of draft.fields) if (f.type === 'lookup' && f.lookup?.formId) this.loadSource(f.lookup.formId);
     this.saveError.set('');
     this.attempted.set(false);
     this.previewing.set(false);
@@ -153,6 +172,7 @@ export class FormBuilder implements OnInit {
           next.key = uniqueKey(patch.label, d.fields.filter((_, j) => j !== index).map(o => o.key));
         }
         if (patch.type === 'choice' && !(next.options ?? []).length) next.options = ['Option 1'];
+        if (patch.type && patch.type !== f.type) Object.assign(next, typeDefaults(patch.type), keepOwn(f, patch.type));
         return next;
       });
       return { ...d, fields };
@@ -161,6 +181,96 @@ export class FormBuilder implements OnInit {
 
   setOptions(index: number, text: string): void {
     this.setField(index, { options: optionsFromText(text) });
+  }
+
+  // ---- MIG-277: tables, files, lookups, rules ----------------------------------------------------------------
+
+  setColumn(index: number, column: number, patch: Partial<FormField>): void {
+    const f = this.draft()?.fields[index];
+    if (!f) return;
+    const columns = (f.columns ?? []).map((c, ci) => {
+      if (ci !== column) return c;
+      const next = { ...c, ...patch };
+      if (patch.label !== undefined && (c.key === uniqueKey(c.label, []) || !c.key)) {
+        next.key = uniqueKey(patch.label, (f.columns ?? []).filter((_, j) => j !== column).map(o => o.key));
+      }
+      if (patch.type === 'choice' && !(next.options ?? []).length) next.options = ['Option 1'];
+      return next;
+    });
+    this.setField(index, { columns });
+  }
+
+  addColumn(index: number): void {
+    const f = this.draft()?.fields[index];
+    if (!f) return;
+    const taken = (f.columns ?? []).map(c => c.key);
+    const label = `Column ${taken.length + 1}`;
+    this.setField(index, { columns: [...(f.columns ?? []), { key: uniqueKey(label, taken), label, type: 'text', required: false }] });
+  }
+
+  removeColumn(index: number, column: number): void {
+    const f = this.draft()?.fields[index];
+    if (!f) return;
+    this.setField(index, { columns: (f.columns ?? []).filter((_, ci) => ci !== column) });
+  }
+
+  setAccept(index: number, text: string): void {
+    const accept = [...new Set(text.split(/[\s,;]+/).map(a => a.trim().toLowerCase().replace(/^\./, '')).filter(a => !!a))];
+    this.setField(index, { accept });
+  }
+
+  numberOr(text: string, otherwise: number): number {
+    const n = Number(text);
+    return text === '' || !Number.isFinite(n) ? otherwise : Math.round(n);
+  }
+
+  /** A lookup's source form: its fields are fetched to pick from, and its values for the preview. */
+  setLookupForm(index: number, value: string): void {
+    const formId = value ? Number(value) : null;
+    this.setField(index, { lookup: { formId, field: '' } });
+    if (formId) this.loadSource(formId);
+  }
+
+  sourceFields(formId: number | null | undefined): FormField[] {
+    return formId ? lookupSources(this.sourceForms()[formId]?.fields) : [];
+  }
+
+  private loadSource(formId: number): void {
+    if (this.sourceForms()[formId]) return;
+    this.api.fetch(formId).subscribe({
+      next: r => { if (r.status === API_SUCCESS && r.data) this.sourceForms.update(m => ({ ...m, [formId]: r.data! })); },
+      error: () => { /* the field list stays empty; the save says what is wrong */ },
+    });
+  }
+
+  ruleOf(f: FormField, which: RuleKind): FieldRule | null {
+    return f[which] ?? null;
+  }
+
+  setRule(index: number, which: RuleKind, patch: Partial<FieldRule>): void {
+    const f = this.draft()?.fields[index];
+    if (!f) return;
+    if (patch.field === '') { this.setField(index, { [which]: null }); return; }
+    const current: FieldRule = f[which] ?? { field: '', op: 'eq', value: '' };
+    const next: FieldRule = { ...current, ...patch };
+    if (patch.field && patch.field !== current.field) {
+      const target = this.draft()?.fields.find(x => x.key === patch.field);
+      next.op = target?.type === 'table' || target?.type === 'file' || target?.type === 'signature' ? 'filled' : 'eq';
+      next.value = target?.type === 'yesNo' ? true : '';
+    }
+    this.setField(index, { [which]: next });
+  }
+
+  needsValue(rule: FieldRule): boolean {
+    return !!RULE_OPS.find(o => o.value === rule.op)?.needsValue;
+  }
+
+  targetOf(fields: FormField[], rule: FieldRule): FormField | undefined {
+    return fields.find(f => f.key === rule.field);
+  }
+
+  ruleValueText(rule: FieldRule): string {
+    return Array.isArray(rule.value) ? rule.value.join(', ') : rule.value == null ? '' : String(rule.value);
   }
 
   optionsText(field: FormField): string {
@@ -206,6 +316,7 @@ export class FormBuilder implements OnInit {
         if (r.status !== API_SUCCESS || !r.data) { this.saveError.set(r.message || 'The form was not saved.'); return; }
         this.toast.success(r.message || 'Form saved.');
         const f = r.data;
+        this.previewLookups.set(f.lookupValues ?? {});
         this.draft.update(cur => cur ? { ...cur, formId: f.formId, fields: cur.fields.map(x => ({ ...x, autoKey: false })) } : cur);
         this.load();
       },
@@ -224,4 +335,12 @@ export class FormBuilder implements OnInit {
       error: err => this.toast.error(err?.error?.message || 'The form\'s status was not changed.'),
     });
   }
+}
+
+/** What a field keeps of its own when its type changes to one that has the same setting. */
+function keepOwn(f: FormField, type: FieldType): Partial<FormField> {
+  if (type === 'table' && f.columns?.length) return { columns: f.columns, maxRows: f.maxRows };
+  if (type === 'file' && f.accept?.length) return { accept: f.accept, maxSizeMb: f.maxSizeMb, maxFiles: f.maxFiles };
+  if (type === 'lookup' && f.lookup) return { lookup: f.lookup };
+  return {};
 }
