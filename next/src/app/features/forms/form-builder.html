@@ -64,6 +64,22 @@
                   Read CSV/JSON/Parquet step names no file reads it as one row.
                 </p>
               </div>
+              <div class="field">
+                <label class="label" for="formWorkflow">Approval</label>
+                <select id="formWorkflow" class="input" (change)="patch({ workflowKey: $any($event.target).value || null })">
+                  <option value="" [selected]="!d.workflowKey">None: no approval</option>
+                  @for (w of workflows(); track w.key) {
+                    <option [value]="w.key" [selected]="d.workflowKey === w.key">{{ w.name }}</option>
+                  }
+                  @if (d.workflowKey && !hasWorkflow(d.workflowKey)) {
+                    <option [value]="d.workflowKey" selected>{{ d.workflowKey }} (not active)</option>
+                  }
+                </select>
+                <p class="field-note text-[color:var(--text-muted)]">
+                  Each submission starts this workflow; its status (Pending, Approved, Rejected, Overdue) shows on Submissions.
+                  <a class="link-inline" routerLink="/workflows/designer">Workflow designer</a>
+                </p>
+              </div>
             </div>
 
             <div class="flex items-center justify-between gap-2 border-t border-subtle pt-3">

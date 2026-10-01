@@ -14,7 +14,7 @@ import { Donut } from '../../shared/charts/donut';
 import { ColumnCard } from './column-card';
 import { Histogram } from '../../shared/charts/histogram';
 import { RankedBar } from '../../shared/charts/ranked-bar';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
 import { SqlEditor } from './sql-editor';
 import { DataGrid, GridColumn, GridCopy, GridSort, readWrap, writeWrap } from './data-grid';
@@ -686,6 +686,10 @@ export class Analytics implements OnInit {
   }
 
   private readonly storage = inject(StorageService);
+
+  /** A link may name a dataset to open (?connection=&path=&name=): a form's submissions (MIG-279). Optional for the specs. */
+
+  private readonly route = inject(ActivatedRoute, { optional: true });
   /** Server times, read and written as the rest of the console does. */
   private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
   /** A time in the given format, or the text as it came when it is not a time at all. */
@@ -1139,6 +1143,13 @@ export class Analytics implements OnInit {
         // job is reading data, and an empty picker shows nothing about what it does. First
         // readable, not simply first, because the rail's order is the storage list's order and
         // an FTP connection is as likely to lead it as anything else.
+        const asked = this.route?.snapshot.queryParamMap;
+        const connection = asked?.get('connection');
+        const path = asked?.get('path');
+        if (connection && path) {
+          this.openRegistered({ connectionAlias: connection, datasetPath: path, datasetName: asked?.get('name') || path } as RegisteredDataset);
+          return;
+        }
         const first = this.readableConnections()[0];
         if (first) this.pickConnection(first.bucket);
       },

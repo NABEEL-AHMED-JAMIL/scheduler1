@@ -5,7 +5,7 @@ import { throwError } from 'rxjs';
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { ToastService } from '../../shared/ui/toast.service';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subject, of } from 'rxjs';
 import { Analytics, dateOnly, plainDecimal } from './analytics';
@@ -4327,6 +4327,24 @@ describe('the dashboard and the registry are reachable from the workspace', () =
 
     expect(grid.studio.browseError()).toContain('not a connection Analytics Studio can read');
     expect(grid.studio.path()).toBe('daily/sales-2026.csv');
+  });
+
+  it('opens the dataset a link names (a form\'s submissions, MIG-279) instead of the first connection', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({
+          connection: 'minio-main', path: 'datasets/forms/form-1001/*.json', name: 'Form: Visit' }) } } },
+        { provide: StorageService, useValue: { buckets: () => of(SERVER_RESPONSE([MINIO])), listObjects: () => of(SERVER_RESPONSE({ objects: [] })) } },
+        { provide: AnalyticsService, useValue: { schema: () => new Subject<any>(), preview: () => new Subject<any>(), profile: () => new Subject<any>(),
+          overview: () => new Subject<any>() } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Analytics);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.path()).toBe('datasets/forms/form-1001/*.json');
+    expect(fixture.componentInstance.prefix()).toBe('datasets/forms/form-1001/');
   });
 
   it('opens one that IS readable, landing the rail in the folder it lives in', () => {

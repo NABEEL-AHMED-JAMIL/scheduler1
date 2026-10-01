@@ -6,8 +6,10 @@ import { TableShell } from '../../shared/ui/data-table';
 import { LoadError } from '../../shared/ui/load-error';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
-import { FormField, FormSummary, Submission, answerText, formsOf, submissionStatusText, submissionTone, submissionsOf } from './forms.model';
+import { FormField, FormSummary, Submission, UploadRef, answerText, approvalText, approvalTone, formsOf, submissionStatusText, submissionTone, submissionsOf } from './forms.model';
 import { FormsApi } from './forms.service';
+import { DocumentsApi } from '../documents/documents.service';
+import { AuthService } from '../../core/auth/auth.service';
 
 /**
  * Forms › Submissions (Wave 5 Forms lite; page 'form-submissions'): what a form collected, newest first -- who sent it
@@ -19,6 +21,8 @@ interface AnswerRow {
   label: string;
   value: string;
   table?: { columns: FormField[]; rows: Record<string, unknown>[] };
+  /** A file field's files, each of which can be read with Document Intelligence (MIG-279). */
+  files?: UploadRef[];
 }
 
 @Component({
@@ -39,6 +43,18 @@ export class FormSubmissions implements OnInit {
   readonly formsError = signal('');
   readonly selected = signal<number | null>(null);
   readonly form = signal<FormSummary | null>(null);
+  private readonly auth = inject(AuthService);
+  /** Analytics Studio is a page of its own: the button shows only for someone who holds it. */
+  readonly canAnalyse = computed(() => this.auth.canOpen('analytics'));
+  private readonly documents = inject(DocumentsApi);
+  /** Document Intelligence is a page of its own: its button shows only for someone who holds it. */
+  readonly canRead = computed(() => this.auth.canOpen('document-intelligence'));
+  /** Files sent to Document Intelligence on this page, by storage key: reading, or why not. */
+  readonly reads = signal<Record<string, 'reading' | 'sent' | string>>({});
+  readonly approvalTone = approvalTone;
+  readonly approvalText = approvalText;
+  /** MIG-279: an Approval column when the form starts a workflow, or any submission has a status from one. */
+  readonly hasApproval = computed(() => !!this.form()?.workflowKey || this.submissions().some(s => !!s.workflowStatus));
   readonly submissions = signal<Submission[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
@@ -103,6 +119,9 @@ export class FormSubmissions implements OnInit {
     const fields = s.fields ?? this.form()?.fields ?? [];
     const rows: AnswerRow[] = fields.map(f => {
       const value = s.answers[f.key];
+      if (f.type === 'file' && Array.isArray(value) && value.length) {
+        return { label: f.label, value: answerText(f, value), files: value as UploadRef[] };
+      }
       if (f.type === 'table' && Array.isArray(value) && value.length) {
         return { label: f.label, value: answerText(f, value), table: { columns: f.columns ?? [], rows: value as Record<string, unknown>[] } };
       }
@@ -112,6 +131,20 @@ export class FormSubmissions implements OnInit {
       if (!fields.some(f => f.key === key)) rows.push({ label: key, value: answerText(undefined, s.answers[key]) });
     }
     return rows;
+  }
+
+  /** Asks Document Intelligence to read one attached file where it is (its bucket and key); the result is on its page. */
+  readWithIntelligence(file: UploadRef): void {
+    if (!file.bucket || !file.key || this.reads()[file.key] === 'reading') return;
+    const key = file.key;
+    this.reads.update(r => ({ ...r, [key]: 'reading' }));
+    this.documents.requestRead(file.bucket, key).subscribe({
+      next: r => {
+        this.reads.update(m => ({ ...m, [key]: r.status === API_SUCCESS ? 'sent' : r.message || 'It could not be read.' }));
+        if (r.status === API_SUCCESS) this.toast.success(`${file.name} is being read by Document Intelligence.`);
+      },
+      error: err => this.reads.update(m => ({ ...m, [key]: err?.error?.message || 'It could not be read. Try again.' })),
+    });
   }
 
   cell(column: FormField, value: unknown): string {

@@ -23,6 +23,8 @@ export interface UploadRef {
   name: string;
   contentType?: string;
   size?: number;
+  /** Where Core kept it: the workspace bucket and key (a sent submission's files carry them). */
+  bucket?: string;
   key?: string;
 }
 
@@ -68,6 +70,9 @@ export interface FormSummary {
   fields?: FormField[];
   /** A lookup field's values now, by its key (fetch only). */
   lookupValues?: Record<string, string[]>;
+  /** MIG-279: the workflow a submission starts, and where its rows are as an Analytics dataset. */
+  workflowKey?: string | null;
+  dataset?: { analyticsDatasetId?: number | null; name: string; connection: string; path: string } | null;
 }
 
 export interface LinkableJob {
@@ -92,6 +97,10 @@ export interface Submission {
   answers: Record<string, unknown>;
   /** The fields of the version it answered, when that is not the form's current one (MIG-277). */
   fields?: FormField[];
+  /** MIG-279: the request it started and its status now -- Pending, Overdue, Approved, Rejected ... -- or NotStarted. */
+  workflowInstanceId?: number | null;
+  workflowStatus?: string | null;
+  workflowReason?: string | null;
 }
 
 /** What POST form.json/save takes. */
@@ -102,6 +111,8 @@ export interface FormDraft {
   status: FormStatus;
   jobId: number | null;
   fields: FormField[];
+  /** MIG-279: the workflow a submission starts (its key), or none. */
+  workflowKey?: string | null;
 }
 
 export type AnswerValue = string | boolean | null | TableRow[] | UploadRef[] | UploadRef;
@@ -361,6 +372,7 @@ export function draftForSave(draft: FormDraft): FormDraft {
     ...draft,
     name: draft.name.trim(),
     description: draft.description.trim(),
+    workflowKey: draft.workflowKey?.trim() || null,
     fields: draft.fields.map(f => ({
       key: f.key.trim(), label: f.label.trim(), type: f.type, required: !!f.required,
       help: f.help?.trim() || null, options: f.type === 'choice' ? (f.options ?? []).map(o => o.trim()).filter(o => !!o) : null,
@@ -490,6 +502,18 @@ export function submissionStatusText(s: Pick<Submission, 'status' | 'jobQueueId'
 
 export function submissionTone(status: string): 'ok' | 'crit' | 'neutral' {
   return status === 'RunStarted' ? 'ok' : status === 'RunNotStarted' ? 'crit' : 'neutral';
+}
+
+/** An approval status's colour: approved green, rejected or failed red, overdue amber, the rest neutral. */
+export function approvalTone(status: string | null | undefined): 'ok' | 'crit' | 'warn' | 'neutral' {
+  if (status === 'Approved' || status === 'Completed') return 'ok';
+  if (status === 'Rejected' || status === 'Failed' || status === 'NotStarted') return 'crit';
+  if (status === 'Overdue') return 'warn';
+  return 'neutral';
+}
+
+export function approvalText(status: string | null | undefined): string {
+  return status === 'NotStarted' ? 'Not started' : status ?? '';
 }
 
 export function formTone(status: string): 'ok' | 'warn' | 'neutral' {

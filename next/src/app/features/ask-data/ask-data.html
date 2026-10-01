@@ -95,7 +95,7 @@
                         <span class="pill pill-brand shrink-0 tabular-nums">{{ s.n }}</span>
                         <div class="min-w-0 flex-1">
                           <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <app-icon [name]="s.kind === 'document' ? 'file' : 'table'" size="0.9em" class="shrink-0 text-[color:var(--text-muted)]" />
+                            <app-icon [name]="s.kind === 'document' ? 'file' : s.kind === 'form' ? 'edit' : 'table'" size="0.9em" class="shrink-0 text-[color:var(--text-muted)]" />
                             <a class="font-medium hover-brand break-words" [routerLink]="s.link">{{ s.title }}</a>
                             <span class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel(s) }}{{ s.cited ? '' : ' · given, not cited' }}</span>
                           </div>

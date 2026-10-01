@@ -142,7 +142,7 @@ export class AskData implements OnInit {
   }
 
   kindLabel(s: AskSourceRef): string {
-    return s.kind === 'document' ? 'Document' : 'Pipeline result';
+    return s.kind === 'document' ? 'Document' : s.kind === 'form' ? 'Form submissions' : 'Pipeline result';
   }
 
   seconds(ms: number | null | undefined): string {

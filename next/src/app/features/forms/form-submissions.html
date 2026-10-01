@@ -44,6 +44,11 @@
           @if (f.status === 'Active') {
             <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']"><app-icon name="send" />Fill in</a>
           }
+          @if (f.dataset && canAnalyse()) {
+            <a class="btn btn-ghost btn-sm" routerLink="/data/analytics" data-open-analytics
+               [queryParams]="{ connection: f.dataset.connection, path: f.dataset.path, name: f.dataset.name }">
+              <app-icon name="chart" />Open in Analytics Studio</a>
+          }
         }
       </ng-container>
       <table class="table-modern">
@@ -53,6 +58,7 @@
             <th>Submitted by</th>
             <th>Submitted</th>
             <th>Status</th>
+            @if (hasApproval()) { <th>Approval</th> }
             <th>Details</th>
             <th class="text-right">Answers</th>
           </tr>
@@ -71,6 +77,14 @@
                   <span class="pill" [class]="'pill-' + tone(s.status)">{{ statusText(s) }}</span>
                 }
               </td>
+              @if (hasApproval()) {
+                <td class="whitespace-nowrap" [attr.data-approval]="s.workflowStatus">
+                  @if (s.workflowStatus) {
+                    <span class="pill" [class]="'pill-' + approvalTone(s.workflowStatus)"
+                          [title]="s.workflowReason || (s.workflowInstanceId ? 'Request #' + s.workflowInstanceId : '')">{{ approvalText(s.workflowStatus) }}</span>
+                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                </td>
+              }
               <td class="text-xs max-w-96">
                 @if (s.reason) { <span class="text-crit-500">{{ s.reason }}</span> }
                 @else if (s.storageKey) { <span class="mono text-[color:var(--text-muted)] break-all">{{ s.bucket }}/{{ s.storageKey }}</span> }
@@ -84,7 +98,7 @@
             </tr>
             @if (open() === s.submissionId) {
               <tr class="bg-[color:var(--surface-sunken)]">
-                <td colspan="6">
+                <td [attr.colspan]="hasApproval() ? 7 : 6">
                   <dl class="grid gap-x-4 gap-y-1.5 sm:grid-cols-[14rem_1fr] text-sm py-1" [attr.aria-label]="'Answers of submission ' + s.submissionId">
                     @for (row of answerRows(s); track row.label) {
                       <dt class="text-[color:var(--text-muted)]">{{ row.label }}</dt>
@@ -98,6 +112,28 @@
                               }
                             </tbody>
                           </table>
+                        </dd>
+                      } @else if (row.files; as files) {
+                        <dd class="flex flex-col gap-1">
+                          @for (file of files; track file.uploadId) {
+                            <span class="flex items-center gap-2 flex-wrap" [attr.data-file]="file.key">
+                              <app-icon name="file" size="0.95em" class="icon-muted" />{{ file.name }}
+                              @if (canRead()) {
+                                @switch (reads()[file.key ?? '']) {
+                                  @case ('reading') { <span class="text-xs text-[color:var(--text-muted)]">Sending…</span> }
+                                  @case ('sent') {
+                                    <a class="text-xs text-accent hover:underline" routerLink="/documents/intelligence" [queryParams]="{ tab: 'documents' }">
+                                      Being read — open Document Intelligence</a>
+                                  }
+                                  @case (undefined) {
+                                    <button type="button" class="btn btn-ghost btn-xs" (click)="readWithIntelligence(file)" data-read-file>
+                                      <app-icon name="sparkle" />Read with Document Intelligence</button>
+                                  }
+                                  @default { <span class="text-xs text-crit-500">{{ reads()[file.key ?? ''] }}</span> }
+                                }
+                              }
+                            </span>
+                          }
                         </dd>
                       } @else {
                         <dd class="break-words whitespace-pre-line">{{ row.value }}</dd>

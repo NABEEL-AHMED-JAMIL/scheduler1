@@ -16,6 +16,7 @@ import {
 
 type RuleKind = 'showWhen' | 'requiredWhen';
 import { FormsApi } from './forms.service';
+import { WorkflowSummary, WorkflowsApi } from '../workflows/workflows.api';
 
 /** A field while it is being built: whether its key still follows its label (a new field's does, a saved one's never). */
 type BuilderField = FormField & { autoKey?: boolean };
@@ -39,6 +40,9 @@ export class FormBuilder implements OnInit {
   private readonly api = inject(FormsApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly workflowsApi = inject(WorkflowsApi);
+  /** MIG-279: the workspace's workflows a form may start (Active and published). */
+  readonly workflows = signal<WorkflowSummary[]>([]);
 
   readonly forms = signal<FormSummary[]>([]);
   readonly loading = signal(true);
@@ -86,6 +90,10 @@ export class FormBuilder implements OnInit {
   ngOnInit(): void {
     this.load();
     if (this.isAdmin()) {
+      this.workflowsApi.list().subscribe({
+        next: r => { if (r.status === API_SUCCESS) this.workflows.set((r.data ?? []).filter(w => w.status === 'Active' && w.currentVersion > 0)); },
+        error: () => { /* no workflows to pick; a saved one still shows its key */ },
+      });
       this.api.linkableJobs().subscribe({
         next: r => { if (r.status === API_SUCCESS) this.jobs.set(r.data ?? []); },
         error: () => { /* the job list stays empty; a saved link still shows its name */ },
@@ -116,7 +124,7 @@ export class FormBuilder implements OnInit {
   newForm(): void {
     if (!this.canBuild()) return;
     const first = blankField([]);
-    this.open({ formId: null, name: '', description: '', status: 'Draft', jobId: null, fields: [{ ...first, autoKey: true }] });
+    this.open({ formId: null, name: '', description: '', status: 'Draft', jobId: null, workflowKey: null, fields: [{ ...first, autoKey: true }] });
   }
 
   edit(form: FormSummary): void {
@@ -130,6 +138,7 @@ export class FormBuilder implements OnInit {
         this.previewLookups.set(f.lookupValues ?? {});
         this.open({
           formId: f.formId, name: f.name, description: f.description ?? '', status: f.status, jobId: f.jobId ?? null,
+          workflowKey: f.workflowKey ?? null,
           fields: (f.fields ?? []).map(field => ({ ...field, help: field.help ?? '', autoKey: false })),
         });
       },
@@ -217,6 +226,10 @@ export class FormBuilder implements OnInit {
   setAccept(index: number, text: string): void {
     const accept = [...new Set(text.split(/[\s,;]+/).map(a => a.trim().toLowerCase().replace(/^\./, '')).filter(a => !!a))];
     this.setField(index, { accept });
+  }
+
+  hasWorkflow(key: string): boolean {
+    return this.workflows().some(w => w.key === key);
   }
 
   numberOr(text: string, otherwise: number): number {

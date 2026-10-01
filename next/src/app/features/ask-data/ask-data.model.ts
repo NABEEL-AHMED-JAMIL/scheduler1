@@ -6,7 +6,7 @@
 /** One source an answer was given, numbered as the answer cites it. */
 export interface AskSourceRef {
   n: number;
-  kind: 'document' | 'run-output';
+  kind: 'document' | 'run-output' | 'form';
   title: string;
   /** A console route that opens it. */
   link: string;
@@ -18,6 +18,8 @@ export interface AskSourceRef {
 export interface Searched {
   documents: number;
   runOutputs: number;
+  /** MIG-279: forms whose submissions were read (absent from an older ai-service). */
+  forms?: number;
 }
 
 export interface AskAnswer {
@@ -69,11 +71,13 @@ export function segments(answer: string, known: ReadonlySet<number>): Segment[] 
   return out;
 }
 
-/** "3 documents and 4 pipeline results" -- what a question is answered from. */
+/** "3 documents and 4 pipeline results" (and "2 forms' submissions") -- what a question is answered from. */
 export function searchedText(s: Searched | null | undefined): string {
   if (!s) return '';
   const part = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-  return `${part(s.documents, 'document', 'documents')} and ${part(s.runOutputs, 'pipeline result', 'pipeline results')}`;
+  const parts = [part(s.documents, 'document', 'documents'), part(s.runOutputs, 'pipeline result', 'pipeline results')];
+  if (s.forms) parts.push(part(s.forms, 'form\'s submissions', 'forms\' submissions'));
+  return parts.length === 2 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 
 /** The server's words when it said no (the envelope's message), else a plain sentence for the status. */
