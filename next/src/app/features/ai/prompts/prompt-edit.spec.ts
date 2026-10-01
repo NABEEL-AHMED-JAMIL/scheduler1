@@ -83,6 +83,13 @@ describe('PromptEdit', () => {
    * Try it on a file. The file's text rides on the try as `values`, keyed by variable, and
    * never becomes the saved sample; a file_name variable is filled with the name alongside.
    */
+  it('names the variable plainly in the file picker: no template braces in its heading', () => {
+    const { component } = editor();
+    const open = vi.spyOn((component as any).dialog, 'open').mockReturnValue({ closed: of(undefined) } as any);
+    component.fromFile('file_name');
+    expect((open.mock.calls[0][1] as any).data.heading).toBe('Choose a file for file_name');
+  });
+
   it('fills a variable from a file for the try alone, and file_name with it', () => {
     const { component, post, get } = editor();
     component.form.patchValue({ name: 'Any file', userTemplate: '{{file_name}}: {{document_text}}' });

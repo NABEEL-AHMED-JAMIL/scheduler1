@@ -150,7 +150,7 @@ export class PromptEdit implements OnInit {
   fromFile(variableName: string): void {
     const name = (variableName || '').trim();
     if (!name) { this.toast.error('Name the variable first.'); return; }
-    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({ heading: `Fill {{${name}}} from a file` }))
+    this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({ heading: `Choose a file for ${name}` }))
       .closed.subscribe(picked => { if (picked) this.readObject(name, picked); });
   }
 
