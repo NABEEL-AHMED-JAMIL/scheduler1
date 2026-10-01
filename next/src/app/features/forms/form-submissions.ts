@@ -8,6 +8,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FormField, FormSummary, Submission, UploadRef, answerText, approvalText, approvalTone, formsOf, submissionStatusText, submissionTone, submissionsOf } from './forms.model';
 import { FormsApi } from './forms.service';
+import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
 import { DocumentsApi } from '../documents/documents.service';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -27,7 +28,7 @@ interface AnswerRow {
 
 @Component({
   selector: 'app-form-submissions',
-  imports: [Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
+  imports: [StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
   templateUrl: './form-submissions.html',
 })
 export class FormSubmissions implements OnInit {
@@ -55,6 +56,37 @@ export class FormSubmissions implements OnInit {
   readonly approvalText = approvalText;
   /** MIG-279: an Approval column when the form starts a workflow, or any submission has a status from one. */
   readonly hasApproval = computed(() => !!this.form()?.workflowKey || this.submissions().some(s => !!s.workflowStatus));
+  /** MIG-280: narrowing the list -- by state (approval, else the run) and by text (who, number, answers). */
+  readonly state = signal('');
+  readonly search = signal('');
+  readonly canOpenRequests = computed(() => this.auth.canOpen('task-inbox'));
+  readonly states = computed<{ value: string; label: string }[]>(() => this.hasApproval()
+    ? [{ value: 'Pending', label: 'Awaiting approval' }, { value: 'Overdue', label: 'Overdue' }, { value: 'Approved', label: 'Approved' },
+       { value: 'Rejected', label: 'Rejected' }, { value: 'NotStarted', label: 'Approval not started' }]
+    : [{ value: 'Received', label: 'Received' }, { value: 'RunStarted', label: 'Run started' }, { value: 'RunNotStarted', label: 'Run not started' }]);
+  readonly shownRows = computed(() => {
+    const state = this.state();
+    const text = this.search().trim().toLowerCase();
+    return this.submissions().filter(s => (!state || s.workflowStatus === state || s.status === state)
+      && (!text || [String(s.submissionId), this.submitter(s), s.workflowStage ?? '', JSON.stringify(s.answers)].some(v => v.toLowerCase().includes(text))));
+  });
+  /** The strip above the list: the form's latest submissions at a glance. */
+  readonly kpis = computed<StatStripItem[]>(() => {
+    const rows = this.submissions();
+    const count = (pick: (s: Submission) => boolean) => rows.filter(pick).length;
+    const all: StatStripItem = { label: 'Submissions', value: rows.length, icon: 'inbox', foot: rows.length >= 200 ? 'the latest 200' : 'all of them' };
+    if (this.hasApproval()) {
+      return [all,
+        { label: 'Awaiting approval', value: count(s => s.workflowStatus === 'Pending'), icon: 'clock', tone: 'warn' },
+        { label: 'Approved', value: count(s => s.workflowStatus === 'Approved' || s.workflowStatus === 'Completed'), icon: 'checkCircle', tone: 'ok' },
+        { label: 'Overdue', value: count(s => s.workflowStatus === 'Overdue'), icon: 'alert', tone: 'crit',
+          foot: count(s => s.workflowStatus === 'Rejected') + ' rejected' }];
+    }
+    return [all,
+      { label: 'Run started', value: count(s => s.status === 'RunStarted'), icon: 'play', tone: 'ok' },
+      { label: 'Run not started', value: count(s => s.status === 'RunNotStarted'), icon: 'alert', tone: 'crit' },
+      { label: 'Kept only', value: count(s => s.status === 'Received'), icon: 'inbox' }];
+  });
   readonly submissions = signal<Submission[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');

@@ -11,10 +11,17 @@ import { AnswerChange, FormRenderer } from './form-renderer';
 import {
   ALLOWED_EXTENSIONS, Answers, COLUMN_TYPES, FIELD_TYPES, FORM_STATUSES, FieldRule, FieldType, FormDraft, FormField, FormStatus, FormSummary,
   LinkableJob, MAX_FIELDS, RULE_OPS, blankField, definitionProblems, draftForSave, formTone, formsOf, lookupSources, optionsFromText,
-  typeDefaults, typeLabel, uniqueKey,
+  ruleText, typeDefaults, typeLabel, uniqueKey,
 } from './forms.model';
 
 type RuleKind = 'showWhen' | 'requiredWhen';
+type BuilderTab = 'build' | 'logic' | 'settings';
+
+/** The icon each field type shows in the palette and the properties panel. */
+const TYPE_ICONS: Record<FieldType, string> = {
+  text: 'edit', longText: 'list', number: 'chart', date: 'calendar', choice: 'selector', yesNo: 'checkCircle', email: 'mail',
+  table: 'table', file: 'file', signature: 'edit', lookup: 'search',
+};
 import { FormsApi } from './forms.service';
 import { WorkflowSummary, WorkflowsApi } from '../workflows/workflows.api';
 
@@ -59,6 +66,21 @@ export class FormBuilder implements OnInit {
   readonly previewing = signal(false);
   readonly previewAnswers = signal<Answers>({});
   readonly newType = signal<FieldType>('text');
+  /** MIG-280: the builder's tab, and the field whose properties show beside the canvas. */
+  readonly tab = signal<BuilderTab>('build');
+  readonly selected = signal<number | null>(null);
+  readonly selectedField = computed(() => {
+    const i = this.selected();
+    return i === null ? null : this.draft()?.fields[i] ?? null;
+  });
+  /** The version the open form was saved as, and what it is around it. */
+  readonly savedForm = signal<FormSummary | null>(null);
+  readonly savedVersion = computed(() => this.savedForm()?.version ?? 1);
+  readonly dataset = computed(() => this.savedForm()?.dataset ?? null);
+  readonly datasetName = computed(() => this.dataset()?.name ?? null);
+  readonly submissionCount = computed(() => this.savedForm()?.submissions ?? null);
+  readonly ruleCount = computed(() => (this.draft()?.fields ?? []).filter(f => f.showWhen || f.requiredWhen).length);
+  readonly ruleText = ruleText;
 
   readonly isAdmin = computed(() => this.auth.isTenantAdmin());
   readonly canBuild = computed(() => this.auth.canBuild());
@@ -124,6 +146,7 @@ export class FormBuilder implements OnInit {
   newForm(): void {
     if (!this.canBuild()) return;
     const first = blankField([]);
+    this.savedForm.set(null);
     this.open({ formId: null, name: '', description: '', status: 'Draft', jobId: null, workflowKey: null, fields: [{ ...first, autoKey: true }] });
   }
 
@@ -136,6 +159,7 @@ export class FormBuilder implements OnInit {
         if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message || 'The form could not be opened.'); return; }
         const f = r.data;
         this.previewLookups.set(f.lookupValues ?? {});
+        this.savedForm.set(f);
         this.open({
           formId: f.formId, name: f.name, description: f.description ?? '', status: f.status, jobId: f.jobId ?? null,
           workflowKey: f.workflowKey ?? null,
@@ -148,6 +172,8 @@ export class FormBuilder implements OnInit {
 
   private open(draft: BuilderDraft): void {
     this.draft.set(draft);
+    this.tab.set('build');
+    this.selected.set(draft.fields.length ? 0 : null);
     for (const f of draft.fields) if (f.type === 'lookup' && f.lookup?.formId) this.loadSource(f.lookup.formId);
     this.saveError.set('');
     this.attempted.set(false);
@@ -295,6 +321,7 @@ export class FormBuilder implements OnInit {
     if (this.locked() || !d || d.fields.length >= MAX_FIELDS) return;
     const field = blankField(d.fields.map(f => f.key), this.newType());
     this.patch({ fields: [...d.fields, { ...field, autoKey: true }] });
+    this.selected.set(d.fields.length);
   }
 
   moveField(index: number, by: -1 | 1): void {
@@ -304,12 +331,51 @@ export class FormBuilder implements OnInit {
     const fields = [...d.fields];
     [fields[index], fields[to]] = [fields[to], fields[index]];
     this.patch({ fields });
+    if (this.selected() === index) this.selected.set(to);
   }
 
   removeField(index: number): void {
     const d = this.draft();
     if (this.locked() || !d) return;
     this.patch({ fields: d.fields.filter((_, i) => i !== index) });
+    const left = d.fields.length - 1;
+    this.selected.set(left ? Math.min(index, left - 1) : null);
+  }
+
+  // ---- MIG-280: palette, canvas, preview, publish -------------------------------------------------------------
+
+  select(index: number): void {
+    this.selected.set(index);
+  }
+
+  /** A palette click: a field of that type, chosen at once. */
+  addFieldOfType(type: FieldType): void {
+    this.newType.set(type);
+    this.addField();
+  }
+
+  typeIcon(type: FieldType): string {
+    return TYPE_ICONS[type] ?? 'edit';
+  }
+
+  workflowName(key: string): string {
+    return this.workflows().find(w => w.key === key)?.name ?? key;
+  }
+
+  togglePreview(): void {
+    this.previewing.update(v => !v);
+    this.previewAnswers.set({});
+  }
+
+  /** Publish: save the form as Active, the version members fill in from now on. */
+  publish(): void {
+    const d = this.draft();
+    if (this.locked() || !d) return;
+    const before = d.status;
+    this.patch({ status: 'Active' });
+    this.save();
+    // Refused before it was sent (a field is wrong): it is still what it was.
+    if (!this.saving() && this.saveError()) this.patch({ status: before });
   }
 
   previewChange(event: AnswerChange): void {
@@ -330,6 +396,7 @@ export class FormBuilder implements OnInit {
         this.toast.success(r.message || 'Form saved.');
         const f = r.data;
         this.previewLookups.set(f.lookupValues ?? {});
+        this.savedForm.set(f);
         this.draft.update(cur => cur ? { ...cur, formId: f.formId, fields: cur.fields.map(x => ({ ...x, autoKey: false })) } : cur);
         this.load();
       },

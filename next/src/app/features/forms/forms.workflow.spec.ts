@@ -62,9 +62,27 @@ describe('Forms -- approval and dataset', () => {
     const el = render(true);
     const heads = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent!.trim());
     expect(heads).toContain('Approval');
-    const approvals = Array.from(el.querySelectorAll('[data-approval]')).map(td => td.textContent!.trim());
+    const approvals = Array.from(el.querySelectorAll('[data-approval] .pill')).map(p => p.textContent!.trim());
     expect(approvals).toEqual(['Overdue', 'Approved', 'Not started']);
+    // MIG-280: the stage beside it, a link to the request where there is one, the strip above, and the state filter.
+    expect(el.querySelectorAll('[data-open-request]').length).toBe(2);
+    expect(Array.from(el.querySelectorAll('thead th')).map(th => th.textContent!.trim())).toContain('Stage');
+    expect(el.textContent).toContain('Awaiting approval');
     expect(el.querySelector('[data-approval="NotStarted"] .pill')!.getAttribute('title')).toContain('no active workflow');
+  });
+
+  it('narrows the list by state and by text', () => {
+    render(true);
+    const fixture = TestBed.createComponent(FormSubmissions);
+    fixture.componentRef.setInput('formId', '1001');
+    fixture.detectChanges();
+    const page = fixture.componentInstance;
+    page.state.set('Approved');
+    expect(page.shownRows().map(s => s.submissionId)).toEqual([1003]);
+    page.state.set('');
+    page.search.set('heel');
+    expect(page.shownRows().map(s => s.submissionId)).toEqual([1004]);
+    expect(page.kpis().map(k => k.label)).toEqual(['Submissions', 'Awaiting approval', 'Approved', 'Overdue']);
   });
 
   it('opens the form\'s rows in Analytics Studio, only for someone who holds that page', () => {

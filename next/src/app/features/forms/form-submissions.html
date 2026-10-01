@@ -36,10 +36,21 @@
       <a class="btn btn-default btn-sm" routerLink="/forms/builder"><app-icon name="edit" />Form builder</a>
     </div>
   } @else {
+    @if (submissions().length) {
+      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="These submissions at a glance" />
+    }
     <app-table-shell [heading]="form()?.name || 'Submissions'" columnsKey="form-submissions" [loading]="loading()" [error]="error()"
-                     [isEmpty]="!submissions().length" [shown]="submissions().length" [scrollRows]="false"
-                     emptyMessage="Nothing submitted yet." emptyIcon="inbox" (retry)="load()">
+                     [isEmpty]="!shownRows().length" [shown]="shownRows().length" [scrollRows]="false"
+                     [emptyMessage]="submissions().length ? 'No submission matches.' : 'Nothing submitted yet.'" emptyIcon="inbox" (retry)="load()">
       <ng-container toolbar>
+        <label class="sr-only" for="submissionsState">State</label>
+        <select id="submissionsState" class="input input-sm w-auto" (change)="state.set($any($event.target).value)" data-state-filter>
+          <option value="" [selected]="!state()">All states</option>
+          @for (o of states(); track o.value) { <option [value]="o.value" [selected]="state() === o.value">{{ o.label }}</option> }
+        </select>
+        <label class="sr-only" for="submissionsSearch">Search</label>
+        <input id="submissionsSearch" class="input input-sm w-48" type="search" placeholder="Search submissions…" [value]="search()"
+               (input)="search.set($any($event.target).value)" />
         @if (form(); as f) {
           @if (f.status === 'Active') {
             <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']"><app-icon name="send" />Fill in</a>
@@ -58,13 +69,13 @@
             <th>Submitted by</th>
             <th>Submitted</th>
             <th>Status</th>
-            @if (hasApproval()) { <th>Approval</th> }
+            @if (hasApproval()) { <th>Stage</th><th>Approval</th> }
             <th>Details</th>
             <th class="text-right">Answers</th>
           </tr>
         </thead>
         <tbody>
-          @for (s of submissions(); track s.submissionId) {
+          @for (s of shownRows(); track s.submissionId) {
             <tr [attr.data-submission]="s.submissionId">
               <td class="tabular">{{ s.submissionId }}</td>
               <td class="whitespace-nowrap">{{ submitter(s) }}</td>
@@ -78,11 +89,16 @@
                 }
               </td>
               @if (hasApproval()) {
+                <td class="text-sm" data-stage>{{ s.workflowStage || '—' }}</td>
                 <td class="whitespace-nowrap" [attr.data-approval]="s.workflowStatus">
                   @if (s.workflowStatus) {
                     <span class="pill" [class]="'pill-' + approvalTone(s.workflowStatus)"
                           [title]="s.workflowReason || (s.workflowInstanceId ? 'Request #' + s.workflowInstanceId : '')">{{ approvalText(s.workflowStatus) }}</span>
                   } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                  @if (s.workflowInstanceId && canOpenRequests()) {
+                    <a class="text-xs text-accent hover:underline ml-2" routerLink="/workflows/requests" [queryParams]="{ id: s.workflowInstanceId }"
+                       data-open-request>Open request</a>
+                  }
                 </td>
               }
               <td class="text-xs max-w-96">
@@ -98,7 +114,7 @@
             </tr>
             @if (open() === s.submissionId) {
               <tr class="bg-[color:var(--surface-sunken)]">
-                <td [attr.colspan]="hasApproval() ? 7 : 6">
+                <td [attr.colspan]="hasApproval() ? 8 : 6">
                   <dl class="grid gap-x-4 gap-y-1.5 sm:grid-cols-[14rem_1fr] text-sm py-1" [attr.aria-label]="'Answers of submission ' + s.submissionId">
                     @for (row of answerRows(s); track row.label) {
                       <dt class="text-[color:var(--text-muted)]">{{ row.label }}</dt>

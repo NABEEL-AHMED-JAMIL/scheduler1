@@ -101,6 +101,8 @@ export interface Submission {
   workflowInstanceId?: number | null;
   workflowStatus?: string | null;
   workflowReason?: string | null;
+  /** MIG-280: the step its request waits at now ("Manager approval"); none once it ended. */
+  workflowStage?: string | null;
 }
 
 /** What POST form.json/save takes. */

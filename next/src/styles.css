@@ -2283,3 +2283,22 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .signature-pad { width: 100%; max-width: 36rem; aspect-ratio: 600 / 180; background: var(--signature-paper); border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md); touch-action: none; cursor: crosshair; }
 .signature-pad.is-disabled { opacity: 0.6; cursor: not-allowed; }
+/* Form builder (MIG-280): palette | the form as it will look | the chosen field's properties; stacked on a tablet. */
+.builder-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1280px) { .builder-grid { grid-template-columns: 11rem minmax(0, 1fr) 22rem; } }
+.builder-palette { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+@media (min-width: 1280px) { .builder-palette { flex-direction: column; align-items: stretch; position: sticky; top: 1rem; } }
+.builder-palette-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.55rem; border-radius: var(--radius-md); font-size: 0.875rem;
+  background: transparent; text-align: left; }
+.builder-palette-item:hover:not(:disabled), .builder-palette-item:focus-visible { background: var(--surface-sunken); }
+.builder-canvas { background: var(--surface-sunken); border-radius: var(--radius-card); padding: 1.25rem; display: flex; justify-content: center; }
+.builder-sheet { width: 100%; max-width: 40rem; }
+.builder-field { position: relative; padding: 0.6rem 0.75rem; border-radius: var(--radius-md); border: 1px solid transparent; }
+.builder-field:hover { border-color: var(--border-subtle); }
+.builder-field.is-on { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text); }
+.builder-field.has-problem { border-color: var(--series-crit); }
+.builder-field-pick { position: absolute; inset: 0; z-index: 1; background: transparent; border-radius: var(--radius-md); }
+.builder-field-pick:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+.builder-field-tools { position: absolute; top: 0.35rem; right: 0.35rem; z-index: 2; display: flex; gap: 0.125rem; background: var(--surface-raised);
+  border-radius: var(--radius-md); }
+@media (min-width: 1280px) { .builder-props { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; } }

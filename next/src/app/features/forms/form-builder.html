@@ -23,193 +23,265 @@
   <app-managed-banner what="forms" still="You can still fill them in and read their submissions." />
 
   @if (draft(); as d) {
-    <div class="grid gap-4 xl:grid-cols-5 items-start">
-      <section class="card p-4 xl:col-span-3 flex flex-col gap-4 min-w-0" aria-labelledby="formEditorHeading">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <h2 id="formEditorHeading" class="text-base font-semibold">{{ d.formId ? 'Edit form' : 'New form' }}</h2>
-          @if (locked()) { <span class="pill pill-neutral">Read-only</span> }
+    <!-- MIG-280: the builder as modules.html draws it -- the form's header with its state and actions; Build (a palette
+         of field types, the form as it will look, the chosen field's properties), Logic, Settings; and Preview. -->
+    <section class="flex flex-col gap-4 min-w-0" aria-labelledby="formEditorHeading" data-form-editor>
+      <div class="flex flex-wrap items-start gap-3">
+        <div class="min-w-0 flex-1">
+          <h2 id="formEditorHeading" class="text-xl font-semibold truncate">{{ d.name || (d.formId ? 'Untitled form' : 'New form') }}</h2>
+          <p class="text-sm text-[color:var(--text-muted)]">
+            Form builder@if (d.formId) { · version {{ savedVersion() }} }@if (datasetName()) { · saves to dataset {{ datasetName() }} }@if (d.workflowKey) { · starts workflow "{{ workflowName(d.workflowKey) }}" }
+          </p>
         </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span class="pill" [class]="'pill-' + tone(d.status)" data-form-state>
+            <app-icon [name]="d.status === 'Active' ? 'globe' : d.status === 'Draft' ? 'edit' : 'history'" size="0.9em" />
+            {{ d.status === 'Active' ? 'Published' : d.status }}@if (d.formId) { v{{ savedVersion() }} }
+          </span>
+          @if (locked()) { <span class="pill pill-neutral">Read-only</span> }
+          <button type="button" class="btn btn-default btn-sm" (click)="togglePreview()" [class.btn-active]="previewing()" data-preview>
+            <app-icon [name]="previewing() ? 'edit' : 'eye'" />{{ previewing() ? 'Back to editing' : 'Preview' }}</button>
+          @if (d.formId && d.status === 'Active') {
+            <a class="btn btn-default btn-sm" [routerLink]="['/forms', d.formId, 'fill']"><app-icon name="send" />Fill in</a>
+          }
+          @if (!locked()) {
+            <button type="button" class="btn btn-default btn-sm" (click)="save()" [disabled]="saving()" data-save-form>
+              <app-icon name="save" />{{ saving() ? 'Saving…' : 'Save' }}</button>
+            @if (d.status !== 'Active') {
+              <button type="button" class="btn btn-primary btn-sm" (click)="publish()" [disabled]="saving()" data-publish-form>
+                <app-icon name="upload" />Publish</button>
+            }
+          }
+        </div>
+      </div>
+
+      @if (attempted() && problemCount()) {
+        <p class="text-sm text-crit-500" role="alert">{{ problems()['form'] || (problemCount() === 1 ? 'One field needs attention.' : problemCount() + ' fields need attention.') }}</p>
+      }
+      @if (saveError()) { <p class="text-sm text-crit-500" role="alert">{{ saveError() }}</p> }
+
+      @if (previewing()) {
+        <section class="card p-4 flex flex-col gap-4 max-w-3xl w-full mx-auto" aria-labelledby="formPreviewHeading">
+          <div class="flex items-center justify-between gap-2">
+            <h3 id="formPreviewHeading" class="text-base font-semibold">Preview</h3>
+            <span class="text-xs text-[color:var(--text-muted)]">As members see it; nothing is sent.</span>
+          </div>
+          <div>
+            <p class="text-lg font-semibold">{{ d.name || 'Untitled form' }}</p>
+            @if (d.description) { <p class="text-sm text-[color:var(--text-secondary)] whitespace-pre-line">{{ d.description }}</p> }
+          </div>
+          <app-form-renderer [fields]="d.fields" [answers]="previewAnswers()" idPrefix="preview" [lookupValues]="previewLookups()"
+                             (answerChange)="previewChange($event)" />
+        </section>
+      } @else {
+        <div class="seg self-start" role="tablist" aria-label="Builder">
+          <button type="button" class="seg-btn" role="tab" [class.seg-on]="tab() === 'build'" [attr.aria-selected]="tab() === 'build'" (click)="tab.set('build')" data-tab="build">Build</button>
+          <button type="button" class="seg-btn" role="tab" [class.seg-on]="tab() === 'logic'" [attr.aria-selected]="tab() === 'logic'" (click)="tab.set('logic')" data-tab="logic">
+            Logic@if (ruleCount()) { ({{ ruleCount() }}) }</button>
+          <button type="button" class="seg-btn" role="tab" [class.seg-on]="tab() === 'settings'" [attr.aria-selected]="tab() === 'settings'" (click)="tab.set('settings')" data-tab="settings">Settings</button>
+          @if (d.formId && canSeeSubmissions()) {
+            <a class="seg-btn" routerLink="/forms/submissions" [queryParams]="{ formId: d.formId }">Submissions@if (submissionCount() !== null) { ({{ submissionCount() }}) }</a>
+          }
+        </div>
+
         <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
         <fieldset class="form-lock" [disabled]="locked()">
-          <div class="flex flex-col gap-4">
-            <div class="grid gap-3 sm:grid-cols-2">
-              <div class="field sm:col-span-2">
-                <label class="label" for="formName">Name <span class="text-crit-500" aria-hidden="true">*</span></label>
-                <input id="formName" class="input" maxlength="120" [value]="d.name" placeholder="Wound intake"
-                       (input)="patch({ name: $any($event.target).value })" />
-              </div>
-              <div class="field sm:col-span-2">
-                <label class="label" for="formDescription">Description</label>
-                <textarea id="formDescription" class="input" rows="2" maxlength="2000" [value]="d.description"
-                          placeholder="What the form is for; shown above its fields."
-                          (input)="patch({ description: $any($event.target).value })"></textarea>
-              </div>
-              <div class="field">
-                <label class="label" for="formStatus">Status</label>
-                <select id="formStatus" class="input" (change)="patch({ status: $any($event.target).value })">
-                  @for (s of statuses; track s) { <option [value]="s" [selected]="d.status === s">{{ s }}</option> }
-                </select>
-                <p class="field-note text-[color:var(--text-muted)]">Only an Active form takes submissions.</p>
-              </div>
-              <div class="field">
-                <label class="label" for="formJob">When submitted, start</label>
-                <select id="formJob" class="input" (change)="setJob($any($event.target).value)">
-                  <option value="" [selected]="!d.jobId">Nothing: keep the submission</option>
-                  @for (j of jobs(); track j.jobId) {
-                    <option [value]="j.jobId" [selected]="d.jobId === j.jobId">{{ j.jobName }}{{ j.jobStatus !== 'Active' ? ' (' + j.jobStatus + ')' : '' }}</option>
+          @switch (tab()) {
+            @case ('build') {
+              <div class="builder-grid">
+                <!-- The palette: a click adds a field of that type below the chosen one. -->
+                <div class="card p-4 builder-palette" aria-label="Field types">
+                  <span class="label">Fields</span>
+                  @for (t of fieldTypes; track t.value) {
+                    <button type="button" class="builder-palette-item" (click)="addFieldOfType(t.value)" [disabled]="d.fields.length >= maxFields"
+                            [attr.data-add-type]="t.value">
+                      <app-icon [name]="typeIcon(t.value)" class="icon-muted" />{{ t.label }}</button>
                   }
-                </select>
-                <p class="field-note text-[color:var(--text-muted)]">
-                  The submission is written to the workspace inbox as JSON and the schedule runs with it: a pipeline whose
-                  Read CSV/JSON/Parquet step names no file reads it as one row.
-                </p>
-              </div>
-              <div class="field">
-                <label class="label" for="formWorkflow">Approval</label>
-                <select id="formWorkflow" class="input" (change)="patch({ workflowKey: $any($event.target).value || null })">
-                  <option value="" [selected]="!d.workflowKey">None: no approval</option>
-                  @for (w of workflows(); track w.key) {
-                    <option [value]="w.key" [selected]="d.workflowKey === w.key">{{ w.name }}</option>
-                  }
-                  @if (d.workflowKey && !hasWorkflow(d.workflowKey)) {
-                    <option [value]="d.workflowKey" selected>{{ d.workflowKey }} (not active)</option>
-                  }
-                </select>
-                <p class="field-note text-[color:var(--text-muted)]">
-                  Each submission starts this workflow; its status (Pending, Approved, Rejected, Overdue) shows on Submissions.
-                  <a class="link-inline" routerLink="/workflows/designer">Workflow designer</a>
-                </p>
-              </div>
-            </div>
+                  <span class="text-xs text-[color:var(--text-muted)] mt-1">{{ d.fields.length }} of {{ maxFields }} fields</span>
+                </div>
 
-            <div class="flex items-center justify-between gap-2 border-t border-subtle pt-3">
-              <h3 class="text-sm font-semibold">Fields <span class="text-[color:var(--text-muted)] font-normal">({{ d.fields.length }} of {{ maxFields }})</span></h3>
-            </div>
-            <ol class="flex flex-col gap-3" aria-label="Fields">
-              @for (f of d.fields; track $index; let i = $index; let first = $first; let last = $last) {
-                <li class="rounded-md border border-subtle p-3 flex flex-col gap-3" [attr.data-field-row]="i">
-                  <div class="flex items-center gap-2">
-                    <span class="text-xs text-[color:var(--text-muted)] tabular w-6">{{ i + 1 }}.</span>
-                    <span class="text-sm font-medium flex-1 min-w-0 truncate">{{ f.label || 'Untitled field' }}</span>
-                    <span class="pill pill-neutral">{{ typeLabel(f.type) }}</span>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="first" [attr.aria-label]="'Move ' + (f.label || 'field') + ' up'"
-                            (click)="moveField(i, -1)"><app-icon name="arrowUp" /></button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="last" [attr.aria-label]="'Move ' + (f.label || 'field') + ' down'"
-                            (click)="moveField(i, 1)"><app-icon name="arrowDown" /></button>
-                    <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + (f.label || 'field')"
-                            (click)="removeField(i)"><app-icon name="trash" class="icon-crit" /></button>
+                <!-- The canvas: the form as members will see it; pick a field to change it. -->
+                <div class="builder-canvas">
+                  <div class="card p-4 flex flex-col gap-2 builder-sheet">
+                    <div class="mb-2">
+                      <p class="text-base font-semibold">{{ d.name || 'Untitled form' }}</p>
+                      @if (d.description) { <p class="text-sm text-[color:var(--text-muted)] whitespace-pre-line">{{ d.description }}</p> }
+                    </div>
+                    <ol class="flex flex-col gap-2" aria-label="Fields">
+                      @for (f of d.fields; track $index; let i = $index; let first = $first; let last = $last) {
+                        <li class="builder-field" [class.is-on]="selected() === i" [class.has-problem]="attempted() && problems()[i + '']" [attr.data-field-row]="i">
+                          <button type="button" class="builder-field-pick" (click)="select(i)" [attr.aria-label]="'Edit ' + (f.label || 'field ' + (i + 1))"></button>
+                          <app-form-renderer [fields]="[f]" [answers]="{}" [disabled]="true" [idPrefix]="'canvas-' + i" [lookupValues]="previewLookups()" />
+                          @if (f.showWhen || f.requiredWhen) {
+                            <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1 mt-1">
+                              <app-icon name="selector" size="0.9em" />
+                              @if (f.showWhen) { Shown when {{ ruleText(f.showWhen, d.fields) }}. }
+                              @if (f.requiredWhen) { Required when {{ ruleText(f.requiredWhen, d.fields) }}. }
+                            </p>
+                          }
+                          @if (attempted() && problems()[i + '']) { <p class="text-xs text-crit-500 mt-1" role="alert">{{ problems()[i + ''] }}</p> }
+                          @if (selected() === i && !locked()) {
+                            <span class="builder-field-tools">
+                              <button type="button" class="btn btn-ghost btn-icon btn-xs" [disabled]="first" [attr.aria-label]="'Move ' + (f.label || 'field') + ' up'"
+                                      (click)="moveField(i, -1)"><app-icon name="arrowUp" /></button>
+                              <button type="button" class="btn btn-ghost btn-icon btn-xs" [disabled]="last" [attr.aria-label]="'Move ' + (f.label || 'field') + ' down'"
+                                      (click)="moveField(i, 1)"><app-icon name="arrowDown" /></button>
+                              <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Remove ' + (f.label || 'field')"
+                                      (click)="removeField(i)"><app-icon name="trash" class="icon-crit" /></button>
+                            </span>
+                          }
+                        </li>
+                      } @empty {
+                        <li class="text-sm text-[color:var(--text-muted)] py-6 text-center">No fields yet. Pick a type on the left to add the first one.</li>
+                      }
+                    </ol>
                   </div>
-                  <div class="grid gap-3 sm:grid-cols-2">
-                    <div class="field">
-                      <label class="label" [for]="'fieldLabel' + i">Label</label>
-                      <input class="input" [id]="'fieldLabel' + i" maxlength="120" [value]="f.label"
-                             (input)="setField(i, { label: $any($event.target).value })" />
-                    </div>
-                    <div class="field">
-                      <label class="label" [for]="'fieldKey' + i">Key</label>
-                      <input class="input mono text-xs" [id]="'fieldKey' + i" maxlength="40" [value]="f.key"
-                             (input)="setField(i, { key: $any($event.target).value })" />
-                      <p class="field-note text-[color:var(--text-muted)]">The answer's name in the submission file.</p>
-                    </div>
-                    <div class="field">
-                      <label class="label" [for]="'fieldType' + i">Type</label>
-                      <select class="input" [id]="'fieldType' + i" (change)="setField(i, { type: $any($event.target).value })">
-                        @for (t of fieldTypes; track t.value) { <option [value]="t.value" [selected]="f.type === t.value">{{ t.label }}</option> }
-                      </select>
-                    </div>
-                    <div class="field justify-end">
-                      <label class="flex items-center gap-2 text-sm mt-6">
-                        <input type="checkbox" class="checkbox" [checked]="f.required" (change)="setField(i, { required: $any($event.target).checked })" />
-                        Required
-                      </label>
-                    </div>
-                    <div class="field sm:col-span-2">
-                      <label class="label" [for]="'fieldHelp' + i">Help text</label>
-                      <input class="input" [id]="'fieldHelp' + i" maxlength="500" [value]="f.help || ''"
-                             (input)="setField(i, { help: $any($event.target).value })" />
-                    </div>
-                    @if (f.type === 'choice') {
-                      <div class="field sm:col-span-2">
-                        <label class="label" [for]="'fieldOptions' + i">Options, one per line</label>
-                        <textarea class="input" rows="3" [id]="'fieldOptions' + i" [value]="optionsText(f)"
-                                  (change)="setOptions(i, $any($event.target).value)"></textarea>
+                </div>
+
+                <!-- The chosen field's properties. -->
+                <div class="card builder-props" aria-label="Field properties" data-field-props>
+                  @if (selectedField(); as f) {
+                    @let i = selected()!;
+                    <div class="px-4 py-3 border-b border-subtle flex items-center gap-2">
+                      <app-icon [name]="typeIcon(f.type)" class="icon-muted" />
+                      <div class="min-w-0 flex-1">
+                        <p class="text-sm font-semibold truncate">Field · {{ f.label || 'Untitled' }}</p>
+                        <p class="text-xs text-[color:var(--text-muted)]">{{ typeLabel(f.type) }} field</p>
                       </div>
-                    }
-                    @if (f.type === 'table') {
-                      <div class="field sm:col-span-2" [attr.data-columns]="i">
-                        <span class="label">Columns</span>
-                        <div class="flex flex-col gap-2">
-                          @for (c of f.columns ?? []; track $index; let ci = $index) {
-                            <div class="grid gap-2 sm:grid-cols-[1fr_9rem_8rem_auto_auto] items-center">
-                              <input class="input input-sm" [value]="c.label" placeholder="Column label" [attr.aria-label]="'Column ' + (ci + 1) + ' label'"
-                                     (input)="setColumn(i, ci, { label: $any($event.target).value })" />
-                              <input class="input input-sm mono text-xs" [value]="c.key" [attr.aria-label]="'Column ' + (ci + 1) + ' key'"
-                                     (input)="setColumn(i, ci, { key: $any($event.target).value })" />
-                              <select class="input input-sm" [attr.aria-label]="'Column ' + (ci + 1) + ' type'"
-                                      (change)="setColumn(i, ci, { type: $any($event.target).value })">
-                                @for (t of columnTypes; track t.value) { <option [value]="t.value" [selected]="c.type === t.value">{{ t.label }}</option> }
-                              </select>
-                              <label class="flex items-center gap-1.5 text-xs"><input type="checkbox" class="checkbox" [checked]="c.required"
-                                     (change)="setColumn(i, ci, { required: $any($event.target).checked })" />Required</label>
-                              <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="(f.columns ?? []).length <= 1"
-                                      [attr.aria-label]="'Remove column ' + (ci + 1)" (click)="removeColumn(i, ci)"><app-icon name="trash" /></button>
-                              @if (c.type === 'choice') {
-                                <textarea class="input input-sm sm:col-span-5" rows="2" placeholder="Options, one per line" [value]="(c.options ?? []).join('\n')"
-                                          [attr.aria-label]="'Column ' + (ci + 1) + ' options'"
-                                          (change)="setColumn(i, ci, { options: optionsFromText($any($event.target).value) })"></textarea>
-                              }
-                            </div>
-                          }
-                          <div class="flex items-center gap-3 flex-wrap">
-                            <button type="button" class="btn btn-default btn-sm" [disabled]="(f.columns ?? []).length >= 20" (click)="addColumn(i)">
-                              <app-icon name="plus" />Add column</button>
-                            <label class="flex items-center gap-2 text-sm">At most
-                              <input class="input input-sm w-20" type="number" min="1" max="200" [value]="f.maxRows ?? 20"
-                                     (input)="setField(i, { maxRows: numberOr($any($event.target).value, 20) })" />rows</label>
-                          </div>
+                    </div>
+                    <div class="p-4 flex flex-col gap-3">
+                      <div class="flex flex-col gap-3">
+                        <div class="field">
+                          <label class="label" [for]="'fieldLabel' + i">Label</label>
+                          <input class="input" [id]="'fieldLabel' + i" maxlength="120" [value]="f.label"
+                                 (input)="setField(i, { label: $any($event.target).value })" />
                         </div>
+                        <div class="field">
+                          <label class="label" [for]="'fieldKey' + i">Key</label>
+                          <input class="input mono text-xs" [id]="'fieldKey' + i" maxlength="40" [value]="f.key"
+                                 (input)="setField(i, { key: $any($event.target).value })" />
+                          <p class="field-note text-[color:var(--text-muted)]">The answer's name in the submission file.</p>
+                        </div>
+                        <div class="field">
+                          <label class="label" [for]="'fieldType' + i">Type</label>
+                          <select class="input" [id]="'fieldType' + i" (change)="setField(i, { type: $any($event.target).value })">
+                            @for (t of fieldTypes; track t.value) { <option [value]="t.value" [selected]="f.type === t.value">{{ t.label }}</option> }
+                          </select>
+                        </div>
+                        <div class="field">
+                          <label class="flex items-center gap-2 text-sm">
+                            <input type="checkbox" class="checkbox" [checked]="f.required" (change)="setField(i, { required: $any($event.target).checked })" />
+                            Required
+                          </label>
+                        </div>
+                        <div class="field">
+                          <label class="label" [for]="'fieldHelp' + i">Help text</label>
+                          <input class="input" [id]="'fieldHelp' + i" maxlength="500" [value]="f.help || ''"
+                                 (input)="setField(i, { help: $any($event.target).value })" />
+                        </div>
+                        @if (f.type === 'choice') {
+                          <div class="field">
+                            <label class="label" [for]="'fieldOptions' + i">Options, one per line</label>
+                            <textarea class="input" rows="3" [id]="'fieldOptions' + i" [value]="optionsText(f)"
+                                      (change)="setOptions(i, $any($event.target).value)"></textarea>
+                          </div>
+                        }
+                        @if (f.type === 'table') {
+                          <div class="field" [attr.data-columns]="i">
+                            <span class="label">Columns</span>
+                            <div class="flex flex-col gap-2">
+                              @for (c of f.columns ?? []; track $index; let ci = $index) {
+                                <div class="grid gap-2 grid-cols-2 items-center rounded-md border border-subtle p-2">
+                                  <input class="input input-sm" [value]="c.label" placeholder="Column label" [attr.aria-label]="'Column ' + (ci + 1) + ' label'"
+                                         (input)="setColumn(i, ci, { label: $any($event.target).value })" />
+                                  <input class="input input-sm mono text-xs" [value]="c.key" [attr.aria-label]="'Column ' + (ci + 1) + ' key'"
+                                         (input)="setColumn(i, ci, { key: $any($event.target).value })" />
+                                  <select class="input input-sm" [attr.aria-label]="'Column ' + (ci + 1) + ' type'"
+                                          (change)="setColumn(i, ci, { type: $any($event.target).value })">
+                                    @for (t of columnTypes; track t.value) { <option [value]="t.value" [selected]="c.type === t.value">{{ t.label }}</option> }
+                                  </select>
+                                  <label class="flex items-center gap-1.5 text-xs"><input type="checkbox" class="checkbox" [checked]="c.required"
+                                         (change)="setColumn(i, ci, { required: $any($event.target).checked })" />Required</label>
+                                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="(f.columns ?? []).length <= 1"
+                                          [attr.aria-label]="'Remove column ' + (ci + 1)" (click)="removeColumn(i, ci)"><app-icon name="trash" /></button>
+                                  @if (c.type === 'choice') {
+                                    <textarea class="input input-sm col-span-2" rows="2" placeholder="Options, one per line" [value]="(c.options ?? []).join('\n')"
+                                              [attr.aria-label]="'Column ' + (ci + 1) + ' options'"
+                                              (change)="setColumn(i, ci, { options: optionsFromText($any($event.target).value) })"></textarea>
+                                  }
+                                </div>
+                              }
+                              <div class="flex items-center gap-3 flex-wrap">
+                                <button type="button" class="btn btn-default btn-sm" [disabled]="(f.columns ?? []).length >= 20" (click)="addColumn(i)">
+                                  <app-icon name="plus" />Add column</button>
+                                <label class="flex items-center gap-2 text-sm">At most
+                                  <input class="input input-sm w-20" type="number" min="1" max="200" [value]="f.maxRows ?? 20"
+                                         (input)="setField(i, { maxRows: numberOr($any($event.target).value, 20) })" />rows</label>
+                              </div>
+                            </div>
+                          </div>
+                        }
+                        @if (f.type === 'file') {
+                          <div class="field">
+                            <label class="label" [for]="'fieldAccept' + i">Accepted file types</label>
+                            <input class="input mono text-xs" [id]="'fieldAccept' + i" [value]="(f.accept ?? []).join(', ')"
+                                   (change)="setAccept(i, $any($event.target).value)" />
+                            <p class="field-note text-[color:var(--text-muted)]">Extensions, comma-separated, from {{ allowedExtensions.join(', ') }}.</p>
+                          </div>
+                          <div class="field">
+                            <label class="label" [for]="'fieldSize' + i">Largest file (MB)</label>
+                            <input class="input" type="number" min="1" max="25" [id]="'fieldSize' + i" [value]="f.maxSizeMb ?? 10"
+                                   (input)="setField(i, { maxSizeMb: numberOr($any($event.target).value, 10) })" />
+                          </div>
+                          <div class="field">
+                            <label class="label" [for]="'fieldFiles' + i">How many files</label>
+                            <input class="input" type="number" min="1" max="10" [id]="'fieldFiles' + i" [value]="f.maxFiles ?? 1"
+                                   (input)="setField(i, { maxFiles: numberOr($any($event.target).value, 1) })" />
+                          </div>
+                        }
+                        @if (f.type === 'lookup') {
+                          <div class="field">
+                            <label class="label" [for]="'lookupForm' + i">Offers the answers of</label>
+                            <select class="input" [id]="'lookupForm' + i" (change)="setLookupForm(i, $any($event.target).value)">
+                              <option value="" [selected]="!f.lookup?.formId">Pick a form…</option>
+                              @for (o of otherForms(); track o.formId) {
+                                <option [value]="o.formId" [selected]="f.lookup?.formId === o.formId">{{ o.name }}</option>
+                              }
+                            </select>
+                          </div>
+                          <div class="field">
+                            <label class="label" [for]="'lookupField' + i">Field</label>
+                            <select class="input" [id]="'lookupField' + i" [disabled]="!f.lookup?.formId"
+                                    (change)="setField(i, { lookup: { formId: f.lookup?.formId ?? null, field: $any($event.target).value } })">
+                              <option value="" [selected]="!f.lookup?.field">Pick a field…</option>
+                              @for (o of sourceFields(f.lookup?.formId); track o.key) {
+                                <option [value]="o.key" [selected]="f.lookup?.field === o.key">{{ o.label }}</option>
+                              }
+                            </select>
+                          </div>
+                        }
                       </div>
-                    }
-                    @if (f.type === 'file') {
-                      <div class="field sm:col-span-2">
-                        <label class="label" [for]="'fieldAccept' + i">Accepted file types</label>
-                        <input class="input mono text-xs" [id]="'fieldAccept' + i" [value]="(f.accept ?? []).join(', ')"
-                               (change)="setAccept(i, $any($event.target).value)" />
-                        <p class="field-note text-[color:var(--text-muted)]">Extensions, comma-separated, from {{ allowedExtensions.join(', ') }}.</p>
-                      </div>
-                      <div class="field">
-                        <label class="label" [for]="'fieldSize' + i">Largest file (MB)</label>
-                        <input class="input" type="number" min="1" max="25" [id]="'fieldSize' + i" [value]="f.maxSizeMb ?? 10"
-                               (input)="setField(i, { maxSizeMb: numberOr($any($event.target).value, 10) })" />
-                      </div>
-                      <div class="field">
-                        <label class="label" [for]="'fieldFiles' + i">How many files</label>
-                        <input class="input" type="number" min="1" max="10" [id]="'fieldFiles' + i" [value]="f.maxFiles ?? 1"
-                               (input)="setField(i, { maxFiles: numberOr($any($event.target).value, 1) })" />
-                      </div>
-                    }
-                    @if (f.type === 'lookup') {
-                      <div class="field">
-                        <label class="label" [for]="'lookupForm' + i">Offers the answers of</label>
-                        <select class="input" [id]="'lookupForm' + i" (change)="setLookupForm(i, $any($event.target).value)">
-                          <option value="" [selected]="!f.lookup?.formId">Pick a form…</option>
-                          @for (o of otherForms(); track o.formId) {
-                            <option [value]="o.formId" [selected]="f.lookup?.formId === o.formId">{{ o.name }}</option>
-                          }
-                        </select>
-                      </div>
-                      <div class="field">
-                        <label class="label" [for]="'lookupField' + i">Field</label>
-                        <select class="input" [id]="'lookupField' + i" [disabled]="!f.lookup?.formId"
-                                (change)="setField(i, { lookup: { formId: f.lookup?.formId ?? null, field: $any($event.target).value } })">
-                          <option value="" [selected]="!f.lookup?.field">Pick a field…</option>
-                          @for (o of sourceFields(f.lookup?.formId); track o.key) {
-                            <option [value]="o.key" [selected]="f.lookup?.field === o.key">{{ o.label }}</option>
-                          }
-                        </select>
-                      </div>
-                    }
-                    @if (i > 0) {
+                      @if (i > 0) {
+                        <button type="button" class="text-xs text-accent hover:underline self-start" (click)="tab.set('logic')">
+                          <app-icon name="selector" size="0.9em" />@if (f.showWhen || f.requiredWhen) { Logic: {{ f.showWhen ? 'shown when ' + ruleText(f.showWhen, d.fields) : 'required when ' + ruleText(f.requiredWhen, d.fields) }} } @else { Add logic (show or require it when…) }</button>
+                      }
+                    </div>
+                  } @else {
+                    <p class="p-6 text-center text-sm text-[color:var(--text-muted)]">Pick a field on the form to change it, or add one from the palette.</p>
+                  }
+                </div>
+              </div>
+            }
+            @case ('logic') {
+              <div class="card p-4 flex flex-col gap-4 max-w-4xl" data-logic>
+                <p class="text-sm text-[color:var(--text-secondary)]">
+                  Show a field, or make it required, only when an earlier answer says so. A field that is not shown is not asked,
+                  and its answer is not kept.
+                </p>
+                @for (f of d.fields; track $index; let i = $index) {
+                  @if (i > 0) {
+                    <div class="border-t border-subtle pt-3 flex flex-col gap-2" [attr.data-logic-field]="f.key">
+                      <p class="text-sm font-medium">{{ i + 1 }}. {{ f.label || 'Untitled field' }} <span class="text-xs text-[color:var(--text-muted)]">· {{ typeLabel(f.type) }}</span></p>
                       @for (which of ruleKinds; track which.key) {
                         <div class="field sm:col-span-2" [attr.data-rule]="which.key">
                           <span class="label">{{ which.label }}</span>
@@ -246,56 +318,78 @@
                           </div>
                         </div>
                       }
-                    }
-                  </div>
-                  @if (attempted() && problems()[i + '']) {
-                    <p class="text-sm text-crit-500" role="alert">{{ problems()[i + ''] }}</p>
+
+                    </div>
                   }
-                </li>
-              } @empty {
-                <li class="text-sm text-[color:var(--text-muted)]">No fields yet. Add the first one below.</li>
-              }
-            </ol>
-            <div class="flex flex-wrap items-center gap-2">
-              <label class="sr-only" for="newFieldType">Type of the new field</label>
-              <select id="newFieldType" class="input w-auto" (change)="newType.set($any($event.target).value)">
-                @for (t of fieldTypes; track t.value) { <option [value]="t.value" [selected]="newType() === t.value">{{ t.label }}</option> }
-              </select>
-              <button type="button" class="btn btn-default btn-sm" (click)="addField()" [disabled]="d.fields.length >= maxFields">
-                <app-icon name="plus" />Add field
-              </button>
-            </div>
-          </div>
+                } @empty {
+                  <p class="text-sm text-[color:var(--text-muted)]">Add fields first.</p>
+                }
+                @if (d.fields.length === 1) { <p class="text-sm text-[color:var(--text-muted)]">Rules need a field above the one they apply to: add a second field.</p> }
+              </div>
+            }
+            @case ('settings') {
+              <div class="card p-4 flex flex-col gap-4 max-w-4xl" data-settings>
+                <div class="grid gap-3 sm:grid-cols-2">
+                  <div class="field sm:col-span-2">
+                    <label class="label" for="formName">Name <span class="text-crit-500" aria-hidden="true">*</span></label>
+                    <input id="formName" class="input" maxlength="120" [value]="d.name" placeholder="Wound intake"
+                           (input)="patch({ name: $any($event.target).value })" />
+                  </div>
+                  <div class="field sm:col-span-2">
+                    <label class="label" for="formDescription">Description</label>
+                    <textarea id="formDescription" class="input" rows="2" maxlength="2000" [value]="d.description"
+                              placeholder="What the form is for; shown above its fields."
+                              (input)="patch({ description: $any($event.target).value })"></textarea>
+                  </div>
+                  <div class="field">
+                    <label class="label" for="formStatus">Status</label>
+                    <select id="formStatus" class="input" (change)="patch({ status: $any($event.target).value })">
+                      @for (s of statuses; track s) { <option [value]="s" [selected]="d.status === s">{{ s }}</option> }
+                    </select>
+                    <p class="field-note text-[color:var(--text-muted)]">Only an Active form takes submissions.</p>
+                  </div>
+                  <div class="field">
+                    <label class="label" for="formJob">When submitted, start</label>
+                    <select id="formJob" class="input" (change)="setJob($any($event.target).value)">
+                      <option value="" [selected]="!d.jobId">Nothing: keep the submission</option>
+                      @for (j of jobs(); track j.jobId) {
+                        <option [value]="j.jobId" [selected]="d.jobId === j.jobId">{{ j.jobName }}{{ j.jobStatus !== 'Active' ? ' (' + j.jobStatus + ')' : '' }}</option>
+                      }
+                    </select>
+                    <p class="field-note text-[color:var(--text-muted)]">
+                      The submission is written to the workspace inbox as JSON and the schedule runs with it: a pipeline whose
+                      Read CSV/JSON/Parquet step names no file reads it as one row.
+                    </p>
+                  </div>
+                  <div class="field">
+                    <label class="label" for="formWorkflow">Approval</label>
+                    <select id="formWorkflow" class="input" (change)="patch({ workflowKey: $any($event.target).value || null })">
+                      <option value="" [selected]="!d.workflowKey">None: no approval</option>
+                      @for (w of workflows(); track w.key) {
+                        <option [value]="w.key" [selected]="d.workflowKey === w.key">{{ w.name }}</option>
+                      }
+                      @if (d.workflowKey && !hasWorkflow(d.workflowKey)) {
+                        <option [value]="d.workflowKey" selected>{{ d.workflowKey }} (not active)</option>
+                      }
+                    </select>
+                    <p class="field-note text-[color:var(--text-muted)]">
+                      Each submission starts this workflow; its status (Pending, Approved, Rejected, Overdue) shows on Submissions.
+                      <a class="link-inline" routerLink="/workflows/designer">Workflow designer</a>
+                    </p>
+                  </div>
+                </div>
+                @if (dataset(); as ds) {
+                  <div class="border-t border-subtle pt-3 text-sm">
+                    <span class="label">Dataset</span>
+                    <p>Every submission is a row of <b>{{ ds.name }}</b> in Analytics (<span class="mono text-xs">{{ ds.connection }} / {{ ds.path }}</span>).</p>
+                  </div>
+                }
+              </div>
+            }
+          }
         </fieldset>
-
-        @if (attempted() && problems()['form']) { <p class="text-sm text-crit-500" role="alert">{{ problems()['form'] }}</p> }
-        @if (saveError()) { <p class="text-sm text-crit-500" role="alert">{{ saveError() }}</p> }
-        <div class="flex flex-wrap items-center gap-2 border-t border-subtle pt-3">
-          @if (!locked()) {
-            <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving()" data-save-form>
-              <app-icon name="save" />{{ saving() ? 'Saving…' : 'Save form' }}
-            </button>
-          }
-          @if (d.formId && d.status === 'Active') {
-            <a class="btn btn-default btn-sm" [routerLink]="['/forms', d.formId, 'fill']"><app-icon name="edit" />Fill in</a>
-          }
-          <button type="button" class="btn btn-ghost btn-sm" (click)="close()">Close</button>
-        </div>
-      </section>
-
-      <section class="card p-4 xl:col-span-2 flex flex-col gap-3 min-w-0" aria-labelledby="formPreviewHeading">
-        <div class="flex items-center justify-between gap-2">
-          <h2 id="formPreviewHeading" class="text-base font-semibold">Preview</h2>
-          <span class="text-xs text-[color:var(--text-muted)]">As members see it; nothing is sent.</span>
-        </div>
-        <div>
-          <p class="text-lg font-semibold">{{ d.name || 'Untitled form' }}</p>
-          @if (d.description) { <p class="text-sm text-[color:var(--text-secondary)] whitespace-pre-line">{{ d.description }}</p> }
-        </div>
-        <app-form-renderer [fields]="d.fields" [answers]="previewAnswers()" idPrefix="preview" [lookupValues]="previewLookups()"
-                           (answerChange)="previewChange($event)" />
-      </section>
-    </div>
+      }
+    </section>
   } @else {
     <app-table-shell heading="Forms" columnsKey="forms" [loading]="loading() || editorLoading()" [error]="error()"
                      [isEmpty]="!forms().length" [shown]="forms().length" [scrollRows]="false"

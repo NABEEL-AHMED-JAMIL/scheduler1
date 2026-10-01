@@ -86,6 +86,44 @@ describe('Form builder -- the list', () => {
 });
 
 describe('Form builder -- the editor', () => {
+  it('lays the form out as palette, canvas and the chosen field\'s properties, with Logic and Settings tabs (MIG-280)', () => {
+    const { screen, fixture, el } = screenWith();
+    screen.edit(FORMS[0]);
+    fixture.detectChanges();
+    expect(el.querySelectorAll('[data-add-type]').length).toBe(11);
+    expect(Array.from(el.querySelectorAll('[data-field-row]')).length).toBe(2);
+    expect(el.querySelector('[data-field-row="0"]')!.classList).toContain('is-on');
+    expect(el.querySelector('[data-field-props]')!.textContent).toContain('Field · Patient ID');
+
+    (el.querySelector('[data-field-row="1"] .builder-field-pick') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-field-props]')!.textContent).toContain('Field · Wound location');
+
+    (el.querySelector('[data-add-type="date"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.draft()!.fields.map(f => f.type)).toEqual(['text', 'choice', 'date']);
+    expect(screen.selected()).toBe(2);
+
+    screen.tab.set('logic');
+    fixture.detectChanges();
+    expect(el.querySelectorAll('[data-logic-field]').length).toBe(2);
+    screen.tab.set('settings');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-settings] #formName')).not.toBeNull();
+  });
+
+  it('publishes a draft as Active, and leaves it a draft when a field is wrong', () => {
+    const { api, screen } = screenWith();
+    screen.newForm();
+    screen.publish();
+    expect(api.save).not.toHaveBeenCalled();
+    expect(screen.draft()!.status).toBe('Draft');
+    screen.patch({ name: 'Visit' });
+    screen.publish();
+    const sent = (api.save.mock.calls[0] as unknown[])[0] as { status: string };
+    expect(sent.status).toBe('Active');
+  });
+
   it('builds a new form: keys follow labels, fields move and go, and it saves what the server takes', () => {
     const { api, screen } = screenWith();
     screen.newForm();
@@ -155,6 +193,7 @@ describe('Form builder -- the editor', () => {
   it('previews the fields as the fill-in page draws them', () => {
     const { screen, fixture, el } = screenWith();
     screen.edit(FORMS[0]);
+    screen.togglePreview();
     fixture.detectChanges();
     const preview = el.querySelector('[aria-labelledby="formPreviewHeading"]')!;
     expect(Array.from(preview.querySelectorAll('[data-field]')).map(e => e.getAttribute('data-field'))).toEqual(['patient_id', 'wound_location']);
