@@ -40,12 +40,12 @@
             <div class="font-medium truncate">{{ c.spec.label }}</div>
             <div class="text-xs text-[color:var(--text-muted)] truncate" [title]="c.spec.summary">{{ c.spec.summary }}</div>
           </div>
-          @if (c.connections > 0) {
-            <span class="pill pill-ok" [title]="c.connections + ' connection' + (c.connections === 1 ? '' : 's')"><app-icon name="check" size="0.85em" />Connected</span>
-          } @else if (!c.spec.available) {
+          @if (!c.spec.available) {
             <span class="pill pill-neutral" [title]="blocked(c)">Not yet</span>
           } @else if (!c.oauthRegistered) {
             <span class="pill pill-neutral" [title]="blocked(c)" data-on-request>On request</span>
+          } @else if (c.connections > 0) {
+            <span class="pill pill-ok" [title]="c.connections + ' connection' + (c.connections === 1 ? '' : 's')"><app-icon name="check" size="0.85em" />Connected</span>
           } @else if (canBuild()) {
             <button type="button" class="btn btn-default btn-xs" (click)="connect(c)" [attr.aria-label]="'Connect ' + c.spec.label">Connect</button>
           }
