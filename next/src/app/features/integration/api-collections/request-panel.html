@@ -85,8 +85,10 @@
               </select>
             </app-field>
             @if (e.bodyType !== 'NONE') {
-              <app-field label="Body template" for="apiBody" [hint]="variableHint">
-                <textarea id="apiBody" class="input mono text-xs" rows="10" [value]="e.bodyTemplate" (input)="patch({ bodyTemplate: $any($event.target).value })"></textarea>
+              @let fileBody = fileBodies[e.bodyType];
+              <app-field label="Body template" for="apiBody" [hint]="fileBody ? fileBody.hint : variableHint">
+                <textarea id="apiBody" class="input mono text-xs" rows="10" [value]="e.bodyTemplate" [placeholder]="fileBody ? fileBody.example : ''"
+                          (input)="patch({ bodyTemplate: $any($event.target).value })"></textarea>
               </app-field>
             }
           }

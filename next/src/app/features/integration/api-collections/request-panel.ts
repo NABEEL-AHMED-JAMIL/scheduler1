@@ -62,6 +62,19 @@ export class RequestPanel {
   readonly urlPlaceholder = '{{baseUrl}}/v1/patients';
   readonly envHint = 'Where its {{variables}} come from.';
   readonly variableHint = 'Write {{name}} to take a value from the environment; a credential is always a {{variable}}.';
+  /** MIG-306: a multipart or binary body names its files in the workspace's storage -- a connection's alias and a key. */
+  readonly fileBodies: Record<string, { hint: string; example: string }> = {
+    MULTIPART: {
+      hint: 'Parts, each a text value or a file from one of this workspace\'s storage connections (bucket = the connection\'s alias). '
+        + 'Values, buckets and keys may use {{variables}}.',
+      example: '{"parts": [{"name": "note", "value": "{{note}}"}, {"name": "scan", "file": {"bucket": "claims", "key": "in/scan.pdf"}, '
+        + '"contentType": "application/pdf"}]}',
+    },
+    BINARY: {
+      hint: 'One file from this workspace\'s storage, sent as the whole body (bucket = the storage connection\'s alias).',
+      example: '{"file": {"bucket": "claims", "key": "in/{{claimId}}.bin"}, "contentType": "application/octet-stream"}',
+    },
+  };
 
   readonly edit = signal<RequestEdit | null>(null);
   private readonly savedAs = signal('');

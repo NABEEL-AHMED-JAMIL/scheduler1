@@ -161,6 +161,22 @@ describe('RequestPanel -- the panel', () => {
     expect((el.querySelector('#apiUrl') as HTMLInputElement).value).toBe('https://example.com/');
   });
 
+  it('shows a multipart or binary body\'s shape: its files are named in the workspace\'s storage (MIG-306)', () => {
+    const { fixture, el } = render(true);
+    const screen = fixture.componentInstance;
+    screen.tab.set('body');
+    screen.patch({ bodyType: 'MULTIPART' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('a file from one of this workspace\'s storage connections');
+    expect((el.querySelector('#apiBody') as HTMLTextAreaElement).placeholder).toContain('"file": {"bucket": "claims"');
+    screen.patch({ bodyType: 'BINARY' });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('One file from this workspace\'s storage, sent as the whole body');
+    screen.patch({ bodyType: 'JSON' });
+    fixture.detectChanges();
+    expect((el.querySelector('#apiBody') as HTMLTextAreaElement).placeholder).toBe('');
+  });
+
   it('is read-only for a tenant user: no Save, no Test, nothing editable', () => {
     const { el } = render(false);
     const names = buttonNames(el);
