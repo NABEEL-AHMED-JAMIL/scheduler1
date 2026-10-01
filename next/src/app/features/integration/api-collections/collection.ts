@@ -19,7 +19,6 @@ import {
   CollectionDetail, EnvironmentRow, RequestRow, UsageRow, authLabel, effectiveAuthMode, sourceLabel,
 } from './api-collections.model';
 import { ApiCollectionsApi, usersOf } from './api-collections.service';
-import { currentDefaultAuth } from './collection-save';
 import { CollectionDialog, CollectionDialogData } from './collection-dialog';
 import { EnvironmentDialog, EnvironmentDialogData } from './environment-dialog';
 import { InUseDialog, InUseData } from './in-use-dialog';
@@ -114,12 +113,13 @@ export class Collection implements OnChanges {
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS || !r.data) {
-          this.missing.set(isMissingRecord(r) || /\bnot found\.$/i.test(r.message));
+          this.missing.set(isMissingRecord(r));
           this.error.set(r.message);
           return;
         }
         this.detail.set(r.data);
-        this.readAuth(r.data);
+        // The APIs' Auth column and the editor need it; /get says it (MIG-310).
+        this.defaultAuth.set(r.data.collection.defaultAuth ?? null);
       },
       error: err => {
         this.loading.set(false);
@@ -130,14 +130,6 @@ export class Collection implements OnChanges {
     this.api.usage(id).subscribe({
       next: r => this.usage.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.usage.set([]),
-    });
-  }
-
-  /** The default auth is only in a version's snapshot; the APIs' Auth column and the editor need it. */
-  private readAuth(d: CollectionDetail): void {
-    currentDefaultAuth(this.api, d.collection).subscribe({
-      next: read => this.defaultAuth.set('error' in read ? null : read.auth),
-      error: () => this.defaultAuth.set(null),
     });
   }
 

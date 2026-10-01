@@ -36,6 +36,11 @@ export interface CollectionRow {
   updatedBy?: number | null;
   dateCreated?: string | null;
   dateUpdated?: string | null;
+  /**
+   * MIG-310: the default auth its APIs inherit, as saved -- secret fields only ever {{variable}} references. Absent when
+   * it has none. A save that leaves it out keeps it.
+   */
+  defaultAuth?: unknown;
 }
 
 export interface FolderRow { folderId: number; parentFolderId: number | null; name: string; sortOrder?: number | null; }

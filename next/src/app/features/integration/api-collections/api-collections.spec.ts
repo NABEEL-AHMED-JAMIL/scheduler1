@@ -27,8 +27,7 @@ const ROWS: CollectionRow[] = [
 function stubApi(overrides: Partial<Record<keyof ApiCollectionsApi, unknown>> = {}) {
   return {
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: ROWS, paging: { totalRecord: 2, pageSize: 50, currentPage: 1 } })),
-    version: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { collectionId: 1000, version: 3,
-      snapshot: { collection: { defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' } } } } } })),
+    version: vi.fn(),
     saveCollection: vi.fn(() => of({ status: 'SUCCESS', message: 'API collection saved.', data: { id: 1000, collectionId: 1000, version: 4 } })),
     deleteCollection: vi.fn(() => of({ status: 'SUCCESS', message: 'API collection deleted.', data: { id: 1000, collectionId: 1000 } })),
     ...overrides,
@@ -115,15 +114,14 @@ describe('API Collections list -- reading', () => {
 });
 
 describe('API Collections list -- writing', () => {
-  it('keeps the collection\'s default auth when it is switched off: read from its current version first', () => {
+  it('switches a collection off without touching its default auth: the save leaves it out and the service keeps it (MIG-310)', () => {
     const { api } = screenWith();
     const screen = TestBed.runInInjectionContext(() => new ApiCollections());
     screen.ngOnInit();
     screen.setStatus(ROWS[0]);
-    expect(api.version).toHaveBeenCalledWith(1000, 3);
+    expect(api.version).not.toHaveBeenCalled();
     expect(api.saveCollection).toHaveBeenCalledWith({
       collectionId: 1000, name: 'LIVE-CHECK 0928 httpbin', description: 'MIG-227 live check', sensitivity: 'INTERNAL', status: 'Inactive',
-      defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' } },
     });
   });
 
@@ -136,15 +134,6 @@ describe('API Collections list -- writing', () => {
     const { sensitivityLabel: _dropped, ...unlabelled } = ROWS[0];
     screen.setStatus({ ...unlabelled, sensitivity: 'internal' });
     expect(api.saveCollection).toHaveBeenLastCalledWith(expect.objectContaining({ sensitivity: null }));
-  });
-
-  it('does not save when the default auth could not be read, rather than wiping it', () => {
-    const { api, toast } = screenWith({ api: stubApi({ version: vi.fn(() => of({ status: 'ERROR', message: 'Version 3 of this collection does not exist.' })) }) });
-    const screen = TestBed.runInInjectionContext(() => new ApiCollections());
-    screen.ngOnInit();
-    screen.setStatus(ROWS[0]);
-    expect(api.saveCollection).not.toHaveBeenCalled();
-    expect(toast.error).toHaveBeenCalled();
   });
 
   it('lists who still uses a collection the service would not delete', async () => {

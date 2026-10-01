@@ -60,8 +60,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /apiCollection.json/get?collectionId=1000",
-      "GET /apiCollection.json/usage?collectionId=1000",
-      "GET /apiCollection.json/version?collectionId=1000&version=3"
+      "GET /apiCollection.json/usage?collectionId=1000"
     ],
     "headings": [
       "LIVE-CHECK 0928 httpbin",
@@ -112,8 +111,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /apiCollection.json/get?collectionId=1000",
-      "GET /apiCollection.json/usage?collectionId=1000",
-      "GET /apiCollection.json/version?collectionId=1000&version=3"
+      "GET /apiCollection.json/usage?collectionId=1000"
     ],
     "headings": [
       "LIVE-CHECK 0928 httpbin",

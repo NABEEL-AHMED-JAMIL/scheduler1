@@ -9,13 +9,12 @@ import { CollectionDialog, CollectionDialogData } from './collection-dialog';
 
 /**
  * MIG-247: a collection's details and its default auth -- the scheme its APIs inherit. A secret in the auth is
- * always a {{variable}}: its value lives, sealed, in an environment. On an edit the auth is read back from the
- * collection's current version, because the list does not carry it and a save without it would clear it.
+ * always a {{variable}}: its value lives, sealed, in an environment. On an edit the auth is the row's own: the list
+ * and /get carry it (MIG-310), so nothing is read first.
  */
 function dialogWith(data: CollectionDialogData, api: Partial<Record<string, unknown>> = {}) {
   const stub = {
-    version: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { collectionId: 7, version: 2,
-      snapshot: { collection: { defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' }, apikey: { key: 'X-Key', value: '{{k}}' } } } } } })),
+    version: vi.fn(),
     saveCollection: vi.fn(() => of({ status: 'SUCCESS', message: 'API collection saved.', data: { id: 7, collectionId: 7, version: 3 } })),
     ...api,
   };
@@ -34,7 +33,8 @@ function dialogWith(data: CollectionDialogData, api: Partial<Record<string, unkn
   return { dialog, stub, ref };
 }
 
-const ROW = { collectionId: 7, name: 'Clinic API', description: 'Patients', sensitivity: 'sensitive', sensitivityLabel: 'PHI', status: 'Active', currentVersion: 2 };
+const ROW = { collectionId: 7, name: 'Clinic API', description: 'Patients', sensitivity: 'sensitive', sensitivityLabel: 'PHI', status: 'Active', currentVersion: 2,
+  defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' }, apikey: { key: 'X-Key', value: '{{k}}' } } };
 
 describe('CollectionDialog -- a new collection', () => {
   it('creates with a name, and no auth unless one is chosen', () => {
@@ -81,9 +81,9 @@ describe('CollectionDialog -- a new collection', () => {
 });
 
 describe('CollectionDialog -- editing', () => {
-  it('reads the auth from the current version and keeps the other schemes\' blocks', () => {
+  it('reads the auth from the row, with no version read, and keeps the other schemes\' blocks', () => {
     const { dialog, stub } = dialogWith({ collection: ROW });
-    expect(stub.version).toHaveBeenCalledWith(7, 2);
+    expect(stub.version).not.toHaveBeenCalled();
     expect(dialog.authType()).toBe('BEARER');
     expect(dialog.authValue('token')).toBe('{{token}}');
     dialog.description.set('All patients');
@@ -92,11 +92,10 @@ describe('CollectionDialog -- editing', () => {
       status: 'Active', defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' }, apikey: { key: 'X-Key', value: '{{k}}' } } });
   });
 
-  it('will not save when the auth could not be read, so it is never wiped by accident', () => {
-    const { dialog, stub } = dialogWith({ collection: ROW }, { version: vi.fn(() => of({ status: 'ERROR', message: 'Version 2 of this collection does not exist.' })) });
-    expect(dialog.authError()).toContain('Version 2');
-    dialog.save();
-    expect(stub.saveCollection).not.toHaveBeenCalled();
+  it('opens a collection with no default auth on None', () => {
+    const { defaultAuth: _none, ...plain } = ROW;
+    const { dialog } = dialogWith({ collection: plain });
+    expect(dialog.authType()).toBe('NONE');
   });
 
   it('shows the service\'s refusal in the dialog', () => {

@@ -84,6 +84,10 @@ test.describe('API Collections', () => {
     test.setTimeout(180_000);
     const page = await pageAs(browser, s);
     const leaks = watchForSecrets(page);
+    // MIG-310: "Open collection" closes the import dialog from its own confirm; that used to throw NG0911.
+    const angularErrors: string[] = [];
+    page.on('console', m => { if (m.type() === 'error' && /NG0\d+/.test(m.text())) angularErrors.push(m.text()); });
+    page.on('pageerror', e => { if (/NG0\d+/.test(e.message)) angularErrors.push(e.message); });
 
     // ---- create
     await page.goto('/integration/api-collections');
@@ -183,5 +187,6 @@ test.describe('API Collections', () => {
     // ---- the rule, over every response of the whole run
     await page.waitForTimeout(500);
     expect(leaks, 'responses holding a secret').toEqual([]);
+    expect(angularErrors, 'Angular runtime errors').toEqual([]);
   });
 });

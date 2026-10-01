@@ -1,4 +1,4 @@
-import { Component, ElementRef, Injector, inject, input, output } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Injector, inject, input, output } from '@angular/core';
 import { Icon } from './icon';
 import { focusFirstInvalid } from './focus-first-invalid';
 
@@ -76,13 +76,21 @@ export class FormDialog {
 
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
+  private destroyed = false;
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => { this.destroyed = true; });
+  }
 
   /**
    * The dialog's save runs first (the output is synchronous); if it marked fields to fix, focus
    * goes to the first of them, so every dialog's "Check the highlighted fields." gets it at once.
+   * A handler that closed the dialog has destroyed this shell with it: there is nothing to focus,
+   * and asking for the next render of a destroyed view throws NG0911 (MIG-310).
    */
   confirm(): void {
     this.confirmed.emit();
+    if (this.destroyed) return;
     focusFirstInvalid(this.host.nativeElement, this.injector);
   }
 }

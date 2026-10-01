@@ -101,7 +101,6 @@ describe('ImportDialog -- the report', () => {
     expect(dialog.rows().map(r => r.kind)).toEqual(['Review', 'Skipped', 'Imported', 'Imported']);
     expect(dialog.confirmLabel()).toBe('Open collection');
     dialog.confirm();
-    await Promise.resolve();
     expect(ref.close).toHaveBeenCalledWith({ collectionId: 1002, open: true });
   });
 

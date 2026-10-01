@@ -203,9 +203,7 @@ export class ImportDialog {
 
   confirm(): void {
     const done = this.result();
-    // Closed a moment later, not inside the confirm: app-form-dialog goes on to look for an invalid field once
-    // its (confirmed) returns, and a dialog already destroyed by then throws NG0911.
-    if (done) queueMicrotask(() => this.ref.close({ collectionId: done.collectionId, open: true }));
+    if (done) this.ref.close({ collectionId: done.collectionId, open: true });
     else void this.run();
   }
 

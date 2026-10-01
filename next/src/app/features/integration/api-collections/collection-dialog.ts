@@ -7,7 +7,6 @@ import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { AUTH_FIELDS, CollectionRow, SENSITIVITIES, authLabel, holdsReference, sensitivityLabel, sensitivityWord } from './api-collections.model';
 import { ApiCollectionsApi } from './api-collections.service';
-import { currentDefaultAuth } from './collection-save';
 
 export interface CollectionDialogData {
   collection?: CollectionRow;
@@ -28,7 +27,7 @@ type AuthBlocks = Record<string, Record<string, string>>;
   template: `
     <app-form-dialog [heading]="isEdit() ? 'Edit collection' : 'New API collection'"
                      [subtitle]="isEdit() ? data.collection!.name : 'A set of APIs, with the auth they share and the environments they run in.'"
-                     [confirmLabel]="isEdit() ? 'Save changes' : 'Create'" [saving]="saving()" [confirmDisabled]="loadingAuth()"
+                     [confirmLabel]="isEdit() ? 'Save changes' : 'Create'" [saving]="saving()"
                      (confirmed)="save()" (cancelled)="ref.close(null)">
       <div class="form-stack">
         @if (data.tenants && !isEdit()) {
@@ -59,34 +58,28 @@ type AuthBlocks = Record<string, Record<string, string>>;
           </app-field>
         }
 
-        <fieldset class="form-section" [disabled]="loadingAuth() || !!authError()">
-          <legend class="form-section-title">Default auth</legend>
+        <div class="form-section" role="group" aria-labelledby="acAuthTitle">
+          <div id="acAuthTitle" class="form-section-title">Default auth</div>
           <p class="text-xs text-[color:var(--text-muted)] mb-3">
             What an API set to "From the collection" signs in with. Secret fields take a variable such as
             <span class="mono">{{ tokenExample }}</span>; set its value in an environment, marked Secret.
           </p>
-          @if (loadingAuth()) {
-            <p class="text-sm text-[color:var(--text-muted)]" role="status">Reading the current auth…</p>
-          } @else if (authError()) {
-            <p class="text-sm text-crit-500" role="alert">The current auth could not be read, so nothing can be saved: {{ authError() }}</p>
-          } @else {
-            <app-field label="Scheme" for="acAuthType">
-              <select id="acAuthType" class="input" [value]="authType()" (change)="authType.set($any($event.target).value)">
-                @for (m of schemes; track m) { <option [value]="m" [selected]="m === authType()">{{ authText(m) }}</option> }
-              </select>
-            </app-field>
-            @if (fields().length) {
-              <div class="form-grid mt-3">
-                @for (f of fields(); track f.key) {
-                  <app-field [label]="f.label" [for]="'acAuth-' + f.key" [hint]="f.secret ? secretHint : ''">
-                    <input [id]="'acAuth-' + f.key" class="input mono" [value]="authValue(f.key)" [placeholder]="f.placeholder || ''"
-                           autocomplete="off" (input)="setAuthField(f.key, $any($event.target).value)" />
-                  </app-field>
-                }
-              </div>
-            }
+          <app-field label="Scheme" for="acAuthType">
+            <select id="acAuthType" class="input" [value]="authType()" (change)="authType.set($any($event.target).value)">
+              @for (m of schemes; track m) { <option [value]="m" [selected]="m === authType()">{{ authText(m) }}</option> }
+            </select>
+          </app-field>
+          @if (fields().length) {
+            <div class="form-grid mt-3">
+              @for (f of fields(); track f.key) {
+                <app-field [label]="f.label" [for]="'acAuth-' + f.key" [hint]="f.secret ? secretHint : ''">
+                  <input [id]="'acAuth-' + f.key" class="input mono" [value]="authValue(f.key)" [placeholder]="f.placeholder || ''"
+                         autocomplete="off" (input)="setAuthField(f.key, $any($event.target).value)" />
+                </app-field>
+              }
+            </div>
           }
-        </fieldset>
+        </div>
         @if (error()) { <p class="text-sm text-crit-500" role="alert">{{ error() }}</p> }
       </div>
     </app-form-dialog>
@@ -108,8 +101,6 @@ export class CollectionDialog {
   readonly authType = signal('NONE');
   /** Every scheme's block as read, so an imported collection's other schemes survive an edit of one. */
   private readonly blocks = signal<AuthBlocks>({});
-  readonly loadingAuth = signal(false);
-  readonly authError = signal('');
   readonly saving = signal(false);
   readonly error = signal('');
 
@@ -124,18 +115,8 @@ export class CollectionDialog {
   });
 
   constructor() {
-    const row = this.data.collection;
-    if (row?.collectionId) {
-      this.loadingAuth.set(true);
-      currentDefaultAuth(this.api, row).subscribe({
-        next: read => {
-          this.loadingAuth.set(false);
-          if ('error' in read) { this.authError.set(read.error); return; }
-          this.readAuth(read.auth);
-        },
-        error: err => { this.loadingAuth.set(false); this.authError.set(err?.error?.message || 'the service did not answer'); },
-      });
-    }
+    // The row carries the collection's default auth (MIG-310): the list and /get both say it.
+    this.readAuth(this.data.collection?.defaultAuth);
   }
 
   label(level: string): string { return sensitivityLabel(level); }
@@ -184,7 +165,6 @@ export class CollectionDialog {
 
   save(): void {
     this.error.set('');
-    if (this.loadingAuth() || this.authError()) return;
     const name = this.name().trim();
     if (!name) { this.error.set('Give the collection a name.'); return; }
     if (this.data.tenants && !this.isEdit() && !this.tenantId()) { this.error.set('Choose the workspace the collection is for.'); return; }

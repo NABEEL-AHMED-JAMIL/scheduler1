@@ -19,7 +19,8 @@ import { InUseDialog } from './in-use-dialog';
 const DETAIL = {
   collection: { collectionId: 1000, tenantId: 2924, name: 'LIVE-CHECK 0928 httpbin', description: 'MIG-227 live check', sourceFormat: 'MANUAL',
     sensitivity: 'internal', sensitivityLabel: 'INTERNAL', currentVersion: 3, status: 'Active', folderCount: 1, requestCount: 3,
-    dateCreated: '2026-09-29T02:26:22.327+00:00', dateUpdated: '2026-09-29T02:26:32.018+00:00' },
+    dateCreated: '2026-09-29T02:26:22.327+00:00', dateUpdated: '2026-09-29T02:26:32.018+00:00',
+    defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' } } },
   folders: [{ folderId: 31, parentFolderId: null, name: 'Status', sortOrder: 0 }],
   requests: [
     { requestId: 1000, folderId: null, name: 'Get status', method: 'GET', urlTemplate: 'https://example.com/', authMode: 'NONE', bodyType: 'NONE', timeoutMs: 30000, enabled: true },
@@ -37,7 +38,7 @@ const DETAIL = {
 function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; confirm?: boolean } = {}) {
   const api = {
     get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: structuredClone(DETAIL) })),
-    version: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { collectionId: 1000, version: 3, snapshot: { collection: { defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' } } } } } })),
+    version: vi.fn(),
     usage: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     setEnabled: vi.fn(() => of({ status: 'SUCCESS', message: 'API request disabled.', data: { id: 1000, collectionId: 1000, version: 4 } })),
     deleteRequest: vi.fn(() => of({ status: 'SUCCESS', message: 'API request deleted.', data: { id: 1000, collectionId: 1000, version: 4 } })),
@@ -64,10 +65,10 @@ function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; 
 }
 
 describe('Collection -- reading', () => {
-  it('reads the collection, its default auth from the current version, and who uses it', () => {
+  it('reads the collection, its default auth as /get says it (MIG-310), and who uses it', () => {
     const { api, screen } = setup();
     expect(api.get).toHaveBeenCalledWith(1000);
-    expect(api.version).toHaveBeenCalledWith(1000, 3);
+    expect(api.version).not.toHaveBeenCalled();
     expect(api.usage).toHaveBeenCalledWith(1000);
     expect(screen.defaultAuth()).toEqual({ type: 'BEARER', bearer: { token: '{{token}}' } });
     expect(Object.fromEntries(screen.kpis().map(k => [k.label, k.value]))).toEqual({ APIs: 3, Enabled: 2, Folders: 1, Environments: 1, Version: 'v3' });
@@ -88,9 +89,14 @@ describe('Collection -- reading', () => {
   });
 
   it('says plainly when the collection does not exist, with no Try again', () => {
-    const { screen } = setup({ api: { get: vi.fn(() => of({ status: 'ERROR', message: 'API collection not found.' })) } });
-    expect(screen.error()).toBe('API collection not found.');
+    const { screen } = setup({ api: { get: vi.fn(() => of({ status: 'ERROR', message: 'API collection not found with 1000.' })) } });
+    expect(screen.error()).toBe('API collection not found with 1000.');
     expect(screen.missing()).toBe(true);
+  });
+
+  it('reads any other refusal as a refusal, not a missing collection (MIG-310: the shared wording, no special case)', () => {
+    const { screen } = setup({ api: { get: vi.fn(() => of({ status: 'ERROR', message: 'Your access profile does not include this page.' })) } });
+    expect(screen.missing()).toBe(false);
   });
 
   it('shows a secret as configured and never as a value', () => {
