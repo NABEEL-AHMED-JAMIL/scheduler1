@@ -26,10 +26,12 @@ describe('status columns stay on screen', () => {
     expect(classesOf(html, '<app-status [label]="row.jobStatus"')).toContain('col-pin-right');
   });
 
-  it('pins the Failed runs outcome cell, which carries the Logs link', async () => {
+  it('gives the Failed runs status its own header and pins the Logs link', async () => {
+    // Owner, 2026-10-01: one "Outcome" header sat over the pill and the link, so the pill had none.
     const html = await read('reports/reports.html');
-    expect(classesOf(html, '>Outcome</th>', 'th')).toContain('col-pin-right');
-    expect(classesOf(html, '<app-status [label]="failure.status"')).toContain('col-pin-right');
+    expect(html).toContain('<th>Status</th>');
+    expect(classesOf(html, '>Logs</th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '(click)="openRunLogs(failure)"')).toContain('col-pin-right');
   });
 
   it('pins the Task health state cell', async () => {

@@ -385,8 +385,10 @@
                 <th>Error</th>
                 <th class="hidden lg:table-cell">When</th>
                 <th class="text-right hidden md:table-cell">Took</th>
-                <!-- Pinned right, with the Logs link inside it: on a phone both were off-screen. -->
-                <th class="text-right col-pin-right">Outcome</th>
+                <!-- Status and Logs each under their own header (owner, 2026-10-01): one "Outcome"
+                     header sat over both, so the pill had none. Logs stays pinned right. -->
+                <th>Status</th>
+                <th class="text-right col-pin-right">Logs</th>
               </tr>
             </thead>
             <tbody>
@@ -415,20 +417,18 @@
                   <td class="text-right hidden md:table-cell mono text-xs">
                     {{ formatDuration(failure.seconds) }}
                   </td>
+                  <td class="whitespace-nowrap"><app-status [label]="failure.status" /></td>
                   <td class="text-right col-pin-right">
-                    <div class="flex items-center justify-end gap-2">
-                      <app-status [label]="failure.status" />
-                      <!-- Only rendered when the run has an id to open. Every run in this
-                           system now has audit lines, but a control that can open nothing must
-                           not be drawn as though it can. -->
-                      @if (failure.jobId && failure.jobQueueId) {
-                        <button type="button" class="btn btn-ghost btn-xs"
-                                (click)="openRunLogs(failure)"
-                                [title]="'Open the run log for #' + failure.jobQueueId">
-                          <app-icon name="history" size="0.85em" />Logs
-                        </button>
-                      }
-                    </div>
+                    <!-- Only rendered when the run has an id to open. Every run in this system now
+                         has audit lines, but a control that can open nothing must not be drawn as
+                         though it can. -->
+                    @if (failure.jobId && failure.jobQueueId) {
+                      <button type="button" class="btn btn-ghost btn-xs"
+                              (click)="openRunLogs(failure)"
+                              [title]="'Open the run log for #' + failure.jobQueueId">
+                        <app-icon name="history" size="0.85em" />Logs
+                      </button>
+                    }
                   </td>
                 </tr>
               }
