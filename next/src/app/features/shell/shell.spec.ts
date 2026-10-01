@@ -49,7 +49,7 @@ describe('shell navigation', () => {
   it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
     const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
     expect(tagged).toEqual([
-      '/ai/assistant', '/ai/prompts', '/ai/tools', '/data/analytics', '/data/analytics/dashboards', '/data/ask',
+      '/ai/assistant', '/ai/prompts', '/ai/tools', '/data/analytics', '/data/analytics/dashboards', '/data/ask', '/data/catalog',
       '/documents/converter', '/documents/files', '/documents/inbox', '/documents/intelligence', '/documents/reports', '/documents/review',
       '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
       '/integration/sources', '/pipelines', '/pipelines/queue', '/pipelines/run-analytics',

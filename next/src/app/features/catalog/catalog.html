@@ -1,0 +1,60 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Data Catalog</h1>
+      <p class="page-subtitle">
+        Every dataset, file and document type in this workspace: what it holds, who owns it, how fresh it is, and which fields are sensitive.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+    </div>
+  </div>
+
+  @if (kpis().length) {
+    <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance" />
+  }
+
+  <app-table-shell heading="Assets" columnsKey="data-catalog" [loading]="loading()" [error]="error()" [isEmpty]="!shown().length"
+                   [shown]="shown().length" [scrollRows]="false" emptyIcon="database" (retry)="load()"
+                   [emptyMessage]="assets().length || search() || flag() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
+    <ng-container toolbar>
+      <app-segmented [value]="kind()" (valueChange)="kind.set($event)" [options]="kinds" ariaLabel="Kind of asset" />
+      <label class="sr-only" for="catalogFlag">Show</label>
+      <select id="catalogFlag" class="input input-sm w-auto" (change)="setFlag($any($event.target).value)" data-flag>
+        @for (f of flags; track f.id) { <option [value]="f.id" [selected]="flag() === f.id">{{ f.label }}</option> }
+      </select>
+      <label class="sr-only" for="catalogSearch">Search</label>
+      <input id="catalogSearch" class="input input-sm w-56" type="search" placeholder="Search name, column or tag…" [value]="search()"
+             (input)="typed($any($event.target).value)" />
+      <label class="flex items-center gap-1 text-xs">
+        <input type="checkbox" [checked]="withDeleted()" (change)="showDeleted($any($event.target).checked)" /> Deleted too
+      </label>
+    </ng-container>
+    <table class="table-modern">
+      <thead>
+        <tr><th>Asset</th><th>Type</th><th>Owner</th><th>Freshness</th><th>Sensitive fields</th><th>Sensitivity</th><th class="text-right">Quality</th></tr>
+      </thead>
+      <tbody>
+        @for (a of shown(); track a.assetId) {
+          <tr class="cursor-pointer" [attr.data-asset]="a.assetId" (click)="open(a.assetId, a.name)" tabindex="0" (keydown.enter)="open(a.assetId, a.name)">
+            <td class="min-w-0">
+              <div class="font-medium truncate max-w-md" [title]="a.name">{{ a.name }}</div>
+              <div class="text-xs text-[color:var(--text-muted)] truncate max-w-md" [title]="where(a)">{{ where(a) }}</div>
+            </td>
+            <td class="whitespace-nowrap">{{ kindText(a.kind) }}
+              @if (a.status === 'Deleted') { <span class="pill pill-crit">Deleted</span> }</td>
+            <td class="whitespace-nowrap">{{ a.ownerName || '—' }}</td>
+            <td class="whitespace-nowrap" [class.is-stale]="a.stale">{{ fresh(a.lastChangedAt) }}</td>
+            <td>
+              @for (t of a.tags ?? []; track t) { <span class="pill pill-warn">{{ tagText(t) }}</span> }
+              @if (!(a.tags ?? []).length) { <span class="text-[color:var(--text-muted)]">—</span> }
+            </td>
+            <td><span class="pill" [class]="'pill-' + tone(a.sensitivity)">{{ a.sensitivity }}</span></td>
+            <td class="text-right tabular">{{ a.qualityScore != null ? a.qualityScore + '%' : '—' }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>

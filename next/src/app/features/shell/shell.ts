@@ -100,8 +100,8 @@ export class Shell {
    * An entry marked `soon` is a page that is not built yet: its route is a "coming soon" page that
    * calls nothing, gated by the page's key so the gate is in place before the screen is.
    */
-  // Owner decision 2026-09-30: Connector Hub and Data Catalog come after the demo -- off the menu and the routes until
-  // they are built (identity's catalogue leaves their keys out too). Workflows is built (MIG-276).
+  // Owner decision 2026-09-30: Connector Hub comes after the demo -- off the menu and the routes until it is built
+  // (identity's catalogue leaves its key out too). Workflows is built (MIG-276), the Data Catalog too (MIG-288).
   private readonly allNav: NavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'chart' },
     {
@@ -162,6 +162,8 @@ export class Shell {
       children: [
         { label: 'Ask your data', path: '/data/ask', pageKey: 'ask-data', icon: 'chat',
           hint: 'Questions in plain language, with sources' },
+        { label: 'Data Catalog', path: '/data/catalog', pageKey: 'data-catalog', icon: 'database',
+          hint: 'Every dataset, owner, schema and sensitive field' },
         { label: 'Analytics Studio', path: '/data/analytics', pageKey: 'analytics', icon: 'chart',
           hint: 'Read a file as data, where it lives' },
         // The saved-analysis library had a route and no way to reach it: /analytics/dashboards

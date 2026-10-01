@@ -312,6 +312,15 @@ export const routes: Routes = [
       // Data (Wave 5; Analytics Studio and Saved Analyses moved here from Object Browser)
       // ---------------------------------------------------------------------------------------------
       {
+        // Wave 5 (MIG-288): every dataset, file and document type -- owner, freshness, sensitive fields, lineage, access
+        // requests -- from analytics-service's /analyticsCatalog.json, gated by data-catalog at the gateway.
+        path: 'data/catalog',
+        title: 'Data Catalog',
+        loadComponent: () => import('./features/catalog/catalog').then(m => m.Catalog),
+        data: { pageKey: 'data-catalog' },
+        canActivate: [pageGuard],
+      },
+      {
         // Wave 5: plain-language questions answered only from the workspace's documents and pipeline results, with
         // numbered sources (ai-service /askData.json, gated by ask-data at the gateway). Every member holding the page asks.
         path: 'data/ask',

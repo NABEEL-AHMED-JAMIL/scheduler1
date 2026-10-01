@@ -301,6 +301,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/data/catalog",
+      "title": "Data Catalog",
+      "pageKey": "data-catalog",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/data/ask",
       "title": "Ask your data",
       "pageKey": "ask-data",

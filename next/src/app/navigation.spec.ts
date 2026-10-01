@@ -239,8 +239,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
 });
 
 describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', () => {
-  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data, Forms and Workflows (MIG-276) are built;
-  // Connector Hub and Data Catalog were taken off the menu and the routes until they are.
+  // Owner decision 2026-09-30: nothing unfinished on the menu. Ask your data, Forms, Workflows (MIG-276) and the Data
+  // Catalog (MIG-288) are built; Connector Hub was taken off the menu and the routes until it is.
   it('no route is a coming-soon placeholder any more', () => {
     expect(flatten(routes).filter(e => e.route.data?.['comingSoon']).map(e => e.path)).toEqual([]);
   });
@@ -253,6 +253,13 @@ describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', (
     expect(route!.data?.['comingSoon']).toBeUndefined();
     expect(route!.canActivate).toContain(pageGuard);
     expect(route!.loadComponent).toBeDefined();
+  });
+
+  it('/data/catalog is the built Data Catalog: titled and gated by data-catalog', () => {
+    const route = byPath('/data/catalog');
+    expect(route?.title).toBe('Data Catalog');
+    expect(route?.data?.['pageKey']).toBe('data-catalog');
+    expect(route?.canActivate).toContain(pageGuard);
   });
 
   it('names the renamed pages as the menu does when a page is refused', () => {
@@ -317,6 +324,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   ];
   const DATA_SOON = [
     'Data › Ask your data -> /data/ask',
+    'Data › Data Catalog -> /data/catalog',
   ];
   const DATA = [
     'Data › Analytics Studio -> /data/analytics',
