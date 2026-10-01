@@ -69,7 +69,49 @@ export interface OcrDocument {
   dateCreated?: string | null;
   dateStarted?: string | null;
   dateFinished?: string | null;
+  /** MIG-271: how the file arrived (upload, email, form, connector); absent for a read of a stored file. */
+  intakeChannel?: string | null;
+  /** MIG-271: where it came from, as a person reads it ("Email from ...: subject"). */
+  intakeLabel?: string | null;
+  /** MIG-271: the file's own name as it arrived. */
+  originalName?: string | null;
 }
+
+/** MIG-271: what became of one file offered to Document Intelligence (/documentOcr.json/upload's answer, per file). */
+export interface IntakeAnswer {
+  intakeId: number;
+  fileName: string;
+  outcome: 'Accepted' | 'Duplicate' | 'Refused';
+  reason?: string | null;
+  ocrDocumentId?: number | null;
+}
+
+/** MIG-271: one file offered by any channel, as /documentOcr.json/intakes lists it. */
+export interface IntakeRow extends IntakeAnswer {
+  channel: string;
+  sourceLabel?: string | null;
+  contentType?: string | null;
+  sizeBytes: number;
+  extractionId?: number | null;
+  extractionNote?: string | null;
+  createdBy?: number | null;
+  dateCreated?: string | null;
+}
+
+/** MIG-271: the workspace's email-in address (/documentOcr.json/mailbox). */
+export interface Mailbox {
+  configured: boolean;
+  active: boolean;
+  address: string | null;
+  domain: string;
+  /** False when the platform has no inbound mail domain: email-in cannot be turned on. */
+  enabled: boolean;
+  maxFiles: number;
+  maxFileSizeMb: number;
+}
+
+/** MIG-271: how a channel is named on the screen. */
+export const CHANNEL_LABELS: Record<string, string> = { upload: 'Upload', email: 'Email', form: 'Form', connector: 'Connector' };
 
 export interface Box { left: number; top: number; width: number; height: number; }
 
@@ -524,21 +566,25 @@ export function recentRows(reads: OcrDocument[], extractions: Extraction[]): Rec
     const ocr = byRead.get(e.ocrDocumentId) ?? null;
     return {
       key: `e${e.extractionId}`, ocr, extraction: e,
-      name: ocr ? fileName(ocr.sourceKey) : `OCR document ${e.ocrDocumentId}`,
+      name: ocr ? nameOf(ocr) : `OCR document ${e.ocrDocumentId}`,
       where: ocr ? whereOf(ocr) : '',
       status: statusLabel(e), received: e.dateCreated ?? null,
     };
   });
   const unread: RecentRow[] = reads.filter(r => !extracted.has(r.ocrDocumentId)).map(r => ({
-    key: `o${r.ocrDocumentId}`, ocr: r, extraction: null, name: fileName(r.sourceKey), where: whereOf(r),
+    key: `o${r.ocrDocumentId}`, ocr: r, extraction: null, name: nameOf(r), where: whereOf(r),
     status: r.status === 'Done' ? 'Read' : r.status, received: r.dateCreated ?? null,
   }));
   return [...rows, ...unread];
 }
 
+/** A document's name: the file's own as it arrived (MIG-271), else the last part of its key. */
+function nameOf(r: OcrDocument): string { return r.originalName || fileName(r.sourceKey); }
+
+/** Where a document came from: the channel's sentence for one that arrived (MIG-271), else its storage connection. */
 function whereOf(r: OcrDocument): string {
   const pages = r.pageCount ?? r.pagesRead;
-  return `${r.sourceBucket}${pages ? ` · ${pages} page${pages === 1 ? '' : 's'}` : ''}`;
+  return `${r.intakeLabel || r.sourceBucket}${pages ? ` · ${pages} page${pages === 1 ? '' : 's'}` : ''}`;
 }
 
 // ---------------------------------------------------------------------------------------------- the type editor

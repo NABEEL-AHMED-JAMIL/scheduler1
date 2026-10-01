@@ -12,6 +12,7 @@ import { DocumentsApi } from './documents.service';
 import { DocumentIntelligence } from './intelligence';
 import { ReadDocumentDialog } from './read-document-dialog';
 import { TypePanel } from './type-panel';
+import { UploadDocumentsDialog } from './upload-documents-dialog';
 import { DocumentType } from './documents.model';
 import { PO_DEFINITION } from './documents.fixtures';
 
@@ -43,6 +44,16 @@ const DATASET = { total: 1, page: 0, size: 50, rows: [{ datasetRowId: 1000, extr
   row: { fields: { po_number: '77104', total: 9820.0, supplier_name: 'Dock Supplies Ltd (LIVE-CHECK)', delivery_date: null },
     tables: { line_items: [{ description: 'Pallets', quantity: 40, amount: 9820.0 }] } } }] };
 const ok = <T>(data: T, message = '') => of({ status: 'SUCCESS', message, data });
+const INTAKES = [
+  { intakeId: 1003, channel: 'email', sourceLabel: 'Email from bob@supplier.example: March', fileName: 'inv.pdf', sizeBytes: 10, outcome: 'Duplicate',
+    reason: 'The same file as document 1010 (Uploaded by alex); no second document was made.', ocrDocumentId: 1010 },
+  { intakeId: 1002, channel: 'upload', sourceLabel: 'Uploaded by alex', fileName: 'setup.exe', sizeBytes: 2, outcome: 'Refused',
+    reason: 'Document Intelligence reads PDF, PNG, JPEG, TIFF and BMP files.' },
+  { intakeId: 1001, channel: 'upload', sourceLabel: 'Uploaded by alex', fileName: 'inv.pdf', sizeBytes: 10, outcome: 'Accepted', ocrDocumentId: 1010,
+    extractionId: 1020 },
+];
+const MAILBOX = { configured: true, active: true, address: 'abcdefghij0123456789@docs.etl-console.local', domain: 'docs.etl-console.local',
+  enabled: true, maxFiles: 20, maxFileSizeMb: 20 };
 
 function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown } = {}) {
   const api = {
@@ -51,6 +62,10 @@ function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown } = 
     reads: vi.fn(() => ok(READS)),
     extractions: vi.fn(() => ok(EXTRACTIONS)),
     dataset: vi.fn(() => ok(DATASET)),
+    intakes: vi.fn(() => ok(INTAKES)),
+    mailbox: vi.fn(() => ok(MAILBOX)),
+    mailboxAction: vi.fn((action: string) => ok({ ...MAILBOX, address: action === 'rotate' ? 'newtoken0000000000000@docs.etl-console.local' : MAILBOX.address,
+      active: action !== 'disable' }, action === 'rotate' ? 'A new email-in address is on; the old one no longer works.' : 'Email-in is on.')),
     datasetExport: vi.fn(() => of(new HttpResponse({ body: new Blob(['a,b']),
       headers: new HttpHeaders({ 'content-disposition': 'attachment; filename="purchase_order-dataset.csv"' }) }))),
   };
@@ -103,7 +118,8 @@ describe('DocumentIntelligence -- overview', () => {
     await fixture.whenStable();
     expect(el.textContent).not.toContain('Custom type');
     expect(el.textContent).not.toContain('New document type');
-    expect(el.textContent).toContain('Read a document');
+    expect(el.textContent).toContain('Read a stored file');
+    expect(el.textContent).toContain('Upload documents');
   });
 
   it('lists every extraction, linked to its review, then the reads not yet extracted', async () => {
@@ -185,5 +201,51 @@ describe('DocumentIntelligence -- dataset', () => {
     expect(api.datasetExport).toHaveBeenCalledWith(1001, 'csv');
     expect(saved).toHaveBeenCalledWith(expect.any(Blob), 'purchase_order-dataset.csv');
     saved.mockRestore();
+  });
+});
+
+// MIG-271: files arrive by upload, email-in, a form's file field or a connector; the Intake tab says what became of each.
+describe('DocumentIntelligence -- intake', () => {
+  it('uploads many documents at once and reads the lists again when any was taken', async () => {
+    const { fixture, screen, opened, api } = screenWith({ closed: { changed: true } });
+    await fixture.whenStable();
+    screen.uploadDocuments();
+    expect(opened[0].component).toBe(UploadDocumentsDialog);
+    expect(api.extractions).toHaveBeenCalledTimes(2);
+  });
+
+  it('lists what arrived by every channel with its outcome, and narrows by channel', async () => {
+    const { fixture, el, api, screen } = screenWith({ tab: 'intake' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.intakes).toHaveBeenCalledWith('');
+    const table = el.querySelector('[data-test="intake"]')!;
+    expect(table.textContent).toContain('Email from bob@supplier.example: March');
+    expect(table.textContent).toContain('The same file as document 1010');
+    expect(table.querySelector('a')?.getAttribute('href')).toBe('/documents/review/1020');
+    screen.pickChannel('email');
+    expect(api.intakes).toHaveBeenLastCalledWith('email');
+  });
+
+  it('shows the email-in address, and lets an administrator give it a new one or turn it off', async () => {
+    const { fixture, el, api, screen } = screenWith({ tab: 'intake' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="mailbox-address"]')?.textContent).toBe('abcdefghij0123456789@docs.etl-console.local');
+    expect(el.querySelector('[data-test="mailbox"]')?.textContent).toContain('New address');
+    screen.mailboxAction('rotate');
+    expect(api.mailboxAction).toHaveBeenCalledWith('rotate');
+    expect(screen.mailbox()?.address).toBe('newtoken0000000000000@docs.etl-console.local');
+    screen.mailboxAction('disable');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="mailbox"]')?.textContent).toContain('Turn on');
+  });
+
+  it('offers a member the address but not its controls', async () => {
+    const { fixture, el } = screenWith({ tab: 'intake', admin: false });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="mailbox-address"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="mailbox"]')?.textContent).not.toContain('New address');
   });
 });

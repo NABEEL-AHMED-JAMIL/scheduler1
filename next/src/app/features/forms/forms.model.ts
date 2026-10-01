@@ -49,6 +49,8 @@ export interface FormField {
   accept?: string[] | null;
   maxSizeMb?: number | null;
   maxFiles?: number | null;
+  /** MIG-271: a file field whose files also become documents in Document Intelligence, one each. */
+  toDocuments?: boolean | null;
   /** A lookup's source: another form of the workspace, and the field whose answers it offers. */
   lookup?: { formId: number | null; field: string } | null;
 }
@@ -385,7 +387,8 @@ export function draftForSave(draft: FormDraft): FormDraft {
           options: c.type === 'choice' ? (c.options ?? []).map(o => o.trim()).filter(o => !!o) : null })),
         maxRows: f.maxRows ?? 20,
       } : {}),
-      ...(f.type === 'file' ? { accept: f.accept ?? [...DEFAULT_ACCEPT], maxSizeMb: f.maxSizeMb ?? 10, maxFiles: f.maxFiles ?? 1 } : {}),
+      ...(f.type === 'file' ? { accept: f.accept ?? [...DEFAULT_ACCEPT], maxSizeMb: f.maxSizeMb ?? 10, maxFiles: f.maxFiles ?? 1,
+        ...(f.toDocuments ? { toDocuments: true } : {}) } : {}),
       ...(f.type === 'lookup' ? { lookup: f.lookup ?? null } : {}),
     })),
   };

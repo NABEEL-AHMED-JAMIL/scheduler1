@@ -153,7 +153,7 @@ describe('MIG-272: Document Intelligence', () => {
 
   it('read a document', async () => {
     const v = await visit('/documents/intelligence', 'TENANT_ADMIN', null, ANSWERS);
-    await click(v, 'Read a document');
+    await click(v, 'Read a stored file');
     pin(FILE, 'read a document', overlay(), PINNED);
   });
 

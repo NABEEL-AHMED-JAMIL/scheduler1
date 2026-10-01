@@ -97,6 +97,10 @@ describe('Forms -- the new types', () => {
     expect(sent[2].showWhen).toEqual({ field: 'infected', op: 'eq', value: true });
     expect(sent[3]).toMatchObject({ maxRows: 2, columns: [{ key: 'drug', type: 'text', required: true, options: null }, { key: 'mg' }] });
     expect(sent[4]).toMatchObject({ accept: ['jpg'], maxSizeMb: 5, maxFiles: 2 });
+    // MIG-271: "send to Document Intelligence" is sent only when on, so a form saved before it reads as it did.
+    expect('toDocuments' in sent[4]).toBe(false);
+    const toDocuments = { ...draft, fields: draft.fields.map((f, i) => i === 4 ? { ...f, toDocuments: true } : f) };
+    expect(draftForSave(toDocuments).fields[4].toDocuments).toBe(true);
     expect(sent[0].lookup).toEqual({ formId: 900, field: 'patient_id' });
     expect('columns' in sent[1]).toBe(false);
   });

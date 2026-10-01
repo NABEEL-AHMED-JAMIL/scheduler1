@@ -227,11 +227,13 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Dataset",
       "Document types",
+      "Intake",
       "JSON Lines",
       "New document type",
       "Overview",
-      "Read a document",
-      "Refresh"
+      "Read a stored file",
+      "Refresh",
+      "Upload documents"
     ],
     "columns": [
       [
@@ -268,12 +270,14 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Dataset",
       "Document types",
+      "Intake",
       "Invoice",
       "New document type",
       "Overview",
       "Purchase order",
-      "Read a document",
-      "Refresh"
+      "Read a stored file",
+      "Refresh",
+      "Upload documents"
     ],
     "columns": [
       [
@@ -309,11 +313,13 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Dataset",
       "Document types",
+      "Intake",
       "Invoice: 4 fields, 0 documents",
       "Overview",
       "Purchase order: 4 fields, 1 document",
-      "Read a document",
-      "Refresh"
+      "Read a stored file",
+      "Refresh",
+      "Upload documents"
     ],
     "columns": [
       [
@@ -376,12 +382,14 @@ export const PINNED: Record<string, unknown> = {
       "Custom type",
       "Dataset",
       "Document types",
+      "Intake",
       "Invoice: 4 fields, 0 documents",
       "New document type",
       "Overview",
       "Purchase order: 4 fields, 1 document",
-      "Read a document",
-      "Refresh"
+      "Read a stored file",
+      "Refresh",
+      "Upload documents"
     ],
     "columns": [
       [

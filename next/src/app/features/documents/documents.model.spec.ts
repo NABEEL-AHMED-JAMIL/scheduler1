@@ -164,6 +164,13 @@ describe('the overview', () => {
       ['o1003', 'a.png', 'ui-review-s3 · 1 page', 'Read'],
     ]);
   });
+
+  // MIG-271: a document that arrived by a channel shows the file's own name and where it came from.
+  it('names an arrived document by its own file name and shows where it came from', () => {
+    const rows = recentRows([{ ocrDocumentId: 1010, sourceBucket: 'etl-documents', sourceKey: 'ocr/2924/1010/original.pdf', status: 'Done',
+      pageCount: 1, intakeChannel: 'email', intakeLabel: 'Email from bob@supplier.example: March invoices', originalName: 'inv-march.pdf' }], []);
+    expect(rows.map(r => [r.name, r.where])).toEqual([['inv-march.pdf', 'Email from bob@supplier.example: March invoices · 1 page']]);
+  });
 });
 
 describe('the type editor', () => {

@@ -420,7 +420,7 @@ export class FormBuilder implements OnInit {
 /** What a field keeps of its own when its type changes to one that has the same setting. */
 function keepOwn(f: FormField, type: FieldType): Partial<FormField> {
   if (type === 'table' && f.columns?.length) return { columns: f.columns, maxRows: f.maxRows };
-  if (type === 'file' && f.accept?.length) return { accept: f.accept, maxSizeMb: f.maxSizeMb, maxFiles: f.maxFiles };
+  if (type === 'file' && f.accept?.length) return { accept: f.accept, maxSizeMb: f.maxSizeMb, maxFiles: f.maxFiles, toDocuments: f.toDocuments };
   if (type === 'lookup' && f.lookup) return { lookup: f.lookup };
   return {};
 }

@@ -16,16 +16,18 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { StorageService } from '../objects/storage.service';
 import {
-  DatasetRow, DocumentType, Extraction, OcrDocument, RecentRow, TypeStats, lowLine, recentRows, refusalText, totalsOf,
+  CHANNEL_LABELS, DatasetRow, DocumentType, Extraction, IntakeRow, Mailbox, OcrDocument, RecentRow, TypeStats, lowLine, recentRows, refusalText,
+  totalsOf,
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
 import { ReadDocumentData, ReadDocumentDialog, ReadDocumentResult } from './read-document-dialog';
 import { TypePanel, TypePanelData } from './type-panel';
+import { UploadDocumentsDialog, UploadDocumentsResult } from './upload-documents-dialog';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
 
-export type IntelligenceTab = 'overview' | 'types' | 'dataset';
-const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset'];
+export type IntelligenceTab = 'overview' | 'types' | 'dataset' | 'intake';
+const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset', 'intake'];
 
 /** A type's glyph on its card, from what it is for. */
 const TYPE_ICONS: Record<string, string> = {
@@ -71,9 +73,12 @@ export class DocumentIntelligence implements OnInit {
 
   readonly tabs: { id: IntelligenceTab; label: string }[] = [
     { id: 'overview', label: 'Overview' }, { id: 'types', label: 'Document types' }, { id: 'dataset', label: 'Dataset' },
+    { id: 'intake', label: 'Intake' },
   ];
   readonly tab = signal<IntelligenceTab>(this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
   readonly canManage = computed(() => this.auth.canBuild());
+  /** The email-in address is the workspace's: an administrator's to turn on, renew or turn off (MIG-271). */
+  readonly canManageMailbox = computed(() => this.auth.isTenantAdmin());
 
   // -------------------------------------------------------------------------------------------- overview
 
@@ -160,11 +165,13 @@ export class DocumentIntelligence implements OnInit {
   private readTab(tab: IntelligenceTab): void {
     if (tab === 'overview' && !this.overviewRead) this.load();
     if (tab === 'dataset' && !this.datasetRead && this.datasetType()) this.loadDataset();
+    if (tab === 'intake' && !this.intakeRead) this.loadIntake();
   }
 
   refresh(): void {
     this.loadTypes();
     if (this.tab() === 'dataset') this.loadDataset();
+    else if (this.tab() === 'intake') this.loadIntake();
     else this.load();
   }
 
@@ -219,6 +226,61 @@ export class DocumentIntelligence implements OnInit {
       this.load();
       if (result.openExtractionId) this.router.navigate(['/documents/review', result.openExtractionId]);
     });
+  }
+
+  /** Many files at once (MIG-271): one document each, read and extracted on its own. */
+  uploadDocuments(): void {
+    this.dialog.open<UploadDocumentsResult>(UploadDocumentsDialog, { hasBackdrop: true }).closed.subscribe(result => {
+      if (!result?.changed) return;
+      this.load();
+      if (this.intakeRead) this.loadIntake();
+    });
+  }
+
+  // -------------------------------------------------------------------------------------------- intake (MIG-271)
+
+  readonly channelLabels = CHANNEL_LABELS;
+  readonly channels = Object.keys(CHANNEL_LABELS);
+  readonly intakes = signal<IntakeRow[]>([]);
+  readonly intakeLoading = signal(false);
+  readonly intakeError = signal('');
+  readonly channelFilter = signal('');
+  readonly mailbox = signal<Mailbox | null>(null);
+  readonly mailboxBusy = signal(false);
+  private intakeRead = false;
+
+  loadIntake(): void {
+    this.intakeRead = true;
+    this.intakeLoading.set(true);
+    this.intakeError.set('');
+    this.api.intakes(this.channelFilter()).subscribe({
+      next: r => {
+        this.intakeLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.intakeError.set(r.message || 'Could not load what arrived.'); return; }
+        this.intakes.set(r.data ?? []);
+      },
+      error: err => { this.intakeLoading.set(false); this.intakeError.set(refusalText(err, 'Could not load what arrived.')); },
+    });
+    this.api.mailbox().subscribe({ next: r => { if (r.status === API_SUCCESS) this.mailbox.set(r.data ?? null); }, error: () => this.mailbox.set(null) });
+  }
+
+  pickChannel(channel: string): void { this.channelFilter.set(channel); this.loadIntake(); }
+
+  mailboxAction(action: 'enable' | 'rotate' | 'disable'): void {
+    this.mailboxBusy.set(true);
+    this.api.mailboxAction(action).subscribe({
+      next: r => {
+        this.mailboxBusy.set(false);
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The email-in address could not be changed.'); return; }
+        this.mailbox.set(r.data ?? null);
+        this.toast.success(r.message);
+      },
+      error: err => { this.mailboxBusy.set(false); this.toast.error(refusalText(err, 'The email-in address could not be changed.')); },
+    });
+  }
+
+  copyAddress(address: string): void {
+    navigator.clipboard?.writeText(address).then(() => this.toast.success('Address copied.'), () => this.toast.error('Could not copy the address.'));
   }
 
   openReview(extractionId: number): void { this.router.navigate(['/documents/review', extractionId]); }

@@ -3,7 +3,8 @@ import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 import {
-  CorrectionSent, DatasetPage, DocumentType, Extraction, OcrDocument, QueuePage, ReviewDetail, TypeDefinition, TypeStats, TypeVersion,
+  CorrectionSent, DatasetPage, DocumentType, Extraction, IntakeAnswer, IntakeRow, Mailbox, OcrDocument, QueuePage, ReviewDetail, TypeDefinition,
+  TypeStats, TypeVersion,
 } from './documents.model';
 
 const OCR = `${API_BASE}/documentOcr.json`;
@@ -50,6 +51,31 @@ export class DocumentsApi {
 
   read(ocrDocumentId: number): Observable<ApiResponse<OcrDocument>> {
     return this.http.get<ApiResponse<OcrDocument>>(`${OCR}/fetchById`, { params: { ocrDocumentId } });
+  }
+
+  // ------------------------------------------------------------------------------------------ intake (media, MIG-271)
+
+  /** Many files at once: one document each, a duplicate (by checksum) or a refusal, said per file. */
+  upload(files: File[]): Observable<ApiResponse<IntakeAnswer[]>> {
+    const form = new FormData();
+    for (const f of files) form.append('files', f, f.name);
+    return this.http.post<ApiResponse<IntakeAnswer[]>>(`${OCR}/upload`, form);
+  }
+
+  /** Every file offered to the workspace by any channel, newest first. */
+  intakes(channel = '', limit = 100): Observable<ApiResponse<IntakeRow[]>> {
+    const params: Record<string, string | number> = { limit };
+    if (channel) params['channel'] = channel;
+    return this.http.get<ApiResponse<IntakeRow[]>>(`${OCR}/intakes`, { params });
+  }
+
+  mailbox(): Observable<ApiResponse<Mailbox>> {
+    return this.http.get<ApiResponse<Mailbox>>(`${OCR}/mailbox`);
+  }
+
+  /** Turn the email-in address on, give it a new address, or turn it off: a workspace administrator's. */
+  mailboxAction(action: 'enable' | 'rotate' | 'disable'): Observable<ApiResponse<Mailbox>> {
+    return this.http.post<ApiResponse<Mailbox>>(`${OCR}/mailbox/${action}`, null);
   }
 
   /** Queues a read of a stored file; an unchanged file read before answers that read (unless forced). */
