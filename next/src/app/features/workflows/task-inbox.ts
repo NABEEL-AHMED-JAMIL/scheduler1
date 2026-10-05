@@ -275,16 +275,30 @@ export class TaskInbox implements OnInit {
     return t.state === 'ChangesRequested' ? 'Changes asked' : t.state;
   }
 
-  /** The subject's fields as label and value, the way a person reads them. */
+  /**
+   * The subject's fields as label and value, the way a person reads them (UI review U10, U14): a yes/no answer says
+   * Yes or No rather than true or false, and a person's username (Submitted by) reads as their name.
+   */
   fields(subject: Record<string, unknown> | undefined | null): { label: string; value: string }[] {
     if (!subject) return [];
     return Object.entries(subject)
       .filter(([, v]) => v !== null && v !== undefined && v !== '')
-      .map(([k, v]) => ({ label: labelOf(k), value: typeof v === 'object' ? JSON.stringify(v) : String(v) }));
+      .map(([k, v]) => ({ label: labelOf(k), value: this.valueText(v) }));
+  }
+
+  private valueText(v: unknown): string {
+    if (typeof v === 'boolean' || v === 'true' || v === 'false') return v === true || v === 'true' ? 'Yes' : 'No';
+    if (typeof v === 'object') return JSON.stringify(v);
+    const text = String(v);
+    const me = this.auth.user();
+    if (me?.username && text === me.username) return me.fullName || text;
+    const person = this.colleagues().find(c => c.username === text);
+    return person?.fullName || text;
   }
 }
 
 function labelOf(key: string): string {
-  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+  // Sentence case, as every label in the console: "submittedBy" is "Submitted by", "submissionId" "Submission ID".
+  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/\bid\b/g, 'ID');
   return words.charAt(0).toUpperCase() + words.slice(1);
 }

@@ -62,11 +62,19 @@ describe('Task inbox', () => {
     const { api, el } = screenWith();
     expect(api.task).toHaveBeenCalledWith(501);
     const detail = el.querySelector('[data-test="task-detail"]')!.textContent!.replace(/\s+/g, ' ');
-    expect(detail).toContain('Vendor Name');
+    expect(detail).toContain('Vendor name');
     expect(detail).toContain('Acme');
     expect(detail).toContain('Requested by Alex');
     expect(detail).toContain('Manager approves: waiting for you · due ' + shortTime('2026-10-02T16:00:00'));
     expect(el.querySelector('[data-test="decisions"]')!.textContent).toContain('Approve');
+  });
+
+  it('reads a yes/no field as Yes or No and a username as the person\'s name (UI review U10, U14)', () => {
+    const { screen } = screenWith();
+    expect(screen.fields({ infected: false, signed: 'true', submittedBy: 'alex@x.io', patient: 'SYN-001' })).toEqual([
+      { label: 'Infected', value: 'No' }, { label: 'Signed', value: 'Yes' }, { label: 'Submitted by', value: 'Alex' },
+      { label: 'Patient', value: 'SYN-001' }]);
+    expect(screen.fields({ submissionId: 1005 })).toEqual([{ label: 'Submission ID', value: '1005' }]);
   });
 
   it('asks for a reason before a rejection that needs one', () => {
