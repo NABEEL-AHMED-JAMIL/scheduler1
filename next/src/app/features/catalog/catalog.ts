@@ -1,9 +1,12 @@
-import { Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { Router } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
+import { Pagination } from '../../shared/ui/pagination';
+import { PAGE_SIZES } from '../../shared/ui/pager';
 import { SegmentOption, Segmented } from '../../shared/ui/segmented';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
@@ -19,10 +22,13 @@ type KindFilter = '' | 'dataset' | 'file' | 'document_type';
  * and filters (sensitive, stale, without an owner); the chips narrow by kind; the search reads names, paths,
  * descriptions, columns and tags. A row opens its asset in a panel: details, columns and tags, lineage, access.
  * ?flag=, ?q= and ?asset= open the page that way (the strip's tiles link to themselves with a flag).
+ *
+ * Paged on the server (UI review U4, P2 #29): kind, flag and text are all filtered there, the heading says "N of M"
+ * from the server's total, and a new search cancels the one still in flight so a slow answer cannot overwrite it.
  */
 @Component({
   selector: 'app-catalog',
-  imports: [StatStrip, TableShell, Icon, Segmented],
+  imports: [StatStrip, TableShell, Icon, Segmented, Pagination],
   templateUrl: './catalog.html',
 })
 export class Catalog implements OnInit {
@@ -43,6 +49,12 @@ export class Catalog implements OnInit {
   readonly flag = signal('');
   readonly search = signal('');
   readonly withDeleted = signal(false);
+  /** The page shown, from 1 as the pager counts; the server counts from 0. */
+  readonly page = signal(1);
+  readonly size = signal(PAGE_SIZES[0]);
+  /** How many assets the filter matches in all; null until the first answer. */
+  readonly total = signal<number | null>(null);
+  private inFlight?: Subscription;
 
   readonly kinds: SegmentOption<KindFilter>[] = [
     { id: '', label: 'All' }, { id: 'dataset', label: 'Datasets', icon: 'database' }, { id: 'file', label: 'Files', icon: 'file' },
@@ -54,15 +66,13 @@ export class Catalog implements OnInit {
 
   readonly kindText = kindText;
   readonly tagText = tagText;
+  readonly tagList = (tags: string[] | null | undefined) => (tags ?? []).map(tagText).join(', ');
   readonly where = whereText;
   readonly tone = sensitivityTone;
   readonly fresh = (at: string | null) => freshnessText(at);
 
-  /** The rows shown: the server filters by flag and text; kind is narrowed here so the chips answer at once. */
-  readonly shown = computed(() => {
-    const kind = this.kind();
-    return kind ? this.assets().filter(a => a.kind === kind) : this.assets();
-  });
+  /** The rows shown: one page, filtered by kind, flag and text on the server. */
+  readonly shown = this.assets.asReadonly();
 
   readonly kpis = computed<StatStripItem[]>(() => {
     const s = this.summary();
@@ -79,6 +89,7 @@ export class Catalog implements OnInit {
   private searchTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
+    inject(DestroyRef).onDestroy(() => { this.inFlight?.unsubscribe(); if (this.searchTimer) clearTimeout(this.searchTimer); });
     // The address is the filter: a tile, a link or the back button sets the flag and text, and the list follows.
     effect(() => {
       const flag = this.flagParam() ?? '';
@@ -86,6 +97,7 @@ export class Catalog implements OnInit {
       untracked(() => {
         this.flag.set(flag);
         this.search.set(q);
+        this.page.set(1);
         this.load();
       });
     });
@@ -104,16 +116,23 @@ export class Catalog implements OnInit {
   }
 
   load(): void {
+    this.inFlight?.unsubscribe();
     this.loading.set(true);
     this.error.set('');
-    this.api.list({ q: this.search().trim() || undefined, flag: this.flag() || undefined, withDeleted: this.withDeleted() }).subscribe({
+    this.inFlight = this.api.list({ q: this.search().trim() || undefined, kind: this.kind() || undefined, flag: this.flag() || undefined,
+      withDeleted: this.withDeleted(), page: this.page() - 1, size: this.size() }).subscribe({
       next: res => {
         this.loading.set(false);
         if (res.status !== API_SUCCESS) {
           this.error.set(res.message || 'The catalog could not be read.');
           return;
         }
-        this.assets.set(res.data ?? []);
+        const rows = res.data ?? [];
+        this.assets.set(rows);
+        this.total.set(res.paging?.total ?? rows.length);
+        // A filter that shrank the list under the page shown: go to its last page rather than show a blank one.
+        const last = Math.max(1, Math.ceil((this.total() ?? 0) / this.size()));
+        if (!rows.length && this.page() > last) this.goTo(last);
       },
       error: () => { this.loading.set(false); this.error.set('The catalog could not be reached.'); },
     });
@@ -131,11 +150,29 @@ export class Catalog implements OnInit {
   typed(text: string): void {
     this.search.set(text);
     if (this.searchTimer) clearTimeout(this.searchTimer);
-    this.searchTimer = setTimeout(() => this.load(), 300);
+    this.searchTimer = setTimeout(() => { this.page.set(1); this.load(); }, 300);
+  }
+
+  setKind(kind: KindFilter): void {
+    this.kind.set(kind);
+    this.page.set(1);
+    this.load();
   }
 
   showDeleted(on: boolean): void {
     this.withDeleted.set(on);
+    this.page.set(1);
+    this.load();
+  }
+
+  goTo(page: number): void {
+    this.page.set(Math.max(1, page));
+    this.load();
+  }
+
+  setSize(size: number): void {
+    this.size.set(size);
+    this.page.set(1);
     this.load();
   }
 

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
-import { AssetDetail, CatalogAsset, CatalogSummary, Grant, LineageGraph } from './catalog.model';
+import { AssetDetail, CatalogAsset, CatalogPaging, CatalogSummary, Grant, LineageGraph } from './catalog.model';
 
 const BASE = () => `${API_BASE}/analyticsCatalog.json`;
 
@@ -11,13 +11,16 @@ const BASE = () => `${API_BASE}/analyticsCatalog.json`;
 export class CatalogApi {
   private readonly http = inject(HttpClient);
 
-  list(filter: { q?: string; kind?: string; flag?: string; withDeleted?: boolean }): Observable<ApiResponse<CatalogAsset[]>> {
+  /** One page of the assets (page from 0); paging.total is how many the filter matches in all. */
+  list(filter: { q?: string; kind?: string; flag?: string; withDeleted?: boolean; page?: number; size?: number }):
+    Observable<ApiResponse<CatalogAsset[]> & { paging?: CatalogPaging }> {
     let params = new HttpParams();
     if (filter.q) params = params.set('q', filter.q);
     if (filter.kind) params = params.set('kind', filter.kind);
     if (filter.flag) params = params.set('flag', filter.flag);
     if (filter.withDeleted) params = params.set('withDeleted', 'true');
-    return this.http.get<ApiResponse<CatalogAsset[]>>(`${BASE()}/list`, { params });
+    if (filter.size) params = params.set('page', filter.page ?? 0).set('size', filter.size);
+    return this.http.get<ApiResponse<CatalogAsset[]> & { paging?: CatalogPaging }>(`${BASE()}/list`, { params });
   }
 
   summary(): Observable<ApiResponse<CatalogSummary>> {

@@ -77,6 +77,9 @@ export interface AssetDetail extends CatalogAsset {
   myAccess: Grant | null;
 }
 
+/** The list's paging block: page from 0, and how many assets the filter matches in all. */
+export interface CatalogPaging { page: number; size: number; total: number; }
+
 export interface CatalogSummary {
   assets: number;
   sensitive: number;
@@ -115,7 +118,7 @@ export function sensitivityTone(level: string | null | undefined): string {
 /** Where an asset lives, and how big it is, for the line under its name. */
 export function whereText(a: CatalogAsset): string {
   const where = a.kind === 'document_type' ? 'Document Intelligence' : [a.connection, a.path].filter(Boolean).join(' · ');
-  const rows = a.rowCount != null ? `${a.rowCount.toLocaleString('en-US')} rows` : '';
+  const rows = a.rowCount != null ? `${a.rowCount.toLocaleString('en-US')} ${a.rowCount === 1 ? 'row' : 'rows'}` : '';
   return [where, rows].filter(Boolean).join(' · ');
 }
 

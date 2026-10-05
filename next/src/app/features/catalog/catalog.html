@@ -16,10 +16,10 @@
   }
 
   <app-table-shell heading="Assets" columnsKey="data-catalog" [loading]="loading()" [error]="error()" [isEmpty]="!shown().length"
-                   [shown]="shown().length" [scrollRows]="false" emptyIcon="database" (retry)="load()"
-                   [emptyMessage]="assets().length || search() || flag() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
+                   [shown]="shown().length" [total]="total()" [scrollRows]="false" emptyIcon="database" (retry)="load()"
+                   [emptyMessage]="search() || flag() || kind() || withDeleted() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
     <ng-container toolbar>
-      <app-segmented [value]="kind()" (valueChange)="kind.set($event)" [options]="kinds" ariaLabel="Kind of asset" />
+      <app-segmented [value]="kind()" (valueChange)="setKind($event)" [options]="kinds" ariaLabel="Kind of asset" />
       <label class="sr-only" for="catalogFlag">Show</label>
       <select id="catalogFlag" class="input input-sm w-auto" (change)="setFlag($any($event.target).value)" data-flag>
         @for (f of flags; track f.id) { <option [value]="f.id" [selected]="flag() === f.id">{{ f.label }}</option> }
@@ -33,28 +33,39 @@
     </ng-container>
     <table class="table-modern">
       <thead>
-        <tr><th>Asset</th><th>Type</th><th>Owner</th><th>Freshness</th><th>Sensitive fields</th><th>Sensitivity</th><th class="text-right">Quality</th></tr>
+        <tr><th>Asset</th><th class="hidden xl:table-cell">Type</th><th>Owner</th><th>Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell">Sensitivity</th><th class="text-right">Quality</th></tr>
       </thead>
       <tbody>
         @for (a of shown(); track a.assetId) {
           <tr class="cursor-pointer" [attr.data-asset]="a.assetId" (click)="open(a.assetId, a.name)" tabindex="0" (keydown.enter)="open(a.assetId, a.name)">
             <td class="min-w-0">
-              <div class="font-medium truncate max-w-md" [title]="a.name">{{ a.name }}</div>
-              <div class="text-xs text-[color:var(--text-muted)] truncate max-w-md" [title]="where(a)">{{ where(a) }}</div>
+              <div class="font-medium truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="a.name">{{ a.name }}</div>
+              <!-- Below 1280px the type rides on this line and its column goes: seven columns did not fit 1024 (UI review U4). -->
+              <div class="text-xs text-[color:var(--text-muted)] truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="where(a)"><span class="xl:hidden">{{ kindText(a.kind) }} · </span>{{ where(a) }}</div>
+              @if (a.status === 'Deleted') { <span class="pill pill-crit xl:hidden">Deleted</span> }
             </td>
-            <td class="whitespace-nowrap">{{ kindText(a.kind) }}
+            <td class="whitespace-nowrap hidden xl:table-cell">{{ kindText(a.kind) }}
               @if (a.status === 'Deleted') { <span class="pill pill-crit">Deleted</span> }</td>
-            <td class="whitespace-nowrap">{{ a.ownerName || '—' }}</td>
+            <td><div class="truncate max-w-[8rem] lg:max-w-[10rem] xl:max-w-[14rem]" [title]="a.ownerName || ''">{{ a.ownerName || '—' }}</div></td>
             <td class="whitespace-nowrap" [class.is-stale]="a.stale">{{ fresh(a.lastChangedAt) }}</td>
             <td>
-              @for (t of a.tags ?? []; track t) { <span class="pill pill-warn">{{ tagText(t) }}</span> }
-              @if (!(a.tags ?? []).length) { <span class="text-[color:var(--text-muted)]">—</span> }
+              <!-- Two tags and a count: a file with eight tagged columns stacked eight pills and stood a row 100px tall. -->
+              <div class="flex flex-wrap items-center gap-1">
+                <!-- Below 1024px the sensitivity leads this cell and its own column goes. -->
+                <span class="pill lg:hidden" [class]="'pill-' + tone(a.sensitivity)">{{ a.sensitivity }}</span>
+                @for (t of (a.tags ?? []).slice(0, 2); track t) { <span class="pill pill-warn">{{ tagText(t) }}</span> }
+                @if ((a.tags ?? []).length > 2) {
+                  <span class="text-xs text-[color:var(--text-muted)]" [title]="tagList(a.tags)">+{{ (a.tags ?? []).length - 2 }} more</span>
+                }
+                @if (!(a.tags ?? []).length) { <span class="text-[color:var(--text-muted)] hidden lg:inline">—</span> }
+              </div>
             </td>
-            <td><span class="pill" [class]="'pill-' + tone(a.sensitivity)">{{ a.sensitivity }}</span></td>
+            <td class="hidden lg:table-cell"><span class="pill" [class]="'pill-' + tone(a.sensitivity)">{{ a.sensitivity }}</span></td>
             <td class="text-right tabular">{{ a.qualityScore != null ? a.qualityScore + '%' : '—' }}</td>
           </tr>
         }
       </tbody>
     </table>
+    <app-pagination pager [total]="total() ?? 0" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
   </app-table-shell>
 </div>

@@ -3,7 +3,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { of } from 'rxjs';
+import { Observable, Subject, of } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { Catalog } from './catalog';
@@ -43,7 +43,7 @@ function api(detail?: Partial<AssetDetail>) {
     { position: 1, name: 'region', dataType: 'VARCHAR', nullPercent: 25, distinctCount: 2, tags: [], tagsReviewed: true }],
     canEdit: false, masked: false, myAccess: null, ...detail };
   return {
-    list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: ASSETS })),
+    list: vi.fn((): Observable<unknown> => of({ status: 'SUCCESS', message: '', data: ASSETS, paging: { page: 0, size: 50, total: 244 } })),
     summary: vi.fn(() => of({ status: 'SUCCESS', message: '', data: SUMMARY })),
     asset: vi.fn(() => of({ status: 'SUCCESS', message: '', data: asset })),
     lineage: vi.fn(() => of({ status: 'SUCCESS', message: '', data: GRAPH })),
@@ -88,7 +88,8 @@ function panel(detail?: Partial<AssetDetail>) {
 describe('Data Catalog', () => {
   it('lists the assets with their owner, freshness, sensitive fields, sensitivity and quality, and counts them in the strip', () => {
     const { el, fake } = page();
-    expect(fake.list).toHaveBeenCalledWith({ q: undefined, flag: undefined, withDeleted: false });
+    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: undefined, withDeleted: false, page: 0, size: 50 });
+    expect(el.querySelector('h2')?.textContent).toContain('(2 of 244)');
     const rows = Array.from(el.querySelectorAll('tr[data-asset]'));
     expect(rows.map(r => r.getAttribute('data-asset'))).toEqual(['1346', '1010']);
     expect(rows[0].textContent).toContain('customers.csv');
@@ -102,12 +103,31 @@ describe('Data Catalog', () => {
     expect(el.textContent).toContain('Stale over 30 days');
   });
 
-  it('narrows by kind at once and by flag through the address', () => {
-    const { screen, fixture, el, fake } = page('sensitive');
-    expect(fake.list).toHaveBeenCalledWith({ q: undefined, flag: 'sensitive', withDeleted: false });
-    screen.kind.set('dataset');
+  it('narrows by kind on the server and by flag through the address, from the first page', () => {
+    const { screen, fake } = page('sensitive');
+    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: 'sensitive', withDeleted: false, page: 0, size: 50 });
+    screen.goTo(3);
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
+    screen.setKind('dataset');
+    expect(fake.list).toHaveBeenLastCalledWith({ q: undefined, kind: 'dataset', flag: 'sensitive', withDeleted: false, page: 0, size: 50 });
+  });
+
+  it('pages on the server and cancels a search still in flight when a newer one starts', () => {
+    const { screen, fixture, el, fake } = page();
+    const slow = new Subject<unknown>();
+    const fast = new Subject<unknown>();
+    fake.list.mockReturnValueOnce(slow).mockReturnValueOnce(fast);
+    screen.load();
+    screen.load();
+    expect(slow.observed).toBe(false);
+    fast.next({ status: 'SUCCESS', message: '', data: [ASSETS[1]], paging: { page: 0, size: 50, total: 1 } });
     fixture.detectChanges();
     expect(Array.from(el.querySelectorAll('tr[data-asset]')).map(r => r.getAttribute('data-asset'))).toEqual(['1010']);
+    expect(el.querySelector('h2')?.textContent).toContain('(1 of 1)');
+  });
+
+  it('says one row, not one rows', () => {
+    expect(whereText({ ...ASSETS[0], rowCount: 1 })).toBe('ui-review-s3 · crm/customers.csv · 1 row');
   });
 
   it('opens an asset in its panel', () => {
