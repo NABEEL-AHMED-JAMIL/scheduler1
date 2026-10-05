@@ -2,7 +2,7 @@ import { Component, computed, input, output } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Params, RouterLink } from '@angular/router';
 import { Icon } from './icon';
-import { StatTone } from './stat-tile';
+import { StatTone, figure } from './stat-tile';
 
 /** One count in a strip. Plain data only -- no callbacks, so a template never binds a function. */
 export interface StatStripItem {
@@ -106,7 +106,7 @@ const lastSpan = (count: number, cols: number): number => count % cols === 0 ? 1
     }
     @if (summary(); as total) {
       <div role="listitem" class="stat-strip-summary">
-        <span class="stat-strip-value">{{ total.value }}</span>
+        <span class="stat-strip-value">{{ figure(total.value) }}</span>
         <span class="stat-strip-label">{{ total.label }}</span>
       </div>
     }
@@ -121,7 +121,7 @@ const lastSpan = (count: number, cols: number): number => count % cols === 0 ? 1
       }
       <span class="stat-strip-text">
         <span class="stat-strip-label">{{ item.label }}</span>
-        <span class="stat-strip-value" [class.is-quiet]="item.quiet">{{ item.value }}</span>
+        <span class="stat-strip-value" [class.is-quiet]="item.quiet">{{ figure(item.value) }}</span>
         @if (item.foot) { <span class="stat-strip-foot">{{ item.foot }}</span> }
       </span>
       @if (item.live) {
@@ -132,6 +132,8 @@ const lastSpan = (count: number, cols: number): number => count % cols === 0 ? 1
   `,
 })
 export class StatStrip {
+  /** Counts with thousands separators (UI review U12). */
+  protected readonly figure = figure;
   readonly items = input.required<readonly StatStripItem[]>();
   /** Columns on a phone. Two or three: a fourth squeezes the labels into single letters. */
   readonly cols = input<StripPhoneCols>(2);

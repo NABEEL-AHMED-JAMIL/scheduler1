@@ -1,8 +1,13 @@
-import { Component, input } from '@angular/core';
+import { Component, computed, input } from '@angular/core';
 import { Icon } from './icon';
 
 /** The intent tints shared by the stat tile and the stat strip: the icon-* helpers in styles.css. */
 export type StatTone = 'ok' | 'warn' | 'crit' | 'info' | 'muted';
+
+/** A number with en-US grouping; anything else as it is. */
+export function figure(value: string | number | null | undefined): string {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString('en-US') : String(value ?? '');
+}
 
 /**
  * The KPI tile that sits above a page's table. Six screens had hand-rolled copies of the
@@ -19,7 +24,7 @@ export type StatTone = 'ok' | 'warn' | 'crit' | 'info' | 'muted';
     <div class="flex items-start justify-between gap-2">
       <div class="min-w-0">
         <div class="stat-label">{{ label() }}</div>
-        <div class="stat-value">{{ value() }}</div>
+        <div class="stat-value">{{ shown() }}</div>
       </div>
       @if (icon()) {
         <span class="stat-glyph" [class]="'icon-' + tone()">
@@ -34,6 +39,8 @@ export type StatTone = 'ok' | 'warn' | 'crit' | 'info' | 'muted';
 export class StatTile {
   readonly label = input('');
   readonly value = input<string | number>('');
+  /** A count with thousands separators: 137500 tokens read as 137,500 (UI review U12). Text passes as given. */
+  protected readonly shown = computed(() => figure(this.value()));
   readonly foot = input('');
   readonly icon = input('');
   /** Matches the icon-* helpers in styles.css, so the tint follows the same palette as everywhere else. */
