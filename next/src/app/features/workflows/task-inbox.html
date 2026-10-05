@@ -13,9 +13,9 @@
     <div class="flex items-center gap-2 flex-wrap">
       <div class="seg" role="tablist" aria-label="Which tasks">
         <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'mine'" [class.seg-on]="tab() === 'mine'" (click)="pick('mine')" data-test="tab-mine">
-          Mine ({{ mine().length }})</button>
+          Mine ({{ mineCount() }})</button>
         <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'groups'" [class.seg-on]="tab() === 'groups'" (click)="pick('groups')" data-test="tab-groups">
-          My groups ({{ groups().length }})</button>
+          My groups ({{ groupsCount() }})</button>
         <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'done'" [class.seg-on]="tab() === 'done'" (click)="pick('done')" data-test="tab-done">Done</button>
         <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'requests'" [class.seg-on]="tab() === 'requests'" (click)="pick('requests')" data-test="tab-requests">
           My requests</button>
@@ -56,6 +56,12 @@
             @else if (tab() === 'groups') { Nothing is waiting for your groups. }
             @else { You have not acted on any task yet. }
           </div>
+        }
+        @if (listCapped()) {
+          <!-- P2 #31: the list stops at the service's limit; say so rather than pass it off as all. -->
+          <p class="px-4 py-3 border-t border-subtle text-xs text-[color:var(--text-muted)]" data-capped>
+            {{ tab() === 'done' ? 'The ' + rows().length + ' you acted on most recently.' : 'The ' + rows().length + ' due soonest; act on these and the rest move up.' }}
+          </p>
         }
       } @else {
         @for (r of requests(); track r.id) {
@@ -109,7 +115,16 @@
           </div>
 
           @if (ownRequest() && d.state === 'Open') {
-            <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-[color:var(--text-secondary)]" role="note"><app-icon name="info" size="0.95em" />This is your own request: someone else decides it.</p>
+            <p class="flex items-start gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-[color:var(--text-secondary)]" role="note" data-own-request>
+              <app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" />
+              <!-- P2 #36: in a one-person workspace there is no one else, and the request would wait for ever. -->
+              @if (aloneInWorkspace()) {
+                <span>This is your own request, and no one may approve their own. You are the only person in this workspace, so it waits
+                  until someone else joins: add a person under Administration › Users, then they decide it from their Task inbox.</span>
+              } @else {
+                <span>This is your own request: someone else decides it.</span>
+              }
+            </p>
           }
 
           @if (canDecide()) {

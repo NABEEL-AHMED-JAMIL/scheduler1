@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
-import { TaskInbox } from './task-inbox';
+import { TaskInbox, INBOX_LIST_LIMIT } from './task-inbox';
 import { TaskCountService } from './task-count.service';
 import { InboxTask, TaskDetail, WorkflowsApi } from './workflows.api';
 import { historyLines, shortTime } from './history';
@@ -48,7 +48,7 @@ function screenWith(detail: TaskDetail = DETAIL) {
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
     ],
   });
@@ -117,5 +117,21 @@ describe('Task history in words', () => {
     expect(shortTime('2026-10-01T08:05:00', 'America/Chicago')).toBe('1 Oct, 08:05');
     expect(shortTime('2026-09-30T22:20:57.914+00:00', 'America/Chicago')).toBe('30 Sep, 17:20');
     expect(shortTime('2026-09-30T22:20:57.914+00:00', 'UTC')).toBe('30 Sep, 22:20');
+  });
+});
+
+describe('P2 #31 and #36: the inbox at the edges', () => {
+  it('reads a full tab from the count service, or "200+", never a silent 200', () => {
+    const { screen } = screenWith();
+    expect(screen.tabCount(12, 0)).toBe('12');
+    expect(screen.tabCount(INBOX_LIST_LIMIT, 0)).toBe('200+');
+    expect(screen.tabCount(INBOX_LIST_LIMIT, 1240)).toBe('1,240');
+  });
+
+  it('explains a request of one\'s own in a workspace with no one else to approve it', () => {
+    const { screen } = screenWith();
+    expect(screen.aloneInWorkspace()).toBe(false);
+    screen.colleagues.set([{ userId: 4537, fullName: 'Me', username: 'me@x.io' } as never]);
+    expect(screen.aloneInWorkspace()).toBe(true);
   });
 });

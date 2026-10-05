@@ -15,6 +15,9 @@ import { TaskCountService } from './task-count.service';
 
 export type InboxTab = 'mine' | 'groups' | 'done' | 'requests';
 
+/** How many tasks a tab's list holds at most: the workflow service's Inbox.LIMIT. */
+export const INBOX_LIST_LIMIT = 200;
+
 /**
  * The Task inbox (MIG-276): the approvals and tasks waiting for the reader, as the design preview draws it -- the list on
  * the left (Mine, My groups, Done), the task on the right with the request's fields, its history, a comment and the
@@ -50,6 +53,7 @@ export class TaskInbox implements OnInit {
   readonly detailError = signal('');
 
   readonly colleagues = signal<Colleague[]>([]);
+  private readonly colleaguesLoaded = signal(false);
   readonly comment = signal('');
   readonly passTo = signal<number | null>(null);
   readonly passing = signal(false);
@@ -100,7 +104,7 @@ export class TaskInbox implements OnInit {
     }
     const task = Number(params.get('task'));
     if (task) this.openTask(task);
-    this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) this.colleagues.set(r.data ?? []); }, error: () => {} });
+    this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     this.load();
   }
 
@@ -237,6 +241,22 @@ export class TaskInbox implements OnInit {
     this.load();
     this.openTask(taskId);
   }
+
+  /**
+   * A tab's count (P2 #31): the list stops at the service's 200, so a full list reads the service's own count, or
+   * "200+" until that count is in, never a silent 200.
+   */
+  tabCount(listed: number, counted: number): string {
+    if (listed < INBOX_LIST_LIMIT) return String(listed);
+    return counted > listed ? counted.toLocaleString('en-US') : `${listed}+`;
+  }
+
+  /** P2 #36: nobody else in the workspace, so a request of one's own has no one to approve it. */
+  readonly aloneInWorkspace = computed(() => this.colleaguesLoaded() && !this.colleagues().some(c => c.userId !== this.me()));
+  readonly mineCount = computed(() => this.tabCount(this.mine().length, this.badge.mine()));
+  readonly groupsCount = computed(() => this.tabCount(this.groups().length, this.badge.groups()));
+  /** The open tab's list is cut at the service's limit. */
+  readonly listCapped = computed(() => this.tab() !== 'requests' && this.rows().length >= INBOX_LIST_LIMIT);
 
   // ---- words ------------------------------------------------------------------------------------------------------
 

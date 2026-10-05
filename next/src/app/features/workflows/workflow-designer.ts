@@ -58,6 +58,10 @@ export class WorkflowDesigner implements OnInit {
   readonly view = signal<'steps' | 'history' | 'test' | 'new'>('steps');
 
   readonly colleagues = signal<Colleague[]>([]);
+  private readonly colleaguesLoaded = signal(false);
+  /** P2 #36: the workspace has nobody but the reader, so an approval has no one to decide it. */
+  readonly soleMember = computed(() => this.colleaguesLoaded()
+    && !this.colleagues().some(c => c.userId !== this.auth.user()?.appUserId));
   readonly groups = signal<{ id: number; name: string }[]>([]);
   readonly jobs = signal<{ jobId: number; jobName?: string }[]>([]);
 
@@ -94,7 +98,7 @@ export class WorkflowDesigner implements OnInit {
     .map(j => ({ value: String(j.jobId), label: j.jobName || `Schedule #${j.jobId}`, hint: `#${j.jobId}` })));
 
   ngOnInit(): void {
-    this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) this.colleagues.set(r.data ?? []); }, error: () => {} });
+    this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     if (this.auth.isTenantAdmin()) {
       this.profiles.list().subscribe({
         next: r => { if (r.status === API_SUCCESS) this.groups.set((r.data ?? []).map(p => ({ id: p.pageAccessProfileId, name: p.profileName }))); },

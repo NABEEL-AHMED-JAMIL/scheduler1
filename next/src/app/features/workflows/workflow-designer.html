@@ -196,6 +196,14 @@
                     @if (s.slaHours) {
                       <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'escalateTo', who: s.escalateTo ?? { kind: 'manager' }, label: 'When overdue, it goes to', allowNone: false, noRequester: true }" />
                     }
+                    @if (s.type === 'approval' && soleMember()) {
+                      <!-- P2 #36: no one approves their own request, so with one person nothing would ever be decided. -->
+                      <p class="flex items-start gap-2 rounded-md px-3 py-2 text-xs bg-sunken text-[color:var(--text-secondary)]" role="note" data-sole-member>
+                        <app-icon name="info" size="0.95em" class="mt-px shrink-0" />
+                        <span>You are the only person in this workspace. No one approves their own request, so a request you start here waits
+                          until someone else joins and can decide it.</span>
+                      </p>
+                    }
                     @if (s.type === 'approval') {
                       <label class="flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="s.rejectNeedsComment" (ngModelChange)="set('rejectNeedsComment', $event)" />A rejection needs a reason</label>
                       <div>
