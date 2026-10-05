@@ -1,3 +1,4 @@
+import { ModelSetupBanner } from '../model-setup-banner';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -56,7 +57,7 @@ const SUGGESTIONS = [
  */
 @Component({
   selector: 'app-assistant',
-  imports: [Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, ModelSetupBanner],
   templateUrl: './assistant.html',
 })
 export class Assistant implements OnInit {

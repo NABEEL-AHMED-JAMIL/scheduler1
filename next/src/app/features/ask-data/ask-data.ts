@@ -1,3 +1,4 @@
+import { ModelSetupBanner } from '../ai/model-setup-banner';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
@@ -19,7 +20,7 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [RouterLink, Icon, RankedBar, AskIndex],
+  imports: [RouterLink, Icon, RankedBar, AskIndex, ModelSetupBanner],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {

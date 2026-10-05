@@ -117,7 +117,7 @@ describe('Ask your data -- the index panel is a workspace administrator\'s', () 
     TestBed.configureTestingModule({
       imports: [AskData],
       providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AskDataApi, useValue: api },
-        { provide: AuthService, useValue: { isTenantAdmin: () => admin } }],
+        { provide: AuthService, useValue: { isTenantAdmin: () => admin, user: () => null } }],
     });
     const fixture = TestBed.createComponent(AskData);
     fixture.detectChanges();
