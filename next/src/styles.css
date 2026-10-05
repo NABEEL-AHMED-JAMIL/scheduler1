@@ -2375,3 +2375,10 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 .date-field { display: inline-flex; align-items: center; gap: 0.25rem; position: relative; }
 .date-field-button { display: inline-flex; align-items: center; gap: 0.45rem; min-width: 9.5rem; text-align: left; cursor: pointer; }
 .date-field-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* Ask your data (UI review U13): from 1280px an answer's sources stand beside its text instead of under it, so a
+   wide screen holds the answer and what it came from side by side. */
+@media (min-width: 1280px) {
+  .ask-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, 34rem); column-gap: 1.5rem; align-items: start; }
+  .ask-split > .ask-sources { border-top: 0; padding-top: 0; border-left: 1px solid var(--border-subtle); padding-left: 1rem; }
+}

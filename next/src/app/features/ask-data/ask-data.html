@@ -1,4 +1,6 @@
-<div class="page max-w-6xl">
+<!-- The whole width (UI review U13): at 2560 a 72rem column left two-thirds of the screen empty. The answer's sources
+     stand beside it from 1280px, and its text keeps a readable measure. -->
+<div class="page">
   <div class="page-head">
     <div>
       <h1 class="page-title">Ask your data</h1>
@@ -16,7 +18,7 @@
     <label class="sr-only" for="ask-question">Your question</label>
     <div class="flex items-start gap-2">
       <textarea id="ask-question" class="input flex-1 min-w-0 resize-y" rows="2" data-test="question"
-                placeholder="For example: which wounds are getting worse?" [attr.maxlength]="max"
+                placeholder="For example: which records changed this week?" [attr.maxlength]="max"
                 [value]="question()" (input)="question.set($any($event.target).value)" (keydown)="onKey($event)"></textarea>
       <button type="button" class="btn btn-primary shrink-0" data-test="ask" [disabled]="!canAsk()" (click)="ask()">
         <app-icon name="send" />Ask
@@ -82,6 +84,7 @@
               @if (a.query; as q) {
                 <div class="flex flex-col gap-3" data-test="query-answer">
                   <p class="text-sm leading-relaxed" data-test="answer">{{ a.answer }}</p>
+                  <div class="flex flex-col gap-3 2xl:grid 2xl:grid-cols-2 2xl:items-start">
                   @if (chartItems(q).length) {
                     <div class="card p-4" data-test="query-chart">
                       <p class="text-xs text-[color:var(--text-muted)] mb-2">{{ q.chart!.value }} by {{ q.chart!.label }}</p>
@@ -89,6 +92,7 @@
                     </div>
                   }
                   @if (q.rows.length) {
+                    <div class="min-w-0 flex flex-col gap-2">
                     <div class="overflow-x-auto">
                       <table class="table-modern" data-test="query-rows">
                         <thead><tr>@for (c of q.columns; track $index) { <th>{{ c }}</th> }</tr></thead>
@@ -102,7 +106,9 @@
                     @if (q.rows.length > 20 || q.truncated) {
                       <p class="text-xs text-[color:var(--text-muted)]">The first {{ shownRows(q).length }} of {{ q.rowCount }} rows{{ q.truncated ? ' (more were cut at the row limit)' : '' }}.</p>
                     }
+                    </div>
                   }
+                  </div>
                   <div class="flex flex-col gap-1">
                     <p class="text-xs font-medium">The query, run as you over "{{ q.dataset.name }}"</p>
                     <pre class="mono text-xs whitespace-pre-wrap break-words card p-4" data-test="query-sql">{{ q.sql }}</pre>
@@ -126,9 +132,10 @@
                   </div>
                 </div>
               } @else {
-                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words" data-test="answer">@for (p of parts(a); track $index) {@if (p.cite !== undefined) {<button type="button" class="text-xs font-semibold text-accent hover:underline" [attr.aria-label]="'Source ' + p.cite" (click)="showSource(t, p.cite)">[{{ p.cite }}]</button>} @else {<span>{{ p.text }}</span>}}</p>
+                <div class="flex flex-col gap-3" [class.ask-split]="a.sources.length">
+                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words max-w-[100ch]" data-test="answer">@for (p of parts(a); track $index) {@if (p.cite !== undefined) {<button type="button" class="text-xs font-semibold text-accent hover:underline" [attr.aria-label]="'Source ' + p.cite" (click)="showSource(t, p.cite)">[{{ p.cite }}]</button>} @else {<span>{{ p.text }}</span>}}</p>
                 @if (a.sources.length) {
-                  <ol class="flex flex-col gap-2 border-t border-subtle pt-3" data-test="sources" aria-label="Sources">
+                  <ol class="ask-sources flex flex-col gap-2 border-t border-subtle pt-3" data-test="sources" aria-label="Sources">
                     @for (s of a.sources; track s.n) {
                       <li class="flex items-start gap-2 text-sm rounded-lg -mx-1 px-1 transition-colors" [class.bg-accent-soft]="highlighted() === anchor(t, s.n)"
                           [id]="anchor(t, s.n)" [attr.data-source]="s.n">
@@ -147,6 +154,7 @@
                     }
                   </ol>
                 }
+                </div>
               }
               <p class="text-[11px] text-[color:var(--text-muted)]" data-test="meta">
                 @if (a.model) { Answered by {{ a.model }}{{ a.connection ? ' on ' + a.connection : '' }} in {{ seconds(a.latencyMs) }}. }
