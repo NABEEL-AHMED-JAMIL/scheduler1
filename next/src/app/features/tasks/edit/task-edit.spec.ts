@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { of } from 'rxjs';
-import { TaskEdit } from './task-edit';
+import { TaskEdit, yesNoAsCheckbox } from './task-edit';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 
@@ -603,5 +603,14 @@ describe('TaskEdit name', () => {
     expect(name.errors).toEqual({ required: true });
     name.setValue(' Nightly load ');
     expect(name.valid).toBe(true);
+  });
+});
+
+describe('UI review U15: a yes/no field is a checkbox, not a box for the word', () => {
+  it('draws a text field defaulting to true or false as a checkbox, and leaves other text alone', () => {
+    const base = { tagKey: 'deleteInput', label: 'Delete the input after success', required: false, position: 5 } as never;
+    expect(yesNoAsCheckbox({ ...(base as object), fieldType: 'text', defaultValue: 'false' } as never).fieldType).toBe('checkbox');
+    expect(yesNoAsCheckbox({ ...(base as object), fieldType: 'text', defaultValue: ' TRUE ' } as never).defaultValue).toBe('true');
+    expect(yesNoAsCheckbox({ ...(base as object), fieldType: 'text', defaultValue: 'falsey' } as never).fieldType).toBe('text');
   });
 });

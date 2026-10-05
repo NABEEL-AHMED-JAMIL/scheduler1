@@ -29,6 +29,15 @@ const PAGE_TABS: { id: PageTab; label: string }[] = [
 ];
 const BUILDER_TABS: string[] = ['steps', 'settings', 'yaml', 'json'];
 
+/**
+ * A text field whose default is "true" or "false" is a yes/no answer typed into a box (UI review U15: "Delete the
+ * input after success" asked for the word). It is drawn as a checkbox; the tag still carries "true" or "false".
+ */
+export function yesNoAsCheckbox(field: PipelineField): PipelineField {
+  return field.fieldType === 'text' && /^(true|false)$/i.test((field.defaultValue ?? '').trim())
+    ? { ...field, fieldType: 'checkbox', defaultValue: field.defaultValue!.trim().toLowerCase() } : field;
+}
+
 @Component({
   selector: 'app-task-edit',
   imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner],
@@ -88,7 +97,7 @@ export class TaskEdit implements OnInit {
 
   /** The fields in the order their author put them in; `position` is not guaranteed sorted. */
   readonly formFields = computed(() =>
-    [...(this.pipelineDef()?.fields ?? [])].sort((a, b) => a.position - b.position));
+    [...(this.pipelineDef()?.fields ?? [])].sort((a, b) => a.position - b.position).map(yesNoAsCheckbox));
 
   /** Which pipeline the currently loaded form belongs to, so the same fetch is not repeated. */
   private loadedFormPipeline: string | null = null;

@@ -44,7 +44,7 @@ export interface TaskType {
                    [control]="form.get('serviceName')" [submitted]="submitted()"
                    hint="How the topic appears when a task picks it — usually the consumer's name.">
           <input id="serviceName" class="input" formControlName="serviceName"
-                 placeholder="ETL Scrapping Pipeline" />
+                 placeholder="ETL Scraping Pipeline" />
         </app-field>
 
         @if (needsWorkspace()) {
@@ -67,7 +67,7 @@ export interface TaskType {
                      [control]="form.get('topic')" [submitted]="submitted()"
                      hint="Letters, digits, dots, underscores and hyphens — up to 249 characters."
                      [errorMessages]="{ pattern: 'Use letters, digits, dots, underscores or hyphens, such as test-user-1-topic.' }">
-            <input id="topic" class="input mono" formControlName="topic" placeholder="scrapping-topic" />
+            <input id="topic" class="input mono" formControlName="topic" placeholder="scraping-topic" />
           </app-field>
 
           <app-field label="Partition" for="partitions"
@@ -78,7 +78,8 @@ export interface TaskType {
           </app-field>
         </div>
 
-        <p class="field-note text-[color:var(--text-muted)] flex items-start gap-1.5">
+        <!-- mb-2: the note sat flush on the Status label below it (UI review U15). -->
+        <p class="field-note text-[color:var(--text-muted)] flex items-start gap-1.5 mb-2">
           <app-icon name="server" size="0.9em" class="mt-px shrink-0" />
           <span>Publishes through <strong>{{ data.profileName || 'the profile it was opened from' }}</strong>.
             A topic belongs to the connection it was added under; to move it, add it under the other one.</span>

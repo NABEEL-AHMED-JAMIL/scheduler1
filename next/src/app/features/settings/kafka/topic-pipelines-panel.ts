@@ -17,7 +17,7 @@ export interface TopicPipelineRow {
  * The pipelines on one topic, in a drawer beside the Kafka pane. A row used to unfold them
  * under itself, which read fine for three and pushed the table apart for thirty; the drawer
  * holds any number, with a search once there are more than a handful, and each row opens
- * the Pipelines screen narrowed to this topic.
+ * the Task Registry narrowed to this topic (UI review U15: the button said Pipelines and went there).
  */
 @Component({
   selector: 'app-topic-pipelines-panel',
@@ -56,7 +56,7 @@ export interface TopicPipelineRow {
       </ul>
       <div foot>
         <a class="btn btn-default btn-sm" [routerLink]="['/configuration/task-registry']" [queryParams]="{ topic: data.sourceTaskTypeId }" (click)="ref.close()">
-          <app-icon name="template" />Open in Pipelines
+          <app-icon name="template" />Open in Task Registry
         </a>
         <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="ref.close()">Close</button>
       </div>
