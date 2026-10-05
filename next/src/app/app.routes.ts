@@ -1,6 +1,7 @@
 import { Routes, Route } from '@angular/router';
 import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
+import { executionsLanding } from './core/routing/executions-landing';
 
 /**
  * MIG-246 / MIG-267: the entry point of a Wave 4 or Wave 5 page that is on the menu before it is built.
@@ -243,7 +244,8 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
         data: { pageKey: 'jobs' },
-        canActivate: [pageGuard],
+        // Bare, with no hour to show, it lands on the recent runs instead of an empty table (UI review U8).
+        canActivate: [pageGuard, executionsLanding],
       },
       {
         path: 'pipelines/queue',
