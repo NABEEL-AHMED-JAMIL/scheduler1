@@ -1,0 +1,99 @@
+<section class="card p-4 flex flex-col gap-3 mt-4" aria-label="Search index" data-test="ask-index">
+  <button type="button" class="flex items-center gap-2 text-left w-full" (click)="toggle()" [attr.aria-expanded]="open()" data-test="index-toggle">
+    <app-icon name="database" class="shrink-0 text-[color:var(--text-muted)]" />
+    <span class="font-semibold">Search index</span>
+    <span class="text-xs text-[color:var(--text-muted)] flex-1 min-w-0 truncate" data-test="index-summary">
+      @if (loadError()) { {{ loadError() }} } @else { {{ summary() }} }
+    </span>
+    <span class="pill pill-neutral text-[11px]">Workspace admins</span>
+    <app-icon [name]="open() ? 'minus' : 'plus'" size="0.9em" class="shrink-0" />
+  </button>
+
+  @if (open()) {
+    @if (status(); as s) {
+      <p class="text-xs text-[color:var(--text-secondary)]">
+        With the index on, questions search your documents, forms and the folders below by words and by meaning, so Ask your data
+        keeps up as they grow. Each person still finds only what they can open; values the Data Catalog holds sensitive are stored masked.
+        Pipeline results are always read live.
+      </p>
+      @if (!s.available) {
+        <p class="text-xs text-warn-600 flex items-center gap-1.5"><app-icon name="info" size="0.9em" />No search index is set up on this platform, so every question reads your sources live.</p>
+      } @else if (!s.reachable) {
+        <p class="text-xs text-warn-600 flex items-center gap-1.5"><app-icon name="alert" size="0.9em" />The search index is not answering right now; questions read your sources live until it is back.</p>
+      }
+
+      <div class="flex flex-col gap-2">
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" class="checkbox" data-test="index-enabled" [checked]="enabled()" [disabled]="!s.available || saving()"
+                 (change)="enabled.set($any($event.target).checked)" />
+          Use a search index for this workspace
+        </label>
+        <div class="flex flex-wrap gap-x-5 gap-y-2 pl-6" [class.opacity-60]="!enabled()">
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" class="checkbox" data-test="index-documents" [checked]="documents()" [disabled]="!enabled() || saving()"
+                   (change)="documents.set($any($event.target).checked)" />
+            Document Intelligence (pages and extracted fields)
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" class="checkbox" data-test="index-forms" [checked]="forms()" [disabled]="!enabled() || saving()"
+                   (change)="forms.set($any($event.target).checked)" />
+            Forms (submissions and their files)
+          </label>
+        </div>
+      </div>
+
+      <div class="flex flex-col gap-2" [class.opacity-60]="!enabled()">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium">Folders</p>
+          <button type="button" class="btn btn-ghost btn-sm" data-test="index-add-folder" [disabled]="!enabled() || saving() || folders().length >= 20"
+                  (click)="addFolder()"><app-icon name="plus" />Add folder</button>
+        </div>
+        @if (!folders().length) {
+          <p class="text-xs text-[color:var(--text-muted)]">No folders: only documents and forms are indexed.</p>
+        }
+        @for (f of folders(); track $index; let i = $index) {
+          <div class="grid grid-cols-1 md:grid-cols-[minmax(0,16rem)_minmax(0,1fr)_auto] gap-2 items-center" data-test="index-folder">
+            <select class="input" [value]="f.connection" [disabled]="!enabled() || saving()" aria-label="Connection"
+                    (change)="setFolder(i, { connection: $any($event.target).value })">
+              @if (!f.connection) { <option value="" selected>Choose a connection</option> }
+              @for (b of buckets(); track b.bucket) {
+                <option [value]="b.bucket" [selected]="b.bucket === f.connection">{{ bucketLabel(b) }}</option>
+              }
+              @if (f.connection && !buckets().length) { <option [value]="f.connection" selected>{{ f.connection }}</option> }
+            </select>
+            <input class="input mono" [value]="f.prefix" [disabled]="!enabled() || saving()" aria-label="Folder"
+                   placeholder="Folder, e.g. policies/ (empty: the whole connection)" (input)="setFolder(i, { prefix: $any($event.target).value })" />
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="saving()" (click)="removeFolder(i)" aria-label="Remove folder">
+              <app-icon name="trash" /></button>
+          </div>
+        }
+      </div>
+
+      @if (saveError()) {
+        <p class="text-xs text-crit-500 flex items-start gap-1.5" data-test="index-error"><app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />{{ saveError() }}</p>
+      }
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" class="btn btn-primary btn-sm" data-test="index-save" [disabled]="!canSave()" (click)="save()">
+          <app-icon [name]="saving() ? 'refresh' : 'save'" [class.spin]="saving()" />Save</button>
+        <button type="button" class="btn btn-ghost btn-sm" [disabled]="!dirty() || saving()" (click)="reset()">Undo changes</button>
+        <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="saving()" (click)="load()"><app-icon name="refresh" />Refresh</button>
+      </div>
+
+      <dl class="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs border-t border-subtle pt-3" data-test="index-counts">
+        <div><dt class="text-[color:var(--text-muted)]">Documents</dt><dd class="tabular-nums font-medium">{{ s.indexed.document }}</dd></div>
+        <div><dt class="text-[color:var(--text-muted)]">Form records</dt><dd class="tabular-nums font-medium">{{ s.indexed.form }}</dd></div>
+        <div><dt class="text-[color:var(--text-muted)]">Files</dt><dd class="tabular-nums font-medium">{{ s.indexed.file }}</dd></div>
+        <div><dt class="text-[color:var(--text-muted)]">Passages</dt><dd class="tabular-nums font-medium">{{ s.indexed.chunks }}</dd></div>
+        <div><dt class="text-[color:var(--text-muted)]">Failed</dt><dd class="tabular-nums font-medium" [class.text-crit-500]="s.indexed.failed > 0">{{ s.indexed.failed }}</dd></div>
+      </dl>
+      @if (s.lastSweepAt) {
+        <p class="text-xs text-[color:var(--text-muted)]" data-test="index-sweep">Last checked {{ s.lastSweepAt | serverTime:'dateTime' }}: {{ s.lastSweepNote }}</p>
+      }
+      @for (f of s.failures; track f.source) {
+        <p class="text-xs text-[color:var(--text-secondary)] break-words"><app-icon name="alert" size="0.85em" class="icon-crit" /> {{ f.title || f.source }}: {{ f.error }}</p>
+      }
+    } @else if (!loadError()) {
+      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5"><app-icon name="refresh" class="spin" size="0.9em" />Reading the search index…</p>
+    }
+  }
+</section>

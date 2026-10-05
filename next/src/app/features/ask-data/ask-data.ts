@@ -5,23 +5,30 @@ import { Subscription, TimeoutError } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, chartItems, csvOf, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, chartItems, csvOf, linkParts, refusalText, searchedText, segments } from './ask-data.model';
+import { AuthService } from '../../core/auth/auth.service';
+import { AskIndex } from './ask-index';
 import { RankedBar } from '../../shared/charts/ranked-bar';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
  * workspace's model only from the documents and pipeline results the person can see, with numbered citations that open
- * each source. The examples are built from what the workspace actually has; the session's questions stay on the page
+ * each source. A workspace administrator also chooses what the workspace's search index holds (MIG-281, AskIndex).
+ * The examples are built from what the workspace actually has; the session's questions stay on the page
  * (newest first) until it is left -- nothing is saved.
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [RouterLink, Icon, RankedBar],
+  imports: [RouterLink, Icon, RankedBar, AskIndex],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {
   private readonly api = inject(AskDataApi);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly auth = inject(AuthService);
+
+  /** MIG-281: a workspace administrator chooses what the search index holds. */
+  readonly isAdmin = computed(() => this.auth.isTenantAdmin());
 
   readonly max = QUESTION_MAX;
   readonly question = signal('');
@@ -163,7 +170,12 @@ export class AskData implements OnInit {
   }
 
   kindLabel(s: AskSourceRef): string {
-    return s.kind === 'document' ? 'Document' : s.kind === 'form' ? 'Form submissions' : 'Pipeline result';
+    return s.kind === 'document' ? 'Document' : s.kind === 'form' ? 'Form submissions' : s.kind === 'file' ? 'File' : 'Pipeline result';
+  }
+
+  /** A source's console link as a route and its query ("/forms/submissions?formId=3"): routerLink alone would encode the "?". */
+  linkOf(s: AskSourceRef): { path: string; query: Record<string, string> } {
+    return linkParts(s.link);
   }
 
   seconds(ms: number | null | undefined): string {

@@ -6,7 +6,8 @@
 /** One source an answer was given, numbered as the answer cites it. */
 export interface AskSourceRef {
   n: number;
-  kind: 'document' | 'run-output' | 'form';
+  /** MIG-281: 'file' -- a file in a folder the workspace's search index reads. */
+  kind: 'document' | 'run-output' | 'form' | 'file';
   title: string;
   /** A console route that opens it. */
   link: string;
@@ -22,6 +23,54 @@ export interface Searched {
   datasets?: number;
   /** MIG-279: forms whose submissions were read (absent from an older ai-service). */
   forms?: number;
+  /** MIG-281: files in the chosen folders, when the workspace's search index answered. */
+  files?: number;
+  /** MIG-281: the search index answered (documents, forms and files from the index). */
+  index?: boolean;
+}
+
+/** MIG-281: one folder the workspace's search index reads -- a connection by alias and a prefix ("" is the whole bucket). */
+export interface IndexFolder {
+  connection: string;
+  prefix: string;
+}
+
+/** MIG-281: the workspace's search index as its administrator sees it (GET /askData.json/index). */
+export interface AskIndexStatus {
+  enabled: boolean;
+  documents: boolean;
+  forms: boolean;
+  folders: IndexFolder[];
+  indexed: { document: number; form: number; file: number; chunks: number; failed: number };
+  failures: { source: string; title: string | null; error: string | null; at: string | null }[];
+  lastSweepAt: string | null;
+  lastSweepNote: string | null;
+  dateUpdated: string | null;
+  /** OpenSearch is configured on this platform. */
+  available: boolean;
+  /** It answers now. */
+  reachable: boolean;
+  embeddingModel: string;
+  rule: string;
+  /** After a save: a sweep was started. */
+  sweeping?: boolean;
+}
+
+export interface AskIndexSave {
+  enabled: boolean;
+  documents: boolean;
+  forms: boolean;
+  folders: IndexFolder[];
+}
+
+/** A console link as routerLink and queryParams: "/forms/submissions?formId=3" -> path and {formId: '3'}. */
+export function linkParts(link: string | null | undefined): { path: string; query: Record<string, string> } {
+  const text = link ?? '/';
+  const at = text.indexOf('?');
+  if (at < 0) return { path: text, query: {} };
+  const query: Record<string, string> = {};
+  new URLSearchParams(text.slice(at + 1)).forEach((v, k) => (query[k] = v));
+  return { path: text.slice(0, at), query };
 }
 
 /** MIG-283: the query a question about numbers was answered with -- always shown with its answer. */
@@ -95,6 +144,7 @@ export function searchedText(s: Searched | null | undefined): string {
   if (s.datasets && s.documents == null) return part(s.datasets, 'dataset', 'datasets');
   const parts = [part(s.documents ?? 0, 'document', 'documents'), part(s.runOutputs ?? 0, 'pipeline result', 'pipeline results')];
   if (s.forms) parts.push(part(s.forms, 'form', 'forms'));
+  if (s.files) parts.push(part(s.files, 'file', 'files'));
   return parts.length === 2 ? parts.join(' and ') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
 }
 

@@ -46,6 +46,10 @@
     }
   </section>
 
+  @if (isAdmin()) {
+    <app-ask-index />
+  }
+
   @if (turns().length) {
     <div class="flex items-center justify-between mt-5 mb-2">
       <h2 class="text-sm font-semibold text-[color:var(--text-secondary)]">This session</h2>
@@ -131,8 +135,8 @@
                         <span class="pill pill-brand shrink-0 tabular-nums">{{ s.n }}</span>
                         <div class="min-w-0 flex-1">
                           <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                            <app-icon [name]="s.kind === 'document' ? 'file' : s.kind === 'form' ? 'edit' : 'table'" size="0.9em" class="shrink-0 text-[color:var(--text-muted)]" />
-                            <a class="font-medium hover-brand break-words" [routerLink]="s.link">{{ s.title }}</a>
+                            <app-icon [name]="s.kind === 'document' ? 'file' : s.kind === 'form' ? 'edit' : s.kind === 'file' ? 'folder' : 'table'" size="0.9em" class="shrink-0 text-[color:var(--text-muted)]" />
+                            <a class="font-medium hover-brand break-words" [routerLink]="linkOf(s).path" [queryParams]="linkOf(s).query">{{ s.title }}</a>
                             <span class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel(s) }}{{ s.cited ? '' : ' · given, not cited' }}</span>
                           </div>
                           @if (s.excerpt) {
