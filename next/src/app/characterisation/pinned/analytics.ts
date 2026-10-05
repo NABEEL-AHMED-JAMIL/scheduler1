@@ -137,7 +137,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
     ],
     "headings": [
-      "Dashboards"
+      "Saved Analyses"
     ],
     "buttons": [
       "New dashboard"

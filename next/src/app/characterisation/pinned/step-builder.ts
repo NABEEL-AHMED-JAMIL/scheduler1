@@ -4,7 +4,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload"
+      "Payload"
     ],
     "buttons": [
       "Clear",
@@ -23,19 +23,19 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [
       "<pipeline>...</pipeline>",
+      "Daily orders import",
       "Definition as JSON",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "Kafka connection",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Status *(required)",
-      "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
@@ -54,7 +54,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload",
+      "Payload",
       "Pipeline settings",
       "Tasks in this workspace",
       "Versions"
@@ -91,22 +91,23 @@ export const PINNED: Record<string, unknown> = {
     ],
     "fields": [
       "<pipeline>...</pipeline>",
+      "Daily orders import",
       "Data sensitivity",
       "Default timeout (seconds)",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "If a step fails",
       "Kafka connection",
       "Keep datasets (hours)",
       "Our team",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Results need review by",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Source",
       "Status *(required)",
       "Switch Aggregate on in this workspace",
@@ -125,7 +126,6 @@ export const PINNED: Record<string, unknown> = {
       "Switch Upload to bucket on in this workspace",
       "Switch Validate on in this workspace",
       "Switch Write Database on in this workspace",
-      "Task name *(required)",
       "The customer (later)",
       "Topic *(required)",
       "XML configuration *(required)"
@@ -141,7 +141,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload",
+      "Payload",
       "Steps"
     ],
     "buttons": [
@@ -175,18 +175,18 @@ export const PINNED: Record<string, unknown> = {
       "<pipeline>...</pipeline>",
       "Add step",
       "Add step from the Task Registry…",
+      "Daily orders import",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "Kafka connection",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Status *(required)",
-      "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
@@ -201,7 +201,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload"
+      "Payload"
     ],
     "buttons": [
       "Clear",
@@ -220,19 +220,19 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [
       "<pipeline>...</pipeline>",
+      "Daily orders import",
       "Definition as YAML",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "Kafka connection",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Status *(required)",
-      "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
@@ -268,7 +268,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload",
+      "Payload",
       "Steps"
     ],
     "buttons": [
@@ -291,18 +291,18 @@ export const PINNED: Record<string, unknown> = {
       "<pipeline>...</pipeline>",
       "Add step",
       "Add step from the Task Registry…",
+      "Daily orders import",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "Kafka connection",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Status *(required)",
-      "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
@@ -335,7 +335,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload",
+      "Payload",
       "Steps"
     ],
     "buttons": [
@@ -369,18 +369,18 @@ export const PINNED: Record<string, unknown> = {
       "<pipeline>...</pipeline>",
       "Add step",
       "Add step from the Task Registry…",
+      "Daily orders import",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "Kafka connection",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Status *(required)",
-      "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
@@ -420,7 +420,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Edit pipeline",
       "Basics",
-      "Task payload",
+      "Payload",
       "Steps"
     ],
     "buttons": [
@@ -454,18 +454,18 @@ export const PINNED: Record<string, unknown> = {
       "<pipeline>...</pipeline>",
       "Add step",
       "Add step from the Task Registry…",
+      "Daily orders import",
       "Group",
       "Home page",
-      "Hurricane Data Task",
       "Kafka connection",
-      "Pipeline",
+      "Pipeline name *(required)",
+      "Registry task",
       "Search connections…",
       "Search groups…",
       "Search home pages…",
       "Search this connection’s topics…",
-      "Search this topic’s pipelines…",
+      "Search this topic’s registry tasks…",
       "Status *(required)",
-      "Task name *(required)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],

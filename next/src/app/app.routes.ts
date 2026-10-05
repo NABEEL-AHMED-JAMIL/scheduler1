@@ -628,7 +628,7 @@ export const routes: Routes = [
       },
       {
         path: 'administration/tenant-requests',
-        title: 'Workspace Requests',
+        title: 'Workspace requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
         data: { minRole: 'PLATFORM_ADMIN' },

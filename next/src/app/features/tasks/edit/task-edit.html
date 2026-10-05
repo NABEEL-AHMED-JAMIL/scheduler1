@@ -39,10 +39,10 @@
       <div class="form-section">
         <h2 class="form-section-title">Basics</h2>
         <div class="form-grid">
-          <app-field label="Task name" for="taskName" [required]="true"
+          <app-field label="Pipeline name" for="taskName" [required]="true"
                      [control]="form.get('taskName')" [submitted]="submitted()">
             <input id="taskName" class="input" formControlName="taskName"
-                   placeholder="Hurricane Data Task" />
+                   placeholder="Daily orders import" />
           </app-field>
 
           <app-field label="Kafka connection" for="taskProfile"
@@ -54,17 +54,18 @@
 
           <app-field label="Topic" for="taskType" [required]="true"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
-                     [hint]="topicsLoading() ? 'Loading this connection’s topics…' : 'Where this task publishes. The pipelines on it come next.'">
+                     [hint]="topicsLoading() ? 'Loading this connection’s topics…' : 'Where this pipeline publishes. The registry tasks on it come next.'">
             <app-combobox id="taskType" formControlName="sourceTaskTypeId" [numeric]="true"
                           [placeholder]="selectedProfileId() == null ? 'Pick a Kafka connection first' : 'Search this connection’s topics…'"
                           clearLabel="None" [selectedLabel]="loadedTopicLabel()"
                           [options]="topicOptions()" />
           </app-field>
 
-          <app-field label="Pipeline" for="pipeline" [control]="form.get('pipelineId')"
+          <!-- "Registry task", not "Pipeline": this page's own record is the pipeline (UI review U11). -->
+          <app-field label="Registry task" for="pipeline" [control]="form.get('pipelineId')"
                      [submitted]="submitted()" [hint]="pipelineHint()">
             <app-combobox id="pipeline" formControlName="pipelineId"
-                          [placeholder]="selectedTopicId() == null ? 'Pick a topic first' : 'Search this topic’s pipelines…'"
+                          [placeholder]="selectedTopicId() == null ? 'Pick a topic first' : 'Search this topic’s registry tasks…'"
                           clearLabel="None"
                           [options]="pipelineOptions()" />
           </app-field>
@@ -77,7 +78,7 @@
           </app-field>
 
           <app-field label="Home page" for="homePage" [control]="form.get('homePageId')"
-                     [submitted]="submitted()" hint="Where users land after this job completes.">
+                     [submitted]="submitted()" hint="Where users land after a run of this pipeline completes.">
             <app-combobox id="homePage" formControlName="homePageId"
                           placeholder="Search home pages…" clearLabel="None"
                           [options]="homePageOptions()" />
@@ -188,10 +189,10 @@
              ever defined by creating its form now, so this is the fallback for a pipeline that
              predates one, not a second way to configure a pipeline that has one. -->
         <div class="form-section">
-          <h2 class="form-section-title">Task payload</h2>
+          <h2 class="form-section-title">Payload</h2>
           <app-field label="XML configuration" for="payload" [required]="true"
                      [control]="form.get('taskPayload')" [submitted]="submitted()"
-                     hint="This pipeline has no form, so this is sent to the consumer as-is. Define the pipeline’s fields under Configuration › Pipelines to fill this in field by field instead.">
+                     hint="This pipeline has no form, so this is sent to the consumer as-is. Define the pipeline’s fields under Configuration › Task Registry to fill this in field by field instead.">
             <textarea id="payload" class="input mono text-xs resize-y min-h-40"
                       formControlName="taskPayload"
                       placeholder="&lt;pipeline&gt;...&lt;/pipeline&gt;"></textarea>
@@ -203,7 +204,7 @@
       <div class="form-actions">
         <a routerLink="/pipelines" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
-          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create task') }}
+          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create pipeline') }}
         </button>
       </div>
     </form>

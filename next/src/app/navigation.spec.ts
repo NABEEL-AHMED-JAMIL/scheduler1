@@ -377,7 +377,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...CONFIGURATION, 'Configuration › Engine settings -> /configuration/engine',
       ...BILLING, 'Billing › Billing analytics -> /billing/analytics', 'Billing › Rate cards -> /billing/rates',
       ...ADMINISTRATION, 'Administration › Tenants -> /administration/tenants',
-      'Administration › Workspace Requests -> /administration/tenant-requests',
+      'Administration › Workspace requests -> /administration/tenant-requests',
       // MIG-254: the managed service.
       'Administration › Managed service -> /administration/managed-service',
       'Administration › Staff activity -> /administration/staff-activity',

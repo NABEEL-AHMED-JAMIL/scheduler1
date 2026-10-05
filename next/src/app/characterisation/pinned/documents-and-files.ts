@@ -170,7 +170,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /storage.json/listObjects?bucket=ui-review-s3&maxKeys=100&prefix="
     ],
     "headings": [
-      "Object Browser"
+      "Browse files"
     ],
     "buttons": [
       "Actions for UI-REVIEW converted",
@@ -216,7 +216,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /storage.json/listObjects?bucket=ui-review-s3&maxKeys=100&prefix="
     ],
     "headings": [
-      "Object Browser"
+      "Browse files"
     ],
     "buttons": [
       "Actions for UI-REVIEW converted",
@@ -261,7 +261,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /storage.json/buckets"
     ],
     "headings": [
-      "Object Browser",
+      "Browse files",
       "Connections"
     ],
     "buttons": [

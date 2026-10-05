@@ -1,8 +1,14 @@
 <div class="page">
   <div class="page-head">
     <div>
-      <h1 class="page-title">Task inbox</h1>
-      <p class="page-subtitle">Approvals and tasks for you or your groups, the soonest due first. Open one to see the request, its history, and decide.</p>
+      <!-- The heading follows the tab: /workflows/requests is titled "My requests" and read "Task inbox" (UI review U11). -->
+      @if (tab() === 'requests') {
+        <h1 class="page-title">My requests</h1>
+        <p class="page-subtitle">What you asked for, newest first, and where each request stands. Open one to see its history.</p>
+      } @else {
+        <h1 class="page-title">Task inbox</h1>
+        <p class="page-subtitle">Approvals and tasks for you or your groups, the soonest due first. Open one to see the request, its history, and decide.</p>
+      }
     </div>
     <div class="flex items-center gap-2 flex-wrap">
       <div class="seg" role="tablist" aria-label="Which tasks">

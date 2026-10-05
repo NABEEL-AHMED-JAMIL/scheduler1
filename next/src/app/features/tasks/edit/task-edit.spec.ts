@@ -292,7 +292,7 @@ describe('TaskEdit -- the pipeline follows the topic', () => {
     component.form.patchValue({ sourceTaskTypeId: 30 });
     settle();
     expect(component.pipelineOptions()).toEqual([]);
-    expect(component.pipelineHint()).toContain('No pipeline publishes on this topic');
+    expect(component.pipelineHint()).toContain('No registry task listens on this topic');
   });
 
   it('clears a pipeline that does not publish on the newly chosen topic', () => {

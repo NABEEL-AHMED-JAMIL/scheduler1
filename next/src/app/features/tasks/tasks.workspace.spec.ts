@@ -67,11 +67,11 @@ describe('Tasks workspace column, card line and filter', () => {
   afterEach(() => vi.unstubAllGlobals());
 
   describe('for a platform administrator', () => {
-    it('shows a Workspace column after Task, with each row\'s workspace', async () => {
+    it('shows a Workspace column after Pipeline, with each row\'s workspace', async () => {
       const { el, headings } = await render('PLATFORM_ADMIN');
       const heads = headings();
       const at = heads.indexOf('Workspace');
-      expect(at).toBe(heads.indexOf('Task') + 1);
+      expect(at).toBe(heads.indexOf('Pipeline') + 1);
       const cells = Array.from(el.querySelectorAll('tbody > tr')).map(tr => (tr.children[at]?.textContent ?? '').trim());
       expect(cells).toEqual(['Acme Ops', 'Borealis', 'Workspace #3']);
     });

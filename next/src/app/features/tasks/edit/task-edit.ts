@@ -479,9 +479,9 @@ export class TaskEdit implements OnInit {
 
   /** What the Pipeline field says under itself, given where the person is in the two-step pick. */
   readonly pipelineHint = computed(() => {
-    if (this.selectedTopicId() == null) return 'Pick a topic first; its pipelines appear here.';
-    if (this.pipelinesLoading()) return 'Loading this topic’s pipelines…';
-    if (!this.pipelinesForTopic().length) return 'No pipeline publishes on this topic yet — add one under Configuration › Pipelines.';
+    if (this.selectedTopicId() == null) return 'Pick a topic first; its registry tasks appear here.';
+    if (this.pipelinesLoading()) return 'Loading this topic’s registry tasks…';
+    if (!this.pipelinesForTopic().length) return 'No registry task listens on this topic yet — add one under Configuration › Task Registry.';
     return 'Picking one loads its form below, if it has one.';
   });
 

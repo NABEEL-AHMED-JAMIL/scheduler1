@@ -90,7 +90,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [
       [
         "",
-        "Task",
+        "Pipeline",
         "Type",
         "Topic",
         "Pipeline",

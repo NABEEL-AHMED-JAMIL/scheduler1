@@ -157,10 +157,10 @@
               @if (task.totalLinksJobs) {
                 <span class="pill pill-neutral">
                   <app-icon name="link" size="0.85em" />{{ task.totalLinksJobs }}
-                  {{ task.totalLinksJobs === 1 ? 'job' : 'jobs' }}
+                  {{ task.totalLinksJobs === 1 ? 'schedule' : 'schedules' }}
                 </span>
               } @else {
-                <span class="text-[11px] text-[color:var(--text-muted)]">No job uses this yet</span>
+                <span class="text-[11px] text-[color:var(--text-muted)]">No schedule runs this yet</span>
               }
             </div>
           </article>
@@ -171,7 +171,7 @@
       <thead>
         <tr>
           <th class="w-8"></th>
-          <th>Task</th>
+          <th>Pipeline</th>
           <!-- Whose task it is, beside its name, for the one role whose list mixes workspaces. It waits
                for xl like Type; the cards and the Workspace filter carry it on a narrower screen. -->
           @if (seesWorkspaces()) {
@@ -284,9 +284,9 @@
                 @if (task.taskPayload) {
                   <div class="flex items-center gap-2 mb-1.5">
                     <app-icon name="file" size="0.9em" class="icon-muted" />
-                    <span class="text-xs font-semibold">Task payload</span>
+                    <span class="text-xs font-semibold">Payload</span>
                     @if (task.totalLinksJobs) {
-                      <span class="pill pill-neutral">{{ task.totalLinksJobs }} linked job{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
+                      <span class="pill pill-neutral">{{ task.totalLinksJobs }} schedule{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
                     }
                     <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(task)">
                       <app-icon [name]="copiedId() === task.taskDetailId ? 'check' : 'copy'"
@@ -297,13 +297,13 @@
                   <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
                       >{{ task.taskPayload }}</pre>
                 } @else {
-                  <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                  <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
                 }
 
                 @if (task.totalLinksJobs) {
                   <div class="flex items-center gap-2 mt-4 mb-1.5">
                     <app-icon name="briefcase" size="0.9em" class="icon-muted" />
-                    <span class="text-xs font-semibold">Jobs using this task</span>
+                    <span class="text-xs font-semibold">Schedules that run this pipeline</span>
                     @if (linkedLoading() === task.taskDetailId) {
                       <app-icon name="refresh" size="0.85em" class="spin icon-muted" />
                     }
@@ -320,7 +320,7 @@
                           <table class="table-modern">
                             <thead>
                               <tr>
-                                <th>Job</th>
+                                <th>Schedule</th>
                                 <th>Execution</th>
                                 <th>Last run</th>
                                 <th>Run status</th>
@@ -351,7 +351,7 @@
                       </div>
                     } @else {
                       <p class="text-xs text-[color:var(--text-muted)]">
-                        Could not read the jobs for this task.
+                        Could not read the schedules for this pipeline.
                       </p>
                     }
                   }

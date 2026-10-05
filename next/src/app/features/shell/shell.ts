@@ -266,7 +266,7 @@ export class Shell {
         // Platform, not admin: listRequests, approve and reject all carry
         // @PreAuthorize("hasRole('PLATFORM_ADMIN')"), so a tenant administrator shown this link was
         // walked straight into the unauthorized page.
-        { label: 'Workspace Requests', path: '/administration/tenant-requests', icon: 'inbox',
+        { label: 'Workspace requests', path: '/administration/tenant-requests', icon: 'inbox',
           platformOnly: true, hint: 'Asks from outside for a workspace' },
         // MIG-254: the managed service. Platform pages first, then the workspace administrator's one.
         { label: 'Managed service', path: '/administration/managed-service', icon: 'briefcase', platformOnly: true,

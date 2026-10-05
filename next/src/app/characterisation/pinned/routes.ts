@@ -624,7 +624,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/tenant-requests",
-      "title": "Workspace Requests",
+      "title": "Workspace requests",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -1149,7 +1149,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /analytics/dashboards": {
     "lands": "/data/analytics/dashboards",
-    "heading": "Dashboards"
+    "heading": "Saved Analyses"
   },
   "old address /assistants/connections": {
     "lands": "/ai/connections",
@@ -1217,7 +1217,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /objects": {
     "lands": "/documents/files",
-    "heading": "Object Browser"
+    "heading": "Browse files"
   },
   "old address /objects/analytics": {
     "lands": "/data/analytics",
@@ -1225,11 +1225,11 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /objects/analytics/dashboards": {
     "lands": "/data/analytics/dashboards",
-    "heading": "Dashboards"
+    "heading": "Saved Analyses"
   },
   "old address /objects/files": {
     "lands": "/documents/files",
-    "heading": "Object Browser"
+    "heading": "Browse files"
   },
   "old address /operations/jobs": {
     "lands": "/pipelines/schedules",
@@ -1345,6 +1345,6 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /tools/transcript": {
     "lands": "/documents/transcript",
-    "heading": "Audio Transcript Extractor"
+    "heading": "Audio Transcript"
   }
 };

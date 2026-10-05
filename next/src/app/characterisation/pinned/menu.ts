@@ -44,7 +44,7 @@ export const PINNED: Record<string, unknown> = {
     "Administration › Access profiles — Which pages your tenant users can open. -> /administration/access-profiles",
     "Administration › Data policies — Which models see each level of data, and for how long -> /administration/data-policies",
     "Administration › Tenants — Isolated workspaces -> /administration/tenants",
-    "Administration › Workspace Requests — Asks from outside for a workspace -> /administration/tenant-requests",
+    "Administration › Workspace requests — Asks from outside for a workspace -> /administration/tenant-requests",
     "Administration › Managed service — Which of our staff may work in which workspace -> /administration/managed-service",
     "Administration › Staff activity — Every change our staff made in a customer's workspace -> /administration/staff-activity",
     "Administration › Work in a workspace — Open a managed session where you hold a grant -> /administration/work-in-workspace",
