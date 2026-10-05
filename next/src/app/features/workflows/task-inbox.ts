@@ -310,10 +310,11 @@ export class TaskInbox implements OnInit {
     if (typeof v === 'boolean' || v === 'true' || v === 'false') return v === true || v === 'true' ? 'Yes' : 'No';
     if (typeof v === 'object') return JSON.stringify(v);
     const text = String(v);
-    const me = this.auth.user();
-    if (me?.username && text === me.username) return me.fullName || text;
+    // The colleague list first: it carries the directory's full name, where the session may hold only the username.
     const person = this.colleagues().find(c => c.username === text);
-    return person?.fullName || text;
+    if (person?.fullName) return person.fullName;
+    const me = this.auth.user();
+    return me?.username && text === me.username && me.fullName ? me.fullName : text;
   }
 }
 
