@@ -98,6 +98,14 @@ describe('Object Browser listing', () => {
     expect(first.el.querySelector('.spinner')).not.toBeNull();
   });
 
+  it('says a search reads only the items listed so far when the folder has more (P2 #33)', () => {
+    const v = opened(() => of(OK({ objects: [SALES], nextContinuationToken: 'more' })));
+    expect(v.el.querySelector('[data-partial-search]')).toBeNull();
+    v.objects.search.set('sales');
+    v.fixture.detectChanges();
+    expect(v.el.querySelector('[data-partial-search]')?.textContent).toContain('the 1 items listed so far');
+  });
+
   it('marks a failed listing with the alert icon', () => {
     const v = opened(() => of({ status: 'ERROR', message: 'Access denied.' }));
     expect(v.text()).toContain('Access denied.');

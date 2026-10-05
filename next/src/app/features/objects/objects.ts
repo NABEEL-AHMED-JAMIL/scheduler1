@@ -1,3 +1,5 @@
+import { instantOf } from '../../core/instant';
+import { localIsoDay } from '../../shared/ui/local-day';
 import { DateField } from '../../shared/ui/date-field';
 import { Component, Injector, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { Combobox } from '../../shared/ui/combobox';
@@ -120,7 +122,9 @@ export class Objects implements OnInit {
       // Folders carry no modified date, so a date filter would silently hide them all --
       // keep them visible and let the dates narrow files only.
       if ((from || to) && !entry.folder) {
-        const day = (entry.lastModified ?? '').slice(0, 10);
+        // The reader's own calendar day, through instantOf: the UTC date cut from the string put an evening upload on tomorrow.
+        const at = instantOf(entry.lastModified);
+        const day = at ? localIsoDay(at) : '';
         if (!day) return false;
         if (from && day < from) return false;
         if (to && day > to) return false;

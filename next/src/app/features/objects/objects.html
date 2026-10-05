@@ -378,6 +378,12 @@
 
         @if (nextToken()) {
           <div class="px-4 py-3 border-t text-center border-subtle">
+            <!-- P2 #33: the filters read only the pages listed so far; with more in the folder, say so. -->
+            @if (hasFilters()) {
+              <p class="text-xs text-[color:var(--text-muted)] mb-2" data-partial-search>
+                The search and dates look at the {{ objects().length.toLocaleString('en-US') }} items listed so far; this folder has more. Load more to look further.
+              </p>
+            }
             <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
               {{ loading() ? 'Loading…' : 'Load more' }}
             </button>
