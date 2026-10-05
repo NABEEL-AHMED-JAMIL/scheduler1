@@ -44,6 +44,10 @@ export class Invoices implements OnInit {
   readonly status = signal<string>('');
   readonly search = signal('');
   readonly selectedNumber = signal<string | null>(null);
+  /** The newest invoice, shown while the address names none; not written to the address. */
+  readonly preview = signal<string | null>(null);
+  /** What the pane shows: the picked invoice, else the preview. */
+  readonly shownNumber = computed(() => this.selectedNumber() ?? this.preview());
   readonly closing = signal(false);
   readonly closePeriod = signal(Invoices.lastMonth());
 
@@ -96,9 +100,13 @@ export class Invoices implements OnInit {
         // It used to be swapped for the first row here, so a deep link to a foreign or mistyped
         // invoice quietly opened a different bill. Otherwise the first that needs a look, else
         // the newest.
+        // Only a bill that needs a look takes over the address (UI review U14): /billing/invoices always became the
+        // first invoice's address, so the list had none of its own. Otherwise the newest shows in the pane and the
+        // address stays the list's until one is picked.
         if (!this.selectedNumber()) {
-          const first = rows.find(x => x.status === 'overdue') ?? rows.find(x => (x.pendingPayments ?? 0) > 0) ?? rows[0] ?? null;
-          if (first) this.select(first, true);
+          const needsLook = rows.find(x => x.status === 'overdue') ?? rows.find(x => (x.pendingPayments ?? 0) > 0) ?? null;
+          if (needsLook) this.select(needsLook, true);
+          else this.preview.set(rows[0]?.number ?? null);
         }
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the invoices.'); },
@@ -114,7 +122,7 @@ export class Invoices implements OnInit {
     this.selectedNumber.set(r.number);
     this.router.navigate(['/billing/invoices', r.number], { replaceUrl: replace });
   }
-  pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.load(); }
+  pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.preview.set(null); this.load(); }
   setStatus(s: string): void { this.status.set(this.status() === s ? '' : s); }
   clearFilters(): void { this.search.set(''); this.status.set(''); }
   money(v: number, currency = 'USD'): string { return formatMoney(v, currency); }

@@ -78,7 +78,7 @@
         <ul class="lookup-rail-list" role="listbox" aria-label="Invoices">
           @for (r of visible(); track r.invoiceId) {
             <li role="presentation">
-              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedNumber() === r.number" [class.is-selected]="selectedNumber() === r.number" (click)="select(r)">
+              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="shownNumber() === r.number" [class.is-selected]="shownNumber() === r.number" (click)="select(r)">
                 <span class="kafka-rail-dot" [class]="'kafka-rail-dot bill-dot-' + tone(r)" [title]="statusLabel[r.status]" aria-hidden="true"></span>
                 <span class="sr-only">{{ statusLabel[r.status] }}</span>
                 <span class="min-w-0 flex-1">
@@ -102,7 +102,7 @@
     </aside>
 
     <section class="lookup-detail" aria-live="polite">
-      @if (selectedNumber(); as n) {
+      @if (shownNumber(); as n) {
         <app-invoice-pane [number]="n" (changed)="load()" />
       } @else {
         <div class="lookup-entries-empty lookup-detail-empty">

@@ -18,9 +18,9 @@ const ROWS = [
   { invoiceId: 4, number: 'INV-2026-09-0007', kind: 'invoice', tenantId: 2905, tenantName: 'MedAxis', periodStart: '2026-09-01', periodEnd: '2026-09-30', status: 'draft', currency: 'USD', subtotal: '184.62', taxRatePercent: '0', tax: '0', total: '184.62', balance: '184.62' },
 ];
 
-function page(platformAdmin: boolean, number: string | null = null) {
+function page(platformAdmin: boolean, number: string | null = null, rows: typeof ROWS = ROWS) {
   const router = { navigate: vi.fn() };
-  const api = { invoices: vi.fn(() => of({ status: API_SUCCESS, data: ROWS.map(r => ({ ...r, documentKinds: r.status === 'paid' ? ['invoice', 'payment_slip', 'receipt'] : r.status === 'draft' ? [] : ['invoice'], pendingPayments: r.number === 'INV-2026-08-0003' ? 1 : 0 })) })), draft: vi.fn(() => of({ status: API_SUCCESS, message: 'Draft built.' })), closeMonth: vi.fn(() => of({ status: API_SUCCESS, message: '2 drafts.' })), statement: vi.fn(), documentBlob: vi.fn() };
+  const api = { invoices: vi.fn(() => of({ status: API_SUCCESS, data: rows.map(r => ({ ...r, documentKinds: r.status === 'paid' ? ['invoice', 'payment_slip', 'receipt'] : r.status === 'draft' ? [] : ['invoice'], pendingPayments: r.number === 'INV-2026-08-0003' ? 1 : 0 })) })), draft: vi.fn(() => of({ status: API_SUCCESS, message: 'Draft built.' })), closeMonth: vi.fn(() => of({ status: API_SUCCESS, message: '2 drafts.' })), statement: vi.fn(), documentBlob: vi.fn() };
   const toast = { success: vi.fn(), error: vi.fn() };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
@@ -73,6 +73,14 @@ describe('Invoices', () => {
     deep.component.select(deep.component.rows()[1]);
     expect(deep.component.selectedNumber()).toBe('INV-2026-08-0007');
     expect(deep.router.navigate).toHaveBeenLastCalledWith(['/billing/invoices', 'INV-2026-08-0007'], { replaceUrl: false });
+  });
+
+  it('keeps the list\'s own address when no bill needs a look, showing the newest in the pane (UI review U14)', () => {
+    const calm = ROWS.filter(r => r.number !== 'INV-2026-08-0003').map(r => ({ ...r, status: r.status === 'overdue' ? 'issued' : r.status }));
+    const { component, router } = page(false, null, calm);
+    expect(router.navigate).not.toHaveBeenCalled();
+    expect(component.selectedNumber()).toBeNull();
+    expect(component.shownNumber()).toBe(calm[0].number);
   });
 
   it('a platform administrator drafts a month for the picked workspace; a tenant administrator cannot', () => {
