@@ -45,3 +45,4 @@ dist
 next/node_modules/
 next/dist/
 next/.angular/
+.angular/
