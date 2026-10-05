@@ -25,14 +25,12 @@
       <div>
         <label class="label"
                for="r-from">From</label>
-        <input id="r-from" type="date" class="input max-w-40 mt-1" [value]="startDate()"
-               (change)="setStart($any($event.target).value)" />
+        <app-date-field class="mt-1" inputId="r-from" label="From" [value]="startDate()" (valueChange)="setStart($event)" />
       </div>
       <div>
         <label class="label"
                for="r-to">To</label>
-        <input id="r-to" type="date" class="input max-w-40 mt-1" [value]="endDate()"
-               (change)="setEnd($any($event.target).value)" />
+        <app-date-field class="mt-1" inputId="r-to" label="To" [value]="endDate()" (valueChange)="setEnd($event)" />
       </div>
       @if (!loading() && !error()) {
         <span class="pill pill-neutral mb-1.5">{{ counts().total }} runs</span>

@@ -14,17 +14,13 @@
     <div class="flex flex-wrap items-end gap-2">
       <div class="flex-1 min-w-[9.5rem] sm:flex-none">
         <label class="label" for="from">From</label>
-        <input id="from" type="date" class="input" [value]="startDate()" [max]="endDate()"
-               [attr.aria-invalid]="!!rangeError() || null"
-               [attr.aria-describedby]="rangeError() ? 'range-error' : null"
-               (change)="startDate.set($any($event.target).value)" />
+        <app-date-field inputId="from" label="From" [value]="startDate()" [max]="endDate()"
+                        (valueChange)="startDate.set($event)" />
       </div>
       <div class="flex-1 min-w-[9.5rem] sm:flex-none">
         <label class="label" for="to">To</label>
-        <input id="to" type="date" class="input" [value]="endDate()" [min]="startDate()"
-               [attr.aria-invalid]="!!rangeError() || null"
-               [attr.aria-describedby]="rangeError() ? 'range-error' : null"
-               (change)="endDate.set($any($event.target).value)" />
+        <app-date-field inputId="to" label="To" [value]="endDate()" [min]="startDate()"
+                        (valueChange)="endDate.set($event)" />
       </div>
       <button type="button" class="btn btn-primary btn-sm" [disabled]="!!rangeError()" (click)="applyRange()"><app-icon name="filter" />Apply</button>
       <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>

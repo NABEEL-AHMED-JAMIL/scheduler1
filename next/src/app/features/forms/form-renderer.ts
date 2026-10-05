@@ -1,3 +1,4 @@
+import { DateField } from '../../shared/ui/date-field';
 import { Component, computed, input, output } from '@angular/core';
 import { Field } from '../../shared/ui/field';
 import { Icon } from '../../shared/ui/icon';
@@ -25,7 +26,7 @@ export interface UploadWanted {
  */
 @Component({
   selector: 'app-form-renderer',
-  imports: [Field, Icon, SignaturePad],
+  imports: [DateField, Field, Icon, SignaturePad],
   template: `
     <div class="flex flex-col gap-4 min-w-0">
       @for (f of shown(); track f.key; let i = $index) {
@@ -163,8 +164,8 @@ export interface UploadWanted {
               </div>
             }
             @case ('date') {
-              <input class="input" type="date" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)" [disabled]="disabled()"
-                     [attr.data-field]="f.key" (input)="set(f.key, $any($event.target).value)" />
+              <app-date-field [inputId]="idPrefix() + '-' + f.key" [label]="f.label" [value]="text(f.key)" [inactive]="disabled()"
+                              [clearable]="!f.required" [attr.data-field]="f.key" (valueChange)="set(f.key, $event)" />
             }
             @case ('number') {
               <input class="input" type="text" inputmode="decimal" [id]="idPrefix() + '-' + f.key" [value]="text(f.key)"

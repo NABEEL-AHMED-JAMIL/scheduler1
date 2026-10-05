@@ -1,3 +1,4 @@
+import { DateField } from '../../shared/ui/date-field';
 import { Component, Injector, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { Combobox } from '../../shared/ui/combobox';
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -31,7 +32,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
+  imports: [DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {

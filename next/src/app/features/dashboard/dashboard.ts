@@ -1,3 +1,4 @@
+import { DateField } from '../../shared/ui/date-field';
 import { BillingBrief } from '../billing/billing-brief';
 import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -50,7 +51,7 @@ type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 @Component({
   selector: 'app-dashboard',
-  imports: [ServerTimePipe, Pagination, Icon, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
+  imports: [ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {

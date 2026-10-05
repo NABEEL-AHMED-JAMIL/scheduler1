@@ -10,6 +10,8 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Field } from '../../../shared/ui/field';
+import { DateField } from '../../../shared/ui/date-field';
+import { TimeField } from '../../../shared/ui/time-field';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { NOTIFY_OPTIONS } from '../notify-summary';
@@ -85,7 +87,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner],
+  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner, DateField, TimeField],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has

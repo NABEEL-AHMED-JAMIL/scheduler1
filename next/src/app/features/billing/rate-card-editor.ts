@@ -1,3 +1,4 @@
+import { DateField } from '../../shared/ui/date-field';
 import { Component, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -23,7 +24,7 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
  */
 @Component({
   selector: 'app-rate-card-editor',
-  imports: [SidePanel, Icon, Combobox, Field],
+  imports: [DateField, SidePanel, Icon, Combobox, Field],
   template: `
     <app-side-panel [heading]="'New version from ' + data.base.name + ' v' + data.base.version" subtitle="Saved as its own version; bills already drafted keep the one they were priced with.">
       <div class="form-grid mb-4">
@@ -32,7 +33,7 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
         <app-field label="For" for="rcFor" hint="A workspace's own card wins over the default from its effective date.">
           <app-combobox id="rcFor" [selected]="tenantId() ?? ''" (selectedChange)="tenantId.set($event || null)" [options]="forOptions" [allowClear]="false" placeholder="Every workspace" /></app-field>
         <app-field label="Effective from" for="rcFrom" [required]="true" hint="Prices bills for periods that start on or after this day.">
-          <input id="rcFrom" class="input mono" type="date" [value]="effectiveFrom()" (input)="effectiveFrom.set($any($event.target).value)" /></app-field>
+          <app-date-field inputId="rcFrom" label="Effective from" [value]="effectiveFrom()" (valueChange)="effectiveFrom.set($event)" /></app-field>
         <app-field class="col-span-2" label="Note" for="rcNote">
           <input id="rcNote" class="input" [value]="note()" (input)="note.set($any($event.target).value)" placeholder="Why — the agreement, the ticket, the reason" /></app-field>
       </div>

@@ -2366,3 +2366,12 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 .hub-health { display: grid; gap: 0.5rem; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
 .hub-health > div { display: flex; flex-direction: column; gap: 0.125rem; padding: 0.5rem 0.75rem; background: var(--surface-sunken);
   border-radius: var(--radius-lg); }
+
+/* UI review U3: a 24-hour time (two selects) and a date written as the console writes dates, picked from the browser's
+   own calendar (the native input sits under the button, invisible, so its picker opens beside it). */
+.time-field { display: inline-flex; align-items: center; gap: 0.25rem; }
+.time-field .input { width: 4.5rem; }
+.time-field-sep { color: var(--text-muted); font-weight: 600; }
+.date-field { display: inline-flex; align-items: center; gap: 0.25rem; position: relative; }
+.date-field-button { display: inline-flex; align-items: center; gap: 0.45rem; min-width: 9.5rem; text-align: left; cursor: pointer; }
+.date-field-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

@@ -214,10 +214,10 @@
           <input class="input" placeholder="Find a file…" aria-label="Filter by name"
                  [value]="search()" (input)="search.set($any($event.target).value)" />
         </div>
-        <input type="date" class="input max-w-40" aria-label="Modified from"
-               [value]="dateFrom()" (change)="dateFrom.set($any($event.target).value)" />
-        <input type="date" class="input max-w-40" aria-label="Modified to"
-               [value]="dateTo()" (change)="dateTo.set($any($event.target).value)" />
+        <app-date-field label="Modified from" placeholder="Modified from" [clearable]="true" [value]="dateFrom()"
+                        (valueChange)="dateFrom.set($event)" />
+        <app-date-field label="Modified to" placeholder="Modified to" [clearable]="true" [value]="dateTo()"
+                        (valueChange)="dateTo.set($event)" />
         @if (hasFilters()) {
           <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
         }

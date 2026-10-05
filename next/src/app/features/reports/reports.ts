@@ -1,3 +1,4 @@
+import { DateField } from '../../shared/ui/date-field';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
@@ -166,7 +167,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
+  imports: [DateField, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {

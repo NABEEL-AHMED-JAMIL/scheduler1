@@ -118,20 +118,20 @@
             <app-field label="Start date" for="startDate" [required]="!isCron()"
                        [control]="scheduler.get('startDate')" [submitted]="submitted()"
                        [hint]="isCron() ? 'Optional. Blank starts it today.' : ''">
-              <input id="startDate" type="date" class="input" formControlName="startDate" />
+              <app-date-field inputId="startDate" label="Start date" formControlName="startDate" [clearable]="isCron()" />
             </app-field>
 
             <app-field label="Start time" for="startTime" [required]="!isCron()"
                        [control]="scheduler.get('startTime')" [submitted]="submitted()"
                        [hint]="isCron() ? 'Optional. Runs are not before this moment.' : ''">
-              <input id="startTime" type="time" class="input" formControlName="startTime" placeholder="HH:MM" />
+              <app-time-field inputId="startTime" label="Start time" formControlName="startTime" [clearable]="isCron()" />
             </app-field>
 
             <app-field label="End date" for="endDate" [control]="scheduler"
                        [submitted]="submitted()"
                        hint="Optional. Inclusive — the job still runs on this day.">
-              <input id="endDate" type="date" class="input" formControlName="endDate"
-                     [class.input-invalid]="scheduler.errors?.['endBeforeStart']" />
+              <app-date-field inputId="endDate" label="End date" formControlName="endDate" [clearable]="true"
+                              [class.input-invalid]="scheduler.errors?.['endBeforeStart']" />
             </app-field>
 
             @if (frequencyValue() === 'Monthly') {
@@ -241,7 +241,7 @@
       <div class="form-actions">
         <a routerLink="/pipelines/schedules" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
-          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create job') }}
+          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create schedule') }}
         </button>
       </div>
     </form>
