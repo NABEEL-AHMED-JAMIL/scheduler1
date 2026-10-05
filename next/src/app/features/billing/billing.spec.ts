@@ -108,7 +108,10 @@ describe('Billing', () => {
     const tokens = component.lines()[4];
     expect(component.fmtRate(tokens)).toBe('Tiered');
     expect(tokens.includedQuantity).toBe(1000);
-    expect(component.fmtUnits(tokens, tokens.billableQuantity)).toBe('41,100');
+    expect(component.fmtUnits(tokens, tokens.billableQuantity)).toBe('41,100 tokens');
+    // UI review U12: the quantity carries its own unit; no Unit column says another.
+    expect(component.fmtQuantity({ ...tokens, quantity: 1 })).toBe('1 token');
+    expect(component.fmtQuantity({ ...tokens, unit: 'minute', quantity: 6.6 })).toBe('6.6 minutes');
     expect(tokens.tiers.map(t => component.fmtUnitPrice(t.unit_price, tokens.per, tokens.unit))).toEqual(['$0.05 per 1,000 tokens', '$0.02 per 1,000 tokens']);
     expect(component.fmtBytes(2048)).toBe('2 KB');
     expect(component.fmtBytes(900)).toBe('900 B');
@@ -202,14 +205,15 @@ describe('Billing', () => {
     expect(firstOfMonth(new Date('2026-09-18T00:00:00'))).toBe('2026-09-01');
   });
 
-  /** MIG-211: one precision per Amount column, sentence case in the cells, a person's words for who did it. */
-  it('the Amount column shares one precision, and the rate and actor cells read in sentence case', () => {
+  /** MIG-211, UI review U12: the Amount column reads in cents; sentence case in the cells, a person's words for who did it. */
+  it('the Amount column reads in cents, and the rate and actor cells read in sentence case', () => {
     const { component } = page();
-    expect(component.lineDigits()).toBe(4);                            // 0.00602 is real and under a cent
-    expect(component.fmtAmount(46.2)).toBe('$46.2000');
-    expect(component.fmtAmount(0.00602)).toBe('$0.0060');
-    const tidy = page(false, LINES.filter(l => l.meter !== 'storage.ops.delete'));
-    expect(tidy.component.fmtAmount(46.2)).toBe('$46.20');
+    expect(component.lineDigits()).toBe(2);
+    expect(component.fmtAmount(46.2)).toBe('$46.20');
+    expect(component.fmtAmount(0.00602)).toBe('$0.01');
+    expect(component.fmtAmount(0.0007)).toBe('< $0.01');
+    expect(component.fmtAmount(0)).toBe('$0.00');
+    expect(component.fmtExact(0.0007)).toBe('$0.0007');
     expect(component.fmtRate(component.lines().find(l => l.hasTiers)!)).toBe('Tiered');
     expect(component.fmtRate({ ...component.lines()[0], unpriced: true })).toBe('Not on the card');
     expect(component.fmtRate(component.lines().find(l => l.meter === 'storage.ops.delete')!)).toBe('$0.005 per 1,000 ops');
@@ -265,8 +269,19 @@ describe('Billing, rendered', () => {
     expect(narrow).toBe(4);
     const beforeAmount = cells.slice(0, cells.findIndex(c => c.textContent!.includes('$'))).filter(c => !c.classList.contains('hidden'));
     expect(beforeAmount.reduce((n, c) => n + Number(c.getAttribute('colspan') ?? 1), 0)).toBe(2);
-    // At full width all seven columns are there.
-    expect(cells.reduce((n, c) => n + Number(c.getAttribute('colspan') ?? 1), 0)).toBe(7);
+    // At full width all six columns are there (the Unit column went with UI review U12).
+    expect(cells.reduce((n, c) => n + Number(c.getAttribute('colspan') ?? 1), 0)).toBe(6);
+  });
+
+  it('keeps lines under half a cent behind a toggle instead of a column of $0.0000 (UI review U12)', () => {
+    const tiny = { meter: 'storage.bytes.written', label: 'Bytes written', service: 'Storage', unit: 'byte', per: 1073741824, unitPrice: '0.01',
+      quantity: '539750', amount: '0.000005', days: 2 };
+    const { component } = page(false, [...LINES, tiny]);
+    expect(component.tinyLines().map(l => l.meter)).toEqual(['storage.bytes.written']);
+    expect(component.shownLines().some(l => l.meter === 'storage.bytes.written')).toBe(false);
+    component.showTinyLines.set(true);
+    expect(component.shownLines().some(l => l.meter === 'storage.bytes.written')).toBe(true);
+    expect(component.fmtAmount(0.000005)).toBe('< $0.01');
   });
 
   it('names the workspace picker', () => {

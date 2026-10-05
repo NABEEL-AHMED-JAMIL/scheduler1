@@ -83,10 +83,17 @@
     </div>
 
     <div class="mt-4">
-      <app-table-shell heading="Line by line" [shown]="lines().length" [total]="lines().length" [loading]="loading()"
+      <app-table-shell heading="Line by line" [shown]="shownLines().length" [total]="lines().length" [loading]="loading()"
                        [isEmpty]="!lines().length" emptyMessage="Nothing metered in this month yet — run a pipeline, open a file, delete something." emptyIcon="chart">
         <ng-container toolbar>
           <span class="text-xs text-[color:var(--text-muted)]">Click a line for what is behind it — which bucket, which prompt, who deleted what.</span>
+          @if (tinyLines().length) {
+            <!-- Lines under half a cent wait here rather than fill the table with "$0.0000" (UI review U12). -->
+            <button type="button" class="btn btn-default btn-sm" data-tiny-toggle [attr.aria-pressed]="showTinyLines()"
+                    [title]="'Together ' + fmtExact(tinyTotal())" (click)="showTinyLines.set(!showTinyLines())">
+              {{ showTinyLines() ? 'Hide lines under a cent' : 'Show ' + tinyLines().length + (tinyLines().length === 1 ? ' line' : ' lines') + ' under a cent' }}
+            </button>
+          }
         </ng-container>
         <table class="table-modern">
           <thead>
@@ -94,14 +101,13 @@
               <th>Meter</th>
               <th class="hidden md:table-cell">Service</th>
               <th class="text-right">Quantity</th>
-              <th class="hidden lg:table-cell">Unit</th>
               <th class="text-right hidden md:table-cell">Rate</th>
               <th class="text-right">Amount</th>
               <th class="w-8"></th>
             </tr>
           </thead>
           <tbody>
-            @for (line of lines(); track line.meter) {
+            @for (line of shownLines(); track line.meter) {
               <tr class="cursor-pointer hover-brand" [class.is-open]="openLine()?.meter === line.meter" (click)="toggleLine(line)">
                 <td>
                   <div class="font-medium">{{ line.label }}</div>
@@ -110,17 +116,16 @@
                 <td class="hidden md:table-cell text-[color:var(--text-secondary)]">{{ line.service }}</td>
                 <td class="text-right tabular">{{ fmtQuantity(line) }}
                   @if (line.includedQuantity > 0) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ fmtUnits(line, line.includedQuantity) }} included · {{ fmtUnits(line, line.billableQuantity) }} billable</div> }</td>
-                <td class="hidden lg:table-cell text-[color:var(--text-muted)]">{{ line.unit }}</td>
                 <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtRate(line) }}
                   @for (t of line.tiers; track t.from) { <div class="text-[11px]">{{ fmtUnits(line, t.units) }} at {{ fmtUnitPrice(t.unit_price, line.per, line.unit) }}</div> }</td>
-                <td class="text-right tabular font-medium">{{ fmtAmount(line.amount) }}</td>
+                <td class="text-right tabular font-medium" [title]="fmtExact(line.amount)">{{ fmtAmount(line.amount) }}</td>
                 <td><button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-expanded]="openLine()?.meter === line.meter"
                             [attr.aria-label]="'Show what is behind ' + line.label" (click)="$event.stopPropagation(); toggleLine(line)">
                   <app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></button></td>
               </tr>
               @if (openLine()?.meter === line.meter) {
                 <tr class="bg-sunken">
-                  <td colspan="7" class="!py-3">
+                  <td colspan="6" class="!py-3">
                     @if (subjectsLoading()) {
                       <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the events…</span>
                     } @else if (subjectsError()) {
@@ -134,7 +139,7 @@
                           @for (s of subjects(); track s.subject_type + s.subject_id) {
                             <tr>
                               <td class="mono text-xs max-w-96"><span class="block truncate" [title]="s.subject_id">{{ subjectLabel(s) }}</span></td>
-                              <td class="text-right tabular">{{ line.unit === 'byte' ? fmtBytes(s.quantity) : line.unit === 'GB' ? fmtGb(s.quantity) : line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : (s.quantity | number: '1.0-2') + ' ' + line.unit }}</td>
+                              <td class="text-right tabular">{{ line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : fmtUnits(line, s.quantity) }}</td>
                               <td class="text-right tabular">{{ s.events }}</td>
                               <td class="text-xs text-[color:var(--text-muted)] tabular">{{ s.last ? (s.last | serverTime: 'recent') : '' }}</td>
                               <td class="text-xs text-[color:var(--text-muted)]">{{ actorLabel(s) }}</td>
@@ -154,9 +159,8 @@
                 <td class="font-semibold">Month to date</td>
                 <td class="hidden md:table-cell"></td>
                 <td></td>
-                <td class="hidden lg:table-cell"></td>
                 <td class="hidden md:table-cell"></td>
-                <td class="text-right tabular font-semibold">{{ fmtAmount(total()) }}</td>
+                <td class="text-right tabular font-semibold" [title]="fmtExact(total())">{{ fmtAmount(total()) }}</td>
                 <td></td>
               </tr>
             }

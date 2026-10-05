@@ -10,7 +10,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { BillingApi, DayRow, MeterLine, PricedWith, RunRow, SERVICES, SubjectRow, UsageQuery } from './billing.service';
-import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
+import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, pluralUnit } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -20,6 +20,11 @@ const SUBJECTS_SHOWN = 25;
 const RUNS_PAGE = 25;
 /** The forecast paces the rest of the month at the last week's daily average. */
 const FORECAST_WINDOW_DAYS = 7;
+
+/** Under half a cent: rounds to $0.00, so it reads "< $0.01" and waits behind the toggle. */
+function isTiny(amount: number): boolean {
+  return Math.abs(Number(amount) || 0) < 0.005;
+}
 
 /**
  * Cost & usage: what this workspace used this month and what it costs, as the meter says.
@@ -53,8 +58,16 @@ export class Billing implements OnInit {
   readonly error = signal('');
   readonly notConfigured = signal(false);
   readonly lines = signal<MeterLine[]>([]);
-  /** The precision the Amount column shares: four decimals for every row when one real amount is under a cent. */
-  readonly lineDigits = computed(() => moneyDigits([...this.lines().map(l => l.amount), this.total()]));
+  /**
+   * The Amount column reads in cents (UI review U12). It used to share four decimals whenever one line was under a
+   * cent, so every line read "$3.0662" beside five lines of "$0.0000". Lines under half a cent now wait behind a
+   * toggle, and shown they read "< $0.01" with the exact figure on the tooltip.
+   */
+  readonly lineDigits = computed(() => 2);
+  readonly showTinyLines = signal(false);
+  readonly tinyLines = computed(() => this.lines().filter(l => isTiny(l.amount)));
+  readonly tinyTotal = computed(() => this.tinyLines().reduce((n, l) => n + l.amount, 0));
+  readonly shownLines = computed(() => this.showTinyLines() ? this.lines() : this.lines().filter(l => !isTiny(l.amount)));
   readonly days = signal<DayRow[]>([]);
   readonly currency = signal('USD');
   readonly rateCard = signal<PricedWith | null>(null);
@@ -277,10 +290,26 @@ export class Billing implements OnInit {
 
   fmtMoney(value: number): string { return formatMoney(value, this.currency()); }
   /** An amount in the line-by-line table, at the precision its column shares. */
-  fmtAmount(value: number): string { return formatMoney(value, this.currency(), this.lineDigits()); }
+  fmtAmount(value: number): string {
+    return isTiny(value) && value !== 0 ? `< ${formatMoney(0.01, this.currency(), 2)}` : formatMoney(value, this.currency(), this.lineDigits());
+  }
+  /** The exact amount, for the tooltip of a figure shown in cents. */
+  fmtExact(value: number): string { return formatMoney(value, this.currency(), 4); }
   fmtBytes(bytes: number): string { return formatBytes(bytes); }
   fmtGb(gb: number): string { return formatGb(gb); }
-  fmtQuantity(line: MeterLine): string { return line.unit === 'byte' || line.unit === 'GB' || line.unit === 'GB-hour' || line.unit === 'minute' ? formatQuantity(line.quantity, line.unit) : Math.round(line.quantity).toLocaleString(); }
+  /**
+   * A quantity with its unit, always (UI review U12): "1.5 s" sat beside a Unit column saying "minute" and "527.1 KB"
+   * beside "byte". The figure now carries the unit it is written in, and the Unit column is gone.
+   */
+  fmtQuantity(line: MeterLine): string {
+    const q = Number(line.quantity) || 0;
+    const unit = line.unit ?? '';
+    if (unit === 'byte' || unit === 'GB') return formatQuantity(q, unit);
+    if (unit === 'GB-hour') return q < 1 ? formatQuantity(q, unit) : `${q.toLocaleString('en-US', { maximumFractionDigits: 1 })} GB-hours`;
+    if (unit === 'minute') return q < 1 ? formatQuantity(q, unit) : `${q.toLocaleString('en-US', { maximumFractionDigits: 1 })} ${q === 1 ? 'minute' : 'minutes'}`;
+    const n = Math.round(q).toLocaleString('en-US');
+    return !unit || unit === 'each' ? n : `${n} ${Math.round(q) === 1 ? unit : pluralUnit(unit)}`;
+  }
   /** The unit price with enough digits to be a price, not "$0.0000". */
   fmtRate(line: MeterLine): string {
     if (line.unpriced) return 'Not on the card';
