@@ -81,7 +81,7 @@
         <div class="search-field max-w-56 ml-auto">
           <app-icon name="search" size="0.95em" />
           <input type="search" class="input" placeholder="Find a person…" [value]="search()"
-                 (input)="search.set($any($event.target).value)" aria-label="Find a person" />
+                 (input)="typed($any($event.target).value)" aria-label="Find a person" />
         </div>
       }
     </div>
@@ -99,7 +99,7 @@
         </div>
       } @else {
         <app-access-people-grid [people]="people()" [profiles]="profiles()" [pages]="pages()"
-                                [search]="search()" [busy]="assigning()" (assign)="assign($event)"
+                                [search]="gridSearch()" [busy]="assigning()" (assign)="assign($event)"
                                 (toggle)="toggle($event)" (reset)="resetExceptions($event)" />
       }
     } @else {

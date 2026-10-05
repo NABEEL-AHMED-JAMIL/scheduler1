@@ -54,6 +54,15 @@ export class AccessProfiles implements OnInit {
   readonly people = signal<AccessPerson[]>([]);
   readonly view = signal<'profiles' | 'people'>('profiles');
   readonly search = signal('');
+  /** The search as the grid reads it, 250 ms after the last keystroke (P2 #34): every key re-drew the whole matrix. */
+  readonly gridSearch = signal('');
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+
+  typed(text: string): void {
+    this.search.set(text);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => this.gridSearch.set(text), 250);
+  }
   readonly loading = signal(false);
   readonly peopleLoading = signal(false);
   readonly error = signal('');
@@ -103,6 +112,7 @@ export class AccessProfiles implements OnInit {
     const params = this.route.snapshot.queryParamMap;
     if (params.get('view') === 'people') this.view.set('people');
     this.search.set(params.get('q') ?? '');
+    this.gridSearch.set(this.search());
     const linkedTenant = Number(params.get('tenantId'));
     if (this.canPickTenant()) {
       this.http.get<ApiResponse<Tenant[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({

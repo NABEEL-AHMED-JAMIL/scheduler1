@@ -179,3 +179,18 @@ describe('AccessPeopleGrid profile select', () => {
     expect(fixture.nativeElement.querySelector('.access-grid-profile select').value).toBe('3');
   });
 });
+
+describe('P2 #34: the people grid draws a page of people at a time', () => {
+  it('pages the matching people, group by group, and a search starts again from the first page', () => {
+    const many = Array.from({ length: 120 }, (_, i) =>
+      person(1000 + i, `Person ${String(i).padStart(3, '0')}`, i % 2 ? 2 : null, i % 2 ? 'Analyst' : null, ['jobs']));
+    const g = grid(many);
+    expect(g.matchCount()).toBe(120);
+    expect(g.shown()).toBe(50);
+    // Default first: the 60 without a profile fill page one, then the Analysts.
+    expect(g.groups().map(x => x.key)).toEqual(['default']);
+    g.page.set(3);
+    expect(g.shown()).toBe(20);
+    expect(g.groups().map(x => x.key)).toEqual(['2']);
+  });
+});

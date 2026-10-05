@@ -1,4 +1,6 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Pagination } from '../../../shared/ui/pagination';
+import { PAGE_SIZES } from '../../../shared/ui/pager';
+import { Component, effect, signal, untracked, computed, input, output } from '@angular/core';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
 import { Icon } from '../../../shared/ui/icon';
 import { Avatar } from '../../../shared/ui/avatar';
@@ -46,7 +48,7 @@ interface ProfileGroup {
  */
 @Component({
   selector: 'app-access-people-grid',
-  imports: [Icon, Avatar],
+  imports: [Icon, Avatar, Pagination],
   templateUrl: './access-people-grid.html',
 })
 export class AccessPeopleGrid {
@@ -84,12 +86,36 @@ export class AccessPeopleGrid {
 
   readonly defaultProfile = computed(() => this.profiles().find(p => p.defaultProfile) ?? null);
 
-  private readonly filtered = computed(() => {
+  private readonly matching = computed(() => {
     const needle = this.search().trim().toLowerCase();
-    if (!needle) return this.people();
-    return this.people().filter(p =>
-      [p.fullName, p.username, p.position ?? ''].some(v => v.toLowerCase().includes(needle)));
+    const people = needle ? this.people().filter(p =>
+      [p.fullName, p.username, p.position ?? ''].some(v => v.toLowerCase().includes(needle))) : this.people();
+    // In the order the groups draw (default first, then by profile name), so a page cuts between groups, not through them.
+    const profileName = (p: AccessPerson) => this.profiles().find(x => x.pageAccessProfileId === p.pageAccessProfileId)?.profileName ?? null;
+    return [...people].sort((a, b) => {
+      const pa = profileName(a), pb = profileName(b);
+      if ((pa === null) !== (pb === null)) return pa === null ? -1 : 1;
+      return (pa ?? '').localeCompare(pb ?? ''); // stable: within a group, the server's order (by name)
+    });
   });
+
+  /**
+   * P2 #34: the grid is people x pages, a checkbox per cell -- a workspace of 2,000 drew 2,000 rows of 40 boxes. It
+   * draws a page of people at a time; a new search starts from the first page.
+   */
+  readonly page = signal(1);
+  readonly pageSize = signal(PAGE_SIZES[0]);
+  readonly matchCount = computed(() => this.matching().length);
+  private readonly filtered = computed(() => {
+    const size = this.pageSize();
+    const last = Math.max(1, Math.ceil(this.matchCount() / size));
+    const page = Math.min(this.page(), last);
+    return this.matching().slice((page - 1) * size, page * size);
+  });
+
+  constructor() {
+    effect(() => { this.search(); untracked(() => this.page.set(1)); });
+  }
 
   readonly groups = computed<ProfileGroup[]>(() => {
     const pages = this.columns();

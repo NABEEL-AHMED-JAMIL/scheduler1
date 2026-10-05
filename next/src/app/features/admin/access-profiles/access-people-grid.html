@@ -99,6 +99,9 @@
       </tbody>
     </table>
   </div>
+  <!-- P2 #34: a page of people at a time; hidden while everyone fits on one. -->
+  <app-pagination [total]="matchCount()" [page]="page()" [size]="pageSize()" (goTo)="page.set($event)"
+                  (setSize)="pageSize.set($event); page.set(1)" />
   <div class="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
     <!-- Samples look exactly like the cells they explain. They used to be disabled inputs, and
          the disabled fade made the ticked "open" sample read as an empty grey box -- the same
