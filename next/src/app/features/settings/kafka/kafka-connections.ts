@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
 import { HttpClient } from '@angular/common/http';
 
@@ -8,7 +8,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { AuthService } from '../../../core/auth/auth.service';
-import { StatTile } from '../../../shared/ui/stat-tile';
+import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Icon } from '../../../shared/ui/icon';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
@@ -83,9 +83,69 @@ export interface KafkaProfile {
   readOnly?: boolean;
 }
 
+/** One consumer group reading a topic, as setting.json/profileHealth reports it. */
+export interface TopicReader { group: string; state: string; members: number; lag: number; }
+
+/** A topic's live shape on the broker. */
+export interface TopicHealth {
+  topic: string;
+  exists: boolean;
+  partitions?: number;
+  replicas?: number;
+  underReplicated?: number;
+  offline?: number;
+  messages?: number;
+  lag: number;
+  readers: number;
+  consumers: TopicReader[];
+  /** Healthy, Under-replicated, Offline, No consumer, Missing. */
+  state: string;
+}
+
+export interface GroupHealth { group: string; state: string; members: number; topics: string[]; lag: number; }
+
+/** The selected profile's brokers, the caller's topics on them and who reads them -- nothing else on the broker. */
+export interface BrokerHealth {
+  checkedAt: string;
+  reachable: boolean;
+  reason?: string;
+  brokers?: number;
+  controller?: boolean;
+  topics?: TopicHealth[];
+  groups?: GroupHealth[];
+  totals?: { topics: number; missing: number; partitions: number; underReplicated: number; offline: number; groups: number;
+    groupsStable: number; maxLag: number; unread: number };
+  partial?: string;
+}
+
+export type KafkaTab = 'topics' | 'groups' | 'connection';
+
+/** How often an open, visible pane asks again; the server keeps an answer 20 s, so tabs share it. */
+export const HEALTH_EVERY_MS = 60_000;
+/** Topics shown per page: a workspace can have hundreds. */
+export const TOPIC_PAGE = 50;
+
+/** "1.2k" for a big count; a lag of 1,234,567 messages does not need its last digits. */
+export function compactCount(n: number | null | undefined): string {
+  const v = n ?? 0;
+  if (v < 1000) return String(v);
+  if (v < 1_000_000) return `${(v / 1000).toFixed(v < 10_000 ? 1 : 0)}k`;
+  return `${(v / 1_000_000).toFixed(v < 10_000_000 ? 1 : 0)}M`;
+}
+
+/** The pill tone for a topic's or a group's live state. */
+export function healthTone(state: string | null | undefined): 'ok' | 'warn' | 'crit' | 'neutral' {
+  switch (state) {
+    case 'Healthy': case 'Stable': return 'ok';
+    case 'Under-replicated': case 'No consumer': case 'Empty': case 'Preparing rebalance': case 'Completing rebalance': return 'warn';
+    case 'Offline': case 'Missing': case 'Dead': return 'crit';
+    default: return 'neutral';
+  }
+}
+
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatTile, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
+  imports: [MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -106,6 +166,7 @@ export class KafkaConnections implements OnInit {
   select(profile: KafkaProfile): void {
     this.selectedId.set(profile.kafkaConnectionProfileId);
     this.topicSearch.set('');
+    this.topicPage.set(0);
     this.topicTests.set({});
     this.detailsOpen.set(false);
     this.router.navigate([], { relativeTo: this.route, queryParams: { profileId: profile.kafkaConnectionProfileId }, queryParamsHandling: 'merge', replaceUrl: true });
@@ -136,13 +197,88 @@ export class KafkaConnections implements OnInit {
 
   /** Narrows the pane's topics by name, Kafka topic or description; a hundred rows need it. */
   readonly topicSearch = signal('');
-  readonly topicsShown = computed(() => {
+  readonly topicsMatching = computed(() => {
     const term = this.topicSearch().trim().toLowerCase();
     const rows = this.topicsHere();
     if (!term) return rows;
     return rows.filter(r => `${r.type.serviceName} ${r.type.description ?? ''} ${this.topicOf(r.type.queueTopicPartition)}`
       .toLowerCase().includes(term));
   });
+  /** One page of the matching topics: a long list is paged, not drawn whole (scale review P2 #37). */
+  readonly topicPage = signal(0);
+  readonly topicPages = computed(() => Math.max(1, Math.ceil(this.topicsMatching().length / TOPIC_PAGE)));
+  readonly topicsShown = computed(() => {
+    const page = Math.min(this.topicPage(), this.topicPages() - 1);
+    return this.topicsMatching().slice(page * TOPIC_PAGE, (page + 1) * TOPIC_PAGE);
+  });
+  setTopicSearch(term: string): void { this.topicSearch.set(term); this.topicPage.set(0); }
+
+  // ---- live health (UI review U2): brokers, the workspace's topics, the groups reading them ----------------------
+
+  readonly tab = signal<KafkaTab>('topics');
+  readonly health = signal<BrokerHealth | null>(null);
+  /** Which profile the health on screen is for. */
+  private readonly healthFor = signal<number | null>(null);
+  readonly healthLoading = signal(false);
+  readonly healthError = signal('');
+  readonly compact = compactCount;
+  readonly healthTone = healthTone;
+  readonly currentHealth = computed(() => this.healthFor() === this.selectedId() ? this.health() : null);
+  private readonly healthByTopic = computed(() => {
+    const out: Record<string, TopicHealth> = {};
+    for (const t of this.currentHealth()?.topics ?? []) out[t.topic] = t;
+    return out;
+  });
+  topicHealth(type: TaskType): TopicHealth | null {
+    return this.healthByTopic()[this.topicOf(type.queueTopicPartition)] ?? null;
+  }
+  readonly groups = computed(() => (this.currentHealth()?.groups ?? []).slice().sort((a, b) => b.lag - a.lag || a.group.localeCompare(b.group)));
+
+  /** The health row: what an operator looks at first. */
+  readonly kpis = computed<StatStripItem[]>(() => {
+    const h = this.currentHealth();
+    if (!h || !h.reachable || !h.totals) return [];
+    const t = h.totals;
+    return [
+      { label: 'Brokers up', value: h.brokers ?? 0, icon: 'server', tone: (h.brokers ?? 0) > 0 && h.controller ? 'ok' : 'crit',
+        foot: h.controller ? 'controller elected' : 'no controller', hint: 'Brokers answering the profile\'s client right now' },
+      { label: 'Topics', value: t.topics, icon: 'layers', tone: t.missing ? 'crit' : 'info',
+        foot: t.missing ? `${t.missing} missing on the broker` : `${t.partitions} partitions`, hint: 'Your topics on this connection' },
+      { label: 'Under-replicated', value: t.underReplicated + t.offline, icon: 'alert',
+        tone: t.offline ? 'crit' : t.underReplicated ? 'warn' : 'ok', quiet: !(t.underReplicated + t.offline),
+        foot: t.offline ? `${t.offline} offline` : 'partitions', hint: 'Partitions with fewer in-sync replicas than replicas, or no leader' },
+      { label: 'Consumer groups', value: t.groups, icon: 'users', tone: t.groups && t.groupsStable === t.groups ? 'ok' : t.groups ? 'warn' : 'muted',
+        foot: `${t.groupsStable} stable`, hint: 'Groups reading your topics' },
+      { label: 'Max lag', value: compactCount(t.maxLag), icon: 'clock', tone: t.maxLag > 1000 ? 'warn' : 'ok', quiet: !t.maxLag,
+        foot: 'messages behind', hint: 'The furthest a group is behind the end of one of your topics' },
+      { label: 'Unread topics', value: t.unread, icon: 'zapOff', tone: t.unread ? 'warn' : 'ok', quiet: !t.unread,
+        foot: t.unread ? 'runs wait at Start' : 'every topic is read', hint: 'Topics no consumer is reading right now: a run sent there waits until a worker subscribes' },
+    ];
+  });
+
+  loadHealth(recheck = false): void {
+    const p = this.selected();
+    if (!p) { this.health.set(null); this.healthFor.set(null); return; }
+    const id = p.kafkaConnectionProfileId;
+    this.healthLoading.set(true);
+    this.healthError.set('');
+    const params: Record<string, string> = { kafkaConnectionProfileId: String(id) };
+    if (recheck) params['recheck'] = 'true';
+    this.http.get<ApiResponse<BrokerHealth>>(`${API_BASE}/setting.json/profileHealth`, { params }).subscribe({
+      next: r => {
+        if (this.selectedId() !== id) return;
+        this.healthLoading.set(false);
+        if (r.status !== API_SUCCESS || !r.data) { this.healthError.set(r.message || 'Broker health could not be read.'); return; }
+        this.health.set(r.data);
+        this.healthFor.set(id);
+      },
+      error: err => {
+        if (this.selectedId() !== id) return;
+        this.healthLoading.set(false);
+        this.healthError.set(err?.error?.message || 'Broker health could not be read.');
+      },
+    });
+  }
 
   /**
    * Whether each topic exists on the profile it is listed under -- the server describes it with
@@ -293,11 +429,17 @@ export class KafkaConnections implements OnInit {
   }
 
   constructor() {
-    // The pane's topics follow the selection: every change of selected profile is one fetch.
+    // The pane's topics and health follow the selection: every change of selected profile is one fetch of each.
     effect(() => {
       const id = this.selectedId();
-      untracked(() => { if (id !== null) this.loadTopics(); else { this.taskTypes.set([]); this.topicsFor.set(null); } });
+      untracked(() => {
+        if (id !== null) { this.loadTopics(); this.loadHealth(); }
+        else { this.taskTypes.set([]); this.topicsFor.set(null); this.health.set(null); this.healthFor.set(null); }
+      });
     });
+    // Health is read again every minute while the page is in view; a hidden tab waits until it is looked at.
+    const timer = setInterval(() => { if (!document.hidden && this.selectedId() !== null) this.loadHealth(); }, HEALTH_EVERY_MS);
+    inject(DestroyRef).onDestroy(() => clearInterval(timer));
     // Keep something selected: the linked profile when the list arrives, else the first, and
     // move off a profile the moment it stops existing or is filtered out.
     effect(() => {
@@ -410,9 +552,12 @@ export class KafkaConnections implements OnInit {
     return profile.readOnly || !profile.bootstrapServers ? 'Managed by the platform' : profile.bootstrapServers;
   }
 
-  /** The workspace's own profiles only: the platform default it is shown is not one of them. */
+  /**
+   * The rail's foot: the profiles the caller sees, the platform default it uses included -- "0 profiles" beside the one
+   * it routes through read as broken (UI review U2).
+   */
   readonly summary = computed(() => {
-    const list = this.profiles().filter(p => !p.readOnly);
+    const list = this.profiles();
     return {
       total: list.length,
       active: list.filter(p => p.status === 'Active').length,

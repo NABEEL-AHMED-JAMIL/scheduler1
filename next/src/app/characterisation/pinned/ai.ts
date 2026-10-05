@@ -142,7 +142,6 @@ export const PINNED: Record<string, unknown> = {
   "model connections, as a platform administrator": {
     "url": "/ai/connections",
     "requests": [
-      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",

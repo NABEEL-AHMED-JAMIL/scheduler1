@@ -210,7 +210,6 @@ export const PINNED: Record<string, unknown> = {
   "the tool registry, as a platform administrator": {
     "url": "/ai/tools",
     "requests": [
-      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants"

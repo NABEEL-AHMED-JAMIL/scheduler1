@@ -7,7 +7,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
-import { KafkaConnections, KafkaProfile } from './kafka-connections';
+import { compactCount, healthTone, KafkaConnections, KafkaProfile } from './kafka-connections';
 
 /**
  * Whose profile a row is, and whose default it is.
@@ -259,11 +259,33 @@ describe('the platform default, as a workspace with no Kafka of its own sees it'
     expect(screen.brokersText(GLOBEX_DEFAULT)).toBe('broker:9092');
   });
 
-  it('is the default the tiles report, but not one of the workspace\'s own profiles', () => {
+  it('is the default, and the rail counts it: "0 connections" beside the one in use read as broken (UI review U2)', () => {
     const screen = tenantScreen();
     expect(screen.defaultProfile()?.kafkaConnectionProfileId).toBe(1009);
-    expect(screen.summary().total).toBe(0);
-    expect(screen.summary().testedOk).toBe(0);
+    expect(screen.summary().total).toBe(1);
+  });
+
+  it('reads the selected connection\'s live health and draws its readings', () => {
+    const screen = tenantScreen();
+    (screen as any).healthFor.set(screen.selectedId());
+    screen.health.set({ checkedAt: '2026-10-05T20:09:16Z', reachable: true, brokers: 1, controller: true,
+      topics: [{ topic: 'etl.reference', exists: true, partitions: 1, replicas: 1, underReplicated: 0, offline: 0, messages: 83, lag: 0,
+        readers: 1, consumers: [{ group: 'service-1-worker', state: 'Stable', members: 1, lag: 0 }], state: 'Healthy' }],
+      groups: [{ group: 'service-1-worker', state: 'Stable', members: 1, topics: ['etl.reference'], lag: 0 }],
+      totals: { topics: 1, missing: 0, partitions: 1, underReplicated: 0, offline: 0, groups: 1, groupsStable: 1, maxLag: 0, unread: 0 } });
+    const kpis = screen.kpis();
+    expect(kpis.map(k => k.label)).toEqual(['Brokers up', 'Topics', 'Under-replicated', 'Consumer groups', 'Max lag', 'Unread topics']);
+    expect(kpis[0]).toMatchObject({ value: 1, tone: 'ok' });
+    expect(kpis[5]).toMatchObject({ value: 0, tone: 'ok' });
+    expect(screen.topicHealth({ serviceName: 'x', queueTopicPartition: 'topic=etl.reference&partitions=[*]' } as any)?.state).toBe('Healthy');
+    expect(screen.groups().map(g => g.group)).toEqual(['service-1-worker']);
+  });
+
+  it('draws no readings for a broker that does not answer', () => {
+    const screen = tenantScreen();
+    (screen as any).healthFor.set(screen.selectedId());
+    screen.health.set({ checkedAt: '2026-10-05T20:09:16Z', reachable: false, reason: 'The brokers did not answer in time.' });
+    expect(screen.kpis()).toEqual([]);
   });
 
   it('tests a topic on it by resolving the caller\'s connection, not by naming the platform\'s', () => {
@@ -284,5 +306,23 @@ describe('the platform default, as a workspace with no Kafka of its own sees it'
     screen.addTopic(SHOWN);
     expect(opened[0].data.defaultProfileId).toBeNull();
     expect(opened[0].data.profileName).toBe('Platform Local Broker [PF] (platform default)');
+  });
+});
+
+describe('Kafka health helpers', () => {
+  it('shortens big counts', () => {
+    expect(compactCount(999)).toBe('999');
+    expect(compactCount(1234)).toBe('1.2k');
+    expect(compactCount(56_000)).toBe('56k');
+    expect(compactCount(2_500_000)).toBe('2.5M');
+    expect(compactCount(null)).toBe('0');
+  });
+
+  it('colours a state by what it means for runs', () => {
+    expect(healthTone('Healthy')).toBe('ok');
+    expect(healthTone('No consumer')).toBe('warn');
+    expect(healthTone('Missing')).toBe('crit');
+    expect(healthTone('Empty')).toBe('warn');
+    expect(healthTone('whatever')).toBe('neutral');
   });
 });

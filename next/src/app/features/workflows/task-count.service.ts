@@ -7,7 +7,7 @@ import { WorkflowsApi } from './workflows.api';
 /**
  * The Task inbox's badge in the menu (MIG-275/276): the open tasks in Mine and My groups. Read again whenever the bell's
  * unread count moves -- a new task, a reminder and an escalation all arrive as a bell -- and every two minutes as a
- * backstop, but only for someone who holds the task-inbox page.
+ * backstop, but only for someone who holds the task-inbox page in a workspace, and only while the tab is visible.
  */
 @Injectable({ providedIn: 'root' })
 export class TaskCountService {
@@ -25,13 +25,18 @@ export class TaskCountService {
       untracked(() => this.refresh());
     });
     setInterval(() => this.refresh(), 120_000);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) this.refresh(); });
   }
 
   refresh(): void {
-    if (!this.auth.user() || !this.auth.canOpen('task-inbox')) {
+    // A platform administrator outside any workspace has no inbox: the count would only answer 400, on every page.
+    const user = this.auth.user();
+    if (!user || !user.tenantId || !this.auth.canOpen('task-inbox')) {
       this.count.set(0);
       return;
     }
+    // A tab in the background re-reads when it is looked at again (the bell moves then), not every two minutes.
+    if (typeof document !== 'undefined' && document.hidden) return;
     this.api.count().subscribe({
       next: r => {
         if (r.status === API_SUCCESS && r.data) {

@@ -142,7 +142,6 @@ export const PINNED: Record<string, unknown> = {
   "the list, as a platform administrator": {
     "url": "/configuration/task-registry",
     "requests": [
-      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",

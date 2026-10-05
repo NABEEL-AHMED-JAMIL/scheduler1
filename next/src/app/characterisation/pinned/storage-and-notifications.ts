@@ -21,7 +21,6 @@ export const PINNED: Record<string, unknown> = {
   "storage connections, as a platform administrator": {
     "url": "/integration/storage-connections",
     "requests": [
-      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storageConnection.json/fetchAllConnections",

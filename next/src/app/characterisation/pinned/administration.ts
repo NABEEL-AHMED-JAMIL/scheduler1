@@ -23,7 +23,6 @@ export const PINNED: Record<string, unknown> = {
   "access profiles, as a platform administrator": {
     "url": "/administration/access-profiles",
     "requests": [
-      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
@@ -123,7 +122,6 @@ export const PINNED: Record<string, unknown> = {
   "tenants, as a platform administrator": {
     "url": "/administration/tenants",
     "requests": [
-      "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants"

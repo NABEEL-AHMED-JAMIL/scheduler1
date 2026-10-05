@@ -1872,6 +1872,8 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
 /* Kafka profile environment chip: a small "env" key before the value, so a coloured word under
    a profile name reads as "environment: prod" rather than as a status. */
 .env-pill { text-transform: none; }
+/* Environment is not a status: every chip is neutral, and production alone is outlined in red (UI review U2). */
+.env-pill.env-pill-prod { border-color: var(--color-crit-500); color: var(--crit-text); }
 .env-pill .env-pill-k { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.7; margin-right: 0.1rem; }
 
 /* A key/value cell (Kafka's profile and topic rows): the text takes the room, icons never wrap under it. */
@@ -1888,7 +1890,7 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
    page: a long invoice never leaves its list behind, and the list uses the height there is
    instead of a fixed 30rem that cut a fifth of a tall screen. Sticky needs the rail not to
    stretch to the grid row, hence align-self: start. */
-.lookup-rail { border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column; min-height: 20rem;
+.lookup-rail { display: flex; flex-direction: column; min-height: 20rem;
   position: sticky; top: calc(3.5rem + 1px); align-self: start; max-height: calc(100vh - 3.5rem - 1px); }
 .lookup-rail-tools { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle); }
 .lookup-rail-list { list-style: none; margin: 0; padding: 0.375rem; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
@@ -1909,7 +1911,9 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .lookup-rail-sub em { font-style: normal; color: var(--pill-brand-fg); }
 .lookup-rail-chev { flex: none; opacity: 0; color: var(--text-muted); }
 .lookup-rail-empty { padding: 2rem 1rem; text-align: center; font-size: 13px; color: var(--text-secondary); display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
-.lookup-detail { min-width: 0; display: flex; flex-direction: column; }
+/* The divider is the pane's left edge, not the rail's right one: the sticky rail stops at its own height, so its
+   border ended part-way down a tall card (UI review U9). */
+.lookup-detail { min-width: 0; display: flex; flex-direction: column; border-left: 1px solid var(--border-subtle); margin-left: -1px; }
 .lookup-detail-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border-subtle); }
 .lookup-detail-key { font-size: 1.05rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .lookup-entries { padding: 0.75rem 0 0; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
@@ -1928,7 +1932,8 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
   /* minmax(0, 1fr), not 1fr: a bare 1fr is minmax(auto, 1fr), so a rail item's nowrap subtitle
      set the column's minimum width and ran past the card's edge on a phone. */
   .lookup-split { grid-template-columns: minmax(0, 1fr); }
-  .lookup-rail { border-right: 0; border-bottom: 1px solid var(--border-subtle); min-height: 0; position: static; max-height: none; }
+  .lookup-rail { border-bottom: 1px solid var(--border-subtle); min-height: 0; position: static; max-height: none; }
+  .lookup-detail { border-left: 0; margin-left: 0; }
   .lookup-rail-list { max-height: 16rem; }
   /* The pane head stacks: beside a "Run every widget" button the title had 130px, so it was
      cut to "20 Executive …" and its description wrapped one or two words to a line. */
@@ -1969,6 +1974,21 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .kafka-strip-dot.crit { background: var(--color-crit-500); }
 .kafka-strip-msg { flex: 1 1 12rem; min-width: 0; }
 .kafka-strip-more { padding-top: 0.4rem; border-top: 1px solid var(--border-subtle); }
+/* Live health (UI review U2): one line saying whether the brokers answer, then the strip of readings. */
+.kafka-health { border-bottom: 1px solid var(--border-subtle); }
+.kafka-health-head { display: flex; align-items: center; gap: 0.6rem; padding: 0.6rem 1.25rem; font-size: 13px; flex-wrap: wrap; }
+.kafka-rail-foot { margin: 0; padding: 0.5rem 0.9rem; border-top: 1px solid var(--border-subtle); font-size: 11px; color: var(--text-muted); }
+/* The topics table fits the pane: fixed layout, the name column takes what is left and clips, the narrow columns
+   keep their width, and the actions column never leaves the screen (it was cut off at 1024 and 768). */
+.kafka-table-wrap { overflow-x: auto; }
+.kafka-table { table-layout: fixed; width: 100%; }
+.kafka-table th:first-child, .kafka-table td.kafka-cell-name { width: auto; }
+.kafka-table .kafka-cell-name { min-width: 0; }
+.kafka-cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.kafka-table .lookup-value { min-width: 0; }
+.kafka-table th:not(:first-child) { width: 7.5rem; }
+.kafka-table th:last-child { width: 3rem; }
+.kafka-cell-pipes { max-width: 12rem; }
 .lookup-detail-head { padding: 0.75rem 1.25rem; }
 
 /* A topic row's unfolded pipelines: name, id, size -- each line a link to the Pipelines page. */
