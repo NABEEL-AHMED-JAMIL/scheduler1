@@ -6,7 +6,7 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
  * nothing is run, saved or deleted.
  *
  *  - A step-engine run (7396 of job 2849, "UI-CHECK registry chain job 0929": read_file, validate, transform,
- *    save_file, upload_bucket) shows its five steps on the Timeline, Completed with their records, and the Console
+ *    save_file, upload_bucket) shows its six steps on the Timeline, Completed with their records, and the Console
  *    shows a step's own lines.
  *  - A legacy run (7383 of job 2834) shows its page as it was: its entries, and no steps card.
  *  - A run a file started in the inbox (7387 of job 2848) names the file on Executions, and the job's trigger is
@@ -35,8 +35,10 @@ const INBOX = { job: Number(process.env['E2E_INBOX_JOB'] ?? 2848), run: Number(p
 /** Wave 4: a run that recorded its outputs -- save_file kept customers-clean.json (3 rows), upload_bucket put it in ui-review-s3. */
 /** Unless E2E_FILES_RUN pins one, the schedule's latest run whose kept file has not expired (found at start). */
 const FILES = { job: Number(process.env['E2E_FILES_JOB'] ?? 2849), run: Number(process.env['E2E_FILES_RUN'] ?? 0) };
-const STEPS = ['read', 'check', 'shape', 'out', 'publish'];
-const TASKS = ['read_file', 'validate', 'transform', 'save_file', 'upload_bucket'];
+// The registry chain pipeline's steps; a Sample step was added in front of Read after this spec was written (live data,
+// MIG-330 moves these specs to seeded fixtures).
+const STEPS = ['sample', 'read', 'check', 'shape', 'out', 'publish'];
+const TASKS = ['sample', 'read_file', 'validate', 'transform', 'save_file', 'upload_bucket'];
 
 interface Session { data: Record<string, unknown>; token: string; }
 
@@ -70,7 +72,7 @@ test.describe('Executions', () => {
   let s: Session;
   test.beforeAll(async ({ request }) => {
     s = await session(request);
-    // The fixtures this reads must be what the spec says they are: an engine run with five steps, and a legacy one.
+    // The fixtures this reads must be what the spec says they are: an engine run with six steps, and a legacy one.
     const headers = { Authorization: `Bearer ${s.token}` };
     // Found, not pinned: a schedule's latest arrival and its kept files move on every time it runs (7387 and 7405
     // were overtaken on 2026-09-29, and a kept file expires after its pipeline's datasetRetentionHours).
@@ -106,9 +108,9 @@ test.describe('Executions', () => {
 
     const card = page.locator('.exec-steps');
     await expect(card).toBeVisible();
-    await expect(card.getByRole('heading', { name: /^Steps/ })).toContainText('5 of 5 completed');
+    await expect(card.getByRole('heading', { name: /^Steps/ })).toContainText(`${STEPS.length} of ${STEPS.length} completed`);
     const rows = card.locator('.exec-step');
-    await expect(rows).toHaveCount(5);
+    await expect(rows).toHaveCount(STEPS.length);
     expect(await rows.evaluateAll(els => els.map(e => e.getAttribute('data-step')))).toEqual(STEPS);
     for (let i = 0; i < STEPS.length; i++) {
       const row = rows.nth(i);
@@ -117,12 +119,13 @@ test.describe('Executions', () => {
       await expect(row).toContainText(/\d+ → \d+ records/);
     }
     // read_file brought three rows in; save_file names the file it wrote.
-    await expect(rows.nth(0)).toContainText('0 → 3 records');
-    await expect(rows.nth(3)).toContainText('customers-clean.json');
+    await expect(rows.nth(STEPS.indexOf('read'))).toContainText('2 → 3 records');
+    await expect(rows.nth(STEPS.indexOf('out'))).toContainText('customers-clean.json');
 
-    // The Console: the first step's own lines, then another step's.
+    // The Console: the read step's own lines, then another step's.
     await card.getByRole('button', { name: 'Console' }).click();
     await expect(card.getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true');
+    await card.getByLabel('Step to show').selectOption('read');
     const lines = card.locator('.log-console-line');
     await expect(lines.first()).toContainText(/Try 1 of \d+\./);
     await expect(lines.nth(1)).toContainText(/row\(s\) from/);

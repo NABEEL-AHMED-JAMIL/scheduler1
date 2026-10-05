@@ -121,7 +121,7 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     await expect(page.getByRole('button', { name: /^Actions for run #/ })).toHaveCount(0);
     await page.goto('/configuration/kafka');
     await expect(page.getByText("this workspace's Kafka connections and topics, so they are read-only here")).toBeVisible();
-    await expect(page.getByRole('button', { name: 'New profile' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'New connection' })).toHaveCount(0);
     await page.goto('/configuration/task-registry');
     await expect(page.getByText("this workspace's pipelines and tasks, so they are read-only here")).toBeVisible();
     await expect(page.getByRole('button', { name: 'New pipeline' })).toHaveCount(0);
@@ -138,7 +138,8 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     await page.getByRole('button', { name: 'Administration' }).click();
     await page.getByRole('link', { name: /Our team's activity/ }).click();
     await expect(page.getByRole('heading', { name: "Our team's activity" })).toBeVisible();
-    await expect(page.getByText('POST /sourceTask.json/updateSourceTask')).toBeVisible();
+    // Read as a person reads it (UI review U6); the raw method and path are on the row's tooltip.
+    await expect(page.getByText('Source task › Update source task')).toBeVisible();
     expect(seen.filter(s => s.path.startsWith('/managedService.json/actions')).map(s => s.path)).toEqual(['/managedService.json/actions?limit=50']);
     await page.close();
   });
@@ -214,9 +215,9 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
       ? { status: 'SUCCESS', message: '', data: [row(40)], paging: { nextBeforeId: null } }
       : { status: 'SUCCESS', message: '', data: [row(42), row(41)], paging: { nextBeforeId: 41 } } }) });
     await page.goto('/administration/staff-activity');
-    await expect(page.getByText('POST /sourceTask.json/change42')).toBeVisible();
+    await expect(page.getByText('Source task › Change42')).toBeVisible();
     await page.getByRole('button', { name: 'Load older' }).click();
-    await expect(page.getByText('POST /sourceTask.json/change40')).toBeVisible();
+    await expect(page.getByText('Source task › Change40')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Load older' })).toHaveCount(0);
     expect(seen.map(s => s.path).filter(p => p.startsWith('/managedService.json/actions')))
       .toEqual(['/managedService.json/actions?limit=50', '/managedService.json/actions?beforeId=41&limit=50']);

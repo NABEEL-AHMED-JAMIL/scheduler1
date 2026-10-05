@@ -49,7 +49,7 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
   let s: Session;
   test.beforeAll(async ({ request }) => { s = await session(request); });
 
-  test('the menu offers All forms and the Task inbox, and none of the deferred modules', async ({ browser }) => {
+  test('the menu offers every Wave 5 module: forms, the Task inbox, Data Catalog and Connector Hub', async ({ browser }) => {
     const page = await pageAs(browser, s, 390);
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu', exact: true }).click();
@@ -60,11 +60,11 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     await expect(menu.getByRole('link', { name: 'All forms' })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Submissions' })).toBeVisible();
     await expect(menu.getByRole('link', { name: 'Ask your data' })).toBeVisible();
-    // Workflows is built (MIG-276); Data Catalog and Connector Hub are still off the menu.
+    // Since the demo moved to 12 October every Wave 5 module is built and on the menu; nothing is "Coming soon".
     await expect(menu.getByRole('link', { name: 'Task inbox' })).toBeVisible();
-    for (const gone of ['Data Catalog', 'Connector Hub', 'Coming soon']) {
-      await expect(menu.getByText(gone, { exact: true })).toHaveCount(0);
-    }
+    await expect(menu.getByRole('link', { name: 'Data Catalog' })).toBeVisible();
+    await expect(menu.getByRole('link', { name: 'Connector Hub' })).toBeVisible();
+    await expect(menu.getByText('Coming soon', { exact: true })).toHaveCount(0);
   });
 
   test('All forms lists the wound form, and its fill-in page asks for its five fields', async ({ browser }) => {
