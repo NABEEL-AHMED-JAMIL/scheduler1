@@ -485,7 +485,14 @@
             <tbody>
               @for (r of aiUsage(); track r.promptName + r.promptId) {
                 <tr>
-                  <td class="max-w-64"><span class="font-medium truncate block">{{ r.promptName }}</span></td>
+                  <!-- The service names calls whose prompt is gone "deleted prompt": said as a row label, not a lower-case name. -->
+                  <td class="max-w-64">
+                    @if (r.promptName === 'deleted prompt') {
+                      <span class="italic text-[color:var(--text-secondary)] truncate block" title="Calls made by prompts that have since been deleted">Prompts since deleted</span>
+                    } @else {
+                      <span class="font-medium truncate block">{{ r.promptName }}</span>
+                    }
+                  </td>
                   <td class="text-right tabular">{{ r.calls | number }}</td>
                   <td class="text-right tabular" [class.text-crit-500]="r.failed > 0" [class.text-[color:var(--text-muted)]]="!r.failed">{{ r.failed }}</td>
                   <td class="text-right tabular hidden md:table-cell text-[color:var(--text-muted)]">{{ r.tries }}</td>

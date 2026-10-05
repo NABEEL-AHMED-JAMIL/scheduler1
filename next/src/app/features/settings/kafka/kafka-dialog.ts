@@ -1,5 +1,6 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
 import { KAFKA_ENVIRONMENTS } from './kafka-environment';
+import { testMessageText } from './kafka-text';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -304,7 +305,7 @@ export class KafkaDialog {
       .subscribe({
         next: response => {
           this.testing.set(false);
-          this.testResult.set({ ok: response.status === API_SUCCESS, message: response.message });
+          this.testResult.set({ ok: response.status === API_SUCCESS, message: testMessageText(response.message) });
         },
         error: err => {
           this.testing.set(false);

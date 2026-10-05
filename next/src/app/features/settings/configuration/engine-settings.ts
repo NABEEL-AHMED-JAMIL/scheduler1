@@ -4,6 +4,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { instantOf } from '../../../core/instant';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { EngineSetting, fetchLimitError } from './configuration.models';
 
@@ -56,6 +57,11 @@ export class EngineSettings implements OnInit {
   }
 
   /** Both the server's flag and the console's own list have to agree before an edit is offered. */
+  /** A value that is a date and time (a cron's watermark), not a number. */
+  isInstant(value: string | null | undefined): boolean {
+    return !!value && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(value) && instantOf(value) !== null;
+  }
+
   canEdit(setting: EngineSetting): boolean {
     return setting.editable && EDITABLE_KEYS.has(setting.key);
   }

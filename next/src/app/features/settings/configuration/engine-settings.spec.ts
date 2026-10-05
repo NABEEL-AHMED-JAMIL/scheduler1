@@ -43,7 +43,11 @@ describe('Engine settings', () => {
   it('lists the fetch limit and both watermarks', () => {
     const { el } = screen();
     expect(row(el, 'QUEUE_FETCH_LIMIT').textContent).toContain('100');
-    expect(row(el, 'SCHEDULER_LAST_RUN_TIME').textContent).toContain('2026-09-24T17:00:00Z');
+    // UI review U6: a watermark reads as a date and time, the stored text only on its tooltip.
+    const watermark = row(el, 'SCHEDULER_LAST_RUN_TIME');
+    expect(watermark.textContent).toContain('24 Sep 2026');
+    expect(watermark.textContent).not.toContain('2026-09-24T17:00:00Z');
+    expect(watermark.querySelector('[title="2026-09-24T17:00:00Z"]')).not.toBeNull();
     expect(row(el, 'AUDIT_LOG_SYNC_LAST_RUN_TIME')).not.toBeNull();
   });
 

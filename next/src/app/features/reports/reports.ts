@@ -703,8 +703,12 @@ export class Reports implements OnInit {
     for (const f of this.visibleFailures()) {
       const key = reasonKey(f.message);
       let g = groups.get(key);
-      if (!g) { g = { key, sample: reasonKey(f.message), count: 0, tasks: 0, lastWhen: '', taskSet: new Set() }; groups.set(key, g); }
-      g.count++; g.taskSet.add(f.task || String(f.jobId)); if (f.when > g.lastWhen) g.lastWhen = f.when;
+      if (!g) { g = { key, sample: '', count: 0, tasks: 0, lastWhen: '', taskSet: new Set() }; groups.set(key, g); }
+      g.count++; g.taskSet.add(f.task || String(f.jobId));
+      // The latest run's own words stand for the reason, not the key with its numbers as "#" (UI review U6):
+      // "Rejected # of # rows (#%)" read as a broken template.
+      if (!g.sample || f.when > g.lastWhen) g.sample = (f.message || '').replace(/\s+/g, ' ').trim() || 'No message';
+      if (f.when > g.lastWhen) g.lastWhen = f.when;
     }
     return [...groups.values()].map(g => ({ key: g.key, sample: g.sample, count: g.count, tasks: g.taskSet.size, lastWhen: g.lastWhen }))
       .sort((a, b) => b.count - a.count);

@@ -1,5 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { KAFKA_ENVIRONMENTS, kafkaEnvironment } from './kafka-environment';
+import { testMessageText } from './kafka-text';
 import { HttpClient } from '@angular/common/http';
 
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -225,6 +226,7 @@ export class KafkaConnections implements OnInit {
   readonly healthError = signal('');
   readonly compact = compactCount;
   readonly healthTone = healthTone;
+  readonly testMessage = testMessageText;
   readonly currentHealth = computed(() => this.healthFor() === this.selectedId() ? this.health() : null);
   private readonly healthByTopic = computed(() => {
     const out: Record<string, TopicHealth> = {};
@@ -649,8 +651,8 @@ export class KafkaConnections implements OnInit {
       { kafkaConnectionProfileId: profile.kafkaConnectionProfileId }).subscribe({
       next: response => {
         this.testing.set(null);
-        if (response.status === API_SUCCESS) this.toast.success(response.message);
-        else this.toast.error(response.message);
+        if (response.status === API_SUCCESS) this.toast.success(testMessageText(response.message));
+        else this.toast.error(testMessageText(response.message));
         this.load();
       },
       error: err => {

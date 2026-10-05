@@ -52,7 +52,12 @@
                   }
                 </div>
               } @else {
-                <span class="mono">{{ s.value }}</span>
+                <!-- A watermark is an instant: read in the console's 24-hour format, the stored text on its tooltip (UI review U6). -->
+                @if (isInstant(s.value)) {
+                  <span class="tabular" [title]="s.value">{{ s.value | serverTime: 'dateTimeSec' }}</span>
+                } @else {
+                  <span class="mono">{{ s.value }}</span>
+                }
                 @if (!canEdit(s)) {
                   <div class="text-xs text-[color:var(--text-muted)]">Written only by its cron</div>
                 }

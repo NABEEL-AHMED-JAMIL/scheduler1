@@ -6,6 +6,42 @@ import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ActionsPage, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
 
+/** Words that read as initials, not as words, when a resource or action name is split. */
+const INITIALS: Record<string, string> = { ai: 'AI', api: 'API', apis: 'APIs', sql: 'SQL', url: 'URL', id: 'ID', ids: 'IDs', kafka: 'Kafka',
+  pdf: 'PDF', ocr: 'OCR', csv: 'CSV', json: 'JSON', sso: 'SSO', mfa: 'MFA', s3: 'S3', qr: 'QR', ip: 'IP' };
+
+/** "setEnabled" -> "set enabled"; "aiPrompt" -> "AI prompt". */
+function words(name: string): string {
+  return name.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').trim().split(/\s+/)
+    .map(w => INITIALS[w.toLowerCase()] ?? w.toLowerCase()).join(' ');
+}
+
+function sentence(text: string): string {
+  return text ? text.charAt(0).toUpperCase() + text.slice(1) : text;
+}
+
+/**
+ * A change as a person reads it (UI review U6): "/aiPrompt.json/tools/setEnabled" is "AI prompt › Tools › Set enabled".
+ * Read from the path itself, so every service's endpoint gets a name with no list to keep; the raw method and path
+ * stay on the row's tooltip for whoever needs them.
+ */
+export function changeText(path: string | null | undefined): string {
+  const parts = (path ?? '').split('?')[0].split('/').filter(Boolean).map(p => p.replace(/\.json$/i, ''));
+  if (!parts.length) return 'A change';
+  return parts.map(p => sentence(words(p))).join(' › ');
+}
+
+/**
+ * What the change was made to, from its query ("sourceTaskId=1854&version=3" -> "Source task 1854 · version 3"). The
+ * workspace is left out: the row already names it, and a bare tenantId means nothing to a customer.
+ */
+export function targetText(target: string | null | undefined): string {
+  return (target ?? '').split('&').map(pair => pair.split('='))
+    .filter(([key, value]) => key && value !== undefined && value !== '' && !/^tenant(Id)?$/i.test(key))
+    .map(([key, value]) => `${sentence(words(key.replace(/Id$/, '')))} ${decodeURIComponent(value)}`)
+    .join(' · ');
+}
+
 /** How many rows a page asks for: the service's default is 100 and its most 500. */
 export const ACTIONS_PAGE = 50;
 
@@ -46,6 +82,8 @@ export class StaffActivity implements OnInit {
   readonly staffFilter = signal<number | null>(null);
   readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter());
   readonly name = personName;
+  readonly change = changeText;
+  readonly targetOf = targetText;
 
   readonly emptyMessage = computed(() => this.hasFilters()
     ? 'No change matches those filters.'

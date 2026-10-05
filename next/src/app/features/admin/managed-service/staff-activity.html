@@ -55,11 +55,12 @@
             </td>
             @if (showWorkspace()) { <td class="max-w-56 truncate">{{ workspaceName(a) }}</td> }
             <td class="min-w-64">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="mono text-xs truncate">{{ a.method }} {{ a.path }}</span>
+              <!-- In words, not the API's path and query (UI review U6); the raw request stays on the tooltip. -->
+              <div class="flex items-center gap-2 min-w-0" [title]="a.method + ' ' + a.path + (a.target ? '?' + a.target : '')">
+                <span class="truncate">{{ change(a.path) }}</span>
                 @if (a.builderAction) { <span class="pill pill-brand" title="A change to what the workspace builds">Builder</span> }
               </div>
-              @if (a.target) { <div class="text-xs text-[color:var(--text-muted)] mono truncate">{{ a.target }}</div> }
+              @if (targetOf(a.target); as what) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ what }}</div> }
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ a.service }}</td>
           </tr>

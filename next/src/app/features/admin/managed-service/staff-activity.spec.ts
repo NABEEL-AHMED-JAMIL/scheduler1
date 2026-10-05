@@ -4,7 +4,7 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { StaffActivity } from './staff-activity';
+import { StaffActivity, changeText, targetText } from './staff-activity';
 import { ManagedServiceApi } from './managed-service.api';
 
 const row = (id: number, extra: Record<string, unknown> = {}) => ({ id, tenantId: 2924, tenantName: 'Claude Demo', appUserId: 5001,
@@ -36,7 +36,9 @@ describe('MIG-254: Staff activity (platform administrators)', () => {
     expect(page.staff().map(s => s.appUserId)).toEqual([5001]);
     expect(page.rows().map(r => r.id)).toEqual([9, 8]);
     expect(text()).toContain('Staff activity');
-    expect(text()).toContain('/sourceTask.json/updateSourceTask');
+    expect(text()).toContain('Source task › Update source task');
+    expect(text()).toContain('Source task 1854');
+    expect(text()).not.toContain('/sourceTask.json');
     expect(page.showWorkspace()).toBe(true);
   });
 
@@ -73,5 +75,15 @@ describe('MIG-254: Our team\'s activity (a workspace administrator)', () => {
   it('says plainly when our team has changed nothing', () => {
     const { text } = setup('workspace', [{ data: [], next: null }]);
     expect(text()).toContain('Our team has not changed anything in this workspace yet.');
+  });
+});
+
+describe('UI review U6: a change in words', () => {
+  it('names the change from its path and the thing from its query, never the workspace id', () => {
+    expect(changeText('/aiPrompt.json/tools/setEnabled')).toBe('AI prompt › Tools › Set enabled');
+    expect(changeText('/managedService.json/openSession')).toBe('Managed service › Open session');
+    expect(changeText('')).toBe('A change');
+    expect(targetText('tenantId=2924')).toBe('');
+    expect(targetText('sourceTaskId=1854&version=3')).toBe('Source task 1854 · Version 3');
   });
 });

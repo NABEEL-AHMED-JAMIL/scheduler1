@@ -233,8 +233,8 @@
             <span class="font-medium">{{ testTone(p).label }}</span>
             @if (p.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ p.lastTestedAt | serverTime: 'recent' }}</span> }
             <span class="kafka-strip-msg truncate text-[color:var(--text-secondary)]"
-                  [title]="p.lastTestMessage || ''">
-              {{ p.lastTestMessage || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus ? 'Never tested — run a test to confirm the brokers answer.' : '') }}
+                  [title]="testMessage(p.lastTestMessage)">
+              {{ testMessage(p.lastTestMessage) || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus ? 'Never tested — run a test to confirm the brokers answer.' : '') }}
             </span>
           </div>
           <div class="kafka-strip-row">

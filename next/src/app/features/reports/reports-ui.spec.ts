@@ -140,6 +140,15 @@ describe('Reports times', () => {
     expect(reports.failureReasons()[0].lastWhen).toBe(newer.when);
   });
 
+  it('stands a reason for its runs in the latest run\'s own words, never the "#" key (UI review U6)', () => {
+    const { reports, fixture } = page();
+    const older = { ...failure(2, 'nightly-load', 'Rejected 24 of 30 rows (80.00%)'), when: '2026-08-01T09:00:00' };
+    const newer = { ...failure(3, 'nightly-load', 'Rejected 12 of 30 rows (40.00%)'), when: '2026-08-01T10:00:00' };
+    reports.failures.set([older, newer]);
+    fixture.detectChanges();
+    expect(reports.failureReasons().map(r => [r.count, r.sample])).toEqual([[2, 'Rejected 12 of 30 rows (40.00%)']]);
+  });
+
   /** MIG-295: no raw ISO day on the page; the task's last day reads as the console writes one. */
   it('writes a task\'s last day as a day, not the ISO key it is sorted by', () => {
     const { text } = page();
