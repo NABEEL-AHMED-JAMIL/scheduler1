@@ -35,6 +35,12 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/f/:token",
+      "title": "Form",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/",
       "guards": [
         "authGuard",
@@ -1295,7 +1301,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /settings/kafka": {
     "lands": "/configuration/kafka",
-    "heading": "Kafka Connections"
+    "heading": "Kafka & Topics"
   },
   "old address /settings/lookup": {
     "lands": "/configuration/values",
@@ -1315,7 +1321,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /settings/task-types": {
     "lands": "/configuration/kafka",
-    "heading": "Kafka Connections"
+    "heading": "Kafka & Topics"
   },
   "old address /tasks": {
     "lands": "/pipelines",

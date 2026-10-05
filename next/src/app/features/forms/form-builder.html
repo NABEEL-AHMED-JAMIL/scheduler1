@@ -337,7 +337,7 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                   <div class="field sm:col-span-2">
                     <label class="label" for="formName">Name <span class="text-crit-500" aria-hidden="true">*</span></label>
-                    <input id="formName" class="input" maxlength="120" [value]="d.name" placeholder="Wound intake"
+                    <input id="formName" class="input" maxlength="120" [value]="d.name" placeholder="Visitor check-in"
                            (input)="patch({ name: $any($event.target).value })" />
                   </div>
                   <div class="field sm:col-span-2">
@@ -390,6 +390,11 @@
                   </div>
                 }
               </div>
+              @if (d.formId) {
+                <app-form-share [formId]="d.formId" [locked]="locked()" />
+              } @else {
+                <p class="text-sm text-[color:var(--text-muted)] max-w-4xl">Save the form to share it by link.</p>
+              }
             }
           }
         </fieldset>

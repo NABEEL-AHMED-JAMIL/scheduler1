@@ -50,6 +50,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/docs/docs').then(m => m.Docs),
   },
   {
+    // MIG-278: a form shared by link. Public on purpose -- the link's token is the only key, and Core decides what it
+    // opens; the page shows the form and nothing of the workspace or the console behind it.
+    path: 'f/:token',
+    title: 'Form',
+    loadComponent: () => import('./features/forms/public-form').then(m => m.PublicForm),
+  },
+  {
     path: '',
     component: Shell,
     canActivate: [authGuard],

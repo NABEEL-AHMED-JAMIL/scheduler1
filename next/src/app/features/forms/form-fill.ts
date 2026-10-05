@@ -12,7 +12,7 @@ import { FormsApi } from './forms.service';
  * Forms › Fill in (Wave 5 Forms lite; page 'forms'): a member of the workspace fills in one of its Active forms. The
  * answers are checked as they are sent -- here first, then by Core, whose refusal is shown at each field -- and the
  * submission is stored; when the form starts a job, the page says whether its run started (and which), or why not.
- * Shared inside the workspace only: there is no public link.
+ * Inside the workspace; a link for people outside it is made in the builder's Settings (MIG-278, /f/:token).
  */
 @Component({
   selector: 'app-form-fill',

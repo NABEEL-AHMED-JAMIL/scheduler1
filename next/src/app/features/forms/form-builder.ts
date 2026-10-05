@@ -22,6 +22,7 @@ const TYPE_ICONS: Record<FieldType, string> = {
   text: 'edit', longText: 'list', number: 'chart', date: 'calendar', choice: 'selector', yesNo: 'checkCircle', email: 'mail',
   table: 'table', file: 'file', signature: 'edit', lookup: 'search',
 };
+import { FormShare } from './form-share';
 import { FormsApi } from './forms.service';
 import { WorkflowSummary, WorkflowsApi } from '../workflows/workflows.api';
 
@@ -40,7 +41,7 @@ type BuilderDraft = Omit<FormDraft, 'fields'> & { fields: BuilderField[] };
  */
 @Component({
   selector: 'app-form-builder',
-  imports: [Icon, TableShell, ManagedBanner, ServerTimePipe, RouterLink, FormRenderer],
+  imports: [Icon, TableShell, ManagedBanner, ServerTimePipe, RouterLink, FormRenderer, FormShare],
   templateUrl: './form-builder.html',
 })
 export class FormBuilder implements OnInit {

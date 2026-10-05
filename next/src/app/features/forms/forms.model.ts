@@ -107,6 +107,60 @@ export interface Submission {
   workflowStage?: string | null;
 }
 
+/** MIG-278: whether this workspace lets its forms be shared by link. */
+export interface SharePolicy {
+  enabled: boolean;
+  canChange: boolean;
+}
+
+export type ShareLinkStatus = 'Active' | 'Expired' | 'Used' | 'Revoked';
+
+export interface ShareLink {
+  linkId: number;
+  formId: number;
+  label?: string | null;
+  status: ShareLinkStatus;
+  expiresAt: string;
+  maxSubmissions?: number | null;
+  usedCount: number;
+  requireSignIn: boolean;
+  createdAt?: string | null;
+  lastUsedAt?: string | null;
+  /** Only in the answer that made it. */
+  token?: string;
+}
+
+export interface ShareLinks {
+  enabled: boolean;
+  shareable: boolean;
+  whyNot?: string | null;
+  links: ShareLink[];
+}
+
+export interface ShareLinkDraft {
+  formId: number;
+  label: string;
+  days: number;
+  maxSubmissions: number | null;
+  requireSignIn: boolean;
+}
+
+/** A share link's form, as its visitor sees it: the form and a ticket for this visit, nothing of the workspace. */
+export interface PublicFormView {
+  name: string;
+  description?: string | null;
+  version: number;
+  fields: FormField[];
+  requireSignIn: boolean;
+  expiresAt: string;
+  ticket: string;
+}
+
+/** The address a share link opens at, built from its token. */
+export function shareUrl(origin: string, token: string): string {
+  return `${origin.replace(/\/+$/, '')}/f/${token}`;
+}
+
 /** What POST form.json/save takes. */
 export interface FormDraft {
   formId?: number | null;

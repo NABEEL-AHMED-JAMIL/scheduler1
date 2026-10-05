@@ -32,6 +32,7 @@ function screenWith(opts: { admin?: boolean; locked?: boolean } = {}) {
     linkableJobs: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ jobId: 2833, jobName: 'Wound triage', jobStatus: 'Active' }] })),
     save: vi.fn(() => of({ status: 'SUCCESS', message: 'Form created.', data: { ...FORMS[1], formId: 1002 } })),
     setStatus: vi.fn(() => of({ status: 'SUCCESS', message: 'The form is archived.', data: FORMS[0] })),
+    shareLinks: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { enabled: false, shareable: true, links: [] } })),
   };
   const toast = { success: vi.fn(), error: vi.fn() };
   TestBed.resetTestingModule();
