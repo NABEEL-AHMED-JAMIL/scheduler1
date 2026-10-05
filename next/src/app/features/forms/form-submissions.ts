@@ -26,6 +26,15 @@ interface AnswerRow {
   files?: UploadRef[];
 }
 
+/** How many submissions the page reads: the newest, as the service lists them. */
+export const SUBMISSIONS_READ = 200;
+
+/** The form the page opens on when the address names none. */
+export function defaultForm(forms: FormSummary[]): FormSummary | undefined {
+  return forms.find(f => f.status === 'Active' && (f.submissions ?? 0) > 0) ?? forms.find(f => f.status === 'Active')
+    ?? forms.find(f => f.status !== 'Archived') ?? forms[0];
+}
+
 @Component({
   selector: 'app-form-submissions',
   imports: [StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
@@ -70,22 +79,33 @@ export class FormSubmissions implements OnInit {
     return this.submissions().filter(s => (!state || s.workflowStatus === state || s.status === state)
       && (!text || [String(s.submissionId), this.submitter(s), s.workflowStage ?? '', JSON.stringify(s.answers)].some(v => v.toLowerCase().includes(text))));
   });
+  /**
+   * P2 #30: the list reads the newest 200. The form's own count says how many there are in all, so a capped list
+   * says "the newest 200 of 1,240" instead of passing 200 off as the total; the other tiles and the search cover
+   * the 200 and say so.
+   */
+  readonly totalSubmissions = computed(() => Math.max(this.form()?.submissions ?? 0,
+    this.forms().find(f => f.formId === this.selected())?.submissions ?? 0, this.submissions().length));
+  readonly capped = computed(() => this.submissions().length >= SUBMISSIONS_READ && this.totalSubmissions() > this.submissions().length);
   /** The strip above the list: the form's latest submissions at a glance. */
   readonly kpis = computed<StatStripItem[]>(() => {
     const rows = this.submissions();
     const count = (pick: (s: Submission) => boolean) => rows.filter(pick).length;
-    const all: StatStripItem = { label: 'Submissions', value: rows.length, icon: 'inbox', foot: rows.length >= 200 ? 'the latest 200' : 'all of them' };
+    const capped = this.capped();
+    const all: StatStripItem = { label: 'Submissions', value: this.totalSubmissions(), icon: 'inbox',
+      foot: capped ? `the newest ${rows.length.toLocaleString('en-US')} below` : 'all of them' };
+    const within = (item: StatStripItem): StatStripItem => capped && !item.foot ? { ...item, foot: `of the newest ${rows.length}` } : item;
     if (this.hasApproval()) {
-      return [all,
+      return ([all,
         { label: 'Awaiting approval', value: count(s => s.workflowStatus === 'Pending'), icon: 'clock', tone: 'warn' },
         { label: 'Approved', value: count(s => s.workflowStatus === 'Approved' || s.workflowStatus === 'Completed'), icon: 'checkCircle', tone: 'ok' },
         { label: 'Overdue', value: count(s => s.workflowStatus === 'Overdue'), icon: 'alert', tone: 'crit',
-          foot: count(s => s.workflowStatus === 'Rejected') + ' rejected' }];
+          foot: count(s => s.workflowStatus === 'Rejected') + ' rejected' }] as StatStripItem[]).map((item, i) => i ? within(item) : item);
     }
-    return [all,
+    return ([all,
       { label: 'Run started', value: count(s => s.status === 'RunStarted'), icon: 'play', tone: 'ok' },
       { label: 'Run not started', value: count(s => s.status === 'RunNotStarted'), icon: 'alert', tone: 'crit' },
-      { label: 'Kept only', value: count(s => s.status === 'Received'), icon: 'inbox' }];
+      { label: 'Kept only', value: count(s => s.status === 'Received'), icon: 'inbox' }] as StatStripItem[]).map((item, i) => i ? within(item) : item);
   });
   readonly submissions = signal<Submission[]>([]);
   readonly loading = signal(false);
@@ -106,7 +126,9 @@ export class FormSubmissions implements OnInit {
         const forms = formsOf(r.data);
         this.forms.set(forms);
         const wanted = Number(this.formId());
-        const first = forms.find(f => f.formId === wanted) ?? forms[0];
+        // With no form asked for, an Active one that has submissions, else any Active one, before a draft or an
+        // archived form (UI review U14: the page opened on an archived form).
+        const first = forms.find(f => f.formId === wanted) ?? defaultForm(forms);
         if (first) this.choose(first.formId);
       },
       error: err => { this.formsLoading.set(false); this.formsError.set(err?.error?.message || 'The forms could not be read.'); },
@@ -129,7 +151,7 @@ export class FormSubmissions implements OnInit {
     if (!formId) return;
     this.loading.set(true);
     this.error.set('');
-    this.api.submissionsOf(formId).subscribe({
+    this.api.submissionsOf(formId, SUBMISSIONS_READ).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }

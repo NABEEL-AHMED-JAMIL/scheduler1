@@ -165,6 +165,15 @@
           }
         </tbody>
       </table>
+      <!-- P2 #30: a capped list says so, rather than stopping silently at 200. -->
+      <div pager>
+        @if (capped()) {
+          <p class="px-4 py-3 border-t border-subtle text-xs text-[color:var(--text-muted)]" data-capped>
+            The newest {{ submissions().length }} of {{ totalSubmissions().toLocaleString('en-US') }} submissions. Search and the counts above cover
+            these {{ submissions().length }}; Export CSV has every submission.
+          </p>
+        }
+      </div>
     </app-table-shell>
   }
 </div>

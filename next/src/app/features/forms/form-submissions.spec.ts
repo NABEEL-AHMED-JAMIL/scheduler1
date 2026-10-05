@@ -5,7 +5,7 @@ import { HttpHeaders, HttpResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { ToastService } from '../../shared/ui/toast.service';
-import { FormSubmissions } from './form-submissions';
+import { FormSubmissions, SUBMISSIONS_READ, defaultForm } from './form-submissions';
 import { FormsApi } from './forms.service';
 import { FormField, FormSummary, Submission } from './forms.model';
 
@@ -55,10 +55,10 @@ function render(formId?: string) {
 
 describe('Form submissions', () => {
   it('opens the first form, or the one the address names, with its submissions newest first', () => {
-    expect(render().api.submissionsOf).toHaveBeenCalledWith(1000);
+    expect(render().api.submissionsOf).toHaveBeenCalledWith(1000, SUBMISSIONS_READ);
     const { api, screen } = render('1001');
     expect(api.list).toHaveBeenCalledWith(true);
-    expect(api.submissionsOf).toHaveBeenCalledWith(1001);
+    expect(api.submissionsOf).toHaveBeenCalledWith(1001, SUBMISSIONS_READ);
     expect(screen.selected()).toBe(1001);
   });
 
@@ -105,5 +105,31 @@ describe('Form submissions', () => {
       URL.revokeObjectURL = original.revoke;
       click.mockRestore();
     }
+  });
+});
+
+describe('UI review U14: the form Submissions opens on', () => {
+  const form = (formId: number, status: 'Draft' | 'Active' | 'Archived', submissions = 0) =>
+    ({ formId, name: 'F' + formId, status, version: 1, fieldCount: 1, startsJob: false, submissions });
+  it('is an Active form with submissions, else an Active one, never an archived one first', () => {
+    expect(defaultForm([form(1, 'Archived', 9), form(2, 'Active'), form(3, 'Active', 4)])?.formId).toBe(3);
+    expect(defaultForm([form(1, 'Archived', 9), form(2, 'Draft'), form(3, 'Active')])?.formId).toBe(3);
+    expect(defaultForm([form(1, 'Archived', 9), form(2, 'Draft')])?.formId).toBe(2);
+    expect(defaultForm([form(1, 'Archived', 9)])?.formId).toBe(1);
+  });
+});
+
+describe('P2 #30: a capped submissions list says so', () => {
+  it('counts the form in all and says the list is its newest 200', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]),
+      { provide: FormsApi, useValue: { list: () => of({ status: 'SUCCESS', data: [] }) } }] });
+    const screen = TestBed.createComponent(FormSubmissions).componentInstance;
+    screen.forms.set([{ formId: 7, name: 'Intake', status: 'Active', version: 1, fieldCount: 1, startsJob: false, submissions: 1240 }]);
+    screen.selected.set(7);
+    screen.submissions.set(Array.from({ length: SUBMISSIONS_READ }, (_, i) => ({ submissionId: i + 1, status: 'Received' }) as never));
+    expect(screen.capped()).toBe(true);
+    expect(screen.kpis()[0]).toEqual(expect.objectContaining({ value: 1240, foot: 'the newest 200 below' }));
+    expect(screen.kpis()[1].foot).toBe('of the newest 200');
   });
 });
