@@ -207,7 +207,7 @@
             @if (!h.reachable) {
               <p class="text-sm text-crit-500 px-5 pb-3" role="alert" data-unreachable>{{ h.reason }}</p>
             } @else {
-              <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="3" [lgCols]="6" align="start" size="md" label="Broker health" />
+              <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="3" [lgCols]="wideStrip() ? 6 : 3" align="start" size="md" label="Broker health" />
               @if (h.partial) { <p class="text-xs text-[color:var(--text-muted)] px-5 pb-2">{{ h.partial }}</p> }
             }
           }
@@ -315,7 +315,7 @@
                 <div class="kafka-table-wrap">
                   <table class="table-modern lookup-entry-table kafka-table">
                     <thead>
-                      <tr><th>Group</th><th>State</th><th class="text-right">Members</th><th class="hidden lg:table-cell">Topics</th><th class="text-right">Lag</th></tr>
+                      <tr><th>Group</th><th class="kc-state">State</th><th class="kc-members text-right">Members</th><th class="kc-topics hidden lg:table-cell">Topics</th><th class="kc-lag text-right">Lag</th></tr>
                     </thead>
                     <tbody>
                       @for (g of groups(); track g.group) {
@@ -379,12 +379,12 @@
                 <thead>
                   <tr>
                     <th>Topic</th>
-                    <th class="hidden xl:table-cell text-right">Partitions</th>
-                    <th>Read by</th>
-                    <th class="text-right">Lag</th>
-                    <th class="hidden lg:table-cell">Pipelines</th>
-                    <th>State</th>
-                    <th class="w-10"><span class="sr-only">Actions</span></th>
+                    <th class="kc-parts hidden xl:table-cell text-right">Partitions</th>
+                    <th class="kc-read">Read by</th>
+                    <th class="kc-lag text-right">Lag</th>
+                    <th class="kc-pipes hidden xl:table-cell">Pipelines</th>
+                    <th class="kc-state">State</th>
+                    <th class="kc-act"><span class="sr-only">Actions</span></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -424,7 +424,7 @@
                         }
                       </td>
                       <td class="text-right tabular" [title]="live ? live.lag + ' messages behind' : ''">{{ live ? compact(live.lag) : '—' }}</td>
-                      <td class="hidden lg:table-cell kafka-cell-pipes">
+                      <td class="hidden xl:table-cell">
                         @if (pipelinesOf(row.type); as list) {
                           @if (!list.length) {
                             <span class="text-xs text-[color:var(--text-muted)]">none yet</span>

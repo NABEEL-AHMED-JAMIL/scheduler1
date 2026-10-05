@@ -216,6 +216,8 @@ export class KafkaConnections implements OnInit {
   // ---- live health (UI review U2): brokers, the workspace's topics, the groups reading them ----------------------
 
   readonly tab = signal<KafkaTab>('topics');
+  /** Six readings in one row need the width: below 1440px they sit three to a row rather than breaking words. */
+  readonly wideStrip = signal(typeof matchMedia === 'function' && matchMedia('(min-width: 1440px)').matches);
   readonly health = signal<BrokerHealth | null>(null);
   /** Which profile the health on screen is for. */
   private readonly healthFor = signal<number | null>(null);
@@ -243,7 +245,7 @@ export class KafkaConnections implements OnInit {
       { label: 'Brokers up', value: h.brokers ?? 0, icon: 'server', tone: (h.brokers ?? 0) > 0 && h.controller ? 'ok' : 'crit',
         foot: h.controller ? 'controller elected' : 'no controller', hint: 'Brokers answering the profile\'s client right now' },
       { label: 'Topics', value: t.topics, icon: 'layers', tone: t.missing ? 'crit' : 'info',
-        foot: t.missing ? `${t.missing} missing on the broker` : `${t.partitions} partitions`, hint: 'Your topics on this connection' },
+        foot: t.missing ? `${t.missing} missing on the broker` : `${t.partitions} partition${t.partitions === 1 ? '' : 's'}`, hint: 'Your topics on this connection' },
       { label: 'Under-replicated', value: t.underReplicated + t.offline, icon: 'alert',
         tone: t.offline ? 'crit' : t.underReplicated ? 'warn' : 'ok', quiet: !(t.underReplicated + t.offline),
         foot: t.offline ? `${t.offline} offline` : 'partitions', hint: 'Partitions with fewer in-sync replicas than replicas, or no leader' },
@@ -439,7 +441,10 @@ export class KafkaConnections implements OnInit {
     });
     // Health is read again every minute while the page is in view; a hidden tab waits until it is looked at.
     const timer = setInterval(() => { if (!document.hidden && this.selectedId() !== null) this.loadHealth(); }, HEALTH_EVERY_MS);
-    inject(DestroyRef).onDestroy(() => clearInterval(timer));
+    const wide = typeof matchMedia === 'function' ? matchMedia('(min-width: 1440px)') : null;
+    const onWidth = () => this.wideStrip.set(!!wide?.matches);
+    wide?.addEventListener?.('change', onWidth);
+    inject(DestroyRef).onDestroy(() => { clearInterval(timer); wide?.removeEventListener?.('change', onWidth); });
     // Keep something selected: the linked profile when the list arrives, else the first, and
     // move off a profile the moment it stops existing or is filtered out.
     effect(() => {

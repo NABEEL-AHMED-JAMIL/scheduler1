@@ -1986,9 +1986,15 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .kafka-table .kafka-cell-name { min-width: 0; }
 .kafka-cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .kafka-table .lookup-value { min-width: 0; }
-.kafka-table th:not(:first-child) { width: 7.5rem; }
-.kafka-table th:last-child { width: 3rem; }
-.kafka-cell-pipes { max-width: 12rem; }
+.kafka-table .kc-parts { width: 6.5rem; }
+.kafka-table .kc-read { width: 11rem; }
+.kafka-table .kc-lag { width: 5rem; }
+.kafka-table .kc-pipes { width: 10rem; }
+.kafka-table .kc-state { width: 9rem; }
+.kafka-table .kc-members { width: 6rem; }
+.kafka-table .kc-topics { width: 16rem; }
+.kafka-table .kc-act { width: 3rem; }
+@media (min-width: 1600px) { .kafka-table .kc-read { width: 16rem; } .kafka-table .kc-pipes { width: 13rem; } }
 .lookup-detail-head { padding: 0.75rem 1.25rem; }
 
 /* A topic row's unfolded pipelines: name, id, size -- each line a link to the Pipelines page. */
