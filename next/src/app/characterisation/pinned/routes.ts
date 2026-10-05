@@ -226,8 +226,7 @@ export const PINNED: Record<string, unknown> = {
       "title": "Executions",
       "pageKey": "jobs",
       "guards": [
-        "pageGuard",
-        "executionsLanding"
+        "pageGuard"
       ],
       "lazy": true
     },
@@ -1209,8 +1208,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Bulk schedules"
   },
   "old address /jobs/history": {
-    "lands": "/pipelines/queue",
-    "heading": "Queue"
+    "lands": "/pipelines/executions",
+    "heading": "Executions"
   },
   "old address /jobs/new": {
     "lands": "/pipelines/schedules/new",
@@ -1257,8 +1256,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Bulk schedules"
   },
   "old address /operations/jobs/history": {
-    "lands": "/pipelines/queue",
-    "heading": "Queue"
+    "lands": "/pipelines/executions",
+    "heading": "Executions"
   },
   "old address /operations/jobs/new": {
     "lands": "/pipelines/schedules/new",
