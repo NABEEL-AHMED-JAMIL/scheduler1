@@ -192,9 +192,9 @@
               <tr>
                 <th>Source</th>
                 <th>Kind</th>
-                <th>Format</th>
+                <th class="hidden lg:table-cell">Format</th>
                 <th>Last test</th>
-                <th>Created</th>
+                <th class="hidden lg:table-cell">Created</th>
                 @if (isPlatformAdmin()) { <th>Workspace</th> }
                 <th class="text-right">State</th>
                 @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
@@ -203,16 +203,20 @@
             <tbody>
               @for (s of filtered(); track s.id) {
                 <tr>
-                  <td class="max-w-80"><button type="button" class="link-inline font-medium text-left [overflow-wrap:anywhere]" (click)="open(s)">{{ s.name }}</button></td>
-                  <td class="whitespace-nowrap"><app-icon [name]="kindGlyph(s.kind)" size="0.9em" class="text-[color:var(--text-muted)]" /> {{ kindText(s.kind) }}</td>
-                  <td class="text-xs whitespace-nowrap">{{ formatText(s.format) }}</td>
+                  <!-- A floor under the name: with overflow-wrap anywhere and no minimum, the table gave it one letter's
+                       width at 768px and names broke letter by letter (UI review U5). Below 1024px the format rides
+                       under the kind and Created goes, so the rest fits beside it. -->
+                  <td class="min-w-40 max-w-80"><button type="button" class="link-inline font-medium text-left [overflow-wrap:break-word]" (click)="open(s)">{{ s.name }}</button></td>
+                  <td class="whitespace-nowrap"><app-icon [name]="kindGlyph(s.kind)" size="0.9em" class="text-[color:var(--text-muted)]" /> {{ kindText(s.kind) }}
+                    @if (s.format) { <span class="block lg:hidden text-xs text-[color:var(--text-muted)]">{{ formatText(s.format) }}</span> }</td>
+                  <td class="text-xs whitespace-nowrap hidden lg:table-cell">{{ formatText(s.format) }}</td>
                   <td class="text-xs whitespace-nowrap">
                     @if (s.lastTestOk === true) { <span class="text-ok-500">Answered</span> }
                     @else if (s.lastTestOk === false) { <span class="text-crit-500">Did not answer</span> }
                     @else { <span class="text-[color:var(--text-muted)]">not tested</span> }
                     @if (s.lastTestedAt) { <span class="block text-[color:var(--text-muted)]">{{ s.lastTestedAt | serverTime: 'dateTime' }}</span> }
                   </td>
-                  <td class="text-xs whitespace-nowrap">@if (s.dateCreated) { {{ s.dateCreated | serverTime: 'dateTime' }} } @else { — }</td>
+                  <td class="text-xs whitespace-nowrap hidden lg:table-cell">@if (s.dateCreated) { {{ s.dateCreated | serverTime: 'dateTime' }} } @else { — }</td>
                   @if (isPlatformAdmin()) { <td class="text-xs">{{ workspace(s) }}</td> }
                   <td class="text-right"><app-status [label]="s.status || 'Active'" [quiet]="true" /></td>
                   @if (canManage()) {
