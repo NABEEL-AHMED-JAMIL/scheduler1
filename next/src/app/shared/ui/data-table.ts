@@ -2,6 +2,7 @@ import { AfterViewInit, Component, DestroyRef, ElementRef, computed, inject, inp
 import { Icon } from './icon';
 import { BlurLoader } from './blur-loader';
 import { LoadError } from './load-error';
+import { RowSnap } from './row-snap';
 
 /**
  * Shared chrome for the list screens: a titled card with a filter slot, plus consistent
@@ -11,7 +12,7 @@ import { LoadError } from './load-error';
  */
 @Component({
   selector: 'app-table-shell',
-  imports: [Icon, BlurLoader, LoadError],
+  imports: [Icon, BlurLoader, LoadError, RowSnap],
   template: `
     <div class="card overflow-hidden">
       <div class="table-toolbar flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-b border-subtle"
@@ -92,7 +93,8 @@ import { LoadError } from './load-error';
              stay put. Without it a 369-entry log ran the page to 15,000px and the view
              switcher, search and refresh were all off-screen by the second row. -->
         <app-blur-loader [active]="loading()" label="Refreshing…">
-          <div class="overflow-x-auto" [class.scroll-table]="scrollRows()"><ng-content /></div>
+          <!-- appRowSnap: the box ends on a row boundary, not halfway through one (UI review U7). -->
+          <div class="overflow-x-auto" [class.scroll-table]="scrollRows()" [appRowSnap]="scrollRows()"><ng-content /></div>
         </app-blur-loader>
       }
       <!-- Outside the scroll box: paging controls that scroll away with the rows are

@@ -159,7 +159,9 @@
     </section>
 
     <!-- Documents: the PDF, the slips, the receipts, the credit notes. -->
-    <section class="lookup-entries">
+    <!-- flex-none: Documents, Payments and History keep their height; only the lines scroll. Shrinking them cut
+         the last history entry in half at the card's foot (UI review U7). -->
+    <section class="lookup-entries flex-none">
       <div class="lookup-entries-head">
         <h3 class="section-title">Documents <span class="text-[color:var(--text-muted)] font-normal">({{ i.documents.length }})</span></h3>
       </div>
@@ -184,7 +186,7 @@
     </section>
 
     @if (i.kind === 'invoice') {
-      <section class="lookup-entries">
+      <section class="lookup-entries flex-none">
         <div class="lookup-entries-head">
           <h3 class="section-title">Payments <span class="text-[color:var(--text-muted)] font-normal">({{ i.payments.length }})</span></h3>
           @if (!isPlatformAdmin()) { <span class="text-xs text-[color:var(--text-muted)]">A payment counts once the platform verifies the slip; a receipt is issued then</span> }
@@ -218,9 +220,11 @@
       </section>
     }
 
-    <section class="lookup-entries pb-3">
+    <section class="lookup-entries flex-none">
       <div class="lookup-entries-head"><h3 class="section-title">History</h3></div>
-      <ul class="text-xs space-y-1.5 px-5">
+      <!-- The bottom padding on the list: .lookup-entries sets its own padding, which outranks a utility on the section,
+           so the last entry sat on the card's edge and read as cut (UI review U7). -->
+      <ul class="text-xs space-y-1.5 px-5 pb-5">
         @for (h of history(); track $index) {
           <li class="flex gap-2"><span class="tabular text-[color:var(--text-muted)] whitespace-nowrap">{{ h.at | serverTime: 'recent' }}</span><span [class.text-crit-500]="h.tone === 'crit'">{{ h.text }}</span></li>
         }
