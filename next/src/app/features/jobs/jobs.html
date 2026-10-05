@@ -132,7 +132,7 @@
           <th class="hidden xl:table-cell">Task</th>
           <th class="hidden xl:table-cell">Execution</th>
           <!-- A floor so "Ends 2026-12-31" is not broken at its hyphens. -->
-          <th class="min-w-40">Schedule</th>
+          <th class="min-w-40 xl:min-w-52">Schedule</th>
           <th>Next / last run</th>
           <th class="hidden xl:table-cell">Created</th>
           <th>Run status</th>
@@ -163,7 +163,7 @@
                 <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />
               </button>
             </td>
-            <td class="max-w-60 xl:max-w-64">
+            <td class="max-w-60 xl:max-w-80 2xl:max-w-[28rem]">
               <div class="font-medium truncate" [title]="job.jobName">{{ job.jobName || '—' }}</div>
               <div class="flex items-center gap-1.5 mt-0.5 text-[11px] leading-none">
                 <span class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</span>
@@ -179,7 +179,7 @@
                 <span class="truncate block" [title]="workspaceName(job)">{{ workspaceName(job) }}</span>
               </td>
             }
-            <td class="hidden xl:table-cell max-w-44">
+            <td class="hidden xl:table-cell max-w-44 2xl:max-w-64">
               @if (job.taskDetail?.taskName) {
                 <span class="truncate block" [title]="job.taskDetail!.taskName">
                   {{ job.taskDetail!.taskName }}
@@ -193,7 +193,7 @@
                 <span class="text-xs text-[color:var(--text-secondary)]">{{ job.execution || '—' }}</span>
               }
             </td>
-            <td class="max-w-44">
+            <td class="max-w-44 xl:max-w-56 2xl:max-w-72">
               <div class="text-[color:var(--text-secondary)]">{{ scheduleSummary(job) }}</div>
               @if (scheduleNote(job); as note) {
                 <div class="text-xs" [class.text-warn-500]="note.tone === 'warn'"
@@ -226,11 +226,11 @@
                 }
               </div>
             </td>
-            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-              {{ job.createdByName || '—' }}
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.createdByName || ''">{{ job.createdByName || '—' }}</span>
             </td>
-            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
-              {{ job.updatedByName || '—' }}
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.updatedByName || ''">{{ job.updatedByName || '—' }}</span>
             </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <!-- The pinned cell paints its own background over the scrolled columns, which also

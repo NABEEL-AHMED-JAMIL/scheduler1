@@ -30,9 +30,9 @@
       } @else if (jobId()) {
         Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
       } @else {
-        <!-- Reached without a job: the dashboard's hour drill-down lands here, and so does a
-             direct visit. Naming a job that was never chosen printed a bare "#". -->
-        Pick a job to see its runs, or choose an hour on the dashboard.
+        <!-- Reached without a job (Executions in the menu): the last day's runs of every job. -->
+        The newest runs of every job in the last day@if (recentCut()) { (the latest {{ runs().length }})}. Open a run's job for its
+        whole history, or choose an hour on the dashboard.
       }
     </p>
   </div>

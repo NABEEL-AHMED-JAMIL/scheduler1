@@ -1,3 +1,4 @@
+import { localIsoDaysAgo } from '../../../shared/ui/local-day';
 import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -34,6 +35,8 @@ import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, t
  * again on each status push.
  */
 const HISTORY_WINDOW = 500;
+/** Runs Executions shows when it is opened without a job: the newest of the last day. */
+export const RECENT_WINDOW = 200;
 
 interface JobQueue {
   jobQueueId: number;
@@ -117,6 +120,8 @@ export class JobHistory {
   readonly runs = signal<JobQueue[]>([]);
   /** The server has runs older than the ones loaded; Load older reads the next window. */
   readonly hasMore = signal(false);
+  /** Executions without a job: more ran in the last day than RECENT_WINDOW shows. */
+  readonly recentCut = signal(false);
   readonly loadingOlder = signal(false);
   readonly historyWindow = HISTORY_WINDOW;
   readonly loading = signal(true);
@@ -182,7 +187,7 @@ export class JobHistory {
   readonly emptyMessage = computed(() =>
     this.statusFilter() || this.search().trim() ? 'No runs match the current filters.'
       : this.isDrillDown() ? 'No runs in this hour.'
-      : !this.jobId() ? 'Open a job, or pick an hour on the dashboard, to see its runs.'
+      : !this.jobId() ? 'No job ran in the last day. Open a schedule to see its whole history.'
       : 'This job has never run.');
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
@@ -418,9 +423,9 @@ export class JobHistory {
       this.missing.set(false);
     }
     if (!this.isDrillDown() && !this.jobId()) {
-      // Nothing identifies what to show. Reachable only by hand-editing the URL.
-      // A prompt, not an error: the empty message says what to do (emptyMessage).
-      this.loading.set(false);
+      // Executions from the menu names no job: the last day's runs of every job, newest first, so the page is a
+      // place to start rather than an empty table (UI review U8). The Queue's own read, bounded by date and count.
+      this.loadRecent(silent);
       return;
     }
 
@@ -478,6 +483,26 @@ export class JobHistory {
       error: err => {
         this.loading.set(false);
         if (!silent) this.error.set(err?.error?.message || 'Could not load the run history.');
+      },
+    });
+  }
+
+  /** The newest runs of every job in the last day (at most RECENT_WINDOW), for Executions opened without a job. */
+  private loadRecent(silent: boolean): void {
+    this.request?.unsubscribe();
+    const body = { fromDate: localIsoDaysAgo(1), toDate: localIsoDaysAgo(0), limit: RECENT_WINDOW };
+    this.request = this.http.post<ApiResponse<any>>(`${API_BASE}/message.json/fetchLogs`, body).subscribe({
+      next: response => {
+        this.loading.set(false);
+        if (response.status !== API_SUCCESS) { if (!silent) this.error.set(response.message); return; }
+        const payload = response.data;
+        this.runs.set(Array.isArray(payload) ? payload : (payload?.sourceJobQueues ?? []));
+        this.hasMore.set(false);
+        this.recentCut.set(!Array.isArray(payload) && !!payload?.hasMore);
+      },
+      error: err => {
+        this.loading.set(false);
+        if (!silent) this.error.set(err?.error?.message || 'Could not load the latest runs.');
       },
     });
   }

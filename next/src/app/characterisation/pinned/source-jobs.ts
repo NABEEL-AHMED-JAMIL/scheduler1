@@ -272,22 +272,43 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /sourceJob.json/listSourceJob"
+      "GET /sourceJob.json/listSourceJob",
+      "POST /message.json/fetchLogs {fromDate,limit,toDate}"
     ],
     "headings": [
       "Executions",
-      "Runs (0 of 0)"
+      "Runs (2 of 2)"
     ],
     "buttons": [
-      "Refresh"
+      "Charts",
+      "Columns",
+      "Completed 1",
+      "Refresh",
+      "Show the full message for run #7381",
+      "Skip 1"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Run",
+        "Job",
+        "Queued",
+        "Started",
+        "Ended",
+        "Duration",
+        "Message",
+        "Status"
+      ]
+    ],
     "fields": [
       "Search run id or message",
       "Search runs"
     ],
     "links": [
-      "/pipelines/schedules"
+      "/pipelines/schedules",
+      "/pipelines/schedules/2835/executions",
+      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2838/executions",
+      "/pipelines/schedules/2838/runs/7382/logs"
     ]
   },
   "the job assistant": {

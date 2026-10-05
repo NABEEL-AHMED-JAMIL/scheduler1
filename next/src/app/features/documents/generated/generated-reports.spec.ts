@@ -27,11 +27,11 @@ const RUN_REPORTS = reportsFromRun(RUN, [
     recordedAt: '2026-09-29T07:07:05.863214', bucket: 'ui-review-s3', key: 'registry-live-check/customers-clean.json' },
 ]);
 
-function page(opts: { runsFail?: boolean } = {}) {
-  const listObjects = vi.fn((_b: string, prefix: string) => of(ok({ objects: prefix === 'reports/'
+function page(opts: { runsFail?: boolean; listObjects?: (b: string, prefix: string, token?: string) => unknown } = {}) {
+  const listObjects = vi.fn(opts.listObjects ?? ((_b: string, prefix: string) => of(ok({ objects: prefix === 'reports/'
     ? [{ name: '2026', key: 'reports/2026/', folder: true },
        { name: 'Q3.pdf', key: 'reports/Q3.pdf', folder: false, size: 13841, lastModified: '2026-09-28T12:00:00Z' }]
-    : [{ name: 'Sep.xlsx', key: 'reports/2026/Sep.xlsx', folder: false, size: 900, lastModified: '2026-09-27T12:00:00Z' }] })));
+    : [{ name: 'Sep.xlsx', key: 'reports/2026/Sep.xlsx', folder: false, size: 900, lastModified: '2026-09-27T12:00:00Z' }] }))));
   const storage = {
     buckets: vi.fn(() => of(ok([{ bucket: 'ui-review-s3', label: 'UI-REVIEW', provider: 'S3' }]))),
     listObjects,
@@ -62,6 +62,17 @@ function page(opts: { runsFail?: boolean } = {}) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('Documents › Reports', () => {
+  it('follows a folder past its first 100 files, up to 1,000, and says when it stopped (scale review P2 #33)', () => {
+    const file = (n: number) => ({ name: `r${n}.pdf`, key: `reports/r${n}.pdf`, folder: false, size: 10, lastModified: '2026-09-28T12:00:00Z' });
+    const hundred = (from: number) => Array.from({ length: 100 }, (_, i) => file(from + i));
+    const { p, storage } = page({ listObjects: (_b, _prefix, token) => of(ok({ objects: hundred(Number(token ?? 0)),
+      nextContinuationToken: String(Number(token ?? 0) + 100) })) });
+    expect(storage.listObjects).toHaveBeenCalledTimes(10);
+    expect(p.reports().filter(r => r.name.startsWith('r')).length).toBe(1000);
+    expect(p.folderCut()).toBe(true);
+    expect(p.reach()).toContain('the first 1,000 of a folder');
+  });
+
   it('lists the reports folder of the first bucket, one level of subfolders, and recent runs\' outputs, newest first', () => {
     const { p, storage } = page();
     expect(p.bucket()).toBe('ui-review-s3');

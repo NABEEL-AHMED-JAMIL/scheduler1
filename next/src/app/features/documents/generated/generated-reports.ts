@@ -1,7 +1,7 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
-import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
+import { EMPTY, Observable, catchError, expand, forkJoin, map, of, reduce, switchMap } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
@@ -20,6 +20,8 @@ import { ReportPreviewDialog } from './report-preview-dialog';
 
 /** Subfolders of the reports folder listed too (one level), at most this many. */
 export const SUBFOLDER_CAP = 10;
+/** Files read per folder, following the listing's pages of 100 (scale review P2 #33: it stopped at the first 100). */
+export const FOLDER_FILE_CAP = 1000;
 const DATASET_FORMATS = ['csv', 'json', 'jsonl'] as const;
 /** A run's kept file that is a report (render_pdf, MIG-255), not rows. */
 const isPdf = (r: GeneratedReport) => r.type.toLowerCase() === 'pdf';
@@ -56,6 +58,8 @@ export class GeneratedReports implements OnInit {
   readonly objects = signal<GeneratedReport[]>([]);
   readonly runs = signal<RecentOutputs | null>(null);
   readonly subfoldersRead = signal(0);
+  /** A folder held more than FOLDER_FILE_CAP files, so the list stops short there. */
+  readonly folderCut = signal(false);
   readonly query = signal('');
 
   readonly reports = computed(() => mergeReports(this.objects(), this.runs()?.reports ?? []));
@@ -76,7 +80,8 @@ export class GeneratedReports implements OnInit {
     const parts: string[] = [];
     if (this.bucket()) {
       const subs = this.subfoldersRead();
-      parts.push(`the files in ${this.bucket()}/${this.folder()}${subs ? ` and ${subs} of its subfolders` : ''}`);
+      parts.push(`the files in ${this.bucket()}/${this.folder()}${subs ? ` and ${subs} of its subfolders` : ''}`
+        + (this.folderCut() ? ` (the first ${FOLDER_FILE_CAP.toLocaleString('en-US')} of a folder)` : ''));
     }
     const runs = this.runs();
     if (runs) {
@@ -131,10 +136,19 @@ export class GeneratedReports implements OnInit {
     const bucket = this.bucket();
     this.objectsError.set('');
     this.subfoldersRead.set(0);
+    this.folderCut.set(false);
     if (!bucket) { this.objects.set([]); return; }
     this.loadingObjects.set(true);
-    const list = (prefix: string): Observable<ObjectSummary[]> => this.storage.listObjects(bucket, prefix).pipe(
-      map(r => { if (r.status !== API_SUCCESS) throw new Error(r.message); return r.data?.objects ?? []; }));
+    // Each folder's pages, one after another, until the listing ends or FOLDER_FILE_CAP files are in.
+    const page = (prefix: string, token?: string) => this.storage.listObjects(bucket, prefix, token).pipe(
+      map(r => { if (r.status !== API_SUCCESS) throw new Error(r.message); return r.data ?? { objects: [] }; }));
+    const list = (prefix: string): Observable<ObjectSummary[]> => page(prefix).pipe(
+      expand((r, i) => r.nextContinuationToken && (i + 1) * 100 < FOLDER_FILE_CAP ? page(prefix, r.nextContinuationToken) : EMPTY),
+      reduce((all, r) => {
+        if (r.nextContinuationToken && all.length + r.objects.length >= FOLDER_FILE_CAP) this.folderCut.set(true);
+        return [...all, ...r.objects];
+      }, [] as ObjectSummary[]),
+      map(all => all.slice(0, FOLDER_FILE_CAP)));
     list(this.folder()).pipe(
       switchMap(top => {
         const subs = top.filter(o => o.folder).slice(0, SUBFOLDER_CAP);

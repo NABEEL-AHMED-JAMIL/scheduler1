@@ -9,10 +9,17 @@ import { JobHistory } from './job-history';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 
+/** What Executions opened without a job asked the Queue for, and the runs it answers. */
+const posts: { url: string; body: any }[] = [];
+function posted(url: string, body: any) {
+  posts.push({ url, body });
+  return of({ status: 'SUCCESS', data: { sourceJobQueues: [{ jobQueueId: 9, jobId: 41, jobStatus: 'Completed' }], hasMore: true } });
+}
+
 function history(route: { jobId?: string; targetDate?: string; targetHr?: string } = { jobId: '41' }) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
-    { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', data: {} }) } },
+    { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', data: {} }), post: posted } },
     { provide: Router, useValue: { navigate: () => {} } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
     { provide: AuthService, useValue: { canManageTasks: () => true } },
@@ -113,11 +120,17 @@ describe('Run history stat strips', () => {
 
 describe('Run history with no job chosen', () => {
   /** Tenant-user review: with no job picked the page showed a red error with "Try again" -- it only needs a pick. */
-  it('is a neutral prompt, not an error', () => {
+  it('lists the last day\'s runs of every job instead of an empty page (UI review U8)', () => {
+    posts.length = 0;
     const h = history({});
     h.load();
     expect(h.error()).toBe('');
-    expect(h.emptyMessage()).toBe('Open a job, or pick an hour on the dashboard, to see its runs.');
+    expect(posts[0].url).toContain('/message.json/fetchLogs');
+    expect(posts[0].body.limit).toBe(200);
+    expect(posts[0].body.fromDate <= posts[0].body.toDate).toBe(true);
+    expect(h.runs().map(r => r.jobQueueId)).toEqual([9]);
+    expect(h.recentCut()).toBe(true);
+    expect(h.emptyMessage()).toBe('No job ran in the last day. Open a schedule to see its whole history.');
   });
 });
 
