@@ -149,8 +149,9 @@
           <th>Run</th>
           <th>Job</th>
           <th>Created</th>
-          <!-- Duration waits for md: on a phone Message is the column worth the width. -->
-          <th class="hidden md:table-cell">Duration</th>
+          <!-- Duration waits for lg: below it Message is the column worth the width, and at 768 the
+               table only fits beside the pinned Status without it (UI review U5). -->
+          <th class="hidden lg:table-cell">Duration</th>
           <th>Message</th>
           <!-- Status and the in-flight menu share one cell pinned to the right edge, as Failed runs
                on Reports does: on a phone both sat hundreds of pixels past the screen. -->
@@ -180,7 +181,7 @@
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ row.dateCreated ? (row.dateCreated | serverTime:'recentSec') : '—' }}
             </td>
-            <td class="hidden md:table-cell tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="hidden lg:table-cell tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (duration(row); as d) { {{ d }} }
               @else if (inFlight(row)) { <span class="text-warn-500">in flight</span> }
               @else { — }
