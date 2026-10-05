@@ -82,8 +82,8 @@ describe('Queue charts and table describe the same messages', () => {
 
   it('ignores the server statistic when drawing the ring, and reports it separately', () => {
     const queue = queueFor();
-    // What the Failed chip produces: the server returns only Failed rows, but its statistic
-    // carries no status clause and no date clause, so it still answers for all time.
+    // The server's statistic counts the whole range by status (scale review P0 #3), while the
+    // ring describes the rows the table lists.
     queue.selectedStatuses.set(['Failed']);
     queue.rows.set([mixedRows[3]]);
     queue.statusStats.set([{ name: 'COMPLETED', value: 48 }, { name: 'FAILED', value: 4 }]);
@@ -92,8 +92,23 @@ describe('Queue charts and table describe the same messages', () => {
     // called the screen 8% failed.
     expect(queue.statusMix()).toEqual([{ name: 'Failed', value: 1 }]);
     expect(queue.failureRate()).toBe(100);
-    // The all-time number survives, but only as its own labelled figure.
-    expect(queue.allTimeTotal()).toBe(52);
+    // The range's number survives, but only as its own labelled figure.
+    expect(queue.rangeTotal()).toBe(52);
+  });
+
+  /** Scale review P0 #3: one read is the range's newest QUEUE_WINDOW runs, and the page says when that is not all. */
+  it('asks for a window of runs and says when the range holds more', () => {
+    const queue = queueFor();
+    const http = TestBed.inject(HttpClient) as unknown as { post: (...a: unknown[]) => unknown };
+    const post = vi.spyOn(http, 'post').mockReturnValue(of({ status: 'SUCCESS', data: {
+      sourceJobQueues: mixedRows, hasMore: true, total: 9000,
+      jobStatusStatistic: [{ name: 'COMPLETED', value: 8000 }, { name: 'FAILED', value: 1000 }] } }));
+
+    queue.load();
+
+    expect((post.mock.calls[0][1] as { limit: number }).limit).toBe(2000);
+    expect(queue.hasMore()).toBe(true);
+    expect(queue.rangeTotal()).toBe(9000);
   });
 
   it('narrows the busiest-jobs, duration and flag charts with the same filter', () => {

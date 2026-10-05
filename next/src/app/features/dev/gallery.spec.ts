@@ -35,7 +35,8 @@ describe('the component gallery (MIG-257)', () => {
   it('draws a pill for every job status and Active, Inactive and Pending', () => {
     const el = render().nativeElement as HTMLElement;
     const pills = [...el.querySelectorAll('[data-gallery="pills"] .pill')].map(p => p.textContent!.trim());
-    for (const status of GALLERY_STATUSES) expect(pills).toContain(status);
+    // A chip says the word, not the enum: Interrupt reads "Interrupted" (UI review U5).
+    for (const status of GALLERY_STATUSES) expect(pills).toContain(status === 'Interrupt' ? 'Interrupted' : status);
   });
 
   it('draws every dashboard widget', () => {

@@ -35,6 +35,14 @@
     </div>
   }
 
+  @if (hasMore()) {
+    <!-- The window, said where the chips and the charts are: they count the rows read, not the range. -->
+    <p class="text-xs text-[color:var(--text-muted)] m-0 flex items-center gap-1.5" data-queue-window>
+      <app-icon name="info" size="0.9em" class="icon-muted" />
+      The newest {{ rows().length }} of {{ rangeTotal() }} runs in these dates. Narrow the dates to see the rest.
+    </p>
+  }
+
   @if (activeFilters().length) {
     <!-- Stated, not implied. The charts and the table describe the same narrowed set now, and
          the search term that narrows them sits in the toolbar below the charts where a reader
@@ -69,11 +77,10 @@
           @if (failureRate()) {
             <span>{{ failureRate() }}% of these failed.</span>
           }
-          @if (allTimeTotal() > rows().length) {
-            <span class="inline-flex items-center gap-1"
-                  [title]="'A server-side total that carries no date range and no filters: it counts every message this workspace has ever recorded, deleted runs included. The ring shows the messages in view instead.'">
+          @if (hasMore()) {
+            <span class="inline-flex items-center gap-1">
               <app-icon name="info" size="0.85em" class="icon-muted" />
-              {{ allTimeTotal() }} on record all time
+              Of the newest {{ rows().length }}; the dates hold {{ rangeTotal() }}.
             </span>
           }
         </p>
@@ -113,14 +120,11 @@
                    emptyIcon="clock" [showSubbar]="!!rangeError()"
                    (retry)="load()">
     <ng-container toolbar>
-      <input type="date" class="input max-w-40" aria-label="From date" [value]="fromDate()" [max]="toDate()"
-             [attr.aria-invalid]="!!rangeError() || null"
-             [attr.aria-describedby]="rangeError() ? 'queue-range-error' : null"
-             (change)="setFrom($any($event.target).value)" />
-      <input type="date" class="input max-w-40" aria-label="To date" [value]="toDate()" [min]="fromDate()"
-             [attr.aria-invalid]="!!rangeError() || null"
-             [attr.aria-describedby]="rangeError() ? 'queue-range-error' : null"
-             (change)="setTo($any($event.target).value)" />
+      <!-- Console-format dates ("5 Oct 2026"), the browser's calendar behind each (UI review U3). -->
+      <app-date-field class="max-w-44" inputId="queue-from" label="From date" [value]="fromDate()" [max]="toDate()"
+                      (valueChange)="setFrom($event)" />
+      <app-date-field class="max-w-44" inputId="queue-to" label="To date" [value]="toDate()" [min]="fromDate()"
+                      (valueChange)="setTo($event)" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
@@ -181,7 +185,9 @@
               @else if (inFlight(row)) { <span class="text-warn-500">in flight</span> }
               @else { — }
             </td>
-            <td class="max-w-96">
+            <!-- The column that gives: it takes the width the others leave and ends in an ellipsis
+                 there, so it never runs on under the pinned Status column (UI review U5). -->
+            <td class="w-full max-w-0 min-w-40">
               <span class="truncate block" [title]="row.jobStatusMessage">
                 {{ row.jobStatusMessage || '—' }}
               </span>

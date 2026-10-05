@@ -53,10 +53,13 @@ export class StepsApi {
     return this.http.request<ApiResponse>(request.method, request.url, { body: request.body });
   }
 
-  /** A job's runs; Run now's answer does not name the run it queued, so the newest is read from here. */
-  runs(jobId: number): Observable<ApiResponse<{ jobQueues?: RunRow[] }>> {
+  /**
+   * A job's newest runs; Run now's answer does not name the run it queued, so the newest is read from here.
+   * `limit` keeps it to the window asked for: the history of a minute job is half a million rows a year.
+   */
+  runs(jobId: number, limit = 1): Observable<ApiResponse<{ jobQueues?: RunRow[] }>> {
     return this.http.get<ApiResponse<{ jobQueues?: RunRow[] }>>(`${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-      { params: { jobId } });
+      { params: { jobId, limit } });
   }
 
   timeline(jobQueueId: number, attempt?: number): Observable<ApiResponse<Timeline>> {

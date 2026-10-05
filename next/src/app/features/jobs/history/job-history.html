@@ -451,6 +451,16 @@
       </tbody>
     </table>
 
+    @if (hasMore() && !isDrillDown()) {
+      <!-- The newest runs come first; a long-lived job's older history is read a window at a time. -->
+      <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs text-[color:var(--text-muted)]">
+        <span>The newest {{ runs().length }} runs. The figures above describe these; older runs load on request.</span>
+        <button type="button" class="btn btn-default btn-sm" (click)="loadOlder()" [disabled]="loadingOlder()">
+          <app-icon name="clock" />{{ loadingOlder() ? 'Loading…' : 'Load ' + historyWindow + ' older runs' }}
+        </button>
+      </div>
+    }
+
     <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>

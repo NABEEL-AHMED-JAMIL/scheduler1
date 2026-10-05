@@ -23,8 +23,8 @@ function setup() {
     providers: [
       provideRouter([]),
       { provide: HttpClient, useValue: {
-        get: (url: string) => {
-          gets.push(url);
+        get: (url: string, options?: { params?: Record<string, string> }) => {
+          gets.push(options?.params ? `${url}?${new URLSearchParams(options.params)}` : url);
           return of({ status: 'SUCCESS', data: url.includes('listSourceJob')
             ? [] : { sourceJobQueues: [{ jobQueueId: 1, jobId: 41, jobStatus: 'Completed' }] } });
         },
@@ -53,7 +53,7 @@ const runReads = (gets: string[]) => gets.filter(url =>
 afterEach(() => vi.useRealTimers());
 
 describe('Run history live updates', () => {
-  it('re-reads once, a second after a burst of this job\'s status pushes, without the loading blur', () => {
+  it('re-reads once, three seconds after the first of a burst of this job\'s status pushes, without the loading blur', () => {
     vi.useFakeTimers();
     const { events, gets } = setup();
     const h = history();
@@ -65,7 +65,7 @@ describe('Run history live updates', () => {
 
     events.next({ type: 'job.status', jobId: 41, jobRunningStatus: 'Running' });
     events.next({ type: 'job.status', jobId: 41, jobRunningStatus: 'Completed', jobQueueId: 2 });
-    vi.advanceTimersByTime(999);
+    vi.advanceTimersByTime(2999);
     expect(runReads(gets)).toBe(before);
     vi.advanceTimersByTime(1);
     expect(runReads(gets)).toBe(before + 1);
@@ -90,8 +90,28 @@ describe('Run history live updates', () => {
     history({ targetDate: '2026-09-28', targetHr: '9' });
     const before = runReads(gets);
     events.next({ type: 'job.status', jobId: 99, jobRunningStatus: 'Completed' });
-    vi.advanceTimersByTime(1000);
+    vi.advanceTimersByTime(3000);
     expect(runReads(gets)).toBe(before + 1);
+  });
+
+  /** An hour across every job is a steady stream: a debounce never fired under it, auditTime reads every 3s. */
+  it('keeps re-reading under a steady stream of pushes, at most once per three seconds', () => {
+    vi.useFakeTimers();
+    const { events, gets } = setup();
+    history({ targetDate: '2026-09-28', targetHr: '9' });
+    const before = runReads(gets);
+    for (let second = 0; second < 12; second++) {
+      events.next({ type: 'job.status', jobId: 90 + second, jobRunningStatus: 'Completed' });
+      vi.advanceTimersByTime(1000);
+    }
+    expect(runReads(gets)).toBe(before + 4);
+  });
+
+  /** Scale review P0 #1: one job's history is read a window at a time, newest first. */
+  it('asks for the newest window of a job\'s runs', () => {
+    const { gets } = setup();
+    history();
+    expect(gets.find(url => url.includes('fetchSourceJobQueueListWithJobId'))).toContain('limit=500');
   });
 
   it('shows the Live mark only while the feed is connected', () => {

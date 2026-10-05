@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
@@ -23,10 +23,11 @@ function jobsWith(rows: SourceJob[], fresh?: SourceJob) {
     providers: [
       {
         provide: HttpClient, useValue: {
-          get: (url: string) => {
-            gets.push(url);
-            // The one-row re-read answers with that job; the list read with every row.
-            return of({ status: 'SUCCESS', data: url.endsWith('fetchSourceJobDetailWithSourceJobId') ? fresh : rows });
+          get: (url: string, options?: { params?: Record<string, string> }) => {
+            const jobIds = options?.params?.['jobIds'];
+            gets.push(jobIds ? `${url}?jobIds=${jobIds}` : url);
+            // The gathered re-read answers with the jobs it named; the list read with every row.
+            return of({ status: 'SUCCESS', data: jobIds ? (fresh ? [fresh] : []) : rows });
           },
           post: () => of({ status: 'SUCCESS', data: [] }),
         },
@@ -61,6 +62,8 @@ const idsOnly = (jobRunningStatus: string): JobEvent => ({
 });
 
 describe('an ids-only status push', () => {
+  afterEach(() => vi.useRealTimers());
+
   it('moves the row to the new status and keeps the name, owner and next run the list read', () => {
     const { jobs, events } = jobsWith([nightly()]);
 
@@ -87,15 +90,35 @@ describe('an ids-only status push', () => {
    * row kept showing the run that just happened as "Next run" until the page was reloaded.
    */
   it('re-reads that one job when its run finishes, so Next run is current', () => {
+    vi.useFakeTimers();
     const moved = { ...nightly(), lastJobRun: '2026-09-24T09:00:00',
       scheduler: { ...nightly().scheduler!, nextRunAt: '2026-09-26T09:00:00' } };
     const { jobs, events, gets } = jobsWith([nightly()], moved);
 
     events.next(idsOnly('Completed'));
+    vi.advanceTimersByTime(2000);
 
-    expect(gets).toEqual([expect.stringContaining('fetchSourceJobDetailWithSourceJobId')]);
+    expect(gets).toEqual([expect.stringContaining('listSourceJob?jobIds=1244')]);
     expect(jobs.jobs()[0].scheduler?.nextRunAt).toBe('2026-09-26T09:00:00');
     expect(jobs.jobs()[0].lastJobRun).toBe('2026-09-24T09:00:00');
+  });
+
+  /**
+   * Scale review P1 #21: a GET per finished run was seventeen a second per tab for a workspace of minute
+   * jobs. Pushes are gathered, a job named twice is read once, and the jobs are read together.
+   */
+  it('gathers the re-reads of a burst into one request, each job once', () => {
+    vi.useFakeTimers();
+    const other = { ...nightly(), jobId: 1245, jobName: 'hourly load' };
+    const { events, gets } = jobsWith([nightly(), other], nightly());
+
+    events.next(idsOnly('Completed'));
+    events.next({ ...idsOnly('Failed'), jobId: 1245 });
+    events.next(idsOnly('Completed'));
+    expect(gets).toEqual([]);
+    vi.advanceTimersByTime(2000);
+
+    expect(gets).toEqual([expect.stringContaining('listSourceJob?jobIds=1244,1245')]);
   });
 
   it('does not fetch a finished job this list is not showing', () => {

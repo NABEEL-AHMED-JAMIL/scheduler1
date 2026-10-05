@@ -129,7 +129,7 @@ describe('From an execution', () => {
     fixture.detectChanges();
     expect(p.scheduleOptions().map(o => o.value)).toEqual(['2849']);
     p.pickSchedule('2849');
-    expect(service.runs).toHaveBeenCalledWith(2849);
+    expect(service.runs).toHaveBeenCalledWith(2849, 20);
     p.pickRun('7405');
     expect(service.runOutputs).toHaveBeenCalledWith(7405);
     expect(p.datasets().map(d => d.runDatasetId)).toEqual([1051]);

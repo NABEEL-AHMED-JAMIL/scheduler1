@@ -2,7 +2,7 @@
 export const PINNED: Record<string, unknown> = {
   "a job's details, with its schedule": {
     "requests": [
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833",
+      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=25",
       "GET /sourceJob.json/inboxTrigger?jobId=2833",
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1854"
     ],
@@ -81,7 +81,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob",
       "GET /sourceJob.json/inboxArrivals?jobId=2833",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833",
+      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=500",
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
       "GET /sourceJob.json/inboxTrigger?jobId=2833"
     ],
@@ -136,7 +136,9 @@ export const PINNED: Record<string, unknown> = {
       "Email me when"
     ],
     "buttons": [
-      "Create job"
+      "Create schedule",
+      "End date: none picked",
+      "Start date: none picked"
     ],
     "columns": [],
     "fields": [
@@ -147,7 +149,6 @@ export const PINNED: Record<string, unknown> = {
       "End date",
       "Execution *(required)",
       "Frequency *(required)",
-      "HH:MM",
       "Job name *(required)",
       "Nightly hurricane export",
       "Priority *(required)",
@@ -155,6 +156,8 @@ export const PINNED: Record<string, unknown> = {
       "Search tasks…",
       "Start date *(required)",
       "Start time *(required)",
+      "Start time, hour",
+      "Start time, minute",
       "Start when a file arrives in the inbox",
       "State *(required)",
       "Task *(required)",
@@ -295,7 +298,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiAgent.json/fetchAllAgents",
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833"
+      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=500"
     ],
     "headings": [
       "Schedule assistant — Reference CSV check (e2e)"

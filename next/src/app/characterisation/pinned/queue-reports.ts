@@ -37,6 +37,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Donut",
       "Excel",
+      "From: 29 Aug 2026",
       "Grouped bars",
       "Heatmap",
       "Highest first",
@@ -48,6 +49,7 @@ export const PINNED: Record<string, unknown> = {
       "Save to bucket",
       "Stacked bars",
       "Swap rows and columns",
+      "To: 28 Sep 2026",
       "UI-REVIEW Ledger 2,000 rows with a long notes column",
       "—"
     ],
@@ -140,6 +142,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Donut",
       "Excel",
+      "From: 29 Aug 2026",
       "Grouped bars",
       "Heatmap",
       "Highest first",
@@ -151,6 +154,7 @@ export const PINNED: Record<string, unknown> = {
       "Save to bucket",
       "Stacked bars",
       "Swap rows and columns",
+      "To: 28 Sep 2026",
       "UI-REVIEW Ledger 2,000 rows with a long notes column",
       "—"
     ],
@@ -228,11 +232,13 @@ export const PINNED: Record<string, unknown> = {
       "5-30s1 100%",
       "Columns",
       "Completed 1",
+      "From date: 22 Sep 2026",
       "Hide charts",
       "Job #28351 50%",
       "Job #28381 50%",
       "Refresh",
-      "Skip 1"
+      "Skip 1",
+      "To date: 28 Sep 2026"
     ],
     "columns": [
       [
@@ -245,10 +251,8 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "From date",
       "Search job, run or message",
-      "Search queue messages",
-      "To date"
+      "Search queue messages"
     ],
     "links": [
       "/pipelines/schedules/2835/executions",
@@ -262,7 +266,7 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "POST /message.json/fetchLogs {fromDate,toDate}",
+      "POST /message.json/fetchLogs {fromDate,limit,toDate}",
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
@@ -273,8 +277,10 @@ export const PINNED: Record<string, unknown> = {
       "Charts",
       "Columns",
       "Completed 1",
+      "From date: 22 Sep 2026",
       "Refresh",
-      "Skip 1"
+      "Skip 1",
+      "To date: 28 Sep 2026"
     ],
     "columns": [
       [
@@ -287,10 +293,8 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "From date",
       "Search job, run or message",
-      "Search queue messages",
-      "To date"
+      "Search queue messages"
     ],
     "links": [
       "/pipelines/schedules/2835/executions",
@@ -305,7 +309,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "POST /message.json/fetchLogs {fromDate,toDate}",
+      "POST /message.json/fetchLogs {fromDate,limit,toDate}",
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
@@ -316,8 +320,10 @@ export const PINNED: Record<string, unknown> = {
       "Charts",
       "Columns",
       "Completed 1",
+      "From date: 22 Sep 2026",
       "Refresh",
-      "Skip 1"
+      "Skip 1",
+      "To date: 28 Sep 2026"
     ],
     "columns": [
       [
@@ -330,10 +336,8 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "From date",
       "Search job, run or message",
-      "Search queue messages",
-      "To date"
+      "Search queue messages"
     ],
     "links": [
       "/pipelines/schedules/2835/executions",

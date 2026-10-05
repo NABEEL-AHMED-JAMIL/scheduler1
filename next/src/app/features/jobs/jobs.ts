@@ -2,7 +2,7 @@ import { Component, LOCALE_ID, OnInit, computed, effect, inject, signal } from '
 import { HttpClient } from '@angular/common/http';
 
 import { RouterLink } from '@angular/router';
-import { EMPTY, catchError, from, mergeMap, tap } from 'rxjs';
+import { EMPTY, Subject, auditTime, catchError, from, mergeMap, tap } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -99,6 +99,9 @@ export interface SourceJob {
 
 /** How many runs the in-panel strip shows before it stops being readable. */
 const RECENT_RUN_BARS = 24;
+/** How long pushes are gathered before the jobs they name are re-read together, and how many one read takes. */
+const REFRESH_BATCH_MS = 2000;
+const REFRESH_CHUNK = 100;
 
 /**
  * How many of a bulk action's calls may be in flight at once.
@@ -302,6 +305,9 @@ export class Jobs implements OnInit {
     // position while anything was running.
     this.jobEvents.events.pipe(takeUntilDestroyed()).subscribe(event => this.applyEvent(event));
 
+    // Re-reads a push asked for, gathered: every job named in the window is read in one request at its end.
+    this.staleTick.pipe(auditTime(REFRESH_BATCH_MS), takeUntilDestroyed()).subscribe(() => this.refreshStale());
+
     /*
      * Re-read the list after a gap in the connection.
      *
@@ -378,21 +384,42 @@ export class Jobs implements OnInit {
       list.map(job => (job.jobId === jobId ? { ...job, ...patch } : job)));
   }
 
-  /** Re-reads a single job. Used when a push says "changed" without saying how. */
+  /** Jobs a push said changed, waiting for the next gathered re-read. */
+  private readonly staleJobs = new Set<number>();
+  private readonly staleTick = new Subject<void>();
+
+  /**
+   * Marks a job for re-reading. Used when a push says "changed" without saying how.
+   *
+   * Not a request per push (scale review P1 #21): every finished run sent its own GET, which for a
+   * workspace of minute jobs was seventeen a second from each open tab. The ids are gathered for
+   * REFRESH_BATCH_MS -- a job finishing twice in that window is read once -- and read together.
+   */
   private refreshOne(jobId: number): void {
-    this.http.get<ApiResponse<any>>(
-      `${API_BASE}/sourceJob.json/fetchSourceJobDetailWithSourceJobId`,
-      { params: { jobId: String(jobId) } }).subscribe({
-      next: response => {
-        if (response.status !== API_SUCCESS || !response.data) return;
-        const fresh = response.data as SourceJob;
-        // A job the list has not seen before (created elsewhere) joins it.
-        this.jobs.update(list => list.some(job => job.jobId === jobId)
-          ? list.map(job => (job.jobId === jobId ? { ...job, ...fresh } : job))
-          : [...list, fresh]);
-      },
-      error: () => { /* the row simply keeps what it had */ },
-    });
+    this.staleJobs.add(jobId);
+    this.staleTick.next();
+  }
+
+  /** The gathered jobs, read through the list endpoint's jobIds, at most REFRESH_CHUNK a request. */
+  private refreshStale(): void {
+    const ids = [...this.staleJobs];
+    this.staleJobs.clear();
+    for (let at = 0; at < ids.length; at += REFRESH_CHUNK) {
+      const chunk = ids.slice(at, at + REFRESH_CHUNK);
+      this.http.get<ApiResponse<SourceJob[]>>(`${API_BASE}/sourceJob.json/listSourceJob`,
+        { params: { jobIds: chunk.join(',') } }).subscribe({
+        next: response => {
+          if (response.status !== API_SUCCESS || !Array.isArray(response.data)) return;
+          const fresh = new Map(response.data.map(job => [job.jobId, job] as [number, SourceJob]));
+          // A job the list has not seen before (created elsewhere) joins it.
+          this.jobs.update(list => [
+            ...list.map(job => (fresh.has(job.jobId) ? { ...job, ...fresh.get(job.jobId)! } : job)),
+            ...[...fresh.values()].filter(job => !list.some(row => row.jobId === job.jobId)),
+          ]);
+        },
+        error: () => { /* the rows simply keep what they had */ },
+      });
+    }
   }
 
   ngOnInit(): void { this.load(); }
@@ -480,7 +507,8 @@ export class Jobs implements OnInit {
     this.runsLoading.set(jobId);
     this.http.get<ApiResponse<{ jobQueues?: any[] }>>(
       `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-      { params: { jobId: String(jobId) } }).subscribe({
+      // The window the strip draws, plus the one run that may still be going: the server reads only these.
+      { params: { jobId: String(jobId), limit: String(RECENT_RUN_BARS + 1) } }).subscribe({
       next: response => {
         this.runsLoading.set(null);
         const queues = response.status === API_SUCCESS ? (response.data?.jobQueues ?? []) : [];

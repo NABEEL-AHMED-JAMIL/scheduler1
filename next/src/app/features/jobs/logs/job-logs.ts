@@ -1,5 +1,5 @@
 import { toneClass } from '../../../shared/ui/tone';
-import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -26,6 +26,9 @@ interface AuditLog {
   logsDetail?: string;
   dateCreated?: string;
 }
+
+/** Log entries drawn at once, and how many more each Show earlier adds. */
+const RENDER_STEP = 2000;
 
 @Component({
   selector: 'app-job-logs',
@@ -71,7 +74,8 @@ export class JobLogs implements OnInit, OnDestroy {
   /** Each entry split into text and the paths it names, once per load rather than per render. */
   readonly segments = computed(() => {
     const bucket = this.bucket();
-    return new Map(this.logs().map(log => [log, logSegments(log.logsDetail ?? '', bucket)] as [AuditLog, LogSegment[]]));
+    // The rendered lines only: a long log split whole on every arriving line was the other half of the freeze.
+    return new Map(this.visible().map(log => [log, logSegments(log.logsDetail ?? '', bucket)] as [AuditLog, LogSegment[]]));
   });
   segmentsOf(log: AuditLog): LogSegment[] { return this.segments().get(log) ?? [{ text: log.logsDetail ?? '' }]; }
   readonly pathParts = pathParts;
@@ -115,7 +119,28 @@ export class JobLogs implements OnInit, OnDestroy {
       this.clearTimer();
       if (on) this.arm();
     });
+
+    /*
+     * While the socket is up the lines arrive on it and the poll stands down (see arm()), so the two
+     * moments it cannot cover are read once each: the run ending -- its last lines and its final
+     * status are the server's -- and the socket coming back after a gap it did not replay.
+     */
+    effect(() => {
+      const running = this.stillRunning();
+      if (this.wasRunning && !running && this.run()) untracked(() => this.load(true));
+      this.wasRunning = running;
+    });
+    effect(() => {
+      const connected = this.socketLive();
+      if (connected && this.socketDropped && untracked(() => this.autoRefreshing())) untracked(() => this.load(true));
+      this.socketDropped = !connected && this.socketEverUp;
+      if (connected) this.socketEverUp = true;
+    });
   }
+
+  private wasRunning = false;
+  private socketEverUp = false;
+  private socketDropped = false;
 
   /**
    * Schedules the next poll.
@@ -136,7 +161,10 @@ export class JobLogs implements OnInit, OnDestroy {
     this.clearTimer();
     // MIG-214: an answer that lands after the page is gone must not start the next poll.
     if (this.destroyed || !this.autoRefreshing()) return;
-    this.timer = setTimeout(() => this.refresh(), 5000);
+    // The full log is re-read only while nothing else delivers it (scale review P1 #22): with the socket
+    // up, each line arrives as it is written, and re-reading the whole log every five seconds besides was
+    // the cost of a long run. The timer keeps ticking, so a dropped socket is polled again within 5s.
+    this.timer = setTimeout(() => (this.socketLive() ? this.arm() : this.refresh()), 5000);
   }
 
   private aiStepsLoadedFor: string | null = null;
@@ -323,6 +351,22 @@ export class JobLogs implements OnInit, OnDestroy {
     if (!term) return this.logs();
     return this.logs().filter(log => (log.logsDetail ?? '').toLowerCase().includes(term));
   });
+
+  /**
+   * How many of the entries are drawn (scale review P1 #22). A run that writes tens of thousands of
+   * lines drew every one in three layouts at once and froze the tab; the newest RENDER_STEP are drawn
+   * -- the end of the run is what a reader follows -- and Show earlier adds RENDER_STEP more above.
+   */
+  readonly renderLimit = signal(RENDER_STEP);
+  readonly renderStep = RENDER_STEP;
+  readonly visible = computed(() => {
+    const all = this.filtered();
+    const limit = this.renderLimit();
+    return all.length > limit ? all.slice(all.length - limit) : all;
+  });
+  /** Entries matching the view that are not drawn yet. */
+  readonly hiddenEarlier = computed(() => this.filtered().length - this.visible().length);
+  showEarlier(): void { this.renderLimit.update(limit => limit + RENDER_STEP); }
 
   ngOnInit(): void {
     this.load();

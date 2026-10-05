@@ -291,3 +291,60 @@ describe('JobLogs after it is gone', () => {
     expect(http.match(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog'))).toHaveLength(0);
   });
 });
+
+/**
+ * Scale review P1 #22: the page re-read the whole log every five seconds while the socket was already
+ * delivering each line, and drew every entry -- a long run froze the tab.
+ */
+describe('JobLogs at scale', () => {
+  afterEach(() => vi.useRealTimers());
+
+  function running(lines: number, connected: boolean) {
+    const live = signal(connected);
+    const events = new Subject();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: live, events } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2808');
+    fixture.componentRef.setInput('jobQueueId', '6839');
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    const auditLogs = Array.from({ length: lines }, (_, i) => ({
+      jobAuditLogId: i + 1, logsDetail: `line ${i + 1}`, dateCreated: '2026-09-20 18:15:34' }));
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog'))
+      .flush({ status: API_SUCCESS, data: { ...LOGS, auditLogs, sourceJobQueue: { ...LOGS.sourceJobQueue, jobStatus: 'Running', endTime: null } } });
+    http.match(r => r.url.endsWith('/aiPrompt.json/runsForJob')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    fixture.detectChanges();
+    const polls = () => http.match(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).length;
+    return { fixture, live, http, polls, el: fixture.nativeElement as HTMLElement, component: fixture.componentInstance };
+  }
+
+  it('does not re-read the log while the socket delivers it, and polls again once it drops', () => {
+    vi.useFakeTimers();
+    const { fixture, live, polls } = running(3, true);
+
+    vi.advanceTimersByTime(15000);
+    expect(polls()).toBe(0);
+
+    live.set(false);
+    fixture.detectChanges();
+    vi.advanceTimersByTime(5000);
+    expect(polls()).toBe(1);
+  });
+
+  it('draws the newest 2000 entries and adds earlier ones on request', () => {
+    const { fixture, el, component } = running(2500, true);
+
+    expect(el.querySelectorAll('.log-timeline li').length).toBe(2000);
+    expect(el.querySelector('.log-timeline li:last-child')!.textContent).toContain('line 2500');
+    const more = el.querySelector<HTMLButtonElement>('[data-earlier] button')!;
+    expect(more.textContent!.trim()).toBe('Show 500 earlier');
+
+    more.click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.log-timeline li').length).toBe(2500);
+    expect(el.querySelector('[data-earlier]')).toBeNull();
+    expect(component.filtered().length).toBe(2500);
+  });
+});

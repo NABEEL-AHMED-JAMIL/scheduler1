@@ -124,3 +124,24 @@ describe('run states are told apart', () => {
     }
   });
 });
+
+/** UI review U5/U14: the Queue's chip said "Interrupt", the enum, where every other status is a word. */
+describe('StatusPill words', () => {
+  function text(label: string): string {
+    TestBed.resetTestingModule();
+    const fixture = TestBed.configureTestingModule({ imports: [Host] }).createComponent(Host);
+    fixture.componentInstance.label.set(label);
+    fixture.detectChanges();
+    return (fixture.nativeElement as HTMLElement).textContent!.trim();
+  }
+
+  it('says Interrupted for the Interrupt status, in either case, and keeps its red', () => {
+    expect(text('Interrupt')).toBe('Interrupted');
+    expect(text('INTERRUPT')).toBe('Interrupted');
+    expect(render('Interrupt').toneClass).toBe(render('Failed').toneClass.replace('solid-', ''));
+  });
+
+  it('says every other status as it is stored', () => {
+    for (const label of ['Completed', 'Failed', 'Skip', 'Active']) expect(text(label)).toBe(label);
+  });
+});

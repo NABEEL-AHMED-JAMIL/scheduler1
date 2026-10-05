@@ -65,7 +65,7 @@ describe('Queue volume by day', () => {
 });
 
 describe('Queue live updates', () => {
-  it('re-reads once, a second after a burst of status pushes, without the loading blur', () => {
+  it('re-reads once, five seconds after the first of a burst of status pushes, without the loading blur', () => {
     vi.useFakeTimers();
     const { events, posts } = setup({ rows: [row()] });
     const queue = TestBed.runInInjectionContext(() => new Queue());
@@ -77,12 +77,30 @@ describe('Queue live updates', () => {
 
     events.next({ type: 'job.status', jobId: 2838, jobRunningStatus: 'Running' });
     events.next({ type: 'job.status', jobId: 2838, jobRunningStatus: 'Completed', jobQueueId: 7359 });
-    vi.advanceTimersByTime(999);
+    vi.advanceTimersByTime(4999);
     expect(posts).toHaveLength(1);
     vi.advanceTimersByTime(1);
     expect(posts).toHaveLength(2);
     // The rows on screen stay put while the fresh ones arrive.
     expect(loading).not.toContain(true);
+  });
+
+  /**
+   * Scale review P0 #3: a debounce waits for a quiet second, and a busy workspace never has one, so the
+   * list never re-read at all under load. A steady stream still costs one read per five seconds.
+   */
+  it('keeps re-reading under a steady stream of pushes, at most once per five seconds', () => {
+    vi.useFakeTimers();
+    const { events, posts } = setup({ rows: [row()] });
+    const queue = TestBed.runInInjectionContext(() => new Queue());
+    queue.ngOnInit();
+
+    for (let second = 0; second < 20; second++) {
+      events.next({ type: 'job.status', jobId: 2838, jobRunningStatus: 'Running' });
+      vi.advanceTimersByTime(1000);
+    }
+
+    expect(posts).toHaveLength(1 + 4);
   });
 
   it('ignores a log line', () => {

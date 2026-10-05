@@ -195,10 +195,20 @@
       }
     </ng-container>
 
+    @if (hiddenEarlier() > 0) {
+      <!-- The newest entries are drawn; earlier ones a step at a time, so a huge log cannot freeze the tab. -->
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2 text-xs text-[color:var(--text-muted)]" data-earlier>
+        <span>{{ hiddenEarlier() }} earlier {{ hiddenEarlier() === 1 ? 'entry is' : 'entries are' }} not shown.</span>
+        <button type="button" class="btn btn-default btn-sm" (click)="showEarlier()">
+          Show {{ hiddenEarlier() < renderStep ? hiddenEarlier() : renderStep }} earlier
+        </button>
+      </div>
+    }
+
     @switch (view()) {
       @case ('timeline') {
         <ul class="log-timeline" [appStickToBottom]="filtered().length">
-          @for (log of filtered(); track $index) {
+          @for (log of visible(); track $index) {
             <li class="log-tl-item">
               <span class="log-tl-rail">
                 <span class="log-tl-dot tone-fill" [class]="toneClass(toneOf(log.logsDetail))"></span>
@@ -223,7 +233,7 @@
               </tr>
             </thead>
             <tbody>
-              @for (log of filtered(); track $index) {
+              @for (log of visible(); track $index) {
                 <tr>
                   <td class="text-right tabular text-[color:var(--text-muted)]">{{ entryNo().get(log) ?? '—' }}</td>
                   <td class="tabular whitespace-nowrap">
@@ -239,7 +249,7 @@
 
       @case ('console') {
         <div class="log-console" [appStickToBottom]="filtered().length">
-          @for (log of filtered(); track $index) {
+          @for (log of visible(); track $index) {
             <div class="log-console-line">
               <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | serverTime:'dateTimeSec') : '—' }}]</span>
               <span class="log-message"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></span>

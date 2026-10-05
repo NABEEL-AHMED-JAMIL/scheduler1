@@ -69,9 +69,10 @@ export class GeneratedService {
     return this.http.post<ApiResponse<RenderResult>>(`${this.converter}/render`, body);
   }
 
-  /** A schedule's runs, newest first. */
-  runs(jobId: number): Observable<RunRow[]> {
-    return this.http.get<ApiResponse<{ jobQueues?: RunRow[] }>>(`${this.jobs}/fetchSourceJobQueueListWithJobId`, { params: { jobId } })
+  /** A schedule's newest `limit` runs, newest first: the server reads that window, not the whole history. */
+  runs(jobId: number, limit: number): Observable<RunRow[]> {
+    return this.http.get<ApiResponse<{ jobQueues?: RunRow[] }>>(`${this.jobs}/fetchSourceJobQueueListWithJobId`,
+      { params: { jobId, limit } })
       .pipe(map(r => r.status === API_SUCCESS ? (r.data?.jobQueues ?? []) : []));
   }
 
@@ -97,7 +98,7 @@ export class GeneratedService {
         const jobs = recentJobs(all, FAN_OUT.jobs);
         if (!jobs.length) return of({ reports: [], runsRead: 0, jobsRead: 0, failed: 0 });
         return from(jobs).pipe(
-          mergeMap(job => this.runs(job.jobId).pipe(
+          mergeMap(job => this.runs(job.jobId, FAN_OUT.runsPerJob).pipe(
             catchError(() => of([] as RunRow[])),
             map(runs => runs.slice(0, FAN_OUT.runsPerJob).map(run => ({ job, run })))), FAN_OUT.concurrency),
           mergeMap(pairs => from(pairs)),

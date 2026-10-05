@@ -68,18 +68,27 @@ const LOOK: Record<string, StatusLook> = {
 
 const UNKNOWN: StatusLook = { tone: 'neutral', glyph: '' };
 
+/**
+ * The word a chip says where the stored value is not one (UI review U5, U14). A run's status is the
+ * server's enum, and "Interrupt" on a chip read as a command beside Completed and Failed. Only the
+ * words change: the value, its colour and every filter keep the enum.
+ */
+const WORD: Record<string, string> = {
+  interrupt: 'Interrupted',
+};
+
 @Component({
   selector: 'app-status',
   imports: [Icon],
   template: `
     @if (isQuiet()) {
       <span class="status-quiet">
-        <span class="status-dot" [class]="'dot-' + tone()"></span>{{ label() || '—' }}
+        <span class="status-dot" [class]="'dot-' + tone()"></span>{{ word() }}
       </span>
     } @else {
       <span [class]="cls()">
         @if (showIcon() && glyph()) { <app-icon [name]="glyph()" size="0.85em" /> }
-        {{ label() || '—' }}
+        {{ word() }}
       </span>
     }
   `,
@@ -100,6 +109,9 @@ export class StatusPill {
     LOOK[(this.label() || '').toLowerCase()] ?? UNKNOWN);
 
   readonly tone = computed(() => this.look().tone);
+
+  /** What the chip says: the label, or its word where the stored value is not one. */
+  readonly word = computed(() => WORD[(this.label() || '').toLowerCase()] ?? (this.label() || '—'));
 
   readonly isQuiet = computed(() => {
     const look = this.look();

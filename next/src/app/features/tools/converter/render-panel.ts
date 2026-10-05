@@ -25,6 +25,8 @@ export type RenderSource = 'dataset' | 'execution';
 export const REPORTS_FOLDER = 'reports/';
 
 /** Tables media-service's render can read from a bucket (MIG-232's source). */
+/** The runs a schedule offers to render from: its newest twenty, which is all the picker shows. */
+const RUN_CHOICES = 20;
 const TABLE_EXTENSIONS = ['csv', 'tsv', 'xlsx', 'parquet', 'json', 'jsonl'];
 
 interface ScheduleRow { jobId: number; jobName?: string | null; lastJobRun?: string | null; }
@@ -166,8 +168,8 @@ export class RenderPanel implements OnInit {
     this.runList.set([]);
     this.pickRun('');
     if (jobId == null) return;
-    this.service.runs(jobId).subscribe({
-      next: runs => this.runList.set(runs.slice(0, 20)),
+    this.service.runs(jobId, RUN_CHOICES).subscribe({
+      next: runs => this.runList.set(runs.slice(0, RUN_CHOICES)),
       error: () => this.toast.error('Could not read this schedule\'s runs.'),
     });
   }

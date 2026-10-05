@@ -122,7 +122,7 @@ describe('Queue date range', () => {
     q.setTo('2026-09-20');
     q.setFrom('2026-09-18');
     expect(q.rangeError()).toBe('');
-    expect(bodies.at(-1)).toEqual({ fromDate: '2026-09-18', toDate: '2026-09-20' });
+    expect(bodies.at(-1)).toEqual({ fromDate: '2026-09-18', toDate: '2026-09-20', limit: 2000 });
   });
 
   it('goes back to the last seven days on Last 7 days', () => {

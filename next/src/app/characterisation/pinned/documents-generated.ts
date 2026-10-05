@@ -27,7 +27,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /storage.json/buckets",
       "GET /sourceJob.json/listSourceJob",
       "GET /storage.json/listObjects?bucket=ui-review-s3&maxKeys=100&prefix=reports/",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849",
+      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849&limit=3",
       "GET /sourceJob.json/runOutputs?jobQueueId=7405"
     ],
     "headings": [
@@ -77,7 +77,7 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /storage.json/objectMetadata?bucket=ui-review-s3&key=registry-live-check/customers-clean.json",
       "GET /sourceJob.json/listSourceJob",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849",
+      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849&limit=3",
       "GET /sourceJob.json/runOutputs?jobQueueId=7405"
     ],
     "headings": [

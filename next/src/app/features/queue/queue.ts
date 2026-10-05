@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, signal } from '@angular/co
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subscription, debounceTime, filter } from 'rxjs';
+import { Subscription, auditTime, filter } from 'rxjs';
 
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -25,6 +25,7 @@ import { daySeries } from '../../shared/charts/day-series';
 import { statusColor } from '../../shared/charts/status-color';
 import { SplitBar } from '../../shared/charts/split-bar';
 import { createPager } from '../../shared/ui/pager';
+import { DateField } from '../../shared/ui/date-field';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
@@ -46,6 +47,12 @@ interface StatusStat { name: string; value: number; }
 /** One narrowing in force, named so it can be shown above the charts and removed from there. */
 interface ActiveFilter { key: string; label: string; value: string; }
 
+/**
+ * How many runs one read brings, newest first (scale review P0 #3). The server keeps to it and says when the
+ * range holds more; the range's counts by status come back beside the rows either way.
+ */
+const QUEUE_WINDOW = 2000;
+
 const STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Skip', 'Interrupt', 'Missed'];
 
 /**
@@ -57,7 +64,7 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner],
+  imports: [DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -86,6 +93,9 @@ export class Queue implements OnInit {
 
   readonly statuses = STATUSES;
   readonly rows = signal<QueueRow[]>([]);
+  /** The range holds more runs than the window brought: the newest QUEUE_WINDOW are on screen. */
+  readonly hasMore = signal(false);
+  readonly queueWindow = QUEUE_WINDOW;
   /** Job names by id: a run carries only its job's id, and a bare number told a reader nothing. */
   private readonly jobNames = signal<Map<number, string>>(new Map());
   readonly loading = signal(true);
@@ -131,9 +141,9 @@ export class Queue implements OnInit {
    */
   readonly data = computed(() => {
     const term = this.search().trim().toLowerCase();
-    // Statuses are applied here, not by the server: the range comes back whole (fetchJobQLog
-    // has no LIMIT), and a server-side filter narrowed the rows the chips are counted over, so
-    // picking one status made every other chip vanish.
+    // Statuses are applied here, not by the server: a server-side filter narrowed the rows the
+    // chips are counted over, so picking one status made every other chip vanish. The rows are
+    // the range's newest QUEUE_WINDOW, and the note under the chips says when that is not all.
     const statuses = this.selectedStatuses();
     const shown = statuses.length ? this.rows().filter(row => statuses.includes(row.jobStatus as string)) : this.rows();
     if (!term) return shown;
@@ -201,15 +211,12 @@ export class Queue implements OnInit {
 
   readonly showInsights = signal(false);
   /**
-   * fetchLogs' second result set, `jobStatusStatistic`.
+   * fetchLogs' second result set, `jobStatusStatistic`: the range's runs by status.
    *
-   * Read QueryService.fetchJobQLog before trusting it: the isState branch carries no date
-   * clause, no job clause, no status clause and no `jq.status <> 'DELETE'`. It is every
-   * message this workspace has ever recorded for every ACTIVE or INACTIVE job, deleted runs
-   * included -- not the total for the selected range, which is what the donut used to plot it
-   * as. Pick the Failed chip and the table showed 4 rows while the ring above drew 48
-   * Completed and the caption called the screen 8% failed. It is kept only as an explicitly
-   * labelled all-time footnote and feeds no chart.
+   * Since scale review P0 #3 it carries the dates and the deleted-run clause the rows do (it
+   * used to count every message ever recorded), but not the status chips -- so it is the whole
+   * range while the rows are its newest QUEUE_WINDOW. It feeds no chart: the ring describes the
+   * rows the table lists. It says how many runs the dates hold when the window is not all of them.
    */
   readonly statusStats = signal<StatusStat[]>([]);
 
@@ -286,15 +293,8 @@ export class Queue implements OnInit {
     return daySeries(map, from, to).bars;
   });
 
-  /**
-   * What the server's range-blind statistic adds up to. Shown as an all-time footnote and
-   * never as this screen's total.
-   *
-   * The figure it replaces subtracted the row count from this same sum and the tooltip blamed
-   * a server row cap -- fetchJobQLog has no LIMIT, so nothing was ever capped. The gap is the
-   * date range and the filters, so that is what the label now says.
-   */
-  readonly allTimeTotal = computed(() =>
+  /** How many runs the chosen dates hold, from the server's count; more than the rows when the window cut it. */
+  readonly rangeTotal = computed(() =>
     this.statusStats().reduce((sum, s) => sum + s.value, 0));
 
   /** Of the messages in view. Reads from the same tally the ring draws. */
@@ -322,7 +322,9 @@ export class Queue implements OnInit {
      */
     this.jobEvents.events.pipe(
       filter(event => event.type === 'job.status'),
-      debounceTime(1000),
+      // auditTime, not debounceTime: a busy workspace pushes without pause, and a debounce that
+      // waits for a quiet second never fires. At most one read per five seconds, however busy.
+      auditTime(5000),
       takeUntilDestroyed(),
     ).subscribe(() => this.load({ silent: true }));
 
@@ -374,7 +376,7 @@ export class Queue implements OnInit {
     // Only the latest read may land: a push arriving mid-read, or a date changed twice, must not
     // let an older answer overwrite a newer one.
     this.request?.unsubscribe();
-    const body: any = { fromDate: this.fromDate(), toDate: this.toDate() };
+    const body: any = { fromDate: this.fromDate(), toDate: this.toDate(), limit: QUEUE_WINDOW };
 
     this.request = this.http.post<ApiResponse<QueueRow[] | { jobQueues?: QueueRow[] }>>(
       `${API_BASE}/message.json/fetchLogs`, body).subscribe({
@@ -388,6 +390,7 @@ export class Queue implements OnInit {
         // which never matched, so the screen showed an empty table over hundreds of rows.
         this.rows.set(Array.isArray(payload) ? payload : (payload?.sourceJobQueues ?? []));
         this.statusStats.set(Array.isArray(payload) ? [] : (payload?.jobStatusStatistic ?? []));
+        this.hasMore.set(!Array.isArray(payload) && !!payload?.hasMore);
       },
       error: err => {
         this.loading.set(false);

@@ -26,6 +26,9 @@ interface Turn {
   at: Date;
 }
 
+/** The runs the assistant describes: the newest of the job's history, which the server reads as one window. */
+const ASSISTANT_RUNS = 500;
+
 /**
  * An assistant that knows one job and nothing else.
  *
@@ -228,8 +231,10 @@ export class JobAssistant {
       },
     });
 
+    // The newest ASSISTANT_RUNS runs: the figures describe a recent window, and a minute job's whole
+    // history is half a million rows a year.
     this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-      { params: { jobId } }).subscribe({
+      { params: { jobId, limit: ASSISTANT_RUNS } }).subscribe({
       next: response => {
         if (ticket !== this.loadTicket) return;
         if (response.status === API_SUCCESS) this.runs.set(response.data?.jobQueues ?? []);

@@ -1,7 +1,7 @@
 import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Subscription, debounceTime, filter } from 'rxjs';
+import { Subscription, auditTime, filter } from 'rxjs';
 
 import { Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -27,6 +27,13 @@ import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
 import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence } from '../inbox/inbox-trigger';
+
+/**
+ * How many runs one read brings: the newest window first, and older ones a window at a time on request.
+ * A job that runs every minute makes half a million runs a year, and this screen read every one of them
+ * again on each status push.
+ */
+const HISTORY_WINDOW = 500;
 
 interface JobQueue {
   jobQueueId: number;
@@ -108,6 +115,10 @@ export class JobHistory {
   private missedEvents = false;
 
   readonly runs = signal<JobQueue[]>([]);
+  /** The server has runs older than the ones loaded; Load older reads the next window. */
+  readonly hasMore = signal(false);
+  readonly loadingOlder = signal(false);
+  readonly historyWindow = HISTORY_WINDOW;
   readonly loading = signal(true);
   readonly error = signal('');
   /** The job is not there, so Try again cannot help: the page offers Back to jobs instead. */
@@ -204,7 +215,9 @@ export class JobHistory {
     .filter(stat => stat.name !== 'Total')
     .map(stat => ({ label: stat.name, value: stat.value, quiet: !stat.value })));
 
-  readonly runTotal = computed<StatStripSummary>(() => ({ label: 'Total', value: this.runs().length }));
+  /** "Total" only when it is: with older runs still on the server, the figure is the newest ones loaded. */
+  readonly runTotal = computed<StatStripSummary>(() =>
+    ({ label: this.hasMore() ? 'Loaded' : 'Total', value: this.runs().length }));
 
   copyPayload(): void {
     copyText(this.detail()?.taskDetail?.taskPayload ?? '').then(() => {
@@ -344,7 +357,9 @@ export class JobHistory {
     this.jobEvents.events.pipe(
       filter(event => event.type === 'job.status'
         && (this.isAllJobs() || String(event.jobId) === this.jobId())),
-      debounceTime(1000),
+      // auditTime, not debounceTime: under a steady stream of pushes a debounce never fires, and an
+      // hour across every job is exactly such a stream. At most one read per three seconds.
+      auditTime(3000),
       takeUntilDestroyed(),
     ).subscribe(() => this.load({ silent: true }));
 
@@ -426,7 +441,7 @@ export class JobHistory {
           { params: drillParams })
       : this.http.get<ApiResponse<any>>(
           `${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
-          { params: { jobId: this.jobId() } });
+          { params: { jobId: this.jobId(), limit: HISTORY_WINDOW } });
 
     // Only the latest read may land: a push arriving mid-read must not let an older answer
     // overwrite a newer one.
@@ -447,12 +462,45 @@ export class JobHistory {
         }
         const data = response.data ?? {};
         // The two endpoints name the same list differently.
-        this.runs.set(data.sourceJobQueues ?? data.jobQueues ?? []);
+        const fresh: JobQueue[] = data.sourceJobQueues ?? data.jobQueues ?? [];
+        if (this.isDrillDown()) {
+          this.runs.set(fresh);
+          this.hasMore.set(false);
+        } else {
+          // A re-read brings the newest window again; older windows the reader already loaded stay below it.
+          const oldestFresh = Math.min(...fresh.map(run => run.jobQueueId));
+          const older = silent && fresh.length ? this.runs().filter(run => run.jobQueueId < oldestFresh) : [];
+          this.runs.set([...fresh, ...older]);
+          if (!older.length) this.hasMore.set(!!data.hasMore);
+        }
         if (data.sourceJob?.jobName) this.jobName.set(data.sourceJob.jobName);
       },
       error: err => {
         this.loading.set(false);
         if (!silent) this.error.set(err?.error?.message || 'Could not load the run history.');
+      },
+    });
+  }
+
+  /** The next window of older runs, below the ones on screen. */
+  loadOlder(): void {
+    const loaded = this.runs();
+    if (!this.jobId() || !loaded.length || this.loadingOlder()) return;
+    const beforeId = Math.min(...loaded.map(run => run.jobQueueId));
+    this.loadingOlder.set(true);
+    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceJob.json/fetchSourceJobQueueListWithJobId`,
+      { params: { jobId: this.jobId(), limit: HISTORY_WINDOW, beforeId } }).subscribe({
+      next: response => {
+        this.loadingOlder.set(false);
+        if (response.status !== API_SUCCESS) { this.toast.error(response.message || 'Could not read older runs.'); return; }
+        const older: JobQueue[] = response.data?.jobQueues ?? [];
+        const known = new Set(this.runs().map(run => run.jobQueueId));
+        this.runs.update(list => [...list, ...older.filter(run => !known.has(run.jobQueueId))]);
+        this.hasMore.set(!!response.data?.hasMore);
+      },
+      error: err => {
+        this.loadingOlder.set(false);
+        this.toast.error(err?.error?.message || 'Could not read older runs.');
       },
     });
   }
