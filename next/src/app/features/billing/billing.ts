@@ -71,6 +71,16 @@ export class Billing implements OnInit {
   readonly days = signal<DayRow[]>([]);
   readonly currency = signal('USD');
   readonly rateCard = signal<PricedWith | null>(null);
+  /** Lines used and priced by no card -- neither this workspace's own nor the default: billed at 0, and said above the table. */
+  readonly unpricedLines = computed(() => this.lines().filter(l => l.unpriced && Number(l.quantity) !== 0));
+  /** Which cards the unpriced lines are missing from: the workspace's own and the default, or the one card that prices it. */
+  readonly unpricedWhere = computed(() => {
+    const card = this.rateCard();
+    if (card?.tenantSpecific) return `neither this workspace's card nor ${card.fallback?.name || 'the default card'}`;
+    return `no rate card (not on ${card?.name || 'the rate card in effect'})`;
+  });
+  /** Lines this workspace's own card does not name, priced from the default card (rate card fallback). */
+  readonly fallbackLines = computed(() => this.lines().filter(l => !!l.pricedFrom));
   /** The month before, priced as a whole -- the comparison the forecast is read against. */
   readonly previousTotal = signal<number | null>(null);
 
@@ -192,7 +202,8 @@ export class Billing implements OnInit {
     this.api.usageByMeter(this.query()).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
-        if (r.data?.rateCard) { this.rateCard.set(r.data.rateCard); this.currency.set(r.data.rateCard.currency || 'USD'); }
+        this.rateCard.set(r.data?.rateCard ?? null);
+        if (r.data?.rateCard) this.currency.set(r.data.rateCard.currency || 'USD');
         this.lines.set((r.data?.rows ?? []).map(l => ({
           ...l, quantity: Number(l.quantity), amount: Number(l.amount), unitPrice: Number(l.unitPrice),
           includedQuantity: Number(l.includedQuantity ?? 0), billableQuantity: Number(l.billableQuantity ?? l.quantity),
@@ -260,7 +271,8 @@ export class Billing implements OnInit {
   exportCsv(): void {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [['meter', 'label', 'service', 'quantity', 'unit', 'included_quantity', 'billable_quantity', 'unit_price', 'per', 'amount', 'currency', 'rate_card']];
-    for (const l of this.lines()) rows.push([l.meter, l.label, l.service, String(l.quantity), l.unit, String(l.includedQuantity), String(l.billableQuantity), String(l.unitPrice), String(l.per), l.amount.toFixed(5), this.currency(), this.rateCard() ? `${this.rateCard()!.name} v${this.rateCard()!.version}` : '']);
+    const cardOf = (l: MeterLine) => l.pricedFrom ? `${l.pricedFrom.name} v${l.pricedFrom.version}` : l.unpriced ? 'none' : this.rateCard() ? `${this.rateCard()!.name} v${this.rateCard()!.version}` : '';
+    for (const l of this.lines()) rows.push([l.meter, l.label, l.service, String(l.quantity), l.unit, String(l.includedQuantity), String(l.billableQuantity), String(l.unitPrice), String(l.per), l.amount.toFixed(5), this.currency(), cardOf(l)]);
     rows.push(['', 'Month to date', '', '', '', '', '', '', '', this.total().toFixed(5), this.currency(), '']);
     const blob = new Blob([rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cost-usage-${this.month().slice(0, 7)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
@@ -312,7 +324,7 @@ export class Billing implements OnInit {
   }
   /** The unit price with enough digits to be a price, not "$0.0000". */
   fmtRate(line: MeterLine): string {
-    if (line.unpriced) return 'Not on the card';
+    if (line.unpriced) return 'Not on any card';
     if (line.hasTiers) return 'Tiered';
     return this.fmtUnitPrice(line.unitPrice, line.per, line.unit);
   }

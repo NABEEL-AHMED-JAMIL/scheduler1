@@ -34,12 +34,26 @@
   } @else {
     <p class="text-xs text-[color:var(--text-muted)]">
       @if (rateCard(); as card) {
-        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> } · {{ currency() }}
+        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> }
+        @if (card.fallback; as f) { <span data-fallback-card>· meters it does not name are priced from <b>{{ f.name }}</b> v{{ f.version }}</span> } · {{ currency() }}
         @if (isPlatformAdmin()) { · <a routerLink="/billing/rates" class="link-inline">rate cards</a> }
       } @else { Priced with the rate card in effect · {{ currency() }} }
       · day {{ daysElapsed() }} of {{ daysInMonth() }}
       @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
     </p>
+
+    @if (unpricedLines().length) {
+      <!-- Rate card fallback: what is left unpriced is on no card at all -- billed at 0 until a card prices it. -->
+      <div class="step-notice step-notice-warn mt-2" role="alert" data-unpriced-warning>
+        <app-icon name="alert" class="icon-warn shrink-0 mt-0.5" />
+        <div>
+          <b>Usage with no price anywhere:</b>
+          @for (l of unpricedLines(); track l.meter) { <span class="mono">{{ l.label }} ({{ l.meter }})</span>{{ $last ? '' : ', ' }} }
+          — on {{ unpricedWhere() }}, so it is billed at 0.
+          @if (isPlatformAdmin()) { <a routerLink="/billing/rates" class="link-inline">Price it on a rate card</a> and the month is priced again. }
+        </div>
+      </div>
+    }
 
     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
       <app-stat-tile label="Month to date" [value]="fmtMoney(total())" icon="chart" tone="info"
@@ -110,7 +124,9 @@
             @for (line of shownLines(); track line.meter) {
               <tr class="cursor-pointer hover-brand" [class.is-open]="openLine()?.meter === line.meter" (click)="toggleLine(line)">
                 <td>
-                  <div class="font-medium">{{ line.label }}</div>
+                  <div class="font-medium">{{ line.label }}
+                    @if (line.pricedFrom) { <span class="pill pill-neutral ml-1" data-priced-from [title]="'Not on this workspace\'s card: priced from ' + line.pricedFrom.name + ' v' + line.pricedFrom.version">{{ line.pricedFrom.name }} price</span> }
+                    @if (line.unpriced) { <span class="pill pill-warn ml-1" data-unpriced>No price</span> }</div>
                   <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ line.meter }}</div>
                 </td>
                 <td class="hidden md:table-cell text-[color:var(--text-secondary)]">{{ line.service }}</td>

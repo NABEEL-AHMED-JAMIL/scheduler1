@@ -82,6 +82,18 @@ describe('BillingAnalyticsPage', () => {
     expect(buttons().map(b => b.getAttribute('aria-pressed'))).toEqual(['false', 'false', 'true']);
   });
 
+  it('lists the workspaces that used a meter no card prices, and says nothing when every meter has a price', () => {
+    expect(page().el.querySelector('[data-unpriced-warning]')).toBeNull();
+    const usage = [{ tenantId: 2905, amount: '1', quantityByMeter: { 'new.meter': 5 }, unpricedMeters: ['new.meter'] },
+      { tenantId: 2901, amount: '1', quantityByMeter: {}, unpricedMeters: [] }];
+    const { component, el } = page({ ...DATA, usageByTenant: usage });
+    expect(component.unpriced()).toEqual([{ tenantId: 2905, tenantName: 'MedAxis Care Network (#2905)', meters: ['new.meter'] }]);
+    const warning = el.querySelector('[data-unpriced-warning]')!;
+    expect(warning.textContent).toContain('no price anywhere');
+    expect(warning.textContent).toContain('MedAxis Care Network (#2905): new.meter');
+    expect(warning.textContent).not.toContain('CareBridge');
+  });
+
   it('offers Try again when the read fails, and it reads again', () => {
     const api = { analytics: vi.fn(() => of({ status: 'FAILED', message: 'The meter did not answer.' })) };
     TestBed.resetTestingModule();

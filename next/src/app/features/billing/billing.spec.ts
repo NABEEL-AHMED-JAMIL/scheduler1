@@ -215,7 +215,7 @@ describe('Billing', () => {
     expect(component.fmtAmount(0)).toBe('$0.00');
     expect(component.fmtExact(0.0007)).toBe('$0.0007');
     expect(component.fmtRate(component.lines().find(l => l.hasTiers)!)).toBe('Tiered');
-    expect(component.fmtRate({ ...component.lines()[0], unpriced: true })).toBe('Not on the card');
+    expect(component.fmtRate({ ...component.lines()[0], unpriced: true })).toBe('Not on any card');
     expect(component.fmtRate(component.lines().find(l => l.meter === 'storage.ops.delete')!)).toBe('$0.005 per 1,000 ops');
     expect(component.actorLabel({ actor_user_id: 4385 } as any)).toBe('User #4385');
     expect(component.actorLabel({ actor_name: 'Olivia Bennett', actor_user_id: 4385 } as any)).toBe('Olivia Bennett');
@@ -247,6 +247,38 @@ describe('Billing, rendered', () => {
     fixture.detectChanges();
     return { fixture, api, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
   }
+
+  // Rate card fallback: a workspace's own card names what it prices; what it does not name is priced from the default card,
+  // and what no card prices is billed at 0 and said above the table.
+  it('says which lines the default card priced and warns about usage no card prices', () => {
+    const rows = [
+      { ...LINES[0] },
+      { meter: 'api.calls', label: 'API calls', service: 'API', unit: 'call', per: 1000, unitPrice: '0.1', quantity: '127', amount: '0.0127', days: 1,
+        pricedFrom: { version: 34, name: 'Standard 2026' } },
+      { meter: 'new.meter', label: 'New meter', service: 'Other', unit: '', per: 1, unitPrice: '0', quantity: '5', amount: '0', days: 1, unpriced: true },
+    ];
+    const card = { version: 37, name: 'Northwind contract', currency: 'USD', tenantSpecific: true, effectiveFrom: '2026-10-01',
+      fallback: { version: 34, name: 'Standard 2026', effectiveFrom: '2026-10-01' } };
+    const { el, component, fixture } = view({ usageByMeter: vi.fn(() => of({ status: API_SUCCESS, data: { rows, rateCard: card } })) });
+    component.showTinyLines.set(true);
+    fixture.detectChanges();
+    expect(component.fallbackLines().map(l => l.meter)).toEqual(['api.calls']);
+    expect(component.unpricedLines().map(l => l.meter)).toEqual(['new.meter']);
+    expect(el.querySelector('[data-fallback-card]')!.textContent).toContain('priced from Standard 2026 v34');
+    const pills = [...el.querySelectorAll('[data-priced-from]')];
+    expect(pills.map(p => p.textContent!.trim())).toEqual(['Standard 2026 price']);
+    expect(el.querySelectorAll('[data-unpriced]').length).toBe(1);
+    const warning = el.querySelector('[data-unpriced-warning]')!;
+    expect(warning.textContent).toContain('New meter (new.meter)');
+    expect(warning.textContent).toContain("on neither this workspace's card nor Standard 2026");
+  });
+
+  it('warns about nothing when every line has a price', () => {
+    const { el } = view();
+    expect(el.querySelector('[data-unpriced-warning]')).toBeNull();
+    expect(el.querySelector('[data-fallback-card]')).toBeNull();
+    expect(el.querySelector('[data-priced-from]')).toBeNull();
+  });
 
   it('opens a line from a real button that says whether it is open', () => {
     const { fixture, el, component } = view();

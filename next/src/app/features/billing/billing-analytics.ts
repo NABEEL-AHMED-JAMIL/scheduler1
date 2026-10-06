@@ -51,6 +51,15 @@ export class BillingAnalyticsPage implements OnInit {
       deletedBytes: Number(u.quantityByMeter?.['storage.bytes.deleted'] ?? 0), writtenBytes: Number(u.quantityByMeter?.['storage.bytes.written'] ?? 0), tokens: Number(u.quantityByMeter?.['ai.tokens.in'] ?? 0) + Number(u.quantityByMeter?.['ai.tokens.out'] ?? 0) }))
       .sort((a, b) => b.deletedBytes - a.deletedBytes);
   });
+  /**
+   * Rate card fallback: the workspaces that used a meter no card prices -- neither their own nor the default -- billed at 0
+   * for it. Empty when every meter used has a price somewhere, which is the normal state.
+   */
+  readonly unpriced = computed(() => {
+    const names = this.labels();
+    return (this.data()?.usageByTenant ?? []).filter(u => (u.unpricedMeters ?? []).length)
+      .map(u => ({ tenantId: u.tenantId, tenantName: names.get(u.tenantId) ?? `Workspace ${u.tenantId}`, meters: u.unpricedMeters ?? [] }));
+  });
   /** Under Collected: the share and how fast it came, or plainly that nothing has yet. */
   readonly collectedFoot = computed(() => {
     const d = this.data();

@@ -61,6 +61,17 @@ describe('InvoicePane', () => {
     expect(component.subjects(component.invoice()!.lines[0])[0].quantity).toBe(812);
   });
 
+  it('a line the default card priced says so; a line its own card priced does not', () => {
+    const lines = [{ invoiceLineId: 9, sort: 0, meter: 'api.calls', description: 'API calls', quantity: '127', unit: 'call', per: 1000, unitPrice: '0.1',
+      amount: '0.0127', manual: false, pricedFromVersion: 34, pricedFromName: 'Standard 2026' },
+      { invoiceLineId: 10, sort: 1, meter: 'webhook.deliveries', description: 'Webhook deliveries', quantity: '9', unit: 'delivery', per: 1000, unitPrice: '0',
+        amount: '0', manual: false }];
+    const { fixture } = page(true, { ...DETAIL, lines });
+    fixture.detectChanges();
+    const said = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-priced-from]')).map(e => e.textContent!.trim());
+    expect(said).toEqual(["Priced from the Standard 2026 card (v34): not on this workspace's card"]);
+  });
+
   it('reads the invoice, sums verified payments only, and tells the story in order', () => {
     const { component, api } = page(false);
     expect(api.invoice).toHaveBeenCalledWith('INV-2026-08-0006');

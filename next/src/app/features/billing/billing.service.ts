@@ -22,6 +22,8 @@ export interface InvoiceLine {
   includedQuantity?: number | null; billableQuantity?: number | null; pricingDetail?: string | null;
   /** MIG-337: who used the line's meter, as JSON [{subjectType, subjectId, quantity}] -- an API client's calls, a webhook's deliveries. */
   breakdown?: string | null;
+  /** Rate card fallback: the default card that priced the line, when the workspace's own card does not name its meter. */
+  pricedFromVersion?: number | null; pricedFromName?: string | null;
 }
 /** One subject of a line's breakdown (MIG-337). */
 export interface LineSubject { subjectType: string; subjectId: string | null; quantity: number }
@@ -67,10 +69,18 @@ export interface MeterLine {
   meter: string; label: string; service: string; unit: string; per: number;
   unitPrice: number; quantity: number; amount: number; days: number;
   /** The calculation applied to the period: allowance first, then tier bands if the card has them. */
-  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean; unpriced?: boolean;
+  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean;
+  /** Used, and no card prices it -- neither the workspace's own nor the default: billed at 0. */
+  unpriced?: boolean;
+  /** Not on the workspace's own card: priced from the default card in effect (rate card fallback). */
+  pricedFrom?: { version: number; name: string } | null;
 }
 /** The card a period is priced with, as the meter names it. */
-export interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
+export interface PricedWith {
+  version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string;
+  /** A workspace's own card: the default card the meters it does not name are priced from. */
+  fallback?: { version: number; name: string; effectiveFrom: string } | null;
+}
 export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
 export interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
 /** One priced line of a run: what its tokens were priced as (a model's own item, or the meter's). */
@@ -99,7 +109,8 @@ export interface BillingAnalytics {
   invoiced: number; collected: number; open: number; overdue: number; overdueCount: number; drafts: number; medianDaysToPay: number; pendingPayments: number;
   months: { month: string; invoiced?: number; collected?: number; open?: number; drafts?: number }[];
   tenants: { tenantId: number; tenantName: string; invoiced: number; collected: number; open: number; overdue: number; status: string }[];
-  usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number> }[] | null;
+  /** unpricedMeters: meters the workspace used that no card prices -- neither its own nor the default (billed at 0). */
+  usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number>; unpricedMeters?: string[] }[] | null;
 }
 
 /** The billing.json calls: invoices, payments, documents, the account, the platform's view. */
