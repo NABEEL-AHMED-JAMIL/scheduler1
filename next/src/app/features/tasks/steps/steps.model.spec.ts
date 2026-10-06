@@ -310,7 +310,7 @@ describe('steps model -- a config form from the task\'s JSON Schema', () => {
     expect(fields.map(f => [f.name, f.kind, f.itemKind ?? ''])).toEqual([
       ['column', 'column', ''], ['with', 'step', ''], ['query', 'textarea', ''], ['title', 'textarea', ''], ['message', 'textarea', ''],
       ['groupBy', 'columns', ''], ['value', 'scalar', ''], ['values', 'list', 'scalar'], ['columns', 'json', ''], ['maybe', 'text', ''],
-      ['bucket', 'text', ''], ['headers', 'object', ''], ['rows', 'objects', ''],
+      ['bucket', 'bucket', ''], ['headers', 'object', ''], ['rows', 'objects', ''],
     ]);
     expect(isMapSchema(fields[11].schema)).toBe(true);
     expect(mapValueKind(fields[11].schema)).toBe('text');

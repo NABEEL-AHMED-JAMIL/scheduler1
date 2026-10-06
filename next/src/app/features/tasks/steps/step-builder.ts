@@ -17,8 +17,8 @@ import { TaskStatePill, TaskSwitch } from './task-switch';
 import {
   Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
-  sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesPrompt,
-  withSample, withSwitchedLine, PromptChoice,
+  sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
+  withSample, withSwitchedLine, BucketChoice, PromptChoice,
 } from './steps.model';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
@@ -255,15 +255,27 @@ export class StepBuilder {
   /** MIG-245: the workspace's active prompts, read the first time a step that names one is opened. */
   private readonly promptChoices = signal<PromptChoice[] | null>(null);
 
+  /** MIG-321: the workspace's buckets, read the first time a step that names one is opened. */
+  private readonly bucketChoices = signal<BucketChoice[] | null>(null);
+
   open(index: number): void {
     const step = this.draft().steps[index];
     if (!step) return;
     this.selected.set(step.key);
-    if (this.promptChoices() === null && usesPrompt(this.taskOf(step)?.configSchema)) {
+    const schema = this.taskOf(step)?.configSchema;
+    if (this.promptChoices() === null && usesPrompt(schema)) {
       // A list that cannot be read leaves the choice empty: a saved prompt still shows by its id.
       this.api.prompts().subscribe({
-        next: prompts => { this.promptChoices.set(prompts); this.openPanel(index); },
-        error: () => { this.promptChoices.set([]); this.openPanel(index); },
+        next: prompts => { this.promptChoices.set(prompts); this.open(index); },
+        error: () => { this.promptChoices.set([]); this.open(index); },
+      });
+      return;
+    }
+    if (this.bucketChoices() === null && usesBucket(schema)) {
+      // Likewise: without the list the box still takes an alias typed by hand.
+      this.api.buckets().subscribe({
+        next: buckets => { this.bucketChoices.set(buckets); this.open(index); },
+        error: () => { this.bucketChoices.set([]); this.open(index); },
       });
       return;
     }
@@ -279,6 +291,7 @@ export class StepBuilder {
       problems: this.stepProblems(index), defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',
       prompts: this.promptChoices() ?? [],
+      buckets: this.bucketChoices() ?? [],
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.

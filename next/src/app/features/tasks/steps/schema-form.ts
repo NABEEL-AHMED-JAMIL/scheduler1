@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  BucketChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -120,6 +120,17 @@ interface MapRow { key: string; value: unknown; }
               </datalist>
             </app-field>
           }
+          @case ('bucket') {
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || (buckets().length ? 'A bucket of this workspace: pick one, or type its alias.' : '')">
+              <input [id]="idOf(f)" class="input mono" [value]="textOf(f)" [disabled]="disabled()" autocomplete="off"
+                     [attr.list]="idOf(f) + '-buckets'" [attr.maxlength]="f.schema.maxLength ?? null"
+                     (input)="set(f.name, coerceText(f, $any($event.target).value))" />
+              <datalist [id]="idOf(f) + '-buckets'">
+                @for (b of buckets(); track b.alias) { <option [value]="b.alias">{{ b.label }}</option> }
+              </datalist>
+            </app-field>
+          }
           @case ('textarea') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
               <textarea [id]="idOf(f)" class="input" rows="4" [class.mono]="f.schema.format === 'sql'" [class.text-xs]="f.schema.format === 'sql'"
@@ -155,7 +166,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -179,7 +190,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -235,6 +246,8 @@ export class SchemaForm {
   readonly steps = input<string[]>([]);
   /** MIG-245: the workspace's active prompts, what a prompt setting offers. */
   readonly prompts = input<PromptChoice[]>([]);
+  /** MIG-321: the workspace's buckets, what a bucket setting offers. */
+  readonly buckets = input<BucketChoice[]>([]);
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 
@@ -277,7 +290,7 @@ export class SchemaForm {
     return value === undefined ? '' : value === null ? 'null' : String(value);
   }
 
-  coerceText(f: FieldSpec, raw: string): unknown { return coerce(f.kind === 'column' ? 'text' : f.kind, raw); }
+  coerceText(f: FieldSpec, raw: string): unknown { return coerce(f.kind === 'column' || f.kind === 'bucket' ? 'text' : f.kind, raw); }
 
   optionText(option: unknown): string { return typeof option === 'string' ? option : JSON.stringify(option); }
 
@@ -384,7 +397,7 @@ export class SchemaForm {
 
   mapCoerce(raw: string): unknown {
     const kind = this.mapKind();
-    return kind === 'text' || kind === 'textarea' || kind === 'column' ? raw : coerce(kind, raw);
+    return kind === 'text' || kind === 'textarea' || kind === 'column' || kind === 'bucket' ? raw : coerce(kind, raw);
   }
 
   mapJson(row: MapRow): string { return row.value === undefined ? '' : JSON.stringify(row.value); }

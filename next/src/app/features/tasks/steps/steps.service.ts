@@ -4,7 +4,7 @@ import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
-import { DefinitionView, LinkedJob, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult } from './steps.model';
+import { DefinitionView, LinkedJob, BucketChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -73,6 +73,12 @@ export class StepsApi {
   }
 
   /** MIG-245: the workspace's active prompts, by name, for a step that names one (the AI prompt step). */
+  /** MIG-321: the workspace's buckets, by alias, for a step's bucket setting. */
+  buckets(): Observable<BucketChoice[]> {
+    return this.http.get<ApiResponse<{ bucket: string; label?: string }[]>>(`${API_BASE}/storage.json/buckets`).pipe(
+      map(r => (r.data ?? []).filter(b => !!b.bucket).map(b => ({ alias: b.bucket, label: b.label || b.bucket }))));
+  }
+
   prompts(): Observable<PromptChoice[]> {
     return this.http.get<ApiResponse<{ promptId?: number; name: string; status?: string }[]>>(`${API_BASE}/aiPrompt.json/list`).pipe(
       map(r => (r.data ?? []).filter(p => p.promptId != null && p.status === 'Active').map(p => ({ id: p.promptId!, label: p.name }))));

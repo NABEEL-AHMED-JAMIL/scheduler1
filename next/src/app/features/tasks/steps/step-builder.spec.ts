@@ -69,6 +69,7 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
     timeline: vi.fn(() => of({ status: 'SUCCESS', message: '', data: null })),
     stepLog: vi.fn(),
     prompts: vi.fn(() => of([{ id: 41, label: 'Wound assessment' }])),
+    buckets: vi.fn(() => of([{ alias: 'ui-review-s3', label: 'Review bucket' }])),
   };
   const opened: { component: unknown; data: any }[] = [];
   let answer: unknown = opts.dialogAnswer;
@@ -175,6 +176,21 @@ describe('StepBuilder -- the step cards', () => {
     expect(panel.data.prompts).toEqual([{ id: 41, label: 'Wound assessment' }]);
     builder.open(2);
     expect(api.prompts).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands a step that names a bucket the workspace\'s buckets, loading them once (MIG-321)', () => {
+    const readTask = { code: 'read_file', name: 'Read file', kind: 'Source', description: 'Reads a file.', runsInEngine: true,
+      enabled: true, available: true, overridable: true, overridden: false,
+      configSchema: { type: 'object', properties: { bucket: { type: 'string', format: 'bucket' } } } };
+    const { builder, api, opened, fixture } = build({ tasks: [...TASKS, readTask] });
+    builder.open(1);
+    expect(api.buckets).not.toHaveBeenCalled();
+    builder.add('read_file');
+    fixture.detectChanges();
+    const panel = opened.filter(o => o.component === StepPanel).pop()!;
+    expect(panel.data.buckets).toEqual([{ alias: 'ui-review-s3', label: 'Review bucket' }]);
+    builder.open(2);
+    expect(api.buckets).toHaveBeenCalledTimes(1);
   });
 
   it('adds a step from the Task Registry and opens it; a disabled task is listed but not added', () => {

@@ -635,15 +635,18 @@ export function inputColumns(definition: Definition, index: number, tasks: StepT
 // ---------------------------------------------------------------------------------------------- a config form
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json'
-  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt';
+  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket';
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
 export interface PromptChoice { id: number; label: string; }
 
+/** MIG-321: a workspace bucket a step may name: its alias, and the connection's name as the choice shows it. */
+export interface BucketChoice { alias: string; label: string; }
+
 /**
- * The registry's widget hints (configSchema `format`). column, step, sql, template, multiline and prompt have widgets here;
- * the rest are text until their pickers exist.
- * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, bucket, pipeline and user.
+ * The registry's widget hints (configSchema `format`). column, step, sql, template, multiline, prompt and bucket have widgets
+ * here; the rest are text until their pickers exist.
+ * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
   'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression'] as const;
@@ -691,6 +694,7 @@ function kindOf(schema: JsonSchema): FieldKind {
     case 'string':
       if (schema.format === 'column') return 'column';
       if (schema.format === 'step') return 'step';
+      if (schema.format === 'bucket') return 'bucket';
       return (schema.maxLength ?? 0) > 200 || LONG_TEXT_FORMATS.includes(schema.format ?? '') ? 'textarea' : 'text';
     case 'integer': return schema.format === 'prompt' ? 'prompt' : 'integer';
     case 'number': return 'number';
@@ -798,11 +802,21 @@ export function errorText(error: unknown): string {
   return JSON.stringify(error);
 }
 
-/** MIG-245: whether a task's settings name a saved prompt anywhere (so its panel needs the prompts to choose from). */
-export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
+/** Whether a task's settings use a widget format anywhere, nested settings included. */
+function usesFormat(schema: JsonSchema | null | undefined, format: string): boolean {
   if (!schema || typeof schema !== 'object') return false;
-  if (schema.format === 'prompt') return true;
+  if (schema.format === format) return true;
   const nested = [...Object.values(schema.properties ?? {}), schema.items, schema.additionalProperties]
     .filter((s): s is JsonSchema => !!s && typeof s === 'object');
-  return nested.some(usesPrompt);
+  return nested.some(n => usesFormat(n, format));
+}
+
+/** MIG-245: whether a task's settings name a saved prompt anywhere (so its panel needs the prompts to choose from). */
+export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'prompt');
+}
+
+/** MIG-321: whether a task's settings name a bucket anywhere (so its panel offers the workspace's buckets). */
+export function usesBucket(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'bucket');
 }

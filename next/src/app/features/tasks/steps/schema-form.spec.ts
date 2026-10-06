@@ -249,6 +249,25 @@ describe('SchemaForm -- a prompt setting', () => {
     return { el: fixture.nativeElement as HTMLElement, fixture, changes };
   }
 
+  it('offers the workspace\'s buckets for a bucket setting, and still takes an alias typed by hand (MIG-321)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', { type: 'object', properties: { bucket: { type: 'string', format: 'bucket', title: 'Bucket' } } });
+    fixture.componentRef.setInput('value', null);
+    fixture.componentRef.setInput('buckets', [{ alias: 'ui-review-s3', label: 'Review bucket' }]);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const box = el.querySelector<HTMLInputElement>('#cfg-bucket')!;
+    expect(box.getAttribute('list')).toBe('cfg-bucket-buckets');
+    expect(Array.from(el.querySelectorAll('#cfg-bucket-buckets option')).map(o => (o as HTMLOptionElement).value)).toEqual(['ui-review-s3']);
+    box.value = 'archive';
+    box.dispatchEvent(new Event('input'));
+    expect(changes[changes.length - 1]).toEqual({ bucket: 'archive' });
+  });
+
   it('offers the prompts by name and stores the chosen id as a number', () => {
     const { el, fixture, changes } = promptForm([{ id: 41, label: 'Wound assessment' }, { id: 42, label: 'Summary' }], { promptId: 42 });
     const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
