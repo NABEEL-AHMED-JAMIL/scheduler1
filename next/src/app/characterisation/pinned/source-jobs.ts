@@ -273,7 +273,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob",
-      "POST /message.json/fetchLogs {fromDate,limit,toDate}"
+      "POST /message.json/fetchLogs {fromDate,limit,toDate}",
+      "GET /sourceJob.json/review/waiting"
     ],
     "headings": [
       "Executions",

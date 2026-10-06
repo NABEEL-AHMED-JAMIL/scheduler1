@@ -24,6 +24,9 @@ export interface UploadWanted {
  * every change is handed back, and chosen files and drawn signatures are handed to the page to upload. The fill-in page
  * and the builder's preview both draw it.
  */
+/** The image extensions a form may accept, by MIME type. */
+const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' };
+
 @Component({
   selector: 'app-form-renderer',
   imports: [DateField, Field, Icon, SignaturePad],
@@ -254,8 +257,14 @@ export class FormRenderer {
     return value && typeof value === 'object' && !Array.isArray(value) ? value as UploadRef : null;
   }
 
+  /**
+   * The extensions, plus each image type's MIME name: with those a phone offers its camera and photo library, and
+   * Safari hands over an iPhone's HEIC photo as a JPEG (MIG-325).
+   */
   acceptOf(f: FormField): string {
-    return (f.accept ?? []).map(a => '.' + a).join(',');
+    const accept = (f.accept ?? []).map(a => a.toLowerCase());
+    const mimes = [...new Set(accept.map(a => IMAGE_MIME[a]).filter((m): m is string => !!m))];
+    return [...accept.map(a => '.' + a), ...mimes].join(',');
   }
 
   choose(key: string, input: HTMLInputElement): void {

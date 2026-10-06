@@ -37,6 +37,10 @@
     </p>
   </div>
 
+  @if (!jobId() && !isDrillDown()) {
+    <app-review-waiting />
+  }
+
   @if (isDrillDown()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
       <span class="text-[color:var(--text-secondary)]">Filtered to</span>
