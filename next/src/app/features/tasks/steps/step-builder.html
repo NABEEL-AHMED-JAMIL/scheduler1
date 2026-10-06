@@ -97,18 +97,20 @@
                 @for (s of sensitivities; track s) { <option [value]="s" [selected]="draft().settings?.sensitivity === s">{{ sensitivityText(s) }}</option> }
               </select>
             </app-field>
-            <!-- MIG-237: whose review a run's results wait for. The customer's review needs customer integration (later). -->
+            <!-- MIG-237, MIG-334: whose review a run's results wait for. The customer decides through the API
+                 (POST /v1/runs/{id}/review), from the organisation's own portal. -->
             <app-field label="Results need review by" for="reviewInternal" [error]="settingProblem('settings.review')"
-                       hint="A run's results start as waiting for review and are approved or rejected on the run's page.">
+                       hint="A run's results start as waiting for review. Our team approves or rejects them on the run's page; the customer does it through the API, from its own portal.">
               <div class="flex flex-wrap gap-4 pt-1">
                 <label class="flex items-center gap-2 text-sm">
                   <input id="reviewInternal" type="checkbox" class="checkbox" [checked]="reviewRequires('internal')" [disabled]="!canManage()"
                          (change)="setReviewRequired('internal', $any($event.target).checked)" />
                   Our team
                 </label>
-                <label class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]" title="Needs customer integration, coming later">
-                  <input id="reviewCustomer" type="checkbox" class="checkbox" [checked]="reviewRequires('customer')" disabled />
-                  The customer (later)
+                <label class="flex items-center gap-2 text-sm">
+                  <input id="reviewCustomer" type="checkbox" class="checkbox" [checked]="reviewRequires('customer')" [disabled]="!canManage()"
+                         (change)="setReviewRequired('customer', $any($event.target).checked)" />
+                  The customer (through the API)
                 </label>
               </div>
             </app-field>

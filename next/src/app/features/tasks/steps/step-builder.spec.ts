@@ -528,7 +528,7 @@ describe('StepBuilder -- the Task Registry', () => {
   });
 });
 
-/** MIG-237: a pipeline says whose review its results wait for; the customer's waits for customer integration. */
+/** MIG-237: a pipeline says whose review its results wait for; MIG-334: the customer's is decided through the API. */
 describe('StepBuilder -- the review setting', () => {
   it('writes settings.review.required, and drops it when nobody is ticked', () => {
     const { builder, fixture, el, tab } = build();
@@ -536,12 +536,24 @@ describe('StepBuilder -- the review setting', () => {
     const internal = el.querySelector<HTMLInputElement>('#reviewInternal')!;
     const customer = el.querySelector<HTMLInputElement>('#reviewCustomer')!;
     expect(internal.checked).toBe(false);
-    expect(customer.disabled).toBe(true);
+    expect(customer.disabled).toBe(false);
     internal.click();
     fixture.detectChanges();
     expect(builder.draft().settings?.review).toEqual({ required: ['internal'] });
     internal.click();
     fixture.detectChanges();
     expect(builder.draft().settings?.review).toBeUndefined();
+  });
+
+  it('asks for the customer\'s review too, now that the API takes it (MIG-334)', () => {
+    const { builder, fixture, el, tab } = build();
+    tab('settings');
+    el.querySelector<HTMLInputElement>('#reviewCustomer')!.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toEqual({ required: ['customer'] });
+    el.querySelector<HTMLInputElement>('#reviewInternal')!.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toEqual({ required: ['customer', 'internal'] });
+    expect(el.textContent).toContain('The customer (through the API)');
   });
 });

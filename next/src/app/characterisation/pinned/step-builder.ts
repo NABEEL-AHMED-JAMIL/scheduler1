@@ -126,7 +126,7 @@ export const PINNED: Record<string, unknown> = {
       "Switch Upload to bucket on in this workspace",
       "Switch Validate on in this workspace",
       "Switch Write Database on in this workspace",
-      "The customer (later)",
+      "The customer (through the API)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
