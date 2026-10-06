@@ -8,23 +8,23 @@ import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
-import { WorkflowDesigner } from './workflow-designer';
+import { WorkflowDesigner, isBuiltIn } from './workflow-designer';
 import { WorkflowDetail, WorkflowSummary, WorkflowsApi } from './workflows.api';
 import { STEP_TYPES } from './designer.model';
 import { splitTail } from './inbox-list';
 
 /**
  * The Workflow designer's design (owner, 2026-10-06: "redesign the page, check the issue"), on the Task inbox's layout:
- * a list with a pinned search and status filter and rows by name, the workflow's header with real tabs, the publish bar
- * pinned at the pane's foot and loud once something is unpublished, steps with a type badge and move buttons that say
- * which step they move, and an add button between every two steps. Below 1024 px is CSS (data-pane, data-sheet); what
- * these pin is the state behind it.
+ * a list with a pinned search and status filter and rows by name under sticky Built in and This workspace headers, the
+ * workflow's header with real tabs, the publish bar pinned at the pane's foot and loud once something is unpublished,
+ * steps with a type badge and move buttons that say which step they move, and an add button between every two steps.
+ * Below 1024 px is CSS (data-pane, data-sheet); what these pin is the state behind it.
  */
 const summary = (key: string, name: string, extra: Partial<WorkflowSummary> = {}): WorkflowSummary =>
-  ({ id: key.length, key, name, subjectType: 'request', currentVersion: 1, status: 'Active', running: 0, ...extra });
+  ({ id: key.length, key, name, subjectType: 'request', currentVersion: 1, status: 'Active', running: 0, builtIn: false, createdBy: 4537, ...extra });
 
 const LIST: WorkflowSummary[] = [
-  summary('data-access', 'Data access request'),
+  summary('data-access', 'Data access request', { builtIn: true, createdBy: 0 }),
   summary('e2e-1', 'E2E purchase 1006022333'),
   summary('e2e-2', 'E2E purchase 1006022934', { status: 'Inactive' }),
   summary('visit', 'MIG-279 visit approval (synthetic)', { running: 2, description: 'Wound care visit' }),
@@ -126,6 +126,44 @@ describe('Workflow designer, the design -- the list', () => {
     expect(split()).toBe('list');
     // A link to one workflow opens on it.
     expect(screen({ key: 'data-access' }).el.querySelector('.inbox-split')!.getAttribute('data-pane')).toBe('detail');
+  });
+
+  it('groups the rows under sticky headers with counts, Built in first; search and status apply inside, an empty group has no header', () => {
+    const { designer, el, render, rows } = screen();
+    const headers = () => [...el.querySelectorAll('[data-test="workflow-group"]')]
+      .map(h => [...h.querySelectorAll('span')].map(s => s.textContent!.trim()).join(' '));
+    expect(headers()).toEqual(['Built in 1', 'This workspace 3']);
+    expect(rows()).toEqual(['data-access', 'e2e-1', 'e2e-2', 'visit']);
+    // Each header sits right before its rows, in the scrolling list, as the Task inbox's day headers (sticky).
+    const first = el.querySelector('[data-test="workflow-group"]')!;
+    expect(first.classList).toContain('inbox-day');
+    expect(first.parentElement!.classList).toContain('inbox-scroll');
+    expect(first.nextElementSibling!.getAttribute('data-workflow')).toBe('data-access');
+    expect(el.querySelector('[data-workflow="data-access"]')!.nextElementSibling!.textContent).toContain('This workspace');
+
+    designer.setQuery('purchase');
+    render();
+    expect(headers()).toEqual(['This workspace 2']);
+    designer.setQuery('data access');
+    render();
+    expect(headers()).toEqual(['Built in 1']);
+    designer.setQuery('');
+    designer.statusFilter.set('Inactive');
+    render();
+    expect(headers()).toEqual(['This workspace 1']);
+    expect(rows()).toEqual(['e2e-2']);
+    designer.statusFilter.set('');
+    designer.setQuery('nothing like it');
+    render();
+    expect(headers()).toEqual([]);
+  });
+
+  it('takes a workflow as built in by builtIn, or by createdBy 0 from a service that does not send builtIn yet', () => {
+    expect(isBuiltIn({ builtIn: true })).toBe(true);
+    expect(isBuiltIn({ builtIn: false, createdBy: 0 })).toBe(false);
+    expect(isBuiltIn({ createdBy: 0 })).toBe(true);
+    expect(isBuiltIn({ createdBy: 4537 })).toBe(false);
+    expect(isBuiltIn({})).toBe(false);
   });
 
   it('cuts a name before a trailing number or #reference, and leaves other names whole', () => {

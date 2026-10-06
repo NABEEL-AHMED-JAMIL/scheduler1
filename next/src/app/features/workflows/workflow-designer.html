@@ -44,16 +44,21 @@
       </div>
 
       <div class="inbox-scroll">
-        @for (w of shown(); track w.key) {
-          <button type="button" class="inbox-row designer-row" [class.is-on]="current()?.key === w.key && view() !== 'new'"
-                  [attr.aria-current]="current()?.key === w.key && view() !== 'new' ? 'true' : null" (click)="choose(w.key)" [attr.data-workflow]="w.key">
-            <!-- The name is cut in its middle, never its trailing number: often all that tells two workflows apart. -->
-            @let parts = nameParts(w.name);
-            <span class="inbox-row-title" [title]="w.name"><span class="inbox-title-name">{{ parts.name }}</span>@if (parts.ref) {<span class="inbox-title-ref">{{ ' ' + parts.ref }}</span>}</span>
-            <span class="inbox-row-time">@if (w.running) { {{ w.running }} running }</span>
-            <span class="inbox-row-sub">@if (w.currentVersion) { v{{ w.currentVersion }} } @else { Not published }</span>
-            <span class="inbox-row-status"><span class="inbox-dot" [class.is-ok]="w.status === 'Active'"></span>{{ w.status }}</span>
-          </button>
+        @for (g of groupsShown(); track g.label) {
+          <div class="inbox-day" role="presentation" data-test="workflow-group">
+            <span>{{ g.label }}</span><span class="inbox-day-count">{{ g.rows.length }}</span>
+          </div>
+          @for (w of g.rows; track w.key) {
+            <button type="button" class="inbox-row designer-row" [class.is-on]="current()?.key === w.key && view() !== 'new'"
+                    [attr.aria-current]="current()?.key === w.key && view() !== 'new' ? 'true' : null" (click)="choose(w.key)" [attr.data-workflow]="w.key">
+              <!-- The name is cut in its middle, never its trailing number: often all that tells two workflows apart. -->
+              @let parts = nameParts(w.name);
+              <span class="inbox-row-title" [title]="w.name"><span class="inbox-title-name">{{ parts.name }}</span>@if (parts.ref) {<span class="inbox-title-ref">{{ ' ' + parts.ref }}</span>}</span>
+              <span class="inbox-row-time">@if (w.running) { {{ w.running }} running }</span>
+              <span class="inbox-row-sub">@if (w.currentVersion) { v{{ w.currentVersion }} } @else { Not published }</span>
+              <span class="inbox-row-status"><span class="inbox-dot" [class.is-ok]="w.status === 'Active'"></span>{{ w.status }}</span>
+            </button>
+          }
         } @empty {
           <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">
             @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading workflows… }

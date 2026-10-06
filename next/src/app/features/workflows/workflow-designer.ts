@@ -18,6 +18,11 @@ import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, new
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 
+/** The platform made it -- a service's built-in workflow (builtIn, or createdBy 0 from a service that predates it). */
+export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): boolean {
+  return w.builtIn ?? w.createdBy === 0;
+}
+
 /**
  * The Workflow designer (MIG-276): an administrator lays out a workflow's steps as a chain of cards -- who approves,
  * what is checked, what runs -- edits one at a time in the panel beside it, and publishes the chain as the next version.
@@ -110,6 +115,18 @@ export class WorkflowDesigner implements OnInit {
       && words.every(word => `${w.name} ${w.key} ${w.description ?? ''}`.toLowerCase().includes(word)));
   });
 
+  /**
+   * The shown workflows in their groups, as the Task inbox's day groups: Built in (made by the platform) first, then the
+   * workspace's own. A group nothing is left in has no header.
+   */
+  readonly groupsShown = computed(() => {
+    const rows = this.shown();
+    return [
+      { label: 'Built in', rows: rows.filter(isBuiltIn) },
+      { label: 'This workspace', rows: rows.filter(w => !isBuiltIn(w)) },
+    ].filter(g => g.rows.length);
+  });
+
   readonly statusChoices: { value: '' | 'Active' | 'Inactive'; label: string }[] = [
     { value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }, { value: '', label: 'All' }];
 
@@ -128,7 +145,7 @@ export class WorkflowDesigner implements OnInit {
   });
 
   /** The platform made it (a service's built-in workflow); the workspace may still change it. */
-  readonly builtIn = computed(() => this.current()?.createdBy === 0);
+  readonly builtIn = computed(() => { const wf = this.current(); return !!wf && isBuiltIn(wf); });
 
   readonly step = computed<DraftStep | null>(() => {
     const i = this.selected();
@@ -174,7 +191,8 @@ export class WorkflowDesigner implements OnInit {
         if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Workflows could not be read.'); return; }
         const rows = r.data ?? [];
         this.workflows.set(rows);
-        const key = open ?? this.current()?.key ?? rows[0]?.key;
+        // With nothing named, the first row as the list draws it: Built in comes first.
+        const key = open ?? this.current()?.key ?? (rows.find(isBuiltIn) ?? rows[0])?.key;
         if (key) this.open(key, true);
         else if (this.canEdit()) this.view.set('new');
       },

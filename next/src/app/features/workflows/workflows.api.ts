@@ -75,9 +75,10 @@ export interface WorkflowSummary {
   currentVersion: number;
   status: string;
   running?: number;
-  /** Who made it; 0 is the platform (a service's built-in workflow, such as the Data Catalog's data-access). Only
-   *  fetch returns it -- the list does not. */
+  /** Who made it; 0 is the platform (a service's built-in workflow, such as the Data Catalog's data-access). */
   createdBy?: number | null;
+  /** The platform made it (createdBy 0): the list groups it under Built in. */
+  builtIn?: boolean;
   dateUpdated?: string | null;
   dateCreated?: string | null;
 }
