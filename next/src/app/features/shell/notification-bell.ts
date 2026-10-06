@@ -1,0 +1,311 @@
+import {
+  Component, ElementRef, HostListener, LOCALE_ID, OnDestroy, OnInit, computed, inject, signal,
+} from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router, RouterLink } from '@angular/router';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { UnreadCountService } from '../../core/notifications/unread-count.service';
+import { instantMs } from '../../core/instant';
+import { Icon } from '../../shared/ui/icon';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { openableTarget } from '../notifications/notification-links';
+import { AuthService } from '../../core/auth/auth.service';
+
+interface Note {
+  notificationId: number;
+  title: string;
+  message?: string;
+  severity?: string;
+  read: boolean;
+  dateCreated: string;
+  linkUrl?: string;
+}
+
+/** How many rows the dropdown lists before handing over to the full notifications page. */
+const PANEL_ROWS = 8;
+
+/** How many rows the dropdown fetches to pick those from. */
+const FETCH_ROWS = 20;
+
+/**
+ * The bell the old app had in its header.
+ *
+ * Without it the notifications page had no entry point anywhere in the UI -- it was not in the
+ * navigation either, so the only way to reach it was to type the URL.
+ */
+@Component({
+  selector: 'app-notification-bell',
+  imports: [Icon, RouterLink],
+  // Unread rows get the same tint the Notifications page gives them, not just the dot. Not
+  // .notification-row itself: that brings its own padding and a left rule the panel has no room for.
+  styles: [`
+    button.is-unread { background: color-mix(in oklab, var(--accent-text) 6%, transparent); }
+    button.is-unread:hover { background: color-mix(in oklab, var(--accent-text) 10%, transparent); }
+  `],
+  template: `
+    <div class="relative" data-nav-menu="__bell" (focusout)="onFocusOut($event)">
+      <button type="button" class="btn btn-ghost btn-icon relative" (click)="toggle()"
+              [attr.aria-expanded]="open()" aria-controls="notif-panel"
+              [attr.aria-label]="unread() ? unread() + ' unread notifications' : 'Notifications'">
+        <app-icon name="bell" size="1.05em" />
+        @if (unread()) {
+          <span class="bell-badge">{{ unread() > 99 ? '99+' : unread() }}</span>
+        }
+      </button>
+
+      @if (open()) {
+        <div id="notif-panel" class="bell-panel fixed inset-x-2 top-14 mt-1 sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:w-80 rounded-lg border shadow-lg z-50 overflow-hidden bg-raised border-subtle"
+            >
+          <div class="flex items-center gap-2 px-3 py-2 border-b border-subtle"
+              >
+            <span class="text-sm font-semibold mr-auto">Notifications</span>
+            @if (unread()) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="markAllRead()">
+                <app-icon name="check" size="0.85em" />Mark all read
+              </button>
+            }
+          </div>
+
+          <!-- A failed load with nothing in hand is not an empty mailbox; saying "all caught up"
+               there told people they had nothing to read when the bell simply could not look.
+               Rows from an earlier poll stay on screen: stale beats blank. -->
+          @if (!recent().length && failed()) {
+            <div class="px-3 py-8 text-center">
+              <app-icon name="alert" size="1.5rem" class="icon-warn block mx-auto mb-2" />
+              <p class="text-sm text-[color:var(--text-muted)]">Notifications could not be loaded.</p>
+            </div>
+          } @else if (!recent().length) {
+            <div class="px-3 py-8 text-center">
+              <app-icon name="bell" size="1.5rem" class="icon-muted block mx-auto mb-2" />
+              <p class="text-sm text-[color:var(--text-muted)]">You are all caught up.</p>
+            </div>
+          } @else {
+            <ul class="max-h-[26rem] overflow-y-auto divide-y divide-[color:var(--border-subtle)]">
+              @for (note of recent(); track note.notificationId) {
+                <li>
+                  <button type="button" class="w-full text-left flex items-start gap-2.5 px-3 py-2.5
+                                               transition-colors hover:bg-[color:var(--surface-sunken)]"
+                          [class.is-unread]="!note.read"
+                          (click)="open_(note)">
+                    <app-icon [name]="glyphOf(note)" [class]="intentOf(note)" size="1em"
+                              class="mt-0.5 shrink-0" />
+                    <span class="min-w-0 flex-1">
+                      <span class="flex items-center gap-1.5">
+                        <span class="text-sm font-medium truncate">{{ note.title }}</span>
+                        @if (!note.read) {
+                          <span class="size-1.5 rounded-full bg-[color:var(--accent-text)] shrink-0"></span>
+                        }
+                      </span>
+                      @if (note.message) {
+                        <span class="block text-xs text-[color:var(--text-secondary)] mt-0.5
+                                     leading-snug line-clamp-2">{{ note.message }}</span>
+                      }
+                      <span class="block text-[11px] text-[color:var(--text-muted)] mt-1">
+                        {{ ago(note.dateCreated) }}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+
+          <!-- The badge counts the whole mailbox; this panel holds eight rows. Without this line
+               a badge reading 30 over a panel showing nothing unread looks like a bug. -->
+          @if (hiddenUnread() && !failed()) {
+            <!-- Its own band, so it cannot be read as the tail of the last row above it. -->
+            <p class="px-3 py-2 border-t border-subtle bg-sunken text-[11px] text-center text-[color:var(--text-muted)]">
+              {{ hiddenUnread() }} more unread not shown here.
+            </p>
+          }
+
+          <a routerLink="/notifications" (click)="open.set(false)"
+             class="block px-3 py-2 text-sm text-center border-t text-accent hover:underline border-subtle"
+            >
+            View all notifications
+          </a>
+        </div>
+      }
+    </div>
+  `,
+})
+export class NotificationBell implements OnInit, OnDestroy {
+  private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
+  private readonly elementRef = inject(ElementRef<HTMLElement>);
+  private readonly store = inject(UnreadCountService);
+  private readonly auth = inject(AuthService);
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
+
+  readonly open = signal(false);
+  readonly items = signal<Note[]>([]);
+
+  /** The last list load failed, so an empty panel means "could not look", not "nothing new". */
+  readonly failed = signal(false);
+
+  /**
+   * The badge, as the server counts it.
+   *
+   * This used to be a tally of the unread rows among the twenty this component fetches, so a
+   * user with more than twenty unread saw a badge that stopped at twenty and disagreed with the
+   * dashboard tile -- which reads the server's count. Same number, same source, one truth. It
+   * lives in UnreadCountService, so the dashboard tile and the Notifications page move it too.
+   */
+  readonly unread = this.store.count;
+
+  constructor() {
+    // Rows marked here or on the Notifications page flip in this panel as soon as the server agrees.
+    this.store.marked.pipe(takeUntilDestroyed()).subscribe(id =>
+      this.items.update(list => list.map(n => (id === 'all' || n.notificationId === id ? { ...n, read: true } : n))));
+  }
+
+  /**
+   * What the panel lists: unread first, then the newest read rows to fill the space.
+   *
+   * Taking the newest eight whatever their state meant the badge and the panel could describe
+   * different sets -- unread items that were not among the eight newest left the badge lit over
+   * a panel with nothing unread in it, which reads as a broken badge. Both groups keep the
+   * dateCreated-desc order the endpoint returns them in.
+   */
+  readonly recent = computed(() => {
+    const rows = this.items();
+    return rows.filter(note => !note.read)
+      .concat(rows.filter(note => note.read))
+      .slice(0, PANEL_ROWS);
+  });
+
+  /**
+   * Unread notifications the badge counts that the panel has no room to show -- older than the
+   * fetched window, or past PANEL_ROWS. Said out loud rather than left as a silent gap, so the
+   * badge's number is always accounted for by something on screen.
+   */
+  readonly hiddenUnread = computed(() =>
+    Math.max(0, this.unread() - this.recent().filter(note => !note.read).length));
+
+  private timer: any = null;
+
+  ngOnInit(): void {
+    this.load();
+    // Cheap enough at this size, and a notification nobody sees is not a notification.
+    this.timer = setInterval(() => this.load(), 60_000);
+  }
+
+  ngOnDestroy(): void {
+    if (this.timer) clearInterval(this.timer);
+  }
+
+  toggle(): void {
+    this.open.update(v => !v);
+    if (this.open()) this.load();
+  }
+
+  // Shell's own document:click/Escape handlers close its nav dropdowns but never touch this
+  // component's `open` -- they don't know about it, and shouldn't have to. Without these two,
+  // clicking anywhere else on the page or pressing Escape closed every other header dropdown
+  // and left this one open; it could only be dismissed by clicking the bell again, a
+  // notification, or "View all notifications".
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (this.open() && !this.elementRef.nativeElement.contains(event.target as Node)) {
+      this.open.set(false);
+    }
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscape(): void {
+    // Closing removes the row that had focus, which would drop focus to the page body. When
+    // focus was in here, give it back to the bell; an Escape aimed elsewhere leaves focus alone.
+    const host = this.elementRef.nativeElement as HTMLElement;
+    const refocus = this.open() && host.contains(document.activeElement);
+    this.open.set(false);
+    if (refocus) host.querySelector<HTMLElement>('button')?.focus();
+  }
+
+  /**
+   * Tabbing out of the panel closes it rather than leaving it open behind the focus. A null
+   * relatedTarget (a click on something unfocusable) is the click handler's to judge.
+   */
+  onFocusOut(event: FocusEvent): void {
+    const next = event.relatedTarget as Node | null;
+    if (next && this.open() && !this.elementRef.nativeElement.contains(next)) {
+      this.open.set(false);
+    }
+  }
+
+  private load(): void {
+    // The count comes from the server rather than from the rows below, because the rows below are
+    // one small window onto the mailbox and the badge is a statement about all of it.
+    this.store.refresh();
+    this.http.get<ApiResponse<any>>(`${API_BASE}/notification.json/list`,
+      { params: { page: '1', limit: String(FETCH_ROWS) } }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) { this.failed.set(true); return; }
+        this.failed.set(false);
+        const data = response.data as any;
+        this.items.set(Array.isArray(data) ? data : (data?.content ?? []));
+      },
+      // A failing bell must not put an error in front of whatever the user is doing; the panel
+      // says so quietly instead.
+      error: () => this.failed.set(true),
+    });
+  }
+
+  open_(note: Note): void {
+    this.open.set(false);
+    if (!note.read) {
+      // Quietly, as every bell failure is. The store flips the row and moves the badge only
+      // once the server agrees, so a refusal leaves both as they were.
+      this.store.markRead(note.notificationId).subscribe({ error: () => {} });
+    }
+    // A page the access profile withholds is not followed: the row is marked read, and that is all.
+    const target = openableTarget(note.linkUrl, key => this.auth.canOpen(key));
+    if (target) this.router.navigateByUrl(target);
+  }
+
+  markAllRead(): void {
+    this.store.markAllRead().subscribe({ error: () => {} });
+  }
+
+  private severity(note: Note): string { return (note.severity || '').toUpperCase(); }
+
+  glyphOf(note: Note): string {
+    switch (this.severity(note)) {
+      case 'SUCCESS': return 'checkCircle';
+      case 'ERROR':   return 'xCircle';
+      case 'WARNING': return 'alert';
+      default:        return 'info';
+    }
+  }
+
+  intentOf(note: Note): string {
+    switch (this.severity(note)) {
+      case 'SUCCESS': return 'icon-ok';
+      case 'ERROR':   return 'icon-crit';
+      case 'WARNING': return 'icon-warn';
+      default:        return 'icon-info';
+    }
+  }
+
+  /**
+   * How long ago a notification arrived.
+   *
+   * Through instantMs, not new Date(). dateCreated is a Java LocalDateTime and carries no offset,
+   * so new Date() read the server's wall clock as the reader's own: a notification a minute old
+   * showed as "5h ago" -- or as a time in the future -- for anyone outside the server's zone,
+   * and the bell is exactly where a stale-looking timestamp is most alarming. See core/instant.ts.
+   */
+  ago(text: string): string {
+    const then = instantMs(text);
+    if (then === null) return '';
+    const mins = Math.round((Date.now() - then) / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.round(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.round(hours / 24);
+    // Past a month, the day itself: "24 Sep 2026", as every date in the console is written. It was
+    // toLocaleDateString(), which wrote "9/24/2026" in the US and "24/09/2026" elsewhere (MIG-295).
+    return days < 30 ? `${days}d ago` : this.clock.transform(then, 'date') ?? '';
+  }
+}

@@ -1,0 +1,81 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">{{ showWorkspace() ? 'Staff activity' : "Our team's activity" }}</h1>
+      <p class="page-subtitle">
+        @if (showWorkspace()) {
+          Every change our staff made in a customer's workspace during a managed session, newest first.
+        } @else {
+          Every change our team made in this workspace, newest first. Nothing they change here goes unrecorded.
+        }
+      </p>
+    </div>
+    <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+      <app-icon name="refresh" [class.spin]="loading()" />Refresh
+    </button>
+  </div>
+
+  <app-table-shell heading="Changes" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
+                   [shown]="rows().length" [emptyMessage]="emptyMessage()" emptyIcon="history" (retry)="load()">
+    <ng-container toolbar>
+      @if (showWorkspace()) {
+        <select class="input max-w-48 min-w-0" aria-label="Filter by workspace" [value]="tenantFilter() ?? ''"
+                (change)="setTenant($any($event.target).value)">
+          <option value="">Every workspace</option>
+          @for (t of tenants(); track t.tenantId) { <option [value]="t.tenantId">{{ t.tenantName }}</option> }
+        </select>
+      }
+      <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
+              (change)="setStaff($any($event.target).value)">
+        <option value="">Every staff member</option>
+        @for (s of staff(); track s.appUserId) { <option [value]="s.appUserId">{{ name(s) }}</option> }
+      </select>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Staff member</th>
+          @if (showWorkspace()) { <th>Workspace</th> }
+          <th>Change</th>
+          <th>Service</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (a of rows(); track a.id) {
+          <tr>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ a.createdAt ? (a.createdAt | serverTime: 'dateTimeSec') : '—' }}</td>
+            <td class="max-w-56">
+              <div class="font-medium truncate">{{ name(a) }}</div>
+              @if (a.fullName && a.username) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ a.username }}</div> }
+            </td>
+            @if (showWorkspace()) { <td class="max-w-56 truncate">{{ workspaceName(a) }}</td> }
+            <td class="min-w-64">
+              <!-- In words, not the API's path and query (UI review U6); the raw request stays on the tooltip. -->
+              <div class="flex items-center gap-2 min-w-0" [title]="a.method + ' ' + a.path + (a.target ? '?' + a.target : '')">
+                <span class="truncate">{{ change(a.path) }}</span>
+                @if (a.builderAction) { <span class="pill pill-brand" title="A change to what the workspace builds">Builder</span> }
+              </div>
+              @if (targetOf(a.target); as what) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ what }}</div> }
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ a.service }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    <!-- The @if inside the slot: content inside an @if is not projected by its selector (see TableShell). -->
+    <div pager>
+      @if (hasMore()) {
+        <div class="flex justify-center p-4 border-t border-subtle">
+          <button type="button" class="btn btn-default btn-sm" (click)="loadOlder()" [disabled]="loadingMore()">
+            <app-icon name="history" [busy]="loadingMore()" />Load older
+          </button>
+        </div>
+      }
+    </div>
+  </app-table-shell>
+</div>

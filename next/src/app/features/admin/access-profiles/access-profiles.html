@@ -1,0 +1,189 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Access profiles</h1>
+      <p class="page-subtitle">
+        A named bundle of pages for your tenant users. Everyone holds one; anyone without their own
+        gets the default. Admins always open everything.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      @if (canPickTenant()) {
+        <!-- [selected] on the options, not [value] on the select: the select's value is applied
+             before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
+             above a grid that had already loaded that tenant's people. -->
+        <div class="w-56" data-testid="tenant-picker">
+          <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
+                        placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
+        </div>
+      }
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || needsWorkspace()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile" [disabled]="needsWorkspace()">
+        <app-icon name="plus" />New profile
+      </button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <app-stat-tile label="Profiles" [value]="stats().profiles" icon="layers" tone="info"
+                   [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'" />
+    <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info"
+                   [foot]="stats().onDefault ? stats().onDefault + ' more on the default' : 'hold a profile of their own'" />
+    <app-stat-tile label="Default" [value]="stats().defaultName || '—'" icon="shield" tone="info"
+                   [foot]="stats().defaultName ? 'for anyone without their own' : 'no default: unassigned users see everything'" />
+    <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld" />
+  </div>
+
+  @if (needsWorkspace()) {
+    <div class="card p-10 text-center">
+      <app-icon name="globe" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
+      <h2 class="text-base font-semibold">Choose a workspace</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-md mx-auto">
+        Access profiles belong to a workspace. Pick one above to see and edit its profiles.
+      </p>
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm text-crit-500">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()">Try again</button>
+    </div>
+  } @else if (loading() && profiles().length === 0) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (!loading() && profiles().length === 0) {
+    <div class="card p-10 text-center">
+      <app-icon name="shield" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
+      <h2 class="text-base font-semibold">No access profiles yet</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-md mx-auto">
+        Every tenant user currently opens every page. Create the first profile — it becomes the
+        default — and people without one of their own move onto it.
+      </p>
+      <button type="button" class="btn btn-primary btn-sm mt-4" (click)="add()">
+        <app-icon name="plus" />New profile
+      </button>
+    </div>
+  } @else {
+    <!-- The view switch and, for the grid, a people filter -->
+    <div class="flex flex-wrap items-center gap-2">
+      <div class="seg" role="group" aria-label="View">
+        <button type="button" class="seg-btn" [class.seg-on]="view() === 'profiles'" [attr.aria-pressed]="view() === 'profiles'" (click)="showProfiles()" data-testid="view-profiles">
+          <app-icon name="layers" />Profiles
+        </button>
+        <button type="button" class="seg-btn" [class.seg-on]="view() === 'people'" [attr.aria-pressed]="view() === 'people'" (click)="showPeople()" data-testid="view-people">
+          <app-icon name="users" />People × pages
+        </button>
+      </div>
+      @if (view() === 'people') {
+        <div class="search-field max-w-56 ml-auto">
+          <app-icon name="search" size="0.95em" />
+          <input type="search" class="input" placeholder="Find a person…" [value]="search()"
+                 (input)="typed($any($event.target).value)" aria-label="Find a person" />
+        </div>
+      }
+    </div>
+
+    @if (view() === 'people') {
+      @if (peopleLoading() && people().length === 0) {
+        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
+          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading people"></div>Loading people…
+        </div>
+      } @else if (peopleError()) {
+        <div class="card p-8 text-center" role="alert">
+          <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+          <p class="text-sm text-crit-500">{{ peopleError() }}</p>
+          <button type="button" class="btn btn-default btn-sm mt-3" (click)="loadPeople()">Try again</button>
+        </div>
+      } @else {
+        <app-access-people-grid [people]="people()" [profiles]="profiles()" [pages]="pages()"
+                                [search]="gridSearch()" [busy]="assigning()" (assign)="assign($event)"
+                                (toggle)="toggle($event)" (reset)="resetExceptions($event)" />
+      }
+    } @else {
+      <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4" data-testid="profile-cards">
+        @for (card of cards(); track card.profile.pageAccessProfileId) {
+          <div class="card flex flex-col" [attr.data-profile]="card.profile.profileName"
+               [class.opacity-55]="busy() === card.profile.pageAccessProfileId">
+            <!-- Name, default badge, and the actions tucked in a menu so the card is about the profile -->
+            <div class="flex items-start justify-between gap-3 p-4 pb-3">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h2 class="text-base font-semibold truncate">{{ card.profile.profileName }}</h2>
+                  @if (card.profile.defaultProfile) {
+                    <span class="pill pill-brand" title="Anyone without a profile of their own gets this one">Default</span>
+                  }
+                </div>
+                <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 min-h-5">{{ card.profile.description || 'No description.' }}</p>
+              </div>
+              <button type="button" class="btn btn-ghost btn-icon shrink-0" [cdkMenuTriggerFor]="cardMenu"
+                      [attr.aria-label]="'Actions for ' + card.profile.profileName">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #cardMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(card.profile)">
+                    <app-icon name="edit" />Edit pages
+                  </button>
+                  @if (!card.profile.defaultProfile) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setDefault(card.profile)">
+                      <app-icon name="shield" />Make default
+                    </button>
+                  }
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(card.profile)">
+                    <app-icon name="trash" class="icon-crit" />Delete
+                  </button>
+                </div>
+              </ng-template>
+            </div>
+
+            <!-- Pages by menu section: what it opens in each, and how many it withholds -->
+            <div class="px-4 pb-3 flex flex-col gap-2 flex-1">
+              <div class="flex items-center justify-between text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">
+                <span>Opens {{ card.opened }} of {{ stats().pages }} pages</span>
+              </div>
+              @for (section of card.sections; track section.section) {
+                <div class="grid grid-cols-[6.5rem_1fr] gap-x-3 items-baseline text-sm">
+                  <span class="text-xs text-[color:var(--text-muted)] truncate">{{ section.section }}</span>
+                  <div class="flex flex-wrap gap-1">
+                    @for (label of section.opens; track label) {
+                      <span class="pill pill-neutral"><app-icon name="check" size="0.75em" class="icon-ok" />{{ label }}</span>
+                    }
+                    @if (section.withholds.length) {
+                      <span class="text-xs text-[color:var(--text-muted)] self-center" [title]="'Withheld: ' + section.withholds.join(', ')">
+                        {{ section.opens.length ? '+' : '' }}{{ section.withholds.length }} withheld
+                      </span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
+            <!-- Who it covers: assigned people, and on the default the people who land on it
+                 with no profile of their own -- said separately, because "by default" is the
+                 part that changes when a new default is picked. -->
+            <div class="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
+              <span class="truncate" [title]="card.coverage.names.join(', ')">
+                @if (card.coverage.total === 0) {
+                  No one on it yet
+                } @else {
+                  <span class="font-medium text-[color:var(--text-primary)]">{{ card.coverage.total }} {{ card.coverage.total === 1 ? 'person' : 'people' }}</span>
+                  @if (card.coverage.byDefault && card.coverage.assigned) {
+                    · {{ card.coverage.assigned }} assigned, {{ card.coverage.byDefault }} by default
+                  } @else if (card.coverage.byDefault) {
+                    · all by default
+                  } @else {
+                    · {{ card.coverage.names.slice(0, 3).join(', ') }}{{ card.coverage.total > 3 ? ', …' : '' }}
+                  }
+                }
+              </span>
+              <button type="button" class="hover:underline shrink-0" (click)="showPeople()">See in grid ›</button>
+            </div>
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

@@ -1,0 +1,101 @@
+<div class="min-h-screen grid lg:grid-cols-2">
+  <!-- Left: the sign-in panel itself, kept narrow and calm. -->
+  <div class="flex items-center justify-center px-6 py-12">
+    <div class="w-full max-w-sm">
+      <!-- The mark leads back to the front page and the toggle matches the other public pages;
+           without them this page was a dead end. -->
+      <div class="mb-8 flex items-center justify-between gap-3">
+        <a routerLink="/" aria-label="ETL Console front page">
+          <app-brand-mark subtitle="Data pipeline platform" />
+        </a>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
+                (click)="theme.toggle()">
+          <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
+        </button>
+      </div>
+
+      <h1 class="text-2xl font-semibold tracking-tight mb-1">Sign in</h1>
+      <p class="text-sm text-[color:var(--text-secondary)] mb-7">
+        Use your platform account to continue.
+      </p>
+
+      @if (notice) {
+        <div class="card p-4 mb-5 flex items-start gap-2.5 border-[color:var(--accent-mark)]" role="status">
+          <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
+          <p class="text-sm">{{ notice }}</p>
+        </div>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="form-stack">
+        <app-field label="Username" for="username" [control]="form.controls.username">
+          <input id="username" class="input" formControlName="username"
+                 autocomplete="username" placeholder="you@company.com"
+                 [attr.aria-invalid]="form.controls.username.touched && form.controls.username.invalid" />
+        </app-field>
+
+        <app-field label="Password" for="password" [control]="form.controls.password">
+          <input id="password" class="input" type="password" formControlName="password"
+                 autocomplete="current-password"
+                 [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid" />
+        </app-field>
+
+        <!-- The same error line request-workspace uses. bg-crit-100 is not remapped in dark, so
+             the old box was light pink under dark-mode pink text; and it had no live region. -->
+        @if (error()) {
+          <p class="field-note text-crit-500 flex items-start gap-1.5 text-sm" role="alert">
+            <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+            <span>{{ error() }}</span>
+          </p>
+        }
+
+        <button type="submit" class="btn btn-primary w-full" [disabled]="submitting()">
+          @if (submitting()) { <app-icon name="refresh" class="spin" /> }
+          {{ submitting() ? 'Signing in…' : 'Sign in' }}
+        </button>
+      </form>
+
+      <div class="mt-6 space-y-2 text-sm text-[color:var(--text-secondary)]">
+        <p>No account yet? <a routerLink="/request-workspace" class="link-inline">Request a workspace</a>.</p>
+        <p>Forgot your password? Ask your workspace administrator to reset it.</p>
+        <p><a routerLink="/docs" class="link-inline">Setup guide</a></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: a quiet panel rather than a stock photo. Hidden on small screens
+       where it would just push the form down. -->
+  <div class="hidden lg:block relative overflow-hidden bg-ink-900">
+    <div class="absolute inset-0 opacity-[0.18] login-grid-lines"></div>
+    <!-- Shows the thing being signed into: the same preview the landing page uses, drawn from
+         the app's own tokens rather than a screenshot, so it follows the theme, cannot drift out
+         of date, and carries no real tenant's data on a page anyone can reach. -->
+    <!-- Three anchors rather than one block: heading at the top, the preview holding the
+         middle, a footnote on the floor. Centring a ~400px preview in a full-height panel left
+         equal voids above and below; anchoring it high just moved the whole void to the bottom.
+         Spreading the content gives the empty space somewhere to go. -->
+    <div class="relative h-full flex flex-col justify-between gap-8 px-10 py-12 text-[color:var(--on-solid)]">
+      <p class="text-[1.75rem] font-semibold max-w-lg leading-tight tracking-tight">
+        Schedule the work, watch it run, and read what comes out.
+      </p>
+
+      <!-- No cap: the panel's padding already bounds it, and max-w-lg was leaving 68px of dead
+           space to its right at 1255px for no reason. -->
+      <div class="w-full">
+        <app-console-preview />
+      </div>
+
+      <div class="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-[color:var(--on-solid-dim)]">
+        <span class="flex items-center gap-1.5">
+          <app-icon name="clock" size="0.9em" />Scheduled pipelines
+        </span>
+        <span class="flex items-center gap-1.5">
+          <app-icon name="cloud" size="0.9em" />Object storage
+        </span>
+        <span class="flex items-center gap-1.5">
+          <app-icon name="sparkle" size="0.9em" />AI assistance
+        </span>
+      </div>
+    </div>
+  </div>
+</div>

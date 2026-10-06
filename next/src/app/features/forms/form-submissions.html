@@ -1,0 +1,179 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Submissions</h1>
+      <p class="page-subtitle">
+        What each form collected, who sent it and when, and whether it started the form's pipeline.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      @if (forms().length) {
+        <label class="sr-only" for="submissionsForm">Form</label>
+        <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
+          @for (f of forms(); track f.formId) {
+            <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
+          }
+        </select>
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+        <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
+          <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  @if (formsLoading()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the forms…</div>
+  } @else if (formsError()) {
+    <div class="card p-0"><app-load-error [message]="formsError()" (retry)="ngOnInit()" /></div>
+  } @else if (!forms().length) {
+    <div class="card p-8 flex flex-col items-center text-center gap-3">
+      <span class="stat-glyph"><app-icon name="table" /></span>
+      <h2 class="text-base font-semibold">No forms yet</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] max-w-xl">Submissions show here once a form is built and filled in.</p>
+      <a class="btn btn-default btn-sm" routerLink="/forms/builder"><app-icon name="edit" />Form builder</a>
+    </div>
+  } @else {
+    @if (submissions().length) {
+      <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="These submissions at a glance" />
+    }
+    <app-table-shell [heading]="form()?.name || 'Submissions'" columnsKey="form-submissions" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!shownRows().length" [shown]="shownRows().length" [scrollRows]="false"
+                     [emptyMessage]="submissions().length ? 'No submission matches.' : 'Nothing submitted yet.'" emptyIcon="inbox" (retry)="load()">
+      <ng-container toolbar>
+        <label class="sr-only" for="submissionsState">State</label>
+        <select id="submissionsState" class="input input-sm w-auto" (change)="state.set($any($event.target).value)" data-state-filter>
+          <option value="" [selected]="!state()">All states</option>
+          @for (o of states(); track o.value) { <option [value]="o.value" [selected]="state() === o.value">{{ o.label }}</option> }
+        </select>
+        <label class="sr-only" for="submissionsSearch">Search</label>
+        <input id="submissionsSearch" class="input input-sm w-48" type="search" placeholder="Search submissions…" [value]="search()"
+               (input)="search.set($any($event.target).value)" />
+        @if (form(); as f) {
+          @if (f.status === 'Active') {
+            <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']"><app-icon name="send" />Fill in</a>
+          }
+          @if (f.dataset && canAnalyse()) {
+            <a class="btn btn-ghost btn-sm" routerLink="/data/analytics" data-open-analytics
+               [queryParams]="{ connection: f.dataset.connection, path: f.dataset.path, name: f.dataset.name }">
+              <app-icon name="chart" />Open in Analytics Studio</a>
+          }
+        }
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Submitted by</th>
+            <th>Submitted</th>
+            <th>Status</th>
+            @if (hasApproval()) { <th>Stage</th><th>Approval</th> }
+            <th>Details</th>
+            <th class="text-right">Answers</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (s of shownRows(); track s.submissionId) {
+            <tr [attr.data-submission]="s.submissionId">
+              <td class="tabular">{{ s.submissionId }}</td>
+              <td class="whitespace-nowrap">{{ submitter(s) }}</td>
+              <td class="text-xs whitespace-nowrap">@if (s.submittedAt) { {{ s.submittedAt | serverTime: 'dateTime' }} }</td>
+              <td class="whitespace-nowrap">
+                @if (s.status === 'RunStarted' && s.jobId && s.jobQueueId) {
+                  <a class="pill pill-ok" [routerLink]="['/pipelines/schedules', s.jobId, 'runs', s.jobQueueId, 'logs']"
+                     [title]="'Open the run log for #' + s.jobQueueId">{{ statusText(s) }}</a>
+                } @else {
+                  <span class="pill" [class]="'pill-' + tone(s.status)">{{ statusText(s) }}</span>
+                }
+              </td>
+              @if (hasApproval()) {
+                <td class="text-sm" data-stage>{{ s.workflowStage || '—' }}</td>
+                <td class="whitespace-nowrap" [attr.data-approval]="s.workflowStatus">
+                  @if (s.workflowStatus) {
+                    <span class="pill" [class]="'pill-' + approvalTone(s.workflowStatus)"
+                          [title]="s.workflowReason || (s.workflowInstanceId ? 'Request #' + s.workflowInstanceId : '')">{{ approvalText(s.workflowStatus) }}</span>
+                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                  @if (s.workflowInstanceId && canOpenRequests()) {
+                    <a class="text-xs text-accent hover:underline ml-2" routerLink="/workflows/requests" [queryParams]="{ id: s.workflowInstanceId }"
+                       data-open-request>Open request</a>
+                  }
+                </td>
+              }
+              <td class="text-xs max-w-96">
+                @if (s.reason) { <span class="text-crit-500">{{ s.reason }}</span> }
+                @else if (s.storageKey) { <span class="mono text-[color:var(--text-muted)] break-all">{{ s.bucket }}/{{ s.storageKey }}</span> }
+              </td>
+              <td class="text-right">
+                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-expanded]="open() === s.submissionId"
+                        [attr.aria-label]="'Answers of submission ' + s.submissionId" (click)="toggle(s.submissionId)">
+                  <app-icon [name]="open() === s.submissionId ? 'chevronDown' : 'chevronRight'" />View
+                </button>
+              </td>
+            </tr>
+            @if (open() === s.submissionId) {
+              <tr class="bg-[color:var(--surface-sunken)]">
+                <td [attr.colspan]="hasApproval() ? 8 : 6">
+                  <dl class="grid gap-x-4 gap-y-1.5 sm:grid-cols-[14rem_1fr] text-sm py-1" [attr.aria-label]="'Answers of submission ' + s.submissionId">
+                    @for (row of answerRows(s); track row.label) {
+                      <dt class="text-[color:var(--text-muted)]">{{ row.label }}</dt>
+                      @if (row.table; as t) {
+                        <dd class="min-w-0 overflow-x-auto">
+                          <table class="table-modern text-xs" [attr.aria-label]="row.label">
+                            <thead><tr>@for (c of t.columns; track c.key) { <th>{{ c.label }}</th> }</tr></thead>
+                            <tbody>
+                              @for (r of t.rows; track $index) {
+                                <tr>@for (c of t.columns; track c.key) { <td>{{ cell(c, r[c.key]) }}</td> }</tr>
+                              }
+                            </tbody>
+                          </table>
+                        </dd>
+                      } @else if (row.files; as files) {
+                        <dd class="flex flex-col gap-1">
+                          @for (file of files; track file.uploadId) {
+                            <span class="flex items-center gap-2 flex-wrap" [attr.data-file]="file.key">
+                              <app-icon name="file" size="0.95em" class="icon-muted" />{{ file.name }}
+                              @if (canRead()) {
+                                @switch (reads()[file.key ?? '']) {
+                                  @case ('reading') { <span class="text-xs text-[color:var(--text-muted)]">Sending…</span> }
+                                  @case ('sent') {
+                                    <a class="text-xs text-accent hover:underline" routerLink="/documents/intelligence" [queryParams]="{ tab: 'documents' }">
+                                      Being read — open Document Intelligence</a>
+                                  }
+                                  @case (undefined) {
+                                    <button type="button" class="btn btn-ghost btn-xs" (click)="readWithIntelligence(file)" data-read-file>
+                                      <app-icon name="sparkle" />Read with Document Intelligence</button>
+                                  }
+                                  @default { <span class="text-xs text-crit-500">{{ reads()[file.key ?? ''] }}</span> }
+                                }
+                              }
+                            </span>
+                          }
+                        </dd>
+                      } @else {
+                        <dd class="break-words whitespace-pre-line">{{ row.value }}</dd>
+                      }
+                    }
+                  </dl>
+                  @if (s.fields) {
+                    <p class="text-xs text-[color:var(--text-muted)] mt-1">Answered version {{ s.formVersion }} of the form; shown with that version's fields.</p>
+                  }
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+      <!-- P2 #30: a capped list says so, rather than stopping silently at 200. -->
+      <div pager>
+        @if (capped()) {
+          <p class="px-4 py-3 border-t border-subtle text-xs text-[color:var(--text-muted)]" data-capped>
+            The newest {{ submissions().length }} of {{ totalSubmissions().toLocaleString('en-US') }} submissions. Search and the counts above cover
+            these {{ submissions().length }}; Export CSV has every submission.
+          </p>
+        }
+      </div>
+    </app-table-shell>
+  }
+</div>

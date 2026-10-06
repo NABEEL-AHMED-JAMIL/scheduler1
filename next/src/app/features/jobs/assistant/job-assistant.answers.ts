@@ -1,0 +1,413 @@
+import { formatDate } from '@angular/common';
+import { Intent } from './job-assistant.intents';
+import { instantOf } from '../../../core/instant';
+import { clockTime, monthDayLabel, weekdayLabel } from '../schedule-labels';
+import { dayLabel, formatDuration, resolveFormat } from '../../../shared/ui/time-format';
+
+export interface JobRun {
+  jobQueueId: number;
+  jobStatus: string;
+  startTime?: string;
+  endTime?: string;
+  jobStatusMessage?: string;
+  dateCreated?: string;
+}
+
+export interface JobFacts {
+  jobId: number;
+  jobName: string;
+  jobStatus: string;
+  execution?: string;
+  priority?: number;
+  lastJobRun?: string;
+  assignedUsername?: string;
+  taskName?: string;
+  taskType?: string;
+  topic?: string;
+  pipelineId?: string;
+  bucket?: string;
+  inputFolder?: string;
+  outputFolder?: string;
+  homePageId?: string;
+  schedule?: {
+    frequency?: string;
+    intervalValue?: string;
+    startDate?: string;
+    endDate?: string;
+    startTime?: string;
+    nextRunAt?: string;
+    expired?: boolean;
+    /** MON..SUN, comma-separated; a weekly job pinned to days. */
+    daysOfWeek?: string;
+    /** A monthly job pinned to a date; 0 or less is the last day. */
+    dayOfMonth?: number;
+    /** Wave 4: a Cron schedule's expression. */
+    cronExpression?: string | null;
+  } | null;
+}
+
+export interface RunStats {
+  total: number;
+  byStatus: Record<string, number>;
+  successRate: number | null;
+  averageSeconds: number | null;
+  longestSeconds: number | null;
+  firstRun?: string;
+  lastRun?: string;
+}
+
+/** One block of an answer. The component decides how each is drawn. */
+export type AnswerBlock =
+  | { kind: 'text'; text: string }
+  /**
+   * Prose written by a configured AI agent rather than composed from this job's record.
+   *
+   * It is a separate kind, not a 'text' block, because the reader has to be able to tell the
+   * two apart: every other block is the job's own data and cannot be wrong, while this one is
+   * a model's answer and can be. The component draws it with the agent's name attached.
+   */
+  | { kind: 'ai'; text: string; agent: string }
+  | { kind: 'facts'; rows: { label: string; value: string }[] }
+  | { kind: 'stats' }
+  | { kind: 'chart' }
+  | { kind: 'runs'; runs: JobRun[] };
+
+export interface Answer {
+  blocks: AnswerBlock[];
+  /** Shown when the assistant declines, so the reason is never a mystery. */
+  refused?: boolean;
+  /** An agent was asked and has not replied yet. The turn renders a spinner until it does. */
+  pending?: boolean;
+}
+
+const HUMAN_STATUS: Record<string, string> = {
+  Completed: 'completed', Failed: 'failed', Skip: 'skipped',
+  Interrupt: 'interrupted', Missed: 'missed', Queue: 'queued',
+  Start: 'starting', Running: 'running',
+};
+
+export function computeStats(runs: JobRun[]): RunStats {
+  const byStatus: Record<string, number> = {};
+  let durationTotal = 0, durationCount = 0, longest = 0;
+
+  for (const run of runs) {
+    byStatus[run.jobStatus] = (byStatus[run.jobStatus] ?? 0) + 1;
+    if (run.startTime && run.endTime) {
+      const seconds = (new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000;
+      if (Number.isFinite(seconds) && seconds >= 0) {
+        durationTotal += seconds;
+        durationCount++;
+        longest = Math.max(longest, seconds);
+      }
+    }
+  }
+
+  const finished = (byStatus['Completed'] ?? 0) + (byStatus['Failed'] ?? 0);
+  const ordered = [...runs]
+    .filter(r => r.startTime)
+    .sort((a, b) => new Date(a.startTime!).getTime() - new Date(b.startTime!).getTime());
+
+  return {
+    total: runs.length,
+    byStatus,
+    // Of the runs that reached a verdict; queued and skipped runs are neither pass nor fail.
+    successRate: finished ? Math.round(((byStatus['Completed'] ?? 0) / finished) * 100) : null,
+    averageSeconds: durationCount ? Math.round((durationTotal / durationCount) * 10) / 10 : null,
+    longestSeconds: durationCount ? Math.round(longest * 10) / 10 : null,
+    firstRun: ordered[0]?.startTime,
+    lastRun: ordered[ordered.length - 1]?.startTime,
+  };
+}
+
+/**
+ * A timestamp as a person would read it. The API returns a naive local stamp
+ * ("2026-08-19T00:01:27.90799"), which was being printed verbatim next to dates the schedule
+ * rows had already formatted -- so one row read "2026-08-17 at 00:01" and the next dumped its
+ * microseconds. Anything unparseable is returned untouched rather than shown as "Invalid Date".
+ *
+ * Read with instantOf, as the serverTime pipe reads it: the stamp is Chicago wall-clock, and
+ * `new Date` took it as the viewer's own zone, hours off for anyone elsewhere. Formatted as the
+ * runs table formats ("24 Sep 2026, 22:47"), not with the browser's "Sept".
+ */
+export function humanMoment(value?: string): string {
+  if (!value) return '—';
+  const at = instantOf(value);
+  if (!at || !Number.isFinite(at.getTime())) return value;
+  return formatDate(at, resolveFormat('dateTime'), 'en-US');
+}
+
+/**
+ * How long a run took, as the history table and the run logs write it; this had its own copy,
+ * which said "1m 0s" where they said "1m". No measured run is "unknown" in a sentence rather
+ * than the tables' dash, because "Runs take — on average" does not read.
+ */
+export function humanDuration(seconds: number | null): string {
+  return seconds === null ? 'unknown' : formatDuration(seconds);
+}
+
+/**
+ * What the timetable means, with execution read before the schedule row rather than after it.
+ *
+ * A job switched from Auto to Manual keeps its Scheduler row: the editor posts no schedulers
+ * block for a Manual job, so updateSourceJob leaves the row alone, and findDueSchedulers passes
+ * over it on `source_job.execution = 'Auto'` instead of expiring it -- deliberately, so that
+ * switching back to Auto resumes the timetable rather than losing it. But
+ * fetchSourceJobDetailWithSourceJobId attaches that row to the DTO with no execution check, so
+ * reading the schedule first the assistant answered "It runs every 2 weeks at 09:00" about a job
+ * the dispatcher will never pick up. Execution is what the dispatcher actually reads, so it is
+ * what is answered from here.
+ */
+function scheduleSentence(facts: JobFacts): string {
+  const s = facts.schedule;
+  if (facts.execution === 'Manual') {
+    return s
+      ? 'It runs only when someone triggers it — its stored timetable is held, and would resume if this job were set back to Auto.'
+      : 'It runs only when someone triggers it — there is no schedule.';
+  }
+  if (!s) return 'No schedule is attached to this job.';
+  const at = s.startTime ? ` at ${clockTime(s.startTime)}` : '';
+  const when = s.frequency === 'Cron'
+    ? `on the cron schedule ${s.cronExpression ?? ''} (server time)`
+    : `${cadence(s)}${pinnedTo(s)}${at}`;
+  if (s.expired) return `The schedule has expired — it ran ${when} and will not run again.`;
+  return `It runs ${when}.`;
+}
+
+type Schedule = NonNullable<JobFacts['schedule']>;
+
+const UNITS: Record<string, [string, string]> = {
+  Mint: ['minute', 'minutes'], Hr: ['hour', 'hours'], Daily: ['day', 'days'],
+  Weekly: ['week', 'weeks'], Monthly: ['month', 'months'],
+};
+
+/** "every week", "every 2 weeks": the bare unit read "It runs weeks at 09:30". */
+function cadence(s: Schedule): string {
+  const n = Number(s.intervalValue) || 1;
+  const [one, many] = UNITS[s.frequency ?? ''] ?? [s.frequency ?? '', s.frequency ?? ''];
+  return n === 1 ? `every ${one}` : `every ${n} ${many}`;
+}
+
+/** The days a weekly or monthly job is pinned to, as the Jobs list says them. */
+function pinnedTo(s: Schedule): string {
+  const days = weekdayLabel(s.daysOfWeek);
+  if (days) return ` on ${days}`;
+  const monthDay = monthDayLabel(s.dayOfMonth);
+  return monthDay ? ` on the ${monthDay}` : '';
+}
+
+/**
+ * Builds the answer for one intent. Every number here comes from the job's own runs, so an
+ * answer is either right or absent -- there is no path that produces a plausible invention.
+ */
+export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
+                          mentionedJobId?: number): Answer {
+  const stats = computeStats(runs);
+
+  switch (intent) {
+    case 'out-of-scope':
+      return {
+        refused: true,
+        blocks: [{
+          kind: 'text',
+          text: mentionedJobId
+            ? `I only know about job #${facts.jobId}. For job #${mentionedJobId}, open its own assistant.`
+            : `I only know about job #${facts.jobId} — "${facts.jobName}". I cannot answer about other jobs, tenants or users from here.`,
+        }],
+      };
+
+    /*
+     * It reads; it does not act. Said here rather than left to fall through to the guide,
+     * because "unknown" is handed to the configured AI agent -- and a model asked to trigger a
+     * job has no way to do it and every incentive to sound as though it did.
+     */
+    case 'action':
+      return {
+        refused: true,
+        blocks: [{
+          kind: 'text',
+          text: `I can only read job #${facts.jobId}. Running, pausing, editing and deleting it are done from the job's own page — I cannot do them from here.`,
+        }],
+      };
+
+    case 'summary': {
+      const rows = [
+        { label: 'Job', value: `#${facts.jobId} · ${facts.jobName}` },
+        { label: 'State', value: facts.jobStatus },
+        { label: 'Runs how', value: facts.execution === 'Manual' ? 'On demand' : 'On a schedule' },
+        { label: 'Task', value: facts.taskName ?? '—' },
+        { label: 'Writes to', value: targetPath(facts) },
+        { label: 'Runs recorded', value: String(stats.total) },
+      ];
+      // Gathered into JobFacts since it was written and displayed nowhere, so "what is the
+      // priority" had no local answer and was spent on a model round-trip.
+      if (facts.priority !== undefined && facts.priority !== null) {
+        rows.push({ label: 'Priority', value: String(facts.priority) });
+      }
+      if (facts.assignedUsername) rows.push({ label: 'Assigned to', value: facts.assignedUsername });
+      return {
+        blocks: [
+          { kind: 'text', text: `${scheduleSentence(facts)} ${verdictSentence(stats)}`.trim() },
+          { kind: 'facts', rows },
+          { kind: 'stats' },
+        ],
+      };
+    }
+
+    case 'stats':
+      if (!stats.total) return { blocks: [{ kind: 'text', text: 'This job has never run, so there is nothing to count yet.' }] };
+      return {
+        blocks: [
+          { kind: 'text', text: verdictSentence(stats) },
+          { kind: 'stats' },
+          { kind: 'chart' },
+        ],
+      };
+
+    case 'schedule': {
+      const s = facts.schedule;
+      // Whether a next run can be asserted at all is an execution question, not a schedule one:
+      // the held row still carries the next_run_at it had when the job was made Manual, and
+      // printing that as "Next run" names a moment that never arrives. See scheduleSentence.
+      const onDemand = facts.execution === 'Manual';
+      const rows: { label: string; value: string }[] = [];
+      if (s) {
+        const n = Number(s.intervalValue) || 1;
+        rows.push({ label: 'Frequency', value: s.frequency === 'Cron' ? `Cron ${s.cronExpression ?? ''}`.trim()
+          : `${s.frequency ?? '—'}${n > 1 ? ` every ${n}` : ''}${pinnedTo(s)}` });
+        if (s.startDate) rows.push({ label: 'Starts', value: `${dayLabel(s.startDate)}${s.startTime ? ` at ${clockTime(s.startTime)}` : ''}` });
+        if (s.endDate) rows.push({ label: 'Ends', value: dayLabel(s.endDate) });
+        rows.push({ label: 'Next run', value: onDemand
+          ? 'On demand — nothing is scheduled'
+          : (s.expired ? 'Expired — no further runs' : (s.nextRunAt ? humanMoment(s.nextRunAt) : 'Not scheduled')) });
+      }
+      if (facts.lastJobRun) rows.push({ label: 'Last run', value: humanMoment(facts.lastJobRun) });
+      return { blocks: [{ kind: 'text', text: scheduleSentence(facts) }, ...(rows.length ? [{ kind: 'facts' as const, rows }] : [])] };
+    }
+
+    case 'target': {
+      const rows = [
+        { label: 'Bucket', value: facts.bucket || 'Not configured' },
+        { label: 'Reads from', value: facts.inputFolder || '—' },
+        { label: 'Writes to', value: facts.outputFolder || '—' },
+      ];
+      if (facts.homePageId) rows.push({ label: 'Home page', value: facts.homePageId });
+      return {
+        blocks: [
+          {
+            kind: 'text',
+            text: facts.bucket
+              ? `Its task writes into ${targetPath(facts)}.`
+              : 'Its task has no storage configured, so it writes nowhere the browser can show.',
+          },
+          { kind: 'facts', rows },
+        ],
+      };
+    }
+
+    case 'failures': {
+      const failed = runs.filter(r => r.jobStatus === 'Failed');
+      if (!failed.length) {
+        return { blocks: [{ kind: 'text', text: `No run of this job has failed across ${stats.total} recorded ${stats.total === 1 ? 'run' : 'runs'}.` }] };
+      }
+      // Grouped on the message with its run ids blanked: workers name the run in the message
+      // ("run-7400", "#7400"), so no two were ever equal and "most common first" never grouped.
+      // The newest real message stands for its group -- runs arrive newest first.
+      const messages = new Map<string, { count: number; sample: string }>();
+      for (const run of failed) {
+        const message = (run.jobStatusMessage ?? 'No message recorded').trim();
+        const key = message.replace(/\brun-\d+\b/g, 'run-…').replace(/#\d+/g, '#…');
+        const group = messages.get(key);
+        if (group) group.count++;
+        else messages.set(key, { count: 1, sample: message });
+      }
+      const ranked = [...messages.values()].sort((a, b) => b.count - a.count).slice(0, 5);
+      return {
+        blocks: [
+          { kind: 'text', text: `${failed.length} of ${stats.total} ${stats.total === 1 ? 'run' : 'runs'} failed. The reasons given, most common first:` },
+          { kind: 'facts', rows: ranked.map(({ sample, count }) => ({ label: `${count}×`, value: sample })) },
+          { kind: 'runs', runs: failed.slice(0, 10) },
+        ],
+      };
+    }
+
+    case 'history':
+      if (!stats.total) return { blocks: [{ kind: 'text', text: 'This job has no recorded runs yet.' }] };
+      return {
+        blocks: [
+          { kind: 'text', text: `${stats.total} ${stats.total === 1 ? 'run' : 'runs'} recorded, most recent first.` },
+          { kind: 'runs', runs: [...runs].slice(0, 15) },
+        ],
+      };
+
+    case 'task':
+      return {
+        blocks: [
+          { kind: 'text', text: facts.taskName ? `This job runs the task "${facts.taskName}".` : 'No task is attached to this job.' },
+          {
+            kind: 'facts',
+            rows: [
+              { label: 'Task', value: facts.taskName ?? '—' },
+              { label: 'Type', value: facts.taskType ?? '—' },
+              { label: 'Topic', value: facts.topic ?? '—' },
+              { label: 'Pipeline', value: facts.pipelineId ?? '—' },
+            ],
+          },
+        ],
+      };
+
+    default:
+      return {
+        blocks: [{
+          kind: 'text',
+          text: `I can answer about job #${facts.jobId} — its schedule, where it writes, its run history, failures and statistics. Try one of the buttons above.`,
+        }],
+      };
+  }
+}
+
+function targetPath(facts: JobFacts): string {
+  if (!facts.bucket) return 'no configured storage';
+  return facts.outputFolder ? `${facts.bucket}/${facts.outputFolder}` : facts.bucket;
+}
+
+function verdictSentence(stats: RunStats): string {
+  if (!stats.total) return 'It has never run.';
+  const parts = Object.entries(stats.byStatus)
+    .sort((a, b) => b[1] - a[1])
+    .map(([status, count]) => `${count} ${HUMAN_STATUS[status] ?? status.toLowerCase()}`);
+  const rate = stats.successRate !== null ? ` That is a ${stats.successRate}% success rate.` : '';
+  const avg = stats.averageSeconds !== null ? ` Runs take ${humanDuration(stats.averageSeconds)} on average.` : '';
+  return `Across ${stats.total} recorded ${stats.total === 1 ? 'run' : 'runs'}: ${parts.join(', ')}.${rate}${avg}`;
+}
+
+/** The run history as CSV. The XLSX export is this, converted server-side. */
+export function runsToCsv(facts: JobFacts, runs: JobRun[]): string {
+  /*
+   * Spreadsheets treat a cell opening with = + - or @ as a formula, so a status message
+   * beginning with one is executed when the file is opened -- and this export exists to be
+   * opened in Excel. The message is written by the pipeline, which means its first character
+   * is not ours to trust. A leading apostrophe is the standard defusal: Excel reads the rest
+   * as text and does not display the quote.
+   *
+   * Only strings are treated this way. The run id and duration are numbers, and prefixing
+   * those would turn real figures into text a sheet cannot add up.
+   */
+  const FORMULA_LEAD = /^[=+\-@\t\r]/;
+  const escape = (value: unknown) => {
+    if (value === null || value === undefined) return '';
+    const isText = typeof value === 'string';
+    let text = String(value);
+    if (isText && FORMULA_LEAD.test(text)) text = `'${text}`;
+    return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+  };
+  const header = ['Run', 'Job', 'Status', 'Queued', 'Started', 'Ended', 'Duration (s)', 'Message'];
+  const rows = runs.map(run => {
+    const seconds = run.startTime && run.endTime
+      ? Math.round(((new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000) * 10) / 10
+      : '';
+    return [run.jobQueueId, `#${facts.jobId} ${facts.jobName}`, run.jobStatus,
+            run.dateCreated ?? '', run.startTime ?? '', run.endTime ?? '', seconds,
+            run.jobStatusMessage ?? ''].map(escape).join(',');
+  });
+  return [header.join(','), ...rows].join('\n');
+}

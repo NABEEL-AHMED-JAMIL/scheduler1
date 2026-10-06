@@ -1,0 +1,243 @@
+<div [class.page]="!compact()" [class.flex]="compact()" [class.flex-col]="compact()"
+     [class.gap-3]="compact()" [class.min-h-0]="compact()" [class.p-3]="compact()">
+  @if (!compact()) {
+    <a class="link-inline text-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']">
+      <app-icon name="arrowLeft" size="0.9em" />Back to run history
+    </a>
+  }
+
+  <div class="page-head" [class.hidden]="compact()">
+    <div>
+      <h1 class="page-title">
+        Schedule assistant
+        @if (facts(); as f) { <span class="font-normal text-[color:var(--text-secondary)]">— {{ f.jobName }}</span> }
+      </h1>
+      <p class="page-subtitle">
+        Answers about job #{{ jobId() }} only, built from its own record and runs.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <!-- Bordered rather than ghost: these are real actions, and a ghost button in a page
+           header reads as a caption. Not brand-filled -- they are secondary to asking. -->
+      <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+              [title]="runs().length ? 'Download this job\'s runs as CSV' : 'There are no runs to export yet'"
+              (click)="exportRuns('csv')">
+        <app-icon name="download" />CSV
+      </button>
+      <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+              [title]="runs().length ? 'Download this job\'s runs as an Excel workbook' : 'There are no runs to export yet'"
+              (click)="exportRuns('xlsx')">
+        <app-icon name="table" [busy]="exporting() === 'xlsx'" />
+        {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
+      </button>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Reading the job…
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center">
+      <app-icon name="alert" size="1.6em" class="icon-warn" />
+      <p class="mt-2 text-sm">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()">Try again</button>
+    </div>
+  } @else if (facts(); as f) {
+
+    <!-- The composer leads and the newest answer appears directly beneath it, so asking and
+         reading happen in the same place. In a panel the presets become one scrolling row
+         rather than a wrapping block that eats a third of the height. -->
+    <div class="card shrink-0" [class.p-4]="!compact()" [class.p-2.5]="compact()">
+      <div class="flex items-center gap-2"
+           [class.mb-3]="!compact()" [class.mb-2]="compact()">
+        <div class="search-field flex-1">
+          <app-icon name="chat" size="0.95em" />
+          <input class="input" [value]="question()" aria-label="Ask about this job"
+                 placeholder="Ask about this job — its schedule, files, failures or history"
+                 (input)="question.set($any($event.target).value)"
+                 (keydown.enter)="ask(question())" />
+        </div>
+        @if (voiceSupported) {
+          <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                  [class.btn-intent-crit]="listening()"
+                  (click)="toggleMic()"
+                  [attr.aria-label]="listening() ? 'Stop dictating' : 'Ask by voice'"
+                  [title]="listening() ? 'Listening — click to stop' : 'Ask by voice'">
+            <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
+          </button>
+        }
+        <button type="button" class="btn btn-primary btn-sm"
+                [disabled]="!question().trim() || asking()"
+                (click)="ask(question())">
+          <app-icon name="send" [busy]="asking()" />{{ asking() ? 'Asking…' : 'Ask' }}
+        </button>
+      </div>
+
+      <!-- Only shown when an agent exists. Everything above answers from the job's own record
+           with no provider at all; the agent is what picks up the questions those patterns do
+           not match, so with none configured there is nothing here to choose. -->
+      @if (agents().length) {
+        <div class="flex items-center gap-2 mb-2.5">
+          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
+                 [attr.for]="'assistant-agent-' + jobId()">Anything else, ask</label>
+          <select class="input max-w-52 shrink-0" [attr.id]="'assistant-agent-' + jobId()"
+                  [value]="agentId()"
+                  (change)="agentId.set(+$any($event.target).value || null)">
+            @for (agent of agents(); track agent.aiAgentId) {
+              <option [value]="agent.aiAgentId">{{ agent.agentName }}</option>
+            }
+            <option [value]="0">No AI — answers from the job's own data</option>
+          </select>
+        </div>
+      }
+
+      <div class="flex items-center gap-1.5"
+           [class.flex-wrap]="!compact()"
+           [class.overflow-x-auto]="compact()" [class.pb-0.5]="compact()">
+        @for (preset of presets; track preset.id) {
+          <button type="button" class="btn btn-default shrink-0"
+                  [class.btn-sm]="!compact()" [class.btn-xs]="compact()"
+                  (click)="askPreset(preset.id, preset.question)">
+            <app-icon [name]="preset.icon" size="0.9em" />{{ preset.label }}
+          </button>
+        }
+        @if (turns().length) {
+          <button type="button" class="btn btn-ghost shrink-0 ml-auto"
+                  [class.btn-sm]="!compact()" [class.btn-xs]="compact()" (click)="clear()">
+            <app-icon name="close" />Clear
+          </button>
+        }
+      </div>
+    </div>
+
+    @if (!turns().length) {
+      <div class="text-center" [class.card]="!compact()" [class.p-10]="!compact()"
+           [class.px-4]="compact()" [class.py-8]="compact()">
+        <app-icon name="chat" [size]="compact() ? '1.4em' : '1.8em'" class="icon-muted" />
+        <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
+          Ask about job #{{ f.jobId }}, or pick a question above.
+        </p>
+        <p class="mt-1 text-xs text-[color:var(--text-muted)]">
+          This job alone — schedule, storage, runs, failures and statistics.
+        </p>
+      </div>
+    }
+
+    <!-- A column with a gap everywhere; only the dock makes it a scroll panel. With the gap behind
+         compact() too, the full page stacked its answer cards flush against each other. -->
+    <div class="flex flex-col gap-3"
+         [class.flex-1]="compact()" [class.min-h-0]="compact()" [class.overflow-y-auto]="compact()">
+    @for (turn of turns(); track turn.id) {
+      <div class="card p-4">
+        <div class="flex items-baseline gap-2 pb-3 mb-3 border-b border-subtle">
+          <app-icon name="user" size="0.9em" class="icon-muted" />
+          <p class="text-sm font-medium flex-1">{{ turn.question }}</p>
+          <span class="text-[11px] tabular text-[color:var(--text-muted)]">
+            {{ turn.at | serverTime: 'time' }}
+          </span>
+        </div>
+
+        @for (block of turn.answer.blocks; track $index) {
+          @switch (block.kind) {
+
+            @case ('text') {
+              <p class="text-sm leading-relaxed"
+                 [class.text-warn-500]="turn.answer.refused">
+                @if (turn.answer.refused) { <app-icon name="alert" size="0.9em" class="icon-warn mr-1" /> }
+                {{ block.text }}
+              </p>
+            }
+
+            <!-- Drawn unlike every other block on purpose: the rest of this transcript is the
+                 job's own record and cannot be wrong, while this is a model's prose and can be.
+                 The agent's name rides with it so the reader knows who is talking. -->
+            @case ('ai') {
+              @if (turn.answer.pending) {
+                <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2">
+                  <span class="spinner [--spinner-size:0.9rem]" aria-hidden="true"></span>
+                  Asking {{ block.agent }}…
+                </p>
+              } @else {
+                <div class="rounded-lg border border-subtle bg-sunken px-3 py-2.5">
+                  <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ block.text }}</p>
+                  <p class="text-[11px] text-[color:var(--text-muted)] mt-2 flex items-center gap-1">
+                    <app-icon name="chat" size="0.85em" />
+                    Answered by {{ block.agent }} — generated, not read from the job record.
+                  </p>
+                </div>
+              }
+            }
+
+            @case ('facts') {
+              <!-- One column in the dock: at its width two columns left a failure reason about
+                   150px, and the label column took a hundred of those. -->
+              <dl class="grid gap-x-6 gap-y-2 mt-3" [class.sm:grid-cols-2]="!compact()">
+                @for (row of block.rows; track row.label) {
+                  <div class="flex gap-2 text-sm">
+                    <dt class="text-[color:var(--text-muted)] shrink-0"
+                        [class.min-w-24]="!compact()" [class.min-w-10]="compact()">{{ row.label }}</dt>
+                    <dd class="min-w-0 break-words">{{ row.value }}</dd>
+                  </div>
+                }
+              </dl>
+            }
+
+            @case ('stats') {
+              <app-stat-strip class="mt-3" [items]="statTiles()" [cols]="2" [smCols]="4" label="Run summary" />
+            }
+
+            @case ('chart') {
+              <div class="grid gap-3 mt-3 lg:grid-cols-2">
+                <div class="rounded-lg border p-3 border-subtle">
+                  <h3 class="chart-title">Outcomes</h3>
+                  <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="outcomeColor" />
+                </div>
+                @if (slowestRuns().length) {
+                  <div class="rounded-lg border p-3 border-subtle">
+                    <h3 class="chart-title">Slowest runs</h3>
+                    <p class="chart-sub">Where this job spent the most time.</p>
+                    <app-ranked-bar [data]="slowestRuns()" [max]="6" [showPercent]="false" [sorted]="false" />
+                  </div>
+                }
+              </div>
+            }
+
+            @case ('runs') {
+              <div class="overflow-x-auto mt-3 rounded-lg border border-subtle">
+                <table class="table-modern">
+                  <thead>
+                    <tr><th>Run</th><th>Started</th><th>Status</th><th>Message</th><th class="w-16"></th></tr>
+                  </thead>
+                  <tbody>
+                    @for (run of block.runs; track run.jobQueueId) {
+                      <tr>
+                        <td class="mono">#{{ run.jobQueueId }}</td>
+                        <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                          {{ run.startTime ? (run.startTime | serverTime: 'recent') : '—' }}
+                        </td>
+                        <td><app-status [label]="run.jobStatus" /></td>
+                        <td class="max-w-72 truncate" [title]="run.jobStatusMessage">
+                          {{ run.jobStatusMessage || '—' }}
+                        </td>
+                        <td class="text-right">
+                          @if (run.jobQueueId) {
+                            <a class="link-inline text-xs"
+                               [routerLink]="['/pipelines/schedules', jobId(), 'runs', run.jobQueueId, 'logs']">Logs</a>
+                          } @else {
+                            <span class="text-xs text-[color:var(--text-muted)]">—</span>
+                          }
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          }
+        }
+      </div>
+    }
+    </div>
+  }
+</div>

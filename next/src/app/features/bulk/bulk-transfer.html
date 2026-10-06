@@ -1,0 +1,98 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <!-- A link to its own list, like every other sub-page's back link: location.back() left
+           the console when the page was opened directly or in a new tab. -->
+      <a [routerLink]="config().backTo" class="text-sm text-accent hover:underline">← Back to {{ noun() }}</a>
+      <h1 class="page-title mt-1">Bulk {{ noun() }}</h1>
+      <p class="page-subtitle">
+        Import many {{ noun() }} from a spreadsheet, or export what is already here.
+      </p>
+    </div>
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-2 items-start">
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold flex items-center gap-2">
+        <app-icon name="upload" class="icon-info" />Import
+      </h2>
+      <div class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug space-y-1">
+        <p>
+          Start from the template — it carries the column names and the allowed values the
+          importer expects.
+        </p>
+        @if (config().templateNote; as note) {
+          <p data-template-note>{{ note }}</p>
+        }
+      </div>
+
+      <!-- The template is where an import starts, so it sits here rather than in the Export
+           card, where "start from the template" sent people looking for it. -->
+      <button type="button" class="btn btn-default btn-sm mt-3"
+              [disabled]="downloading() === 'template'" (click)="download('template')">
+        <app-icon [name]="downloading() === 'template' ? 'refresh' : 'table'"
+                  [class.spin]="downloading() === 'template'" />Download the import template
+      </button>
+
+      <!-- The shared dropzone, which this markup was extracted into -- its dragleave handling
+           keeps the highlight on while the pointer crosses the icon and text. .xlsx only: the
+           importer cannot read an old .xls workbook. -->
+      <app-file-dropzone class="block mt-4" [file]="file()" (fileChange)="onFile($event)"
+                         accept=".xlsx" prompt="Drop a spreadsheet here" hint=".xlsx workbook, from the import template" />
+
+      @if (file()) {
+        @if (uploading()) {
+          <div class="progress mt-3" role="progressbar" aria-label="Upload progress"
+               aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progress()">
+            <div class="progress-bar" [style.width.%]="progress()"></div>
+          </div>
+          <p class="text-xs text-[color:var(--text-muted)] mt-1.5" aria-hidden="true">{{ progress() }}% uploaded</p>
+        } @else {
+          <div class="flex items-center gap-2 mt-3">
+            <button type="button" class="btn btn-primary btn-sm" (click)="upload()">
+              <app-icon name="upload" />Upload
+            </button>
+          </div>
+        }
+      }
+
+      @if (result(); as r) {
+        <div class="card flex items-start gap-2 px-4 py-2.5 text-sm mt-4" role="status">
+          <app-icon [name]="r.ok ? 'checkCircle' : 'xCircle'"
+                    [class]="r.ok ? 'icon-ok' : 'icon-crit'" class="mt-0.5 shrink-0" />
+          <div class="min-w-0 flex-1">
+            <p>{{ r.message }}</p>
+            @if (r.rows.length) {
+              <ul class="bulk-rows mt-1.5 list-disc pl-4 space-y-0.5 text-xs text-[color:var(--text-muted)] break-words max-h-60 overflow-y-auto">
+                @for (row of rowsShown(); track $index) { <li>{{ row }}</li> }
+              </ul>
+              @if (rowsHidden()) {
+                <p class="text-xs mt-1 text-[color:var(--text-muted)]">and {{ rowsHidden() }} more</p>
+              }
+              <button type="button" class="btn btn-ghost btn-xs mt-1.5" (click)="copyRows()">
+                <app-icon name="copy" />Copy all {{ r.rows.length }} {{ r.rows.length === 1 ? 'reason' : 'reasons' }}
+              </button>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="card p-4">
+      <h2 class="text-sm font-semibold flex items-center gap-2">
+        <app-icon name="download" class="icon-info" />Export
+      </h2>
+      <p class="text-xs text-[color:var(--text-muted)] mt-1 leading-snug">
+        Every {{ noun().slice(0, -1) }} you can currently see, as a spreadsheet.
+      </p>
+
+      <div class="mt-4">
+        <button type="button" class="btn btn-default btn-sm"
+                [disabled]="downloading() === 'exportAll'" (click)="download('exportAll')">
+          <app-icon [name]="downloading() === 'exportAll' ? 'refresh' : 'download'"
+                    [class.spin]="downloading() === 'exportAll'" />Export all {{ noun() }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

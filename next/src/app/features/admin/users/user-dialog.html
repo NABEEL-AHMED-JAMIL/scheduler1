@@ -1,0 +1,107 @@
+<app-form-dialog
+    [heading]="isEdit() ? 'Edit user' : 'New user'"
+    subtitle="Roles are enforced on the server, not just in the menu."
+    [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
+    [saving]="saving()"
+    (cancelled)="ref.close(false)" (confirmed)="save()">
+
+  <form [formGroup]="form" class="form-stack">
+    <div class="form-grid">
+      <app-field label="Full name" for="fullName" [required]="true"
+                 [control]="form.get('fullName')" [submitted]="submitted()">
+        <input id="fullName" class="input" formControlName="fullName" placeholder="Alex Morgan" />
+      </app-field>
+
+      <app-field label="Position" for="position"
+                 [control]="form.get('position')" [submitted]="submitted()"
+                 hint="Their job title. What they may do in the app is set by Role, below.">
+        <input id="position" class="input" formControlName="position" list="common-positions"
+               placeholder="Software Engineer" />
+        <datalist id="common-positions">
+          <option value="Software Engineer"></option>
+          <option value="Senior Software Engineer"></option>
+          <option value="Team Lead"></option>
+          <option value="Engineering Manager"></option>
+          <option value="Data Engineer"></option>
+          <option value="Data Analyst"></option>
+          <option value="IT Administrator"></option>
+          <option value="Systems Administrator"></option>
+          <option value="Operations Manager"></option>
+          <option value="Operations Analyst"></option>
+          <option value="QA Engineer"></option>
+          <option value="Product Manager"></option>
+          <option value="Compliance Officer"></option>
+          <option value="Finance Analyst"></option>
+          <option value="Support Specialist"></option>
+        </datalist>
+      </app-field>
+
+      @if (role() !== 'PLATFORM_ADMIN') {
+        <app-field label="Manager" for="managerId" class="sm:col-span-2"
+                   hint="Whom their workflow approvals go to when a step says &quot;their manager&quot;, and whom overdue tasks escalate to.">
+          <app-combobox id="managerId" formControlName="managerId" [numeric]="true" placeholder="Search people…"
+                        clearLabel="No manager" [options]="managerOptions()" />
+        </app-field>
+      }
+
+      <app-field label="Phone" for="phoneNumber" class="sm:col-span-2"
+                 hint="Pick the country, then the number as it is written there.">
+        <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="submitted()" />
+      </app-field>
+
+      <app-field label="Email" for="username" [required]="true" class="sm:col-span-2"
+                 [control]="form.get('username')" [submitted]="submitted()"
+                 hint="Used to sign in.">
+        <input id="username" type="email" class="input" formControlName="username"
+               placeholder="alex@example.com" autocomplete="off" />
+      </app-field>
+    </div>
+
+    <app-field label="Password" for="password"
+               [control]="form.get('password')" [submitted]="submitted()"
+               [hint]="isEdit()
+                 ? 'Leave blank to keep the current password.'
+                 : 'Leave blank and we email them a one-time password. Set one here and it is not emailed \u2014 you pass it on yourself.'">
+      <input id="password" type="password" class="input" formControlName="password"
+             autocomplete="new-password"
+             [placeholder]="isEdit() ? '' : 'leave blank to send a one-time password'" />
+    </app-field>
+
+    <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"
+               [control]="form.get('userRole')" [submitted]="submitted()">
+      <select id="userRole" class="input" formControlName="userRole">
+        @for (option of roles(); track option.value) {
+          <option [value]="option.value">{{ option.label }}</option>
+        }
+      </select>
+    </app-field>
+
+    @if (needsTenant() && data.canPickTenant) {
+      <app-field label="Tenant" for="tenantId" [required]="!tenantLocked()"
+                 [control]="form.get('tenantId')" [submitted]="submitted()"
+                 [hint]="tenantLocked()
+                   ? 'Fixed once the account exists. Moving somebody between workspaces re-parents everything they are attached to.'
+                   : ''">
+        <app-combobox id="tenantId" formControlName="tenantId" [numeric]="true"
+                      placeholder="Search tenants…" [allowClear]="false" [options]="tenantOptions()" />
+      </app-field>
+    } @else if (!needsTenant()) {
+      <p class="text-sm rounded-md px-3 py-2 bg-sunken">
+        A platform administrator spans every tenant, so no tenant is assigned.
+      </p>
+    }
+
+    @if (offersProfile()) {
+      <app-field label="Access profile" for="pageAccessProfileId"
+                 [control]="form.get('pageAccessProfileId')" [submitted]="submitted()"
+                 hint="Which pages they can open. Profiles are set up under Administration › Access profiles.">
+        <select id="pageAccessProfileId" class="input" formControlName="pageAccessProfileId">
+          <option [ngValue]="null">Workspace default{{ defaultProfileName() ? ' (' + defaultProfileName() + ')' : '' }}</option>
+          @for (profile of accessProfiles(); track profile.pageAccessProfileId) {
+            <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
+          }
+        </select>
+      </app-field>
+    }
+  </form>
+</app-form-dialog>

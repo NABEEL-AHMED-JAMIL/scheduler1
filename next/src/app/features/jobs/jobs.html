@@ -1,0 +1,466 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Schedules</h1>
+      <p class="page-subtitle">
+        When each pipeline runs. A schedule binds a pipeline to a timetable.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      @if (live()) {
+        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
+              title="Connected — job status arrives as the pipeline reports it">
+          <span class="live-dot live-on"></span>Live
+        </span>
+      }
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
+      @if (!locked()) {
+        <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
+          <app-icon name="upload" />Bulk import
+        </a>
+        <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="schedules" still="You can still run them." />
+
+  @if (stalledCount()) {
+    <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 border-warn-500"
+        >
+      <app-icon name="alert" class="icon-warn" />
+      <p class="text-sm flex-1">
+        {{ stalledCount() }}
+        {{ stalledCount() === 1 ? 'run has' : 'runs have' }}
+        been in flight for over half an hour without an update. A worker that has finished but
+        cannot report back leaves a job looking busy for ever — check the worker's logs, and
+        that its callback token still matches the server's.
+      </p>
+    </div>
+  }
+
+  <!-- Live run counts. Driven by the same rows the socket patches, so they move on their own. -->
+  <app-stat-strip [items]="liveTiles()" [cols]="2" [smCols]="3" [lgCols]="5" align="start" size="md"
+                  label="Live run counts" />
+
+  <app-table-shell heading="Jobs" [scrollRows]="false" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
+                   [emptyMessage]="hasFilters()
+                      ? 'No jobs match the current filters.' : 'No jobs yet.'"
+                   emptyIcon="briefcase"
+                   [showSubbar]="selected().size > 0"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <!-- A platform administrator's list holds every workspace; the options are the workspaces
+           in it, so nothing offered narrows to an empty table. -->
+      @if (seesWorkspaces()) {
+        <div class="w-48">
+          <app-combobox id="jobs-tenant" ariaLabel="Filter by workspace" [selected]="workspaceFilter()"
+                        (selectedChange)="workspaceFilter.set($event); onFilterChange()"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="workspaceOptions()" />
+        </div>
+      }
+      <select class="input max-w-32" aria-label="Filter by execution type" [value]="executionFilter()"
+              (change)="executionFilter.set($any($event.target).value); onFilterChange()">
+        <option value="">All types</option>
+        @for (execution of executions(); track execution) {
+          <option [value]="execution">{{ execution }}</option>
+        }
+      </select>
+      <select class="input max-w-36" aria-label="Filter by run status" [value]="statusFilter()"
+              (change)="statusFilter.set($any($event.target).value); onFilterChange()">
+        <option value="">All statuses</option>
+        @for (status of statuses(); track status) { <option [value]="status">{{ status }}</option> }
+      </select>
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, job, task or workspace' : 'Search id, job or task'"
+               aria-label="Search jobs"
+               [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
+      </div>
+      @if (seesOthersJobs()) {
+        <app-mine-filter [(only)]="onlyMine" />
+      }
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    <!-- The shell's second toolbar row, written for exactly this: inside the body slot the bar
+         sat in the blur and scroll box, and vanished whenever the shell showed its empty or
+         error state with a selection still made. -->
+    <div subbar class="contents">
+      <span class="text-xs font-medium">{{ selected().size }} selected</span>
+      @if (!locked()) {
+        <button type="button" class="btn btn-default btn-sm btn-intent-ok"
+                [disabled]="bulkBusy()" (click)="runSelected()">
+          <app-icon name="play" [busy]="bulkBusy()" />Run selected
+        </button>
+        <button type="button" class="btn btn-default btn-sm btn-intent-crit"
+                [disabled]="bulkBusy()" (click)="deleteSelected()">
+          <app-icon name="trash" [busy]="bulkBusy()" />Delete selected
+        </button>
+      }
+      <button type="button" class="btn btn-ghost btn-sm ml-auto"
+              [disabled]="bulkBusy()" (click)="clearSelection()">
+        <app-icon name="close" />Clear selection
+      </button>
+    </div>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th class="w-10">
+            <input type="checkbox" class="checkbox" aria-label="Select all jobs on this page"
+                   [checked]="allOnPageSelected()"
+                   [indeterminate]="someOnPageSelected()"
+                   [disabled]="!selectableOnPage().length"
+                   (change)="toggleSelectAllOnPage()" />
+          </th>
+          <th class="w-8"></th>
+          <th>Job</th>
+          <!-- Whose job it is, beside its name, for the one role whose list mixes workspaces. It waits
+               for xl like Task and Execution; on a narrower screen the Workspace filter still narrows. -->
+          @if (seesWorkspaces()) {
+            <th class="hidden xl:table-cell">Workspace</th>
+          }
+          <!-- Task, Execution and Created wait for xl, as the metadata columns wait for 2xl: at 1024
+               they pushed Run status and the row's menu past the card edge. None is lost -- the
+               task is in the row's panel, and Schedule already reads "On demand" for Manual. -->
+          <th class="hidden xl:table-cell">Task</th>
+          <th class="hidden xl:table-cell">Execution</th>
+          <!-- A floor so "Ends 2026-12-31" is not broken at its hyphens. -->
+          <th class="min-w-40 xl:min-w-52">Schedule</th>
+          <th>Next / last run</th>
+          <th class="hidden xl:table-cell">Created</th>
+          <th>Run status</th>
+          <!-- Metadata columns wait for a wide screen, as on Tasks; the detail row still spans them. -->
+          <th class="hidden 2xl:table-cell">Created by</th>
+          <th class="hidden 2xl:table-cell">Updated by</th>
+          <th class="text-right">State</th>
+          <th class="w-12 col-pin-right"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (job of paged(); track job.jobId) {
+          <tr [class.opacity-55]="busyJob() === job.jobId"
+              [class.row-selected]="selected().has(job.jobId)">
+            <td>
+              <input type="checkbox" class="checkbox"
+                     [checked]="selected().has(job.jobId)"
+                     [disabled]="!selectable(job)"
+                     [attr.aria-label]="'Select ' + job.jobName"
+                     [title]="selectable(job) ? '' : (job.jobStatus === 'Delete' ? 'Deleted jobs cannot be selected' : 'Already queued or running')"
+                     (change)="toggleSelect(job)" />
+            </td>
+            <td>
+              <button type="button" class="btn btn-ghost btn-icon btn-xs"
+                      (click)="toggleRow(job)"
+                      [attr.aria-expanded]="expanded().has(job.jobId)"
+                      [attr.aria-label]="(expanded().has(job.jobId) ? 'Hide details for ' : 'Show details for ') + job.jobName">
+                <app-icon [name]="expanded().has(job.jobId) ? 'chevronDown' : 'chevronRight'" />
+              </button>
+            </td>
+            <td class="max-w-60 xl:max-w-80 2xl:max-w-[28rem]">
+              <div class="font-medium truncate" [title]="job.jobName">{{ job.jobName || '—' }}</div>
+              <div class="flex items-center gap-1.5 mt-0.5 text-[11px] leading-none">
+                <span class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</span>
+                @if (job.priority) {
+                  <span class="text-[color:var(--border-strong)]">·</span>
+                  <span class="text-[color:var(--text-muted)]"
+                        [title]="'Priority ' + job.priority + ' (1 is highest)'">P{{ job.priority }}</span>
+                }
+              </div>
+            </td>
+            @if (seesWorkspaces()) {
+              <td class="hidden xl:table-cell max-w-44 text-[color:var(--text-secondary)]">
+                <span class="truncate block" [title]="workspaceName(job)">{{ workspaceName(job) }}</span>
+              </td>
+            }
+            <td class="hidden xl:table-cell max-w-44 2xl:max-w-64">
+              @if (job.taskDetail?.taskName) {
+                <span class="truncate block" [title]="job.taskDetail!.taskName">
+                  {{ job.taskDetail!.taskName }}
+                </span>
+              } @else { — }
+            </td>
+            <td class="hidden xl:table-cell">
+              @if (job.execution === 'Auto') {
+                <span class="pill pill-brand">{{ job.execution }}</span>
+              } @else {
+                <span class="text-xs text-[color:var(--text-secondary)]">{{ job.execution || '—' }}</span>
+              }
+            </td>
+            <td class="max-w-44 xl:max-w-56 2xl:max-w-72">
+              <div class="text-[color:var(--text-secondary)]">{{ scheduleSummary(job) }}</div>
+              @if (scheduleNote(job); as note) {
+                <div class="text-xs" [class.text-warn-500]="note.tone === 'warn'"
+                     [class.text-[color:var(--text-muted)]]="note.tone === 'muted'">
+                  {{ note.text }}
+                </div>
+              }
+            </td>
+            <td class="whitespace-nowrap">
+              @if (nextRun(job); as nextRunAt) {
+                <div class="text-[color:var(--text-secondary)]">
+                  Next {{ nextRunAt | serverTime:'recent' }}
+                </div>
+              }
+              <div class="text-xs text-[color:var(--text-muted)]">
+                {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'recent')) : 'Never run' }}
+              </div>
+            </td>
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ job.dateCreated ? (job.dateCreated | serverTime:'date') : '—' }}
+            </td>
+            <td>
+              <div class="flex items-center gap-1.5">
+                <app-status [label]="job.jobRunningStatus" />
+                @if (isStalled(job)) {
+                  <span class="pill pill-warn shrink-0"
+                        [title]="stallHint(job)">
+                    <app-icon name="alert" size="0.8em" />Stalled
+                  </span>
+                }
+              </div>
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.createdByName || ''">{{ job.createdByName || '—' }}</span>
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.updatedByName || ''">{{ job.updatedByName || '—' }}</span>
+            </td>
+            <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
+            <!-- The pinned cell paints its own background over the scrolled columns, which also
+                 painted over the selected row's tint; it takes the tint back here. -->
+            <td class="text-right col-pin-right"
+                [class.bg-[var(--surface-sunken)]]="selected().has(job.jobId)">
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
+                      [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('job #' + job.jobId))">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <!-- Owner 2026-09-29: running an existing schedule is not building it, so a MANAGED workspace keeps these. -->
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
+                          [title]="runBlockedReason(job)"
+                          (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
+                          [title]="runBlockedReason(job) || 'Run now, choosing the model each AI step runs on'"
+                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with…</button>
+                  @if (!locked()) {
+                  <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
+                          [title]="skipBlockedReason(job)"
+                          (cdkMenuItemTriggered)="skipNext(job)"><app-icon name="skip" />Skip next run</button>
+                  <div class="my-1 border-t border-subtle"></div>
+                  }
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']"><app-icon name="clock" />Executions</a>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAssistant(job)">
+                    <app-icon name="chat" />Ask about this job
+                  </button>
+                  @if (!locked()) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
+                    <app-icon name="copy" />Duplicate
+                  </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editNotifications(job)">
+                    <app-icon name="bell" />Email notifications
+                    @if (notifyCount(job)) {
+                      <span class="pill pill-brand ml-auto">{{ notifyCount(job) }}</span>
+                    } @else {
+                      <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">off</span>
+                    }
+                  </button>
+                  <div class="my-1 border-t border-subtle"></div>
+                  <button cdkMenuItem class="menu-item"
+                          [class]="job.jobStatus === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+                          (cdkMenuItemTriggered)="toggleStatus(job)">
+                    <app-icon [name]="job.jobStatus === 'Active' ? 'pause' : 'play'" />
+                    {{ job.jobStatus === 'Active' ? 'Deactivate' : 'Activate' }}
+                  </button>
+                  <button cdkMenuItem class="menu-item menu-item-danger"
+                          (cdkMenuItemTriggered)="remove(job)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  }
+                </div>
+              </ng-template>
+            </td>
+          </tr>
+
+          @if (expanded().has(job.jobId)) {
+            <tr>
+              <!-- One cell spanning the whole row: the empty leading cell was a leftover from
+                   before the checkbox column existed, and it pushed the panel 48px in while
+                   making the row span twelve slots of an eleven-column table.
+
+                   The count has to track the header exactly: the table grew Created by and
+                   Updated by, and a colspan left behind at 11 rendered the panel 166px
+                   narrower than the table, which reads as a broken layout. A platform
+                   administrator's table has the Workspace column as well. -->
+              <td [attr.colspan]="seesWorkspaces() ? 14 : 13" class="!p-0">
+               <div class="detail-panel">
+                <dl class="grid grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-3 text-sm">
+                  @for (item of [
+                    { label: 'Type',        value: job.taskDetail?.sourceTaskType?.serviceName },
+                    { label: 'Pipeline',    value: job.taskDetail?.pipelineId },
+                    { label: 'Bucket',      value: job.taskDetail?.bucket, mono: true },
+                    { label: 'Output',      value: job.taskDetail?.outputFolder, mono: true },
+                    { label: 'Home page',   value: job.taskDetail?.homePageId },
+                    { label: 'Assigned to', value: job.assignedUsername },
+                    { label: 'Cron',        value: job.scheduler?.cronExpression, mono: true },
+                    { label: 'Starts',      value: dayLabel(job.scheduler?.startDate) },
+                    { label: 'Ends',        value: dayLabel(job.scheduler?.endDate) }
+                  ]; track item.label) {
+                    @if (item.value) {
+                      <div>
+                        <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
+                          {{ item.label }}
+                        </dt>
+                        <dd class="truncate" [class.mono]="item.mono" [title]="item.value">
+                          {{ item.value }}
+                        </dd>
+                      </div>
+                    }
+                  }
+                  @if (job.taskDetail?.taskDetailId) {
+                    <div>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Task</dt>
+                      <dd class="mt-1">
+                        <!-- The task editor is an admin's; anyone else gets the name, not a link to a refusal. -->
+                        @if (canManageTasks()) {
+                          <a class="link-inline" [routerLink]="['/pipelines', job.taskDetail!.taskDetailId, 'edit']">
+                            <app-icon name="link" size="0.85em" class="icon-info" />
+                            #{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}
+                          </a>
+                        } @else {
+                          <span>#{{ job.taskDetail!.taskDetailId }} {{ job.taskDetail!.taskName }}</span>
+                        }
+                      </dd>
+                    </div>
+                  }
+                  @if (triggerNote(job); as note) {
+                    <!-- MIG-251: the Event start. A Manual job reads "On demand" in the list. -->
+                    <div class="sm:col-span-2">
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Inbox trigger</dt>
+                      <dd class="flex items-start gap-1.5">
+                        <app-icon name="inbox" size="0.9em" class="icon-info mt-0.5 shrink-0" />{{ note }}
+                      </dd>
+                    </div>
+                  }
+                  @if (topicOf(job)) {
+                    <div>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Topic</dt>
+                      <dd class="mono truncate" [title]="topicOf(job)">{{ topicOf(job) }}</dd>
+                    </div>
+                  }
+                  @if (bucketLink(job); as target) {
+                    <div>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Storage</dt>
+                      <dd class="mt-1">
+                        <a class="link-inline" routerLink="/documents/files"
+                           [queryParams]="{ bucket: target.bucket, prefix: target.prefix }">
+                          <app-icon name="folder" size="0.85em" class="icon-info" />View in bucket
+                        </a>
+                      </dd>
+                    </div>
+                  }
+                  <div class="sm:col-span-2">
+                    <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
+                      Email notifications
+                    </dt>
+                    <dd class="mt-1">
+                      <!-- The sentence carries the meaning; the chips are the detail behind it. -->
+                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <p class="text-sm">{{ notifySentence(job) }}</p>
+                        @if (!locked()) {
+                          <button type="button" class="btn btn-default btn-sm"
+                                  (click)="editNotifications(job)">
+                            <app-icon name="edit" size="0.85em" />Change
+                          </button>
+                        }
+                      </div>
+                      <div class="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        @for (chip of notifyChips(job); track chip.label) {
+                          <!-- Colour says on or off and nothing else: tinting "fails" red made
+                               it read as a run outcome on a panel that also shows one. -->
+                          <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
+                                [title]="chip.on
+                                  ? 'An email is sent when this job ' + chip.label
+                                  : 'No email is sent when this job ' + chip.label">
+                            <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
+                          </span>
+                        }
+                      </div>
+                    </dd>
+                  </div>
+                </dl>
+
+                @if (job.taskDetail?.taskDetailId) {
+                  <div class="detail-section">
+                    <div class="flex flex-wrap items-baseline gap-2 mb-2">
+                      <h3 class="text-xs font-semibold uppercase tracking-wider
+                                 text-[color:var(--text-secondary)]">Task payload</h3>
+                      @if (payloadFor(job)) {
+                        <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(job)">
+                          <app-icon name="copy" size="0.85em" />Copy
+                        </button>
+                      }
+                    </div>
+                    @if (payloadFor(job); as payload) {
+                      <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
+                          >{{ payload }}</pre>
+                    } @else if (payloadFor(job) === '') {
+                      <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                    } @else {
+                      <p class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
+                        <app-icon name="refresh" size="0.85em" class="spin" />Reading the task…
+                      </p>
+                    }
+                  </div>
+                }
+
+                <div class="detail-section">
+                  <div class="flex flex-wrap items-baseline gap-2 mb-2">
+                    <h3 class="text-xs font-semibold uppercase tracking-wider
+                               text-[color:var(--text-secondary)]">Recent runs</h3>
+                    @if (runsByJob()[job.jobId]?.length) {
+                      <span class="text-[11px] text-[color:var(--text-muted)]">
+                        Last {{ recentRunBars }} runs, oldest first · how long each took — click a bar for its logs
+                      </span>
+                    }
+                    <a class="link-inline text-xs ml-auto" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']">
+                      <app-icon name="clock" size="0.85em" class="icon-info" />Full history
+                    </a>
+                  </div>
+
+                  @if (runsLoading() === job.jobId) {
+                    <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
+                      <app-icon name="refresh" class="spin" size="0.9em" /> Loading run history…
+                    </p>
+                  } @else if (runsByJob()[job.jobId]?.length) {
+                    <app-bar-chart [data]="runsByJob()[job.jobId]!" [height]="120" [clickable]="true" unit="duration"
+                                   (barClicked)="openRunLogs(job, $event)" />
+                  } @else {
+                    <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
+                      This job has not completed a run yet.
+                    </p>
+                  }
+                </div>
+               </div>
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>
+
+@if (assistantJob(); as job) {
+  <app-assistant-dock [jobId]="String(job.jobId)" [jobName]="job.jobName"
+                      [(minimised)]="assistantMinimised" (closed)="assistantJob.set(null)" />
+}

@@ -1,0 +1,315 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Dashboard</h1>
+      <p class="page-subtitle">
+        <!-- The range as the console writes a day ("24 Sep 2026"); the date boxes keep the ISO value. -->
+        Showing {{ dayLabel(appliedStart()) }} to {{ dayLabel(appliedEnd()) }}@if (scopeLabel(); as scope) {, {{ scope }}}
+        <!-- The figures follow job events on their own; this says how fresh they are. -->
+        @if (updatedAt(); as at) { · Updated {{ at | serverTime:'time' }} }
+      </p>
+    </div>
+    <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
+         buttons need 454px, which overflowed the page on a phone. -->
+    <div class="flex flex-wrap items-end gap-2">
+      <div class="flex-1 min-w-[9.5rem] sm:flex-none">
+        <label class="label" for="from">From</label>
+        <app-date-field inputId="from" label="From" [value]="startDate()" [max]="endDate()"
+                        (valueChange)="startDate.set($event)" />
+      </div>
+      <div class="flex-1 min-w-[9.5rem] sm:flex-none">
+        <label class="label" for="to">To</label>
+        <app-date-field inputId="to" label="To" [value]="endDate()" [min]="startDate()"
+                        (valueChange)="endDate.set($event)" />
+      </div>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!!rangeError()" (click)="applyRange()"><app-icon name="filter" />Apply</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <!-- A full row of its own under the boxes, so the reason sits beside the fields it is about. -->
+      @if (rangeError()) {
+        <p id="range-error" class="field-note text-crit-500 basis-full" role="alert">{{ rangeError() }}</p>
+      }
+    </div>
+  </div>
+
+  @if (error()) {
+    <!-- Every read was refused for the same reason (a date the server will not take): one
+         sentence, once, rather than the same one on every card. -->
+    <div class="card"><app-load-error [message]="error()" (retry)="load()" /></div>
+  } @else {
+    <!-- KPI tiles. Only Unread goes anywhere, so only it is a link. A tile whose read failed shows
+         a dash rather than a zero that reads like a real count; Unread never depends on those reads. -->
+    <app-blur-loader [active]="loading()" label="Loading…">
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <app-stat-tile label="Total jobs"  [value]="errors().status ? '—' : totalJobs()"  icon="briefcase" tone="info" />
+        <app-stat-tile label="Active jobs" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok" />
+        <app-stat-tile label="Running now" [value]="errors().running ? '—' : runningNow()" icon="play" tone="info" />
+        <app-stat-tile label="Last run completed" [value]="errors().running ? '—' : completed()" foot="jobs" icon="checkCircle" tone="ok" />
+        <app-stat-tile label="Last run failed" [value]="errors().running ? '—' : failed()" foot="jobs" icon="xCircle" tone="crit" />
+        <!-- h-full on the link and the tile: the other tiles are grid items and stretch to the row,
+             this one sits inside a link and stayed at its own height, shorter than its neighbours. -->
+        <a routerLink="/notifications" class="block h-full rounded-card hover:shadow-md transition-shadow"
+           [attr.aria-label]="unread() + ' unread notifications'">
+          <app-stat-tile class="h-full" label="Unread" [value]="unread()" icon="bell" tone="warn" />
+        </a>
+      </div>
+    </app-blur-loader>
+  }
+
+  <app-billing-brief [compact]="true" [headingLevel]="2" />
+
+  @if (!error()) {
+    <app-blur-loader [active]="loading()">
+      <div class="space-y-5">
+        <!-- Charts. Each card shows why its own read failed, with a Try again for that read only. -->
+        <div class="grid lg:grid-cols-3 gap-4">
+          <div class="card p-4">
+            <h2 class="text-sm font-semibold mb-3">Job status</h2>
+            @if (errors().status; as reason) {
+              <app-load-error [message]="reason" (retry)="retry('status')" />
+            } @else {
+              <!-- Status colours, so Inactive is amber like its pill rather than the next palette slot,
+                   a pink that read as Failed. -->
+              <app-donut [data]="statusCategories()" totalLabel="jobs" [colorFor]="outcomeColor" />
+            }
+          </div>
+
+          <div class="card p-4">
+            <!-- jobRunningStatistics counts jobs by the state of their latest run, not runs: a job
+                 that ran two hundred times contributes one. Labelled "runs" it read as a run count and
+                 disagreed with the two charts beside it, which do count runs. -->
+            <h2 class="text-sm font-semibold mb-3">Jobs by last outcome</h2>
+            @if (errors().running; as reason) {
+              <app-load-error [message]="reason" (retry)="retry('running')" />
+            } @else {
+              <app-donut [data]="jobRunning()" totalLabel="jobs" [colorFor]="outcomeColor" />
+            }
+          </div>
+
+          <div class="card p-4">
+            <h2 class="text-sm font-semibold mb-3">Queue volume by day</h2>
+            @if (errors().hourly; as reason) {
+              <app-load-error [message]="reason" (retry)="retry('hourly')" />
+            } @else {
+              <app-bar-chart [data]="dayBars()" [height]="104" emptyMessage="No runs in this range." />
+            }
+          </div>
+        </div>
+
+        <!-- Hour x weekday heatmap -->
+        <div class="card p-4">
+          <div class="flex flex-wrap items-baseline gap-2 mb-4">
+            <h2 class="text-sm font-semibold">Queue activity by hour</h2>
+            <span class="text-xs text-[color:var(--text-muted)]">
+              Click any cell to see which jobs ran in that hour
+            </span>
+          </div>
+          @if (errors().hourly; as reason) {
+            <app-load-error [message]="reason" (retry)="retry('hourly')" />
+          } @else {
+            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
+          }
+        </div>
+      </div>
+    </app-blur-loader>
+  }
+
+  <!-- Drill-down breakdown -->
+  @if (selectedCell(); as cell) {
+    <!-- Opening a cell scrolls here and focuses it. scroll-mt clears the sticky top bar. -->
+    <section id="dash-drill" tabindex="-1" class="scroll-mt-20 outline-none"
+             [attr.aria-label]="drillHeading()">
+      <!-- The table shell's loading, error (with Try again) and empty states; the card used to
+           hand-roll them and had no error state, so a failed read said "No jobs ran in this hour." -->
+      <!-- A fixed key: the heading changes with every hour, and the hidden columns went with it. -->
+    <app-table-shell columnsKey="dashboard-hour" [heading]="drillHeading()"
+                       [loading]="breakdownLoading()" [error]="breakdownError()"
+                       [isEmpty]="!filteredBreakdown().length"
+                       [shown]="breakdownRows().length ? filteredBreakdown().length : null"
+                       [total]="breakdownRows().length ? breakdownRows().length : null"
+                       [emptyMessage]="breakdownSearch() ? 'No jobs match your search.' : 'No jobs ran in this hour.'"
+                       emptyIcon="clock"
+                       (retry)="retryBreakdown()">
+        <ng-container toolbar>
+          <!-- Over more than a week one cell is several dates; the breakdown is for one of them. -->
+          @if (cell.dates.length > 1) {
+            <div class="seg max-w-full overflow-x-auto" role="group" [attr.aria-label]="'Dates in this cell'">
+              @for (date of cell.dates; track date) {
+                <button type="button" class="seg-btn tabular" [class.seg-on]="date === cell.date"
+                        [attr.aria-pressed]="date === cell.date" (click)="pickDate(date)">{{ date | serverTime:'day' }}</button>
+              }
+            </div>
+          }
+          <div class="search-field max-w-56">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" [placeholder]="seesWorkspaces() ? 'Search job id, name or workspace' : 'Search job id or name'"
+                   aria-label="Search jobs in this hour"
+                   [value]="breakdownSearch()" (input)="onBreakdownSearch($any($event.target).value)" />
+          </div>
+          <button type="button" class="btn btn-ghost btn-sm" (click)="clearCell()"><app-icon name="close" />Close</button>
+        </ng-container>
+
+        <!-- A busy hour returns every job that ran in it: one cell held 500 rows and ran the page
+             to 27,000px. The shell scrolls the rows in their own box, and the pager keeps that box
+             a readable size. -->
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  <th>Job</th>
+                  <!-- Whose job it is, for the one role whose hour mixes workspaces. -->
+                  @if (seesWorkspaces()) {
+                    <th>Workspace</th>
+                  }
+                  @for (column of visibleColumns(); track column) {
+                    <th class="text-right">{{ column }}</th>
+                  }
+                  <!-- Total is pinned so the key figure stays on screen however far the row
+                       runs; below md the Breakdown bar is dropped so Total is the last column. -->
+                  <th class="text-right col-pin-right">Total</th>
+                  <th class="w-28 hidden md:table-cell">Breakdown</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of pagedBreakdown(); track row.jobId) {
+                  <tr>
+                    <td class="max-w-64">
+                      <div class="font-medium truncate" [title]="row.jobName">{{ row.jobName }}</div>
+                      <div class="mono text-[color:var(--text-muted)]">#{{ row.jobId }}</div>
+                    </td>
+                    @if (seesWorkspaces()) {
+                      <td class="max-w-48 truncate text-[color:var(--text-secondary)]" [title]="workspaceName(row)">
+                        {{ workspaceName(row) }}
+                      </td>
+                    }
+                    @for (column of visibleColumns(); track column) {
+                      <td class="text-right tabular !p-0">
+                        <!-- Without the Jobs page the counts would land on /unauthorized: figures, not links. -->
+                        @if (canOpenJobs()) {
+                          <button type="button"
+                                  class="w-full h-full px-4 py-2.5 text-right tabular rounded-sm
+                                         hover-brand
+                                         focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                         disabled:hover:bg-transparent"
+                                  [class.text-[color:var(--text-muted)]]="!countFor(row, column)"
+                                  [disabled]="!countFor(row, column)"
+                                  [title]="countFor(row, column)
+                                    ? 'View the ' + column + ' runs for this job in this hour'
+                                    : 'No ' + column + ' runs'"
+                                  (click)="openCount(row, column, countFor(row, column))">
+                            {{ countFor(row, column) }}
+                          </button>
+                        } @else {
+                          <span class="block px-4 py-2.5 text-right tabular" [class.text-[color:var(--text-muted)]]="!countFor(row, column)">{{ countFor(row, column) }}</span>
+                        }
+                      </td>
+                    }
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right">
+                      @if (canOpenJobs()) {
+                        <button type="button"
+                                class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                       hover-brand
+                                       focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]"
+                                [disabled]="!row.total"
+                                title="View every run for this job in this hour"
+                                (click)="openCount(row, 'Total', row.total)">
+                          {{ row.total }}
+                        </button>
+                      } @else {
+                        <span class="block px-4 py-2.5 text-right tabular font-semibold">{{ row.total }}</span>
+                      }
+                    </td>
+                    <td class="hidden md:table-cell">
+                      <div class="flex h-2 rounded-full overflow-hidden bg-sunken"
+                          >
+                        @for (segment of segmentsFor(row); track segment.key) {
+                          <span [style.width.%]="segment.pct"
+                                [style.background]="outcomeColor(segment.key)"
+                                [title]="segment.key + ': ' + segment.count"></span>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+              @if (breakdownTotal(); as totals) {
+                <tfoot>
+                  <tr class="border-t-2 border-strong">
+                    <td class="font-semibold">
+                      Total
+                      <span class="font-normal text-[color:var(--text-muted)]">
+                        · {{ filteredBreakdown().length }} job{{ filteredBreakdown().length === 1 ? '' : 's' }}
+                      </span>
+                    </td>
+                    <!-- A blank under Workspace keeps each total under its own heading, and lets the
+                         Columns menu hide this cell along with the column. -->
+                    @if (seesWorkspaces()) {
+                      <td></td>
+                    }
+                    @for (column of visibleColumns(); track column) {
+                      <td class="text-right tabular font-semibold !p-0">
+                        @if (canOpenJobs()) {
+                          <button type="button"
+                                  class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                         hover-brand
+                                         focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                         disabled:hover:bg-transparent"
+                                  [class.text-[color:var(--text-muted)]]="!countFor(totals, column)"
+                                  [class.font-normal]="!countFor(totals, column)"
+                                  [disabled]="!countFor(totals, column)"
+                                  [title]="countFor(totals, column)
+                                    ? 'View the ' + column + ' runs across every job in this hour'
+                                    : 'No ' + column + ' runs'"
+                                  (click)="openTotal(column, countFor(totals, column))">
+                            {{ countFor(totals, column) }}
+                          </button>
+                        } @else {
+                          <span class="block px-4 py-2.5 text-right tabular font-semibold" [class.text-[color:var(--text-muted)]]="!countFor(totals, column)" [class.font-normal]="!countFor(totals, column)">{{ countFor(totals, column) }}</span>
+                        }
+                      </td>
+                    }
+                    <!-- The pinned cell paints its own ground; the footer row's is inset, not raised. -->
+                    <td class="text-right tabular font-semibold !p-0 col-pin-right bg-[color:var(--surface-inset)]">
+                      @if (canOpenJobs()) {
+                        <button type="button"
+                                class="w-full h-full px-4 py-2.5 text-right tabular font-semibold rounded-sm
+                                       hover-brand
+                                       focus:outline-none focus:ring-2 focus:ring-[color:var(--focus-ring)]
+                                       disabled:hover:bg-transparent"
+                                [disabled]="!totals.total"
+                                title="View every run across every job in this hour"
+                                (click)="openTotal('Total', totals.total)">
+                          {{ totals.total }}
+                        </button>
+                      } @else {
+                        <span class="block px-4 py-2.5 text-right tabular font-semibold">{{ totals.total }}</span>
+                      }
+                    </td>
+                    <td class="hidden md:table-cell">
+                      <!-- The track behind the segments. It asked for var(--surface), a token
+                           defined nowhere, so it resolved to nothing and the groove was invisible
+                           whenever the segments did not fill the row. -->
+                      <div class="flex h-2 rounded-full overflow-hidden bg-sunken">
+                        @for (segment of segmentsFor(totals); track segment.key) {
+                          <span [style.width.%]="segment.pct"
+                                [style.background]="outcomeColor(segment.key)"
+                                [title]="segment.key + ': ' + segment.count"></span>
+                        }
+                      </div>
+                    </td>
+                  </tr>
+                </tfoot>
+              }
+            </table>
+
+          <!-- In the shell's pager slot, outside the scroll box, so the controls do not scroll
+               away with the rows. -->
+          <app-pagination pager [total]="filteredBreakdown().length" [page]="breakdownPager.page()"
+                          [size]="breakdownPager.size()"
+                          (goTo)="goToBreakdownPage($event)"
+                          (setSize)="setBreakdownPageSize($event)" />
+      </app-table-shell>
+    </section>
+  }
+</div>

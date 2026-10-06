@@ -1,0 +1,533 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Run analytics</h1>
+      <p class="page-subtitle">
+        What your runs did in this range — how many succeeded, which tasks are struggling,
+        and what failed.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-ghost btn-sm" (click)="toggleBuilder()"
+              [attr.aria-expanded]="showBuilder()">
+        <app-icon [name]="showBuilder() ? 'chevronDown' : 'chevronRight'" />Build your own view
+      </button>
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </div>
+  </div>
+
+  <!-- Range. Kept as the app's two native date inputs rather than a new picker component:
+       every other screen does it this way, and matching costs nothing. -->
+  <div class="card p-4">
+    <div class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="label"
+               for="r-from">From</label>
+        <app-date-field class="mt-1" inputId="r-from" label="From" [value]="startDate()" (valueChange)="setStart($event)" />
+      </div>
+      <div>
+        <label class="label"
+               for="r-to">To</label>
+        <app-date-field class="mt-1" inputId="r-to" label="To" [value]="endDate()" (valueChange)="setEnd($event)" />
+      </div>
+      @if (!loading() && !error()) {
+        <span class="pill pill-neutral mb-1.5">{{ counts().total }} runs</span>
+      }
+      <div class="ml-auto flex flex-wrap items-end gap-2">
+        <!-- Every one of these narrows data(), which is what the tiles, all three charts, the
+             task table and the pivot builder all read. There is one predicate, so there is no
+             way for a filter to reach some of the page and not the rest. -->
+        <div>
+          <label class="label"
+                 for="r-f-task">Task</label>
+          <div class="w-44 mt-1"><app-combobox id="r-f-task" [selected]="taskFilter()" (selectedChange)="taskFilter.set($event)"
+                    placeholder="All tasks" clearLabel="All tasks" [options]="asOptions(taskOptions())" /></div>
+        </div>
+        <div>
+          <label class="label"
+                 for="r-f-job">Job</label>
+          <div class="w-44 mt-1"><app-combobox id="r-f-job" [selected]="jobFilter()" (selectedChange)="jobFilter.set($event)"
+                    placeholder="All jobs" clearLabel="All jobs" [options]="asOptions(jobOptions())" /></div>
+        </div>
+        <div>
+          <label class="label"
+                 for="r-f-status">Outcome</label>
+          <select id="r-f-status" class="input max-w-36 mt-1" [value]="statusFilter()"
+                  (change)="statusFilter.set($any($event.target).value)">
+            <option value="">All outcomes</option>
+            @for (option of statusOptions(); track option) { <option [value]="option">{{ option }}</option> }
+          </select>
+        </div>
+        @if (showTenantFilter()) {
+          <div>
+            <label class="label"
+                   for="r-f-tenant">Workspace</label>
+            <div class="w-44 mt-1"><app-combobox id="r-f-tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event)"
+                    placeholder="All workspaces" clearLabel="All workspaces" [options]="asOptions(tenantOptions())" /></div>
+          </div>
+        }
+        <div>
+          <label class="label"
+                 for="r-f-owner">Owner</label>
+          <div class="w-40 mt-1"><app-combobox id="r-f-owner" [selected]="ownerFilter()" (selectedChange)="ownerFilter.set($event)"
+                    placeholder="All owners" clearLabel="All owners" [options]="asOptions(ownerOptions())" /></div>
+        </div>
+      </div>
+      @if (truncated()) {
+        <span class="pill pill-warn mb-1.5">
+          <app-icon name="alert" size="0.85em" />Capped
+        </span>
+        <p class="w-full text-xs text-crit-500 mt-1">
+          Only the most recent runs were read. Every figure below describes that sample, not
+          the whole range — narrow the dates for exact numbers.
+        </p>
+      }
+    </div>
+  </div>
+
+  @if (activeFilters().length) {
+    <!-- Stated, not implied. Every figure below describes the narrowed set, and a reader who
+         cannot see that a filter is on will read the numbers as the whole range. -->
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-[color:var(--text-muted)]">Filtered to</span>
+      @for (filter of activeFilters(); track filter.key) {
+        <button type="button" class="pill pill-brand" (click)="clearFilter(filter.key)"
+                [title]="'Remove the ' + filter.label + ' filter'">
+          {{ filter.label }}: {{ filter.value }}<app-icon name="close" size="0.8em" />
+        </button>
+      }
+      <button type="button" class="btn btn-ghost btn-xs" (click)="clearFilters()">Clear all</button>
+      <span class="text-xs text-[color:var(--text-muted)]">
+        {{ counts().total }} of {{ rawData().rows.length }} runs
+      </span>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="card p-12 text-center" role="status" aria-live="polite">
+      <div class="spinner mx-auto mb-3" aria-hidden="true"></div>
+      <p class="text-sm text-[color:var(--text-muted)]">Reading your runs…</p>
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center">
+      <app-icon name="alert" size="1.75em" class="icon-crit" />
+      <p class="mt-2 text-sm text-crit-500" role="alert">{{ error() }}</p>
+      <!-- A bad date range is not a failed request, and retrying it cannot succeed: the offer
+           to "Try again" sent the reader round the same loop until they noticed the dates
+           themselves. Only a request that actually failed gets a retry; a bad range gets the
+           one control that resolves it. -->
+      @if (rangeValid()) {
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()"><app-icon name="refresh" />Try again</button>
+      } @else {
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="resetRange()">
+          Reset to the last 30 days
+        </button>
+      }
+    </div>
+  } @else if (!hasRows()) {
+    <div class="card p-12 text-center">
+      <app-icon name="chart" size="1.75em" class="icon-muted" />
+      @if (activeFilters().length) {
+        <!-- The filters are why the page is empty, not the dates. -->
+        <p class="mt-3 text-sm text-[color:var(--text-secondary)]">No run matches these filters.</p>
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="clearFilters()"><app-icon name="close" />Clear all</button>
+      } @else {
+        <p class="mt-3 text-sm text-[color:var(--text-secondary)]">No runs started in this range.</p>
+        <p class="mt-1 text-xs text-[color:var(--text-muted)]">
+          Widen the dates, or run a job from the Jobs screen to see it here.
+        </p>
+      }
+    </div>
+  } @else {
+
+    <!-- ── Overview ───────────────────────────────────────────────────────────────────── -->
+    <section class="space-y-3">
+      <div>
+          <h2 class="section-title">Overview</h2>
+        <p class="section-sub">Every run due between the two dates above — started, skipped or missed.
+          @if (showTenantFilter() && !tenantFilter()) {
+            <strong>These totals combine {{ tenantOptions().length }} workspaces</strong> —
+            pick one above to separate them.
+          }
+        </p>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <app-stat-tile label="Runs" [value]="counts().total" icon="play"
+                       [foot]="runsFoot()" />
+        <app-stat-tile label="Failed" [value]="counts().failed" icon="alert"
+                       [tone]="counts().failed ? 'crit' : 'muted'" [foot]="failedFoot()" />
+        <!-- A dash, not a zero, when nothing has settled: 0% in red says everything failed,
+             which is the opposite of "nothing has finished yet". -->
+        <app-stat-tile label="Success rate" icon="check"
+                       [value]="settled() ? successRate() + '%' : '—'"
+                       [tone]="!settled() ? 'muted'
+                               : successRate() >= 90 ? 'ok'
+                               : successRate() >= 70 ? 'warn' : 'crit'"
+                       [foot]="successFoot()" />
+        <app-stat-tile label="Median duration" [value]="formatDuration(medianDuration())"
+                       icon="clock" [foot]="durationFoot()" />
+      </div>
+    </section>
+
+    <!-- ── Shape ──────────────────────────────────────────────────────────────────────── -->
+    <section class="space-y-3">
+      <div>
+        <h2 class="section-title">Outcomes and timing</h2>
+        <p class="section-sub">
+          How the runs came out, how long they took, and when they happened.
+        </p>
+      </div>
+      <!-- min-w-0 on each card, not decoration: a grid item's automatic minimum is its
+           min-content width, so at phone width the donut's legend row pushed the auto track
+           to 411px inside a 343px grid and the whole PAGE scrolled sideways. -->
+      <div class="grid gap-3 lg:grid-cols-3">
+        <div class="card p-4 min-w-0">
+          <h3 class="text-sm font-semibold">Outcome mix</h3>
+          <p class="field-note text-[color:var(--text-muted)] mb-3">
+            Only outcomes that occurred. Skipped and missed runs are counted: they were due,
+            even though they never ran.
+          </p>
+          <app-donut [data]="outcomeMix()" totalLabel="runs" [colorFor]="statusColor" />
+        </div>
+
+        <div class="card p-4 min-w-0">
+          <h3 class="text-sm font-semibold">Duration spread</h3>
+          <p class="field-note text-[color:var(--text-muted)] mb-3">
+            Queued to finished. There is no execution-start timestamp, so the dispatcher's wait
+            is inside every figure — the once-a-minute poll is most of the spread below.
+            @if (untimed()) { {{ untimed() }} run(s) with no recorded end time are excluded. }
+          </p>
+          <app-histogram [values]="durations()" [format]="formatDuration" [height]="132"
+                         emptyMessage="No run has finished in this range yet." />
+        </div>
+
+        <div class="card p-4 min-w-0">
+          <h3 class="text-sm font-semibold">Runs by day</h3>
+          <p class="field-note text-[color:var(--text-muted)] mb-3">
+            @if (activeDays() <= 1) {
+              All of these runs happened on one day — there is no trend to read yet.
+            } @else {
+              Runs on {{ activeDays() }} of {{ runsByDay().length }} days. Days with no runs are
+              shown as gaps, not skipped.
+            }
+            @if (daysCapped()) { Showing the most recent {{ runsByDay().length }} days. }
+            Stacked by outcome; pick a bar to narrow the range to that day.
+            @if (undatedRuns()) {
+              {{ undatedRuns() }} run(s) have no recorded day and are not plotted.
+            }
+          </p>
+          <app-bar-chart [data]="runsByDay()" [height]="132" [clickable]="true"
+                         (barClicked)="focusDay($event)"
+                         emptyMessage="No runs to plot in this range." />
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Task health ────────────────────────────────────────────────────────────────── -->
+    <section class="space-y-3">
+      <div>
+        <h2 class="section-title">Task health</h2>
+        <p class="section-sub">
+          Median and Slowest are queued-to-finished, so the dispatcher's wait is inside them —
+          the builder's Execution measures have it taken out.
+          Every task that ran, worst first.
+          @if (unhealthyTasks()) {
+            <strong>{{ unhealthyTasks() }}</strong> of {{ taskHealth().length }} had a failure.
+          } @else {
+            Nothing failed in this range.
+          }
+        </p>
+      </div>
+      <app-table-shell heading="Tasks" [shown]="healthRows().length" [total]="taskHealth().length"
+                       [isEmpty]="!healthRows().length"
+                       [emptyMessage]="taskHealth().length ? 'No task matches.' : 'No task ran in this range.'" emptyIcon="chart">
+        <ng-container toolbar>
+          <!-- At a hundred tasks the worst-first order is not enough: the chips cut the list to
+               the tasks that need looking at, the search finds one by name. -->
+          <button type="button" class="pill pill-crit hover-brand" [class.is-on]="healthState() === 'failing'" [attr.aria-pressed]="healthState() === 'failing'"
+                  (click)="setHealthState('failing')" title="Tasks with at least one failed run">{{ unhealthyTasks() }} failing</button>
+          <button type="button" class="pill pill-warn hover-brand" [class.is-on]="healthState() === 'inflight'" [attr.aria-pressed]="healthState() === 'inflight'"
+                  (click)="setHealthState('inflight')" title="Tasks with a run still going">{{ inFlightTasks() }} in flight</button>
+          <button type="button" class="pill pill-ok hover-brand" [class.is-on]="healthState() === 'healthy'" [attr.aria-pressed]="healthState() === 'healthy'"
+                  (click)="setHealthState('healthy')" title="Tasks whose every run completed">{{ taskHealth().length - unhealthyTasks() - inFlightTasks() }} healthy</button>
+          <div class="search-field max-w-56">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Find a task" aria-label="Find a task" [value]="healthSearch()" (input)="setHealthSearch($any($event.target).value)" />
+          </div>
+        </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th class="text-right hidden lg:table-cell" title="Distinct jobs that drove this task">Jobs</th>
+              <th class="text-right">Runs</th>
+              <!-- One column per outcome, not a single "Failed": Interrupt is a different
+                   problem from Failed (the run was stopped, not broken), and Skip and Missed
+                   are the only trace a task leaves when it never ran at all. -->
+              @for (col of outcomeColumns; track col.status) {
+                <th class="text-right" [title]="col.title">{{ col.label }}</th>
+              }
+              <th class="text-right">Success</th>
+              <th class="text-right">Median</th>
+              <th class="text-right hidden xl:table-cell" title="Slowest finished run">Slowest</th>
+              <th class="hidden md:table-cell">Last run</th>
+              <!-- Pinned right: at 1024 the verdict was the column past the card edge, and the
+                   Interrupted, Skipped and Missed columns must stay (see above). -->
+              <th class="text-right col-pin-right">State</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (task of healthPage(); track task.task) {
+              <tr>
+                <td class="max-w-64">
+                  <button type="button" class="link-inline font-medium text-left max-w-full block"
+                          (click)="focusTask(task.task)"
+                          [title]="taskFilter() === task.task
+                                   ? 'Remove the filter on ' + task.task
+                                   : 'Filter the whole page to ' + task.task">
+                    <span class="block truncate">{{ task.task }}</span></button>
+                  <div class="text-xs text-[color:var(--text-muted)]">{{ task.why }}</div>
+                </td>
+                <td class="text-right tabular hidden lg:table-cell">{{ task.jobs }}</td>
+                <td class="text-right tabular">{{ task.runs }}</td>
+                @for (col of outcomeColumns; track col.status) {
+                  <td class="text-right tabular"
+                      [class.text-[color:var(--text-muted)]]="!task.outcomes[col.status]"
+                      [class.text-crit-500]="col.tone === 'crit' && task.outcomes[col.status] > 0"
+                      [class.text-warn-500]="col.tone === 'warn' && task.outcomes[col.status] > 0">
+                    {{ task.outcomes[col.status] || 0 }}
+                  </td>
+                }
+                <td class="text-right tabular">
+                  {{ task.successRate >= 0 ? task.successRate + '%' : '—' }}
+                </td>
+                <td class="text-right tabular mono text-xs">
+                  {{ formatDuration(task.median) }}
+                </td>
+                <td class="text-right tabular mono text-xs hidden xl:table-cell">
+                  {{ formatDuration(task.slowest) }}
+                </td>
+                <td class="hidden md:table-cell mono text-xs
+                           text-[color:var(--text-muted)]">{{ task.lastDay ? dayLabel(task.lastDay) : '—' }}</td>
+                <td class="text-right col-pin-right">
+                  <span class="pill"
+                        [class.pill-ok]="task.tone === 'ok'"
+                        [class.pill-warn]="task.tone === 'warn'"
+                        [class.pill-crit]="task.tone === 'crit'"
+                        [title]="task.why">{{ task.state }}</span>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <app-pagination pager [total]="healthRows().length" [page]="healthPager.page()" [size]="healthPager.size()"
+                        (goTo)="healthPager.goTo($event, healthRows().length)" (setSize)="healthPager.setSize($event)" />
+      </app-table-shell>
+    </section>
+
+    <!-- ── Failures ───────────────────────────────────────────────────────────────────── -->
+    @if (counts().failed) {
+      <section class="space-y-3">
+        <div>
+          <h2 class="section-title">What failed, and why</h2>
+          <p class="section-sub">
+            The error each failed run reported. Open a job for its full run history, or a run
+            for the lines the pipeline wrote while it was failing.
+          </p>
+        </div>
+        <!-- [total] is the same population as [shown]. It used to be counts().failed, which
+             comes from the runs feed while the rows come from fetchLogs: the two filter on
+             different date columns, so the header could read "(5 of 4)". -->
+        <!-- The same message with its numbers taken out is one reason. Sixty failed rows were
+             four reasons; this says so first, and a reason narrows the list under it. -->
+        @if (failureReasons().length > 1) {
+          <div class="card p-4">
+            <div class="flex items-baseline gap-2 mb-2">
+              <h3 class="font-semibold text-sm">By reason</h3>
+              <span class="text-xs text-[color:var(--text-muted)]">{{ failureReasons().length }} distinct · click one to narrow the list</span>
+            </div>
+            <ul class="reason-list">
+              @for (r of failureReasons().slice(0, 8); track r.key) {
+                <li>
+                  <button type="button" class="reason-row" [class.is-on]="failureReason() === r.key" [attr.aria-pressed]="failureReason() === r.key" (click)="setFailureReason(r.key)" [title]="r.sample">
+                    <span class="reason-count tabular">{{ r.count }}</span>
+                    <span class="reason-bar"><span class="reason-fill" [style.width.%]="(r.count / failureReasons()[0].count) * 100"></span></span>
+                    <span class="reason-text mono truncate">{{ r.sample }}</span>
+                    <span class="reason-meta">{{ r.count === 1 ? 'run' : 'runs' }} across {{ r.tasks }} task{{ r.tasks === 1 ? '' : 's' }}</span>
+                  </button>
+                </li>
+              }
+            </ul>
+          </div>
+        }
+        <app-table-shell heading="Failed runs" [loading]="failuresLoading()"
+                         [error]="failuresError()" [shown]="failureRows().length"
+                         [total]="visibleFailures().length" [isEmpty]="!failureRows().length"
+                         [emptyMessage]="visibleFailures().length ? 'No failed run matches.' : 'No failure detail was returned for this range.'"
+                         emptyIcon="alert" (retry)="retryFailures()">
+          <ng-container toolbar>
+            @if (failureReason()) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="setFailureReason(failureReason())"><app-icon name="close" />Clear reason</button>
+            }
+            <div class="search-field max-w-56">
+              <app-icon name="search" size="0.95em" />
+              <input class="input" placeholder="Find by job, task or error" aria-label="Find a failed run" [value]="failureSearch()" (input)="setFailureSearch($any($event.target).value)" />
+            </div>
+          </ng-container>
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Job</th>
+                <th>Error</th>
+                <th class="hidden lg:table-cell">When</th>
+                <th class="text-right hidden md:table-cell">Took</th>
+                <!-- Status and Logs each under their own header (owner, 2026-10-01): one "Outcome"
+                     header sat over both, so the pill had none. Logs stays pinned right. -->
+                <th>Status</th>
+                <th class="text-right col-pin-right">Logs</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (failure of failurePage(); track failure.jobQueueId) {
+                <tr>
+                  <!-- The drill-through is a real control in the cell, not a click handler on
+                       the row. A bare (click) on a <tr> is reachable by mouse only: no tab
+                       stop, no focus ring, nothing announced. -->
+                  <td class="max-w-52">
+                    <!-- (click) belongs on the BUTTON. It was on the inner span, so the button
+                         took focus and Enter/Space did nothing -- the exact mouse-only defect
+                         the comment above says this markup exists to avoid. -->
+                    <button type="button" class="link-inline font-medium text-left max-w-full block"
+                            (click)="openJobHistory(failure.jobId)"
+                            [title]="'Open the run history for ' + failure.job">
+                      <span class="block truncate">{{ failure.job }}</span></button>
+                    <div class="text-xs text-[color:var(--text-muted)] truncate"
+                         [title]="failure.task">{{ failure.task || '#' + failure.jobQueueId }}</div>
+                  </td>
+                  <td class="max-w-md">
+                    <div class="mono text-xs text-[color:var(--text-secondary)] line-clamp-2"
+                         [title]="failure.message">{{ failure.message }}</div>
+                  </td>
+                  <td class="hidden lg:table-cell mono text-xs
+                             text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when ? (failure.when | serverTime: 'recentSec') : '—' }}</td>
+                  <td class="text-right hidden md:table-cell mono text-xs">
+                    {{ formatDuration(failure.seconds) }}
+                  </td>
+                  <td class="whitespace-nowrap"><app-status [label]="failure.status" /></td>
+                  <td class="text-right col-pin-right">
+                    <!-- Only rendered when the run has an id to open. Every run in this system now
+                         has audit lines, but a control that can open nothing must not be drawn as
+                         though it can. -->
+                    @if (failure.jobId && failure.jobQueueId) {
+                      <button type="button" class="btn btn-ghost btn-xs"
+                              (click)="openRunLogs(failure)"
+                              [title]="'Open the run log for #' + failure.jobQueueId">
+                        <app-icon name="history" size="0.85em" />Logs
+                      </button>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          <app-pagination pager [total]="failureRows().length" [page]="failurePager.page()" [size]="failurePager.size()"
+                          (goTo)="failurePager.goTo($event, failureRows().length)" (setSize)="failurePager.setSize($event)" />
+        </app-table-shell>
+      </section>
+    }
+
+    <!-- ── Model calls ────────────────────────────────────────────────────────────────── -->
+    <!-- Shown when there are calls, and when the read failed: a failure used to look exactly
+         like "no AI calls in this range" -- no section at all. -->
+    @if (aiUsage().length || aiUsageError()) {
+      <section class="space-y-3">
+        <div>
+          <h2 class="section-title">Model calls</h2>
+          <p class="section-sub">
+            What the AI steps and prompt tries in this range cost: every call, whichever prompt
+            made it, with the tokens it spent. A failed call is a refusal before the model was
+            asked (budget, an empty variable) or an answer that never validated.
+          </p>
+        </div>
+        @if (aiUsage().length) {
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <app-stat-tile label="Calls" [value]="aiTotals().calls" icon="sparkle" tone="info" [foot]="aiTotals().prompts + ' prompt' + (aiTotals().prompts === 1 ? '' : 's')" />
+          <app-stat-tile label="Failed" [value]="aiTotals().failed" icon="alert" [tone]="aiTotals().failed ? 'warn' : 'muted'" [foot]="aiTotals().calls ? aiTotals().failedPct + '% of calls' : ''" />
+          <app-stat-tile label="Tokens in" [value]="aiTotals().tokensIn" icon="list" tone="info" foot="what the prompts sent" />
+          <app-stat-tile label="Tokens out" [value]="aiTotals().tokensOut" icon="code" tone="info" foot="what the models answered" />
+        </div>
+        }
+        @if (aiCost(); as cost) {
+          <p class="text-xs text-[color:var(--text-muted)]">
+            Priced from the meter, these calls cost <b class="text-[color:var(--text-primary)] tabular">{{ aiCostText() }}</b> in this range
+            @for (l of cost.lines; track l.meter) { · {{ l.label }} {{ formatMoney(l.amount, cost.currency) }} }
+            · <a routerLink="/billing/usage" class="link-inline">Cost &amp; usage</a>
+          </p>
+        }
+        <app-table-shell heading="Prompts" [shown]="aiUsage().length" [total]="aiUsage().length" [loading]="aiUsageLoading()"
+                         [error]="aiUsageError()" (retry)="loadAiUsage()"
+                         [isEmpty]="!aiUsage().length" emptyMessage="No model call in this range." emptyIcon="sparkle">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th>Prompt</th>
+                <th class="text-right">Calls</th>
+                <th class="text-right">Failed</th>
+                <th class="text-right hidden md:table-cell" title="Runs from the editor's Try it">Tries</th>
+                <th class="text-right">Tokens in</th>
+                <th class="text-right">Tokens out</th>
+                <th class="text-right hidden lg:table-cell">Median</th>
+                <th class="hidden lg:table-cell">Last call</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of aiUsage(); track r.promptName + r.promptId) {
+                <tr>
+                  <!-- The service names calls whose prompt is gone "deleted prompt": said as a row label, not a lower-case name. -->
+                  <td class="max-w-64">
+                    @if (r.promptName === 'deleted prompt') {
+                      <span class="italic text-[color:var(--text-secondary)] truncate block" title="Calls made by prompts that have since been deleted">Prompts since deleted</span>
+                    } @else {
+                      <span class="font-medium truncate block">{{ r.promptName }}</span>
+                    }
+                  </td>
+                  <td class="text-right tabular">{{ r.calls | number }}</td>
+                  <td class="text-right tabular" [class.text-crit-500]="r.failed > 0" [class.text-[color:var(--text-muted)]]="!r.failed">{{ r.failed }}</td>
+                  <td class="text-right tabular hidden md:table-cell text-[color:var(--text-muted)]">{{ r.tries }}</td>
+                  <td class="text-right tabular">{{ r.tokensIn | number }}</td>
+                  <td class="text-right tabular">{{ r.tokensOut | number }}</td>
+                  <td class="text-right tabular mono text-xs hidden lg:table-cell">{{ formatDuration(r.medianMs / 1000) }}</td>
+                  <!-- The viewer's own time: sliced, the UTC string put a 22:59 Chicago call at "03:59" the next day. -->
+                  <td class="hidden lg:table-cell mono text-xs text-[color:var(--text-muted)] whitespace-nowrap"
+                      [title]="r.lastAt ? (r.lastAt | serverTime: 'dateTimeSec') : ''">{{ r.lastAt ? (r.lastAt | serverTime: 'recent') : '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </app-table-shell>
+      </section>
+    }
+
+  }
+
+  <!-- ── The builder ──────────────────────────────────────────────────────────────────
+       [hidden], not @if. An @if DESTROYS the component, so collapsing the builder threw away
+       the reader's dimensions, measure, chart kind and open drill-down; reopening it dropped
+       them back to Task x Job / Runs / Grouped bars. It also refetched nothing, since the
+       data is an input -- so the only thing the destroy achieved was losing the work.
+
+       And outside the loading / error / empty chain for the same reason: inside it, every
+       Refresh, date change or Try again destroyed the builder on the way through "loading". -->
+  <section class="space-y-3" [hidden]="!showBuilder() || loading() || !!error() || !hasRows()">
+      <div>
+        <h2 class="section-title">Build your own view</h2>
+        <p class="section-sub">
+          Group these same runs by any two dimensions, measure them how you like, and export
+          the result.
+        </p>
+      </div>
+      <app-report-pivot [data]="data()" [startDate]="startDate()" [endDate]="endDate()" />
+  </section>
+</div>

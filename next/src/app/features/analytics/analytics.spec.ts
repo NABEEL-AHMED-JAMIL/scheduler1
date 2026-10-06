@@ -1,0 +1,5968 @@
+import { DataGrid } from './data-grid';
+import { ColumnCard } from './column-card';
+import { provideZonelessChangeDetection } from '@angular/core';
+import { throwError } from 'rxjs';
+import { describe, it, expect, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { ToastService } from '../../shared/ui/toast.service';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
+import { Dialog } from '@angular/cdk/dialog';
+import { Subject, of } from 'rxjs';
+import { Analytics, dateOnly, plainDecimal } from './analytics';
+import {
+  AnalysisResult, AnalyticsService, ColumnProfile, DatasetPreview, DatasetProfile, FilterGroup,
+  PreviewShape, QueryResult, QueryRun, SavedAnalysis, SavedQuery,
+} from './analytics.service';
+import { BucketSummary, ObjectSummary, StorageService } from '../objects/storage.service';
+import { API_SUCCESS } from '../../core/api/api.config';
+
+/**
+ * Analytics Studio's frontend, which had no test at all.
+ *
+ * Four things are pinned here and each is pinned because it can drift silently. readable() is a
+ * SECOND COPY of an extension list the server owns in DatasetRef.Format.of -- they agree today,
+ * and nothing but a test would notice the day someone adds a reader on one side only. The four
+ * states of the dataset pane are the whole screen from a reader's point of view and three of them
+ * are failure or waiting, which is where a refactor lands first. The paging bounds and the
+ * carried total are arithmetic against a server contract. And the folder filter has to clear on
+ * navigation, because a filter that survives a folder change hides files in a folder the user
+ * has just opened and looks like an empty bucket.
+ *
+ * Phase two added a fifth thing, and it is the one worth reading first: THE HEDGES ON THE THREE
+ * FIGURES THAT ARE NOT EXACT. A distinct count is a sketch, a null row count is reconstructed
+ * from a percentage rounded to two places, and a text column's min and max are alphabetical.
+ * Those hedges live in the TEMPLATE, so asserting them against the component's signals would
+ * assert nothing -- "the three figures that are not exact" renders the studio and reads the
+ * screen, because the screen is where the claim is made. A refactor that drops the word
+ * "estimated" from beside a number is exactly the kind that leaves every signal test green.
+ */
+
+const SERVER_RESPONSE = <T>(data: T) => ({ status: 'SUCCESS' as const, message: '', data });
+const SERVER_REFUSAL = (message: string) => ({ status: 'ERROR' as const, message, data: undefined });
+
+/**
+ * Every tooltip on the screen, joined. The owner asked (2026-09-28) for the long explanatory
+ * paragraphs to become one line or a tooltip, so several hedges these specs guard now live in a
+ * title attribute: still on the screen, still next to the figure, and still worth pinning.
+ */
+function tipsIn(fixture: { nativeElement: unknown; detectChanges(): void }): string {
+  fixture.detectChanges();
+  return [...(fixture.nativeElement as HTMLElement).querySelectorAll('[title]')]
+    .map(element => element.getAttribute('title') ?? '').join(' ').replace(/\s+/g, ' ');
+}
+
+const MINIO: BucketSummary = { label: 'MinIO Main', bucket: 'minio-main', provider: 'MINIO' };
+const S3: BucketSummary = { label: 'Reports S3', bucket: 'reports-s3', provider: 'S3' };
+const AZURE: BucketSummary = { label: 'Blob Archive', bucket: 'blob-archive', provider: 'AZURE' };
+const FTP: BucketSummary = { label: 'Partner Drop', bucket: 'partner-drop', provider: 'FTP' };
+const FTPS: BucketSummary = { label: 'Secure Drop', bucket: 'secure-drop', provider: 'FTPS' };
+
+// A BUCKET_LIST lookup child, which storage.json/buckets merges into the same list. It has no
+// storage_connection row behind it, so the resolver answers "Storage connection not found." for
+// every file in it; its "provider" is really the lookup's free-text description.
+const LEGACY: BucketSummary = {
+  label: 'Legacy Bucket', bucket: 'legacy-bucket', provider: 'Configured for the object browser',
+};
+
+const CSV_FILE: ObjectSummary = {
+  name: 'sales-2026.csv', key: 'daily/sales-2026.csv', folder: false, size: 4096,
+  lastModified: '2026-09-08T14:55:40.779Z',
+};
+// A SECOND readable file. Two tests below describe opening "another file" and passed CSV_FILE --
+// the one already open -- so what they actually exercised was a re-click on the current row. That
+// only cleared anything because openFile used to reload unconditionally, so the day that became a
+// no-op (which is what a click on the current selection should always have been) both tests failed
+// for a behaviour neither of them was about.
+const OTHER_CSV: ObjectSummary = {
+  name: 'sales-2025.csv', key: 'daily/sales-2025.csv', folder: false, size: 2048,
+  lastModified: '2025-09-08T14:55:40.779Z',
+};
+const TEXT_FILE: ObjectSummary = { name: 'notes.txt', key: 'daily/notes.txt', folder: false };
+const FOLDER: ObjectSummary = { name: 'archive', key: 'archive/', folder: true };
+
+const SCHEMA = {
+  bucket: 'minio-main', path: 'daily/sales-2026.csv', format: 'CSV', multiFile: false,
+  columns: [{ name: 'id', type: 'BIGINT' }, { name: 'amount', type: 'DECIMAL(18,3)' }],
+};
+
+function pageOf(over: Partial<DatasetPreview> = {}): DatasetPreview {
+  return {
+    columns: ['id', 'amount'], rows: [['1', '9.50']], page: 0, pageSize: 100,
+    totalRows: 250, multiFile: false, filtered: false, ...over,
+  };
+}
+
+/**
+ * The shape a request carries when the reader has touched nothing.
+ *
+ * Spelled out rather than left off the assertions, because the ONE field on it that can be
+ * silently wrong is knownTotalFiltered -- and a test that ignored the shape argument would go on
+ * passing while it was omitted. `undefined` properties compare equal to absent ones here, so
+ * this is the whole of what a quiet request says.
+ */
+const PLAIN_SHAPE = { knownTotalFiltered: false };
+
+/**
+ * A studio wired to stubbed services, already past ngOnInit.
+ *
+ * The storage calls answer immediately because browsing is not what is being tested; the
+ * analytics calls hand back a fresh Subject each time so a test can hold the screen in its
+ * loading state, then decide whether that request succeeded or failed.
+ */
+function studioWith(over: { connections?: BucketSummary[]; objects?: ObjectSummary[] } = {}) {
+  const answers: { schema?: Subject<any>; preview?: Subject<any>; profile?: Subject<any> } = {};
+  const listObjects = vi.fn(() => of(SERVER_RESPONSE({ objects: over.objects ?? [] })));
+  const buckets = vi.fn(() => of(SERVER_RESPONSE(over.connections ?? [MINIO])));
+  const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+  const preview = vi.fn(() => (answers.preview = new Subject<any>()).asObservable());
+  const profile = vi.fn(() => (answers.profile = new Subject<any>()).asObservable());
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
+      // The Overview tab reads analytics.json/overview through its own component; here it is an
+      // empty answer so the Studio's specs stay about the Studio.
+      { provide: AnalyticsService, useValue: { schema, preview, profile, overview: () => of({ status: API_SUCCESS, data: { profile: { totalRows: 0, columns: [] }, charts: [], durationMs: 0 } }) } },
+    ],
+  });
+  const studio = TestBed.runInInjectionContext(() => new Analytics());
+  studio.ngOnInit();
+  return { studio, answers, schema, preview, profile, listObjects };
+}
+
+/** Opens CSV_FILE and settles both requests, leaving the pane in its loaded state. */
+function opened(over: Partial<DatasetPreview> = {}) {
+  const harness = studioWith({ objects: [FOLDER, CSV_FILE, TEXT_FILE] });
+  harness.studio.openFile(CSV_FILE);
+  harness.answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+  harness.answers.preview!.next(SERVER_RESPONSE(pageOf(over)));
+  return harness;
+}
+
+// ---------------------------------------------------------------------------------------------
+
+describe('which connections the picker offers', () => {
+  const ALL = [FTP, AZURE, LEGACY, MINIO, S3, FTPS];
+
+  it('offers an object-store connection with no reason against it', () => {
+    const { studio } = studioWith({ connections: ALL });
+    const issues = new Map(studio.connectionOptions().map(o => [o.bucket, o.issue]));
+    expect(issues.get('minio-main')).toBe('');
+    expect(issues.get('reports-s3')).toBe('');
+  });
+
+  it('lists an unreadable connection rather than hiding it, with the reason on it', () => {
+    const { studio } = studioWith({ connections: ALL });
+    // Every one the rail returned is still in the picker; none of them disappeared.
+    expect(studio.connectionOptions().map(o => o.bucket))
+      .toEqual(['partner-drop', 'blob-archive', 'legacy-bucket', 'minio-main', 'reports-s3', 'secure-drop']);
+
+    const issues = new Map(studio.connectionOptions().map(o => [o.bucket, o.issue]));
+    expect(issues.get('partner-drop')).toContain('this connection is FTP');
+    expect(issues.get('secure-drop')).toContain('this connection is FTPS');
+    expect(issues.get('legacy-bucket')).toContain('not configured as an object-storage connection');
+  });
+
+  it('says Azure is unverified rather than untried, matching what the server now refuses', () => {
+    const { studio } = studioWith({ connections: [AZURE, MINIO] });
+    const azure = studio.connectionOptions().find(o => o.bucket === 'blob-archive');
+    expect(azure!.issue).toBe('Analytics Studio has not been verified against Azure Blob yet.');
+  });
+
+  it('treats a connection with no provider recorded as one it cannot read', () => {
+    const { studio } = studioWith({
+      connections: [{ label: 'Half configured', bucket: 'half', provider: '' }, MINIO],
+    });
+    expect(studio.connectionOptions()[0].issue).not.toBe('');
+  });
+
+  it('opens on the first READABLE connection, not simply the first', () => {
+    const { studio } = studioWith({ connections: ALL });
+    expect(studio.connection()).toBe('minio-main');
+  });
+
+  it('refuses to select an unreadable connection, and does not browse it', () => {
+    const { studio, listObjects } = studioWith({ connections: ALL });
+    listObjects.mockClear();
+
+    studio.pickConnection('partner-drop');
+
+    expect(studio.connection()).toBe('minio-main');
+    expect(listObjects).not.toHaveBeenCalled();
+  });
+
+  it('selects nothing, and says so, when not one connection can be read', () => {
+    const { studio } = studioWith({ connections: [FTP, AZURE, LEGACY] });
+    expect(studio.connection()).toBe('');
+    expect(studio.noReadableConnection()).toBe(true);
+  });
+
+  it('does not claim connections are unreadable when there are none at all', () => {
+    const { studio } = studioWith({ connections: [] });
+    expect(studio.noReadableConnection()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('readable() against the server format list', () => {
+  // DatasetRef.Format.of takes the text after the LAST dot, lowercased, and maps exactly these.
+  // Anything else returns null and the resolver refuses the file.
+  const SERVER_READS = ['csv', 'tsv', 'json', 'jsonl', 'ndjson', 'parquet'];
+  const SERVER_REFUSES = ['txt', 'xlsx', 'xls', 'gz', 'zip', 'pdf', 'avro', 'orc', 'log'];
+
+  it('accepts every extension DatasetRef.Format.of maps', () => {
+    const { studio } = studioWith();
+    for (const extension of SERVER_READS) {
+      expect(studio.readable(`daily/part-0.${extension}`), extension).toBe(true);
+    }
+  });
+
+  it('refuses every extension DatasetRef.Format.of returns null for', () => {
+    const { studio } = studioWith();
+    for (const extension of SERVER_REFUSES) {
+      expect(studio.readable(`daily/part-0.${extension}`), extension).toBe(false);
+    }
+  });
+
+  it('reads the LAST extension, so a compressed csv is refused on both sides', () => {
+    const { studio } = studioWith();
+    expect(studio.readable('daily/sales.csv.gz')).toBe(false);
+  });
+
+  it('is case-insensitive, as the server is by lowercasing first', () => {
+    const { studio } = studioWith();
+    expect(studio.readable('DAILY/SALES.PARQUET')).toBe(true);
+    expect(studio.readable('Daily/Sales.Csv')).toBe(true);
+  });
+
+  it('refuses a file with no extension, where the server finds no dot to split on', () => {
+    const { studio } = studioWith();
+    expect(studio.readable('daily/README')).toBe(false);
+    expect(studio.readable('daily/trailing.')).toBe(false);
+  });
+
+  it('does not open a file it says is unreadable', () => {
+    const { studio, schema } = studioWith({ objects: [TEXT_FILE] });
+    studio.openFile(TEXT_FILE);
+    expect(schema).not.toHaveBeenCalled();
+    expect(studio.hasDataset()).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the four states of the dataset pane', () => {
+  it('nothing selected: no dataset, nothing loading, nothing wrong', () => {
+    const { studio } = studioWith({ objects: [CSV_FILE] });
+    expect(studio.hasDataset()).toBe(false);
+    expect(studio.loading()).toBe(false);
+    expect(studio.error()).toBe('');
+    expect(studio.preview()).toBeNull();
+  });
+
+  it('loading: the dataset is named and in flight before either request answers', () => {
+    const { studio } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+
+    expect(studio.hasDataset()).toBe(true);
+    expect(studio.datasetName()).toBe('sales-2026.csv');
+    expect(studio.loading()).toBe(true);
+    expect(studio.error()).toBe('');
+    expect(studio.columns()).toEqual([]);
+  });
+
+  it('loading: still loading between the schema answering and the first page', () => {
+    const { studio, answers } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+
+    expect(studio.loading()).toBe(true);
+    expect(studio.columnCount()).toBe(2);
+    expect(studio.preview()).toBeNull();
+  });
+
+  it('error: a business refusal is shown in the words the server chose', () => {
+    const { studio, answers, preview } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    answers.schema!.next(SERVER_REFUSAL('Storage connection not found.'));
+
+    expect(studio.error()).toBe('Storage connection not found.');
+    expect(studio.loading()).toBe(false);
+    // The page is never asked for once the schema has been refused.
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('error: a transport failure falls back to a sentence rather than a stack trace', () => {
+    const { studio, answers } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    answers.schema!.error({ error: { message: 'Too many analytics queries are running right now.' } });
+
+    expect(studio.error()).toBe('Too many analytics queries are running right now.');
+    expect(studio.loading()).toBe(false);
+  });
+
+  it('error: a failure with no message at all still says something readable', () => {
+    const { studio, answers } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    answers.schema!.error({});
+
+    expect(studio.error()).toBe('The dataset could not be read.');
+  });
+
+  it('error: retry clears it and starts the whole open again', () => {
+    const { studio, answers, schema } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    answers.schema!.next(SERVER_REFUSAL('Storage connection not found.'));
+
+    studio.retry();
+
+    expect(studio.error()).toBe('');
+    expect(studio.loading()).toBe(true);
+    expect(schema).toHaveBeenCalledTimes(2);
+    expect(schema).toHaveBeenLastCalledWith('minio-main', 'daily/sales-2026.csv');
+  });
+
+  it('loaded: columns, rows and the counts that come from two different requests', () => {
+    const { studio } = opened();
+
+    expect(studio.loading()).toBe(false);
+    expect(studio.error()).toBe('');
+    expect(studio.format()).toBe('CSV');
+    expect(studio.multiFile()).toBe(false);
+    expect(studio.columnCount()).toBe(2);
+    expect(studio.rowCount()).toBe(250);
+    expect(studio.preview()!.rows).toEqual([['1', '9.50']]);
+  });
+
+  it('a new connection empties the pane, so no dataset outlives the bucket it came from', () => {
+    const { studio } = opened();
+    studio.pickConnection('minio-main');
+
+    expect(studio.hasDataset()).toBe(false);
+    expect(studio.preview()).toBeNull();
+    expect(studio.columns()).toEqual([]);
+    expect(studio.error()).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('reading a whole folder as one dataset', () => {
+  it('builds the pattern it claims to, from the folder the rail is standing in', () => {
+    const { studio, schema } = studioWith({ objects: [CSV_FILE] });
+    studio.openFolder('archive/2026/');
+    studio.openFolderAsDataset('parquet');
+
+    expect(studio.path()).toBe('archive/2026/*.parquet');
+    expect(schema).toHaveBeenLastCalledWith('minio-main', 'archive/2026/*.parquet');
+  });
+
+  it('has no prefix at the root, where the folder is the bucket itself', () => {
+    const { studio } = studioWith({ objects: [CSV_FILE] });
+    studio.openFolderAsDataset('csv');
+    expect(studio.path()).toBe('*.csv');
+  });
+
+  it('is a pattern and not a file, so nothing claims a size or a modified date', () => {
+    const { studio } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    expect(studio.selected()).not.toBeNull();
+
+    studio.openFolderAsDataset('csv');
+    expect(studio.selected()).toBeNull();
+    expect(studio.modifiedAt()).toBe('');
+  });
+
+  it('names the pattern in the header rather than the folder above it', () => {
+    const { studio } = studioWith({ objects: [CSV_FILE] });
+    studio.openFolder('archive/2026/');
+    studio.openFolderAsDataset('parquet');
+    expect(studio.datasetName()).toBe('*.parquet');
+  });
+
+  it('offers only the formats actually present in the folder, deduplicated and sorted', () => {
+    const { studio } = studioWith({
+      objects: [
+        FOLDER, TEXT_FILE,
+        { name: 'a.parquet', key: 'a.parquet', folder: false },
+        { name: 'b.parquet', key: 'b.parquet', folder: false },
+        { name: 'c.CSV', key: 'c.CSV', folder: false },
+      ],
+    });
+    expect(studio.folderFormats()).toEqual(['csv', 'parquet']);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('paging', () => {
+  it('rounds a partial last page up', () => {
+    expect(opened({ totalRows: 250, pageSize: 100 }).studio.pageCount()).toBe(3);
+    expect(opened({ totalRows: 200, pageSize: 100 }).studio.pageCount()).toBe(2);
+    expect(opened({ totalRows: 1, pageSize: 100 }).studio.pageCount()).toBe(1);
+  });
+
+  it('is no pages at all before anything has been read, and never divides by zero', () => {
+    expect(studioWith().studio.pageCount()).toBe(0);
+    expect(opened({ pageSize: 0 }).studio.pageCount()).toBe(0);
+    expect(opened({ totalRows: 0 }).studio.pageCount()).toBe(0);
+  });
+
+  it('turns forward within range', () => {
+    const { studio, preview } = opened({ page: 0, totalRows: 250 });
+    preview.mockClear();
+
+    studio.nextPage();
+
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
+  });
+
+  it('will not run off the end', () => {
+    const { studio, preview } = opened({ page: 2, totalRows: 250 });
+    preview.mockClear();
+
+    studio.nextPage();
+
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('turns back within range', () => {
+    const { studio, preview } = opened({ page: 2, totalRows: 250 });
+    preview.mockClear();
+
+    studio.previousPage();
+
+    expect(preview).toHaveBeenCalledTimes(1);
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
+  });
+
+  it('will not run off the front', () => {
+    const { studio, preview } = opened({ page: 0, totalRows: 250 });
+    preview.mockClear();
+
+    studio.previousPage();
+
+    expect(preview).not.toHaveBeenCalled();
+  });
+
+  it('turns no page when there is no dataset to turn', () => {
+    const { studio, preview } = studioWith();
+    studio.loadPage(3);
+    expect(preview).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('carrying the row count forward', () => {
+  it('does not send a total on a first load, where nothing has counted the dataset', () => {
+    const { studio, answers, preview } = studioWith({ objects: [CSV_FILE] });
+    studio.openFile(CSV_FILE);
+    answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 0, undefined, undefined, PLAIN_SHAPE);
+  });
+
+  it('sends the total it is already holding on a page turn, so the server skips the COUNT', () => {
+    const { studio, preview } = opened({ page: 0, totalRows: 250 });
+    preview.mockClear();
+
+    studio.nextPage();
+
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
+  });
+
+  it('sends it turning back as well, which is the same dataset counted the same moment ago', () => {
+    const { studio, preview } = opened({ page: 2, totalRows: 250 });
+    preview.mockClear();
+
+    studio.previousPage();
+
+    expect(preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 1, 250, undefined, PLAIN_SHAPE);
+  });
+
+  it('forgets it when the dataset is reopened, because that count is a fresh one', () => {
+    const harness = opened({ page: 0, totalRows: 250 });
+    harness.preview.mockClear();
+
+    harness.studio.retry();
+    harness.answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+
+    expect(harness.preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 0, undefined, undefined, PLAIN_SHAPE);
+  });
+
+  it('carries the total the LAST response gave, not the one the first did', () => {
+    const harness = opened({ page: 0, totalRows: 250 });
+    harness.studio.nextPage();
+    // A folder dataset gaining a file mid-read is exactly why the server is allowed to disagree.
+    harness.answers.preview!.next(SERVER_RESPONSE(pageOf({ page: 1, totalRows: 400 })));
+    harness.preview.mockClear();
+
+    harness.studio.nextPage();
+
+    expect(harness.preview).toHaveBeenCalledWith(
+      'minio-main', 'daily/sales-2026.csv', 2, 400, undefined, PLAIN_SHAPE);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the folder filter', () => {
+  const ENTRIES: ObjectSummary[] = [
+    FOLDER,
+    { name: 'archive-old', key: 'archive-old/', folder: true },
+    CSV_FILE,
+    TEXT_FILE,
+  ];
+
+  it('narrows folders and files together', () => {
+    const { studio } = studioWith({ objects: ENTRIES });
+    expect(studio.filtered()).toBe(false);
+
+    studio.filter.set('archive');
+
+    expect(studio.folders().map(f => f.key)).toEqual(['archive/', 'archive-old/']);
+    expect(studio.files()).toEqual([]);
+    expect(studio.filtered()).toBe(true);
+  });
+
+  it('matches any part of the name, case-insensitively, and trims what was typed', () => {
+    const { studio } = studioWith({ objects: ENTRIES });
+
+    studio.filter.set('  SALES  ');
+
+    expect(studio.files().map(f => f.key)).toEqual(['daily/sales-2026.csv']);
+  });
+
+  it('reports nothing narrowed when the filter matches everything', () => {
+    const { studio } = studioWith({ objects: ENTRIES });
+
+    // A needle every one of the four names contains. The count is asserted first so that a
+    // future entry without an "e" in it fails as a broken premise rather than as a broken
+    // filtered(), which is the mistake this test was originally written with.
+    studio.filter.set('e');
+
+    expect(studio.folders().length + studio.files().length).toBe(ENTRIES.length);
+    expect(studio.filtered()).toBe(false);
+  });
+
+  it('narrows the folder-as-dataset offer to the formats still showing', () => {
+    const { studio } = studioWith({
+      objects: [CSV_FILE, { name: 'x.parquet', key: 'daily/x.parquet', folder: false }],
+    });
+    expect(studio.folderFormats()).toEqual(['csv', 'parquet']);
+
+    studio.filter.set('sales');
+
+    expect(studio.folderFormats()).toEqual(['csv']);
+  });
+
+  it('clears on opening a folder, so it cannot hide what is inside the one just opened', () => {
+    const { studio } = studioWith({ objects: ENTRIES });
+    studio.filter.set('sales');
+    studio.openFolder('archive/');
+    expect(studio.filter()).toBe('');
+  });
+
+  it('clears on a breadcrumb, on the root, and on a new connection', () => {
+    const { studio } = studioWith({ objects: ENTRIES });
+
+    studio.filter.set('sales');
+    studio.goToCrumb('archive/');
+    expect(studio.filter()).toBe('');
+
+    studio.filter.set('sales');
+    studio.goToRoot();
+    expect(studio.filter()).toBe('');
+
+    studio.filter.set('sales');
+    studio.pickConnection('minio-main');
+    expect(studio.filter()).toBe('');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A column profile carrying every field the server sends, so a test can change exactly one.
+ *
+ * The default is a well-behaved BIGINT: complete, plenty of distinct values, a real spread and
+ * nothing far from its own mean. Every quality test below is that column with one thing wrong.
+ */
+function columnOf(over: Partial<ColumnProfile> = {}): ColumnProfile {
+  return {
+    name: 'amount', type: 'BIGINT',
+    min: '1', max: '1000', avg: '412.5', std: '190.25',
+    approxQ25: '210', approxQ50: '400', approxQ75: '780',
+    approxDistinct: 940, nullPercentage: 0, completeness: 100, approxNullRows: 0,
+    allNull: false, constant: false, keyLike: false, typeSurprise: null,
+    ...over,
+  };
+}
+
+/** A text column, which is where the quartiles are absent and min/max are alphabetical. */
+function textColumn(over: Partial<ColumnProfile> = {}): ColumnProfile {
+  return columnOf({
+    name: 'region', type: 'VARCHAR', min: 'alpha', max: 'zulu',
+    avg: null, std: null, approxQ25: null, approxQ50: null, approxQ75: null, ...over,
+  });
+}
+
+function profileOf(columns: ColumnProfile[], totalRows = 1000): DatasetProfile {
+  return {
+    bucket: 'minio-main', path: 'daily/sales-2026.csv', format: 'CSV',
+    multiFile: false, totalRows, columns,
+  };
+}
+
+/** Opens CSV_FILE, moves to the Profile tab and settles the scan. */
+function profiled(columns: ColumnProfile[], totalRows = 1000) {
+  const harness = opened();
+  harness.studio.showTab('profile');
+  harness.answers.profile!.next(SERVER_RESPONSE(profileOf(columns, totalRows)));
+  return harness;
+}
+
+/** The single view of a column, for the tests that only care about one. */
+function viewOf(column: ColumnProfile) {
+  return profiled([column]).studio.profileColumns()[0];
+}
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the profile scan is paid for once, by the reader who asks for it', () => {
+  it('is not requested when a file is opened', () => {
+    // A file open already costs three sessions against a governor that admits four. A fourth on
+    // every open, for a tab most readers never open, is the wrong direction.
+    const { profile } = opened();
+    expect(profile).not.toHaveBeenCalled();
+  });
+
+  it('is requested the first time the Profile tab is opened', () => {
+    const { studio, profile } = opened();
+
+    studio.showTab('profile');
+
+    expect(profile).toHaveBeenCalledTimes(1);
+    expect(profile).toHaveBeenCalledWith('minio-main', 'daily/sales-2026.csv');
+    expect(studio.profileLoading()).toBe(true);
+  });
+
+  it('is requested by the Quality tab too, because it is the same scan', () => {
+    const { studio, profile } = opened();
+    studio.showTab('quality');
+    expect(profile).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not scanned twice when the reader visits both tabs', () => {
+    const harness = profiled([columnOf()]);
+    harness.studio.showTab('quality');
+    harness.studio.showTab('profile');
+    expect(harness.profile).toHaveBeenCalledTimes(1);
+  });
+
+  it('is not requested twice while the first request is still in flight', () => {
+    const { studio, profile } = opened();
+    studio.showTab('profile');
+    studio.showTab('quality');
+    expect(profile).toHaveBeenCalledTimes(1);
+  });
+
+  it('is forgotten when the dataset is reopened, because it describes one dataset', () => {
+    const harness = profiled([columnOf()]);
+    expect(harness.studio.profile()).not.toBeNull();
+
+    harness.studio.retry();
+
+    expect(harness.studio.profile()).toBeNull();
+    expect(harness.studio.profileColumns()).toEqual([]);
+  });
+
+  it('is forgotten when a new connection empties the pane', () => {
+    const harness = profiled([columnOf()]);
+    harness.studio.pickConnection('minio-main');
+    expect(harness.studio.profile()).toBeNull();
+    expect(harness.studio.profileError()).toBe('');
+  });
+
+  it('still moves to the tab it was asked for', () => {
+    const { studio } = opened();
+    studio.showTab('quality');
+    expect(studio.tab()).toBe('quality');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the states of the Profile tab', () => {
+  it('loading: in flight, with nothing to draw and nothing wrong', () => {
+    const { studio } = opened();
+    studio.showTab('profile');
+
+    expect(studio.profileLoading()).toBe(true);
+    expect(studio.profileError()).toBe('');
+    expect(studio.profile()).toBeNull();
+    expect(studio.profileColumns()).toEqual([]);
+  });
+
+  it('error: a business refusal is shown in the words the server chose', () => {
+    const { studio, answers } = opened();
+    studio.showTab('profile');
+
+    answers.profile!.next(SERVER_REFUSAL('Too many analytics queries are running right now.'));
+
+    expect(studio.profileError()).toBe('Too many analytics queries are running right now.');
+    expect(studio.profileLoading()).toBe(false);
+    expect(studio.profile()).toBeNull();
+  });
+
+  it('error: a failure with no message at all still says something readable', () => {
+    const { studio, answers } = opened();
+    studio.showTab('profile');
+    answers.profile!.error({});
+    expect(studio.profileError()).toBe('The dataset could not be profiled.');
+  });
+
+  it('error: coming back to the tab does not silently spend another permit', () => {
+    // The one request per click would be a request per click, against the governor, for a scan
+    // that has just failed. It waits for the Try again the shell already draws.
+    const { studio, answers, profile } = opened();
+    studio.showTab('profile');
+    answers.profile!.next(SERVER_REFUSAL('The dataset could not be read.'));
+    profile.mockClear();
+
+    studio.showTab('data');
+    studio.showTab('profile');
+
+    expect(profile).not.toHaveBeenCalled();
+    expect(studio.profileError()).toBe('The dataset could not be read.');
+  });
+
+  it('error: Try again clears it and scans once more', () => {
+    const { studio, answers, profile } = opened();
+    studio.showTab('profile');
+    answers.profile!.next(SERVER_REFUSAL('The dataset could not be read.'));
+    profile.mockClear();
+
+    studio.loadProfile();
+
+    expect(studio.profileError()).toBe('');
+    expect(studio.profileLoading()).toBe(true);
+    expect(profile).toHaveBeenCalledTimes(1);
+  });
+
+  it('error: a failed scan leaves the rows that did load alone', () => {
+    // Two requests with two fates. A reader on the Data tab must not be told the dataset could
+    // not be read because a tab they have not opened could not be scanned.
+    const { studio, answers } = opened();
+    studio.showTab('profile');
+    answers.profile!.error({ error: { message: 'Analytics query timed out.' } });
+
+    expect(studio.profileError()).toBe('Analytics query timed out.');
+    expect(studio.error()).toBe('');
+    expect(studio.preview()!.rows).toEqual([['1', '9.50']]);
+  });
+
+  it('loaded: the figures the server measured, per column', () => {
+    const { studio } = profiled([columnOf(), textColumn()], 5000);
+
+    expect(studio.profileLoading()).toBe(false);
+    expect(studio.profileError()).toBe('');
+    expect(studio.profileColumns().map(column => column.name)).toEqual(['amount', 'region']);
+    expect(studio.profileColumns()[0].rows).toBe(5000);
+  });
+
+  it('loaded: takes the completeness the server sent rather than subtracting its own', () => {
+    // Two roundings of the same figure disagree by a hundredth on screen sooner or later.
+    const view = viewOf(columnOf({ nullPercentage: 12.34, completeness: 87.66 }));
+    expect(view.filledPercent).toBe(87.66);
+    expect(view.nullPercent).toBe(12.34);
+  });
+
+  it('loaded: a dataset with no rows has no percentage, and does not invent one', () => {
+    const view = viewOf(columnOf({ nullPercentage: null, completeness: null, approxNullRows: null }));
+    expect(view.measured).toBe(false);
+    expect(view.approxNullRows).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the three figures that are not exact', () => {
+  /** The studio rendered, because the hedges are on the screen rather than in the signals. */
+  function renderedStudio() {
+    const answers: { schema?: Subject<any>; preview?: Subject<any>; profile?: Subject<any> } = {};
+    const listObjects = vi.fn(() => of(SERVER_RESPONSE({ objects: [CSV_FILE] })));
+    const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+    const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+    const preview = vi.fn(() => (answers.preview = new Subject<any>()).asObservable());
+    const profile = vi.fn(() => (answers.profile = new Subject<any>()).asObservable());
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
+        // The Overview tab reads analytics.json/overview through its own component; here it is an
+      // empty answer so the Studio's specs stay about the Studio.
+      { provide: AnalyticsService, useValue: { schema, preview, profile, overview: () => of({ status: API_SUCCESS, data: { profile: { totalRows: 0, columns: [] }, charts: [], durationMs: 0 } }) } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Analytics);
+    fixture.detectChanges();
+    const studio = fixture.componentInstance;
+    studio.openFile(CSV_FILE);
+    answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+    answers.preview!.next(SERVER_RESPONSE(pageOf()));
+
+    return {
+      studio,
+      /**
+       * Everything a person can read on the screen, with the template's whitespace collapsed.
+       *
+       * Opens COMPACT and expands every column, because that is where the per-column cards --
+       * and so the three hedged figures -- now live. They had their own tab, which drew the same
+       * scan this table reads; the card moved under the row it describes and the tab went. Every
+       * assertion in this block is about a figure on a card, so the harness follows it.
+       */
+      show(columns: ColumnProfile[], totalRows = 1000,
+           tab: 'profile' | 'quality' | 'compact' = 'compact') {
+        studio.showTab(tab);
+        answers.profile!.next(SERVER_RESPONSE(profileOf(columns, totalRows)));
+        fixture.detectChanges();
+        if (tab === 'compact') {
+          for (const column of columns) studio.toggleColumn(column.name);
+          fixture.detectChanges();
+        }
+        return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+      },
+      /** The tooltips, where the longer hedges went (owner, 2026-09-28). */
+      tips(): string { return tipsIn(fixture); },
+      /** The statistic labels on the profile cards, which is where "min" is or is not said. */
+      statLabels() {
+        return [...(fixture.nativeElement as HTMLElement).querySelectorAll('dt')]
+          .map(label => (label.textContent ?? '').trim());
+      },
+    };
+  }
+
+  it('claims no clean bill of health on a dataset it never examined', () => {
+    // A header-only file: columns, no rows. The normal shape of a botched export, and precisely
+    // the file this tab exists for. It used to answer "Checked 1 column: none is empty, none is
+    // more than 5% empty..." -- five claims about an examination that never happened, and "none
+    // is empty" the exact opposite of the truth. Asserted against the SCREEN, because the
+    // component's own qualityFindings() was already correctly empty in this state; the lie was
+    // entirely in what the template said about that emptiness.
+    const text = renderedStudio().show([columnOf()], 0, 'quality');
+
+    expect(text).toContain('no rows, so there was nothing to check');
+    expect(text).not.toContain('none is empty');
+    expect(text).not.toContain('Checked 1 column:');
+  });
+
+  it('still gives a real clean bill when it actually examined something', () => {
+    // The control. A gate that refused to say "clean" in every case would pass the test above
+    // while making the tab useless on the datasets that are genuinely fine.
+    const studio = renderedStudio();
+    const text = studio.show([columnOf()], 5000, 'quality');
+
+    expect(text).toContain('Nothing needs attention.');
+    expect(text).toContain('Checked 1 column for');
+    // What "checked" covered, stated exactly -- one line on screen, the list as its tooltip.
+    expect(studio.tips()).toContain('none is more than 5% empty');
+  });
+
+  it('does not claim a column is completely full when the engine only rounded to 100', () => {
+    // null_percentage is DECIMAL(9,2), so one empty row in ten million rounds to 0.00. The card
+    // printed a bare "100% filled" and the quality tab raised nothing, so both halves of the
+    // screen agreed on a completeness neither had measured.
+    const text = renderedStudio().show(
+      [columnOf({ nullPercentage: 0, completeness: 100, approxNullRows: 0 })], 10000000);
+
+    expect(text).toContain('none measured empty');
+  });
+
+  it('shows a failed scan as a failure even when the server sent no words with it', () => {
+    // The business-refusal branch had no fallback, unlike the transport one. An empty message
+    // left profileError falsy, and a FAILED scan rendered as "Nothing needs attention." -- the
+    // one failure mode where saying nothing is worse than saying the wrong thing.
+    const rendered = renderedStudio();
+    rendered.studio.showTab('quality');
+    const text = rendered.show([], 0, 'quality');
+
+    expect(text).not.toContain('Nothing needs attention.');
+  });
+
+  it('never prints the distinct estimate as an exact-looking count', () => {
+    const text = renderedStudio().show([columnOf({ approxDistinct: 1234 })], 5000);
+
+    expect(text).toContain('≈ 1.2K');
+    expect(text).toContain('distinct values (estimated)');
+    // The number the estimator did not measure. Printing it would be the first lie on the screen.
+    expect(text).not.toContain('1,234');
+  });
+
+  it('says "about" in front of every row count derived from the rounded percentage', () => {
+    const text = renderedStudio().show(
+      [columnOf({ nullPercentage: 12.5, completeness: 87.5, approxNullRows: 625 })], 5000);
+
+    expect(text).toContain('87.5% filled');
+    expect(text).toContain('about 625 of 5,000 rows empty');
+  });
+
+  it('labels a text column’s extremes as alphabetical rather than as min and max', () => {
+    // The labels REPLACE min and max rather than sitting beside them. Two names for one figure
+    // is how the surprising reading gets mistaken for the reassuring one.
+    const studio = renderedStudio();
+    studio.show([textColumn()]);
+
+    expect(studio.statLabels()).toEqual(['first (A–Z)', 'last (A–Z)']);
+  });
+
+  it('calls a numeric column’s extremes min and max, where that is what they are', () => {
+    const studio = renderedStudio();
+    const text = studio.show([columnOf()]);
+
+    // "quartiles" joined the list when 06's "percentile values where applicable" were finally
+    // written out: they had been on the card as the WIDTHS of the spread bar since it shipped
+    // and were never named, so a reader could see the shape and not read a quartile off it.
+    expect(studio.statLabels()).toEqual(['min', 'max', 'mean', 'std dev', 'quartiles']);
+    expect(text).toContain('quartiles estimated');
+  });
+
+  it('names the three quartiles it draws, and calls every one of them estimated', () => {
+    // approx_quantile, not the quantile: on the measured column the exact first quartile was
+    // 21.0 and this reported 18.375. Writing them out without the word beside them would turn
+    // three estimates into three figures that look measured.
+    const text = renderedStudio().show([columnOf({
+      min: '0', approxQ25: '10', approxQ50: '20', approxQ75: '30', max: '40',
+    })]);
+
+    expect(text).toContain('10 · 20 · 30');
+    expect(text).toContain('(estimated)');
+  });
+
+  it('says how much of a column is distinct, carrying the sketch’s own hedge', () => {
+    // 06 asks for "distinct %". It is approxDistinct over the row count, so it inherits the
+    // HyperLogLog inexactness whole -- and a bare "40% of rows" would read as a measurement.
+    const text = renderedStudio().show([columnOf({ approxDistinct: 400 })], 1000);
+
+    expect(text).toContain('≈ 40% of rows');
+  });
+
+  it('says the quartiles are estimated where it draws them', () => {
+    const text = renderedStudio().show([columnOf()]);
+
+    expect(text).toContain('quartiles estimated');
+    expect(text).toContain('Each block holds about a quarter of the rows');
+  });
+
+  it('shows what IS true about a column with no numeric spread, not an empty chart frame', () => {
+    const text = renderedStudio().show([textColumn()]);
+
+    // The wording changed with the counted distribution. "No distribution to draw" is no longer
+    // true of a text column: the quartile STRIP cannot be drawn for one, but its values can be
+    // counted, and the button to do it sits directly beneath this line. Telling a reader there
+    // is nothing to see, above the control that shows it to them, is worse than saying nothing.
+    expect(text).toContain('No numeric range to spread');
+    expect(text).toContain('Measure values');
+    expect(text).toContain('distinct values (estimated)');
+    expect(text).toContain('% filled');
+  });
+
+  it('says out loud that duplicate rows were not counted', () => {
+    const studio = renderedStudio();
+    studio.show([columnOf()], 1000, 'quality');
+    expect(studio.tips()).toContain('Duplicate rows are not part of this check');
+  });
+
+  it('writes a percentage the way the engine measured it, without rounding it further', () => {
+    const { studio } = opened();
+    expect(studio.percent(38.24)).toBe('38.24');
+    expect(studio.percent(38.2)).toBe('38.2');
+    expect(studio.percent(100)).toBe('100');
+    expect(studio.percent(0)).toBe('0');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the quartile spread', () => {
+  it('is four blocks spanning min to max, each holding about a quarter of the rows', () => {
+    const spread = viewOf(columnOf()).spread;
+
+    expect(spread.length).toBe(4);
+    expect(spread[0].from).toBe(1);
+    expect(spread[3].to).toBe(1000);
+    expect(spread.reduce((sum, block) => sum + block.width, 0)).toBeCloseTo(100);
+    expect(spread[0].label).toContain('About a quarter of the values sit between');
+  });
+
+  it('places the blocks by value, so a crowd shows as a narrow one', () => {
+    // Three quarters of the rows inside the first 3% of the range is the whole point of drawing
+    // this: a mean of 100 would have said nothing about it.
+    const spread = viewOf(columnOf({
+      min: '0', approxQ25: '10', approxQ50: '20', approxQ75: '30', max: '1000',
+    })).spread;
+
+    expect(spread[0].width).toBeCloseTo(1);
+    expect(spread[3].width).toBeCloseTo(97);
+  });
+
+  it('draws none for a VARCHAR column, which has no quartiles at all', () => {
+    expect(viewOf(textColumn()).spread).toEqual([]);
+  });
+
+  it('draws none for a DATE column, whose quartiles are present and are not numbers', () => {
+    // The trap a naive parse falls into: DATE is the one non-numeric type SUMMARIZE gives
+    // quartiles for, and Number('2026-06-15') is NaN rather than an error.
+    const view = viewOf(columnOf({
+      type: 'DATE', min: '2026-01-01', max: '2026-12-31', avg: null, std: null,
+      approxQ25: '2026-03-01', approxQ50: '2026-06-15', approxQ75: '2026-09-20',
+    }));
+
+    expect(view.spread).toEqual([]);
+    // And the dates are shown as the file spells them, not run through a number formatter.
+    expect(view.minLabel).toBe('2026-01-01');
+    expect(view.maxLabel).toBe('2026-12-31');
+  });
+
+  it('draws none where every value is the same, rather than dividing by a zero span', () => {
+    const view = viewOf(columnOf({
+      min: '5', max: '5', approxQ25: '5', approxQ50: '5', approxQ75: '5',
+    }));
+    expect(view.spread).toEqual([]);
+  });
+
+  it('keeps a text column’s value exactly as the file holds it', () => {
+    // "007" tidied to 7 would print a value that is not in the file, on the one column type
+    // where the string IS the value.
+    const view = viewOf(textColumn({ min: '007', max: '9' }));
+    expect(view.minLabel).toBe('007');
+    expect(view.maxLabel).toBe('9');
+  });
+
+  it('tidies a numeric column’s full-precision mean into a number a person reads', () => {
+    const view = viewOf(columnOf({ avg: '402.14285714285717' }));
+    expect(view.avgLabel).toBe('402.14');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the Quality tab leads with what needs attention', () => {
+  it('a clean dataset says so plainly and flags nothing', () => {
+    const { studio } = profiled([columnOf(), columnOf({ name: 'id', approxDistinct: 1000 })]);
+
+    expect(studio.qualityFindings()).toEqual([]);
+    expect(studio.qualityClean()).toBe(true);
+    expect(studio.qualityChecked()).toBe(2);
+    expect(studio.qualityClearCount()).toBe(2);
+  });
+
+  it('does not treat a key-like column as a problem', () => {
+    // An id column is not a fault, and flagging one would make "nothing needs attention" a
+    // state no real dataset ever reaches. The Profile card describes it instead.
+    const { studio } = profiled([columnOf({ name: 'id', approxDistinct: 1000, keyLike: true })]);
+
+    expect(studio.qualityFindings()).toEqual([]);
+    expect(studio.profileColumns()[0].keyLike).toBe(true);
+  });
+
+  it('is not clean before anything has been scanned', () => {
+    const { studio } = opened();
+    studio.showTab('quality');
+    expect(studio.qualityClean()).toBe(false);
+    expect(studio.qualityChecked()).toBe(0);
+  });
+
+  const BROKEN = [
+    columnOf({
+      name: 'notes', type: 'VARCHAR', allNull: true, nullPercentage: 100, completeness: 0,
+      approxNullRows: 5000, approxDistinct: 0, min: null, max: null, avg: null, std: null,
+      approxQ25: null, approxQ50: null, approxQ75: null,
+    }),
+    textColumn({
+      name: 'region', nullPercentage: 38.24, completeness: 61.76, approxNullRows: 1912,
+      approxDistinct: 1, constant: true, min: 'GB', max: 'GB',
+    }),
+    textColumn({
+      name: 'postcode', typeSurprise: 'NUMBER', min: '00123', max: '99999',
+    }),
+    columnOf(),
+  ];
+
+  it('puts the loudest finding first and the untouched column nowhere', () => {
+    const { studio } = profiled(BROKEN, 5000);
+
+    expect(studio.qualityFindings().map(finding => finding.column))
+      .toEqual(['notes', 'region', 'region', 'postcode']);
+    expect(studio.qualityFindings()[0].level).toBe('crit');
+    expect(studio.qualityClean()).toBe(false);
+    expect(studio.qualityClearCount()).toBe(1);
+  });
+
+  it('says an empty column is empty because both signals agreed, not because one did', () => {
+    const finding = profiled(BROKEN, 5000).studio.qualityFindings()[0];
+
+    expect(finding.title).toBe('Empty column');
+    expect(finding.detail).toContain('100% of rows null, and not one distinct value');
+    expect(finding.detail).toContain('Both signals agree');
+  });
+
+  it('hedges the derived row count on a mostly-empty column', () => {
+    const finding = profiled(BROKEN, 5000).studio.qualityFindings()[1];
+
+    expect(finding.title).toBe('Mostly empty');
+    expect(finding.level).toBe('warn');
+    expect(finding.detail).toBe('38.24% of rows have no value — about 1,912 of 5,000.');
+  });
+
+  it('says a constant column is constant among the rows that HAVE a value', () => {
+    const finding = profiled(BROKEN, 5000).studio.qualityFindings()[2];
+
+    expect(finding.title).toBe('One value throughout');
+    expect(finding.detail).toContain('Estimated at a single distinct value');
+    expect(finding.detail).toContain('Rows with no value are not counted in that');
+  });
+
+  it('names the type surprise and warns that it was judged from two values', () => {
+    const finding = profiled(BROKEN, 5000).studio.qualityFindings()[3];
+
+    expect(finding.title).toBe('Numbers read as text');
+    expect(finding.detail).toContain('"9" after "100"');
+    expect(finding.detail).toContain('leading-zero codes');
+  });
+
+  it('names a date surprise as a question rather than a fault', () => {
+    const { studio } = profiled([textColumn({ typeSurprise: 'DATE' })], 5000);
+
+    expect(studio.qualityFindings()[0].title).toBe('Dates read as text');
+    expect(studio.qualityFindings()[0].level).toBe('note');
+  });
+
+  it('mentions a column that is a little empty, quietly', () => {
+    const { studio } = profiled(
+      [columnOf({ nullPercentage: 7.5, completeness: 92.5, approxNullRows: 75 })], 1000);
+
+    expect(studio.qualityFindings()[0].title).toBe('Some values missing');
+    expect(studio.qualityFindings()[0].level).toBe('note');
+  });
+
+  it('says nothing at all about a column that is barely empty', () => {
+    const { studio } = profiled(
+      [columnOf({ nullPercentage: 1.2, completeness: 98.8, approxNullRows: 12 })], 1000);
+    expect(studio.qualityFindings()).toEqual([]);
+  });
+
+  it('reports a far-out extreme without claiming to have looked for outliers', () => {
+    const { studio } = profiled([columnOf({ avg: '10', std: '2', max: '1000' })], 1000);
+    const finding = studio.qualityFindings()[0];
+
+    expect(finding.title).toBe('An extreme far from the mean');
+    expect(finding.detail).toContain('1,000 sits 495 standard deviations above the mean of 10');
+    expect(finding.detail).toContain('cannot say whether that is one stray row or many');
+  });
+
+  it('reports one below the mean on the side it is actually on', () => {
+    const { studio } = profiled([columnOf({ min: '-1000', avg: '10', std: '2' })], 1000);
+    expect(studio.qualityFindings()[0].detail).toContain('standard deviations below the mean');
+  });
+
+  it('says nothing about extremes on a column with no spread to measure them against', () => {
+    // std of zero is every value identical, and dividing by it would report Infinity sigma on
+    // the least interesting column in the file.
+    const { studio } = profiled([columnOf({ avg: '5', std: '0', min: '5', max: '5' })], 1000);
+    expect(studio.qualityFindings()).toEqual([]);
+  });
+
+  it('checks nothing on a dataset with no rows, rather than flagging every column', () => {
+    const { studio } = profiled([columnOf({ nullPercentage: null, completeness: null })], 0);
+    expect(studio.qualityFindings()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+const REFUNDS: ObjectSummary = {
+  name: 'refunds-2026.csv', key: 'daily/refunds-2026.csv', folder: false, size: 2048,
+};
+
+const SECOND_SCHEMA = {
+  bucket: 'minio-main', path: 'daily/refunds-2026.csv', format: 'CSV', multiFile: false,
+  columns: [{ name: 'id', type: 'BIGINT' }, { name: 'refunded', type: 'DECIMAL(18,3)' }],
+};
+
+function resultOf(over: Partial<QueryResult> = {}): QueryResult {
+  return {
+    columns: ['id', 'amount'], rows: [['1', '9.50'], ['2', null]], rowCount: 2, truncated: false,
+    ...over,
+  };
+}
+
+const SAVED: SavedQuery = {
+  analyticsQueryId: 7, queryName: 'Daily totals', connectionAlias: 'minio-main',
+  datasetPath: 'daily/sales-2026.csv', queryText: 'select sum(amount) from dataset',
+};
+
+function runOf(over: Partial<QueryRun> = {}): QueryRun {
+  return {
+    analyticsQueryRunId: 41, analyticsQueryId: 7, connectionAlias: 'minio-main',
+    datasetPath: 'daily/sales-2026.csv', queryText: 'select sum(amount) from dataset',
+    runStatus: 'SUCCESS', rowCount: 1, durationMs: 340, errorMessage: null,
+    dateCreated: '2026-09-08T14:55:40.779Z', ...over,
+  };
+}
+
+/**
+ * The console, rendered, with a dataset already open and the SQL tab showing.
+ *
+ * RENDERED rather than driven through signals, because the two claims this tab has to keep are
+ * both sentences on a screen: that a truncated result says so beside its row count, and that a
+ * refusal reaches the reader in the server's own words. Neither is a property of a signal, and a
+ * refactor that drops either one leaves every signal test green.
+ *
+ * Every analytics call hands back a fresh Subject, so a test can hold the console in its running
+ * state and then decide what became of the query.
+ */
+function consoleWith(over: { objects?: ObjectSummary[]; confirms?: boolean } = {}) {
+  const answers: {
+    schema?: Subject<any>; preview?: Subject<any>; profile?: Subject<any>; query?: Subject<any>;
+    saved?: Subject<any>; runs?: Subject<any>; store?: Subject<any>; rename?: Subject<any>;
+    remove?: Subject<any>; download?: Subject<any>; writeBack?: Subject<any>;
+    cancel?: Subject<any>;
+  } = {};
+
+  const listObjects = vi.fn(() =>
+    of(SERVER_RESPONSE({ objects: over.objects ?? [CSV_FILE, REFUNDS, TEXT_FILE] })));
+  const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+  const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+  const preview = vi.fn(() => (answers.preview = new Subject<any>()).asObservable());
+  const profile = vi.fn(() => (answers.profile = new Subject<any>()).asObservable());
+  const query = vi.fn((_request?: any) => (answers.query = new Subject<any>()).asObservable());
+  const fetchAllQueries = vi.fn(() => (answers.saved = new Subject<any>()).asObservable());
+  const fetchRecentRuns = vi.fn(() => (answers.runs = new Subject<any>()).asObservable());
+  const saveQuery = vi.fn(() => (answers.store = new Subject<any>()).asObservable());
+  const renameQuery = vi.fn(() => (answers.rename = new Subject<any>()).asObservable());
+  const deleteQuery = vi.fn(() => (answers.remove = new Subject<any>()).asObservable());
+  const cancel = vi.fn((_id?: string) => (answers.cancel = new Subject<any>()).asObservable());
+  const download = vi.fn((_request?: any) => (answers.download = new Subject<any>()).asObservable());
+  const writeBack = vi.fn((_request?: any) => (answers.writeBack = new Subject<any>()).asObservable());
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
+      {
+        provide: AnalyticsService,
+        useValue: {
+          schema, preview, profile, query, fetchAllQueries, fetchRecentRuns, saveQuery,
+          renameQuery, deleteQuery, download, writeBack, cancel,
+          // Reached from the Charts empty state's "Build one in Canvas", which reads the
+          // saved-analysis list on arrival like any other way into the Canvas.
+          fetchAllAnalyses: () => new Subject<any>().asObservable(),
+        },
+      },
+      // confirmWith resolves as soon as the dialog "closes", so this is the reader saying yes or
+      // no to the delete without an overlay ever being rendered.
+      { provide: Dialog, useValue: { open: () => ({ closed: of(over.confirms ?? true) }) } },
+    ],
+  });
+
+  const fixture = TestBed.createComponent(Analytics);
+  fixture.detectChanges();
+  const studio = fixture.componentInstance;
+  studio.openFile(CSV_FILE);
+  answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+  answers.preview!.next(SERVER_RESPONSE(pageOf()));
+  studio.showTab('sql');
+  fixture.detectChanges();
+  // The editor is created in afterNextRender, which is queued rather than run inline.
+  TestBed.tick();
+  fixture.detectChanges();
+
+  return {
+    download, writeBack, cancel,
+    studio, fixture, answers,
+    query, fetchAllQueries, fetchRecentRuns, saveQuery, renameQuery, deleteQuery, schema,
+    /** Everything a person can read on the console, with the template's whitespace collapsed. */
+    show(): string {
+      fixture.detectChanges();
+      return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+    },
+    /** Types a statement and runs it, stopping while it is in flight. */
+    runs(sql = 'select * from dataset'): void {
+      studio.sql.set(sql);
+      studio.run();
+      fixture.detectChanges();
+    },
+  };
+}
+
+describe('the console before anything has run', () => {
+  it('will not run an empty editor, and offers something to put in it', () => {
+    const console = consoleWith();
+
+    expect(console.studio.canRun()).toBe(false);
+    expect(console.show()).toContain('Start from');
+    expect(console.show()).toContain('Nothing has run yet.');
+  });
+
+  it('fills the editor from the starter rather than leaving a blank page', () => {
+    const console = consoleWith();
+    console.studio.useStarter();
+
+    expect(console.studio.sql()).toContain('from dataset');
+    expect(console.studio.canRun()).toBe(true);
+  });
+
+  it('does not run a statement that is only whitespace', () => {
+    const console = consoleWith();
+    console.studio.sql.set('   \n  ');
+    console.studio.run();
+
+    expect(console.query).not.toHaveBeenCalled();
+    expect(console.studio.canRun()).toBe(false);
+  });
+
+  it('names the two tables the SQL is allowed to use, because that naming IS the interface', () => {
+    const console = consoleWith();
+    const text = console.show();
+
+    expect(text).toContain('What your SQL can name');
+    expect(text).toContain('dataset');
+    expect(text).toContain('minio-main/daily/sales-2026.csv');
+    expect(text).toContain('never a path');
+    expect(tipsIn(console.fixture)).toContain('there is no bucket, URL or path to write');
+  });
+});
+
+describe('running a query', () => {
+  it('holds the console in its running state until the server answers', () => {
+    const console = consoleWith();
+    console.runs();
+
+    expect(console.studio.running()).toBe(true);
+    expect(console.studio.canRun()).toBe(false);
+    expect(console.show()).toContain('Running…');
+  });
+
+  it('sends the statement as typed, with no second dataset on a one-dataset query', () => {
+    const console = consoleWith();
+    console.runs('select *\n  from dataset\n');
+
+    expect(console.query).toHaveBeenCalledWith({
+      connection: 'minio-main', path: 'daily/sales-2026.csv',
+      sql: 'select *\n  from dataset\n',
+      queryId: expect.stringMatching(/^ui-/),
+      connection2: undefined, path2: undefined,
+    });
+  });
+
+  it('names the run before sending it, so there is something to stop', () => {
+    // The endpoint is synchronous, so an id minted by the SERVER arrives with the rows — after
+    // there is anything left to stop. The client naming the run is what makes cancellation
+    // reachable at all; the backend was built and tested and no user could get to it.
+    const console = consoleWith();
+    console.runs();
+
+    const sent = console.query.mock.calls[0][0];
+    expect(sent.queryId).toBeTruthy();
+    expect(console.studio.runningId()).toBe(sent.queryId);
+    expect(console.studio.canStop()).toBe(true);
+  });
+
+  it('stops waiting for nothing: the run id is released whether the query lands or fails', () => {
+    const ok = consoleWith();
+    ok.runs();
+    ok.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    expect(ok.studio.runningId()).toBe('');
+    expect(ok.studio.canStop()).toBe(false);
+
+    const bad = consoleWith();
+    bad.runs();
+    bad.answers.query!.error({ error: { message: 'gone' } });
+    expect(bad.studio.runningId()).toBe('');
+  });
+
+  it('asks the server to stop, and does NOT decide the outcome itself', () => {
+    // The original request is still open and will answer — with rows if it finished first, or
+    // with the engine's interruption if the cancel won. Clearing the result here would be the
+    // screen guessing at a race the server has already settled.
+    const console = consoleWith();
+    console.runs();
+    console.studio.stop();
+
+    expect(console.cancel).toHaveBeenCalledWith(console.studio.runningId());
+    expect(console.studio.stopping()).toBe(true);
+    expect(console.studio.running()).toBe(true);
+  });
+
+  it('shows the rows it got back, telling a null apart from a blank', () => {
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    const text = console.show();
+
+    expect(console.studio.result()!.rowCount).toBe(2);
+    expect(text).toContain('9.50');
+    expect(text).toContain('null');
+  });
+});
+
+describe('taking the result away', () => {
+  it('sends the QUERY to be re-run, never the rows the browser is holding', () => {
+    // A client that posted its own rows could post any rows, and the file would carry an
+    // application filename over data the application never produced. It costs a second execution.
+    const c = consoleWith();
+    c.runs('SELECT * FROM dataset');
+    c.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    c.studio.downloadResult();
+
+    expect(c.download).toHaveBeenCalledWith(expect.objectContaining({
+      connection: 'minio-main', path: 'daily/sales-2026.csv',
+      sql: 'SELECT * FROM dataset', format: 'csv',
+    }));
+    // Not the rows. If this ever appears in the request the guarantee above is gone.
+    expect(c.download.mock.calls[0][0]).not.toHaveProperty('rows');
+  });
+
+  it('says a downloaded file is partial, at the last moment the reader is looking at it', () => {
+    const c = consoleWith();
+    c.runs();
+    c.answers.query!.next(SERVER_RESPONSE(resultOf({ rowCount: 10000, truncated: true })));
+    c.studio.downloadResult();
+    c.answers.download!.next(SERVER_RESPONSE({
+      filename: 'sales-partial.csv', contentType: 'text/csv', content: 'YQ==', bytes: 1,
+      rowCount: 10000, truncated: true, notice: 'This file holds 10,000 rows and there are more.',
+    }));
+
+    expect(c.show()).toContain('This file holds 10,000 rows and there are more.');
+  });
+
+  it('never names a bucket when writing back — only a folder inside the one already open', () => {
+    const c = consoleWith();
+    c.runs();
+    c.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    c.studio.writeFolder.set('exports');
+    c.studio.writeResultBack();
+
+    const sent = c.writeBack.mock.calls[0][0];
+    expect(sent).toMatchObject({ connection: 'minio-main', folder: 'exports' });
+    // The bucket comes from the connection record on the server. If the client could name one,
+    // the module's central property would stop being true at its newest endpoint.
+    expect(sent).not.toHaveProperty('bucket');
+  });
+
+  it('shows the server\'s refusal verbatim rather than a generic export failure', () => {
+    const c = consoleWith();
+    c.runs();
+    c.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    c.studio.writeResultBack();
+    c.answers.writeBack!.next({
+      status: 'ERROR', message: 'An export folder cannot contain "..", an empty step, or a leading slash.',
+    });
+
+    expect(c.show()).toContain('An export folder cannot contain');
+  });
+});
+
+describe('a truncated result is a partial answer and has to read as one', () => {
+  it('says so beside the row count, not in a footnote under the table', () => {
+    // The whole point. A reader handed ten thousand rows out of forty thousand and not told has
+    // a WRONG answer, not a short one, and the count is the figure they take away -- so the
+    // caveat has to be on the count itself, where it is read at the same moment.
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(resultOf({ rowCount: 10000, truncated: true })));
+    const text = console.show();
+
+    expect(console.studio.truncated()).toBe(true);
+    expect(text).toContain('Stopped at the limit — there may be more');
+    expect(text).toContain('This is part of the answer, not all of it.');
+    expect(text).not.toContain('everything the query matched');
+  });
+
+  it('refuses to say how many are missing, because nothing here knows', () => {
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(resultOf({ rowCount: 10000, truncated: true })));
+
+    expect(console.show()).toContain('Nothing here can say how many.');
+  });
+
+  it('calls a complete result complete, so the warning means something by contrast', () => {
+    // The control. A console that hedged every result would make the hedge invisible on the one
+    // that needed it.
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    const text = console.show();
+
+    expect(text).toContain('everything the query matched');
+    expect(text).not.toContain('there may be more');
+  });
+});
+
+describe('a refusal reaches the reader in the server’s own words', () => {
+  const GATE = 'A query may not name a location of its own; read the dataset by its name instead.';
+
+  it('shows the server’s sentence unchanged rather than a failure of its own invention', () => {
+    const console = consoleWith();
+    console.runs('select * from read_csv(\'s3://elsewhere/secrets.csv\')');
+    console.answers.query!.next(SERVER_REFUSAL(GATE));
+    const text = console.show();
+
+    expect(console.studio.queryError()).toBe(GATE);
+    expect(text).toContain(GATE);
+    // Several of these are security refusals. Folding them into one generic line takes away the
+    // only thing that tells a reader which of the two happened to them.
+    expect(text).toContain('refusals rather than faults');
+    expect(text).not.toContain('Nothing has run yet.');
+  });
+
+  it('still reads as a failure when the server sent no words with it', () => {
+    // The same hole the profile scan had: an empty message left the error signal falsy, and a
+    // refused query rendered as the clean "nothing has run yet" empty state.
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_REFUSAL(''));
+    const text = console.show();
+
+    expect(text).toContain('The query did not run');
+    expect(text).not.toContain('Nothing has run yet.');
+  });
+
+  it('leaves the dataset alone: a bad statement is not a file that could not be read', () => {
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_REFUSAL(GATE));
+
+    expect(console.studio.error()).toBe('');
+    expect(console.studio.preview()).not.toBeNull();
+  });
+
+  it('records the attempt either way, because a refusal is the row worth keeping', () => {
+    const console = consoleWith();
+    const before = console.fetchRecentRuns.mock.calls.length;
+    console.runs();
+    console.answers.query!.next(SERVER_REFUSAL(GATE));
+
+    expect(console.fetchRecentRuns.mock.calls.length).toBe(before + 1);
+  });
+});
+
+describe('the second dataset, and the naming that is the whole interface', () => {
+  it('offers the rail’s own readable files, and never the dataset already open', () => {
+    const paths = consoleWith().studio.secondOptions().map(option => option.path);
+
+    expect(paths).toContain('daily/refunds-2026.csv');
+    // Joining a file to itself is spelled by naming "dataset" twice, not by resolving and paying
+    // for the same file a second time.
+    expect(paths).not.toContain('daily/sales-2026.csv');
+    // notes.txt is in the folder and is not something this reader can open.
+    expect(paths).not.toContain('daily/notes.txt');
+  });
+
+  it('reads the second dataset’s schema as soon as it is picked, not when the query runs', () => {
+    const console = consoleWith();
+    console.studio.pickSecond('daily/refunds-2026.csv');
+
+    expect(console.schema).toHaveBeenLastCalledWith('minio-main', 'daily/refunds-2026.csv');
+    expect(console.studio.secondLoading()).toBe(true);
+  });
+
+  it('feeds both files’ columns to the editor under the names the SQL will use', () => {
+    const console = consoleWith();
+    expect(console.studio.editorSchema()).toEqual({ dataset: ['id', 'amount'] });
+
+    console.studio.pickSecond('daily/refunds-2026.csv');
+    console.answers.schema!.next(SERVER_RESPONSE(SECOND_SCHEMA));
+
+    expect(console.studio.editorSchema())
+      .toEqual({ dataset: ['id', 'amount'], dataset2: ['id', 'refunded'] });
+  });
+
+  it('says on screen that the second file is called dataset2', () => {
+    const console = consoleWith();
+    console.studio.pickSecond('daily/refunds-2026.csv');
+    console.answers.schema!.next(SERVER_RESPONSE(SECOND_SCHEMA));
+    const text = console.show();
+
+    expect(text).toContain('dataset2');
+    expect(text).toContain('minio-main/daily/refunds-2026.csv');
+  });
+
+  it('sends both datasets once one is picked', () => {
+    const console = consoleWith();
+    console.studio.pickSecond('daily/refunds-2026.csv');
+    console.answers.schema!.next(SERVER_RESPONSE(SECOND_SCHEMA));
+    console.runs('select * from dataset join dataset2 using (id)');
+
+    expect(console.query).toHaveBeenLastCalledWith(expect.objectContaining({
+      connection2: 'minio-main', path2: 'daily/refunds-2026.csv',
+    }));
+  });
+
+  it('says the second file could not be read where it was picked, not on the query', () => {
+    const console = consoleWith();
+    console.studio.pickSecond('daily/refunds-2026.csv');
+    console.answers.schema!.next(SERVER_REFUSAL('Storage connection not found.'));
+
+    expect(console.show()).toContain('Storage connection not found.');
+  });
+
+  it('drops the second dataset when the connection changes, because its path went with it', () => {
+    const console = consoleWith();
+    console.studio.pickSecond('daily/refunds-2026.csv');
+    console.answers.schema!.next(SERVER_RESPONSE(SECOND_SCHEMA));
+    console.studio.pickConnection('minio-main');
+
+    expect(console.studio.secondPath()).toBe('');
+    expect(console.studio.editorSchema()['dataset2']).toBeUndefined();
+  });
+});
+
+describe('the library: saving, loading and deleting a query', () => {
+  it('is asked for once, when a reader opens the tab that needs it', () => {
+    const console = consoleWith();
+    expect(console.fetchAllQueries).toHaveBeenCalledTimes(1);
+
+    console.studio.showTab('data');
+    console.studio.showTab('sql');
+
+    expect(console.fetchAllQueries).toHaveBeenCalledTimes(1);
+  });
+
+  it('saves only the four fields a person decides, with no id on a new one', () => {
+    const console = consoleWith();
+    console.studio.sql.set('select 1 from dataset');
+    console.studio.saveName.set('  Daily totals  ');
+    console.studio.saveAsNew();
+
+    expect(console.saveQuery).toHaveBeenCalledWith({
+      queryName: 'Daily totals',
+      connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv',
+      // Stored exactly as typed: the row ceiling belongs to the engine on the day it runs, so a
+      // saved query must not carry a rewritten copy of itself.
+      queryText: 'select 1 from dataset',
+    });
+  });
+
+  it('will not save a query with no name to find it by', () => {
+    const console = consoleWith();
+    console.studio.sql.set('select 1 from dataset');
+    console.studio.saveAsNew();
+
+    expect(console.saveQuery).not.toHaveBeenCalled();
+  });
+
+  it('shows the server’s refusal rather than pretending the query was kept', () => {
+    const console = consoleWith();
+    console.studio.sql.set('select 1');
+    console.studio.saveName.set('Totals');
+    console.studio.saveAsNew();
+    console.answers.store!.next(SERVER_REFUSAL('A saved query name is at most 120 characters.'));
+
+    expect(console.show()).toContain('A saved query name is at most 120 characters.');
+    expect(console.studio.loadedQuery()).toBeNull();
+  });
+
+  it('points Update at the row the server built, not the payload that was sent', () => {
+    const console = consoleWith();
+    console.studio.sql.set('select 1');
+    console.studio.saveName.set('Totals');
+    console.studio.saveAsNew();
+    console.answers.store!.next(SERVER_RESPONSE({ ...SAVED, analyticsQueryId: 31 }));
+
+    console.studio.updateLoaded();
+
+    expect(console.saveQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ analyticsQueryId: 31 }));
+  });
+
+  it('separates Update from Save as new rather than guessing between them', () => {
+    // The same button silently overwriting somebody's saved work on one visit and forking it on
+    // the next is not recoverable from either side.
+    const console = consoleWith();
+    console.studio.loadSaved(SAVED);
+    console.studio.saveAsNew();
+
+    expect(console.saveQuery).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ analyticsQueryId: 7 }));
+  });
+
+  it('loads a saved query into the editor and clears the last result with it', () => {
+    const console = consoleWith();
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    console.studio.loadSaved(SAVED);
+
+    expect(console.studio.sql()).toBe('select sum(amount) from dataset');
+    expect(console.studio.saveName()).toBe('Daily totals');
+    // A result that stayed would be the previous query's answer sitting under this one's name.
+    expect(console.studio.result()).toBeNull();
+  });
+
+  it('does not reopen the file a saved query was written against, and says so instead', () => {
+    const console = consoleWith();
+    console.studio.loadSaved({ ...SAVED, datasetPath: 'daily/2025-archive.csv' });
+    const text = console.show();
+
+    expect(console.studio.path()).toBe('daily/sales-2026.csv');
+    expect(text).toContain('saved against');
+    expect(text).toContain('daily/2025-archive.csv');
+  });
+
+  it('says nothing about a mismatch when there is none', () => {
+    const console = consoleWith();
+    console.studio.loadSaved(SAVED);
+
+    expect(console.studio.loadedElsewhere()).toBe('');
+  });
+
+  it('asks before deleting, and says what deleting does not do', async () => {
+    const console = consoleWith({ confirms: false });
+    await console.studio.removeSaved(SAVED);
+
+    expect(console.deleteQuery).not.toHaveBeenCalled();
+  });
+
+  it('deletes once the reader has said yes, and forgets it was loaded', async () => {
+    const console = consoleWith({ confirms: true });
+    console.studio.loadSaved(SAVED);
+    await console.studio.removeSaved(SAVED);
+    console.answers.remove!.next(SERVER_RESPONSE(undefined));
+
+    expect(console.deleteQuery).toHaveBeenCalledWith(7);
+    expect(console.studio.loadedQuery()).toBeNull();
+  });
+
+  it('renames in place, and keeps the loaded copy’s name in step with the list', () => {
+    const console = consoleWith();
+    console.studio.loadSaved(SAVED);
+    console.studio.startRename(SAVED);
+    console.studio.renameName.set('  Monthly totals ');
+    console.studio.applyRename();
+    console.answers.rename!.next(SERVER_RESPONSE({ ...SAVED, queryName: 'Monthly totals' }));
+
+    expect(console.renameQuery).toHaveBeenCalledWith(7, 'Monthly totals');
+    // A header still saying the old name would be the screen disagreeing with itself.
+    expect(console.studio.loadedQuery()!.queryName).toBe('Monthly totals');
+    expect(console.studio.saveName()).toBe('Monthly totals');
+  });
+
+  it('leaves a way back when the library could not be read', () => {
+    // The library is fetched once, on the first visit to this tab. A failure with no retry
+    // beside it would leave the card dead for the rest of the session.
+    const console = consoleWith();
+    console.answers.saved!.next(SERVER_REFUSAL('Data could not be fetched.'));
+    expect(console.show()).toContain('Data could not be fetched.');
+
+    const before = console.fetchAllQueries.mock.calls.length;
+    console.studio.loadSavedQueries();
+    expect(console.fetchAllQueries.mock.calls.length).toBe(before + 1);
+  });
+
+  it('lists what is saved, and says so plainly when nothing is', () => {
+    const empty = consoleWith();
+    empty.answers.saved!.next(SERVER_RESPONSE([]));
+    expect(empty.show()).toContain('Nothing saved yet.');
+
+    const stocked = consoleWith();
+    stocked.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    expect(stocked.show()).toContain('Daily totals');
+  });
+});
+
+/**
+ * The console with the ACTIVITY tab open, which is where run history lives now.
+ *
+ * It was the second card under the SQL library, which made the record of everything a workspace
+ * ran a footnote to the statements one person chose to keep. Document 02 names it as a tab; the
+ * fetch is lazy on arrival there, exactly as the library's is on arrival at SQL.
+ */
+function activityWith() {
+  const console = consoleWith();
+  console.studio.showTab('activity');
+  console.fixture.detectChanges();
+  return console;
+}
+
+describe('the run history', () => {
+  it('says what ran, when, how long it took and how many rows came back', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
+    const text = console.show();
+
+    // Sentence case, like every other chip in the console.
+    expect(text).toContain('Ran');
+    expect(text).toContain('340ms');
+    expect(text).toContain('1 rows');
+    expect(text).toContain('select sum(amount) from dataset');
+  });
+
+  it('draws a refusal as a refusal, not as a failure, and carries its sentence', () => {
+    // The two are different events: FAILED reached the engine and broke there, REFUSED never
+    // reached it. A history that drew both in red would hide the one worth looking at.
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([
+      runOf({
+        analyticsQueryRunId: 42, runStatus: 'REFUSED', rowCount: null, durationMs: null,
+        errorMessage: 'A query may not attach another database.',
+      }),
+    ]));
+    const text = console.show();
+
+    expect(text).toContain('refused');
+    expect(text).toContain('A query may not attach another database.');
+  });
+
+  it('shows a zero-row run as zero rather than as no answer at all', () => {
+    const console = consoleWith();
+    expect(console.studio.runRows(runOf({ rowCount: 0 }))).toBe('0');
+    expect(console.studio.runRows(runOf({ rowCount: null }))).toBe('');
+  });
+
+  it('writes a duration in the unit a reader can hold', () => {
+    const console = consoleWith();
+    // The console's one way of writing a duration (MIG-295), not "340 ms" and "4.2 s".
+    expect(console.studio.runTook(runOf({ durationMs: 340 }))).toBe('340ms');
+    expect(console.studio.runTook(runOf({ durationMs: 4200 }))).toBe('4.2s');
+    expect(console.studio.runTook(runOf({ durationMs: 200_000 }))).toBe('3m 20s');
+    expect(console.studio.runTook(runOf({ durationMs: null }))).toBe('');
+  });
+
+  it('puts a statement back in the editor without running it', () => {
+    // A row here may be one the engine refused or one that took thirty seconds. A single click
+    // that re-spends a governor permit on either punishes curiosity.
+    const console = consoleWith();
+    const before = console.query.mock.calls.length;
+    console.studio.reuseRun(runOf({ queryText: 'select count(*) from dataset' }));
+
+    expect(console.studio.sql()).toBe('select count(*) from dataset');
+    expect(console.query.mock.calls.length).toBe(before);
+    // It is no longer the saved query that was loaded, so Update must not point at that row.
+    expect(console.studio.loadedQuery()).toBeNull();
+  });
+
+  it('says the durations are the engine’s, not the wait the reader had', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
+
+    expect(tipsIn(console.fixture)).toContain('inside the query engine, not counting the network');
+  });
+
+  it('says plainly when nothing has been run in the workspace', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([]));
+
+    expect(console.show()).toContain('Nothing has been run here yet.');
+  });
+});
+
+describe('the console does not disturb the tabs beside it', () => {
+  it('opens a dataset on Details, with the ten tabs document 02 names', () => {
+    // Canvas sits before SQL. The console is the escape hatch for the questions a structured
+    // analysis cannot phrase, and an escape hatch belongs at the end of a group rather than in
+    // the middle of it.
+    const console = consoleWith();
+    expect(console.studio.tabs.map(tab => tab.id)).toEqual([
+      'overview', 'data', 'compact', 'profile', 'quality',
+      'canvas', 'sql', 'charts', 'activity',
+    ]);
+
+    // Another file, not the one already open: opening a dataset lands on Details, and re-clicking
+    // the current row is deliberately inert.
+    console.studio.openFile(OTHER_CSV);
+    expect(console.studio.tab()).toBe('overview');
+  });
+
+  it('keeps the three groups, drawn as a divider rather than all-caps headings', () => {
+    // The groups are by what each tab COSTS, and stay. Their headings -- THE FILE, ITS COLUMNS,
+    // QUESTIONS -- made the strip three rows tall on a phone and are gone (owner, 2026-09-28):
+    // a thin divider marks the boundary and each group's reason is its tabs' tooltip.
+    const console = consoleWith();
+    expect(console.studio.tabGroups.map(group => group.label))
+      .toEqual(['The file', 'Its columns', 'Questions']);
+    expect(console.studio.tabGroups.flatMap(group => group.tabs).length)
+      .toBe(console.studio.tabs.length);
+    expect(console.studio.tabGroups[1].tabs.map(tab => tab.id))
+      .toEqual(['compact', 'profile', 'quality']);
+
+    const strip = (console.fixture.nativeElement as HTMLElement).querySelector('[role="tablist"]')!;
+    expect(strip.textContent).not.toContain('Its columns');
+    const dividers = strip.querySelectorAll('.tab-divider');
+    expect(dividers.length).toBe(2);
+    dividers.forEach(divider => expect(divider.getAttribute('aria-hidden')).toBe('true'));
+    const compact = strip.querySelector('#a-tab-compact')!;
+    expect(compact.getAttribute('title')).toBe(console.studio.tabGroups[1].hint);
+  });
+
+  it('clears a result when another file is opened, and keeps the statement', () => {
+    // A result table left standing under a new file's heading claims to be that file's answer.
+    // The SQL is the reader's own work, and running it against the next file is a normal want.
+    const console = consoleWith();
+    console.runs('select count(*) from dataset');
+    console.answers.query!.next(SERVER_RESPONSE(resultOf()));
+    console.studio.openFile(REFUNDS);
+
+    expect(console.studio.result()).toBeNull();
+    expect(console.studio.sql()).toBe('select count(*) from dataset');
+  });
+
+  it('does not scan the profile just because the SQL tab was opened', () => {
+    const console = consoleWith();
+    expect(console.studio.profileLoading()).toBe(false);
+    expect(console.studio.profile()).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The chart, which is the easiest place on this screen to tell a lie.
+ *
+ * Everything below is one of two questions. The first is whether the console can tell what a
+ * column IS, given a result that is entirely text -- and it has to answer by parsing, because a
+ * VARCHAR of "1200" is drawable and a DOUBLE of nulls is not.
+ *
+ * The second is the one worth the file space. A chart compresses thousands of rows into a few
+ * shapes and then looks equally finished whether or not those shapes are the whole story, so
+ * every way this one can quietly narrow its input is pinned here: a truncated result, a row that
+ * does not parse, a row with no label, rows folded together by a shared label, and a tail rolled
+ * up behind a top N. Several of those claims are SENTENCES ON A SCREEN rather than properties of
+ * a signal, so they are asserted against the rendered console for the same reason the truncation
+ * pill and the profile hedges are.
+ */
+function pairsOf(rows: [string, string | null][], over: Partial<QueryResult> = {}): QueryResult {
+  return resultOf({
+    columns: ['region', 'amount'], rows: rows.map(([name, value]) => [name, value]),
+    rowCount: rows.length, ...over,
+  });
+}
+
+/** N categories carrying 1, 2, 3... so nothing is zero and every value is distinct. */
+function categories(count: number): QueryResult {
+  return pairsOf(Array.from({ length: count },
+    (_, index) => [`region-${index}`, String(index + 1)] as [string, string]));
+}
+
+/**
+ * A console holding the answer to one query, with the CHARTS tab open on it.
+ *
+ * The chart used to sit under the result table on the SQL tab, and document 02 and document 06
+ * both ask for a tab of its own. It draws from whatever the console last ran, so the harness
+ * runs the query first and then moves -- which is also the order a reader does it in.
+ */
+function charted(result: QueryResult) {
+  const console = consoleWith();
+  console.runs();
+  console.answers.query!.next(SERVER_RESPONSE(result));
+  console.studio.showTab('charts');
+  console.fixture.detectChanges();
+  return console;
+}
+
+describe('choosing what the chart draws', () => {
+  it('takes the names for the label and the measure for the value, not the other way round', () => {
+    // `select region, month, sum(amount)` puts what a row IS at the front and what it measures
+    // at the end. Defaulting to the first numeric column would chart an id.
+    const { studio } = charted(resultOf({
+      columns: ['region', 'month', 'total'],
+      rows: [['north', '1', '900'], ['south', '2', '400']], rowCount: 2,
+    }));
+
+    expect(studio.labelColumn()!.name).toBe('region');
+    expect(studio.valueColumn()!.name).toBe('total');
+  });
+
+  it('decides a column by parsing it, never by what its values look like they are', () => {
+    // Every cell of a result is text -- a DECIMAL has no JSON form that survives -- so a type
+    // name is not available and would not be trusted if it were. A date column parses as nothing
+    // and is a label; a column of numeric strings is a value.
+    const { studio } = charted(resultOf({
+      columns: ['day', 'amount'],
+      rows: [['2026-01-01', '12.5'], ['2026-01-02', '18'], ['2026-01-03', '4']], rowCount: 3,
+    }));
+    const reading = new Map(studio.chartColumns().map(column => [column.name, column]));
+
+    expect(reading.get('day')!.numbers).toBe(0);
+    expect(reading.get('amount')!.numbers).toBe(3);
+    expect(studio.labelColumn()!.name).toBe('day');
+    expect(studio.valueColumn()!.name).toBe('amount');
+  });
+
+  it('holds a pick by NAME, so the next result keeps it or visibly loses it', () => {
+    // By index it would silently become a different column the moment a query returns one more
+    // in front of it, under a chart that still looks like the one being read a second ago.
+    const console = charted(resultOf({
+      columns: ['region', 'orders', 'total'],
+      rows: [['north', '3', '900'], ['south', '5', '400']], rowCount: 2,
+    }));
+    console.studio.chartValueName.set('orders');
+    expect(console.studio.valueColumn()!.name).toBe('orders');
+
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(pairsOf([['north', '900'], ['south', '400']])));
+
+    // "orders" is not in this result at all, so the pick falls back where a reader can see it.
+    expect(console.studio.valueColumn()!.name).toBe('amount');
+  });
+
+  it('never offers one column as both the label and the value', () => {
+    // Grouping a column by itself and adding the duplicates up is a chart of how often each
+    // number occurs, drawn as though it were a chart of the numbers.
+    const { studio } = charted(pairsOf([['north', '10'], ['south', '20']]));
+
+    expect(studio.chartLabelOptions().map(column => column.name)).toEqual(['region']);
+    expect(studio.chartValueOptions().map(column => column.name)).toEqual(['amount']);
+  });
+
+  it('has no label column on a one-column result, rather than labelling a number with itself', () => {
+    const { studio } = charted(resultOf({
+      columns: ['duration'], rows: [['12'], ['30'], ['44']], rowCount: 3,
+    }));
+
+    expect(studio.labelColumn()).toBeNull();
+    expect(studio.valueColumn()!.name).toBe('duration');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the kinds offered change with the columns', () => {
+  /** The kinds that can draw the result as it stands, by id. */
+  function offered(studio: { chartKinds: () => { id: string; issue: string }[] }) {
+    return studio.chartKinds().filter(kind => !kind.issue).map(kind => kind.id);
+  }
+
+  /** One kind in the segmented switch, by the label on it. */
+  function kindButton(fixture: { nativeElement: unknown; detectChanges(): void }, label: string) {
+    fixture.detectChanges();
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll<HTMLButtonElement>('.seg-btn')]
+      .find(button => button.textContent!.trim() === label)!;
+  }
+
+  it('offers a ring for a handful of categories', () => {
+    const { studio } = charted(categories(4));
+
+    expect(offered(studio)).toContain('donut');
+  });
+
+  it('refuses a ring of hundreds of slices, and says so on the option itself', () => {
+    // "A donut of 500 categories is not a chart." The option stays listed and inert with the
+    // reason on it, exactly as an unreadable connection does in the picker above.
+    const console = charted(categories(40));
+    const donut = console.studio.chartKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('ring of 40 slices');
+    expect(offered(console.studio)).not.toContain('donut');
+    // On the screen, not only in the signal: the reason is what stops a reader hunting for it.
+    // It is the inert kind's tooltip, and the kind is aria-disabled rather than disabled so the
+    // tooltip still shows.
+    const button = kindButton(console.fixture, 'Share of the total');
+    expect(button.getAttribute('title')).toContain('A ring of 40 slices cannot be read');
+    expect(button.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('stops drawing bars in result order once no name can fit under one', () => {
+    const { studio } = charted(categories(70));
+
+    expect(offered(studio)).not.toContain('bar');
+    // Ranked bars still work at any count, because they keep the largest and roll up the rest.
+    expect(offered(studio)).toContain('ranked');
+  });
+
+  it('refuses every length-based kind on a column with negatives, and keeps the distribution', () => {
+    // app-bar-chart floors a bar at zero height and app-ranked-bar drops the row, so a loss of
+    // -400 would read as an absence beside a profit of 400. A distribution has an axis and can
+    // put it where it belongs.
+    const console = charted(pairsOf([
+      ['a', '10'], ['b', '-400'], ['c', '30'], ['d', '40'],
+      ['e', '50'], ['f', '60'], ['g', '70'], ['h', '80'],
+    ]));
+
+    expect(offered(console.studio)).toEqual(['histogram']);
+    expect(console.studio.chartKind()).toBe('histogram');
+    expect(tipsIn(console.fixture)).toContain('a length cannot be negative');
+  });
+
+  it('bins the result as ROWS, and keeps a negative value on the axis', () => {
+    // The two things app-histogram had welded into it for its first caller. Its bins said "412
+    // runs between 0 and 100", which on a column of sales amounts is a false sentence on screen,
+    // and it threw away every value below zero -- right for a run that carries -1 instead of a
+    // duration, wrong for a refund. Asserted through the caller, because the point is not that
+    // the component has two more inputs but that this screen's chart says true things.
+    const console = charted(pairsOf([
+      ['a', '10'], ['b', '-400'], ['c', '30'], ['d', '40'],
+      ['e', '50'], ['f', '60'], ['g', '70'], ['h', '80'],
+    ]));
+    const chart = (console.fixture.nativeElement as HTMLElement)
+      .querySelector('app-histogram [role="img"]');
+
+    expect(console.studio.chartKind()).toBe('histogram');
+    expect(console.studio.chartValues()).toHaveLength(8);
+    // Eight rows, none dropped, and the axis starts at the negative one.
+    expect(chart!.getAttribute('aria-label')).toContain('Distribution of 8 rows from -400');
+  });
+
+  it('offers a distribution of a single column, which is the only chart it can have', () => {
+    const console = charted(resultOf({
+      columns: ['duration'],
+      rows: [['1'], ['2'], ['3'], ['4'], ['5'], ['6'], ['7'], ['8']], rowCount: 8,
+    }));
+
+    expect(offered(console.studio)).toEqual(['histogram']);
+    expect(tipsIn(console.fixture)).toContain('This result has one column, so there is nothing to label');
+  });
+
+  it('refuses a distribution of too few numbers to have a shape', () => {
+    const { studio } = charted(pairsOf([['north', '10'], ['south', '20']]));
+    const distribution = studio.chartKinds().find(kind => kind.id === 'histogram')!;
+
+    expect(distribution.issue).toContain('too few');
+    expect(offered(studio)).toEqual(['bar', 'ranked', 'donut']);
+  });
+
+  it('leaves a picked kind behind when the next result cannot support it', () => {
+    // A control that keeps saying "share of the total" over an empty frame is worse than one
+    // that moves: the columns changed under the pick, and the picker shows that they did.
+    const console = charted(categories(4));
+    console.studio.chartKindName.set('donut');
+    expect(console.studio.chartKind()).toBe('donut');
+
+    console.runs();
+    console.answers.query!.next(SERVER_RESPONSE(categories(40)));
+
+    expect(console.studio.chartKind()).not.toBe('donut');
+    expect(console.studio.chartKind()).toBe('bar');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('a truncated result makes a wrong chart, and has to say so ON it', () => {
+  it('marks the chart partial beside its own title and again above it', () => {
+    // The point of the whole section. "Sales by region" over the first ten thousand of forty
+    // thousand rows is not a slightly-off chart, it is a wrong one, and it has exactly the shape,
+    // the confidence and the finish of a right one.
+    const console = charted(pairsOf(
+      [['north', '10'], ['south', '20'], ['east', '30']], { truncated: true, rowCount: 3 }));
+    const text = console.show();
+
+    expect(console.studio.chartDrawn()).toBe(true);
+    expect(text).toContain('Partial — part of the answer');
+    expect(text).toContain('This chart is drawn from part of the answer.');
+    // And it does not guess at what is missing, because nothing here knows. The wording is the
+    // chart's own -- the result table above says the same thing about its rows, and asserting a
+    // sentence the two share would pass with no strip on the chart at all.
+    expect(text).toContain('which way they would move one');
+  });
+
+  it('marks it on every kind, not only the one that happens to be first', () => {
+    const console = charted(pairsOf(
+      [['north', '10'], ['south', '20'], ['east', '30']], { truncated: true, rowCount: 3 }));
+
+    for (const kind of ['bar', 'ranked', 'donut'] as const) {
+      console.studio.chartKindName.set(kind);
+      expect(console.show(), kind).toContain('Partial — part of the answer');
+    }
+  });
+
+  it('says nothing of the sort about a complete result, so the mark means something', () => {
+    const console = charted(pairsOf([['north', '10'], ['south', '20'], ['east', '30']]));
+
+    expect(console.show()).not.toContain('Partial — part of the answer');
+    expect(console.show()).not.toContain('This chart is drawn from part of the answer.');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('what the picture cannot say about itself', () => {
+  it('leaves a row that is not a number OUT, and counts it, rather than drawing it as zero', () => {
+    // A zero is a measurement. "n/a" is the absence of one, and a bar drawn at zero for it is a
+    // claim about the data that nobody made.
+    const console = charted(pairsOf([['north', '10'], ['south', 'n/a'], ['east', '20']]));
+
+    expect(console.studio.chartData()).toEqual([
+      { name: 'north', value: 10, rows: 1 }, { name: 'east', value: 20, rows: 1 },
+    ]);
+    expect(console.show()).toContain('1 row has no number in "amount"');
+    expect(console.show()).toContain('an unknown value is not a zero');
+  });
+
+  it('counts an empty cell as a row with no number, not as a blank category', () => {
+    const console = charted(pairsOf([['north', '10'], ['south', null], ['east', '  ']]));
+
+    expect(console.studio.chartData()).toEqual([{ name: 'north', value: 10, rows: 1 }]);
+    expect(console.show()).toContain('2 rows have no number in "amount"');
+  });
+
+  it('leaves a row with nothing to call it out, and says that separately', () => {
+    // A different fact from a missing number: this row has a measurement and nowhere to put it.
+    const console = charted(pairsOf([['north', '10'], ['', '25'], ['east', '20']]));
+
+    expect(console.studio.chartData().map(point => point.name)).toEqual(['north', 'east']);
+    expect(console.show()).toContain('1 row has nothing in "region" to be called');
+  });
+
+  it('says out loud that rows sharing a label were added together', () => {
+    // The one interpretation this screen makes of a reader's own data. Adding is right for a
+    // count or a total and wrong for an average, and only the person who wrote the query knows.
+    const console = charted(pairsOf([['north', '10'], ['north', '5'], ['south', '2']]));
+
+    expect(console.studio.chartData()).toEqual([
+      { name: 'north', value: 15, rows: 2 }, { name: 'south', value: 2, rows: 1 },
+    ]);
+    expect(console.show()).toContain('shared a label with another one');
+    expect(console.show()).toContain('wrong for an average');
+  });
+
+  it('says nothing about adding up when every label appeared once', () => {
+    const console = charted(pairsOf([['north', '10'], ['south', '2']]));
+
+    expect(console.show()).not.toContain('shared a label with another one');
+  });
+
+  it('counts the rows it drew against the rows the result actually had', () => {
+    const console = charted(pairsOf([['north', '10'], ['south', 'n/a'], ['east', '20']]));
+
+    expect(console.show()).toContain('Drawn from 2 of the 3 rows in this result');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('a top N is disclosed, never a quiet tail', () => {
+  it('says how many categories it is showing, and that the rest were rolled up', () => {
+    const console = charted(categories(12));
+    console.studio.chartKindName.set('ranked');
+    const text = console.show();
+
+    expect(console.studio.chartKind()).toBe('ranked');
+    // From the component's own constant, not a literal. This asserted 8 while the chart drew 8,
+    // and both were wrong: Donut and RankedBar colour their marks var(--chart-N % 6), so the
+    // seventh and eighth categories reused the first two colours and the legend mapped two names
+    // to one swatch. Lowering the threshold to match the palette moved the sentence, and a
+    // hardcoded 8 here would have made a correct fix look like a regression.
+    expect(text).toContain(`Showing the ${console.studio.rankedRows} largest of 12`);
+    expect(text).toContain('added together as one "Other" row rather than dropped');
+  });
+
+  it('counts only the rows a ranked bar will actually draw, not every point', () => {
+    // RankedBar filters value > 0 BEFORE taking its top N, so its universe is smaller than the
+    // one the note used to count. With zero-valued categories among them this said "Showing the
+    // N largest of 10 ... the rest are added together as one Other row" above a chart with fewer
+    // rows and no Other row at all. A disclosure that is wrong is worse than no disclosure,
+    // because it reads as having been checked.
+    const rows = [['a', '9'], ['b', '8'], ['c', '7'], ['d', '6'], ['e', '5'], ['f', '4'],
+                  ['g', '3'], ['z1', '0'], ['z2', '0'], ['z3', '0']];
+    const console = charted({ columns: ['region', 'amount'], rows, rowCount: rows.length, truncated: false });
+    console.studio.chartKindName.set('ranked');
+    const text = console.show();
+
+    // Seven categories carry a value, and rankedRows of them are drawn, so there IS a tail --
+    // but it is a tail of seven, never of ten.
+    expect(text).not.toContain('largest of 10');
+    expect(text).toContain(`Showing the ${console.studio.rankedRows} largest of 7`);
+  });
+
+  it('says nothing about a top N when every category is on the chart', () => {
+    const console = charted(categories(5));
+    console.studio.chartKindName.set('ranked');
+
+    expect(console.show()).not.toContain('Showing the 8 largest');
+  });
+
+  it('owns up to a category worth zero, which a ranked bar has no row for', () => {
+    const console = charted(pairsOf([['north', '10'], ['south', '0'], ['east', '20']]));
+    console.studio.chartKindName.set('ranked');
+
+    expect(console.show()).toContain('1 category adds up to zero');
+  });
+
+  it('says a ring is a share of a sum, which is a claim about the numbers in it', () => {
+    const console = charted(categories(4));
+    console.studio.chartKindName.set('donut');
+
+    expect(console.show()).toContain('A ring asserts that the parts add up to a whole');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the chart’s empty states are four different facts', () => {
+  it('says a chart comes from a result before anything has been run', () => {
+    const console = consoleWith();
+    console.studio.showTab('charts');
+
+    expect(console.studio.chartDrawn()).toBe(false);
+    expect(console.show()).toContain('Nothing has run yet — a chart is drawn from a result');
+  });
+
+  it('says a query matched nothing, rather than that nothing can be drawn', () => {
+    const console = charted(resultOf({ columns: ['region', 'amount'], rows: [], rowCount: 0 }));
+
+    expect(console.show()).toContain('That query matched no rows');
+  });
+
+  it('says which column has no numbers in it when the result is one column of text', () => {
+    const console = charted(resultOf({
+      columns: ['note'], rows: [['a'], ['b']], rowCount: 2,
+    }));
+
+    expect(console.studio.chartDrawn()).toBe(false);
+    expect(console.show()).toContain('Nothing in "note" parses as a number');
+  });
+
+  it('says no column carries numbers when several do not', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'note'], rows: [['north', 'a'], ['south', 'b']], rowCount: 2,
+    }));
+
+    expect(console.show()).toContain('No column in this result has numbers in it');
+  });
+
+  it('draws no chart at all under a refusal, where there is no result to draw', () => {
+    const console = consoleWith();
+    console.runs('drop table dataset');
+    console.answers.query!.next(SERVER_REFUSAL('A query may not write.'));
+
+    expect(console.show()).toContain('A query may not write.');
+    expect(console.show()).not.toContain('Nothing has run yet — a chart is drawn from a result');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The Canvas: document 07, and the tab where an aggregate can most easily be believed.
+ *
+ * Everything below is one of three questions.
+ *
+ * THE FIRST is whether the analysis this screen SENDS is the analysis it SHOWS. Dimensions in
+ * order, a measure that only carries a column when the aggregation is about one, and a drill trail
+ * that is echoed rather than rebuilt. That last one is the sharpest: the endpoints are stateless
+ * and the trail travels on every request, and the moment this client's idea of the accumulated
+ * filters differs from the server's, the figure and the breadcrumb over it describe two different
+ * questions with nothing on screen saying so.
+ *
+ * THE SECOND is the rendering rule, and it is a correctness rule rather than a cosmetic one. A
+ * measured defect on this deployment: sum(amount) comes back as "7.466125E7", which is 74,661,250,
+ * and a DATE comes back as a midnight the column cannot hold. Both are fixed on the string,
+ * because going via a float to make a total legible would quietly change it.
+ *
+ * THE THIRD is the honesty of the figure, and it is why this tab has more tests than the chart on
+ * the SQL tab. An aggregate hides its own uncertainty: a chart of ten of forty thousand rows looks
+ * exactly as finished as one of all forty thousand. Five ways that can be wrong are pinned here --
+ * the row ceiling, the rolled-up tail, a distinct count whose exactness differs from the same word
+ * on the Profile tab, a relative window that means a different week depending on when it ran, and
+ * rows a filter excluded being excluded rather than zero -- and each is asserted against the
+ * SCREEN, because the screen is where the claim is made.
+ */
+
+const CANVAS_SCHEMA = {
+  bucket: 'minio-main', path: 'daily/sales-2026.csv', format: 'CSV', multiFile: false,
+  columns: [
+    { name: 'region', type: 'VARCHAR' },
+    { name: 'status', type: 'VARCHAR' },
+    { name: 'city', type: 'VARCHAR' },
+    { name: 'amount', type: 'DECIMAL(18,3)' },
+    { name: 'booked_on', type: 'DATE' },
+  ],
+};
+
+function analysisOf(over: Partial<AnalysisResult> = {}): AnalysisResult {
+  return {
+    columns: [
+      { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['north', '12500.00'], ['south', '9800.00']],
+    rowCount: 2,
+    truncated: false,
+    dimensions: ['region'],
+    measure: 'amount_sum',
+    other: null,
+    crumbs: [{ label: 'All rows' }],
+    drillPath: [],
+    pivot: null,
+    queryId: 'ui-1',
+    durationMs: 42,
+    ...over,
+  };
+}
+
+/**
+ * The Canvas, rendered, with a dataset open and the tab showing.
+ *
+ * Rendered rather than driven through signals for the same reason the console harness is: the
+ * claims that matter most here are sentences -- "partial", "rolled into Other", "excluded, not
+ * zero" -- and a refactor that drops one of those leaves every signal assertion green.
+ */
+function canvasWith(over: { confirms?: boolean } = {}) {
+  const answers: {
+    schema?: Subject<any>; preview?: Subject<any>; analyze?: Subject<any>; drill?: Subject<any>;
+    drillUp?: Subject<any>; analyses?: Subject<any>; saveAnalysis?: Subject<any>;
+    deleteAnalysis?: Subject<any>; cancel?: Subject<any>;
+  } = {};
+
+  const listObjects = vi.fn(() => of(SERVER_RESPONSE({ objects: [CSV_FILE, REFUNDS] })));
+  const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+  const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+  const preview = vi.fn(() => (answers.preview = new Subject<any>()).asObservable());
+  const profile = vi.fn(() => new Subject<any>().asObservable());
+  const analyze = vi.fn((_request?: any) => (answers.analyze = new Subject<any>()).asObservable());
+  const drill = vi.fn((_request?: any, _into?: any) =>
+    (answers.drill = new Subject<any>()).asObservable());
+  const drillUp = vi.fn((_request?: any, _steps?: number) =>
+    (answers.drillUp = new Subject<any>()).asObservable());
+  const fetchAllAnalyses = vi.fn(() => (answers.analyses = new Subject<any>()).asObservable());
+  const saveAnalysis = vi.fn((_body?: any) =>
+    (answers.saveAnalysis = new Subject<any>()).asObservable());
+  const deleteAnalysis = vi.fn((_id?: number) =>
+    (answers.deleteAnalysis = new Subject<any>()).asObservable());
+  const cancel = vi.fn((_id?: string) => (answers.cancel = new Subject<any>()).asObservable());
+  // Recorded rather than stubbed blind: the whole point of a destructive confirmation is the
+  // sentence in it, and a dialog nobody can read back is a dialog no test can hold to account.
+  const dialogOpen = vi.fn((_component?: any, _config?: any) =>
+    ({ closed: of(over.confirms ?? true) }));
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
+      {
+        provide: AnalyticsService,
+        useValue: {
+          schema, preview, profile, analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis,
+          deleteAnalysis, cancel,
+        },
+      },
+      { provide: Dialog, useValue: { open: dialogOpen } },
+    ],
+  });
+
+  const fixture = TestBed.createComponent(Analytics);
+  fixture.detectChanges();
+  const studio = fixture.componentInstance;
+  studio.openFile(CSV_FILE);
+  answers.schema!.next(SERVER_RESPONSE(CANVAS_SCHEMA));
+  answers.preview!.next(SERVER_RESPONSE(pageOf()));
+  studio.showTab('canvas');
+  fixture.detectChanges();
+
+  return {
+    studio, fixture, answers,
+    analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis, deleteAnalysis, cancel,
+    /** What the confirm dialog was opened with, so a warning can be asserted as a sentence. */
+    dialogOpen,
+    /** The body of the most recent confirmation, which is where a consequence has to be named. */
+    confirmBody(): string {
+      return dialogOpen.mock.calls[dialogOpen.mock.calls.length - 1]?.[1]?.data?.body ?? '';
+    },
+    show(): string {
+      fixture.detectChanges();
+      return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+    },
+    /** Picks a one-dimension sum and runs it, settling the request with `result`. */
+    ran(result: AnalysisResult = analysisOf()): void {
+      studio.setDimension(0, 'region');
+      studio.aggregation.set('SUM');
+      studio.measureField.set('amount');
+      studio.runAnalysis();
+      answers.analyze!.next(SERVER_RESPONSE(result));
+      fixture.detectChanges();
+    },
+    /** The body of the most recent analyze call. */
+    sent(): any {
+      return analyze.mock.calls[analyze.mock.calls.length - 1]?.[0];
+    },
+  };
+}
+
+describe('the analysis that is sent is the analysis that is shown', () => {
+  it('will not run a measure that needs a column until one is picked, and says why', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('SUM');
+
+    expect(canvas.studio.canAnalyse()).toBe(false);
+    expect(canvas.show()).toContain('Pick the column to measure');
+
+    canvas.studio.measureField.set('amount');
+    expect(canvas.studio.canAnalyse()).toBe(true);
+  });
+
+  it('runs Count rows with no column at all, and sends no field with it', () => {
+    // COUNT_ROWS is the one aggregation that is a question about rows rather than about a
+    // column. A field sent with it would appear in the record of what was asked while having had
+    // no part in the answer.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().measure).toEqual({ aggregation: 'COUNT_ROWS' });
+  });
+
+  it('keeps the dimensions in the order they were picked', () => {
+    // Department × Status and Status × Department bucket the same rows and are not the same
+    // picture: the first dimension is the one a pivot puts down the side.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().dimensions).toEqual(['region', 'status']);
+  });
+
+  it('takes no dimensions at all as a real analysis rather than an unfinished one', () => {
+    // One figure over the matching rows, which is what a KPI is.
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().dimensions).toEqual([]);
+    expect(canvas.studio.canvasCaption()).toContain('over every matching row');
+  });
+
+  it('compacts the list when a middle dimension is cleared, leaving no hole', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.setDimension(2, 'city');
+    canvas.studio.setDimension(1, '');
+
+    expect(canvas.studio.dimensions()).toEqual(['region', 'city']);
+  });
+
+  it('stops at three dimensions', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.setDimension(2, 'city');
+
+    expect(canvas.studio.dimensionSlots()).toEqual(['region', 'status', 'city']);
+    expect(canvas.studio.dimensionSlots()).toHaveLength(3);
+  });
+
+  it('does not offer a column that is already a dimension in another slot', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+
+    expect(canvas.studio.dimensionOptions(1).map(column => column.name)).not.toContain('region');
+  });
+
+  it('sends no filters key at all when nothing is filtering', () => {
+    // An empty group on the wire is a filter that means nothing, and a server reading it as one
+    // is a server deciding what "no clauses" implies.
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters).toBeUndefined();
+  });
+
+  it('sends the Top-N and its Other bucket only when one is chosen', () => {
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+    expect(canvas.sent().topN).toBeUndefined();
+    // Settled before the second run: a run already in flight blocks another, which is the same
+    // rule the console keeps about spending a second governor permit on an impatient click.
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+
+    canvas.studio.setTopN(25);
+    canvas.studio.runAnalysis();
+    expect(canvas.sent().topN).toEqual({ limit: 25, includeOther: true });
+  });
+
+  it('refuses a custom N that is not a usable number rather than sending it', () => {
+    const canvas = canvasWith();
+    canvas.studio.setCustomTopN('0');
+    expect(canvas.studio.topNLimit()).toBeNull();
+
+    canvas.studio.setCustomTopN('-5');
+    expect(canvas.studio.topNLimit()).toBeNull();
+
+    canvas.studio.setCustomTopN('120');
+    expect(canvas.studio.topNLimit()).toBe(120);
+  });
+
+  it('names the run before it is sent, so there is something to stop', () => {
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().queryId).toMatch(/^ui-/);
+    expect(canvas.studio.canStopAnalysis()).toBe(true);
+
+    canvas.studio.stopAnalysis();
+    expect(canvas.cancel).toHaveBeenCalledWith(canvas.sent().queryId);
+  });
+
+  it('shows the server’s refusal in its own words', () => {
+    const canvas = canvasWith();
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_REFUSAL('amount holds VARCHAR, which cannot be summed.'));
+
+    expect(canvas.show()).toContain('amount holds VARCHAR, which cannot be summed.');
+    expect(canvas.show()).toContain('The analysis did not run');
+  });
+});
+
+describe('the filter tree reaches the request with its shape intact', () => {
+  it('sends a nested OR group as a group, not as a flattened list', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND',
+      clauses: [
+        { field: 'status', operator: 'EQ', value: 'active' },
+        {
+          op: 'OR',
+          clauses: [
+            { field: 'region', operator: 'EQ', value: 'north' },
+            { field: 'region', operator: 'EQ', value: 'south' },
+          ],
+        },
+      ],
+    });
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters).toEqual({
+      op: 'AND',
+      clauses: [
+        { field: 'status', operator: 'EQ', value: 'active' },
+        {
+          op: 'OR',
+          clauses: [
+            { field: 'region', operator: 'EQ', value: 'north' },
+            { field: 'region', operator: 'EQ', value: 'south' },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('nests an OR tree rather than spreading it beside a clicked filter', () => {
+    // Spreading (a OR b) into a list joined by AND turns a filter that admitted either into one
+    // that demands both -- silently, and only when a chip happens to be present.
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'OR',
+      clauses: [
+        { field: 'region', operator: 'EQ', value: 'north' },
+        { field: 'region', operator: 'EQ', value: 'south' },
+      ],
+    });
+    canvas.studio.crossFilter('status', 'active');
+
+    const filters = canvas.sent().filters;
+    expect(filters.op).toBe('AND');
+    expect(filters.clauses[0].op).toBe('OR');
+    expect(filters.clauses[1]).toEqual({ field: 'status', operator: 'EQ', value: 'active' });
+  });
+
+  it('does not send a condition that is still missing an operand, and says how many', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND',
+      clauses: [
+        { field: 'region', operator: 'EQ', value: 'north' },
+        { field: 'amount', operator: 'BETWEEN', values: ['10'] },
+      ],
+    });
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters.clauses).toHaveLength(1);
+    expect(canvas.studio.unfinishedFilterCount()).toBe(1);
+    expect(canvas.show()).toContain('1 not finished, so not applied');
+  });
+
+  it('says that these filters DO reach the Data tab, and only once they have been run', () => {
+    // This assertion has been retargeted twice rather than deleted, because the sentence it
+    // guards has been wrong twice. It first said the preview endpoint "has no filter to give
+    // it", then that nothing carried a chip from here to there; both were true when written and
+    // both outlived the code. What it guards now is the qualifier: the Data tab inherits what
+    // was RUN, so a note promising it inherits what is typed would be the same mistake again.
+    const canvas = canvasWith();
+
+    // The Filters heading's tooltip now (owner, 2026-09-28), in place of a paragraph under it.
+    expect(tipsIn(canvas.fixture)).toContain('once you run it');
+    expect(tipsIn(canvas.fixture)).toContain('Data tab');
+  });
+});
+
+describe('cross-filtering: clicking a result narrows everything drawn from it', () => {
+  it('adds a chip and re-runs the analysis', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+
+    expect(canvas.sent().filters.clauses)
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+    expect(canvas.studio.filterChips().map(chip => chip.label)).toEqual(['region is "north"']);
+  });
+
+  it('shows the chip on screen, as something that can be taken off', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+
+    expect(canvas.show()).toContain('Filtered to');
+    expect(canvas.show()).toContain('region is "north"');
+  });
+
+  it('removes the chip and re-runs without it', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    canvas.studio.removeChip({ kind: 'clicked', index: 0 });
+
+    expect(canvas.studio.crossFilters()).toEqual([]);
+    expect(canvas.sent().filters).toBeUndefined();
+  });
+
+  it('does not add the same filter twice when the same cell is clicked again', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    canvas.studio.crossFilter('region', 'north');
+
+    expect(canvas.studio.crossFilters()).toHaveLength(1);
+  });
+
+  it('filters a null group with IS NULL rather than an equality that is never true', () => {
+    // "= NULL" is never true, so an equality here would hand back an empty result for a group the
+    // reader can see has rows in it -- and they would read that emptiness as the answer.
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+    canvas.studio.crossFilter('region', null);
+
+    expect(canvas.sent().filters.clauses)
+      .toEqual([{ field: 'region', operator: 'IS_NULL' }]);
+  });
+
+  it('leaves a chart mark inert when the label is several dimensions joined together', () => {
+    // "north · active" is not a value in any column, so filtering on it would match nothing
+    // while looking like it matched something.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', 'active', '100']],
+      dimensions: ['region', 'status'],
+    })));
+
+    expect(canvas.studio.markClickable()).toBe(false);
+    // The whole mark now, not its drawn name: the name is what the chart printed, and over two
+    // dimensions it is two values joined by a middle dot, which is no column's value at all.
+    canvas.studio.crossFilterFromMark(canvas.studio.canvasPoints()[0]);
+    expect(canvas.studio.crossFilters()).toEqual([]);
+  });
+
+  it('clicking a mark filters on the RAW value, not the label the chart drew', () => {
+    const canvas = canvasWith();
+    canvas.studio.dimensions.set(['booked_on']);
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'booked_on', type: 'DATE', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01 00:00', '100']],
+      dimensions: ['booked_on'],
+      grains: [null],
+    })));
+
+    // The chart DRAWS "2024-03-01" -- renderCell cuts a midnight timestamp to its date -- and the
+    // column holds "2024-03-01 00:00". Filtering on what was drawn asks for a string the data
+    // does not contain.
+    expect(canvas.studio.canvasPoints()[0].name).toBe('2024-03-01');
+    canvas.studio.crossFilterFromMark(canvas.studio.canvasPoints()[0]);
+
+    expect(canvas.studio.crossFilters())
+      .toEqual([{ field: 'booked_on', operator: 'EQ', value: '2024-03-01 00:00' }]);
+  });
+
+  it('refuses to narrow on the Top-N roll-up, which is not a value in the data', () => {
+    const canvas = canvasWith();
+    canvas.studio.dimensions.set(['region']);
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', '100'], ['Other', '40']],
+      dimensions: ['region'],
+      other: { label: 'Other', values: ['south'], valueCount: 3, valuesTruncated: false },
+      rollupRows: [1],
+    })));
+
+    const [real, rollUp] = canvas.studio.canvasPoints();
+    expect(real.operand).toBe('north');
+    // Inert individually, on a chart whose other bars work -- the same treatment the roll-up row
+    // already gets in the table beside it.
+    expect(rollUp.inert).toBe(true);
+    canvas.studio.crossFilterFromMark(rollUp);
+    expect(canvas.studio.crossFilters()).toEqual([]);
+
+    // And the real bar still narrows, so this refuses the roll-up rather than the chart.
+    canvas.studio.crossFilterFromMark(real);
+    expect(canvas.studio.crossFilters())
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+  });
+
+  it('refuses to narrow a grained date, whose bar stands for a whole bucket', () => {
+    const canvas = canvasWith();
+    canvas.studio.dimensions.set(['booked_on']);
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'booked_on', type: 'TIMESTAMP', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['2024-03-01 00:00:00', '100'], ['2024-04-01 00:00:00', '90']],
+      dimensions: ['booked_on'],
+      grains: ['MONTH'],
+    })));
+
+    // The bar says March and MEANS March. An equality would hand back the first of the month.
+    expect(canvas.studio.markClickable()).toBe(false);
+    canvas.studio.crossFilterFromMark(canvas.studio.canvasPoints()[0]);
+    expect(canvas.studio.crossFilters()).toEqual([]);
+  });
+
+  it('says that the figures cover the matching rows, and that a missing one is not a zero', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+
+    expect(canvas.show())
+      .toContain('absent from this result, which is not the same as its value being zero');
+  });
+});
+
+describe('drill-down and drill-up, where the trail is echoed and never rebuilt', () => {
+  const STEP = { dimension: 'region', value: 'north', nextDimension: 'city' };
+  const DRILLED = analysisOf({
+    columns: [
+      { name: 'city', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['leeds', '4000']],
+    dimensions: ['city'],
+    drillPath: [STEP],
+    crumbs: [{ label: 'All rows' }, { label: 'region: north', field: 'region', value: 'north' }],
+  });
+
+  function drilling() {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillNext.set('city');
+    canvas.studio.drillInto('north');
+    return canvas;
+  }
+
+  it('sends the whole analysis with the step, and lets the server compose it', () => {
+    const canvas = drilling();
+    const [request, into] = canvas.drill.mock.calls[0];
+
+    expect(into).toEqual({ dimension: 'region', value: 'north', nextDimension: 'city' });
+    expect(request.dimensions).toEqual(['region']);
+    expect(request.drillPath).toEqual([]);
+  });
+
+  it('does not narrow anything until the drill has actually succeeded', () => {
+    // Applying the composition first would leave the screen holding a narrowing that never
+    // happened if the request failed.
+    const canvas = drilling();
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+
+    canvas.answers.drill!.next(SERVER_REFUSAL('The engine had no slot free.'));
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+
+  it('takes the new grouping and the new trail from the answer, not from a local guess', () => {
+    // The intent of this test was always right and its target was wrong. The server's answer says
+    // what is GROUPED now; it does not say what the analysis was built from. Writing it into
+    // dimensions() overwrote the root, so the next drill-up asked the server to restore something
+    // that had already been replaced.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+
+    expect(canvas.studio.groupedBy()).toEqual(['city']);
+    expect(canvas.studio.effectiveDimensions()).toEqual(['city']);
+    // The ROOT is untouched, which is the whole of the fix.
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.drillPath()).toEqual([STEP]);
+  });
+
+  it('sends the root, not the drilled grouping, so drill-up has something to restore', () => {
+    // The defect in one assertion. After a drill the request carried dimensions: ['city'], so the
+    // server -- which derives the effective grouping from the root plus the trail -- had no root
+    // left to put back. Clicking "All rows" removed the filter and left the reader grouped by the
+    // column they had drilled INTO, which is not where they started.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.drillUp(1);
+
+    expect(canvas.sent().dimensions).toEqual(['region']);
+  });
+
+  it('forgets the reported grouping when the root itself is re-picked', () => {
+    // A grouping reported for an analysis that no longer exists describes nothing.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    expect(canvas.studio.groupedBy()).toEqual(['city']);
+
+    canvas.studio.setDimension(0, 'status');
+
+    expect(canvas.studio.groupedBy()).toEqual([]);
+    expect(canvas.studio.effectiveDimensions()).toEqual(['status']);
+  });
+
+  it('echoes the trail back on the next request, unchanged', () => {
+    // The endpoints are stateless: the trail has to travel, and it travels as the server wrote it.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().drillPath).toEqual([STEP]);
+  });
+
+  it('does not repeat the drill’s own filters in the filter tree', () => {
+    // The server derives a drill's predicates from drillPath itself. Echoing them into `filters`
+    // as well would apply each one twice -- and a null step, which the server narrows with IS
+    // NULL, would be narrowed here with an equality that is never true.
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('status', 'active');
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    canvas.studio.drillInto('north');
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().filters.clauses)
+      .toEqual([{ field: 'status', operator: 'EQ', value: 'active' }]);
+    expect(canvas.sent().drillPath).toEqual([STEP]);
+  });
+
+  it('sends a null group as null, so the server narrows it with IS NULL', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+    canvas.studio.drillInto(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0]));
+
+    expect(canvas.drill.mock.calls[0][1].value).toBeNull();
+  });
+
+  it('renders the crumbs the server sent, and does not build its own', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(analysisOf({
+      dimensions: ['city'],
+      drillPath: [STEP],
+      crumbs: [
+        { label: 'All users' },
+        { label: 'Department: Engineering', field: 'department', value: 'Engineering' },
+      ],
+    })));
+
+    // The labels are the server's words. "Department: Engineering" is nowhere in this component.
+    expect(canvas.show()).toContain('All users');
+    expect(canvas.show()).toContain('Department: Engineering');
+  });
+
+  it('labels a drill chip with the server’s crumb, so the two never word a step differently', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+
+    expect(canvas.studio.filterChips().map(chip => chip.label)).toEqual(['region: north']);
+  });
+
+  it('asks the server to undo the steps rather than undoing them here', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.drillUp(1);
+
+    expect(canvas.drillUp.mock.calls[0][1]).toBe(1);
+    expect(canvas.drillUp.mock.calls[0][0].drillPath).toEqual([STEP]);
+
+    canvas.answers.drillUp!.next(SERVER_RESPONSE(analysisOf()));
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+
+  it('counts the steps to remove from the crumbs on screen, not from its own stack', () => {
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.studio.drillInto('leeds');
+    canvas.answers.drill!.next(SERVER_RESPONSE(analysisOf({
+      dimensions: [],
+      drillPath: [STEP, { dimension: 'city', value: 'leeds' }],
+      crumbs: [{ label: 'All rows' }, { label: 'region: north' }, { label: 'city: leeds' }],
+    })));
+
+    // Clicking "All rows" -- crumb 0 of three -- climbs out of both steps.
+    canvas.studio.crumbClick(0);
+    expect(canvas.drillUp.mock.calls[0][1]).toBe(2);
+  });
+
+  it('says so when it has drilled and the server sent no trail back', () => {
+    // A response with a drill path and no crumbs is a server not holding up its half of the
+    // contract. Inventing the labels here would hide exactly that.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(analysisOf({
+      dimensions: ['city'], drillPath: [STEP], crumbs: [],
+    })));
+
+    expect(canvas.studio.crumbsMissing()).toBe(true);
+    expect(canvas.show()).toContain('the server did not send a breadcrumb trail');
+  });
+
+  it('drops the trail when the dimensions it drilled through are re-picked', () => {
+    // A drill is a narrowing of one particular analysis. Sending its trail on with a fresh set of
+    // dimensions would leave a reader filtered by a step they can no longer see or undo.
+    const canvas = drilling();
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    expect(canvas.studio.drillPath()).toEqual([STEP]);
+
+    canvas.studio.setDimension(0, 'status');
+    expect(canvas.studio.drillPath()).toEqual([]);
+    canvas.studio.runAnalysis();
+    // Empty rather than absent here because these tests see the request object; the wire body
+    // omits an empty trail entirely, which is analysisBody's job and clauseToWire's neighbour.
+    expect(canvas.sent().drillPath).toEqual([]);
+  });
+});
+
+describe('a value on the wire is a string, and has to be a faithful one', () => {
+  it('expands scientific notation without going anywhere near a float', () => {
+    // The measured defect: sum(amount) came back as 7.466125E7 and a reader glancing at it sees
+    // seven point something.
+    expect(plainDecimal('7.466125E7')).toBe('74661250');
+    expect(plainDecimal('-1.5e3')).toBe('-1500');
+    expect(plainDecimal('1.23E-4')).toBe('0.000123');
+    expect(plainDecimal('5E0')).toBe('5');
+  });
+
+  it('leaves a plain decimal exactly as the engine wrote it, trailing zeros and all', () => {
+    // "12500.00" is a currency amount with two places. Normalising it to 12500 would throw away
+    // the scale the engine chose, and a round trip through Number would round a wide DECIMAL.
+    expect(plainDecimal('12500.00')).toBe('12500.00');
+    expect(plainDecimal('0.000000000000000001')).toBe('0.000000000000000001');
+    expect(plainDecimal('123456789012345678901234567890'))
+      .toBe('123456789012345678901234567890');
+  });
+
+  it('leaves anything that is not a number alone', () => {
+    expect(plainDecimal('north')).toBe('north');
+    expect(plainDecimal('')).toBe('');
+  });
+
+  it('trims a DATE’s phantom midnight, and only when it really is midnight', () => {
+    expect(dateOnly('2024-01-01 00:00:00.0')).toBe('2024-01-01');
+    expect(dateOnly('2024-01-01T00:00:00')).toBe('2024-01-01');
+    expect(dateOnly('2024-01-01 00:00')).toBe('2024-01-01');
+    // A time under a column typed DATE is a contradiction between the type and the value, and
+    // the right thing to do with a contradiction is show it.
+    expect(dateOnly('2024-01-01 09:30:00.0')).toBe('2024-01-01 09:30:00.0');
+  });
+
+  it('renders each cell as the column says it is, and no further', () => {
+    const canvas = canvasWith();
+
+    expect(canvas.studio.renderCell(
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' }, '7.466125E7')).toBe('74661250');
+    expect(canvas.studio.renderCell(
+      { name: 'booked_on', type: 'DATE', role: 'DIMENSION' }, '2024-01-01 00:00:00.0'))
+      .toBe('2024-01-01');
+    // A TIMESTAMP genuinely carries a time; trimming it would be the opposite error.
+    expect(canvas.studio.renderCell(
+      { name: 'seen_at', type: 'TIMESTAMP', role: 'DIMENSION' }, '2024-01-01 00:00:00.0'))
+      .toBe('2024-01-01 00:00:00.0');
+    expect(canvas.studio.renderCell(
+      { name: 'region', type: 'VARCHAR', role: 'DIMENSION' }, '007')).toBe('007');
+  });
+
+  it('draws the faithful value on the screen, not the wire form', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '7.466125E7']] }));
+
+    // Grouped, because a MEASURE cell now goes through readableCell the way a dashboard tile's
+    // always did. The Canvas used to print the server's text verbatim while a board tile of the
+    // SAME saved analysis grouped it, so one screen read 20781905.520000000000000 and the other
+    // 20,781,905.52 -- two screens of one analysis disagreeing about a number.
+    expect(canvas.show()).toContain('74,661,250');
+    // And the wire form is still gone, which is what this test was written for: plainDecimal
+    // expands the exponent before readableCell ever sees it.
+    expect(canvas.show()).not.toContain('7.466125E7');
+  });
+
+  it('keeps a null a null rather than turning it into an empty cell', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+
+    expect(canvas.studio.analysisRows()[0].cells[0].isNull).toBe(true);
+    expect(canvas.show()).toContain('null');
+  });
+});
+
+describe('a partial answer says so on the figure, not in a footnote', () => {
+  it('marks a truncated result beside its count and again on the figure’s own title', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ truncated: true }));
+    const text = canvas.show();
+
+    expect(text).toContain('Stopped at the limit — there may be more');
+    expect(text).toContain('Partial — part of the answer');
+    expect(text).toContain('This is part of the answer.');
+  });
+
+  it('says the opposite when the result is whole', () => {
+    // The control. A screen that always hedged would be as useless as one that never did.
+    const canvas = canvasWith();
+    canvas.ran();
+    const text = canvas.show();
+
+    expect(text).toContain('every group that matched');
+    expect(text).not.toContain('Partial — part of the answer');
+  });
+
+  it('shows the Other bucket rather than implying it', () => {
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.ran(analysisOf({
+      rows: [['north', '12500.00'], ['Other', '3000.00']],
+      other: {
+        label: 'Other', values: ['east', 'west', 'central'], valueCount: 3, valuesTruncated: false,
+      },
+    }));
+    const text = canvas.show();
+
+    expect(text).toContain('3 rolled into');
+    expect(text).toContain('east, west, central');
+  });
+
+  it('reports the size of the bucket, not the length of the sample it was sent', () => {
+    // The server caps the list on a high-cardinality dimension and says so. Reporting the sample
+    // length as the bucket size would turn its own honesty about the cap into a smaller, wrong
+    // number.
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.ran(analysisOf({
+      rows: [['north', '12500.00'], ['Other', '3000.00']],
+      other: {
+        label: 'Other', values: ['east', 'west'], valueCount: 4212, valuesTruncated: true,
+      },
+    }));
+    const text = canvas.show();
+
+    expect(text).toContain('4212 rolled into');
+    // Asserted on the note as well as the pill: they are two separate claims, and only one of
+    // them was reading valueCount when this was written.
+    expect(canvas.studio.canvasNotes().some(note => note.includes('4212 values were rolled into')))
+      .toBe(true);
+    expect(text).toContain('and more that are not listed');
+  });
+
+  it('will not let the rolled-up row be filtered to or drilled into', () => {
+    // "Other" is not a value in the data. It is the values the reader has not been shown.
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.ran(analysisOf({
+      rows: [['north', '12500.00'], ['Other', '3000.00']],
+      other: { label: 'Other', values: ['east', 'west'], valueCount: 2, valuesTruncated: false },
+    }));
+
+    expect(canvas.studio.analysisRows()[0].isOther).toBe(false);
+    expect(canvas.studio.analysisRows()[1].isOther).toBe(true);
+  });
+
+  it('warns before the run that a Top-N with no Other loses the tail entirely', () => {
+    const canvas = canvasWith();
+    canvas.studio.setTopN(10);
+    canvas.studio.topNOther.set(false);
+
+    expect(canvas.show()).toContain('The tail will be missing, not summarised');
+  });
+
+  it('says that rows a filter excluded are excluded, not zero', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'active' }],
+    });
+    canvas.ran();
+
+    expect(canvas.show()).toContain('not the same as its value being zero');
+  });
+
+  it('says an empty result is an answer rather than a failure', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'nothing' }],
+    });
+    canvas.ran(analysisOf({ rows: [], rowCount: 0 }));
+
+    expect(canvas.show()).toContain('the rows are excluded, not zero');
+  });
+
+  it('counts a row whose measure will not parse out of the chart rather than as a zero', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '12500'], ['south', 'n/a']] }));
+    canvas.studio.canvasKindName.set('ranked');
+
+    expect(canvas.studio.canvasUnparsed()).toBe(1);
+    expect(canvas.show()).toContain('does not read as a number');
+  });
+
+  it('says when the ranked view is silently dropping a zero or a negative', () => {
+    // RankedBar filters out values at or below zero, and a dropped bar looks exactly like a
+    // category that was never in the data. A SUM over refunds is negative; a filtered group is
+    // zero. Both are real results here.
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '12500'], ['south', '-400'], ['east', '0']] }));
+    canvas.studio.canvasKindName.set('ranked');
+
+    expect(canvas.studio.canvasNonPositive()).toBe(2);
+    expect(canvas.show()).toContain('zero or below and the ranked view does not draw a bar');
+  });
+
+  it('says what a relative window actually resolved to', () => {
+    // "Last 7 days" is not reproducible from the request alone -- it depends on when it ran -- so
+    // two charts taken an hour either side of midnight legitimately differ. This is the only
+    // thing on screen that lets a reader see why.
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ resolvedWindows: { LAST_7_DAYS: '2024-03-01 to 2024-03-07' } }));
+
+    expect(canvas.show()).toContain('"LAST_7_DAYS" resolved to 2024-03-01 to 2024-03-07');
+  });
+});
+
+describe('a distinct count is labelled as whatever it actually is', () => {
+  function counted(measureColumn: string) {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('DISTINCT_COUNT');
+    canvas.studio.measureField.set('region');
+    canvas.studio.setDimension(0, 'status');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: measureColumn, type: 'BIGINT', role: 'MEASURE' },
+      ],
+      rows: [['active', '12']],
+      dimensions: ['status'],
+      measure: measureColumn,
+    })));
+    return canvas;
+  }
+
+  it('says a grouped distinct count is exact, and that the Profile tab’s is not', () => {
+    // The same word means two different things on two tabs of this screen. The Canvas runs
+    // count(DISTINCT ...); the Profile tab reads SUMMARIZE's approx_unique, a HyperLogLog sketch
+    // measured 3.7% low over a million distinct values. A reader who has learnt to distrust one
+    // has no way of knowing the other is trustworthy unless it is said.
+    const canvas = counted('region_distinct_count');
+
+    expect(canvas.studio.distinctExactness()).toBe('exact');
+    expect(canvas.show()).toContain('This distinct count is exact');
+  });
+
+  it('follows the server’s own column name if it ever becomes an estimate', () => {
+    const canvas = counted('region_approx_distinct');
+
+    expect(canvas.studio.distinctExactness()).toBe('estimated');
+    expect(canvas.show()).toContain('Estimated, not counted');
+    expect(canvas.show()).toContain('3.7% low');
+  });
+
+  it('will not claim either when the name says neither', () => {
+    const canvas = counted('regions');
+
+    expect(canvas.studio.distinctExactness()).toBe('unstated');
+    expect(canvas.show()).toContain('Exactness not stated');
+    expect(canvas.show()).toContain('does not say whether this distinct count is exact');
+  });
+
+  it('says nothing about exactness for the aggregations where it does not arise', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+
+    expect(canvas.studio.distinctExactness()).toBe('');
+    expect(canvas.show()).not.toContain('Exactness not stated');
+  });
+
+  it('hedges the median on the picker, before anything has been run', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('MEDIAN');
+
+    expect(canvas.show()).toContain('two middle values');
+  });
+});
+
+describe('the pivot: two dimensions, with the aggregate in the cells', () => {
+  const GRID = analysisOf({
+    columns: [
+      { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['north', 'active', '100'], ['north', 'closed', '40'], ['south', 'active', '60']],
+    rowCount: 3,
+    dimensions: ['region', 'status'],
+    pivot: {
+      rowDimension: 'region', columnDimension: 'status', columnValues: ['active', 'closed'],
+      rows: [
+        { key: 'north', cells: ['100', '40'] },
+        { key: 'south', cells: ['60', null] },
+      ],
+      columnsTruncated: false,
+    },
+  });
+
+  function pivoted(result: AnalysisResult = GRID) {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(result));
+    canvas.studio.canvasKindName.set('pivot');
+    canvas.fixture.detectChanges();
+    return canvas;
+  }
+
+  it('draws the grid the server composed rather than rebuilding one', () => {
+    // Rebuilding it from the flat rows is a second implementation of the same rearrangement, and
+    // the two could disagree about which dimension is the row axis -- which transposes somebody's
+    // chart without saying so.
+    const canvas = pivoted();
+    const pivot = canvas.studio.pivot()!;
+
+    expect(pivot.rowDimension).toBe('region');
+    expect(pivot.columnDimension).toBe('status');
+    expect(pivot.columns).toEqual(['active', 'closed']);
+    expect(pivot.rows.map(row => row.label)).toEqual(['north', 'south']);
+  });
+
+  it('leaves a combination with no rows empty, and never calls it zero', () => {
+    const canvas = pivoted();
+
+    expect(canvas.studio.pivot()!.rows[1].values).toEqual(['60', null]);
+    expect(canvas.show()).toContain('An empty cell means no rows in that combination');
+  });
+
+  it('totals a row only when the parts add up to it', () => {
+    const canvas = pivoted();
+
+    expect(canvas.studio.pivot()!.additive).toBe(true);
+    expect(canvas.studio.pivot()!.rows[0].total).toBe(140);
+  });
+
+  it('offers no total at all for an average, rather than summing averages', () => {
+    // The intent of this test was always right and its setup was a shortcut. It used to run the
+    // pivot as a SUM and then move the Measure picker to AVERAGE, which asserted that the totals
+    // track the PICKER -- and that is the defect, not the fix: the cells on screen are still the
+    // sums that were computed, so a picker moved to Average had been removing a total that was
+    // perfectly real. The grid is now described by the analysis that produced it, so the average
+    // has to be the analysis that ran.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'status');
+    canvas.studio.aggregation.set('AVERAGE');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(GRID));
+    canvas.studio.canvasKindName.set('pivot');
+    canvas.fixture.detectChanges();
+
+    expect(canvas.studio.pivot()!.additive).toBe(false);
+    expect(canvas.studio.pivot()!.rows[0].total).toBeNull();
+    expect(canvas.studio.pivotTotalNote()).toContain('does not add up');
+  });
+
+  it('keeps the total a SUM earned when the Measure picker moves off it', () => {
+    // The other half of the same rule, and the defect that made it necessary: moving the picker
+    // to Average grew nothing and removed a real total, while moving it the other way -- an
+    // AVERAGE pivot relabelled Sum -- grew a Total column of sums of averages and silently
+    // dropped the note saying averages do not add up. Every cell under it was still an average.
+    const canvas = pivoted();
+    expect(canvas.studio.pivot()!.rows[0].total).toBe(140);
+
+    canvas.studio.aggregation.set('AVERAGE');
+
+    expect(canvas.studio.pivot()!.additive).toBe(true);
+    expect(canvas.studio.pivot()!.rows[0].total).toBe(140);
+    expect(canvas.studio.pivotTotalNote()).toBe('');
+  });
+
+  it('says why there is no grid when the column dimension is too wide for one', () => {
+    // A table five thousand columns wide is not a narrower version of the answer, it is an
+    // unusable one, so the server sends the reason instead of the grid.
+    const canvas = pivoted(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      dimensions: ['region', 'status'],
+      pivot: {
+        rowDimension: 'region', columnDimension: 'status', columnValues: [], rows: null,
+        columnsTruncated: true,
+      },
+    }));
+
+    expect(canvas.studio.canvasKinds().find(kind => kind.id === 'pivot')!.issue)
+      .toContain('more values than a grid can carry');
+  });
+
+  it('is not offered at all when the server sent no grid', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const pivot = canvas.studio.canvasKinds().find(kind => kind.id === 'pivot')!;
+
+    expect(pivot.issue).toContain('needs exactly two dimensions');
+    expect(canvas.studio.pivot()).toBeNull();
+  });
+});
+
+describe('the chart kinds offered depend on what the analysis can honestly show', () => {
+  it('refuses a ring of averages, because a share needs a total to be a share of', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('AVERAGE');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf()));
+    const donut = canvas.studio.canvasKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('no total to divide');
+  });
+
+  it('refuses a ring that would have to include a negative slice', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', '100'], ['south', '-40']] }));
+    const donut = canvas.studio.canvasKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('zero or below');
+  });
+
+  it('refuses a ring past the number of colours the palette can tell apart', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({
+      rows: [['a', '1'], ['b', '2'], ['c', '3'], ['d', '4'], ['e', '5'], ['f', '6'], ['g', '7']],
+    }));
+    const donut = canvas.studio.canvasKinds().find(kind => kind.id === 'donut')!;
+
+    expect(donut.issue).toContain('six colours');
+  });
+
+  it('falls back visibly when the kind that was picked stops working', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.canvasKindName.set('pivot');
+
+    // One dimension, so the pivot is unavailable and the picker moves rather than drawing
+    // nothing.
+    expect(canvas.studio.canvasKind()).toBe('table');
+  });
+
+  it('offers the table whenever there is any result at all', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [['north', 'n/a']] }));
+
+    expect(canvas.studio.canvasKinds().find(kind => kind.id === 'table')!.issue).toBe('');
+    expect(canvas.studio.canvasKind()).toBe('table');
+  });
+});
+
+describe('saving an analysis: the configuration, never the rows', () => {
+  it('sends the dimensions, measure, filters, sort and Top-N as one configuration', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.setTopN(25);
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'active' }],
+    });
+    canvas.studio.analysisName.set('Sales by region');
+    canvas.studio.saveAnalysis(false);
+
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.analysisName).toBe('Sales by region');
+    expect(body.connectionAlias).toBe('minio-main');
+    expect(body.datasetPath).toBe('daily/sales-2026.csv');
+
+    const config = JSON.parse(body.analysisConfig);
+    expect(config.dimensions).toEqual(['region']);
+    expect(config.measure).toEqual({ aggregation: 'SUM', field: 'amount' });
+    expect(config.topN).toEqual({ limit: 25, includeOther: true });
+    expect(config.sort).toEqual({ by: 'MEASURE', direction: 'DESC' });
+    expect(config.filters.clauses)
+      .toEqual([{ field: 'status', operator: 'EQ', value: 'active' }]);
+  });
+
+  it('keeps the chart kind out of the configuration, because the row has a column for it', () => {
+    // AnalyticsAnalysis lifts visualization_type into its own column so a listing can show it
+    // without parsing, and its javadoc calls a value stored in two places "one row that can
+    // disagree with itself".
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.canvasKindName.set('ranked');
+    canvas.studio.analysisName.set('Sales by region');
+    canvas.studio.saveAnalysis(false);
+
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.visualizationType).toBe('ranked');
+    expect(JSON.parse(body.analysisConfig).visualizationType).toBeUndefined();
+  });
+
+  it('will not save without a name', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+
+    expect(canvas.studio.canSaveAnalysis()).toBe(false);
+    canvas.studio.analysisName.set('  ');
+    expect(canvas.studio.canSaveAnalysis()).toBe(false);
+  });
+
+  it('offers updating separately from saving a new one, never guessing between them', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.analysisName.set('Sales by region');
+    canvas.studio.saveAnalysis(false);
+    expect(canvas.saveAnalysis.mock.calls[0][0].analyticsAnalysisId).toBeUndefined();
+
+    canvas.answers.saveAnalysis!.next(SERVER_RESPONSE({
+      analyticsAnalysisId: 9, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    } as SavedAnalysis));
+    canvas.studio.saveAnalysis(true);
+    expect(canvas.saveAnalysis.mock.calls[1][0].analyticsAnalysisId).toBe(9);
+  });
+
+  it('reopens an analysis onto the canvas without running it', () => {
+    // An analysis can be a full scan. Browsing the list should not spend a governor permit.
+    const canvas = canvasWith();
+    const before = canvas.analyze.mock.calls.length;
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 3, analysisName: 'By status', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', visualizationType: 'donut',
+      analysisConfig: JSON.stringify({
+        dimensions: ['status'],
+        measure: { aggregation: 'AVERAGE', field: 'amount' },
+        filters: { op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'north' }] },
+        topN: { limit: 50, includeOther: false },
+        sort: { by: 'DIMENSION', direction: 'ASC' },
+      }),
+    });
+
+    expect(canvas.analyze.mock.calls.length).toBe(before);
+    expect(canvas.studio.dimensions()).toEqual(['status']);
+    expect(canvas.studio.aggregation()).toBe('AVERAGE');
+    expect(canvas.studio.measureField()).toBe('amount');
+    expect(canvas.studio.topNLimit()).toBe(50);
+    expect(canvas.studio.topNOther()).toBe(false);
+    expect(canvas.studio.sortBy()).toBe('DIMENSION');
+    expect(canvas.studio.canvasKindName()).toBe('donut');
+    expect((canvas.studio.canvasFilters() as FilterGroup).clauses).toHaveLength(1);
+  });
+
+  it('refuses to half-restore an analysis whose configuration will not parse', () => {
+    // Half a restored analysis -- the dimensions but not the filters -- looks like the saved one
+    // and answers a different question.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    // From the saved panel, where the row is; the panel stays open to say why it did not open.
+    canvas.studio.openSaved();
+    canvas.studio.openAnalysis({
+      analysisName: 'Broken', connectionAlias: 'minio-main', datasetPath: 'daily/sales-2026.csv',
+      analysisConfig: '{not json',
+    });
+
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.savedOpen()).toBe(true);
+    expect(canvas.show()).toContain('its saved configuration is not readable');
+  });
+
+  it('warns when the analysis on screen was saved against a different dataset', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 4, analysisName: 'Elsewhere', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', analysisConfig: '{}',
+    });
+
+    expect(canvas.show()).toContain('archive/2025.parquet');
+  });
+
+  it('fetches the saved list once, when the tab is opened, and never runs an analysis for it', () => {
+    const canvas = canvasWith();
+
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+    expect(canvas.analyze).not.toHaveBeenCalled();
+
+    canvas.studio.showTab('overview');
+    canvas.studio.showTab('canvas');
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('the canvas does not disturb the tabs beside it', () => {
+  it('clears its picks when another file is opened, because a dimension is a column name', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+
+    canvas.studio.openFile(REFUNDS);
+    expect(canvas.studio.dimensions()).toEqual([]);
+    expect(canvas.studio.analysisResult()).toBeNull();
+    expect(canvas.studio.crossFilters()).toEqual([]);
+    expect(canvas.studio.canvasFilters().clauses).toEqual([]);
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+
+  it('does not scan the profile just because the Canvas tab was opened', () => {
+    const canvas = canvasWith();
+
+    expect(canvas.studio.profileLoading()).toBe(false);
+    expect(canvas.studio.profile()).toBeNull();
+  });
+
+  it('keeps the storage rail’s own filter separate from the analysis filters', () => {
+    // Two things called "filtered" on one screen is how a template ends up asking one and
+    // meaning the other.
+    const canvas = canvasWith();
+    canvas.studio.filter.set('sales');
+
+    expect(canvas.studio.analysisFiltered()).toBe(false);
+    canvas.studio.crossFilter('region', 'north');
+    expect(canvas.studio.analysisFiltered()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The Data tab, rendered, with a real DataGrid in it.
+ *
+ * The grid was built in the wave before this one and wired into nothing: sorting, filtering,
+ * search, column resize, visibility and copy-cell all existed and no user could reach any of
+ * them, because the Data tab was still the page-turner it shipped as. These tests are the
+ * connection between the two — what the grid emits, and what this screen then asks the server.
+ */
+function gridWith(over: Partial<DatasetPreview> = {}) {
+  const answers: { schema?: Subject<any>; preview?: Subject<any>; profile?: Subject<any> } = {};
+  const listObjects = vi.fn(() => of(SERVER_RESPONSE({ objects: [CSV_FILE] })));
+  const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+  const schema = vi.fn(() => (answers.schema = new Subject<any>()).asObservable());
+  // Declared WITH its parameters, so the mock's recorded calls are a tuple this file can index.
+  // The sixth is the shape, and the shape is what these tests are about.
+  const preview = vi.fn((_connection?: string, _path?: string, _page?: number,
+                         _knownTotal?: number, _pageSize?: number, _shape?: PreviewShape) =>
+    (answers.preview = new Subject<any>()).asObservable());
+  const profile = vi.fn(() => (answers.profile = new Subject<any>()).asObservable());
+
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({
+    providers: [
+      provideRouter([]),
+      { provide: StorageService, useValue: { buckets, listObjects } },
+      // The Overview tab reads analytics.json/overview through its own component; here it is an
+      // empty answer so the Studio's specs stay about the Studio.
+      { provide: AnalyticsService, useValue: { schema, preview, profile, overview: () => of({ status: API_SUCCESS, data: { profile: { totalRows: 0, columns: [] }, charts: [], durationMs: 0 } }) } },
+    ],
+  });
+  const fixture = TestBed.createComponent(Analytics);
+  fixture.detectChanges();
+  const studio = fixture.componentInstance;
+  studio.openFile(CSV_FILE);
+  answers.schema!.next(SERVER_RESPONSE(SCHEMA));
+  answers.preview!.next(SERVER_RESPONSE(pageOf(over)));
+  studio.showTab('data');
+  fixture.detectChanges();
+
+  return {
+    studio, fixture, answers, preview, profile,
+    /** Answers the request now in flight, so a test can chain one request onto another. */
+    answer(page: Partial<DatasetPreview> = {}): void {
+      answers.preview!.next(SERVER_RESPONSE(pageOf(page)));
+      fixture.detectChanges();
+    },
+    /** The shape argument of the most recent preview call — the sixth. */
+    lastShape(): PreviewShape {
+      const calls = preview.mock.calls;
+      return calls[calls.length - 1][5] ?? {};
+    },
+    lastKnownTotal(): number | undefined {
+      const calls = preview.mock.calls;
+      return calls[calls.length - 1][3];
+    },
+    lastPage(): number | undefined {
+      const calls = preview.mock.calls;
+      return calls[calls.length - 1][2];
+    },
+    show(): string {
+      fixture.detectChanges();
+      return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+    },
+  };
+}
+
+describe('the grid is wired to the server, and never sorts the page it is holding', () => {
+  it('renders the rows through the grid rather than a table of its own', () => {
+    const grid = gridWith({ columns: ['id', 'amount'], rows: [['1', '9.50']] });
+
+    expect((grid.fixture.nativeElement as HTMLElement).querySelector('app-data-grid'))
+      .not.toBeNull();
+    // The grid's own toolbar, which is the half of the feature that was unreachable: search,
+    // filters and column visibility all existed and no user could get at any of them.
+    const text = grid.show();
+    expect(text).toContain('Search every text column');
+    expect(text).toContain('Filters');
+    // And its busy line, which is what makes a server-side sort trustworthy rather than merely
+    // applied — the old table said nothing at all about where the ordering came from.
+    expect(text).toContain('Sorting, searching and filtering all run on the server');
+  });
+
+  it('hands the grid the columns in the order the ROWS are in, carrying the schema’s types', () => {
+    // A row is indexed by position in the preview's own column list. Feeding the schema's order
+    // instead would put every cell under the wrong heading the moment the two disagreed.
+    const grid = gridWith({ columns: ['amount', 'id'] });
+
+    expect(grid.studio.gridColumns())
+      .toEqual([{ name: 'amount', type: 'DECIMAL(18,3)' }, { name: 'id', type: 'BIGINT' }]);
+  });
+
+  it('asks the SERVER to sort, from page 0, rather than reordering what it holds', () => {
+    const grid = gridWith({ page: 3, totalRows: 250 });
+    grid.studio.onGridSort({ column: 'amount', direction: 'DESC' });
+
+    expect(grid.lastPage()).toBe(0);
+    expect(grid.lastShape()).toMatchObject({ sort: 'amount', direction: 'DESC' });
+    // Page 3 of an unsorted file and page 3 of a sorted one hold different rows, so the page
+    // number cannot survive the sort.
+    expect(grid.studio.gridSort()).toEqual({ column: 'amount', direction: 'DESC' });
+  });
+
+  it('sends a search and a filter as the server’s own parameters, from page 0', () => {
+    const grid = gridWith({ page: 2 });
+    grid.studio.onGridSearch('north');
+
+    expect(grid.lastPage()).toBe(0);
+    expect(grid.lastShape()).toMatchObject({ search: 'north' });
+
+    grid.answer({ totalRows: 12, filtered: true });
+    grid.studio.onGridFilters([{ field: 'amount', operator: 'GT', value: '100' }]);
+
+    expect(grid.lastShape()).toMatchObject({
+      filters: [{ field: 'amount', operator: 'GT', value: '100' }],
+    });
+  });
+
+  it('drops the sort, the search and the filters when another file is opened', () => {
+    // A sort names a column of the file being closed and a filter names a value in it.
+    const grid = gridWith();
+    grid.studio.onGridSort({ column: 'amount', direction: 'ASC' });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 4, filtered: true });
+
+    grid.studio.openFile(OTHER_CSV);
+
+    expect(grid.studio.gridSort()).toBeNull();
+    expect(grid.studio.gridSearch()).toBe('');
+    expect(grid.studio.gridFilters()).toEqual([]);
+    expect(grid.studio.datasetRows()).toBeNull();
+  });
+
+  it('reports a copy the clipboard refused, rather than saying nothing', () => {
+    const grid = gridWith();
+    grid.studio.onCopyCell({ row: 0, column: 'amount', value: '9.50', copied: false });
+
+    expect(grid.show()).toContain('would not let the page write to the clipboard');
+  });
+});
+
+describe('knownTotalFiltered: the flag that stops a dataset appearing to shrink', () => {
+  it('says false while nothing has narrowed the count it is carrying', () => {
+    const grid = gridWith({ totalRows: 250, filtered: false });
+    grid.studio.loadPage(1);
+
+    expect(grid.lastKnownTotal()).toBe(250);
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: false });
+  });
+
+  it('echoes the flag from the response the carried total came out of', () => {
+    // The server counted 12 rows UNDER a filter and said so. Every request that carries that
+    // number has to carry where it came from, or the server has no way to tell 12-of-250 from
+    // a file with 12 rows in it.
+    const grid = gridWith();
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    grid.studio.loadPage(1);
+
+    expect(grid.lastKnownTotal()).toBe(12);
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: true });
+  });
+
+  it('STILL says true on the request that clears the filter, which is the whole defect', () => {
+    // This is the one the backend test guards, and the one a careless client gets wrong. The
+    // request that clears a filter does not narrow, so the server takes its trusting branch and
+    // would reuse the carried total -- while the total in hand is the FILTERED one, counted a
+    // moment ago under the filter just removed. Reused, the pager offers one page of a dataset
+    // with three, and the file looks permanently smaller for having been filtered once.
+    //
+    // Deriving the flag from "am I narrowing now" would be right on every request except this
+    // one. It is read off the response the number came from instead.
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    grid.studio.onGridSearch('');
+
+    expect(grid.lastShape()).toMatchObject({ search: undefined, knownTotalFiltered: true });
+    expect(grid.lastKnownTotal()).toBe(12);
+  });
+
+  it('goes back to false once an unfiltered count has come back', () => {
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+    grid.studio.onGridSearch('');
+    grid.answer({ totalRows: 250, filtered: false });
+
+    grid.studio.loadPage(1);
+
+    expect(grid.lastKnownTotal()).toBe(250);
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: false });
+  });
+
+  it('does not call a SORT a narrowing, because ordering removes no rows', () => {
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSort({ column: 'amount', direction: 'ASC' });
+    grid.answer({ totalRows: 250, filtered: false });
+    grid.studio.loadPage(1);
+
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: false });
+    expect(grid.studio.previewFiltered()).toBe(false);
+  });
+
+  it('remembers the size of the FILE, and never overwrites it with a filtered count', () => {
+    const grid = gridWith({ totalRows: 250, filtered: false });
+    expect(grid.studio.datasetRows()).toBe(250);
+
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    // The count the pager divides is the filtered one; the size of the file is not.
+    expect(grid.studio.rowCount()).toBe(12);
+    expect(grid.studio.datasetRows()).toBe(250);
+  });
+
+  it('prints the size of the file in the header, with the match count beside it', () => {
+    // The header used to print rowCount(), which becomes a count of matches the moment a filter
+    // goes on -- so filtering announced that the dataset had shrunk.
+    const grid = gridWith({ totalRows: 250, filtered: false });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: true });
+
+    const text = grid.show();
+    expect(text).toContain('250');
+    expect(text).toContain('12 match the filter');
+  });
+
+  it('falls back to what it asked for when a response carries no flag at all', () => {
+    // The flag is a primitive on the DTO and is always serialised today. This is about which way
+    // the screen falls when that stops being true: a search in hand means the count is a count
+    // of matches, whatever the response forgot to say.
+    const grid = gridWith();
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: undefined as unknown as boolean });
+
+    expect(grid.studio.previewFiltered()).toBe(true);
+  });
+});
+
+describe('the pager tells the truth about the order it is paging', () => {
+  it('says pages follow the file’s own read order while nothing is sorted', () => {
+    const grid = gridWith({ totalRows: 250, pageSize: 100 });
+
+    expect(grid.show()).toContain('Pages follow the order the file is read in');
+  });
+
+  it('says pages follow the SERVER’S sort once one is applied', () => {
+    // The note claimed there was no ORDER BY because object storage has no row order. That is
+    // still true of an unsorted file and became false the moment a column could be sorted.
+    const grid = gridWith({ totalRows: 250, pageSize: 100 });
+    grid.studio.onGridSort({ column: 'amount', direction: 'ASC' });
+    grid.answer({ totalRows: 250, pageSize: 100 });
+
+    const text = grid.show();
+    expect(text).toContain('Pages follow the sort on');
+    expect(text).toContain('across every row in the dataset');
+    expect(text).not.toContain('Pages follow the order the file is read in');
+  });
+
+  it('says the pages are pages of the matching rows while a filter is on', () => {
+    const grid = gridWith({ totalRows: 250, pageSize: 100 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 250, pageSize: 100, filtered: true });
+
+    expect(grid.show()).toContain('pages of the rows that match');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/** The studio on one of the four tabs that read the single SUMMARIZE scan. */
+function scanned(tab: 'compact' | 'profile' | 'quality',
+                 columns: ColumnProfile[], totalRows = 1000,
+                 page: Partial<DatasetPreview> = {}) {
+  const grid = gridWith(page);
+  grid.studio.showTab(tab);
+  grid.answers.profile!.next(SERVER_RESPONSE(profileOf(columns, totalRows)));
+  grid.fixture.detectChanges();
+  return grid;
+}
+
+/**
+ * Compact, with one column's card open.
+ *
+ * The per-column detail used to be its own tab. It is the same card, rendered under the Compact
+ * row it belongs to, so the assertions about what that card says are unchanged -- only the way
+ * a reader reaches it is.
+ */
+function columnOpened(name: string, columns: ColumnProfile[], totalRows = 1000) {
+  const grid = scanned('compact', columns, totalRows);
+  grid.studio.toggleColumn(name);
+  grid.fixture.detectChanges();
+  return grid;
+}
+
+describe('Profile and Columns are what document 06 says they are', () => {
+  it('scans once for all three of the tabs that read it', () => {
+    // The cost argument the tab grouping makes on screen has to be true.
+    const grid = gridWith();
+    grid.studio.showTab('compact');
+    grid.answers.profile!.next(SERVER_RESPONSE(profileOf([columnOf()])));
+    grid.studio.showTab('profile');
+    grid.studio.showTab('quality');
+
+    expect(grid.profile).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives an opened column the per-column detail, which is where the hedged figures are', () => {
+    const grid = columnOpened('amount', [columnOf({ name: 'amount' })]);
+    const text = grid.show();
+
+    expect(text).toContain('amount');
+    expect(text).toContain('distinct values (estimated)');
+    expect(text).toContain('quartiles estimated');
+  });
+
+  it('says top values are a second pass, and offers to buy it per column', () => {
+    // 06 asks for them and SUMMARIZE does not return them: they need a GROUP BY of their own.
+    // Naming what is absent is the alternative to a card that quietly does not have it.
+    const grid = columnOpened('a_column', [columnOf({ name: 'a_column' })]);
+
+    // Reworded with the counted distribution. The second pass is still a second pass, but it is
+    // now BUYABLE per column rather than simply absent -- saying it is "not here" directly above
+    // a button that fetches it would be the screen contradicting itself.
+    expect(tipsIn(grid.fixture)).toContain('a second pass over the file');
+    expect(grid.show()).toContain('Measure values');
+  });
+
+  it('puts a column’s quality warnings on the column they are about', () => {
+    const grid = columnOpened('note', [columnOf({
+      name: 'note', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true,
+    })]);
+
+    expect(grid.show()).toContain('Empty column');
+  });
+
+  it('gives Profile the aggregate view, which did not exist at all before', () => {
+    const grid = scanned('profile', [
+      columnOf({ name: 'amount', type: 'BIGINT' }),
+      columnOf({ name: 'total', type: 'BIGINT' }),
+      textColumn({ name: 'region' }),
+    ]);
+    const text = grid.show();
+
+    expect(text).toContain('Types');
+    expect(text).toContain('Completeness, in columns');
+    expect(text).toContain('Distinct values (estimated)');
+    // Two BIGINT columns and one VARCHAR, grouped on the short type.
+    expect(grid.studio.typeBands())
+      .toEqual([
+        { name: 'BIGINT', value: 2, detail: '2 columns are BIGINT.' },
+        { name: 'VARCHAR', value: 1, detail: '1 column is VARCHAR.' },
+      ]);
+  });
+
+  it('counts COLUMNS in every band, and says so where the band is read', () => {
+    // The whole risk of an aggregate view. "42% empty" over a file reads as a claim about cells,
+    // and nothing in this module has ever counted a cell.
+    const grid = scanned('profile', [
+      columnOf({ nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'b', nullPercentage: 40, completeness: 60 }),
+      columnOf({ name: 'c', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true }),
+    ]);
+
+    expect(grid.studio.completenessBands().map(band => band.value)).toEqual([1, 0, 0, 1, 1]);
+    // In the heading, where the band is read, and in full as its tooltip.
+    expect(grid.show()).toContain('Completeness, in columns');
+    expect(tipsIn(grid.fixture)).toContain('A count of columns in each band, not of rows or values');
+  });
+
+  it('refuses to let the averaged percentage read as a share of the values in the file', () => {
+    const grid = scanned('profile', [
+      columnOf({ nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'b', nullPercentage: 50, completeness: 50 }),
+    ]);
+
+    expect(grid.studio.averageFilled()).toBe(75);
+    expect(grid.show()).toContain('averaged over the columns');
+    expect(tipsIn(grid.fixture)).toContain('Not a share of cells');
+    expect(tipsIn(grid.fixture)).toContain('each weighted the same');
+  });
+
+  it('bands cardinality off the sketch, and labels the whole chart estimated', () => {
+    const grid = scanned('profile', [
+      columnOf({ name: 'flag', approxDistinct: 2 }),
+      columnOf({ name: 'id', approxDistinct: 990, keyLike: true }),
+    ]);
+
+    expect(grid.studio.cardinalityBands().find(band => band.name === 'Under 10')!.value).toBe(1);
+    expect(grid.studio.cardinalityBands()
+      .find(band => band.name === 'Almost every row different')!.value).toBe(1);
+    expect(grid.show()).toContain('Distinct values (estimated)');
+    expect(tipsIn(grid.fixture)).toContain('rests on the distinct-value sketch');
+  });
+});
+
+describe('the Compact view is dense, and every figure in it carries its own hedge', () => {
+  it('draws one row per column with 06’s seven fields', () => {
+    const grid = scanned('compact', [columnOf({ name: 'amount' }), textColumn({ name: 'region' })],
+      1000, { columns: ['amount', 'region'], rows: [['9.50', 'north']] });
+
+    expect(grid.studio.compactRows().map(row => row.name)).toEqual(['amount', 'region']);
+    const text = grid.show();
+    expect(text).toContain('Sample');
+    expect(text).toContain('Key metric');
+    expect(text).toContain('Quality');
+  });
+
+  it('takes the sample from the page in hand, and says that is what it is', () => {
+    const grid = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [['9.50'], ['12.00']] });
+
+    expect(grid.studio.compactRows()[0].sample).toBe('9.50');
+    expect(grid.studio.compactRows()[0].sampleKind).toBe('value');
+    expect(tipsIn(grid.fixture)).toContain("the sample is the first value on the Data tab's current page");
+  });
+
+  it('tells a null, a blank and an empty page apart', () => {
+    // The same distinction the grid draws in every cell: a null is the file having no value, a
+    // blank is the file having an empty one, and no rows is this screen having nothing to show.
+    const nulls = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [[null], [null]] });
+    expect(nulls.studio.compactRows()[0].sampleKind).toBe('null');
+
+    const blank = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [['   ']] });
+    expect(blank.studio.compactRows()[0].sampleKind).toBe('blank');
+
+    const none = scanned('compact', [columnOf({ name: 'amount' })], 1000,
+      { columns: ['amount'], rows: [] });
+    expect(none.studio.compactRows()[0].sampleKind).toBe('none');
+  });
+
+  it('writes N/A rather than a zero where a statistic does not apply', () => {
+    // 06 says so in as many words, and a zero would claim a fully populated column on a file
+    // where nothing was measured at all.
+    const grid = scanned('compact',
+      [columnOf({ nullPercentage: null, completeness: null, approxNullRows: null })], 0);
+    const row = grid.studio.compactRows()[0];
+
+    expect(row.nullLabel).toBe('N/A');
+    expect(row.distinctLabel).toBe('N/A');
+    expect(row.checked).toBe(false);
+    expect(row.quality).toBe('not checked');
+  });
+
+  it('never prints the distinct share without the mark that says it is a sketch', () => {
+    const grid = scanned('compact', [columnOf({ approxDistinct: 400 })], 1000);
+
+    expect(grid.studio.compactRows()[0].distinctLabel).toBe('≈ 40%');
+  });
+
+  it('picks the key metric from what the engine returned, not from a type name', () => {
+    const numeric = scanned('compact', [columnOf()]).studio.compactRows()[0];
+    expect(numeric.metricName).toBe('mean');
+    expect(numeric.metricEstimated).toBe(false);
+
+    // No mean, but quantiles: a DATE column. The median is approx_quantile, so it is marked.
+    const dated = scanned('compact', [columnOf({
+      name: 'booked_on', type: 'DATE', avg: null, std: null,
+      approxQ25: '2026-01-02', approxQ50: '2026-02-01', approxQ75: '2026-03-01',
+    })]).studio.compactRows()[0];
+    expect(dated.metricName).toBe('median');
+    expect(dated.metricEstimated).toBe(true);
+
+    const text = scanned('compact', [textColumn()]).studio.compactRows()[0];
+    expect(text.metricName).toBe('range');
+    expect(text.metricValue).toBe('alpha → zulu');
+  });
+
+  it('keeps "clear" and "not checked" apart, which is a clean bill of health or none', () => {
+    const clear = scanned('compact', [columnOf()]).studio.compactRows()[0];
+    expect(clear.quality).toBe('clear');
+    expect(clear.checked).toBe(true);
+
+    const flagged = scanned('compact', [columnOf({
+      name: 'note', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true,
+    })]).studio.compactRows()[0];
+    expect(flagged.level).toBe('crit');
+    expect(flagged.quality).toBe('Empty column');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('Charts is a tab, and the drift the old layout prevented is now said out loud', () => {
+  it('draws whatever the console last ran', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900'], ['south', '400']], rowCount: 2,
+    }));
+
+    expect(console.studio.chartDrawn()).toBe(true);
+    expect(console.show()).toContain('"total" by "region"');
+  });
+
+  it('says the picture is of the PREVIOUS statement once the editor has moved on', () => {
+    // The chart used to sit under the result, and that geography was the safeguard: editing the
+    // SQL was visibly editing the thing above the picture. On a tab the two are never on screen
+    // together, so the drift has to be stated.
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1,
+    }));
+    expect(console.studio.chartStale()).toBe(false);
+
+    console.studio.sql.set('select region, avg(total) from dataset group by region');
+    const text = console.show();
+
+    expect(console.studio.chartStale()).toBe(true);
+    expect(text).toContain('This is a chart of the previous answer');
+    expect(text).toContain('From the previous statement');
+  });
+
+  it('shows the statement that actually ran, rather than asserting one has changed', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1,
+    }));
+    console.studio.sql.set('select 1');
+
+    expect(console.studio.ranSql()).toBe('select * from dataset');
+    expect(console.show()).toContain('select * from dataset');
+  });
+
+  it('has nothing to be stale about once the result is cleared', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1,
+    }));
+    console.studio.sql.set('select 1');
+    console.studio.openFile(REFUNDS);
+
+    expect(console.studio.ranSql()).toBe('');
+    expect(console.studio.chartStale()).toBe(false);
+  });
+
+  it('keeps saying a truncated chart is partial, on the tab as it did under the result', () => {
+    const console = charted(resultOf({
+      columns: ['region', 'total'], rows: [['north', '900']], rowCount: 1, truncated: true,
+    }));
+    const text = console.show();
+
+    expect(text).toContain('This chart is drawn from part of the answer');
+    expect(text).toContain('Partial — part of the answer');
+  });
+});
+
+describe('Activity promotes the run history, and leads with the refusals', () => {
+  it('does not read the history because the SQL tab was opened', () => {
+    // It is the Activity tab's subject now. A workspace's whole history is not worth a database
+    // round trip to somebody who came to write a query.
+    const console = consoleWith();
+
+    expect(console.fetchRecentRuns).not.toHaveBeenCalled();
+  });
+
+  it('reads it once on arrival, and not again on a second visit', () => {
+    const console = consoleWith();
+    console.studio.showTab('activity');
+    console.answers.runs!.next(SERVER_RESPONSE([runOf()]));
+    console.studio.showTab('sql');
+    console.studio.showTab('activity');
+
+    expect(console.fetchRecentRuns).toHaveBeenCalledTimes(1);
+  });
+
+  it('counts refusals apart from failures, because they are different events', () => {
+    // A refusal never reached the engine: the statement gate or the governor turned it away.
+    // Counted with failures it would read as something that broke.
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([
+      runOf({ analyticsQueryRunId: 1, runStatus: 'REFUSED', errorMessage: 'A query may not write.' }),
+      runOf({ analyticsQueryRunId: 2, runStatus: 'REFUSED', errorMessage: 'A query may not attach.' }),
+      runOf({ analyticsQueryRunId: 3, runStatus: 'FAILED' }),
+      runOf({ analyticsQueryRunId: 4, runStatus: 'CANCELLED' }),
+      runOf({ analyticsQueryRunId: 5, runStatus: 'SUCCESS' }),
+    ]));
+    const text = console.show();
+
+    expect(console.studio.refusedRuns().length).toBe(2);
+    expect(console.studio.failedRuns().length).toBe(1);
+    expect(console.studio.stoppedRuns().length).toBe(1);
+    expect(text).toContain('2 refused');
+    expect(text).toContain('1 failed');
+    expect(text).toContain('1 stopped or timed out');
+    // What a refusal is, as the refused count's tooltip rather than a paragraph under it.
+    expect(tipsIn(console.fixture)).toContain('never reached the engine');
+  });
+
+  it('says how many of the runs were against the file that is open', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE([
+      runOf({ analyticsQueryRunId: 1 }),
+      runOf({ analyticsQueryRunId: 2, datasetPath: 'daily/other.csv' }),
+    ]));
+
+    expect(console.studio.runsHere().length).toBe(1);
+    expect(console.show()).toContain('1 against the file open here');
+  });
+
+  it('lands a statement in the console rather than running it where it cannot be read', () => {
+    const console = activityWith();
+    const before = console.query.mock.calls.length;
+    console.studio.openRunInConsole(runOf({ queryText: 'select count(*) from dataset' }));
+
+    expect(console.studio.sql()).toBe('select count(*) from dataset');
+    expect(console.studio.tab()).toBe('sql');
+    expect(console.query.mock.calls.length).toBe(before);
+  });
+});
+
+describe('the dashboard and the registry are reachable from the workspace', () => {
+  it('offers the dashboards by name from the file header\'s menu', () => {
+    // Both halves of dashboard.ts shipped wired into nothing: a board had no route and no link,
+    // and the registry had no caller at all. This is the way in -- the "Where this is" card that
+    // held it is gone (owner, 2026-09-28) and its two actions are the header's ⋯ menu.
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const more = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-label="More for this file"]')!;
+    more.click();
+    grid.fixture.detectChanges();
+
+    // The menu is an overlay, so it is drawn under <body> rather than inside the component.
+    const link = document.querySelector('a[href="/data/analytics/dashboards"]');
+    expect(link).not.toBeNull();
+    expect(document.body.textContent).toContain('Name this dataset');
+  });
+
+  it('does not create the registry until somebody asks for it', () => {
+    // It reads the registry when it is made. Rendering it unconditionally would spend that read
+    // on every file open for a feature most readers never touch.
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+
+    expect((grid.fixture.nativeElement as HTMLElement).querySelector('app-dataset-registry'))
+      .toBeNull();
+    expect(grid.studio.registryOpen()).toBe(false);
+  });
+
+  it('refuses to open a registered dataset under a connection it cannot read', () => {
+    // A registered name can outlive the connection it points at, and this screen refuses several
+    // kinds of connection the registry never checked. Opening it anyway would browse a tree that
+    // returns a refusal for every file in it.
+    const grid = gridWith();
+    grid.studio.openRegistered({
+      analyticsDatasetId: 1, datasetName: 'Archive', connectionAlias: 'partner-drop',
+      datasetPath: 'daily/old.csv',
+    });
+
+    expect(grid.studio.browseError()).toContain('not a connection Analytics Studio can read');
+    expect(grid.studio.path()).toBe('daily/sales-2026.csv');
+  });
+
+  it('opens the dataset a link names (a form\'s submissions, MIG-279) instead of the first connection', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({
+          connection: 'minio-main', path: 'datasets/forms/form-1001/*.json', name: 'Form: Visit' }) } } },
+        { provide: StorageService, useValue: { buckets: () => of(SERVER_RESPONSE([MINIO])), listObjects: () => of(SERVER_RESPONSE({ objects: [] })) } },
+        { provide: AnalyticsService, useValue: { schema: () => new Subject<any>(), preview: () => new Subject<any>(), profile: () => new Subject<any>(),
+          overview: () => new Subject<any>() } },
+      ],
+    });
+    const fixture = TestBed.createComponent(Analytics);
+    fixture.detectChanges();
+    expect(fixture.componentInstance.path()).toBe('datasets/forms/form-1001/*.json');
+    expect(fixture.componentInstance.prefix()).toBe('datasets/forms/form-1001/');
+  });
+
+  it('opens one that IS readable, landing the rail in the folder it lives in', () => {
+    const grid = gridWith();
+    grid.studio.openRegistered({
+      analyticsDatasetId: 2, datasetName: 'Sales', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025/sales.csv',
+    });
+
+    expect(grid.studio.path()).toBe('archive/2025/sales.csv');
+    expect(grid.studio.prefix()).toBe('archive/2025/');
+    // No ObjectSummary came with it, so there is no size or modified date to claim.
+    expect(grid.studio.selected()).toBeNull();
+  });
+});
+
+describe('a response that forgets the flag cannot break the provenance chain', () => {
+  it('records the fallback, so the NEXT request still says the total was filtered', () => {
+    // The flag is a primitive on the DTO and is always serialised today. This is about which way
+    // the screen falls when that stops being true: without settling it on arrival, a filtered
+    // total would be carried forward marked unfiltered — and the server would then reuse it on
+    // the request that clears the filter, which is the exact defect knownTotalFiltered exists
+    // to prevent.
+    const grid = gridWith({ totalRows: 250 });
+    grid.studio.onGridSearch('north');
+    grid.answer({ totalRows: 12, filtered: undefined as unknown as boolean });
+
+    expect(grid.studio.previewFiltered()).toBe(true);
+    // And it did not mistake that 12 for the size of the file.
+    expect(grid.studio.datasetRows()).toBe(250);
+
+    grid.studio.onGridSearch('');
+    expect(grid.lastShape()).toMatchObject({ knownTotalFiltered: true });
+  });
+});
+
+describe('a filter survives leaving the Data tab and coming back', () => {
+  it('still shows what it is narrowed by, and can still be cleared', () => {
+    // The grid lives inside @if (tab() === 'data'), so a tab switch destroys it and a return
+    // rebuilds it empty. sort and search survived because they are inputs; filters were not, so
+    // the server went on filtering while the chip naming the filter and the Clear button that
+    // would have removed it both disappeared. The only ways out were retyping the filter in order
+    // to delete it, or reopening the file.
+    const console = consoleWith();
+    console.studio.showTab('data');
+    // 'amount' is a real column of this fixture — filtering a column the dataset does not have
+    // would make the grid correctly render nothing and the test pass for the wrong reason.
+    console.studio.onGridFilters([{ field: 'amount', operator: 'CONTAINS', value: '9' }] as never);
+
+    console.studio.showTab('overview');
+    console.studio.showTab('data');
+    console.fixture.detectChanges();
+
+    // The parent still holds it — that half was never the bug.
+    expect(console.studio.gridFilters().length).toBe(1);
+    // And the SCREEN says so, which is the half that broke. Read from the rendered DOM rather
+    // than from a signal: the defect was that the count went on reading as narrowed while the
+    // chip naming the filter and the Clear button both vanished, and only the DOM shows that.
+    const screen = (console.fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(screen).toContain('amount');
+    const clear = [...(console.fixture.nativeElement as HTMLElement)
+      .querySelectorAll('button')].some(b => (b.textContent ?? '').trim().startsWith('Clear'));
+    expect(clear).toBe(true);
+  });
+
+  it('clears filters the grid itself never emitted', () => {
+    // clearAll() used to guard on "am I holding any filters", which is false for a filter set by
+    // the parent — Quality drilling into its own findings, or the Canvas cross-filtering — and
+    // false again for one this instance lost to a tab switch. Clear became a no-op in exactly the
+    // cases a reader most needs it.
+    const grid = TestBed.createComponent(DataGrid);
+    const emitted: unknown[] = [];
+    grid.componentRef.setInput('columns', [{ name: 'region', type: 'VARCHAR' }]);
+    grid.componentRef.setInput('rows', []);
+    grid.componentRef.setInput('filters',
+      [{ field: 'region', operator: 'CONTAINS', value: 'west' }]);
+    grid.componentInstance.filtersChange.subscribe(v => emitted.push(v));
+    grid.detectChanges();
+
+    grid.componentInstance.clearAll();
+
+    expect(emitted).toEqual([[]]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Cross-filtering: document 07's "clicking a result applies a filter to the data table".
+ *
+ * The three other targets that section lists were already met -- the charts and every subsequent
+ * dimension analysis draw from the narrowed result, and there are no KPI cards by design. The
+ * data table was the one real gap, and it is the one with the traps: what gets carried (what RAN,
+ * not what is typed), how it is carried (an OR group whole, not spread into an AND), and what the
+ * carried total is then allowed to mean.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('cross-filtering into the Data tab', () => {
+  it('carries nothing before an analysis has run, however much is typed into the builder', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'east' }],
+    });
+
+    // Typed, not run. Narrowing the rows here would apply a predicate the reader has not
+    // pressed Run on and can see the effect of nowhere else.
+    expect(canvas.studio.inheritedDataFilters()).toEqual([]);
+    expect(canvas.studio.inheritedDataFilterCount()).toBe(0);
+  });
+
+  it('carries the filters an analysis actually ran with', () => {
+    const canvas = canvasWith();
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'region', operator: 'EQ', value: 'east' }],
+    });
+    canvas.ran();
+
+    expect(canvas.studio.inheritedDataFilters())
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'east' }]);
+  });
+
+  it('carries an OR group whole rather than spreading it into the ANDed list', () => {
+    // Spread, "(a OR b)" becomes "a AND b" -- a filter that admitted either now demands both,
+    // silently, and only for the Data tab. The rows would disagree with the analysis above them.
+    const canvas = canvasWith();
+    const either = {
+      op: 'OR' as const,
+      clauses: [
+        { field: 'region', operator: 'EQ' as const, value: 'east' },
+        { field: 'region', operator: 'EQ' as const, value: 'west' },
+      ],
+    };
+    canvas.studio.setFilters(either);
+    canvas.ran();
+
+    expect(canvas.studio.inheritedDataFilters()).toEqual([either]);
+    // Two predicates, one node.
+    expect(canvas.studio.inheritedDataFilterCount()).toBe(2);
+  });
+
+  it('compiles a null drill step to IS_NULL, not to an equality against null', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: null }]);
+
+    expect(canvas.studio.inheritedDataFilters())
+      .toEqual([{ field: 'region', operator: 'IS_NULL' }]);
+  });
+
+  it('compiles a valued drill step to an equality on the drilled column', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'east' }]);
+
+    expect(canvas.studio.inheritedDataFilters())
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'east' }]);
+  });
+
+  it('sends the tab\u2019s own filters and the Canvas\u2019s together, ANDed', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'east' }]);
+    canvas.studio.gridFilters.set([{ field: 'amount', operator: 'GT', value: '10' }]);
+
+    canvas.studio.loadPage(0);
+
+    const shape: any = (canvas.studio as any).analytics.preview.mock.calls.at(-1)[5];
+    expect(shape.filters).toEqual([
+      { field: 'amount', operator: 'GT', value: '10' },
+      { field: 'region', operator: 'EQ', value: 'east' },
+    ]);
+  });
+
+  it('stops carrying anything once the reader turns it off', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'east' }]);
+    expect(canvas.studio.inheritedDataFilterCount()).toBe(1);
+
+    canvas.studio.toggleCrossFilterData();
+
+    expect(canvas.studio.inheritedDataFilters()).toEqual([]);
+  });
+
+  it('drops the inherited narrowing when the Canvas is cleared', () => {
+    // Or the Data tab keeps filtering by an analysis that no longer exists anywhere on screen.
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.analysedFilters()).not.toBeNull();
+
+    canvas.studio.openFile(REFUNDS);
+
+    expect(canvas.studio.analysedFilters()).toBeNull();
+    expect(canvas.studio.inheritedDataFilters()).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Calendar grain: grouping a date column by month, quarter, week or year.
+ *
+ * Before this, grouping a DATE column gave one bucket per day -- two years of orders is 730 groups
+ * with no way to fold them -- so the grain a business reads was not expressible at all.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('bucketing a date dimension by a calendar grain', () => {
+
+  it('carries a null per dimension when nothing is grained', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.runAnalysis();
+
+    // Nulls rather than absent HERE because these tests see the request object; the wire body
+    // omits the list entirely when nothing is grained, which is analysisBody's job -- the same
+    // split the drill-trail test above records. A list of nulls on the wire would be a request
+    // that LOOKS grained to anything reading it back.
+    expect(canvas.sent().grains).toEqual([null]);
+  });
+
+  it('sends the grain index-aligned with the dimensions', () => {
+    // Not canvas.ran(), which picks region as dimension 0 for its own purposes.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+
+    expect(canvas.sent().dimensions).toEqual(['booked_on']);
+    expect(canvas.sent().grains).toEqual(['MONTH']);
+  });
+
+  it('keeps the two lists the same length when a dimension is added or removed', () => {
+    // The property everything downstream relies on. A grain left behind by a removed dimension
+    // would bucket whichever column slid into its slot.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.setDimension(1, 'region');
+
+    expect(canvas.studio.dimensionGrains()).toHaveLength(2);
+    expect(canvas.studio.dimensionGrains()[0]).toBe('MONTH');
+    expect(canvas.studio.dimensionGrains()[1]).toBeNull();
+
+    canvas.studio.setDimension(0, '');
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.dimensionGrains()).toEqual([null]);
+  });
+
+  it('drops the grain when the dimension in that slot is replaced', () => {
+    // The new column is not necessarily temporal, and inheriting "by month" onto a region would
+    // be a bucketing nobody asked for -- and one the server would refuse.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+
+    canvas.studio.setDimension(0, 'region');
+
+    expect(canvas.studio.dimensionGrains()).toEqual([null]);
+  });
+
+  it('offers a bucket only for a column that has a calendar in it', () => {
+    // Offering "by month" against a text column would be offering an error: the server refuses
+    // it, rightly, and the picker should not walk anybody into that.
+    const canvas = canvasWith();
+    expect(canvas.studio.isTemporal('booked_on')).toBe(true);
+    expect(canvas.studio.isTemporal('region')).toBe(false);
+    expect(canvas.studio.isTemporal('nothing-called-this')).toBe(false);
+  });
+
+  it('clears the drill trail when the grain changes', () => {
+    // Both describe the analysis that has just stopped existing. A breadcrumb left over a
+    // different question is worse than no breadcrumb.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.drillPath.set([{ dimension: 'booked_on', value: '2024-03-01' }]);
+
+    canvas.studio.setGrain(0, 'QUARTER');
+
+    expect(canvas.studio.drillPath()).toEqual([]);
+  });
+});
+
+describe('the heading says what a bucket is', () => {
+  it('names the grain, so a month is not read as the first of the month', () => {
+    // A monthly grouping renders its buckets as the first of each month, so "Sum of amount by
+    // order_date" over a row labelled 2024-07-01 tells a reader they are looking at one day's
+    // takings when they are looking at July's.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by booked_on by month');
+  });
+
+  it('says nothing extra when there is no bucket', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by region');
+  });
+
+  it('describes the ANSWER rather than the controls, once one has come back', () => {
+    // The picker above may already have been changed. A heading that tracked it would relabel
+    // figures that were computed a different way.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.analysisResult.set({
+      columns: [], rows: [], rowCount: 0, truncated: false,
+      dimensions: ['booked_on'], grains: ['QUARTER'],
+    } as any);
+
+    expect(canvas.studio.canvasCaption()).toContain('by quarter');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A bucketed dimension has TWO names in a response, and telling them apart is the whole of this.
+ *
+ * `dimensions` carries the schema field name -- the identity a filter and a drill step use -- while
+ * the DIMENSION-role columns are headed with the ALIAS, which is that name plus its grain. Group
+ * booked_on by month and the two are booked_on and booked_on_month. Every defect below came from
+ * one of them being used where the other was meant, and each one failed SILENTLY: a drill into the
+ * wrong group, a filter naming a column the dataset does not have.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('a bucketed dimension is not the column it was bucketed from', () => {
+  /** What the server sends back for "Sum of amount by booked_on, by month". */
+  const BY_MONTH = analysisOf({
+    columns: [
+      { name: 'booked_on_month', type: 'DATE', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['2024-03-01 00:00:00', '412900'], ['2024-04-01 00:00:00', '318400']],
+    rowCount: 2,
+    dimensions: ['booked_on'],
+    grains: ['MONTH'],
+    measure: 'amount_sum',
+  });
+
+  function monthly() {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(BY_MONTH));
+    canvas.fixture.detectChanges();
+    return canvas;
+  }
+
+  it('reads a drill value out of the row by position, never by matching the header', () => {
+    // The defect in one assertion. Matching the header looked for a cell whose column is called
+    // booked_on and found none, because the column is called booked_on_month -- and "none" was
+    // returned as null, which is not absence but the name of a real group.
+    const canvas = monthly();
+
+    expect(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0]))
+      .toBe('2024-03-01 00:00:00');
+  });
+
+  it('tells "no such dimension here" apart from "this row is the null group"', () => {
+    const canvas = canvasWith();
+    canvas.ran(analysisOf({ rows: [[null, '100']] }));
+
+    // The group with no value in it, which IS drillable: the server narrows it with IS NULL.
+    expect(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0])).toBeNull();
+
+    canvas.studio.drillDimension.set('city');
+    // Not a dimension of this result at all. Undefined rather than null, because null here would
+    // drill into the no-value group of a column the result is not even grouped by.
+    expect(canvas.studio.drillValueOf(canvas.studio.analysisRows()[0])).toBeUndefined();
+  });
+
+  it('drills a bucketed dimension, because the server now narrows to the whole bucket', () => {
+    // This screen used to REFUSE the drill, and that refusal was the honest stop-gap while the
+    // server compiled every step as an equality on the raw column -- drilling the March row handed
+    // back the first of March under a breadcrumb saying March. AnalysisQueryBuilder.bucketWindow
+    // now compiles a grained step as a DATE_RANGE over the whole bucket, so refusing here would
+    // withhold a drill that works. The step still travels as the bucket's start; what changed is
+    // what the server does with it.
+    const canvas = monthly();
+    const before = canvas.drill.mock.calls.length;
+
+    canvas.studio.drillInto('2024-03-01 00:00:00');
+
+    expect(canvas.drill.mock.calls.length).toBe(before + 1);
+    expect(canvas.drill.mock.calls[before][1]).toMatchObject({
+      dimension: 'booked_on',
+      value: '2024-03-01 00:00:00',
+    });
+  });
+
+  it('gives a dimension cell the schema field name, index-aligned with the dimensions', () => {
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'region');
+    canvas.studio.setDimension(1, 'booked_on');
+    canvas.studio.setGrain(1, 'MONTH');
+    canvas.studio.aggregation.set('SUM');
+    canvas.studio.measureField.set('amount');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'region', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'booked_on_month', type: 'DATE', role: 'DIMENSION' },
+        { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+      ],
+      rows: [['north', '2024-03-01 00:00:00', '100']],
+      rowCount: 1,
+      dimensions: ['region', 'booked_on'],
+      grains: [null, 'MONTH'],
+    })));
+
+    const cells = canvas.studio.analysisRows()[0].cells;
+    expect(cells[0].field).toBe('region');
+    // Bucketed, so inert: the cell says March and means March, and an equality on booked_on asks
+    // for the first of the month. Empty rather than 'booked_on_month', which is the alias and is
+    // what the click used to send -- "This dataset has no column called booked_on_month", with
+    // the chip left on so every later Run, drill and drill-up failed the same way.
+    expect(cells[1].field).toBe('');
+    expect(cells[2].field).toBe('');
+  });
+
+  it('says why a bucketed cell will not click, rather than leaving a dead cell', () => {
+    const canvas = monthly();
+
+    expect(canvas.studio.analysisRows()[0].cells[0].field).toBe('');
+    expect(canvas.show()).toContain('cannot be filtered to or drilled into');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Every sentence on the Canvas is a claim about the ROWS on screen, and the rows do not move when
+ * a picker does.
+ *
+ * The figure and the controls that built it are on screen together, which is the arrangement that
+ * makes a stale description invisible: a reader who nudges a control is looking at the control, and
+ * the sentence above the result relabels itself under their eye. Each test here changes a picker
+ * WITHOUT pressing Run and asserts that the description does not follow it.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('the Canvas describes the answer, not the controls above it', () => {
+  it('goes on calling a Top-N result a Top-N after the control is set back to All', () => {
+    const canvas = canvasWith();
+    canvas.studio.setTopN(25);
+    canvas.ran();
+    expect(canvas.show()).toContain('the top 25');
+
+    canvas.studio.setTopN(null);
+
+    // The same twenty-five rows are still there. Calling them "every group that matched" presents
+    // a partial answer as the complete one, which is the claim this tab exists never to make.
+    expect(canvas.show()).toContain('the top 25');
+    expect(canvas.show()).not.toContain('every group that matched');
+  });
+
+  it('names the measure that RAN in the heading, not the one now in the picker', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by region');
+
+    canvas.studio.aggregation.set('AVERAGE');
+
+    expect(canvas.studio.canvasCaption()).toBe('Sum of amount by region');
+  });
+
+  it('keeps the exactness mark on a distinct count when the picker moves off it', () => {
+    const canvas = canvasWith();
+    canvas.studio.aggregation.set('DISTINCT_COUNT');
+    canvas.studio.measureField.set('region');
+    canvas.studio.setDimension(0, 'status');
+    canvas.studio.runAnalysis();
+    canvas.answers.analyze!.next(SERVER_RESPONSE(analysisOf({
+      columns: [
+        { name: 'status', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'region_distinct_count', type: 'BIGINT', role: 'MEASURE' },
+      ],
+      rows: [['active', '12']],
+      rowCount: 1,
+      dimensions: ['status'],
+      measure: 'region_distinct_count',
+    })));
+    expect(canvas.studio.distinctExactness()).toBe('exact');
+
+    canvas.studio.aggregation.set('SUM');
+
+    // The column on screen is still a count(DISTINCT ...). Dropping the mark left a figure whose
+    // exactness the reader had been told, and then untold, without the figure changing.
+    expect(canvas.studio.distinctExactness()).toBe('exact');
+  });
+
+  it('counts the filters the result was computed over, not the ones typed since', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    expect(canvas.studio.canvasNotes().some(note => note.includes('filters are on'))).toBe(false);
+
+    canvas.studio.setFilters({
+      op: 'AND', clauses: [{ field: 'status', operator: 'EQ', value: 'active' }],
+    });
+
+    // Typed, not run. "Every figure here is over the rows that match them" about rows computed
+    // without the filter is a false statement about the numbers rather than a stale label.
+    expect(canvas.studio.canvasNotes().some(note => note.includes('filters are on'))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('the Drill picker offers the column the analysis is grouped by NOW', () => {
+  const STEP = { dimension: 'region', value: 'north', nextDimension: 'city' };
+  const DRILLED = analysisOf({
+    columns: [
+      { name: 'city', type: 'VARCHAR', role: 'DIMENSION' },
+      { name: 'amount_sum', type: 'DOUBLE', role: 'MEASURE' },
+    ],
+    rows: [['leeds', '4000']],
+    rowCount: 1,
+    dimensions: ['city'],
+    drillPath: [STEP],
+    crumbs: [{ label: 'All rows' }, { label: 'region: north', field: 'region', value: 'north' }],
+  });
+
+  function drilled() {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillNext.set('city');
+    canvas.studio.drillInto('north');
+    canvas.answers.drill!.next(SERVER_RESPONSE(DRILLED));
+    canvas.fixture.detectChanges();
+    return canvas;
+  }
+
+  function optionsOf(canvas: ReturnType<typeof canvasWith>, id: string): string[] {
+    const select = (canvas.fixture.nativeElement as HTMLElement)
+      .querySelector(id) as HTMLSelectElement;
+    return Array.from(select.options).map(option => option.value);
+  }
+
+  it('lists the drilled-INTO column rather than the root it came from', () => {
+    const canvas = drilled();
+
+    // 'region' was the only option here while the control's bound value was 'city': a select
+    // displaying one column and holding another, and a Drill button that then did nothing at all.
+    expect(optionsOf(canvas, '#a-drill-dim')).toEqual(['city']);
+    expect(canvas.studio.drillDimension()).toBe('city');
+  });
+
+  it('offers the root again under "then by", because it is no longer grouped by it', () => {
+    const canvas = drilled();
+    const options = optionsOf(canvas, '#a-drill-next');
+
+    expect(options).toContain('region');
+    expect(options).not.toContain('city');
+  });
+
+  it('drills again through the column that is actually on the table', () => {
+    const canvas = drilled();
+    canvas.studio.drillInto('leeds');
+
+    expect(canvas.drill.mock.calls[1][1]).toEqual({ dimension: 'city', value: 'leeds' });
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+describe('what a saved analysis records is what was on screen', () => {
+  it('drops a calendar bucket when another dataset is opened', () => {
+    // The Bucket picker is rendered only beside a temporal dimension, so a MONTH left in slot 0
+    // of a file whose slot 0 holds a VARCHAR is a permanent refusal with no control on screen to
+    // undo it -- the reader has to re-pick the same dimension twice to escape.
+    const canvas = canvasWith();
+    canvas.studio.setDimension(0, 'booked_on');
+    canvas.studio.setGrain(0, 'MONTH');
+    expect(canvas.studio.dimensionGrains()).toEqual(['MONTH']);
+
+    canvas.studio.openFile(REFUNDS);
+
+    expect(canvas.studio.dimensionGrains()).toEqual([]);
+  });
+
+  it('saves the drill as filters, which is what the Save control promises', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: 'north' }]);
+    canvas.studio.analysisName.set('North by city');
+    canvas.studio.saveAnalysis(false);
+
+    // Without this the stored analysis was "Sum of amount by region" over EVERY region -- the
+    // root a drill never changes, with the drill's own narrowing nowhere in the row -- under a
+    // title promising one region, on the canvas and on every dashboard tile built from it.
+    expect(JSON.parse(canvas.saveAnalysis.mock.calls[0][0].analysisConfig).filters.clauses)
+      .toEqual([{ field: 'region', operator: 'EQ', value: 'north' }]);
+  });
+
+  it('compiles a null drill step to IS_NULL in the saved filters too', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.drillPath.set([{ dimension: 'region', value: null }]);
+    canvas.studio.analysisName.set('No region');
+    canvas.studio.saveAnalysis(false);
+
+    expect(JSON.parse(canvas.saveAnalysis.mock.calls[0][0].analysisConfig).filters.clauses)
+      .toEqual([{ field: 'region', operator: 'IS_NULL' }]);
+  });
+
+  it('records the chart kind the reader chose when nothing has been run since', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 12, analysisName: 'Share by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', visualizationType: 'donut',
+      analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+    // openAnalysis deliberately does not run it, so every kind carries "Nothing has run yet."
+    // and canvasKind() -- which answers what to DRAW -- has nothing to fall back to.
+    expect(canvas.studio.canvasKind()).toBeNull();
+
+    canvas.studio.analysisName.set('Share by region');
+    canvas.studio.saveAnalysis(true);
+
+    // 'table' here overwrote a donut for no better reason than that somebody renamed it.
+    expect(canvas.saveAnalysis.mock.calls[0][0].visualizationType).toBe('donut');
+  });
+
+  it('keeps an updated analysis pointed at the dataset it was saved against', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 4, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', visualizationType: 'table',
+      analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+    canvas.studio.analysisName.set('Sales by region, renamed');
+    canvas.studio.saveAnalysis(true);
+
+    // A rename is a rename. Sending the open file here repointed a row whose stored config names
+    // another file's columns: the dashboard tile that ran it yesterday fails on an unknown column
+    // and nothing records which file it used to read.
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.datasetPath).toBe('archive/2025.parquet');
+    expect(body.connectionAlias).toBe('minio-main');
+  });
+
+  it('records the OPEN dataset when it is saved as a new analysis', () => {
+    // The control. Save as new means this cut against the file in front of the reader.
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 4, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', visualizationType: 'table',
+      analysisConfig: JSON.stringify({
+        dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+    canvas.studio.analysisName.set('Sales by region, here');
+    canvas.studio.saveAnalysis(false);
+
+    const body = canvas.saveAnalysis.mock.calls[0][0];
+    expect(body.analyticsAnalysisId).toBeUndefined();
+    expect(body.datasetPath).toBe('daily/sales-2026.csv');
+  });
+
+  it('shows a restored field the open dataset does not have, rather than an empty picker', () => {
+    const canvas = canvasWith();
+    canvas.studio.openAnalysis({
+      analyticsAnalysisId: 5, analysisName: 'From elsewhere', connectionAlias: 'minio-main',
+      datasetPath: 'archive/2025.parquet', visualizationType: 'table',
+      analysisConfig: JSON.stringify({
+        dimensions: ['nowhere'], measure: { aggregation: 'SUM', field: 'amount' },
+      }),
+    });
+
+    // The select's options come from the OPEN dataset, so no option matched and the control
+    // rendered with nothing selected -- the screen said "no grouping" while the request still
+    // carried dimensions: ['nowhere'].
+    const shown = canvas.studio.dimensionOptions(0).find(option => option.name === 'nowhere');
+    expect(shown?.missing).toBe(true);
+    expect(canvas.studio.analysisFieldsMissing()).toEqual(['nowhere']);
+    expect(canvas.show()).toContain('not a column of this dataset');
+    expect(canvas.show()).toContain('Run will be refused');
+  });
+
+  it('names the dashboard tiles a delete takes with it, before it is confirmed', async () => {
+    const canvas = canvasWith();
+    await canvas.studio.removeAnalysis({
+      analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    });
+
+    // It used to name only what is NOT affected, which reads as a complete account of the
+    // consequences and is not one: the widget rows cascade, on dashboards this reader may not
+    // even be able to see.
+    expect(canvas.confirmBody()).toContain('any dashboard tile showing it');
+    expect(canvas.confirmBody()).toContain('The dataset it reads is untouched');
+  });
+
+  it('shows what a delete actually removed, in the server’s own words', async () => {
+    const canvas = canvasWith();
+    // Deleted from the saved panel, which is where the notice is read.
+    canvas.studio.openSaved();
+    await canvas.studio.removeAnalysis({
+      analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    });
+    canvas.answers.deleteAnalysis!.next({
+      status: 'SUCCESS',
+      message: 'Saved analysis deleted with 1003, and 3 dashboard widget(s) that showed it.',
+      data: true,
+    });
+
+    // The count exists in exactly one place -- the response -- and it was being dropped on the
+    // one branch it is ever sent on.
+    expect(canvas.show()).toContain('3 dashboard widget(s) that showed it');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Two requests in flight at once, which is what clicking faster than a bucket answers produces.
+ *
+ * None of these endpoints promises an order, and the last response to land wins. Each test here
+ * settles the SECOND request first and the first one after it -- the ordering that actually
+ * happens when a large Parquet footer queues behind the four-permit governor while a small CSV
+ * goes straight through -- and asserts that the superseded answer is dropped rather than applied
+ * to the thing that replaced it.
+ *
+ * @author Nabeel Ahmed
+ */
+describe('a superseded response never overwrites the one that replaced it', () => {
+  function racing() {
+    const listings: Subject<any>[] = [];
+    const schemas: Subject<any>[] = [];
+    const pages: Subject<any>[] = [];
+    const held = (into: Subject<any>[]) => {
+      const subject = new Subject<any>();
+      into.push(subject);
+      return subject.asObservable();
+    };
+
+    const buckets = vi.fn(() => of(SERVER_RESPONSE([MINIO])));
+    const listObjects = vi.fn(() => held(listings));
+    const schema = vi.fn(() => held(schemas));
+    const preview = vi.fn(() => held(pages));
+    const profile = vi.fn(() => new Subject<any>().asObservable());
+    const analyze = vi.fn(() => new Subject<any>().asObservable());
+    const drill = vi.fn(() => new Subject<any>().asObservable());
+    const drillUp = vi.fn(() => new Subject<any>().asObservable());
+    const fetchAllAnalyses = vi.fn(() => new Subject<any>().asObservable());
+    const saveAnalysis = vi.fn(() => new Subject<any>().asObservable());
+    const deleteAnalysis = vi.fn(() => new Subject<any>().asObservable());
+    const cancel = vi.fn(() => new Subject<any>().asObservable());
+
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: StorageService, useValue: { buckets, listObjects } },
+        {
+          provide: AnalyticsService,
+          useValue: {
+            schema, preview, profile, analyze, drill, drillUp, fetchAllAnalyses, saveAnalysis,
+            deleteAnalysis, cancel,
+          },
+        },
+        { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } },
+      ],
+    });
+
+    const fixture = TestBed.createComponent(Analytics);
+    fixture.detectChanges();
+    const studio = fixture.componentInstance;
+    // The rail's first listing, which is not part of any race being tested here.
+    listings[0].next(SERVER_RESPONSE({ objects: [CSV_FILE, REFUNDS, FOLDER] }));
+    return { studio, fixture, listings, schemas, pages };
+  }
+
+  it('keeps the OPEN dataset’s columns when a slower schema lands after it', () => {
+    const race = racing();
+    race.studio.openFile(CSV_FILE);
+    race.studio.openFile(REFUNDS);
+
+    race.schemas[1].next(SERVER_RESPONSE(SECOND_SCHEMA));
+    race.schemas[0].next(SERVER_RESPONSE(CANVAS_SCHEMA));
+
+    // Applied, this listed the first file's columns against the second file's rows: the Columns
+    // tab, the Canvas pickers and the grid's column model all described a file the header was not
+    // naming, and any request built from one of them was refused by a server that could see the
+    // mismatch the screen could not.
+    expect(race.studio.path()).toBe('daily/refunds-2026.csv');
+    expect(race.studio.columns().map(column => column.name)).toEqual(['id', 'refunded']);
+  });
+
+  it('keeps the folder the reader is in when a slower listing lands after it', () => {
+    const race = racing();
+    race.studio.openFolder('big/');
+    race.studio.openFolder('small/');
+
+    race.listings[2].next(SERVER_RESPONSE({ objects: [REFUNDS] }));
+    race.listings[1].next(SERVER_RESPONSE({ objects: [CSV_FILE, TEXT_FILE] }));
+
+    // Applied, the rail showed the contents of the folder that was left under the crumbs of the
+    // folder the reader is in -- and "read all of these together" then built a glob over the
+    // CURRENT prefix with an extension from the PREVIOUS folder.
+    expect(race.studio.prefix()).toBe('small/');
+    expect(race.studio.entries().map(entry => entry.key)).toEqual(['daily/refunds-2026.csv']);
+  });
+
+  it('keeps the page the grid asked for last when an earlier one answers after it', () => {
+    const race = racing();
+    race.studio.openFile(CSV_FILE);
+    race.schemas[0].next(SERVER_RESPONSE(CANVAS_SCHEMA));
+    race.pages[0].next(SERVER_RESPONSE(pageOf({ page: 0 })));
+
+    race.studio.loadPage(1);
+    race.studio.loadPage(2);
+    race.pages[2].next(SERVER_RESPONSE(pageOf({ page: 2, rows: [['3', '30.00']] })));
+    race.pages[1].next(SERVER_RESPONSE(pageOf({ page: 1, rows: [['2', '20.00']] })));
+
+    // The pager, the sort and the inherited narrowing all describe the request that was made
+    // last; rows from an earlier one land under all three of them.
+    expect(race.studio.preview()!.page).toBe(2);
+    expect(race.studio.preview()!.rows).toEqual([['3', '30.00']]);
+  });
+});
+
+/**
+ * The saved-analysis library, which was the whole of the Canvas tab's height problem.
+ *
+ * It drew every saved analysis. On a workspace with 135 of them that is a 6,799px panel sitting
+ * under the result, and it made the tab 7,908px -- 8.8 screenfuls at 1440x900 -- with the answer
+ * stranded above it. The two-column layout helped by 500px; this is the other 6,000.
+ */
+describe('the saved-analysis library', () => {
+  const saved = (n: number) => Array.from({ length: n }, (_, at) => ({
+    analyticsAnalysisId: at + 1,
+    analysisName: `Analysis ${at + 1}`,
+    connectionAlias: 'etl-bucket',
+    datasetPath: at % 2 ? 'analytics-samples/orders.csv' : 'analytics-samples/returns.csv',
+    visualizationType: 'table',
+  })) as any[];
+
+  it('draws a handful, not all of them', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(135));
+
+    expect(canvas.studio.libraryVisible().length).toBe(8);
+    expect(canvas.studio.libraryHidden()).toBe(127);
+  });
+
+  it('shows the rest when asked, so nothing is unreachable', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(135));
+
+    canvas.studio.libraryShowAll.set(true);
+
+    expect(canvas.studio.libraryVisible().length).toBe(135);
+    expect(canvas.studio.libraryHidden()).toBe(0);
+  });
+
+  it('searches by name and by dataset, because 135 is past scrolling', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(135));
+
+    canvas.studio.librarySearch.set('Analysis 42');
+    expect(canvas.studio.libraryMatches().map(a => a.analysisName)).toEqual(['Analysis 42']);
+
+    canvas.studio.librarySearch.set('returns.csv');
+    // Every other fixture row is the returns dataset.
+    expect(canvas.studio.libraryMatches().length).toBe(68);
+  });
+
+  it('leaves a small library alone entirely', () => {
+    const canvas = canvasWith();
+    canvas.studio.analyses.set(saved(3));
+
+    expect(canvas.studio.libraryVisible().length).toBe(3);
+    expect(canvas.studio.libraryHidden()).toBe(0);
+  });
+});
+
+/**
+ * Clicking the file that is already open.
+ *
+ * Reported from the screen: with Canvas open, a click on the highlighted row in the left list
+ * threw the reader back to Details. That is the visible half. The rest of load() ran too --
+ * the Canvas picks, the SQL result, the computed profile and the grid's sort and filter were all
+ * cleared, and schema and preview were re-issued for a path that had not changed, which is two
+ * of the four permits the query governor has.
+ *
+ * Every one of those is the right thing to do when the dataset CHANGES. None of them is the
+ * right thing to do when it does not, and a misclick is how most people found out.
+ */
+describe('clicking the dataset that is already open', () => {
+  it('does not re-read a file whose path has not changed', () => {
+    const harness = opened();
+    const schemaCallsAfterOpen = harness.schema.mock.calls.length;
+    const previewCallsAfterOpen = harness.preview.mock.calls.length;
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.schema).toHaveBeenCalledTimes(schemaCallsAfterOpen);
+    expect(harness.preview).toHaveBeenCalledTimes(previewCallsAfterOpen);
+  });
+
+  it('leaves the reader on the tab they were on', () => {
+    const harness = opened();
+    harness.studio.tab.set('canvas');
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.studio.tab()).toBe('canvas');
+  });
+
+  it('keeps the columns and the page already on screen', () => {
+    const harness = opened();
+    const columns = harness.studio.columns();
+    expect(columns.length).toBeGreaterThan(0);
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.studio.columns()).toEqual(columns);
+    expect(harness.studio.preview()).not.toBeNull();
+    expect(harness.studio.loading()).toBe(false);
+  });
+
+  it('still opens a DIFFERENT file, which is the case the guard must not break', () => {
+    const harness = opened();
+    const before = harness.schema.mock.calls.length;
+
+    harness.studio.openFile(OTHER_CSV);
+
+    expect(harness.schema.mock.calls.length).toBe(before + 1);
+    expect(harness.studio.path()).toBe('daily/sales-2025.csv');
+    expect(harness.studio.tab()).toBe('overview');
+  });
+
+  it('fills in the entry when the path was opened without going through the list', () => {
+    // A deep link sets the path directly, so `selected` is empty while the file is open and the
+    // details card has no entry to read. Clicking the row must supply it -- without reloading.
+    const harness = opened();
+    harness.studio.selected.set(null);
+    const before = harness.schema.mock.calls.length;
+
+    harness.studio.openFile(CSV_FILE);
+
+    expect(harness.studio.selected()?.key).toBe(CSV_FILE.key);
+    expect(harness.schema.mock.calls.length).toBe(before);
+  });
+
+  it('still refuses a file it cannot read', () => {
+    const harness = opened();
+    const before = harness.schema.mock.calls.length;
+    harness.studio.openFile(TEXT_FILE);
+    expect(harness.schema.mock.calls.length).toBe(before);
+    expect(harness.studio.path()).toBe(CSV_FILE.key);
+  });
+});
+
+/**
+ * Compact rows open into the card the Columns tab used to hold.
+ *
+ * The two tabs drew ONE scan two ways -- a dense row each and a card each -- so a reader wanting
+ * a figure had to guess which tab had it. Compact keeps the row, which is what a two-hundred-
+ * column file needs, and the card opens underneath the row it describes.
+ */
+describe('opening a column from the Compact table', () => {
+  const COLUMNS = [columnOf({ name: 'amount' }), columnOf({ name: 'quantity' })];
+
+  it('starts with every row closed, so a wide file still opens as one screen', () => {
+    const grid = scanned('compact', COLUMNS);
+    expect(grid.studio.isColumnOpen('amount')).toBe(false);
+    expect(grid.show()).not.toContain('quartiles estimated');
+  });
+
+  it('opens the card for the row that was clicked', () => {
+    const grid = columnOpened('amount', COLUMNS);
+    expect(grid.studio.isColumnOpen('amount')).toBe(true);
+    expect(grid.show()).toContain('quartiles estimated');
+  });
+
+  it('closes it again on a second click', () => {
+    const grid = columnOpened('amount', COLUMNS);
+    grid.studio.toggleColumn('amount');
+    expect(grid.studio.isColumnOpen('amount')).toBe(false);
+  });
+
+  it('holds two columns open at once, which two tabs could never do', () => {
+    // The reason anyone opens one at all is usually to compare it with another.
+    const grid = columnOpened('amount', COLUMNS);
+    grid.studio.toggleColumn('quantity');
+    expect(grid.studio.isColumnOpen('amount')).toBe(true);
+    expect(grid.studio.isColumnOpen('quantity')).toBe(true);
+  });
+
+  it('gives the card the view of the column it belongs to', () => {
+    const grid = scanned('compact', COLUMNS);
+    expect(grid.studio.columnViewFor('quantity')?.name).toBe('quantity');
+    expect(grid.studio.columnViewFor('not_a_column')).toBeNull();
+  });
+
+  it('offers the measurement from the opened row', () => {
+    expect(columnOpened('amount', COLUMNS).show()).toContain('Measure values');
+  });
+});
+
+/**
+ * The connection block, in a 260px rail.
+ *
+ * Both of these are about what the rail could not SAY. A crumb rendered at max-w-28 with no
+ * title on it, so a folder called healthcare-claims-sql-pipeline showed as roughly half of
+ * itself and there was nowhere to read the rest; and the picker looked like an ordinary list
+ * until it was opened and most of it turned out to be greyed.
+ */
+describe('finding your way around in the storage rail', () => {
+  function railAt(prefix: string) {
+    const harness = studioWith({ objects: [] });
+    harness.studio.goToCrumb(prefix);
+    return harness.studio;
+  }
+
+  it('shows a shallow path whole, with nothing folded', () => {
+    const studio = railAt('etl-demo/');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['etl-demo']);
+    expect(studio.foldedCrumbs()).toEqual([]);
+  });
+
+  it('keeps two crumbs at the depth the rail can hold', () => {
+    const studio = railAt('etl-demo/F768932/');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['etl-demo', 'F768932']);
+    expect(studio.foldedCrumbs()).toEqual([]);
+  });
+
+  it('folds the middle of a deeper path and keeps where you are', () => {
+    // Three buttons and their separators do not fit 260px, so all three truncated and the
+    // reader got three halves of three names.
+    const studio = railAt('etl-demo/F768932/out/');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['F768932', 'out']);
+    expect(studio.foldedCrumbs().map(c => c.name)).toEqual(['etl-demo']);
+  });
+
+  it('names what it folded, so the ellipsis is not a mystery', () => {
+    const studio = railAt('a/b/c/d/');
+    expect(studio.foldedPath()).toBe('a / b');
+    expect(studio.visibleCrumbs().map(c => c.name)).toEqual(['c', 'd']);
+  });
+
+  it('the folded crumb steps to the parent rather than all the way out', () => {
+    // root is its own button beside it, so both destinations are one click.
+    const studio = railAt('a/b/c/d/');
+    const folded = studio.foldedCrumbs();
+    expect(folded[folded.length - 1].prefix).toBe('a/b/');
+  });
+
+  it('carries the whole location, which the trail itself cannot show', () => {
+    const studio = railAt('etl-demo/F768932/out/');
+    expect(studio.fullPath()).toContain('etl-demo/F768932/out');
+  });
+
+  it('says how many connections are listed but unreadable', () => {
+    // The all-refused case was already said out loud; the partial case was not said at all.
+    const harness = studioWith({ connections: [MINIO, S3, FTP, AZURE] });
+    expect(harness.studio.unreadableConnectionCount()).toBe(2);
+  });
+
+  it('says nothing when every connection can be read', () => {
+    const harness = studioWith({ connections: [MINIO, S3] });
+    expect(harness.studio.unreadableConnectionCount()).toBe(0);
+  });
+
+  it('says nothing when NONE can be read, because that has its own sentence', () => {
+    const harness = studioWith({ connections: [FTP, AZURE] });
+    expect(harness.studio.unreadableConnectionCount()).toBe(0);
+    expect(harness.studio.noReadableConnection()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A refused rename or delete is about ONE row. It used to be written into the signal that means
+ * "the list could not be read", so one refusal replaced the whole list with an error -- and the
+ * "Try again" beside it reloaded the list instead of retrying, which wiped the message.
+ */
+describe('a refused change to one saved item leaves the list alone', () => {
+  const toasts = () => TestBed.inject(ToastService).toasts().map(t => t.message);
+
+  it('keeps the saved queries on screen when a delete is refused, and says why', async () => {
+    const console = consoleWith({ confirms: true });
+    console.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    await console.studio.removeSaved(SAVED);
+    console.answers.remove!.next(SERVER_REFUSAL('Only its owner can delete this query.'));
+
+    expect(console.studio.savedError()).toBe('');
+    expect(console.show()).toContain(SAVED.queryName!);
+    expect(toasts()).toContain('Only its owner can delete this query.');
+  });
+
+  it('keeps the saved queries on screen when a rename is refused, and says why', () => {
+    const console = consoleWith();
+    console.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    console.studio.startRename(SAVED);
+    console.studio.renameName.set('Something else');
+    console.studio.applyRename();
+    console.answers.rename!.next(SERVER_REFUSAL('That name is taken.'));
+
+    expect(console.studio.savedError()).toBe('');
+    expect(console.show()).toContain(SAVED.queryName!);
+    expect(toasts()).toContain('That name is taken.');
+  });
+
+  it('keeps the saved analyses on screen when a delete is refused, and says why', async () => {
+    const canvas = canvasWith();
+    await canvas.studio.removeAnalysis({
+      analyticsAnalysisId: 7, analysisName: 'Q3 draft', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv', analysisConfig: '{}',
+    });
+    canvas.answers.deleteAnalysis!.next(SERVER_REFUSAL('Only its owner can delete this analysis.'));
+
+    expect(canvas.studio.analysesError()).toBe('');
+    expect(toasts()).toContain('Only its owner can delete this analysis.');
+  });
+});
+
+/** MIG-212: the Studio's dates read as the console writes them, not in the browser's own format. */
+describe('the dates the Studio shows', () => {
+  it('writes a run\'s and a saved analysis\'s time as server time in the console\'s format', () => {
+    const { studio } = studioWith();
+    expect(studio.runWhen({ dateCreated: '2026-09-19 09:53:50' } as any)).toMatch(/^19 Sep 2026, \d{2}:53$/);
+    expect(studio.analysisWhen({ dateUpdated: '2026-09-19 09:53:50' } as any)).toMatch(/^19 Sep 2026, \d{2}:53$/);
+    expect(studio.runWhen({ dateCreated: 'not a date' } as any)).toBe('not a date');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// Audit 09-22: the Studio as drawn -- the console's own tabs, a keyboard way into a column,
+// states that do not contradict each other, and a toast after every change that worked.
+
+describe('the Studio, drawn to the console pattern', () => {
+  it('uses the console .tab / .tab-active for the dataset views, not a blue underline of its own', () => {
+    const grid = gridWith();
+    const el = grid.fixture.nativeElement as HTMLElement;
+    const tabs = [...el.querySelectorAll('[aria-label="Dataset views"] button')];
+    expect(tabs.length).toBeGreaterThan(3);
+    for (const tab of tabs) expect(tab.classList).toContain('tab');
+    expect(tabs.filter(t => t.classList.contains('tab-active')).map(t => t.textContent!.trim())).toEqual(['Data']);
+    expect(el.innerHTML).not.toContain('border-[color:var(--chart-0)]');
+  });
+
+  it('opens a Compact column from a named button that says whether it is open', () => {
+    const grid = scanned('compact', [columnOf({ name: 'amount' })]);
+    const el = grid.fixture.nativeElement as HTMLElement;
+    const toggle = el.querySelector<HTMLButtonElement>('button[aria-label="Show details for amount"]')!;
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    toggle.click();
+    grid.fixture.detectChanges();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(toggle.closest('tr')!.hasAttribute('aria-expanded')).toBe(false);
+  });
+
+  it('does not say "Nothing saved yet" under a library that failed to load', () => {
+    const console = consoleWith();
+    console.answers.saved!.next(SERVER_REFUSAL('Data could not be fetched.'));
+    const text = console.show();
+    expect(text).toContain('Data could not be fetched.');
+    expect(text).not.toContain('Nothing saved yet');
+  });
+
+  it('does not say "Nothing has been run here yet" under a history that failed to load, and offers Try again', () => {
+    const console = consoleWith();
+    console.studio.showTab('activity');
+    console.fixture.detectChanges();
+    console.answers.runs!.next(SERVER_REFUSAL('History is unavailable.'));
+    const text = console.show();
+    expect(text).toContain('History is unavailable.');
+    expect(text).not.toContain('Nothing has been run here yet');
+    const before = console.fetchRecentRuns.mock.calls.length;
+    const retry = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(b => b.textContent!.trim() === 'Try again')!;
+    retry.click();
+    expect(console.fetchRecentRuns.mock.calls.length).toBe(before + 1);
+  });
+
+  it('spins the run-history Refresh while it reads', () => {
+    const console = consoleWith();
+    console.studio.showTab('activity');
+    console.fixture.detectChanges();
+    const refresh = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(b => b.textContent!.trim() === 'Refresh')!;
+    expect(refresh.querySelector('app-icon')!.classList).toContain('spin');
+  });
+
+  it('names a removable filter chip by what pressing it does', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.studio.crossFilter('region', 'north');
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    canvas.show();
+    expect([...el.querySelectorAll('button.pill')].some(b => (b.getAttribute('aria-label') ?? '').startsWith('Remove filter '))).toBe(true);
+  });
+
+  it('draws the Canvas grids with .table-modern, like the SQL result beside them', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    canvas.show();
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('table.w-full.text-sm')).toBeNull();
+    expect(el.querySelectorAll('table.table-modern').length).toBeGreaterThan(0);
+  });
+
+  it('confirms a rename and a delete with a toast, as every other screen does', async () => {
+    const console = consoleWith();
+    const toast = TestBed.inject(ToastService);
+    const success = vi.spyOn(toast, 'success');
+    console.answers.saved!.next(SERVER_RESPONSE([SAVED]));
+    console.studio.startRename(SAVED);
+    console.studio.renameName.set('Monthly totals');
+    console.studio.applyRename();
+    console.answers.rename!.next(SERVER_RESPONSE(null));
+    expect(success).toHaveBeenCalledWith('Renamed to "Monthly totals".');
+
+    await console.studio.removeSaved(SAVED);
+    console.answers.remove!.next(SERVER_RESPONSE(null));
+    expect(success).toHaveBeenCalledWith('"Daily totals" deleted.');
+  });
+
+  it('offers Run again under a canvas analysis that did not run', () => {
+    const canvas = canvasWith();
+    canvas.studio.analysisError.set('No governor slot is free.');
+    const text = canvas.show();
+    expect(text).toContain('No governor slot is free.');
+    expect(text).toContain('Run again');
+  });
+});
+
+// Audit 09-22: a column card's failed measurement keeps its way back; its Counts are a .table-modern.
+describe('ColumnCard, audit 09-22', () => {
+  function card(distribution: () => unknown) {
+    const view = viewOf(columnOf({ name: 'col' }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(),
+      { provide: AnalyticsService, useValue: { distribution: vi.fn(distribution) } }] });
+    const fixture = TestBed.createComponent(ColumnCard);
+    fixture.componentRef.setInput('column', view);
+    fixture.componentRef.setInput('connection', 'etl-bucket');
+    fixture.componentRef.setInput('path', 'demo/orders.csv');
+    fixture.detectChanges();
+    return { fixture, card: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('keeps a way to measure again under a failed measurement', () => {
+    let calls = 0;
+    const { fixture, card: c, el } = card(() => (calls++ === 0
+      ? throwError(() => ({ error: { message: 'No governor slot is free.' } }))
+      : of({ status: 'SUCCESS', message: '', data: { name: 'col', exactValues: true, bins: [{ value: 'North', rows: 9 }] } })));
+    c.measure();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('No governor slot is free.');
+    const retry = [...el.querySelectorAll('button')].find(b => b.textContent!.includes('Try again'))!;
+    expect(retry.querySelector('app-icon[name="refresh"]')).not.toBeNull();
+    retry.click();
+    fixture.detectChanges();
+    expect(c.distribution()).not.toBeNull();
+  });
+
+  it('draws the Counts table as .table-modern', () => {
+    const { fixture, card: c, el } = card(() => of({ status: 'SUCCESS', message: '', data: { name: 'col', exactValues: true, bins: [{ value: 'North', rows: 9 }] } }));
+    c.measure();
+    c.chooseKind('table');
+    fixture.detectChanges();
+    expect(el.querySelector('table')!.classList).toContain('table-modern');
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * The redesign the owner approved on 2026-09-28: the same nine tabs as real ARIA tabs in one row
+ * that scrolls on a phone, a compact file header, a KPI strip on the Overview, Save and Open saved
+ * in the Canvas result's own header, a Charts empty state that goes somewhere, and an Activity
+ * list that leads with what a person ran.
+ */
+describe('the tab strip is a real tablist', () => {
+  const strip = (fixture: { nativeElement: unknown }) =>
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLElement>('[role="tablist"]')!;
+  const tabsOf = (fixture: { nativeElement: unknown }) =>
+    [...strip(fixture).querySelectorAll<HTMLButtonElement>('[role="tab"]')];
+
+  it('marks the open tab selected, gives it the one Tab stop, and points it at the panel', () => {
+    const grid = gridWith();
+    grid.studio.showTab('profile');
+    grid.fixture.detectChanges();
+
+    const tabs = tabsOf(grid.fixture);
+    expect(tabs.map(tab => tab.textContent!.trim())).toEqual([
+      'Overview', 'Data', 'Compact', 'Profile', 'Quality', 'Canvas', 'SQL', 'Charts', 'Activity',
+    ]);
+    const open = tabs.filter(tab => tab.getAttribute('aria-selected') === 'true');
+    expect(open.map(tab => tab.id)).toEqual(['a-tab-profile']);
+    expect(tabs.filter(tab => tab.getAttribute('tabindex') === '0')).toEqual(open);
+    expect(tabs.filter(tab => tab.getAttribute('tabindex') === '-1').length).toBe(8);
+    // Only the open tab names a panel: the others' panels are not in the page.
+    expect(open[0].getAttribute('aria-controls')).toBe('a-panel');
+    expect(tabs.filter(tab => tab.hasAttribute('aria-controls')).length).toBe(1);
+
+    const panel = (grid.fixture.nativeElement as HTMLElement).querySelector('#a-panel')!;
+    expect(panel.getAttribute('role')).toBe('tabpanel');
+    expect(panel.getAttribute('aria-labelledby')).toBe('a-tab-profile');
+  });
+
+  it('moves focus with the arrows, Home and End, and opens nothing until Enter or a click', () => {
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const press = (key: string) => {
+      const target = document.activeElement as HTMLElement;
+      target.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+      return (document.activeElement as HTMLElement).id;
+    };
+    tabsOf(grid.fixture)[0].focus();
+
+    expect(press('ArrowRight')).toBe('a-tab-data');
+    expect(press('ArrowRight')).toBe('a-tab-compact');
+    expect(press('End')).toBe('a-tab-activity');
+    // Wraps, so the strip is a ring rather than two dead ends.
+    expect(press('ArrowRight')).toBe('a-tab-overview');
+    expect(press('ArrowLeft')).toBe('a-tab-activity');
+    expect(press('Home')).toBe('a-tab-overview');
+    // Manual activation: arrowing across Compact did not start the scan it would cost.
+    expect(grid.studio.tab()).toBe('overview');
+    expect(grid.profile).not.toHaveBeenCalled();
+
+    (document.activeElement as HTMLElement).dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    (document.activeElement as HTMLButtonElement).click();
+    grid.fixture.detectChanges();
+    expect(grid.studio.tab()).toBe('data');
+  });
+
+  it('leaves an unhandled key alone, so the page keeps its own shortcuts', () => {
+    const grid = gridWith();
+    const event = new KeyboardEvent('keydown', { key: 'PageDown', cancelable: true });
+    grid.studio.onTabStripKey(event, 'data');
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('scrolls sideways on a phone rather than wrapping into rows (source scan)', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/analytics/analytics.html`, 'utf8');
+    const opening = html.slice(0, html.indexOf('role="tablist"'));
+    const classes = opening.slice(opening.lastIndexOf('class="') + 7);
+    expect(classes).toContain('overflow-x-auto');
+    expect(classes).not.toContain('flex-wrap');
+    // Each tab keeps its width and its words on one line inside the scroll box.
+    expect(html).toMatch(/role="tab" class="tab whitespace-nowrap shrink-0/);
+  });
+});
+
+describe('the file header', () => {
+  it('says the file in one line of facts, with its path truncated beneath', () => {
+    const grid = gridWith();
+    const text = grid.show();
+    expect(text).toContain('sales-2026.csv');
+    expect(text).toMatch(/250 rows · 2 columns · 4\.0 KB · \d{1,2} Sep 2026, \d{2}:\d{2}/);
+    const path = [...(grid.fixture.nativeElement as HTMLElement).querySelectorAll('p.mono.truncate')]
+      .find(line => line.textContent!.includes('minio-main/daily/sales-2026.csv'))!;
+    expect(path.getAttribute('title')).toBe('minio-main/daily/sales-2026.csv');
+  });
+
+  it('keeps Files beside the file, opening the panel on the right', () => {
+    const grid = gridWith();
+    const files = (grid.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('button[aria-controls="files-panel"]')!;
+    files.click();
+    grid.fixture.detectChanges();
+    expect(grid.studio.filesOpen()).toBe(true);
+    expect(files.getAttribute('aria-expanded')).toBe('true');
+  });
+});
+
+describe('the Overview KPI strip', () => {
+  it('shows a dash for what the profile has not said yet, never a zero', () => {
+    const grid = gridWith();
+    grid.studio.showTab('overview');
+    const stats = new Map(grid.studio.overviewStats().map(item => [item.label, item]));
+    expect(stats.get('Rows')!.value).toBe('250');
+    expect(stats.get('Columns')!.value).toBe(2);
+    expect(stats.get('Complete')!.value).toBe('—');
+    expect(stats.get('Quality issues')!.value).toBe('—');
+    expect(stats.get('Quality issues')!.clickable).toBe(false);
+  });
+
+  it('counts the Quality tab\'s findings, and the tile goes there', () => {
+    const grid = gridWith();
+    grid.studio.adoptProfile(profileOf([
+      columnOf({ name: 'amount', nullPercentage: 0, completeness: 100 }),
+      columnOf({ name: 'empty', nullPercentage: 100, completeness: 0, approxDistinct: 0, allNull: true }),
+    ]));
+    grid.studio.showTab('overview');
+    grid.fixture.detectChanges();
+    const stats = new Map(grid.studio.overviewStats().map(item => [item.label, item]));
+    const issues = stats.get('Quality issues')!;
+
+    expect(issues.value).toBe(grid.studio.qualityFindings().length);
+    expect(issues.value).toBeGreaterThan(0);
+    expect(stats.get('Complete')!.value).toBe('50%');
+    expect(stats.get('Complete')!.hint).toContain('no cell was counted');
+    // The Quality tab says how many too, so the count is visible from any tab.
+    const quality = (grid.fixture.nativeElement as HTMLElement).querySelector('#a-tab-quality')!;
+    expect(quality.textContent).toContain(String(issues.value));
+
+    grid.studio.onOverviewStat(issues);
+    expect(grid.studio.tab()).toBe('quality');
+  });
+});
+
+describe('saving from the Canvas result', () => {
+  it('asks for the name in a small dialog, and closes it once the server has saved', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const el = canvas.fixture.nativeElement as HTMLElement;
+    const save = [...el.querySelectorAll<HTMLButtonElement>('#a-panel button')]
+      .find(button => button.textContent!.trim() === 'Save')!;
+    save.click();
+    canvas.fixture.detectChanges();
+
+    expect(canvas.studio.saveDialogOpen()).toBe(true);
+    const name = el.querySelector<HTMLInputElement>('#a-save-name')!;
+    name.value = 'Sales by region';
+    name.dispatchEvent(new Event('input'));
+    canvas.fixture.detectChanges();
+    [...el.querySelectorAll<HTMLButtonElement>('app-form-dialog button')]
+      .find(button => button.textContent!.trim() === 'Save as new')!.click();
+
+    expect(canvas.saveAnalysis).toHaveBeenCalledTimes(1);
+    expect(canvas.saveAnalysis.mock.calls[0][0].analysisName).toBe('Sales by region');
+    canvas.answers.saveAnalysis!.next(SERVER_RESPONSE({
+      analyticsAnalysisId: 9, analysisName: 'Sales by region', connectionAlias: 'minio-main',
+      datasetPath: 'daily/sales-2026.csv',
+    }));
+    expect(canvas.studio.saveDialogOpen()).toBe(false);
+  });
+
+  it('keeps the dialog open over a refusal, with the server\'s sentence in it', () => {
+    const canvas = canvasWith();
+    canvas.studio.openSaveDialog();
+    canvas.studio.analysisName.set('Sales');
+    canvas.studio.saveAnalysis(false);
+    canvas.answers.saveAnalysis!.next(SERVER_REFUSAL('That name is taken.'));
+
+    expect(canvas.studio.saveDialogOpen()).toBe(true);
+    expect(canvas.show()).toContain('That name is taken.');
+  });
+
+  it('closes the dialog before the panel on Escape, one thing at a time', () => {
+    const canvas = canvasWith();
+    canvas.studio.openSaved();
+    canvas.studio.openSaveDialog();
+    canvas.studio.onEscape();
+    expect(canvas.studio.saveDialogOpen()).toBe(false);
+    expect(canvas.studio.savedOpen()).toBe(true);
+    canvas.studio.onEscape();
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+
+  it('has no save card or saved list stacked under the result any more', () => {
+    const canvas = canvasWith();
+    canvas.ran();
+    const text = canvas.show();
+    expect(text).not.toContain('Save this analysis');
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+});
+
+describe('opening a saved analysis from the panel', () => {
+  const SAVED_ONE = {
+    analyticsAnalysisId: 4, analysisName: 'Amount by region', connectionAlias: 'minio-main',
+    datasetPath: 'daily/sales-2026.csv', visualizationType: 'bar',
+    analysisConfig: JSON.stringify({ dimensions: ['region'], measure: { aggregation: 'SUM', field: 'amount' } }),
+  } as SavedAnalysis;
+
+  it('lists them in the right-hand panel, read once on arrival at Canvas', () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+
+    expect(canvas.fetchAllAnalyses).toHaveBeenCalledTimes(1);
+    const panel = (canvas.fixture.nativeElement as HTMLElement).querySelector('#saved-panel')!;
+    expect(panel.classList).not.toContain('hidden');
+    expect(panel.textContent).toContain('Amount by region');
+    expect(panel.className).toContain('w-[480px]');
+    expect(panel.className).toContain('right-0');
+  });
+
+  it('puts one on the Canvas without running it, and gets out of the way', () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+    const row = [...(canvas.fixture.nativeElement as HTMLElement)
+      .querySelectorAll<HTMLButtonElement>('#saved-panel button')]
+      .find(button => button.textContent!.includes('Amount by region'))!;
+    row.click();
+
+    expect(canvas.studio.dimensions()).toEqual(['region']);
+    expect(canvas.studio.loadedAnalysis()?.analyticsAnalysisId).toBe(4);
+    expect(canvas.analyze).not.toHaveBeenCalled();
+    expect(canvas.studio.savedOpen()).toBe(false);
+  });
+
+  it('deletes from the panel, behind the same confirmation', async () => {
+    const canvas = canvasWith();
+    canvas.answers.analyses!.next(SERVER_RESPONSE([SAVED_ONE]));
+    canvas.studio.openSaved();
+    canvas.fixture.detectChanges();
+    (canvas.fixture.nativeElement as HTMLElement)
+      .querySelector<HTMLButtonElement>('#saved-panel button[aria-label="Delete Amount by region"]')!.click();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(canvas.confirmBody()).toContain('any dashboard tile showing it');
+    expect(canvas.deleteAnalysis).toHaveBeenCalledWith(4);
+  });
+});
+
+describe('Activity leads with what a person ran', () => {
+  const RUNS = () => [
+    runOf({ analyticsQueryRunId: 1, queryText: '-- schema' }),
+    runOf({ analyticsQueryRunId: 2, queryText: '-- preview page=0' }),
+    runOf({ analyticsQueryRunId: 3, queryText: '-- overview' }),
+    runOf({ analyticsQueryRunId: 4, queryText: 'select count(*) from dataset' }),
+    runOf({ analyticsQueryRunId: 5, queryText: '-- profile' }),
+    // A refused internal read stays in view: somebody reached for a file they could not open.
+    runOf({ analyticsQueryRunId: 6, queryText: '-- schema', runStatus: 'REFUSED',
+            errorMessage: 'You cannot read this connection.' }),
+  ];
+
+  it('names each run\'s kind from the descriptor the server wrote', () => {
+    const console = activityWith();
+    const kinds = RUNS().map(run => console.studio.runKind(run));
+    expect(kinds).toEqual(['schema', 'preview', 'overview', 'SQL', 'profile', 'schema']);
+  });
+
+  it('hides the schema, preview and overview reads behind "Show internal steps"', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE(RUNS()));
+
+    expect(console.studio.visibleRuns().map(run => run.analyticsQueryRunId)).toEqual([4, 5, 6]);
+    expect(console.show()).toContain('3 internal steps are hidden.');
+    expect(console.show()).toContain('You cannot read this connection.');
+
+    const toggle = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('label')]
+      .find(label => label.textContent!.includes('Show internal steps'))!
+      .querySelector<HTMLInputElement>('input')!;
+    toggle.click();
+    console.fixture.detectChanges();
+
+    expect(console.studio.showInternalRuns()).toBe(true);
+    expect(console.studio.visibleRuns().length).toBe(6);
+    expect(console.show()).not.toContain('internal steps are hidden');
+  });
+
+  it('draws one compact row per run, with Open in the console only where there is SQL', () => {
+    const console = activityWith();
+    console.answers.runs!.next(SERVER_RESPONSE(RUNS()));
+    console.studio.showInternalRuns.set(true);
+    console.fixture.detectChanges();
+    const el = console.fixture.nativeElement as HTMLElement;
+
+    expect(el.querySelectorAll('#a-panel li').length).toBe(6);
+    const opens = [...el.querySelectorAll('#a-panel button')]
+      .filter(button => button.textContent!.trim() === 'Open in the console');
+    expect(opens.length).toBe(1);
+  });
+});
+
+describe('the Charts tab when there is nothing to draw', () => {
+  it('says where a chart comes from and offers the way there', () => {
+    const console = consoleWith();
+    console.studio.showTab('charts');
+    const el = console.fixture.nativeElement as HTMLElement;
+    console.fixture.detectChanges();
+    const button = (label: string) => [...el.querySelectorAll<HTMLButtonElement>('#a-panel button')]
+      .find(candidate => candidate.textContent!.trim() === label);
+
+    expect(console.show()).toContain('Nothing has run yet — a chart is drawn from a result');
+    button('Write a query')!.click();
+    expect(console.studio.tab()).toBe('sql');
+
+    console.studio.showTab('charts');
+    console.fixture.detectChanges();
+    button('Build one in Canvas')!.click();
+    expect(console.studio.tab()).toBe('canvas');
+  });
+
+  it('stops offering to write a query once there is a result it cannot draw', () => {
+    const console = charted(resultOf({ columns: ['note'], rows: [['a']], rowCount: 1 }));
+    const labels = [...(console.fixture.nativeElement as HTMLElement).querySelectorAll('#a-panel button')]
+      .map(button => button.textContent!.trim());
+    expect(labels).not.toContain('Write a query');
+    expect(labels).toContain('Build one in Canvas');
+  });
+});

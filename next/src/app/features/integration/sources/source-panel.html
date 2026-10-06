@@ -1,0 +1,189 @@
+<app-side-panel [heading]="heading()" [subtitle]="subtitle()">
+  @if (loading()) {
+    <div class="py-14 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (loadError()) {
+    <p class="text-sm text-crit-500" role="alert">{{ loadError() }}</p>
+  } @else if (edit(); as e) {
+    <div class="flex flex-col gap-4 min-w-0">
+      <fieldset class="flex flex-col gap-3 min-w-0" [disabled]="!data.canManage">
+        @if (data.tenants && !e.sourceId) {
+          <app-field label="Workspace" for="srcTenant" [required]="true" hint="A source belongs to one workspace, and reads with its connections.">
+            <select id="srcTenant" class="input" [value]="e.tenantId ?? ''" (change)="patch({ tenantId: idOf($event) })">
+              <option value="">Pick a workspace</option>
+              @for (t of data.tenants; track t.value) { <option [value]="t.value" [selected]="t.value === (e.tenantId + '')">{{ t.label }}</option> }
+            </select>
+          </app-field>
+        }
+        <div class="form-grid">
+          <app-field label="Name" for="srcName" [required]="true">
+            <input id="srcName" class="input" [value]="e.name" placeholder="Daily customers" (input)="patch({ name: $any($event.target).value })" />
+          </app-field>
+          <app-field label="Description" for="srcDescription">
+            <input id="srcDescription" class="input" [value]="e.description" placeholder="What it holds, and for what" (input)="patch({ description: $any($event.target).value })" />
+          </app-field>
+        </div>
+        <div class="field">
+          <span class="label">Reads from</span>
+          <app-segmented [value]="e.kind" (valueChange)="setKind($event)" [options]="kindOptions" ariaLabel="Reads from" />
+        </div>
+
+        @switch (e.kind) {
+          @case ('API') {
+            <div class="form-grid">
+              <app-field label="Collection" for="srcCollection" [required]="true" hint="From API Collections: the source calls one of its APIs.">
+                <select id="srcCollection" class="input" [value]="e.collectionId ?? ''" (change)="pickCollection(idOf($event))">
+                  <option value="">Pick a collection</option>
+                  @for (c of tenantCollections(); track c.collectionId) { <option [value]="c.collectionId" [selected]="c.collectionId === e.collectionId">{{ c.name }}</option> }
+                </select>
+              </app-field>
+              <app-field label="API" for="srcRequest" [required]="true">
+                <select id="srcRequest" class="input" [value]="e.requestId ?? ''" [disabled]="!e.collectionId" (change)="patch({ requestId: idOf($event) })">
+                  <option value="">Pick an API</option>
+                  @for (q of requests(); track q.requestId) { <option [value]="q.requestId" [selected]="q.requestId === e.requestId">{{ q.method }} {{ q.name }}{{ q.enabled ? '' : ' (disabled)' }}</option> }
+                </select>
+              </app-field>
+              <app-field label="Version" for="srcVersion" [required]="true" hint="The collection version the source runs; a later save of the collection does not change it.">
+                <select id="srcVersion" class="input" [value]="e.version ?? ''" [disabled]="!e.collectionId" (change)="patch({ version: idOf($event) })">
+                  <option value="">Pick a version</option>
+                  @for (v of versions(); track v) { <option [value]="v" [selected]="v === e.version">v{{ v }}{{ v === versions()[0] ? ' (current)' : '' }}</option> }
+                </select>
+              </app-field>
+              <app-field label="Environment" for="srcEnv" [hint]="envHint">
+                <select id="srcEnv" class="input" [value]="e.environmentId ?? ''" [disabled]="!e.collectionId" (change)="patch({ environmentId: idOf($event) })">
+                  <option value="">The collection's default</option>
+                  @for (env of environments(); track env.environmentId) { <option [value]="env.environmentId" [selected]="env.environmentId === e.environmentId">{{ env.name }}</option> }
+                </select>
+              </app-field>
+            </div>
+            <app-field label="Rows at" for="srcRowsPath" hint="A JSONPath to the rows in the answer, e.g. $.items. Blank: the answer is the rows.">
+              <input id="srcRowsPath" class="input mono" [value]="e.rowsPath" placeholder="$.items" (input)="patch({ rowsPath: $any($event.target).value })" />
+            </app-field>
+          }
+          @case ('DATABASE') {
+            <div class="flex items-end gap-2">
+              <app-field class="flex-1 min-w-0" label="Database connection" for="srcConnection" [required]="true" hint="PostgreSQL, read-only. Its password is kept by the service and never shown.">
+                <select id="srcConnection" class="input" [value]="e.connectionId ?? ''" (change)="patch({ connectionId: idOf($event) })">
+                  <option value="">Pick a connection</option>
+                  @for (c of tenantConnections(); track c.id) { <option [value]="c.id" [selected]="c.id === e.connectionId">{{ c.name }} · {{ c.host }}/{{ c.database }}</option> }
+                </select>
+              </app-field>
+              @if (data.canManage) {
+                <button type="button" class="btn btn-default btn-sm mb-[1.6rem]" (click)="newConnection()"><app-icon name="plus" />New connection</button>
+              }
+            </div>
+            <app-field label="Query" for="srcQuery" [required]="true" hint="One statement that only reads: SELECT, WITH, VALUES or TABLE. It runs read-only, capped to the rows asked for.">
+              <textarea id="srcQuery" class="input mono text-xs" rows="6" [value]="e.query" [placeholder]="queryPlaceholder" (input)="patch({ query: $any($event.target).value })"></textarea>
+            </app-field>
+          }
+          @default {
+            <div class="form-grid">
+              <app-field label="Storage connection" for="srcStorage" [required]="true" hint="One of this workspace's Storage Connections, by its alias.">
+                <select id="srcStorage" class="input" [value]="e.storageAlias" (change)="patch({ storageAlias: $any($event.target).value })">
+                  <option value="">Pick a storage connection</option>
+                  @for (b of bucketOptions(); track b.value) { <option [value]="b.value" [selected]="b.value === e.storageAlias">{{ b.label }}</option> }
+                </select>
+              </app-field>
+              <app-field label="Format" for="srcFormat">
+                <select id="srcFormat" class="input" [value]="e.format" (change)="patch({ format: $any($event.target).value })">
+                  @for (f of formats; track f) { <option [value]="f" [selected]="f === e.format">{{ formatText(f) }}</option> }
+                </select>
+              </app-field>
+            </div>
+            <app-field label="Path" for="srcPath" [required]="e.kind === 'FILE'"
+                       [hint]="e.kind === 'FILE' ? 'The file, inside the connection: folder/name.csv. No leading /.' : 'A folder inside the connection (a prefix, ending in /); blank reads every file.'">
+              <input id="srcPath" class="input mono" [value]="e.path" [placeholder]="e.kind === 'FILE' ? 'exports/customers.csv' : 'exports/daily/'"
+                     autocomplete="off" (input)="patch({ path: $any($event.target).value })" />
+            </app-field>
+            @if (e.format === 'PARQUET') {
+              <p class="text-xs text-warn-600" role="note">Parquet is saved as the source's format, but it cannot be previewed yet: only CSV, JSON and JSON Lines are read for now.</p>
+            }
+            @if (e.format === 'CSV') {
+              <div class="form-grid">
+                <app-field label="Delimiter" for="srcDelimiter" hint="Blank: found from the first line. \t for a tab.">
+                  <input id="srcDelimiter" class="input mono" maxlength="2" [value]="e.delimiter" placeholder="," (input)="patch({ delimiter: $any($event.target).value })" />
+                </app-field>
+                <label class="flex items-center gap-2 text-sm self-end pb-2">
+                  <input type="checkbox" class="checkbox" [checked]="e.header" (change)="patch({ header: $any($event.target).checked })" />The first line is a header
+                </label>
+              </div>
+            }
+            @if (e.format === 'JSON') {
+              <app-field label="Rows at" for="srcFileRowsPath" hint="Where the rows are in the file, e.g. $.items. Blank: a list of rows, or one object.">
+                <input id="srcFileRowsPath" class="input mono" [value]="e.fileRowsPath" placeholder="$.items" (input)="patch({ fileRowsPath: $any($event.target).value })" />
+              </app-field>
+            }
+          }
+        }
+      </fieldset>
+
+      <section class="flex flex-col gap-3 border-t border-subtle pt-4" aria-label="Try the source">
+        <div class="flex flex-wrap items-center gap-2">
+          <h3 class="text-sm font-semibold flex-1 min-w-0">Try it</h3>
+          @if (data.canManage) {
+            <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="test()"><app-icon name="plug" [class.spin]="running() === 'test'" />Test connection</button>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="preview()"><app-icon name="table" [class.spin]="running() === 'preview'" />Preview</button>
+            <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="inferSchema()"><app-icon name="layers" [class.spin]="running() === 'schema'" />Infer schema</button>
+          }
+        </div>
+        @if (data.canManage) {
+          @if (runHint()) { <p class="text-xs text-[color:var(--text-muted)]">{{ runHint() }}</p> }
+        } @else {
+          <p class="text-xs text-[color:var(--text-muted)]">Test, preview and schema read the source itself with the workspace's credentials, so they are for a workspace administrator.</p>
+        }
+
+        @if (testResult(); as t) {
+          <div class="flex flex-wrap items-center gap-2 text-sm" role="status" data-test="test-result">
+            <span class="pill" [class.pill-ok]="t.ok" [class.pill-crit]="!t.ok">
+              <app-icon [name]="t.ok ? 'checkCircle' : 'xCircle'" size="0.9em" />{{ t.ok ? 'Answered' : 'Did not answer' }}
+            </span>
+            <span class="min-w-0 [overflow-wrap:anywhere]" [class.text-crit-500]="!t.ok">{{ testMessage() }}</span>
+          </div>
+        } @else if (detail()?.lastTestedAt) {
+          @let d = detail()!;
+          <p class="text-xs text-[color:var(--text-secondary)]" data-test="last-test">
+            Last test {{ d.lastTestedAt | serverTime: 'dateTime' }}:
+            <span [class.text-ok-500]="d.lastTestOk" [class.text-crit-500]="d.lastTestOk === false">{{ d.lastTestOk ? 'answered' : 'did not answer' }}</span>@if (d.lastTestMessage) { · <span class="[overflow-wrap:anywhere]">{{ d.lastTestMessage }}</span> }
+          </p>
+        }
+
+        @if (previewResult() || previewNote() || schemaShown()) {
+          <div #results class="tabs scroll-mt-4" role="tablist" aria-label="Preview and schema">
+            <button type="button" role="tab" class="tab" [class.tab-active]="resultTab() === 'preview'" [attr.aria-selected]="resultTab() === 'preview'" (click)="resultTab.set('preview')">Preview</button>
+            <button type="button" role="tab" class="tab" [class.tab-active]="resultTab() === 'schema'" [attr.aria-selected]="resultTab() === 'schema'" (click)="resultTab.set('schema')">Schema</button>
+          </div>
+          @if (resultTab() === 'preview') {
+            @if (previewNote()) { <p class="text-sm text-warn-600 [overflow-wrap:anywhere]" role="status" data-test="preview-note">{{ previewNote() }}</p> }
+            @if (previewResult(); as p) { <app-preview-table [result]="p" /> }
+            @else if (!previewNote()) { <p class="text-sm text-[color:var(--text-muted)]">Press Preview to read the first rows.</p> }
+          } @else {
+            @if (schemaShown(); as s) {
+              @if (!inferred() && !previewResult()) { <p class="text-xs text-[color:var(--text-muted)]">The schema this source kept when it was last inferred.</p> }
+              <app-schema-view [schema]="s.schema" [fields]="s.fields" />
+            } @else {
+              <p class="text-sm text-[color:var(--text-muted)]">No schema yet. Infer schema reads a preview and keeps the schema it suggests.</p>
+            }
+          }
+        }
+      </section>
+    </div>
+  }
+
+  <ng-container foot>
+    @if (edit(); as e) {
+      @if (data.canManage) {
+        <label class="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
+          <input type="checkbox" class="checkbox" role="switch" [checked]="e.status === 'Active'" (change)="patch({ status: $any($event.target).checked ? 'Active' : 'Inactive' })" />Active
+        </label>
+      } @else {
+        <span class="text-sm text-[color:var(--text-secondary)]">{{ e.status }}</span>
+      }
+    }
+    <span class="flex-1 min-w-0 text-xs text-crit-500 truncate" role="alert" [attr.title]="error() || null">{{ error() }}</span>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="close()">{{ data.canManage && dirty() ? 'Discard' : 'Close' }}</button>
+    @if (data.canManage && edit()) {
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || (!dirty() && !!edit()?.sourceId)" (click)="save()"><app-icon name="save" />{{ saving() ? 'Saving…' : 'Save' }}</button>
+    }
+  </ng-container>
+</app-side-panel>

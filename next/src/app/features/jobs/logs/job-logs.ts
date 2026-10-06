@@ -1,0 +1,492 @@
+import { toneClass } from '../../../shared/ui/tone';
+import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { NgTemplateOutlet } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
+import { TableShell } from '../../../shared/ui/data-table';
+import { StickToBottom } from '../../../shared/ui/stick-to-bottom';
+import { Icon } from '../../../shared/ui/icon';
+import { RankedBar } from '../../../shared/charts/ranked-bar';
+import { StatusPill } from '../../../shared/ui/status-pill';
+import { isMissingRecord } from '../../../core/api/missing-record';
+import { JobEventsService } from '../../../core/socket/job-events.service';
+import { Subscription } from 'rxjs';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { formatDuration } from '../../../shared/ui/time-format';
+import { Markdown } from '../../../shared/ui/markdown';
+import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
+import { LogSegment, logSegments, pathParts } from './log-segments';
+import { RunSteps } from '../run-steps/run-steps';
+
+interface AuditLog {
+  jobAuditLogId?: number;
+  jobQueueId?: number;
+  jobId?: number;
+  logsDetail?: string;
+  dateCreated?: string;
+}
+
+/** Log entries drawn at once, and how many more each Show earlier adds. */
+const RENDER_STEP = 2000;
+
+@Component({
+  selector: 'app-job-logs',
+  imports: [StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented, RunSteps],
+  templateUrl: './job-logs.html',
+})
+export class JobLogs implements OnInit, OnDestroy {
+  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
+  readonly toneClass = toneClass;
+  readonly jobId = input.required<string>();
+  readonly jobQueueId = input.required<string>();
+
+  /** Both ids come from the URL, so both are text until proven to be numbers. */
+  private validIds(): boolean {
+    const isId = (value: string) => /^\d+$/.test((value ?? '').trim());
+    return isId(this.jobId()) && isId(this.jobQueueId());
+  }
+
+  private readonly http = inject(HttpClient);
+  private readonly jobEvents = inject(JobEventsService);
+  private socket: Subscription | null = null;
+
+  /** True when the run's own lines are arriving over the socket rather than by polling. */
+  readonly socketLive = this.jobEvents.connected;
+
+  readonly logs = signal<AuditLog[]>([]);
+  readonly loading = signal(true);
+  readonly error = signal('');
+  readonly search = signal('');
+
+  readonly showInsights = signal(false);
+  /** The run's own start time anchors the first gap, so time spent before the first log shows. */
+  readonly runStartedAt = signal<string | null>(null);
+  /** The job and the specific run, so a log line has the context the old screen showed. */
+  readonly job = signal<any | null>(null);
+  readonly run = signal<any | null>(null);
+  /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
+  readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
+  readonly showDetail = signal(true);
+
+  /** The bucket the run's task reads and writes, which a path in a log line is relative to. */
+  readonly bucket = computed<string | null>(() => this.job()?.taskDetail?.bucket ?? null);
+  /** Each entry split into text and the paths it names, once per load rather than per render. */
+  readonly segments = computed(() => {
+    const bucket = this.bucket();
+    // The rendered lines only: a long log split whole on every arriving line was the other half of the freeze.
+    return new Map(this.visible().map(log => [log, logSegments(log.logsDetail ?? '', bucket)] as [AuditLog, LogSegment[]]));
+  });
+  segmentsOf(log: AuditLog): LogSegment[] { return this.segments().get(log) ?? [{ text: log.logsDetail ?? '' }]; }
+  readonly pathParts = pathParts;
+  /** A model's answer in JSON mode is data, shown as it came; anything else is the markdown it wrote. */
+  isJson(output: string | null | undefined): boolean { return /^\s*[[{]/.test(output ?? ''); }
+
+  /**
+   * Three ways to read the same entries, as the legacy screen had. Timeline for following a
+   * run step by step, table for scanning and sorting by eye, console for the raw stream when
+   * you want it to look like the log file it came from.
+   */
+  readonly view = signal<'timeline' | 'table' | 'console'>('timeline');
+  readonly views: SegmentOption<'timeline' | 'table' | 'console'>[] = [
+    { id: 'timeline', label: 'Timeline', icon: 'clock' },
+    { id: 'table',    label: 'Table',    icon: 'list' },
+    { id: 'console',  label: 'Console',  icon: 'terminal' },
+  ];
+
+  readonly refreshing = signal(false);
+  /** How many times the run has been read: the steps card (MIG-251) re-reads its steps with the run's own poll. */
+  readonly loads = signal(0);
+  readonly live = signal(true);
+  /** The run is not there, so neither Try again nor the live poll can help (the page offers Back to jobs). */
+  readonly missing = signal(false);
+  private timer: ReturnType<typeof setTimeout> | null = null;
+
+  /** A run that has finished will not gain entries, so polling it is pure waste. */
+  readonly stillRunning = computed(() => {
+    const status = (this.run()?.jobStatus ?? '').toLowerCase();
+    if (!status) return false;
+    return !['completed', 'failed', 'interrupt', 'skip', 'missed', 'stop'].includes(status);
+  });
+
+  readonly autoRefreshing = computed(() => this.live() && this.stillRunning());
+
+  constructor() {
+    // Starts and stops the poll when the reader toggles Live, or when the run reaches a terminal
+    // status. It does NOT re-arm the timer between polls -- see arm().
+    effect(() => {
+      const on = this.autoRefreshing();
+      this.clearTimer();
+      if (on) this.arm();
+    });
+
+    /*
+     * While the socket is up the lines arrive on it and the poll stands down (see arm()), so the two
+     * moments it cannot cover are read once each: the run ending -- its last lines and its final
+     * status are the server's -- and the socket coming back after a gap it did not replay.
+     */
+    effect(() => {
+      const running = this.stillRunning();
+      if (this.wasRunning && !running && this.run()) untracked(() => this.load(true));
+      this.wasRunning = running;
+    });
+    effect(() => {
+      const connected = this.socketLive();
+      if (connected && this.socketDropped && untracked(() => this.autoRefreshing())) untracked(() => this.load(true));
+      this.socketDropped = !connected && this.socketEverUp;
+      if (connected) this.socketEverUp = true;
+    });
+  }
+
+  private wasRunning = false;
+  private socketEverUp = false;
+  private socketDropped = false;
+
+  /**
+   * Schedules the next poll.
+   *
+   * This used to live in the effect above, whose comment claimed it "re-arms after every load".
+   * It did not. An effect re-runs when a signal it read reports a NEW VALUE, and the only signal
+   * it reads is autoRefreshing() -- live() && stillRunning() -- which stays true for the whole of
+   * a running job. Every load replaced run() with a fresh object, stillRunning() recomputed to
+   * the same true, the computed therefore notified nobody, and the effect never ran again. So the
+   * screen polled exactly once, five seconds after it opened, and then sat still under a badge
+   * saying Live -- which is the behaviour being reported.
+   *
+   * Re-arming from the completion of each load is what the comment always described: the next
+   * poll is scheduled when the previous one has come back, so the timer cannot stack up behind a
+   * slow response either.
+   */
+  private arm(): void {
+    this.clearTimer();
+    // MIG-214: an answer that lands after the page is gone must not start the next poll.
+    if (this.destroyed || !this.autoRefreshing()) return;
+    // The full log is re-read only while nothing else delivers it (scale review P1 #22): with the socket
+    // up, each line arrives as it is written, and re-reading the whole log every five seconds besides was
+    // the cost of a long run. The timer keeps ticking, so a dropped socket is polled again within 5s.
+    this.timer = setTimeout(() => (this.socketLive() ? this.arm() : this.refresh()), 5000);
+  }
+
+  private aiStepsLoadedFor: string | null = null;
+  private loadAiSteps(): void {
+    // Once per run: the steps ran before dispatch and do not change while the logs poll.
+    if (this.aiStepsLoadedFor === this.jobQueueId()) return;
+    this.aiStepsLoadedFor = this.jobQueueId();
+    this.http.get<ApiResponse<{ run: any; promptName?: string }[]>>(`${API_BASE}/aiPrompt.json/runsForJob`,
+      { params: { jobQueueId: this.jobQueueId() } }).subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.aiSteps.set(r.data ?? []); },
+      error: () => {},
+    });
+  }
+
+  private destroyed = false;
+
+  ngOnDestroy(): void {
+    this.destroyed = true;
+    this.clearTimer();
+    this.socket?.unsubscribe();
+    this.socket = null;
+  }
+
+  private clearTimer(): void {
+    if (this.timer) { clearTimeout(this.timer); this.timer = null; }
+  }
+
+  /** Manual reload; leaves the spinner-free path alone so the list does not blank out. */
+  refresh(): void {
+    this.refreshing.set(true);
+    this.load(true);
+  }
+
+  toggleLive(): void { this.live.update(v => !v); }
+
+  /**
+   * How long the run took, written as the history table and the Jobs list write it. This had its
+   * own formatter, which said "60m 0s" for an hour-long run where the history said "1h".
+   */
+  duration(): string {
+    const run = this.run();
+    if (!run?.startTime || !run?.endTime) return '—';
+    return formatDuration((new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000);
+  }
+
+  /** An AI step's latency, which the API gives in milliseconds. */
+  latency(ms: number): string {
+    return formatDuration(ms / 1000);
+  }
+
+  /** How many bars stay readable at once; beyond this the chart shows a window. */
+
+  /**
+   * A gap is called a stall when it is both more than twice the average and over five
+   * seconds -- the second test stops a run whose entries are milliseconds apart from
+   * flagging half its bars. This colouring is the diagnostic value of the chart: it is how
+   * you find where a run actually sat waiting.
+   */
+  readonly coloured = computed(() => {
+    const all = this.gaps();
+    if (!all.length) return [];
+    const avg = all.reduce((sum, g) => sum + g.value, 0) / all.length;
+    return all.map(g => ({
+      ...g,
+      color: g.value > avg * 2 && g.value > 5
+        ? 'var(--color-warn-500)'
+        // --accent-mark, not brand-500: that step is the dark card's own colour, so every
+        // ordinary gap vanished in dark and only the stalls showed.
+        : 'var(--accent-mark)',
+      stalled: g.value > avg * 2 && g.value > 5,
+    }));
+  });
+
+  readonly stallCount = computed(() => this.coloured().filter(g => g.stalled).length);
+
+  /**
+   * The longest waits, not every interval. A bar per entry meant 368 bars whose labels
+   * overlapped into a smear, and because one 22.5s stall set the scale the other 367 sat at
+   * zero height -- the chart answered nothing while taking a screen to do it. The question
+   * this is here for is "where did the run sit waiting", so it shows exactly that, ranked,
+   * and stays readable whether the run has ten entries or ten thousand.
+   */
+  readonly topGaps = computed(() => {
+    const stalls = this.coloured().filter(g => g.value > 0);
+    return [...stalls]
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 8)
+      .map(g => ({
+        name: `Before ${g.name}`,
+        value: g.value,
+        display: formatDuration(g.value),
+        color: g.color,
+      }));
+  });
+
+  /**
+   * The denominator is the span from the first entry to the last, which is not the same as
+   * the run's own duration: a worker can write a line against a finished run's id, and this
+   * database has 30 such rows -- one of them a day after its run ended, which turned a 1m58s
+   * run into a 25-hour "gap". Calling that share "of the run's elapsed time" was wrong, so
+   * it says what it actually measures and the late entries are called out separately.
+   */
+  readonly gapSummary = computed(() => {
+    const all = this.gaps();
+    if (!all.length) return null;
+    const total = all.reduce((sum, g) => sum + g.value, 0);
+    const shown = this.topGaps().reduce((sum, g) => sum + g.value, 0);
+    return {
+      total: Math.round(total * 10) / 10,
+      totalLabel: formatDuration(total),
+      shownShare: total > 0 ? Math.round((shown / total) * 100) : 0,
+      entries: all.length,
+    };
+  });
+
+  /** Entries stamped after the run finished -- they inflate every gap that follows them. */
+  readonly lateEntries = computed(() => {
+    const ended = this.run()?.endTime;
+    if (!ended) return 0;
+    const cutoff = new Date(ended).getTime();
+    if (!Number.isFinite(cutoff)) return 0;
+    return this.logs().filter(row => {
+      const at = row.dateCreated ? new Date(row.dateCreated).getTime() : NaN;
+      return Number.isFinite(at) && at > cutoff + 1000;
+    }).length;
+  });
+
+  /** The entries in time order: what the chart's gaps and every entry's number are counted from. */
+  private readonly timeOrdered = computed(() => [...this.logs()]
+    .filter(row => !!row.dateCreated)
+    .sort((a, b) => new Date(a.dateCreated!).getTime() - new Date(b.dateCreated!).getTime()));
+
+  /**
+   * Each entry's number in time order, for the table's # column. It counted the rows on screen,
+   * so a search renumbered them 1, 2, 3 and the chart's "(#16)" matched nothing.
+   */
+  readonly entryNo = computed(() => new Map(this.timeOrdered().map((row, index) => [row, index + 1])));
+
+  /** The same clock the views print entry times with: API times are Chicago wall-clock. */
+  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
+
+  /**
+   * Seconds between one log line and the next. A job that looks "slow" is usually waiting in
+   * one specific step, and the tall bar is that step -- far quicker to spot than reading
+   * timestamps down a column.
+   */
+  readonly gaps = computed(() => {
+    const rows = this.timeOrdered();
+    if (!rows.length) return [];
+
+    const started = this.runStartedAt();
+    const anchors: { at: number; label: string }[] = [];
+    if (started) {
+      const t = new Date(started).getTime();
+      if (Number.isFinite(t)) anchors.push({ at: t, label: 'Start' });
+    }
+    // Named by the entry's time, which the Timeline, Table and Console all show, with its number
+    // kept: two entries in the same second would otherwise share a name, and the chart keys its
+    // bars by name.
+    rows.forEach((row, index) =>
+      anchors.push({ at: new Date(row.dateCreated!).getTime(),
+        label: `${this.clock.transform(row.dateCreated, 'timeSec')} (#${index + 1})` }));
+
+    if (anchors.length < 2) return [];
+    const out: { name: string; value: number }[] = [];
+    for (let i = 1; i < anchors.length; i++) {
+      const seconds = (anchors[i].at - anchors[i - 1].at) / 1000;
+      if (!Number.isFinite(seconds)) continue;
+      out.push({ name: anchors[i].label, value: Math.max(0, Math.round(seconds * 10) / 10) });
+    }
+    return out;
+  });
+
+  readonly slowestGap = computed(() => {
+    const list = this.gaps();
+    if (!list.length) return null;
+    return list.reduce((worst, g) => (g.value > worst.value ? g : worst), list[0]);
+  });
+
+  readonly hasInsights = computed(() => this.gaps().length > 1);
+
+  readonly filtered = computed(() => {
+    const term = this.search().trim().toLowerCase();
+    if (!term) return this.logs();
+    return this.logs().filter(log => (log.logsDetail ?? '').toLowerCase().includes(term));
+  });
+
+  /**
+   * How many of the entries are drawn (scale review P1 #22). A run that writes tens of thousands of
+   * lines drew every one in three layouts at once and froze the tab; the newest RENDER_STEP are drawn
+   * -- the end of the run is what a reader follows -- and Show earlier adds RENDER_STEP more above.
+   */
+  readonly renderLimit = signal(RENDER_STEP);
+  readonly renderStep = RENDER_STEP;
+  readonly visible = computed(() => {
+    const all = this.filtered();
+    const limit = this.renderLimit();
+    return all.length > limit ? all.slice(all.length - limit) : all;
+  });
+  /** Entries matching the view that are not drawn yet. */
+  readonly hiddenEarlier = computed(() => this.filtered().length - this.visible().length);
+  showEarlier(): void { this.renderLimit.update(limit => limit + RENDER_STEP); }
+
+  ngOnInit(): void {
+    this.load();
+    this.listen();
+  }
+
+  /**
+   * The server has always published every log line as it was written -- JobEventPublisher.publishLog,
+   * called from all three NotifyService write paths -- and nothing on this side ever subscribed.
+   * The screen said "live" while polling on a five-second timer, so a line could sit unseen for
+   * five seconds and a finished run kept being re-fetched until a poll happened to notice.
+   *
+   * Lines are appended as they arrive. The next poll calls logs.set with the server's own list,
+   * which replaces whatever was appended, so a line that arrives twice cannot persist as a
+   * duplicate -- the socket is an early view of the same rows, not a second source of truth.
+   */
+  private listen(): void {
+    this.socket = this.jobEvents.events.subscribe(event => {
+      if (Number(event.jobId) !== Number(this.jobId())) return;
+
+      if (event.type === 'job.log' && Number(event.jobQueueId) === Number(this.jobQueueId())) {
+        this.logs.update(list => [...list, {
+          jobId: Number(this.jobId()),
+          jobQueueId: Number(this.jobQueueId()),
+          logsDetail: event.message ?? '',
+          dateCreated: event.at ?? new Date().toISOString(),
+        }]);
+        return;
+      }
+
+      // A status push is also what tells this screen the run has ended. stillRunning() reads
+      // the run's status, so without this the poll kept re-arming against a finished run.
+      if (event.type === 'job.status' && event.jobRunningStatus) {
+        this.run.update(run => (run ? { ...run, jobStatus: event.jobRunningStatus } : run));
+      }
+    });
+  }
+
+  /** `quiet` keeps the list on screen during an auto-refresh instead of blanking it. */
+  load(quiet = false): void {
+    // A link built from a missing id arrives here as the literal text "undefined", and the
+    // server answers with a Java type-conversion error that means nothing to whoever clicked.
+    // Refuse it here and say what actually went wrong.
+    if (!this.validIds()) {
+      this.loading.set(false);
+      this.missing.set(true);
+      this.error.set('That link is missing the run it refers to. Open the run from the job\'s '
+        + 'history instead.');
+      return;
+    }
+
+    if (!quiet) this.loading.set(true);
+    this.error.set('');
+    this.http.get<ApiResponse<AuditLog[]>>(`${API_BASE}/sourceJob.json/findSourceJobAuditLog`, {
+      params: { jobId: this.jobId(), jobQueueId: this.jobQueueId() },
+    }).subscribe({
+      next: response => {
+        this.loading.set(false);
+        this.refreshing.set(false);
+        if (response.status === API_SUCCESS) {
+          const data = response.data as any;
+          // The payload is { auditLogs, sourceJob, sourceJobQueue }. This read "jobAuditLogs",
+          // which never matched, so the screen reported no logs for every run.
+          this.logs.set(Array.isArray(data) ? data : (data?.auditLogs ?? []));
+          this.runStartedAt.set(data?.sourceJobQueue?.startTime ?? null);
+          // The same call already carries both -- there is no reason to fetch them again.
+          this.job.set(data?.sourceJob ?? null);
+          this.run.set(data?.sourceJobQueue ?? null);
+          this.loads.update(n => n + 1);
+          this.loadAiSteps();
+        } else if (isMissingRecord(response)) {
+          this.goneMissing();
+          return;
+        } else {
+          this.error.set(response.message);
+        }
+        // The next poll is scheduled from here, when this one has actually come back.
+        this.arm();
+      },
+      error: err => {
+        this.loading.set(false);
+        this.refreshing.set(false);
+        if (isMissingRecord(err)) {
+          this.goneMissing();
+          return;
+        }
+        this.error.set(err?.error?.message || 'Could not load the logs.');
+        // A failed poll still re-arms: a run does not stop producing lines because one request
+        // was refused, and giving up here is how a screen goes quiet without saying so.
+        this.arm();
+      },
+    });
+  }
+
+  /**
+   * The run (or its job) is not there: a stale link, a deleted job, or another person's job for a
+   * tenant user, which the server answers the same way. Said plainly, and the poll stops: the run
+   * is cleared, so the live effect sees nothing still running.
+   */
+  private goneMissing(): void {
+    this.clearTimer();
+    this.run.set(null);
+    this.logs.set([]);
+    this.missing.set(true);
+    this.error.set(`Run #${this.jobQueueId().trim()} of job #${this.jobId().trim()} does not exist or was deleted.`);
+  }
+
+  /**
+   * Workers prefix nothing, so severity is inferred from the wording.
+   *
+   * The words are matched with their endings: workers write "Failed:", "failed", "Completed:",
+   * and bare stems matched none of them, so every dot was grey. Checked in this order so "Attempt 1
+   * of 3 failed ... Queued for attempt 2" stays red. "rejected" is left out on purpose: "40
+   * accepted, 0 rejected" is a good run.
+   */
+  toneOf(detail?: string): string {
+    const text = (detail ?? '').toLowerCase();
+    if (/\b(fail\w*|errors?|exceptions?|could not|unable|interrupt\w*)\b/.test(text)) return 'var(--color-crit-500)';
+    if (/\b(warn\w*|skip\w*|missed|retr(y|ying|ied|ies))\b/.test(text)) return 'var(--color-warn-500)';
+    if (/\b(complet(e|ed)|succe(ss|ssful|ssfully|eded)|done|finished)\b/.test(text)) return 'var(--color-ok-500)';
+    return 'var(--border-strong)';
+  }
+}

@@ -1,0 +1,242 @@
+<div class="page-tool">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Document Converter</h1>
+      <p class="page-subtitle">
+        Convert between Office, OpenDocument, PDF, Markdown and image formats, or render a dataset as a document.
+      </p>
+    </div>
+  </div>
+
+  <div class="card p-4 space-y-4">
+    <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
+
+    <!-- MIG-253: a dataset, or one a run kept, rendered through a template; each mode its own panel. -->
+    @if (mode() === 'dataset') {
+      <app-render-panel source="dataset" [buckets]="buckets()" />
+    } @else if (mode() === 'execution') {
+      <app-render-panel source="execution" [buckets]="buckets()" />
+    } @else {
+    @if (mode() === 'upload') {
+      <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
+                         prompt="Drop a document here" />
+    } @else {
+      <!-- The console's one file picker: buckets, folders, a filter, paging, and a read that
+           fails says so with Try again. -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()">
+          <app-icon name="folder" />{{ selectedKey() ? 'Choose another file…' : 'Choose a file…' }}
+        </button>
+        @if (selectedKey()) {
+          <span class="text-sm min-w-0 truncate" [title]="bucket() + '/' + selectedKey()">
+            <span class="font-medium">{{ sourceName() }}</span>
+            <span class="mono text-xs text-[color:var(--text-muted)]"> · {{ bucket() }}/{{ selectedKey() }}</span>
+          </span>
+        } @else {
+          <span class="text-sm text-[color:var(--text-muted)]">No file chosen yet.</span>
+        }
+      </div>
+    }
+
+    @if (sourceName() && formatsError()) {
+      <p class="text-sm text-crit-500 flex items-center gap-2" role="alert">
+        <app-icon name="alert" class="shrink-0" />{{ formatsError() }}
+        <button type="button" class="btn btn-default btn-xs" (click)="loadFormats()"><app-icon name="refresh" />Try again</button>
+      </p>
+    } @else if (sourceName() && !family()) {
+      <p class="text-sm text-warn-500">".{{ extension() }}" isn't a format this can convert.</p>
+    } @else if (family()) {
+      <p class="text-sm text-[color:var(--text-secondary)]">
+        Detected as {{ family()!.label }}
+        @if (mode() === 'upload' && file()) { · {{ size(file()!.size) }} }
+      </p>
+    }
+
+    @if (family()) {
+      <div class="max-w-xs">
+        <label class="label" for="target">Convert to</label>
+        <select id="target" class="input"
+                (change)="outputFormat.set($any($event.target).value)">
+          @for (format of family()!.outputFormats; track format) {
+            <option [value]="format" [selected]="format === outputFormat()">{{ format.toUpperCase() }}</option>
+          }
+        </select>
+      </div>
+
+      <div class="pt-1">
+        <label class="flex items-center gap-2 text-sm cursor-pointer">
+          <input type="checkbox" class="checkbox" [checked]="saveToBucket()"
+                 (change)="saveToBucket.set($any($event.target).checked)" />
+          Save the result to a bucket
+        </label>
+        <p class="field-note text-[color:var(--text-muted)]">
+          Otherwise the converted file only exists in this tab until you download it.
+        </p>
+      </div>
+
+      @if (saveToBucket()) {
+        <div class="form-grid">
+          <div class="field">
+            <label class="label" for="savebucket">Save to bucket</label>
+            <app-combobox id="savebucket" [selected]="saveBucket()" (selectedChange)="saveBucket.set($event)"
+                          placeholder="Choose a bucket" clearLabel="None" [options]="bucketOptions()" />
+          </div>
+
+          <div class="field">
+            <label class="label" for="savefolder">Folder</label>
+            <input id="savefolder" class="input mono" placeholder="converted/"
+                   [value]="saveFolder()" (input)="saveFolder.set($any($event.target).value)" />
+            <p class="field-note text-[color:var(--text-muted)]">Optional; the bucket root if left empty.</p>
+          </div>
+
+          <div class="field">
+            <label class="label" for="taskname">Name</label>
+            <input id="taskname" class="input" [placeholder]="sourceName() || 'Conversion name'"
+                   [value]="taskName()" (input)="taskName.set($any($event.target).value)" />
+            <p class="field-note text-[color:var(--text-muted)]">Optional; the file's own name if left empty.</p>
+          </div>
+        </div>
+      }
+
+      <div class="flex gap-2">
+        <button type="button" class="btn btn-primary"
+                [disabled]="converting() || fetchingSource() || !canConvert()" (click)="convert()">
+          <app-icon name="refresh" [class.spin]="converting() || fetchingSource()" />
+          {{ fetchingSource() ? 'Reading the file…' : converting() ? 'Converting…' : 'Convert' }}
+        </button>
+        <button type="button" class="btn btn-ghost" (click)="reset()"><app-icon name="close" />Clear</button>
+      </div>
+    }
+
+    @if (result(); as done) {
+      <div class="rounded-md p-3.5 flex items-center gap-3 bg-sunken"
+          >
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium truncate">{{ done.outputFileName }}</div>
+          <div class="text-xs text-[color:var(--text-muted)]">Ready to download</div>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" (click)="download()"><app-icon name="download" />Download</button>
+      </div>
+    }
+    }
+  </div>
+
+  <div class="card overflow-hidden">
+    <button type="button" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold"
+            [attr.aria-expanded]="showFormats()" (click)="showFormats.set(!showFormats())">
+      <span class="mr-auto">Supported formats</span>
+      <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'"
+                class="text-[color:var(--text-muted)]" />
+    </button>
+    @if (showFormats()) {
+      <div class="overflow-x-auto border-t border-subtle">
+        <table class="table-modern">
+          <thead>
+            <tr><th>Family</th><th>From</th><th>To</th></tr>
+          </thead>
+          <tbody>
+            @for (family of families(); track family.key) {
+              <tr>
+                <td class="font-medium whitespace-nowrap">{{ family.label }}</td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    @for (f of family.inputFormats; track f) {
+                      <span class="pill pill-neutral">{{ f }}</span>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div class="flex flex-wrap gap-1">
+                    @for (f of family.outputFormats; track f) {
+                      <span class="pill pill-brand">{{ f }}</span>
+                    }
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </div>
+
+  <app-table-shell heading="Recent conversions" [shown]="pagedTasks().length" [total]="tasks().length"
+                   [loading]="tasksLoading()" [error]="tasksError()" (retry)="loadTasks()"
+                   [isEmpty]="!tasks().length" emptyIcon="file"
+                   emptyMessage="Nothing converted yet. Finished conversions are listed here with a link to the bucket.">
+    <ng-container toolbar>
+      <button type="button" class="btn btn-default btn-sm" (click)="loadTasks()" [disabled]="tasksLoading()">
+        <app-icon name="refresh" [class.spin]="tasksLoading()" />Refresh
+      </button>
+    </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Conversion</th>
+              <th>Size</th>
+              <th>Location</th>
+              <th>Created</th>
+              <th class="w-28"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (task of pagedTasks(); track task.documentConverterTaskId) {
+              <tr>
+                <td class="max-w-64">
+                  <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName }}</div>
+                  <div class="mono text-[color:var(--text-muted)] truncate" [title]="task.inputFileName">
+                    {{ task.inputFileName }}
+                  </div>
+                </td>
+                <td class="whitespace-nowrap">
+                  <span class="pill pill-neutral">{{ task.inputFormat }}</span>
+                  <app-icon name="arrowRight" size="0.85em" class="icon-muted mx-1" />
+                  <span class="pill pill-brand">{{ task.outputFormat }}</span>
+                </td>
+                <td class="tabular whitespace-nowrap text-[color:var(--text-secondary)]">
+                  {{ size(task.inputFileSize) }} → {{ size(task.outputFileSize) }}
+                </td>
+                <td class="max-w-56">
+                  @if (task.bucketName) {
+                    <a class="link-inline truncate" routerLink="/documents/files"
+                       [queryParams]="{ bucket: task.bucketName, prefix: outputFolderOf(task) }"
+                       [title]="task.bucketName + '/' + outputFolderOf(task)">
+                      <app-icon name="folder" size="0.85em" class="icon-info" />{{ task.bucketName }}
+                    </a>
+                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                </td>
+                <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                  {{ task.dateCreated ? (task.dateCreated | serverTime: 'dateTime') : '—' }}
+                </td>
+                <td>
+                  <div class="flex items-center justify-end gap-1.5">
+                    <button type="button" class="btn-circle btn-circle-info"
+                            [disabled]="!task.inputStorageKey"
+                            [title]="task.inputStorageKey ? 'View the original file' : 'The original was not kept'"
+                            aria-label="View the original file"
+                            (click)="view(task, 'input')">
+                      <app-icon name="file" size="0.9em" />
+                    </button>
+                    <button type="button" class="btn-circle btn-circle-info"
+                            [disabled]="!task.outputStorageKey"
+                            [title]="task.outputStorageKey ? 'View the converted file' : 'The result was not kept'"
+                            aria-label="View the converted file"
+                            (click)="view(task, 'output')">
+                      <app-icon name="eye" size="0.9em" />
+                    </button>
+                    <button type="button" class="btn-circle btn-circle-danger"
+                            title="Delete this conversion" aria-label="Delete this conversion"
+                            (click)="removeTask(task)">
+                      <app-icon name="trash" size="0.9em" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+    <app-pagination pager [total]="tasks().length" [page]="taskPager.page()" [size]="taskPager.size()"
+                    (goTo)="taskPager.goTo($event, tasks().length)" (setSize)="taskPager.setSize($event)" />
+  </app-table-shell>
+</div>

@@ -1,0 +1,115 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Invoices</h1>
+      <p class="page-subtitle">
+        Every month closed into a bill. Pick one on the left; its lines, documents, payments and
+        story are on the right, with a QR code of its number for the printed page.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (isPlatformAdmin()) {
+        <label class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">Month
+          <input class="input w-40 py-1 text-xs mono" type="month" [value]="closePeriod()" (input)="closePeriod.set($any($event.target).value)" aria-label="Month to close" />
+        </label>
+        <button type="button" class="btn btn-primary btn-sm" (click)="draft()" [disabled]="closing()" [title]="workspaces.tenantId() ? 'A draft from the meter for the month, for this workspace' : 'A draft for every workspace'">
+          <app-icon name="plus" [busy]="closing()" />{{ closing() ? 'Drafting…' : 'Draft month' }}
+        </button>
+      }
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="pageMenu" aria-label="Billing actions"><app-icon name="dots" size="1.05em" /></button>
+      <ng-template #pageMenu>
+        <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editAccount()"><app-icon name="edit" />Billing profile</button>
+          <button cdkMenuItem class="menu-item" [cdkMenuItemDisabled]="statementBusy()" (cdkMenuItemTriggered)="statement()"><app-icon name="file" [busy]="statementBusy()" />Statement for this year</button>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <app-stat-tile label="Overdue" [value]="summary().overdue" icon="alert" [tone]="summary().overdue ? 'crit' : 'muted'"
+                   [foot]="summary().overdue ? totals(summary().overdueTotals) + ' past due' : 'nothing past due'" />
+    <app-stat-tile label="Open" [value]="summary().open" icon="clock" [tone]="summary().open ? 'info' : 'muted'"
+                   [foot]="summary().open ? totals(summary().openTotals) + ' to collect' : 'nothing outstanding'" />
+    <app-stat-tile label="Slips to verify" [value]="summary().slips" icon="upload" [tone]="summary().slips ? 'warn' : 'muted'"
+                   [foot]="summary().slips ? (isPlatformAdmin() ? 'waiting on the platform' : 'waiting on verification') : 'none pending'" />
+    @if (isPlatformAdmin()) {
+      <app-stat-tile label="Drafts" [value]="summary().drafts" icon="edit" tone="muted" [foot]="summary().drafts ? totals(summary().draftTotals) + ' running' : 'no month open'" />
+    } @else {
+      <app-stat-tile label="Paid" [value]="summary().paid" icon="check" [tone]="summary().paid ? 'ok' : 'muted'" [foot]="summary().paid ? totals(summary().paidTotals) + ' settled' : 'nothing settled yet'" />
+    }
+  </div>
+
+  <div class="card lookup-split">
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a number, workspace, month" aria-label="Find an invoice" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        @if (isPlatformAdmin()) {
+          <select class="input w-full" [value]="workspaces.tenantId() ?? ''" aria-label="Workspace" (change)="pickWorkspace($any($event.target).value)">
+            <option value="">Every workspace</option>
+            @for (o of workspaces.options(); track o.value) { <option [value]="o.value">{{ o.label }}</option> }
+          </select>
+        }
+        <select class="input w-full" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
+          <option value="">All states</option>
+          @for (s of statuses; track s) { @if (counts()[s]) { <option [value]="s">{{ statusLabel[s] }} ({{ counts()[s] }})</option> } }
+        </select>
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="clearFilters()"><app-icon name="close" />Clear filters</button>
+        }
+      </div>
+
+      @if (loading() && !rows().length) {
+        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
+      } @else if (!visible().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="file" size="1.4rem" class="icon-muted" />
+          {{ hasFilters() ? 'No invoice matches the current filters.' : (isPlatformAdmin() ? 'No invoice yet. Draft a month to build one from the meter.' : 'No invoice yet — the first one arrives when a month is closed.') }}
+        </div>
+      } @else {
+        <ul class="lookup-rail-list" role="listbox" aria-label="Invoices">
+          @for (r of visible(); track r.invoiceId) {
+            <li role="presentation">
+              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="shownNumber() === r.number" [class.is-selected]="shownNumber() === r.number" (click)="select(r)">
+                <span class="kafka-rail-dot" [class]="'kafka-rail-dot bill-dot-' + tone(r)" [title]="statusLabel[r.status]" aria-hidden="true"></span>
+                <span class="sr-only">{{ statusLabel[r.status] }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key mono">{{ r.number }}</span>
+                  <span class="lookup-rail-sub">
+                    {{ period(r) }} · <span class="tabular">{{ money(r.total, r.currency) }}</span>
+                    @if (r.status === 'overdue') { · <em>{{ overdueDays(r) }} d overdue</em> }
+                    @else if ((r.pendingPayments ?? 0) > 0) { · <em>slip to verify</em> }
+                    @else if (r.status === 'draft') { · running }
+                    @else if (r.status === 'partially_paid') { · {{ money(r.balance, r.currency) }} open }
+                    @if (isPlatformAdmin()) { · {{ r.tenantName }} }
+                  </span>
+                  @if (docsLabel(r)) { <span class="lookup-rail-sub">{{ docsLabel(r) }}</span> }
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </aside>
+
+    <section class="lookup-detail" aria-live="polite">
+      @if (shownNumber(); as n) {
+        <app-invoice-pane [number]="n" (changed)="load()" />
+      } @else {
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="file" size="1.5rem" class="icon-muted" />
+          <p>Pick an invoice to see its lines, documents and payments.</p>
+        </div>
+      }
+    </section>
+  </div>
+</div>

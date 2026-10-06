@@ -1,0 +1,502 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Kafka &amp; Topics</h1>
+      <p class="page-subtitle">
+        The brokers your pipelines publish through, live: are they up, do your topics exist, who reads them and how far
+        behind. Pick a connection on the left. Secrets are encrypted and never sent back to the browser.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadHealth(true)" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (!locked()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New connection
+      </button>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="Kafka connections and topics" still="You can still test them." />
+
+  @if (!loading() && !error() && profiles().length && !defaultProfile()) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="alert" class="icon-warn" />
+      <span>
+        @if (canSeeWorkspace()) {
+          No platform default. A workspace with no default of its own has no broker to fall back to.
+        } @else {
+          No default profile. Tasks with no explicit profile have no broker to reach.
+        }
+      </span>
+    </div>
+  }
+
+  <!-- ── Master / detail ─────────────────────────────────────────────────────────────── -->
+  <div class="card lookup-split kafka-split">
+
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find name, broker, workspace" aria-label="Find a profile"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <!-- Each filter gets the rail's full width: two selects side by side in 275px cut
+             "All environments" to "All environm". -->
+        <select class="input w-full" [value]="environmentFilter()" aria-label="Environment"
+                (change)="environmentFilter.set($any($event.target).value)">
+          <option value="">All environments</option>
+          @for (e of environments; track e.key) { <option [value]="e.key">{{ e.label }}</option> }
+        </select>
+        <div class="flex items-center gap-2">
+          <select class="input min-w-0 flex-1" [value]="statusFilter()" aria-label="State"
+                  (change)="statusFilter.set($any($event.target).value)">
+            <option value="">All states</option>
+            <option value="Active">Active</option>
+            <option value="Inactive">Inactive</option>
+          </select>
+          <app-mine-filter [(only)]="onlyMine" />
+        </div>
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="clearFilters()">
+            <app-icon name="close" />Clear filters
+          </button>
+        }
+      </div>
+
+      @if (loading() && !profiles().length) {
+        <div class="lookup-rail-empty"><div class="spinner" role="status" aria-label="Loading"></div> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">
+          {{ error() }}
+          <button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button>
+        </div>
+      } @else if (!filtered().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="server" size="1.4rem" class="icon-muted" />
+          {{ hasFilters() ? 'No profile matches the current filters.' : 'No Kafka profiles yet.' }}
+        </div>
+      } @else {
+        <app-blur-loader [active]="loading()">
+        <ul class="lookup-rail-list" role="listbox" aria-label="Kafka profiles">
+          @for (p of filtered(); track p.kafkaConnectionProfileId) {
+            <li role="presentation">
+              <button type="button" class="lookup-rail-item kafka-rail-item"
+                      role="option" [attr.aria-selected]="selectedId() === p.kafkaConnectionProfileId"
+                      [class.is-selected]="selectedId() === p.kafkaConnectionProfileId"
+                      (click)="select(p)">
+                <span class="kafka-rail-dot" [class]="'kafka-rail-dot ' + testTone(p).cls" [title]="testTone(p).label" aria-hidden="true"></span>
+                <span class="sr-only">{{ testTone(p).label }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key">{{ displayName(p) }}</span>
+                  <span class="lookup-rail-sub">
+                    @if (env(p); as e) { <span [class]="'kafka-rail-env kafka-rail-env-' + e.tone">{{ e.label }}</span> · }
+                    @if (canSeeWorkspace()) { {{ workspaceName(p) }} · }
+                    @if (canManage(p)) { <span class="mono">{{ p.bootstrapServers }}</span> } @else { {{ brokersText(p) }} }
+                  </span>
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
+        </ul>
+        </app-blur-loader>
+      }
+      @if (profiles().length) {
+        <p class="kafka-rail-foot" data-rail-foot>
+          {{ summary().total }} connection{{ summary().total === 1 ? '' : 's' }} · {{ summary().active }} active
+          @if (summary().failing) { · <span class="text-crit-500">{{ summary().failing }} failing last test</span> }
+        </p>
+      }
+    </aside>
+
+    <section class="lookup-detail" aria-live="polite">
+      @if (selected(); as p) {
+        <header class="lookup-detail-head">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              @if (env(p); as e) {
+                <span class="pill pill-neutral env-pill" [class.env-pill-prod]="e.key === 'prod'" [title]="'Environment: ' + e.hint">{{ e.label }}</span>
+              }
+              @if (p.isDefault) {
+                <span class="pill pill-brand" [title]="defaultHint(p)"><app-icon name="check" size="0.85em" />Default</span>
+              }
+              @if (canSeeWorkspace()) {
+                <span class="pill pill-neutral" [title]="workspaceHint(p)">
+                  <app-icon [name]="p.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
+                  {{ workspaceName(p) }}
+                </span>
+              }
+              @if (!canManage(p)) {
+                <span class="pill pill-neutral" title="The platform's connection. Your workspace uses it because it has no Kafka connection of its own: only a platform administrator changes the connection, while the topics listed here are your workspace's.">
+                  <app-icon name="lock" size="0.8em" class="opacity-70" />Platform connection
+                </span>
+              }
+              <app-status [label]="p.status" [quiet]="true" />
+            </div>
+            <div class="flex items-baseline gap-3 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [title]="p.profileName">{{ p.profileName }}</h2>
+              <span class="text-xs text-[color:var(--text-muted)] truncate"
+                    [title]="(p.createdByName ? 'Added by ' + p.createdByName : '') + (p.updatedByName ? ' · last changed by ' + p.updatedByName : '')">
+                @if (p.createdByName) { {{ p.createdByName }} }@if (p.dateCreated) { · {{ p.dateCreated | serverTime: 'date' }} }
+              </span>
+            </div>
+          </div>
+          @if (canManage(p)) {
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" class="btn btn-primary btn-sm" (click)="testConnection(p)"
+                    [disabled]="testing() === p.kafkaConnectionProfileId">
+              <app-icon name="plug" [busy]="testing() === p.kafkaConnectionProfileId" />
+              {{ testing() === p.kafkaConnectionProfileId ? 'Testing…' : 'Test connection' }}
+            </button>
+            @if (!locked()) {
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="detailMenu" aria-label="More actions">
+              <app-icon name="dots" size="1.05em" />
+            </button>
+            }
+            <ng-template #detailMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
+                  <app-icon name="edit" />Edit profile
+                </button>
+                @if (p.isDefault) {
+                  <button cdkMenuItem class="menu-item btn-intent-warn" (cdkMenuItemTriggered)="clearDefault()">
+                    <app-icon name="close" />Clear default
+                  </button>
+                } @else {
+                  <button cdkMenuItem class="menu-item btn-intent-ok" (cdkMenuItemTriggered)="setDefault(p)">
+                    <app-icon name="zap" class="icon-ok" />Set as default
+                  </button>
+                }
+                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(p)">
+                  <app-icon name="trash" class="icon-crit" />Delete profile
+                </button>
+              </div>
+            </ng-template>
+          </div>
+          }
+        </header>
+
+        @if (!canManage(p)) {
+          <p class="text-sm text-[color:var(--text-secondary)] px-5 pt-3">
+            Your workspace has no Kafka connection of its own, so its topics publish through the platform's. Add a connection
+            of your own to use your own brokers.
+          </p>
+        }
+
+        <!-- Live health first: what an operator opens this page to see. Asked when the connection is picked, then
+             every minute while the page is in view; the server keeps one answer 20 s for every open tab. -->
+        <section class="kafka-health" aria-label="Broker health" data-health>
+          <div class="kafka-health-head">
+            <span class="kafka-strip-dot" [class]="'kafka-strip-dot ' + (currentHealth()?.reachable ? 'ok' : currentHealth() ? 'crit' : '')"></span>
+            <span class="font-medium">
+              @if (currentHealth(); as h) { {{ h.reachable ? 'Brokers answering' : 'Brokers not answering' }} } @else if (healthError()) { Health unknown } @else { Checking the brokers… }
+            </span>
+            @if (currentHealth(); as h) {
+              <span class="text-xs text-[color:var(--text-muted)]">checked {{ h.checkedAt | serverTime: 'recentSec' }} · every minute</span>
+            }
+            <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="loadHealth(true)" [disabled]="healthLoading()">
+              <app-icon name="refresh" [class.spin]="healthLoading()" size="0.9em" />Recheck
+            </button>
+          </div>
+          @if (healthError()) {
+            <p class="text-sm text-crit-500 px-5 pb-3" role="alert">{{ healthError() }}</p>
+          } @else if (currentHealth(); as h) {
+            @if (!h.reachable) {
+              <p class="text-sm text-crit-500 px-5 pb-3" role="alert" data-unreachable>{{ h.reason }}</p>
+            } @else {
+              <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="3" [lgCols]="wideStrip() ? 6 : 3" align="start" size="md" label="Broker health" />
+              @if (h.partial) { <p class="text-xs text-[color:var(--text-muted)] px-5 pb-2">{{ h.partial }}</p> }
+            }
+          }
+        </section>
+
+        <div class="tabs px-3" role="tablist" aria-label="Connection">
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'topics'" [attr.aria-selected]="tab() === 'topics'"
+                  (click)="tab.set('topics')"><app-icon name="layers" size="0.9em" />Topics
+            <span class="text-[color:var(--text-muted)] font-normal">{{ topicsHere().length }}</span></button>
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'groups'" [attr.aria-selected]="tab() === 'groups'"
+                  (click)="tab.set('groups')"><app-icon name="users" size="0.9em" />Consumer groups
+            <span class="text-[color:var(--text-muted)] font-normal">{{ groups().length }}</span></button>
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'connection'" [attr.aria-selected]="tab() === 'connection'"
+                  (click)="tab.set('connection')"><app-icon name="plug" size="0.9em" />Connection</button>
+        </div>
+
+        @switch (tab()) {
+          @case ('connection') {
+        <div class="kafka-strip">
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Last test</span>
+            <span class="kafka-strip-dot" [class]="'kafka-strip-dot ' + testTone(p).cls"></span>
+            <span class="font-medium">{{ testTone(p).label }}</span>
+            @if (p.lastTestedAt) { <span class="text-[color:var(--text-muted)]">{{ p.lastTestedAt | serverTime: 'recent' }}</span> }
+            <span class="kafka-strip-msg truncate text-[color:var(--text-secondary)]"
+                  [title]="testMessage(p.lastTestMessage)">
+              {{ testMessage(p.lastTestMessage) || (p.connectionStatus === 'UNTESTED' || !p.connectionStatus ? 'Never tested — run a test to confirm the brokers answer.' : '') }}
+            </span>
+          </div>
+          <div class="kafka-strip-row">
+            <span class="kafka-strip-k">Brokers</span>
+            @if (canManage(p)) {
+              <span class="lookup-value min-w-0">
+                <span class="mono truncate" [title]="p.bootstrapServers ?? ''">{{ p.bootstrapServers }}</span>
+                <app-copy-button [value]="p.bootstrapServers ?? ''" [copied]="copiedId() === p.kafkaConnectionProfileId"
+                                 copiedLabel="Brokers copied" (copy)="copyRow(p.kafkaConnectionProfileId, p.bootstrapServers ?? '')" />
+              </span>
+            } @else {
+              <span class="text-[color:var(--text-muted)]">{{ brokersText(p) }}</span>
+            }
+            <span class="pill" [class]="'pill ' + (p.securityProtocol === 'PLAINTEXT' ? 'pill-warn' : 'pill-ok')"
+                  [title]="p.securityProtocol === 'PLAINTEXT' ? 'Unencrypted and unauthenticated — fine on a local stack, not beyond it' : 'Encrypted'">
+              @if (p.securityProtocol === 'PLAINTEXT') { <app-icon name="alert" size="0.85em" /> } @else { <app-icon name="lock" size="0.85em" /> }
+              {{ p.securityProtocol }}
+            </span>
+            @if (p.saslMechanism) {
+              <span class="pill pill-neutral" [title]="'SASL ' + p.saslMechanism + (p.saslUsername ? ' as ' + p.saslUsername : '')">
+                {{ p.saslMechanism }}@if (p.saslUsername) { · {{ p.saslUsername }} }
+              </span>
+            }
+            @if (hasMoreConnectionDetail(p)) {
+              <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="toggleDetails()"
+                      [attr.aria-expanded]="detailsOpen()">
+                <app-icon [name]="detailsOpen() ? 'chevronDown' : 'chevronRight'" size="0.9em" />
+                {{ detailsOpen() ? 'Less' : 'Details' }}
+              </button>
+            }
+          </div>
+          @if (detailsOpen() && hasMoreConnectionDetail(p)) {
+            <dl class="kafka-dl kafka-strip-more">
+              @if (p.securityProtocol === 'SSL' || p.securityProtocol === 'SASL_SSL') {
+                <dt>TLS</dt>
+                <dd class="space-y-1">
+                  <div>Hostname check
+                    <span class="pill" [class]="'pill ' + (p.sslEndpointIdentificationAlgorithm ? 'pill-ok' : 'pill-warn')">
+                      {{ p.sslEndpointIdentificationAlgorithm ? 'On' : 'Off' }}
+                    </span>
+                  </div>
+                  @if (p.sslTruststoreLocation) {
+                    <div class="text-[color:var(--text-secondary)]">Truststore <span class="mono">{{ p.sslTruststoreBucket }}/{{ p.sslTruststoreLocation }}</span></div>
+                  }
+                  @if (p.sslKeystoreLocation) {
+                    <div class="text-[color:var(--text-secondary)]">Keystore <span class="mono">{{ p.sslKeystoreBucket }}/{{ p.sslKeystoreLocation }}</span></div>
+                  }
+                  @if (!p.sslTruststoreLocation && !p.sslKeystoreLocation) {
+                    <div class="text-[color:var(--text-muted)]">No certificate files — the JVM's default trust applies.</div>
+                  }
+                </dd>
+              }
+              @if (p.saslPasswordConfigured) {
+                <dt>SASL password</dt>
+                <dd><span class="pill pill-ok">Stored</span></dd>
+              }
+              @if (p.additionalProperties?.trim()) {
+                <dt>Extra properties</dt>
+                <dd><pre class="kafka-props">{{ p.additionalProperties }}</pre></dd>
+              }
+            </dl>
+          }
+        </div>
+
+          }
+
+          @case ('groups') {
+            <section class="kafka-topics" data-groups>
+              @if (!groups().length) {
+                <div class="lookup-entries-empty">
+                  <app-icon name="users" size="1.5rem" class="icon-muted" />
+                  <p>{{ currentHealth()?.reachable ? 'No consumer group reads your topics on this connection.' : 'Groups show once the brokers answer.' }}</p>
+                  @if (currentHealth()?.reachable && topicsHere().length) {
+                    <p class="text-[color:var(--text-muted)]">A run sent to a topic nobody reads waits at Start until a worker subscribes.</p>
+                  }
+                </div>
+              } @else {
+                <div class="kafka-table-wrap">
+                  <table class="table-modern lookup-entry-table kafka-table">
+                    <thead>
+                      <tr><th>Group</th><th class="kc-state">State</th><th class="kc-members text-right">Members</th><th class="kc-topics hidden lg:table-cell">Topics</th><th class="kc-lag text-right">Lag</th></tr>
+                    </thead>
+                    <tbody>
+                      @for (g of groups(); track g.group) {
+                        <tr>
+                          <td class="kafka-cell-name"><span class="mono text-xs" [title]="g.group">{{ g.group }}</span>
+                            @if (!g.members && g.lag) { <div class="text-[11px] text-warn-500">No member is reading: the lag grows until one joins.</div> }
+                          </td>
+                          <td><span class="pill" [class]="'pill pill-' + healthTone(g.state)">{{ g.state }}</span></td>
+                          <td class="text-right tabular">{{ g.members }}</td>
+                          <td class="hidden lg:table-cell"><span class="mono text-xs kafka-cell-clip" [title]="g.topics.join(', ')">{{ g.topics.join(', ') }}</span></td>
+                          <td class="text-right tabular" [title]="g.lag + ' messages behind'">{{ compact(g.lag) }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              }
+            </section>
+          }
+
+          @default {
+        <section class="kafka-topics">
+          <div class="lookup-entries-head">
+            @if (topicsHere().length > 8) {
+              <div class="search-field max-w-64">
+                <app-icon name="search" size="0.95em" />
+                <input class="input" placeholder="Find a topic" aria-label="Find a topic"
+                       [value]="topicSearch()" (input)="setTopicSearch($any($event.target).value)" />
+              </div>
+            }
+            @if (topicsLoading()) { <app-icon name="refresh" class="spin icon-muted" size="0.9em" /> }
+            @if (topicsMatching().length !== topicsHere().length) {
+              <span class="text-xs text-[color:var(--text-muted)]">{{ topicsMatching().length }} of {{ topicsHere().length }}</span>
+            }
+            @if (!locked()) {
+            <button type="button" class="btn btn-default btn-sm ml-auto" (click)="addTopic(p)">
+              <app-icon name="plus" class="icon-ok" />Add topic
+            </button>
+            }
+          </div>
+          @if (topicsLoading() && !topicsHere().length) {
+            <div class="lookup-entries-empty"><div class="spinner" role="status" aria-label="Loading topics"></div> Loading topics…</div>
+          } @else if (topicsError()) {
+            <div class="lookup-entries-empty text-crit-500" role="alert">
+              <app-icon name="alert" size="1.5rem" />
+              <p>{{ topicsError() }}</p>
+              <button type="button" class="btn btn-default btn-sm" (click)="loadTopics()">Try again</button>
+            </div>
+          } @else if (!topicsHere().length) {
+            <div class="lookup-entries-empty">
+              <app-icon name="layers" size="1.5rem" class="icon-muted" />
+              <p>No topic publishes through this connection yet.</p>
+              <p class="text-[color:var(--text-muted)]">Add one and its pipelines publish through this connection.</p>
+            </div>
+          } @else if (!topicsShown().length) {
+            <div class="lookup-entries-empty"><p>No topic matches “{{ topicSearch() }}”.</p></div>
+          } @else {
+            <app-blur-loader [active]="topicsLoading()" label="Loading topics…">
+            <div class="kafka-table-wrap">
+              <table class="table-modern lookup-entry-table kafka-table">
+                <thead>
+                  <tr>
+                    <th>Topic</th>
+                    <th class="kc-parts hidden xl:table-cell text-right">Partitions</th>
+                    <th class="kc-read">Read by</th>
+                    <th class="kc-lag text-right">Lag</th>
+                    <th class="kc-pipes hidden xl:table-cell">Pipelines</th>
+                    <th class="kc-state">State</th>
+                    <th class="kc-act"><span class="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (row of topicsShown(); track row.type.sourceTaskTypeId) {
+                    @let live = topicHealth(row.type);
+                    <tr>
+                      <td class="kafka-cell-name">
+                        <div class="font-medium kafka-cell-clip" [title]="row.type.serviceName">{{ row.type.serviceName }}</div>
+                        <div class="lookup-value">
+                          <span class="mono text-xs text-accent kafka-cell-clip" [title]="topicOf(row.type.queueTopicPartition)">{{ topicOf(row.type.queueTopicPartition) || '—' }}</span>
+                          @if (partitionsOf(row.type.queueTopicPartition); as parts) {
+                            <span class="mono text-xs text-[color:var(--text-muted)]">{{ parts }}</span>
+                          }
+                          @if (topicOf(row.type.queueTopicPartition); as topic) {
+                            <app-copy-button [value]="topic" [copied]="copiedTopicId() === row.type.sourceTaskTypeId"
+                                             copiedLabel="Topic copied" (copy)="copyTopic(row.type.sourceTaskTypeId, topic)" />
+                          }
+                        </div>
+                        @if (topicTests()[row.type.sourceTaskTypeId!]; as test) {
+                          <div class="text-[11px] mt-0.5 kafka-cell-clip" [class]="test.unread ? 'text-warn-500' : test.ok ? 'text-ok-500' : 'text-crit-500'" [title]="test.message">
+                            {{ test.message }}
+                          </div>
+                        }
+                      </td>
+                      <td class="hidden xl:table-cell text-right tabular whitespace-nowrap">
+                        @if (live?.exists) { {{ live!.partitions }} <span class="text-[color:var(--text-muted)]">× {{ live!.replicas }}</span> } @else { — }
+                      </td>
+                      <td>
+                        @if (live && live.consumers.length) {
+                          <span class="mono text-xs kafka-cell-clip" [title]="live.consumers.map(c => c.group + ' (' + c.members + ' member(s), ' + c.state + ')').join('\n')">
+                            {{ live.consumers[0].group }}@if (live.consumers.length > 1) { <span class="text-[color:var(--text-muted)]"> +{{ live.consumers.length - 1 }}</span> }
+                          </span>
+                        } @else if (live) {
+                          <span class="text-xs text-warn-500">nobody</span>
+                        } @else {
+                          <span class="text-xs text-[color:var(--text-muted)]">—</span>
+                        }
+                      </td>
+                      <td class="text-right tabular" [title]="live ? live.lag + ' messages behind' : ''">{{ live ? compact(live.lag) : '—' }}</td>
+                      <td class="hidden xl:table-cell">
+                        @if (pipelinesOf(row.type); as list) {
+                          @if (!list.length) {
+                            <span class="text-xs text-[color:var(--text-muted)]">none yet</span>
+                          } @else if (list.length === 1) {
+                            <a class="link-inline kafka-cell-clip" [routerLink]="['/configuration/task-registry']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                               [title]="list[0].pipelineId + ' · ' + list[0].fields + ' field(s)'">{{ list[0].pipelineName }}</a>
+                          } @else {
+                            <button type="button" class="pill pill-brand hover-brand" (click)="showPipelines(row.type)"
+                                    [title]="'Show all ' + list.length + ' pipelines'">
+                              {{ list.length }} pipelines<app-icon name="chevronRight" size="0.85em" />
+                            </button>
+                          }
+                        }
+                      </td>
+                      <td>
+                        @if (live) {
+                          <span class="pill" [class]="'pill pill-' + healthTone(live.state)">{{ live.state }}</span>
+                        } @else {
+                          <app-status [label]="row.type.status || 'Active'" [quiet]="true" />
+                        }
+                      </td>
+                      <td class="text-right">
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="topicMenu"
+                                [attr.aria-label]="'Actions for ' + row.type.serviceName">
+                          <app-icon name="dots" size="1em" [busy]="testingTopic() === row.type.sourceTaskTypeId" />
+                        </button>
+                        <ng-template #topicMenu>
+                          <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                            <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="testTopic(p, row.type)">
+                              <app-icon name="plug" />Check topic
+                            </button>
+                            @if (pipelinesOf(row.type).length) {
+                              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="showPipelines(row.type)">
+                                <app-icon name="list" />Pipelines
+                              </button>
+                            }
+                            @if (!locked()) {
+                              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTopic(row.type)">
+                                <app-icon name="edit" />Edit topic
+                              </button>
+                              <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeTopic(row.type)">
+                                <app-icon name="trash" class="icon-crit" />Delete topic
+                              </button>
+                            }
+                          </div>
+                        </ng-template>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+            </app-blur-loader>
+            @if (topicPages() > 1) {
+              <div class="flex items-center justify-end gap-2 px-5 py-2 text-sm" data-topic-pager>
+                <span class="text-[color:var(--text-muted)]">Page {{ topicPage() + 1 }} of {{ topicPages() }}</span>
+                <button type="button" class="btn btn-ghost btn-sm" [disabled]="topicPage() === 0" (click)="topicPage.set(topicPage() - 1)" aria-label="Previous page">
+                  <app-icon name="chevronLeft" /></button>
+                <button type="button" class="btn btn-ghost btn-sm" [disabled]="topicPage() >= topicPages() - 1" (click)="topicPage.set(topicPage() + 1)" aria-label="Next page">
+                  <app-icon name="chevronRight" /></button>
+              </div>
+            }
+          }
+        </section>
+          }
+        }
+      } @else if (!loading() && !error()) {
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="server" size="1.6rem" class="icon-muted" />
+          <p>Pick a profile on the left.</p>
+        </div>
+      }
+    </section>
+  </div>
+</div>

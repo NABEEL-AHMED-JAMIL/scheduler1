@@ -1,0 +1,129 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Billing documents</h1>
+      <p class="page-subtitle">Every invoice, receipt, payment slip, credit note and statement. Pick one on the left to read it here.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="statement()" [disabled]="statementBusy()" [title]="'The ' + year() + ' invoices and payments as one PDF'"><app-icon name="file" [busy]="statementBusy()" />Statement {{ year() }}</button>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <app-stat-tile label="Documents" [value]="summary().documents" icon="folder" tone="info" [foot]="'in ' + year()" />
+    <app-stat-tile label="Invoices" [value]="summary().invoices" icon="file" [tone]="summary().invoices ? 'info' : 'muted'" [foot]="summary().invoices ? totals(summary().invoiced) + ' invoiced' : 'none issued'" />
+    <app-stat-tile label="Receipts" [value]="summary().receipts" icon="check" [tone]="summary().receipts ? 'ok' : 'muted'" [foot]="summary().receipts ? totals(summary().received) + ' received' : 'none yet'" />
+    <app-stat-tile label="Payment slips" [value]="summary().slips" icon="upload" [tone]="summary().slips ? 'warn' : 'muted'" [foot]="summary().slips ? 'uploaded by the workspace' : 'none uploaded'" />
+  </div>
+
+  <div class="card lookup-split">
+    <aside class="lookup-rail">
+      <div class="lookup-rail-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a number, file, person" aria-label="Find a document" [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        @if (isPlatformAdmin()) {
+          <select class="input w-full" [value]="workspaces.tenantId() ?? ''" aria-label="Workspace" (change)="pickWorkspace($any($event.target).value)">
+            <option value="">Every workspace</option>
+            @for (o of workspaces.options(); track o.value) { <option [value]="o.value">{{ o.label }}</option> }
+          </select>
+        }
+        <div class="flex items-center gap-2">
+          <select class="input min-w-0 flex-1" [value]="kind()" aria-label="Kind" (change)="kind.set($any($event.target).value)">
+            <option value="">All kinds</option>
+            @for (k of kinds; track k) { @if (counts()[k]) { <option [value]="k">{{ kindLabel[k] }} ({{ counts()[k] }})</option> } }
+          </select>
+          <select class="input w-24" [value]="year()" (change)="year.set($any($event.target).value)" aria-label="Year">
+            @for (y of years(); track y) { <option [value]="y">{{ y }}</option> }
+          </select>
+        </div>
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="clearFilters()"><app-icon name="close" />Clear filters</button>
+        }
+      </div>
+
+      @if (loading() && !rows().length) {
+        <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
+      } @else if (error()) {
+        <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
+      } @else if (!visible().length) {
+        <div class="lookup-rail-empty">
+          <app-icon name="folder" size="1.4rem" class="icon-muted" />
+          {{ hasFilters() ? 'No document matches the current filters.' : 'No document in ' + year() + ' — the first invoice PDF is made when a month is issued.' }}
+        </div>
+      } @else {
+        <ul class="lookup-rail-list" role="listbox" aria-label="Documents">
+          @for (d of visible(); track d.documentId) {
+            <li role="presentation">
+              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedId() === d.documentId" [class.is-selected]="selectedId() === d.documentId" (click)="pick(d.documentId)">
+                <span class="doc-ic">{{ glyph(d) }}</span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key is-wrap">{{ d.number || d.fileName }}</span>
+                  <span class="lookup-rail-sub">{{ kindLabel[d.kind] }}@if (d.invoiceNumber && d.kind !== 'invoice') { · for {{ d.invoiceNumber }} } · {{ d.issuedAt | serverTime: 'day' }}@if (d.amount != null) { · <span class="tabular">{{ money(d.amount, d.currency) }}</span> }</span>
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </aside>
+
+    <section class="lookup-detail" aria-live="polite">
+      @if (selected(); as d) {
+        <header class="lookup-detail-head">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="pill pill-neutral">{{ kindLabel[d.kind] }}</span>
+              @if (isPlatformAdmin() && d.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ d.tenantName }}</span> }
+              @if (d.amount != null) { <span class="pill pill-brand tabular">{{ money(d.amount, d.currency) }}</span> }
+            </div>
+            <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [title]="d.fileName">{{ d.number || d.fileName }}</h2>
+              <span class="text-xs text-[color:var(--text-muted)] min-w-0">
+                {{ d.issuedAt | serverTime: 'dateTime' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }
+                @if (d.invoiceNumber) { · for <a class="link-inline mono" [routerLink]="['/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> }
+              </span>
+            </div>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            <button type="button" class="btn btn-primary btn-sm" (click)="download(d)"><app-icon name="download" />Download</button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="docMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            <ng-template #docMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="open(d)"><app-icon name="external" />Open in a new tab</button>
+                @if (d.invoiceNumber) {
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/billing/invoices', d.invoiceNumber]"><app-icon name="file" />Open invoice {{ d.invoiceNumber }}</a>
+                }
+              </div>
+            </ng-template>
+          </div>
+        </header>
+
+        <div class="bill-preview">
+          @if (previewLoading()) {
+            <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="refresh" class="spin icon-muted" /> Reading {{ d.fileName }}…</div>
+          } @else if (previewError()) {
+            <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="alert" size="1.5rem" class="icon-crit" /><p class="text-crit-500">{{ previewError() }}</p></div>
+          } @else if (previewUrl() && previewKind() === 'pdf') {
+            <app-pdf-viewer [src]="previewUrl()" />
+          } @else if (previewUrl() && previewKind() === 'image') {
+            <div class="flex-1 overflow-auto p-4 flex"><img [src]="previewUrl()" [alt]="d.fileName" /></div>
+          } @else {
+            <div class="lookup-entries-empty lookup-detail-empty">
+              <app-icon name="file" size="1.5rem" class="icon-muted" />
+              <p>{{ d.fileName }} — {{ d.contentType || 'an unknown type' }}. Download it to read it.</p>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="lookup-entries-empty lookup-detail-empty">
+          <app-icon name="folder" size="1.5rem" class="icon-muted" />
+          <p>Pick a document to read it here.</p>
+        </div>
+      }
+    </section>
+  </div>
+</div>

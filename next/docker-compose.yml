@@ -1,0 +1,25 @@
+services:
+
+  next-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    image: next-app
+    container_name: next-app
+    ports:
+      # 4400 is not arbitrary: process/docker-compose.yml's WEBSOCKET_ALLOWED_ORIGINS default
+      # includes http://localhost:4400, and AppUserServiceImpl/TenantRequestServiceImpl default
+      # app.console.url to the same -- outgoing email links and the websocket CORS check both
+      # already assume the console lives here.
+      - "4400:80"
+    restart: unless-stopped
+    healthcheck:
+      # nginx.conf binds IPv4 only ("listen 80;", no "[::]:80"); "localhost" inside the container
+      # can resolve to ::1 first and read as connection-refused even though the IPv4 listener is
+      # fine. 127.0.0.1 sidesteps that.
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

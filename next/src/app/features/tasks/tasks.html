@@ -1,0 +1,370 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+    <h1 class="page-title">Pipelines</h1>
+    <p class="page-subtitle">
+      A pipeline describes one unit of work and where it reads and writes. Schedules point at these.
+    </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
+           Both routes behind these links are guarded, so for a tenant user they only ever led to
+           /unauthorized -- an offer the console already knows it cannot keep. -->
+      @if (auth.canManageTasks()) {
+        <a routerLink="/pipelines/bulk" class="btn btn-default btn-sm">
+          <app-icon name="upload" />Bulk import
+        </a>
+        <a routerLink="/pipelines/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New pipeline</a>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="pipelines" />
+
+  <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tasks().length"
+                   [emptyMessage]="hasFilters() ? 'No tasks match the filters.' : 'No tasks yet.'"
+                   emptyIcon="list"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="tasks" cardsIcon="layers" />
+      <!-- A platform administrator's list holds every workspace; the options are the workspaces
+           in it, so nothing offered narrows to an empty list. -->
+      @if (seesWorkspaces()) {
+        <div class="max-w-48 w-48">
+          <app-combobox id="tasks-tenant" ariaLabel="Filter by workspace" [selected]="workspaceFilter()"
+                        (selectedChange)="workspaceFilter.set($event); pager.reset()"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="workspaceOptions()" />
+        </div>
+      }
+      <!-- Topic first, then the pipelines on it -- the same two-step pick the task editor uses,
+           so the list can be narrowed the way tasks are actually organised. -->
+      <div class="max-w-48 w-48">
+        <app-combobox id="tasks-topic" ariaLabel="Filter by topic" [selected]="topicFilter()" (selectedChange)="setTopicFilter($event)"
+                      placeholder="All topics" clearLabel="All topics" [options]="topicComboOptions()" />
+      </div>
+      <div class="max-w-52 w-52">
+        <app-combobox id="tasks-pipeline" ariaLabel="Filter by pipeline" [selected]="pipelineFilter()" (selectedChange)="pipelineFilter.set($event); pager.reset()"
+                      [placeholder]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
+                      [clearLabel]="topicFilter() ? 'All pipelines on this topic' : 'All pipelines'"
+                      [options]="pipelineComboOptions()" />
+      </div>
+      <div class="search-field max-w-64">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, name, topic, pipeline or workspace' : 'Search id, name, topic or pipeline'"
+               aria-label="Search tasks"
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
+      </div>
+      <app-mine-filter [(only)]="onlyMine" />
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (task of paged(); track task.taskDetailId) {
+          <article class="card p-4 flex flex-col gap-3"
+                   [class.opacity-55]="busyTask() === task.taskDetailId">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon name="layers" /></span>
+              <!-- The title gets the header's width and two lines: on a phone the status pill beside
+                   it left about twelve characters, so it sits on the id's line instead. -->
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold line-clamp-2 break-words leading-snug" [title]="task.taskName">{{ task.taskName || '—' }}</h3>
+                <div class="flex items-center gap-2 min-w-0 mt-0.5">
+                  <span class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</span>
+                  <app-status [label]="task.taskStatus" [quiet]="true" />
+                </div>
+                <!-- Whose task it is, for the one role whose list mixes workspaces. -->
+                @if (seesWorkspaces()) {
+                  <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5" [title]="workspaceName(task)">
+                    {{ workspaceName(task) }}
+                  </div>
+                }
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <!-- Edit, Duplicate and Delete are the whole menu and all three are TENANT_ADMIN
+                     (Duplicate posts addSourceTask), so the trigger goes with them rather than
+                     opening on nothing. -->
+                @if (auth.canManageTasks()) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                          [disabled]="busyTask() === task.taskDetailId" [attr.aria-label]="'Actions for ' + task.taskName">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #cardMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines', task.taskDetailId, 'edit']">
+                        <app-icon name="edit" />Edit
+                      </a>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
+                        <app-icon name="copy" />Duplicate
+                      </button>
+                      <button cdkMenuItem class="menu-item menu-item-danger"
+                              [disabled]="task.taskStatus === 'Delete' || inUse(task)"
+                              [title]="inUse(task)
+                                ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                                : 'Delete this task'"
+                              (cdkMenuItemTriggered)="remove(task)">
+                        <app-icon name="trash" class="icon-crit" />Delete
+                        @if (task.totalLinksJobs) {
+                          <span class="pill pill-warn ml-auto">In use · {{ task.totalLinksJobs }}</span>
+                        }
+                      </button>
+                    </div>
+                  </ng-template>
+                }
+              </div>
+            </div>
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Type</dt>
+                <dd class="truncate min-w-0">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
+              </div>
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Topic</dt>
+                <dd class="mono truncate min-w-0">
+                  {{ topicOf(task.sourceTaskType?.queueTopicPartition) || '—' }}
+                </dd>
+              </div>
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Pipeline</dt>
+                <dd class="truncate min-w-0" [title]="task.pipelineId">{{ task.pipelineId || '—' }}</dd>
+              </div>
+              <!-- Where it reads and writes is the question a task card is usually opened for. -->
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Storage</dt>
+                <dd class="mono truncate min-w-0" [title]="storageFlow(task)">
+                  @if (hasStorage(task)) {
+                    @if (task.bucket) {
+                      {{ task.bucket }}
+                    } @else if (usesDefaultBucket(task)) {
+                      <span class="font-sans text-[color:var(--text-muted)] italic"
+                            title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</span>
+                    }
+                    @if (storageFlow(task); as flow) {
+                      <span class="text-[color:var(--text-muted)]"> · {{ flow }}</span>
+                    }
+                  } @else { — }
+                </dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
+              @if (task.totalLinksJobs) {
+                <span class="pill pill-neutral">
+                  <app-icon name="link" size="0.85em" />{{ task.totalLinksJobs }}
+                  {{ task.totalLinksJobs === 1 ? 'schedule' : 'schedules' }}
+                </span>
+              } @else {
+                <span class="text-[11px] text-[color:var(--text-muted)]">No schedule runs this yet</span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th class="w-8"></th>
+          <th>Pipeline</th>
+          <!-- Whose task it is, beside its name, for the one role whose list mixes workspaces. It waits
+               for xl like Type; the cards and the Workspace filter carry it on a narrower screen. -->
+          @if (seesWorkspaces()) {
+            <th class="hidden xl:table-cell">Workspace</th>
+          }
+          <!-- Type waits for xl: at 1024 it pushed Status and the row menu off the card, and the
+               Topic beside it already says where the work goes. -->
+          <th class="hidden xl:table-cell">Type</th>
+          <th>Topic</th>
+          <th>Pipeline</th>
+          <th>Storage</th>
+          <!-- Metadata, not identity: hidden until there is width for it, so Status and the
+               row menu stay on screen instead of behind a horizontal scrollbar. -->
+          <th class="hidden 2xl:table-cell">Created by</th>
+          <th class="hidden 2xl:table-cell">Updated by</th>
+          <th class="text-right">Status</th>
+          <!-- Pinned, so a long topic or bucket name can never push the menu off-screen again. -->
+          <th class="w-16 col-pin-right"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (task of paged(); track task.taskDetailId) {
+          <tr>
+            <td>
+              <button type="button" class="btn btn-ghost btn-icon btn-xs"
+                      (click)="toggleRow(task)"
+                      [attr.aria-expanded]="expanded().has(task.taskDetailId)"
+                      [attr.aria-label]="expanded().has(task.taskDetailId) ? 'Hide payload' : 'Show payload'">
+                <app-icon [name]="expanded().has(task.taskDetailId) ? 'chevronDown' : 'chevronRight'" />
+              </button>
+            </td>
+            <td class="max-w-64">
+              <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName || '—' }}</div>
+              <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
+            </td>
+            @if (seesWorkspaces()) {
+              <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate"
+                  [title]="workspaceName(task)">{{ workspaceName(task) }}</td>
+            }
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate">
+              {{ task.sourceTaskType?.serviceName || '—' }}
+            </td>
+            <td>
+              @if (topicOf(task.sourceTaskType?.queueTopicPartition); as topic) {
+                <span class="mono text-[color:var(--text-secondary)]">{{ topic }}</span>
+              } @else { — }
+            </td>
+            <td class="text-[color:var(--text-secondary)] max-w-40 truncate"
+                [title]="task.pipelineId">{{ task.pipelineId || '—' }}</td>
+            <td class="text-[color:var(--text-secondary)]">
+              @if (hasStorage(task)) {
+                @if (task.bucket) {
+                  <div class="mono whitespace-nowrap">{{ task.bucket }}</div>
+                } @else if (usesDefaultBucket(task)) {
+                  <div class="text-xs text-[color:var(--text-muted)] italic"
+                       title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</div>
+                }
+                @if (storageFlow(task); as flow) {
+                  <div class="mono text-[color:var(--text-muted)]">{{ flow }}</div>
+                }
+              } @else { — }
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ task.createdByName || '—' }}
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ task.updatedByName || '—' }}
+            </td>
+            <td class="text-right"><app-status [label]="task.taskStatus" [quiet]="true" /></td>
+            <td class="text-right col-pin-right">
+              @if (auth.canManageTasks()) {
+                <div class="flex items-center justify-end gap-1 whitespace-nowrap">
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="taskMenu"
+                          [disabled]="busyTask() === task.taskDetailId" [attr.aria-label]="'Actions for ' + task.taskName">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                </div>
+                <ng-template #taskMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines', task.taskDetailId, 'edit']">
+                      <app-icon name="edit" />Edit
+                    </a>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(task)">
+                      <app-icon name="copy" />Duplicate
+                    </button>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            [disabled]="task.taskStatus === 'Delete' || inUse(task)"
+                            [title]="inUse(task)
+                              ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                              : 'Delete this task'"
+                            (cdkMenuItemTriggered)="remove(task)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                      @if (task.totalLinksJobs) {
+                        <span class="pill pill-warn ml-auto">In use · {{ task.totalLinksJobs }}</span>
+                      }
+                    </button>
+                  </div>
+                </ng-template>
+              }
+            </td>
+          </tr>
+
+          @if (expanded().has(task.taskDetailId)) {
+            <tr class="bg-sunken">
+              <td></td>
+              <!-- One leading cell plus this: together they must equal the header count, which
+                   grew to ten when Created by and Updated by were added, and to eleven with a
+                   platform administrator's Workspace column. -->
+              <td [attr.colspan]="seesWorkspaces() ? 10 : 9" class="!py-3">
+                @if (task.taskPayload) {
+                  <div class="flex items-center gap-2 mb-1.5">
+                    <app-icon name="file" size="0.9em" class="icon-muted" />
+                    <span class="text-xs font-semibold">Payload</span>
+                    @if (task.totalLinksJobs) {
+                      <span class="pill pill-neutral">{{ task.totalLinksJobs }} schedule{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
+                    }
+                    <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(task)">
+                      <app-icon [name]="copiedId() === task.taskDetailId ? 'check' : 'copy'"
+                                [class.icon-ok]="copiedId() === task.taskDetailId" size="0.85em" />
+                      {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}
+                    </button>
+                  </div>
+                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
+                      >{{ task.taskPayload }}</pre>
+                } @else {
+                  <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
+                }
+
+                @if (task.totalLinksJobs) {
+                  <div class="flex items-center gap-2 mt-4 mb-1.5">
+                    <app-icon name="briefcase" size="0.9em" class="icon-muted" />
+                    <span class="text-xs font-semibold">Schedules that run this pipeline</span>
+                    @if (linkedLoading() === task.taskDetailId) {
+                      <app-icon name="refresh" size="0.85em" class="spin icon-muted" />
+                    }
+                  </div>
+
+                  @if (linkedJobs()[task.taskDetailId]; as jobs) {
+                    @if (jobs.length) {
+                      <!-- A raised surface inside the drawer, not a transparent one: the
+                           table's sticky header is painted --surface-raised, so leaving the
+                           wrapper transparent put a white header on a grey body and the
+                           inner table read as floating at the same level as the outer one. -->
+                      <div class="rounded border overflow-hidden border-subtle bg-raised">
+                        <div class="overflow-y-auto max-h-64">
+                          <table class="table-modern">
+                            <thead>
+                              <tr>
+                                <th>Schedule</th>
+                                <th>Execution</th>
+                                <th>Last run</th>
+                                <th>Run status</th>
+                                <th class="text-right">State</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              @for (job of jobs; track job.jobId) {
+                                <tr>
+                                  <td class="max-w-64">
+                                    <a class="link-inline truncate" [routerLink]="['/pipelines/schedules', job.jobId, 'edit']"
+                                       [title]="job.jobName">
+                                      <app-icon name="link" size="0.8em" class="icon-info" />{{ job.jobName }}
+                                    </a>
+                                    <div class="mono text-[color:var(--text-muted)]">#{{ job.jobId }}</div>
+                                  </td>
+                                  <td><span class="pill pill-neutral">{{ job.execution || '—' }}</span></td>
+                                  <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                                    {{ job.lastJobRun ? (job.lastJobRun | serverTime: 'recent') : 'Never' }}
+                                  </td>
+                                  <td><app-status [label]="job.jobRunningStatus || '—'" /></td>
+                                  <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
+                                </tr>
+                              }
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    } @else {
+                      <p class="text-xs text-[color:var(--text-muted)]">
+                        Could not read the schedules for this pipeline.
+                      </p>
+                    }
+                  }
+                }
+              </td>
+            </tr>
+          }
+        }
+      </tbody>
+    </table>
+    }
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>

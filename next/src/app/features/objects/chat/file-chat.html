@@ -1,0 +1,249 @@
+<div class="fixed bottom-4 right-4 z-50 w-[32rem] max-w-[calc(100vw-2rem)] card shadow-2xl
+            flex flex-col overflow-hidden" role="region" [attr.aria-label]="'Chat about ' + fileName()"
+     [style.height]="minimized() ? 'auto' : 'min(38rem, calc(100vh - 3rem))'">
+
+  <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle"
+      >
+    <span class="text-sm font-medium mr-auto truncate" [title]="fileName()">{{ fileName() }}</span>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="viewRequested.emit()"><app-icon name="eye" />View</button>
+    <button type="button" class="btn btn-ghost btn-icon"
+            (click)="minimized.set(!minimized())" [attr.aria-expanded]="!minimized()"
+            [attr.aria-label]="minimized() ? 'Expand' : 'Minimise'">
+      <app-icon [name]="minimized() ? 'chevronRight' : 'chevronDown'" />
+    </button>
+    <button type="button" class="btn btn-ghost btn-icon" (click)="close()" [disabled]="closing()"
+            aria-label="Close"><app-icon name="close" /></button>
+  </div>
+
+  @if (!minimized()) {
+    <div class="flex items-center gap-2 px-3.5 py-2 border-b text-xs shrink-0 border-subtle"
+        >
+      <label class="text-[color:var(--text-muted)]" for="agent">Agent</label>
+      <select id="agent" class="input py-1 text-xs max-w-56"
+              [value]="agentId() ?? ''"
+              (change)="onAgentChange(+$any($event.target).value)"
+              [disabled]="!agents().length">
+        @if (!agents().length) { <option value="">No usable agents</option> }
+        @for (agent of agents(); track agent.aiAgentId) {
+          <option [value]="agent.aiAgentId">{{ agent.agentName }} · {{ agent.provider }}</option>
+        }
+      </select>
+    </div>
+
+    <div #scroller class="flex-1 overflow-y-auto px-3.5 py-3 space-y-3 min-h-0">
+      @if (preparing()) {
+        <p class="text-center text-sm text-[color:var(--text-muted)] py-8">Reading the file…</p>
+      } @else if (prepareError()) {
+        <!-- The error is shown, but it is not an exit. When no agent matches this file's type
+             loadAgents deliberately offers every usable one and selects the first, so the agent
+             the backend would have accepted is usually sitting in the picker above; disabling the
+             composer on this error also removed the only reason to go and change it, and left the
+             reader looking at a dropdown they could see but could not act on. -->
+        <div class="text-center py-8 space-y-1">
+          <p class="text-sm text-crit-500">{{ prepareError() }}</p>
+          @if (agents().length > 1) {
+            <p class="text-xs text-[color:var(--text-muted)]">Choosing another agent above may work.</p>
+          }
+        </div>
+      } @else {
+        <!-- The server has always known when a file overruns what the model can read, and the
+             UI has always dropped it. Someone asking "summarise this" deserves to know the
+             summary covers the opening section, before they ask rather than after. -->
+        @if (coverage()?.truncated) {
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs bg-warn-500/12">
+            <app-icon name="alert" class="icon-warn mt-0.5 shrink-0" size="0.85em" />
+            <span class="text-[color:var(--text-secondary)]">
+              This file is longer than the model can read at once. Answers cover the first
+              {{ coverage()!.charsUsed | number }} of
+              {{ coverage()!.totalChars | number }} characters.
+            </span>
+          </div>
+        } @else if (coverage()?.usingRetrieval) {
+          <!-- Distinct from the truncation warning above, and mutually exclusive with it: this
+               file isn't being cut short, but answers are drawn from indexed excerpts judged
+               relevant to each question rather than the whole text every time. -->
+          <!-- Theme tokens: brand-500 is near-black and vanished, tint and icon both, in dark. -->
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-xs bg-accent-soft">
+            <app-icon name="info" class="icon-info mt-0.5 shrink-0" size="0.85em" />
+            <span class="text-[color:var(--text-secondary)]">
+              Answers are drawn from indexed excerpts of this file most relevant to each question.
+            </span>
+          </div>
+        }
+        @if (!messages().length) {
+          <p class="text-center text-sm text-[color:var(--text-muted)] py-8">
+            Ask something about this file to get started.
+          </p>
+        }
+      }
+
+      @for (message of messages(); track $index; let mi = $index) {
+        @if (message.role === 'user') {
+            <!-- The person's own picture, the same one the header shows, so a transcript reads
+                 as a conversation rather than two anonymous columns. items-end keeps the avatar
+                 beside the last line of a long message, not floating at the top. -->
+            <div class="flex justify-end items-end gap-2">
+              <div class="max-w-[85%] flex flex-col items-end gap-1">
+                <!-- The primary-button pair, not raw brand-500: after the monochrome rebrand
+                     brand-500 sits at 1.21:1 against the dark panel, so the bubble outline that
+                     tells the user's turn from the assistant's disappeared and the thread read
+                     as one column. These two tokens are the ones defined to invert in dark. -->
+                <div class="rounded-lg rounded-br-sm px-3 py-2 text-sm whitespace-pre-wrap
+                            break-words bg-[color:var(--btn-primary-bg)]
+                            text-[color:var(--btn-primary-fg)]">
+                  {{ message.text }}
+                </div>
+                @if (message.at) {
+                  <time class="text-[11px] text-[color:var(--text-muted)] px-1"
+                        [attr.datetime]="message.at">{{ formatTime(message.at) }}</time>
+                }
+              </div>
+              <app-avatar [bucket]="auth.user()?.avatarBucket" [key]="auth.user()?.avatarKey"
+                          [name]="auth.displayName()" [size]="1.5" class="shrink-0" />
+            </div>
+        } @else if (message.role === 'error') {
+          <div class="flex items-start gap-2 rounded-lg px-3 py-2 text-sm bg-crit-500/12">
+            <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />
+            <span class="text-crit-500 min-w-0 break-words">{{ message.text }}</span>
+            <!-- Also disabled while there is nothing to send to: retry() drops the failed
+                 exchange before asking again, so a Retry that cannot go anywhere is a button
+                 offering to delete the question. -->
+            <button type="button" class="btn btn-ghost btn-sm ml-auto shrink-0"
+                    [disabled]="sending() || preparing() || agentId() === null"
+                    [title]="agentId() === null ? 'Choose an agent first' : 'Ask again'"
+                    (click)="retry()">
+              <app-icon name="refresh" />Retry
+            </button>
+          </div>
+        } @else {
+            <div class="group flex items-start gap-2">
+              <!-- A glyph, not a picture: the assistant has no profile, and giving it a face
+                   invites the reader to treat its answers as somebody's. Tinted from the accent
+                   so it carries in both themes. -->
+              <span class="shrink-0 grid place-items-center rounded-full size-6 mt-0.5 bg-accent-soft text-accent"
+                    aria-hidden="true">
+                <app-icon name="sparkle" size="0.8em" />
+              </span>
+              <div class="min-w-0 flex-1">
+            <div class="rounded-lg rounded-bl-sm px-3 py-2 text-sm max-w-[92%] break-words bg-sunken"
+                >
+              <app-markdown [source]="message.text" />
+            </div>
+
+            @if (message.files?.length) {
+              <div class="flex flex-wrap gap-1.5 mt-1.5">
+                @for (file of message.files; track file.filename) {
+                  <!-- Busy state is keyed by reply + file name: every reply's first CSV is called
+                       <base>-export.csv, so a name alone marked the chip in every earlier reply. -->
+                  <button type="button" class="btn btn-ghost btn-sm"
+                          [disabled]="converting() === busyKey(mi, file)"
+                          (click)="download(file, mi)"
+                          [title]="file.pendingExport
+                             ? 'Converted to ' + file.pendingExport.targetFormat + ' before download'
+                             : 'Download ' + file.filename">
+                    <app-icon [name]="converting() === busyKey(mi, file) ? 'refresh' : 'download'"
+                              [class.spin]="converting() === busyKey(mi, file)"
+                              class="icon-info" size="0.85em" />
+                    {{ converting() === busyKey(mi, file) ? 'Converting…' : file.filename }}
+                  </button>
+                  <!-- The second way out. A download is no use to a reader on a machine that
+                       blocks them, or on a phone; the server converts identically either way. -->
+                  <button type="button" class="btn btn-ghost btn-sm"
+                          [disabled]="!!emailing() || !!converting()"
+                          (click)="emailExport(file, mi)"
+                          [title]="'Email ' + file.filename + ' as an attachment'">
+                    <app-icon name="send" [busy]="emailing() === busyKey(mi, file)"
+                              class="icon-info" size="0.85em" />
+                    {{ emailing() === busyKey(mi, file) ? 'Sending…' : 'Email' }}
+                  </button>
+                }
+              </div>
+            }
+            <!-- Hover-revealed from sm up only: a phone has no hover, and the only way to copy,
+                 email or regenerate an answer there was to tap buttons it could not see. -->
+            <div class="flex items-center gap-1 mt-1 sm:opacity-0 sm:group-hover:opacity-100
+                        focus-within:opacity-100 transition-opacity">
+              <button type="button" class="btn btn-default btn-sm" (click)="copyMessage($index, message.text)">
+                <app-icon [name]="copiedIndex() === $index ? 'check' : 'copy'"
+                          [class.icon-ok]="copiedIndex() === $index" size="0.85em" />
+                {{ copiedIndex() === $index ? 'Copied' : 'Copy' }}
+              </button>
+              <!-- Emailing belongs on EVERY answer, not only on one that happened to carry a
+                   fenced file. It first sat on the attachment chip row, inside
+                   @if (message.files?.length), so an ordinary reply -- which is most of them --
+                   offered no way to send it anywhere at all. -->
+              <button type="button" class="btn btn-default btn-sm"
+                      [disabled]="!!emailing()"
+                      (click)="emailAnswer(message.text, $index)"
+                      title="Email this answer as a PDF attachment">
+                <app-icon name="send" [busy]="emailing() === 'answer-' + $index" size="0.85em" />
+                {{ emailing() === 'answer-' + $index ? 'Sending…' : 'Email' }}
+              </button>
+              @if ($index === messages().length - 1) {
+                <button type="button" class="btn btn-default btn-sm"
+                        [disabled]="sending() || preparing() || agentId() === null"
+                        (click)="retry()"
+                        [title]="agentId() === null ? 'Choose an agent first' : 'Ask again'">
+                  <app-icon name="refresh" size="0.85em" />Regenerate
+                </button>
+              }
+            </div>
+                @if (message.at) {
+                  <time class="text-[11px] text-[color:var(--text-muted)] px-1 mt-1 inline-block"
+                        [attr.datetime]="message.at">{{ formatTime(message.at) }}</time>
+                }
+              </div>
+          </div>
+        }
+      }
+
+      @if (sending()) {
+        <div class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]">
+          <span class="typing"><span></span><span></span><span></span></span>
+          <span>Thinking…</span>
+          <button type="button" class="btn btn-ghost btn-sm ml-1" (click)="stop()">
+            <app-icon name="close" size="0.85em" />Stop
+          </button>
+        </div>
+      }
+    </div>
+
+    @if (!preparing() && !prepareError() && !messages().length) {
+      <div class="flex flex-wrap gap-1.5 px-3.5 pb-2 shrink-0">
+        @for (suggestion of suggestions; track suggestion) {
+          <button type="button" class="pill pill-neutral hover-brand"
+                  (click)="send(suggestion)">{{ suggestion }}</button>
+        }
+      </div>
+    }
+
+    <div class="flex gap-2 px-3.5 py-2.5 border-t shrink-0 border-subtle">
+      <!-- Only `preparing()` disables these two. A prepare that came back with an error is not a
+           dead end -- changing agent re-runs prepare() and can clear it -- and locking the
+           composer on it took away the reason to bother. -->
+      <textarea #composer class="input resize-none text-sm" rows="1" placeholder="Message"
+                [attr.aria-label]="'Message about ' + fileName()"
+                [value]="draft()" (input)="draft.set($any($event.target).value)"
+                (keydown)="onKeydown($event)"
+                [disabled]="preparing()"></textarea>
+      @if (voiceSupported) {
+        <button type="button" class="btn btn-ghost btn-icon btn-sm self-end"
+                [class.btn-intent-crit]="listening()"
+                [disabled]="preparing()"
+                (click)="toggleMic()"
+                [attr.aria-label]="listening() ? 'Stop dictating' : 'Dictate a message'"
+                [title]="listening() ? 'Listening — click to stop' : 'Dictate a message'">
+          <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
+        </button>
+      }
+      <button type="button" class="btn btn-primary btn-sm self-end"
+              [disabled]="sending() || !draft().trim()" (click)="send()">Send</button>
+    </div>
+  }
+
+  <!-- An answer arriving is otherwise a purely visual event: a bubble appears at the foot of a
+       scrolling list, and nothing tells a reader who is not watching the panel that the question
+       was answered at all. Outside the minimised check on purpose -- a reply that lands while the
+       panel is collapsed is exactly the one nobody can see. -->
+  <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">{{ announcement() }}</div>
+</div>

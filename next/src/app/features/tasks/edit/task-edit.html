@@ -1,0 +1,216 @@
+<div class="page-form">
+  <div>
+    <a routerLink="/pipelines" class="text-sm text-accent hover:underline">← Back to pipelines</a>
+    <h1 class="page-title mt-1">
+      {{ isEdit() ? 'Edit pipeline' : 'New pipeline' }}
+    </h1>
+    <p class="page-subtitle">
+      A pipeline describes one unit of work and where it reads and writes.
+    </p>
+  </div>
+  <app-managed-banner what="pipelines" />
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (loadError()) {
+    <div class="card">
+      <app-load-error [message]="loadError()" [retryable]="!loadMissing()" (retry)="retryLoad()">
+        @if (loadMissing()) {
+          <a routerLink="/pipelines" class="btn btn-default btn-sm mt-4">Back to pipelines</a>
+        }
+      </app-load-error>
+    </div>
+  } @else {
+    <!-- MIG-249: a pipeline with steps is edited as steps; Details is today's form, unchanged. A legacy pipeline
+         shows no tabs at all -- the page below is the whole of it, as before. -->
+    @if (stepsMode()) {
+      <div class="tabs" role="tablist" aria-label="Pipeline">
+        @for (t of pageTabs; track t.id) {
+          <button type="button" role="tab" class="tab" [class.tab-active]="activeTab() === t.id" [attr.aria-selected]="activeTab() === t.id"
+                  (click)="setTab(t.id)">{{ t.label }}</button>
+        }
+      </div>
+    }
+    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
+      <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
+      <fieldset class="form-lock" [disabled]="locked()">
+      <div class="form-section">
+        <h2 class="form-section-title">Basics</h2>
+        <div class="form-grid">
+          <app-field label="Pipeline name" for="taskName" [required]="true"
+                     [control]="form.get('taskName')" [submitted]="submitted()">
+            <input id="taskName" class="input" formControlName="taskName"
+                   placeholder="Daily orders import" />
+          </app-field>
+
+          <app-field label="Kafka connection" for="taskProfile"
+                     hint="The connection the topic publishes through. Pick it first; its topics come next.">
+            <app-combobox id="taskProfile" [selected]="selectedProfileId()" [selectedLabel]="selectedProfileLabel()" (selectedChange)="pickProfile($event)"
+                          placeholder="Search connections…" clearLabel="None"
+                          [options]="profileOptions()" />
+          </app-field>
+
+          <app-field label="Topic" for="taskType" [required]="true"
+                     [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
+                     [hint]="topicsLoading() ? 'Loading this connection’s topics…' : 'Where this pipeline publishes. The registry tasks on it come next.'">
+            <app-combobox id="taskType" formControlName="sourceTaskTypeId" [numeric]="true"
+                          [placeholder]="selectedProfileId() == null ? 'Pick a Kafka connection first' : 'Search this connection’s topics…'"
+                          clearLabel="None" [selectedLabel]="loadedTopicLabel()"
+                          [options]="topicOptions()" />
+          </app-field>
+
+          <!-- "Registry task", not "Pipeline": this page's own record is the pipeline (UI review U11). -->
+          <app-field label="Registry task" for="pipeline" [control]="form.get('pipelineId')"
+                     [submitted]="submitted()" [hint]="pipelineHint()">
+            <app-combobox id="pipeline" formControlName="pipelineId"
+                          [placeholder]="selectedTopicId() == null ? 'Pick a topic first' : 'Search this topic’s registry tasks…'"
+                          clearLabel="None"
+                          [options]="pipelineOptions()" />
+          </app-field>
+
+          <app-field label="Group" for="group" [control]="form.get('groupId')"
+                     [submitted]="submitted()">
+            <app-combobox id="group" formControlName="groupId"
+                          placeholder="Search groups…" clearLabel="None"
+                          [options]="groupOptions()" />
+          </app-field>
+
+          <app-field label="Home page" for="homePage" [control]="form.get('homePageId')"
+                     [submitted]="submitted()" hint="Where users land after a run of this pipeline completes.">
+            <app-combobox id="homePage" formControlName="homePageId"
+                          placeholder="Search home pages…" clearLabel="None"
+                          [options]="homePageOptions()" />
+          </app-field>
+
+          <app-field label="Status" for="taskStatus" [required]="true"
+                     [control]="form.get('taskStatus')" [submitted]="submitted()">
+            <select id="taskStatus" class="input" formControlName="taskStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </app-field>
+        </div>
+      </div>
+
+      <!-- What this pipeline actually asks for, when somebody has described it under
+           Settings > Task forms. Above the tag table because it is the thing to fill in; the
+           tags are what it produces. -->
+      @if (formLoading()) {
+        <div class="form-section">
+          <p class="text-sm text-[color:var(--text-muted)]">Checking for a form&hellip;</p>
+        </div>
+      } @else if (pipelineDef(); as def) {
+        <div class="form-section">
+          <!-- Wraps rather than squeezes: on a phone the pill drops below and the name and
+               description keep the full width; wherever both fit, the pill stays beside them. -->
+          <div class="flex flex-wrap items-start gap-2 mb-3">
+            <div class="flex-1 basis-60 min-w-0">
+              <h2 class="form-section-title mb-0">{{ def.pipelineName }}</h2>
+              @if (def.description) {
+                <p class="text-sm text-[color:var(--text-muted)] mt-0.5">{{ def.description }}</p>
+              }
+            </div>
+            <span class="pill pill-brand shrink-0">Defined for {{ def.pipelineId }}</span>
+          </div>
+
+          <div class="form-grid" formGroupName="formData">
+            @for (field of formFields(); track controlName(field)) {
+              @if (field.fieldType === 'ai') {
+                <!-- Not an input: the pipeline runs this before dispatch and writes the answer to
+                     the tag. Shown so the operator knows what the task will carry; not editable
+                     per task -- that is the point of it living on the pipeline. -->
+                <div class="ai-step-card md:col-span-2">
+                  <app-icon name="sparkle" class="icon-brand shrink-0" />
+                  <div class="min-w-0 flex-1">
+                    <div class="text-sm font-medium">{{ field.label }} <span class="pill pill-brand ml-1">AI step</span></div>
+                    <div class="text-xs text-[color:var(--text-secondary)] mt-0.5">
+                      Runs <b>{{ field.promptName || 'a prompt' }}</b> {{ field.runIn === 'worker' ? 'in the worker' : 'before dispatch' }} and writes the answer to
+                      <span class="mono">&lt;{{ field.tagKey }}&gt;</span>@if (aiStepReads(field); as reads) { , reading {{ reads }} }.
+                      @if (field.onError === 'continue') { If it fails the run continues with the tag empty. } @else { If it fails, the run fails. }
+                    </div>
+                  </div>
+                </div>
+              } @else {
+              <app-field [label]="field.label" [for]="'ff-' + controlName(field)"
+                         [control]="formData.get(controlName(field))"
+                         [submitted]="submitted()" [required]="field.required"
+                         [hint]="field.helpText || ''"
+                         [class]="field.fieldType === 'textarea' ? 'md:col-span-2' : ''">
+                @switch (field.fieldType) {
+                  @case ('textarea') {
+                    <textarea [id]="'ff-' + controlName(field)" class="input" rows="3"
+                              [formControlName]="controlName(field)"
+                              (input)="syncFormToTags()"></textarea>
+                  }
+                  @case ('select') {
+                    <select [id]="'ff-' + controlName(field)" class="input"
+                            [formControlName]="controlName(field)"
+                            (change)="syncFormToTags()">
+                      <option value="">None</option>
+                      <!-- Tracked by index rather than by the choice itself: a form is free to
+                           offer two options with the same label, and tracking on the string
+                           collided on Angular's duplicate-key check. -->
+                      @for (choice of fieldChoices(field); track $index) {
+                        <option [value]="choice.value">{{ choice.label }}</option>
+                      }
+                    </select>
+                  }
+                  @case ('checkbox') {
+                    <label class="flex items-center gap-2 text-sm">
+                      <input type="checkbox" class="checkbox" [id]="'ff-' + controlName(field)"
+                             [formControlName]="controlName(field)"
+                             (change)="syncFormToTags()" />
+                      Yes
+                    </label>
+                  }
+                  @default {
+                    <input [id]="'ff-' + controlName(field)" class="input"
+                           [type]="field.fieldType === 'number' ? 'number'
+                                 : field.fieldType === 'date' ? 'date'
+                                 : field.fieldType === 'url' ? 'url' : 'text'"
+                           [formControlName]="controlName(field)"
+                           (input)="syncFormToTags()" />
+                  }
+                }
+              </app-field>
+              }
+            }
+          </div>
+
+          <p class="text-xs text-[color:var(--text-muted)] mt-3">
+            The payload sent to the pipeline is generated from these answers when you save &mdash;
+            there is nothing else to configure.
+          </p>
+        </div>
+      } @else if (!loading()) {
+        <!-- No form exists for the chosen pipeline (or none is chosen yet). A pipeline is only
+             ever defined by creating its form now, so this is the fallback for a pipeline that
+             predates one, not a second way to configure a pipeline that has one. -->
+        <div class="form-section">
+          <h2 class="form-section-title">Payload</h2>
+          <app-field label="XML configuration" for="payload" [required]="true"
+                     [control]="form.get('taskPayload')" [submitted]="submitted()"
+                     hint="This pipeline has no form, so this is sent to the consumer as-is. Define the pipeline’s fields under Configuration › Task Registry to fill this in field by field instead.">
+            <textarea id="payload" class="input mono text-xs resize-y min-h-40"
+                      formControlName="taskPayload"
+                      placeholder="&lt;pipeline&gt;...&lt;/pipeline&gt;"></textarea>
+          </app-field>
+        </div>
+      }
+
+      </fieldset>
+      <div class="form-actions">
+        <a routerLink="/pipelines" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
+        <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
+          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create pipeline') }}
+        </button>
+      </div>
+    </form>
+    @if (stepsMode() && stepsView(); as view) {
+      <app-step-builder [class.hidden]="activeTab() === 'details'" [view]="view" [tab]="builderTab()" [taskDetailId]="taskIdNumber()"
+                        [canManage]="!locked()" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
+    }
+  }
+</div>

@@ -1,0 +1,204 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <!-- The heading follows the tab: /workflows/requests is titled "My requests" and read "Task inbox" (UI review U11). -->
+      @if (tab() === 'requests') {
+        <h1 class="page-title">My requests</h1>
+        <p class="page-subtitle">What you asked for, newest first, and where each request stands. Open one to see its history.</p>
+      } @else {
+        <h1 class="page-title">Task inbox</h1>
+        <p class="page-subtitle">Approvals and tasks for you or your groups, the soonest due first. Open one to see the request, its history, and decide.</p>
+      }
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      <div class="seg" role="tablist" aria-label="Which tasks">
+        <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'mine'" [class.seg-on]="tab() === 'mine'" (click)="pick('mine')" data-test="tab-mine">
+          Mine ({{ mineCount() }})</button>
+        <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'groups'" [class.seg-on]="tab() === 'groups'" (click)="pick('groups')" data-test="tab-groups">
+          My groups ({{ groupsCount() }})</button>
+        <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'done'" [class.seg-on]="tab() === 'done'" (click)="pick('done')" data-test="tab-done">Done</button>
+        <button type="button" class="seg-btn" role="tab" [attr.aria-selected]="tab() === 'requests'" [class.seg-on]="tab() === 'requests'" (click)="pick('requests')" data-test="tab-requests">
+          My requests</button>
+      </div>
+      <button type="button" class="btn btn-default btn-sm" (click)="load()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+      @if (auth.canOpen('workflow-designer')) {
+        <a routerLink="/workflows/designer" class="btn btn-default btn-sm"><app-icon name="layers" />Workflow designer</a>
+      }
+    </div>
+  </div>
+
+  @if (error()) {
+    <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}</p>
+  }
+
+  <div class="inbox-grid">
+    <!-- The list -->
+    <section class="card overflow-clip" aria-label="Tasks">
+      @if (tab() !== 'requests') {
+        @for (t of rows(); track t.id) {
+          <button type="button" class="inbox-row" [class.is-on]="selectedTask() === t.id" (click)="openTask(t.id)" [attr.data-task]="t.id">
+            <app-icon [name]="t.stepType === 'approval' ? 'checkCircle' : 'list'" class="icon-muted shrink-0 mt-0.5" />
+            <span class="min-w-0 flex-1">
+              <span class="block font-medium text-sm truncate">{{ t.name }}</span>
+              <span class="block text-xs text-[color:var(--text-muted)] truncate">{{ t.workflowName }}</span>
+              <span class="block text-xs text-[color:var(--text-secondary)] truncate">{{ t.requestTitle }}</span>
+              @if (t.standingInFor) { <span class="block text-xs text-[color:var(--text-muted)]">Standing in for {{ name(t.standingInFor) }}</span> }
+            </span>
+            <span class="text-right shrink-0">
+              <app-status [label]="stateLabel(t)" [quiet]="true" />
+              <span class="block text-xs mt-1" [class.text-crit-500]="t.overdue" [class.text-[color:var(--text-muted)]]="!t.overdue">{{ dueLabel(t) }}</span>
+            </span>
+          </button>
+        } @empty {
+          <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">
+            @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading your tasks… }
+            @else if (tab() === 'mine') { Nothing is waiting for you. }
+            @else if (tab() === 'groups') { Nothing is waiting for your groups. }
+            @else { You have not acted on any task yet. }
+          </div>
+        }
+        @if (listCapped()) {
+          <!-- P2 #31: the list stops at the service's limit; say so rather than pass it off as all. -->
+          <p class="px-4 py-3 border-t border-subtle text-xs text-[color:var(--text-muted)]" data-capped>
+            {{ tab() === 'done' ? 'The ' + rows().length + ' you acted on most recently.' : 'The ' + rows().length + ' due soonest; act on these and the rest move up.' }}
+          </p>
+        }
+      } @else {
+        @for (r of requests(); track r.id) {
+          <button type="button" class="inbox-row" [class.is-on]="selectedRequest() === r.id" (click)="openRequest(r.id)" [attr.data-request]="r.id">
+            <app-icon name="send" class="icon-muted shrink-0 mt-0.5" />
+            <span class="min-w-0 flex-1">
+              <span class="block font-medium text-sm truncate">{{ r.title }}</span>
+              <span class="block text-xs text-[color:var(--text-muted)] truncate">{{ r.workflowName }}</span>
+            </span>
+            <span class="text-right shrink-0"><app-status [label]="r.state" [quiet]="true" /></span>
+          </button>
+        } @empty {
+          <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">You have not started any request.</div>
+        }
+      }
+    </section>
+
+    <!-- The task, or the request -->
+    @if (tab() !== 'requests') {
+      <section class="card p-4 flex flex-col gap-4 min-w-0" aria-label="Task" data-test="task-detail">
+        @if (detail(); as d) {
+          <div class="flex items-start gap-3">
+            <div class="min-w-0 flex-1">
+              <h2 class="text-base font-semibold">{{ d.name }}</h2>
+              <p class="text-sm text-[color:var(--text-muted)]">{{ d.workflowName }} · {{ d.requestTitle }}</p>
+              <p class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                With {{ holder(d) }} · {{ dueLabel(d) }}@if (d.standingInFor) { · you stand in for {{ name(d.standingInFor) }} }
+              </p>
+            </div>
+            <app-status [label]="stateLabel(d)" />
+          </div>
+
+          @if (fields(d.subject).length) {
+            <dl class="inbox-fields">
+              @for (f of fields(d.subject); track f.label) {
+                <div><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div>
+              }
+            </dl>
+          }
+
+          <div>
+            <h3 class="section-title mb-2">History</h3>
+            <ol class="inbox-timeline" data-test="task-history">
+              @for (h of taskHistory(); track h.id) {
+                <li [class]="'is-' + h.tone">
+                  <span>{{ h.text }}</span><span class="text-xs text-[color:var(--text-muted)]"> · {{ when(h.at) }}</span>
+                  @if (h.comment) { <span class="block text-xs text-[color:var(--text-secondary)]">“{{ h.comment }}”</span> }
+                </li>
+              }
+            </ol>
+          </div>
+
+          @if (ownRequest() && d.state === 'Open') {
+            <p class="flex items-start gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-[color:var(--text-secondary)]" role="note" data-own-request>
+              <app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" />
+              <!-- P2 #36: in a one-person workspace there is no one else, and the request would wait for ever. -->
+              @if (aloneInWorkspace()) {
+                <span>This is your own request, and no one may approve their own. You are the only person in this workspace, so it waits
+                  until someone else joins: add a person under Administration › Users, then they decide it from their Task inbox.</span>
+              } @else {
+                <span>This is your own request: someone else decides it.</span>
+              }
+            </p>
+          }
+
+          @if (canDecide()) {
+            <div>
+              <label class="label" for="task-comment">Comment</label>
+              <textarea id="task-comment" class="input resize-y min-h-16" rows="2" [ngModel]="comment()" (ngModelChange)="comment.set($event)"
+                        [placeholder]="d.rejectNeedsComment ? 'Say why, if you reject it (required)' : 'A note for the requester (optional)'"></textarea>
+            </div>
+            @if (passing()) {
+              <div class="flex items-end gap-2 flex-wrap" data-test="pass-on">
+                <div class="min-w-64 flex-1">
+                  <label class="label" for="pass-to">Pass it to</label>
+                  <app-combobox id="pass-to" [numeric]="true" placeholder="Search people…" [allowClear]="false"
+                                [options]="colleagueOptions()" [ngModel]="passTo()" (ngModelChange)="passTo.set($event)" />
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" [disabled]="passTo() == null || busy()" (click)="passOn()">Pass on</button>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="passing.set(false)">Cancel</button>
+              </div>
+            } @else {
+              <div class="flex items-center gap-2 flex-wrap" data-test="decisions">
+                @if (d.stepType === 'approval') {
+                  <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="decide('approve')"><app-icon name="check" />Approve</button>
+                  <button type="button" class="btn btn-default" [disabled]="busy()" (click)="decide('reject')"><app-icon name="close" />Reject</button>
+                  <button type="button" class="btn btn-default" [disabled]="busy()" (click)="decide('changes')"><app-icon name="chat" />Ask for changes</button>
+                } @else {
+                  <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="decide('done')"><app-icon name="check" />Mark done</button>
+                }
+                <button type="button" class="btn btn-ghost" [disabled]="busy()" (click)="passing.set(true)"><app-icon name="users" />Pass on</button>
+              </div>
+            }
+          }
+        } @else if (detailError()) {
+          <p class="text-sm text-crit-500">{{ detailError() }}</p>
+        } @else {
+          <div class="py-16 text-center text-sm text-[color:var(--text-muted)]">
+            <app-icon name="inbox" size="1.6rem" class="icon-muted block mx-auto mb-2" />Pick a task on the left.
+          </div>
+        }
+      </section>
+    } @else {
+      <section class="card p-4 flex flex-col gap-4 min-w-0" aria-label="Request" data-test="request-detail">
+        @if (request(); as r) {
+          <div class="flex items-start gap-3">
+            <div class="min-w-0 flex-1">
+              <h2 class="text-base font-semibold">{{ r.title }}</h2>
+              <p class="text-sm text-[color:var(--text-muted)]">{{ r.workflow }} · version {{ r.version }}</p>
+            </div>
+            <app-status [label]="r.state" />
+          </div>
+          @if (fields(r.subject).length) {
+            <dl class="inbox-fields">
+              @for (f of fields(r.subject); track f.label) { <div><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div> }
+            </dl>
+          }
+          <div>
+            <h3 class="section-title mb-2">History</h3>
+            <ol class="inbox-timeline">
+              @for (h of requestHistory(); track h.id) {
+                <li [class]="'is-' + h.tone">
+                  <span>{{ h.text }}</span><span class="text-xs text-[color:var(--text-muted)]"> · {{ when(h.at) }}</span>
+                  @if (h.comment) { <span class="block text-xs text-[color:var(--text-secondary)]">“{{ h.comment }}”</span> }
+                </li>
+              }
+            </ol>
+          </div>
+          @if (r.state === 'Running' || r.state === 'Waiting') {
+            <div><button type="button" class="btn btn-default btn-sm" (click)="cancelRequest()"><app-icon name="close" />Cancel request</button></div>
+          }
+        } @else if (detailError()) {
+          <p class="text-sm text-crit-500">{{ detailError() }}</p>
+        } @else {
+          <div class="py-16 text-center text-sm text-[color:var(--text-muted)]">Pick a request on the left.</div>
+        }
+      </section>
+    }
+  </div>
+</div>

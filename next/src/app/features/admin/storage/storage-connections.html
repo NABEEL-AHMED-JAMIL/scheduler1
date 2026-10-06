@@ -1,0 +1,301 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+    <h1 class="page-title">Storage connections</h1>
+    <p class="page-subtitle">
+      S3, Azure, MinIO or FTP/FTPS. Passwords, secret keys and connection strings are encrypted
+      and never sent back to the browser.
+    </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="storage connections" />
+
+  <!-- The row answers "how much of this can a job use, and what is broken": what is in service,
+       then the three test states. The lead is the Active count rather than the headcount, because
+       the headcount is already printed on the card header below and is the sum of the other three
+       tiles, while whether a connection is resolved at all is said nowhere else on the screen.
+       The total stays as its foot, so the row still has a denominator. Counts cover every
+       connection, as they do on Users and Tenants; the line underneath says so while a filter is
+       narrowing the table.
+
+       Glyphs are the screen's own: checkCircle and xCircle are what the Last test column puts on
+       a passed and a failed row, and plug says "a connection" without implying a provider -- a
+       cloud does not describe the FTP and MinIO connections it was counting. -->
+  <div class="space-y-2">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      @for (tile of [
+        { label: 'In service', value: summary().active,   foot: 'of ' + summary().total + ' configured', icon: 'plug', tone: 'info' },
+        { label: 'Tested OK',  value: summary().ok,       foot: 'last test passed', icon: 'checkCircle', tone: 'ok' },
+        { label: 'Failing',    value: summary().failing,  foot: 'last test failed', icon: 'xCircle', tone: 'crit' },
+        { label: 'Untested',   value: summary().untested, foot: 'never verified', icon: 'clock', tone: 'warn' }
+      ]; track tile.label) {
+        <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
+                       [tone]="$any(tile.tone)" [foot]="tile.foot" />
+      }
+    </div>
+    @if (isFiltered()) {
+      <p class="text-xs text-[color:var(--text-muted)]">
+        These totals cover all {{ connections().length }} connections, not the
+        {{ filtered().length }} the filters leave on screen.
+      </p>
+    }
+  </div>
+
+  <app-table-shell heading="Connections" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length"
+                   [total]="connections().length"
+                   [emptyMessage]="isFiltered() ? 'No connections match the filters.' : 'No connections configured yet.'"
+                   emptyIcon="plug"
+                   [showSubbar]="selected().size > 0"
+                   (retry)="load()">
+    <!-- Lives in the shell's second row, so ticking a box cannot shift the filters above it.
+         Kept at the top level of the shell's content on purpose: nested inside the view-mode
+         @if it sat in an embedded view, where a projection selector never reaches it. -->
+    <div subbar class="contents">
+      <span class="text-sm text-[color:var(--text-secondary)] mr-auto">
+        {{ selected().size }} selected
+      </span>
+      <button type="button" class="btn btn-primary btn-sm"
+              [disabled]="bulkRunning()" (click)="testSelected()">
+        @if (bulkRunning()) { <app-icon name="refresh" class="spin" /> }
+        {{ bulkRunning() ? bulkProgress() : 'Test selected' }}
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm"
+              [disabled]="bulkRunning()" (click)="clearSelection()">Clear</button>
+    </div>
+    <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="storage" cardsIcon="layers" />
+
+      <select class="input max-w-36" [value]="providerFilter()" aria-label="Filter by provider"
+              (change)="providerFilter.set($any($event.target).value); pager.reset()">
+        <option value="">All providers</option>
+        @for (p of providers(); track p) { <option [value]="p">{{ p }}</option> }
+      </select>
+      @if (canSeeWorkspace()) {
+        <select class="input max-w-48" [value]="workspaceFilter()" aria-label="Workspace"
+                (change)="workspaceFilter.set($any($event.target).value); pager.reset()">
+          <option value="">All workspaces</option>
+          @for (w of workspaces(); track w.id) { <option [value]="w.id">{{ w.name }}</option> }
+        </select>
+      }
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, alias or host" aria-label="Search connections"
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
+      </div>
+      <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
+
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    @if (view() === 'cards') {
+      <div class="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-3">
+        @for (c of paged(); track c.storageConnectionId) {
+          <article class="card p-4 flex flex-col gap-3"
+                   [class.opacity-55]="testing() === c.storageConnectionId">
+            <div class="flex items-start gap-2.5">
+              <span class="stat-glyph shrink-0"><app-icon [name]="providerGlyph(c)" /></span>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold truncate" [title]="c.connectionName">{{ c.connectionName }}</h3>
+                <!-- The alias is what a job or task actually references, so it leads. -->
+                <div class="flex items-center gap-1 min-w-0">
+                  <p class="mono text-accent truncate" [title]="c.alias">{{ c.alias }}</p>
+                  <app-copy-button [value]="c.alias" [copied]="copiedKey() === c.storageConnectionId + ':alias'"
+                                   copiedLabel="Alias copied" (copy)="copyValue(c.storageConnectionId, 'alias', c.alias)" />
+                </div>
+                @if (canSeeWorkspace()) {
+                  <span class="pill pill-neutral mt-1" [title]="workspaceHint(c)">
+                    <app-icon [name]="c.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
+                    {{ workspaceName(c) }}
+                  </span>
+                }
+              </div>
+              <div class="shrink-0 flex items-center gap-1">
+                <app-status [label]="c.status" [quiet]="true" />
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu"
+                        [disabled]="testing() === c.storageConnectionId" [attr.aria-label]="'Actions for ' + c.connectionName">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #cardMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    @if (!locked()) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
+                    }
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                    @if (!locked()) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(c)"><app-icon name="copy" />Clone…</button>
+                    <div class="my-1 border-t border-subtle"></div>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                    }
+                  </div>
+                </ng-template>
+              </div>
+            </div>
+
+            @if (c.description) {
+              <p class="text-xs text-[color:var(--text-secondary)] line-clamp-2">{{ c.description }}</p>
+            }
+
+            <dl class="text-xs grid gap-1">
+              <div class="flex gap-2 min-w-0">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Target</dt>
+                <dd class="mono truncate min-w-0" [title]="target(c)">{{ target(c) }}</dd>
+              </div>
+              <div class="flex gap-2">
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Provider</dt>
+                <dd>{{ c.provider }}</dd>
+              </div>
+            </dl>
+
+            <div class="flex flex-wrap items-center gap-1.5 mt-auto pt-1">
+              <span [class]="testPill(c)" [title]="c.lastTestMessage || ''">
+                @if (testGlyph(c)) { <app-icon [name]="testGlyph(c)" size="0.85em" /> }{{ testLabel(c) }}
+              </span>
+              @if (c.secretKeyConfigured || c.passwordConfigured) {
+                <span class="pill pill-ok">Stored</span>
+              } @else {
+                <span class="pill pill-neutral" title="No key is stored. The connection only works if this platform was deliberately configured to lend its own host credentials, which is off by default.">
+                  Not stored
+                </span>
+              }
+              @if (c.lastTestedAt) {
+                <span class="text-[11px] text-[color:var(--text-muted)] ml-auto">
+                  {{ c.lastTestedAt | serverTime:'recent' }}
+                </span>
+              }
+            </div>
+          </article>
+        }
+      </div>
+
+    } @else {
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th class="w-8">
+            <input type="checkbox" class="checkbox"
+                   [checked]="allShownSelected()"
+                   [attr.aria-label]="allShownSelected() ? 'Clear selection' : 'Select all shown'"
+                   (change)="toggleAll()" />
+          </th>
+          <th>Name</th>
+          <th>Alias</th>
+          <th>Provider</th>
+          <th>Target</th>
+          @if (canSeeWorkspace()) { <th>Workspace</th> }
+          <th>Credentials</th>
+          <th>Last test</th>
+          <th>Created by</th>
+          <th>Updated by</th>
+          <th class="text-right">State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of paged(); track c.storageConnectionId) {
+          <tr [class.opacity-55]="testing() === c.storageConnectionId">
+            <td>
+              <input type="checkbox" class="checkbox"
+                     [checked]="isSelected(c.storageConnectionId)"
+                     [attr.aria-label]="'Select ' + c.connectionName"
+                     (change)="toggleSelected(c.storageConnectionId)" />
+            </td>
+            <td class="max-w-56">
+              <div class="font-medium truncate">{{ c.connectionName }}</div>
+              @if (c.description) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate" [title]="c.description">
+                  {{ c.description }}
+                </div>
+              }
+            </td>
+            <td class="max-w-52">
+              <div class="lookup-value">
+                <span class="mono text-accent truncate" [title]="c.alias">{{ c.alias }}</span>
+                <app-copy-button [value]="c.alias" [copied]="copiedKey() === c.storageConnectionId + ':alias'"
+                                 copiedLabel="Alias copied" (copy)="copyValue(c.storageConnectionId, 'alias', c.alias)" />
+              </div>
+            </td>
+            <td><span class="pill pill-neutral">{{ c.provider }}</span></td>
+            <td class="max-w-56">
+              <div class="lookup-value">
+                <span class="mono text-[color:var(--text-secondary)] truncate" [title]="target(c)">{{ target(c) }}</span>
+                @if (target(c) && target(c) !== '—') {
+                  <app-copy-button [value]="target(c)" [copied]="copiedKey() === c.storageConnectionId + ':target'"
+                                   copiedLabel="Target copied" (copy)="copyValue(c.storageConnectionId, 'target', target(c))" />
+                }
+              </div>
+            </td>
+            @if (canSeeWorkspace()) {
+              <td>
+                <span class="pill pill-neutral" [title]="workspaceHint(c)">
+                  <app-icon [name]="c.tenantId == null ? 'globe' : 'building'" size="0.8em" class="opacity-70" />
+                  {{ workspaceName(c) }}
+                </span>
+              </td>
+            }
+            <td>
+              @if (c.secretKeyConfigured || c.passwordConfigured) {
+                <span class="pill pill-ok">Stored</span>
+              } @else {
+                <span class="pill pill-neutral" title="No key is stored. The connection only works if this platform was deliberately configured to lend its own host credentials, which is off by default.">
+                  Not stored
+                </span>
+              }
+            </td>
+            <td>
+              <span [class]="testPill(c)" [title]="c.lastTestMessage || ''">
+                @if (testGlyph(c)) { <app-icon [name]="testGlyph(c)" size="0.85em" /> }{{ testLabel(c) }}
+              </span>
+              @if (c.lastTestedAt) {
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                  {{ c.lastTestedAt | serverTime:'recent' }}
+                </div>
+              }
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ c.createdByName || '—' }}
+            </td>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+              {{ c.updatedByName || '—' }}
+            </td>
+            <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      [disabled]="testing() === c.storageConnectionId" [attr.aria-label]="'Actions for ' + c.connectionName">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  @if (!locked()) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit</button>
+                  }
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(c)"><app-icon name="zap" />Test connection</button>
+                  @if (!locked()) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(c)"><app-icon name="copy" />Clone…</button>
+                  <div class="my-1 border-t border-subtle"></div>
+                  <button cdkMenuItem class="menu-item menu-item-danger"
+                          (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  }
+                </div>
+              </ng-template>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    }
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>

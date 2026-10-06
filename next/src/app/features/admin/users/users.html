@@ -1,0 +1,512 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Users</h1>
+      <p class="page-subtitle">
+        Roles are enforced on the server — they decide what a person can reach, not just what they see.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New user
+      </button>
+    </div>
+  </div>
+
+  @if (focusedTenantId() !== null) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="filter" class="text-[color:var(--text-muted)]" />
+      <span>
+        Showing users in <strong>{{ focusedTenantName() }}</strong> only.
+      </span>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearTenantFocus()">
+        <app-icon name="close" />Show all tenants
+      </button>
+    </div>
+  }
+
+  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    @for (tile of [
+      { label: 'Users',            value: summary().total, icon: 'users', tone: 'info' },
+      { label: 'Active',           value: summary().active, icon: 'checkCircle', tone: 'ok' },
+      { label: 'Admins',           value: summary().admins, icon: 'shield', tone: 'info' },
+      { label: 'Never signed in',  value: summary().neverSignedIn, icon: 'clock', tone: 'warn' }
+    ]; track tile.label) {
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" />
+    }
+  </div>
+
+  <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="users().length"
+                   [emptyMessage]="hasFilters() ? 'No users match the current filters.' : 'No users yet.'"
+                   emptyIcon="users"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <app-view-toggle [(value)]="view" key="users" cardsIcon="users" />
+
+      <select class="input max-w-40" [value]="roleFilter()" aria-label="Filter by role"
+              (change)="roleFilter.set($any($event.target).value); pager.reset()">
+        <option value="">All roles</option>
+        @for (role of roles(); track role) {
+          <option [value]="role">{{ roleLabel(role) }}</option>
+        }
+      </select>
+      @if (profileOptions().length || anyOnDefault()) {
+        <select class="input max-w-44" [value]="profileFilter()" aria-label="Filter by access profile"
+                (change)="profileFilter.set($any($event.target).value); pager.reset()">
+          <option value="">All access</option>
+          @if (anyOnDefault()) { <option value="default">On the default</option> }
+          @for (name of profileOptions(); track name) {
+            <option [value]="name">{{ name }}</option>
+          }
+        </select>
+      }
+      @if (canPickTenant() && tenantOptions().length > 1) {
+        <div class="w-44">
+          <app-combobox id="users-tenant" ariaLabel="Filter by tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event); pager.reset()"
+                        placeholder="All tenants" clearLabel="All tenants" [options]="tenantComboOptions()" />
+        </div>
+      }
+      <select class="input max-w-32" [value]="statusFilter()" aria-label="Filter by state"
+              (change)="statusFilter.set($any($event.target).value); pager.reset()">
+        <option value="">All states</option>
+        <option value="Active">Active</option>
+        <option value="Inactive">Inactive</option>
+      </select>
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, email or tenant" aria-label="Search users"
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
+      </div>
+      <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
+    </ng-container>
+
+    @if (view() === 'cards') {
+      <div class="grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 items-stretch">
+        @for (user of paged(); track user.appUserId) {
+          <!-- Structure: a rule, then everything else in a padded column. p-0 on the article
+               with padding on the inner div lets the rule bleed to the card's edges without
+               negative margins fighting the padding. -->
+          <article class="card p-0 overflow-hidden flex flex-col"
+                   [class.opacity-55]="busy() === user.appUserId">
+            <!-- Privilege, readable before any text is. Quiet for a plain user so every card
+                 keeps the same anatomy. -->
+            <div class="h-1 shrink-0 tone-fill" [class]="toneClass(roleAccent(user.userRole))"></div>
+
+            <div class="p-4 flex flex-col gap-3 flex-1">
+              <div class="flex items-start gap-3">
+                <!-- The ring says what the status pill says. Two channels for one fact, because
+                     colour alone is not a signal everybody receives. -->
+                <span class="rounded-full shrink-0 p-[2px] tone-ring"
+                      [class]="toneClass(statusRing(user.status))">
+                  <app-avatar [appUserId]="avatarOwner(user)"
+                              [name]="user.fullName || user.username" [size]="2.75" />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-start gap-2">
+                    <h3 class="font-semibold truncate leading-snug"
+                        [title]="user.fullName || user.username">
+                      {{ user.fullName || user.username }}
+                    </h3>
+                    @if (isSelf(user)) { <span class="pill pill-neutral shrink-0">You</span> }
+                    <div class="ml-auto shrink-0">
+                      <app-status [label]="user.status" [quiet]="true" />
+                    </div>
+                  </div>
+                  @if (user.position) {
+                    <p class="text-xs text-[color:var(--text-muted)] truncate"
+                       [title]="user.position">{{ user.position }}</p>
+                  }
+                  <div class="flex flex-wrap items-center gap-1.5 mt-2">
+                    <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+                    @if (user.tenantName) {
+                      <span class="pill pill-neutral" [title]="'Workspace: ' + user.tenantName">
+                        <app-icon name="building" size="0.8em" class="opacity-70" />{{ user.tenantName }}
+                      </span>
+                    } @else if (reachesEveryTenant(user)) {
+                      <span class="pill pill-neutral" title="Reaches every workspace">
+                        <app-icon name="globe" size="0.8em" class="opacity-70" />All tenants
+                      </span>
+                    }
+                  </div>
+                </div>
+              </div>
+
+              <!-- Both glyphs take icon-info rather than a semantic tone: an address is not "ok"
+                   and a number is not "warn", and borrowing those colours here would blunt what
+                   they mean everywhere else. The envelope and handset shapes carry the difference
+                   between the two lines; the tint only lifts them off the muted text. -->
+              <div class="flex flex-col gap-1 text-xs text-[color:var(--text-muted)]">
+                <div class="flex items-center gap-1.5 min-w-0">
+                  <app-icon name="mail" size="0.9em" class="shrink-0 icon-info" />
+                  <span class="mono truncate" [title]="user.username">{{ user.username }}</span>
+                  <app-copy-button [value]="user.username" [pushRight]="true"
+                                   [copied]="copiedKey() === user.appUserId + ':email'"
+                                   copiedLabel="Address copied"
+                                   (copy)="copyContact(user.appUserId, 'email', user.username)" />
+                </div>
+                @if (user.phoneNumber) {
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <app-icon name="phone" size="0.9em" class="shrink-0 icon-info" />
+                    <a class="mono truncate hover:text-[color:var(--accent-text)] transition-colors"
+                       [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                    <app-copy-button [value]="user.phoneNumber" [pushRight]="true"
+                                     [copied]="copiedKey() === user.appUserId + ':phone'"
+                                     copiedLabel="Number copied"
+                                     (copy)="copyContact(user.appUserId, 'phone', user.phoneNumber)" />
+                  </div>
+                }
+              </div>
+
+              <!-- Access: the profile and what it comes to, on its own line rather than as one
+                   more chip -- it is the fact an admin came here to check. -->
+              @if (user.userRole === 'TENANT_USER') {
+                <button type="button" class="flex items-center gap-2 rounded-md px-2.5 py-1.5 bg-sunken text-left w-full group"
+                        (click)="openPageAccess(user)" [title]="'Open in the People × pages grid'">
+                  <app-icon name="shield" size="0.95em" class="shrink-0 opacity-70" />
+                  <span class="text-sm font-medium group-hover:underline">{{ accessLabel(user) }}</span>
+                  <span class="text-xs text-[color:var(--text-muted)]">{{ accessDetail(user) }}</span>
+                  @if (user.pageExceptionCount) {
+                    <span class="ml-auto pill pill-warn">{{ user.pageExceptionCount }} {{ user.pageExceptionCount === 1 ? 'exception' : 'exceptions' }}</span>
+                  }
+                </button>
+              }
+
+              <!-- Workload, when there is any. Kept as tiles: three figures compared against each
+                   other read better in a row than as three sentences. -->
+              @if (statFor(user); as stat) {
+                @if (stat.jobCount) {
+                  <div class="grid grid-cols-3 gap-px rounded-lg overflow-hidden bg-subtle">
+                    @for (tile of [
+                      { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
+                      { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
+                      { label: 'Runs',  value: stat.runCount,
+                        hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
+                    ]; track tile.label) {
+                      <div class="px-2 py-1.5 text-center bg-raised" [title]="tile.hint">
+                        <div class="text-sm font-semibold tabular leading-none">{{ tile.value }}</div>
+                        <div class="text-[11px] uppercase tracking-wide mt-0.5 text-[color:var(--text-muted)]">
+                          {{ tile.label }}
+                        </div>
+                      </div>
+                    }
+                  </div>
+                  @if (stat.failedCount) {
+                    <p class="text-[11px] -mt-1.5 text-crit-500">
+                      {{ stat.failedCount }} failed {{ stat.failedCount === 1 ? 'run' : 'runs' }}
+                    </p>
+                  }
+                }
+              }
+
+              <!-- Footer: the incidental facts, behind a rule and pushed to the bottom so cards in
+                   a row line their footers up however tall the content above them is. -->
+              <div class="mt-auto pt-2.5 border-t border-subtle text-[11px]
+                          text-[color:var(--text-muted)] flex flex-wrap items-center gap-x-2 gap-y-1">
+                <span>
+                  {{ user.lastLoginAt
+                      ? 'Last in ' + (user.lastLoginAt | serverTime: 'date')
+                      : 'Never signed in' }}
+                </span>
+                @if (statFor(user); as stat) {
+                  @if (!stat.jobCount) {
+                    <span class="text-[color:var(--border-strong)]">·</span>
+                    <span>No jobs</span>
+                  }
+                }
+                @if (user.createdByName) {
+                  <span class="text-[color:var(--border-strong)]">·</span>
+                  <span>Added by {{ user.createdByName }}</span>
+                }
+              </div>
+
+              <!-- The same four the table row offers, and the same guards. A card view that can
+                   only look at people while the table can act on them is a worse version of the
+                   same screen; the reason the actions vanished was a rebuild, not a decision. -->
+              @if (!canManage(user)) {
+                <div class="flex items-center gap-1.5 pt-2.5 border-t border-subtle
+                            text-xs text-[color:var(--text-muted)]">
+                  <app-icon name="lock" />{{ managedByPlatformOnly }}
+                </div>
+              } @else {
+              <div class="flex flex-wrap items-center gap-1 pt-2.5 border-t border-subtle">
+                <button type="button" class="btn btn-ghost btn-sm" (click)="edit(user)"
+                        [disabled]="busy() === user.appUserId">
+                  <app-icon name="edit" />Edit
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" (click)="resetPassword(user)"
+                        [disabled]="busy() === user.appUserId" title="Send a new one-time password">
+                  <app-icon name="key" />Reset
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm"
+                        [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
+                        [disabled]="isSelf(user) || busy() === user.appUserId"
+                        [title]="isSelf(user) ? 'You cannot deactivate your own account' : ''"
+                        (click)="toggleStatus(user)">
+                  <app-icon [name]="user.status === 'Active' ? 'pause' : 'play'" />
+                  {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
+                        [disabled]="isSelf(user) || busy() === user.appUserId"
+                        [title]="isSelf(user) ? 'You cannot delete your own account' : 'Remove this account for good'"
+                        [attr.aria-label]="isSelf(user) ? 'You cannot delete your own account' : 'Delete ' + (user.fullName || user.username)"
+                        (click)="deleteUser(user)">
+                  <app-icon name="trash" [class.icon-crit]="!isSelf(user)" />
+                </button>
+              </div>
+              }
+            </div>
+          </article>
+        }
+      </div>
+    } @else {
+    <table class="table-modern">
+      <thead>
+        <tr>
+          @for (column of [
+            { key: 'fullName',    label: 'Person' },
+            { key: 'userRole',    label: 'Role' },
+            { key: 'pageAccessProfileName', label: 'Access' },
+            { key: 'tenantName',  label: 'Tenant', hide: 'hidden xl:table-cell' },
+            { key: 'lastLoginAt', label: 'Last sign-in', hide: 'hidden lg:table-cell' }
+          ]; track column.key) {
+            <th [class]="column.hide ?? ''">
+              <button type="button" class="th-sort"
+                      [class.th-sort-active]="sort.key() === column.key"
+                      (click)="sort.toggle(column.key)">
+                {{ column.label }}
+                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
+                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
+              </button>
+            </th>
+          }
+          <th class="text-right hidden xl:table-cell">Workload</th>
+          @for (column of [
+            { key: 'dateCreated', label: 'Added' }
+          ]; track column.key) {
+            <th class="hidden xl:table-cell">
+              <button type="button" class="th-sort"
+                      [class.th-sort-active]="sort.key() === column.key"
+                      (click)="sort.toggle(column.key)">
+                {{ column.label }}
+                <app-icon [name]="sort.iconFor(column.key)" size="0.875rem"
+                          [class]="sort.key() === column.key ? 'icon-info' : 'icon-muted'" />
+              </button>
+            </th>
+          }
+          <th class="text-right">State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (user of paged(); track user.appUserId) {
+          <tr [class.opacity-55]="busy() === user.appUserId">
+            <!-- Identity in one cell: name, address and number all answer "who is this", and
+                 split across three columns they cost a third of the table's width to say it. -->
+            <td class="max-w-72">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <app-avatar [appUserId]="avatarOwner(user)"
+                            [name]="user.fullName || user.username" [size]="2" class="shrink-0" />
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-medium truncate">{{ user.fullName || '—' }}</span>
+                    @if (isSelf(user)) {
+                      <span class="pill pill-neutral shrink-0">You</span>
+                    }
+                  </div>
+                  <!-- Same copy buttons as the card. The address truncates in this column and
+                       a tel: link does nothing on a desktop without a phone app, so copying
+                       is the only way either gets into an email or a dialler. -->
+                  <div class="flex items-center gap-1 min-w-0">
+                    <span class="mono text-xs text-[color:var(--text-muted)] truncate"
+                          [title]="user.username">{{ user.username }}</span>
+                    <app-copy-button [value]="user.username"
+                                     [copied]="copiedKey() === user.appUserId + ':email'"
+                                     copiedLabel="Address copied"
+                                     (copy)="copyContact(user.appUserId, 'email', user.username)" />
+                  </div>
+                  <!-- Only when there is one. A column of dashes is noise; a line that appears
+                       when a number exists is information. -->
+                  @if (user.phoneNumber) {
+                    <div class="flex items-center gap-1 min-w-0">
+                      <a class="mono text-xs link-inline truncate"
+                         [href]="'tel:' + user.phoneNumber">{{ user.phoneNumber }}</a>
+                      <app-copy-button [value]="user.phoneNumber"
+                                       [copied]="copiedKey() === user.appUserId + ':phone'"
+                                       copiedLabel="Number copied"
+                                       (copy)="copyContact(user.appUserId, 'phone', user.phoneNumber)" />
+                    </div>
+                  }
+                </div>
+              </div>
+            </td>
+
+            <!-- Permission role above, job title below: two facts about standing, read together.
+                 A tenant user's access profile sits with them: it is the third thing that
+                 decides what this person reaches. -->
+            <td class="max-w-44">
+              <span [class]="rolePill(user.userRole)">{{ roleLabel(user.userRole) }}</span>
+              @if (user.position) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5"
+                     [title]="user.position">{{ user.position }}</div>
+              }
+              @if (user.managerName) {
+                <div class="text-xs text-[color:var(--text-muted)] truncate mt-0.5" data-test="reports-to"
+                     [title]="'Reports to ' + user.managerName">Reports to {{ user.managerName }}</div>
+              }
+            </td>
+
+            <!-- What the person can open: the profile (or the default) and what it comes to, with
+                 any exception made for them alone called out -- that is the one thing an admin
+                 scanning the list cannot infer from the profile's name. -->
+            <td class="max-w-48">
+              @if (user.userRole === 'TENANT_USER') {
+                <button type="button" class="text-left group" (click)="openPageAccess(user)"
+                        [title]="'Open ' + (user.fullName || user.username) + ' in the People × pages grid'">
+                  <span class="inline-flex items-center gap-1.5 font-medium group-hover:underline">
+                    <app-icon name="shield" size="0.85em" class="opacity-70" />{{ accessLabel(user) }}
+                  </span>
+                  <span class="block text-xs text-[color:var(--text-muted)]">
+                    {{ accessDetail(user) }}
+                    @if (user.pageExceptionCount) {
+                      <span class="inline-flex items-center gap-1 text-warn-500">
+                        · <span class="inline-block w-1.5 h-1.5 rounded-full bg-[color:var(--color-warn-500)]"></span>{{ user.pageExceptionCount }} {{ user.pageExceptionCount === 1 ? 'exception' : 'exceptions' }}
+                      </span>
+                    }
+                  </span>
+                </button>
+              } @else {
+                <span class="text-[color:var(--text-muted)]">All pages</span>
+              }
+            </td>
+
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44">
+              @if (user.tenantName) {
+                <span class="truncate block" [title]="user.tenantName">{{ user.tenantName }}</span>
+                @if (user.tenantActive === false) {
+                  <span class="pill pill-warn mt-0.5" title="This user's tenant is deactivated">
+                    Tenant off
+                  </span>
+                }
+              } @else if (reachesEveryTenant(user)) {
+                <span class="text-[color:var(--text-muted)]">All tenants</span>
+              } @else { — }
+            </td>
+
+            <td class="hidden lg:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (user.lastLoginAt) {
+                {{ user.lastLoginAt | serverTime:'date' }}
+                <div class="text-xs text-[color:var(--text-muted)]">
+                  {{ user.lastLoginAt | serverTime:'time' }}
+                </div>
+              } @else {
+                <span class="text-[color:var(--text-muted)]">Never</span>
+              }
+            </td>
+
+            <!-- Jobs and runs answer one question -- how much is this person carrying -- so they
+                 read as one figure with its detail beneath, not two columns to cross-reference. -->
+            <td class="hidden xl:table-cell text-right whitespace-nowrap">
+              @if (statFor(user); as stat) {
+                @if (stat.jobCount || stat.runCount) {
+                  <div class="tabular">
+                    {{ stat.jobCount }}
+                    <span class="text-[color:var(--text-muted)] text-xs">jobs</span>
+                  </div>
+                  @if (stat.runCount) {
+                    <div class="text-xs text-[color:var(--text-muted)] tabular">
+                      {{ stat.runCount }} runs
+                      @if (successRate(stat) !== null) {
+                        <span [class]="successRate(stat)! >= 80 ? 'text-ok-500' : 'text-crit-500'"
+                              [title]="stat.completedCount + ' completed, ' + stat.failedCount + ' failed'">
+                          {{ successRate(stat) }}%
+                        </span>
+                      }
+                    </div>
+                  }
+                } @else {
+                  <span class="text-[color:var(--text-muted)]">Nothing yet</span>
+                }
+              } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+            </td>
+
+            <!-- When, and by whom, in one cell. The editor line appears only when it was somebody
+                 other than the author -- otherwise it restates the line above it. -->
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ user.dateCreated ? (user.dateCreated | serverTime:'date') : '—' }}
+              @if (user.createdByName) {
+                <div class="text-xs text-[color:var(--text-muted)]">by {{ user.createdByName }}</div>
+              }
+              @if (user.updatedByName && user.updatedByName !== user.createdByName) {
+                <div class="text-xs text-[color:var(--text-muted)]">
+                  edited by {{ user.updatedByName }}
+                </div>
+              }
+            </td>
+
+            <td class="text-right"><app-status [label]="user.status" [quiet]="true" /></td>
+
+            <td class="text-right">
+              <!-- No menu at all on a row this administrator cannot act on. Every item in it
+                   would come back "user not found" about somebody visibly in the list, so the
+                   lock says the rule once instead of four refusals saying it wrongly. -->
+              @if (!canManage(user)) {
+                <span class="text-[color:var(--text-muted)] inline-flex"
+                      [title]="managedByPlatformOnly" [attr.aria-label]="managedByPlatformOnly">
+                  <app-icon name="lock" size="1.05em" />
+                </span>
+              } @else {
+              <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
+                      [disabled]="busy() === user.appUserId" [attr.aria-label]="'Actions for ' + user.username">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #menu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(user)">
+                    <app-icon name="edit" />Edit
+                  </button>
+                  @if (user.userRole === 'TENANT_USER') {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openPageAccess(user)">
+                      <app-icon name="shield" />Page access
+                    </button>
+                  }
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
+                    <app-icon name="key" />Reset password
+                  </button>
+                  <div class="my-1 border-t border-subtle"></div>
+                  <button cdkMenuItem class="menu-item"
+                          [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
+                          [disabled]="isSelf(user)"
+                          [title]="isSelf(user) ? 'You cannot deactivate your own account' : ''"
+                          (cdkMenuItemTriggered)="toggleStatus(user)">
+                    <app-icon [name]="user.status === 'Active' ? 'pause' : 'play'" />
+                    {{ user.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                  </button>
+                  <button cdkMenuItem class="menu-item menu-item-danger"
+                          [disabled]="isSelf(user)"
+                          [title]="isSelf(user) ? 'You cannot delete your own account' : 'Remove this account for good'"
+                          (cdkMenuItemTriggered)="deleteUser(user)">
+                    <app-icon name="trash" [class.icon-crit]="!isSelf(user)" />Delete
+                  </button>
+                </div>
+              </ng-template>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+    }
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>

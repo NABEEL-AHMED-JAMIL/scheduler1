@@ -1,0 +1,196 @@
+<div class="min-h-screen flex flex-col">
+  <!-- The header holds a dozen tab stops before the page starts; a keyboard user skips them here. -->
+  <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-default btn-sm">Skip to content</a>
+  <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
+    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
+
+      <a routerLink="/" class="mr-4 shrink-0">
+        <app-brand-mark [hideOnMobile]="true" [hideBesideNav]="true" />
+      </a>
+
+      <!-- Primary navigation -->
+      <nav class="hidden xl:flex items-center gap-0.5 flex-1">
+        @for (item of nav(); track item.label) {
+          @if (item.path) {
+            <a [routerLink]="item.path"
+               routerLinkActive="!text-accent !bg-accent-soft"
+               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+               class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
+                      text-[color:var(--text-secondary)]
+                      hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]">
+              {{ item.label }}
+            </a>
+          } @else {
+            <div class="relative" [attr.data-nav-menu]="item.label" (focusout)="onMenuFocusOut($event, item.label)">
+              <button type="button" (click)="toggleMenu(item.label)"
+                      [attr.aria-expanded]="openMenu() === item.label"
+                      [attr.aria-controls]="menuId(item.label)"
+                      class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
+                             whitespace-nowrap text-[color:var(--text-secondary)]
+                             hover:text-[color:var(--text-primary)]
+                             hover:bg-[color:var(--surface-sunken)]"
+                      [class.bg-accent-soft]="openMenu() === item.label || isSectionActive(item)"
+                      [class.text-accent]="openMenu() === item.label || isSectionActive(item)">
+                {{ item.label }}
+                <app-icon name="chevronDown" size="0.85em"
+                          class="icon-muted transition-transform duration-150"
+                          [class.rotate-180]="openMenu() === item.label" />
+              </button>
+              @if (openMenu() === item.label) {
+                <div [id]="menuId(item.label)"
+                     class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle">
+                  @for (child of item.children; track child.path) {
+                    <a [routerLink]="child.path" (click)="openMenu.set(null)"
+                       routerLinkActive="nav-child-active"
+                       [routerLinkActiveOptions]="{ exact: !!child.exact }"
+                       class="nav-child">
+                      <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+                      <span class="min-w-0">
+                        <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+                        @if (child.hint) {
+                          <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
+                            {{ child.hint }}
+                          </span>
+                        }
+                      </span>
+                    </a>
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      </nav>
+
+      <div class="flex-1 xl:hidden"></div>
+
+      <!-- Right side -->
+      <div class="flex items-center gap-1 shrink-0">
+        <app-notification-bell />
+        <button type="button" class="btn btn-ghost btn-icon" (click)="theme.toggle()"
+                [title]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'">
+          @if (theme.theme() === 'dark') {
+            <app-icon name="sun" size="1.05em" label="Switch to light theme" />
+          } @else {
+            <app-icon name="moon" size="1.05em" label="Switch to dark theme" />
+          }
+        </button>
+
+        <div class="relative" data-nav-menu="__user" (focusout)="onMenuFocusOut($event, '__user')">
+          <button type="button" (click)="toggleMenu('__user')"
+                  aria-label="Account menu" [attr.aria-expanded]="openMenu() === '__user'"
+                  aria-controls="user-menu"
+                  class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
+            @if (auth.avatarUrl()) {
+              <img [src]="auth.avatarUrl()" alt="" class="avatar-img size-7" />
+            } @else {
+              <span class="avatar-initials size-7 text-[11px]">{{ auth.initials() }}</span>
+            }
+            <!-- Between xl and 2xl the full nav and a name do not both fit, so only the avatar shows;
+                 the name is in the panel's header. The cap stops a long name or an email
+                 fallback pushing the page wider than the screen. -->
+            <span class="text-sm font-medium hidden sm:block xl:hidden 2xl:block max-w-36 truncate"
+                  [title]="auth.displayName()">{{ auth.displayName() }}</span>
+          </button>
+          @if (openMenu() === '__user') {
+            <div id="user-menu"
+                 class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50 bg-raised border-subtle">
+              <div class="px-3 py-2 border-b border-subtle">
+                <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                  {{ roleText() }}
+                </div>
+              </div>
+              <!-- MIG-254: a staff session belongs to no workspace's people: no profile to read there (appUser.json/me
+                   refuses it), and its way out is Exit rather than a profile. -->
+              @if (auth.isManagedSession()) {
+                <button type="button" (click)="openMenu.set(null); auth.exitManagedSession()" class="menu-item text-sm">
+                  <app-icon name="logout" size="0.95em" />Exit managed session
+                </button>
+              } @else {
+                <a routerLink="/profile" (click)="openMenu.set(null)"
+                   class="menu-item text-sm">
+                  <app-icon name="user" size="0.95em" />Your profile
+                </a>
+              }
+              <a routerLink="/notifications" (click)="openMenu.set(null)"
+                 class="menu-item text-sm">
+                <app-icon name="bell" size="0.95em" />Notifications
+              </a>
+              <a routerLink="/docs" (click)="openMenu.set(null)"
+                 class="menu-item text-sm">
+                <app-icon name="info" size="0.95em" />Setup guide
+              </a>
+              <button type="button" (click)="auth.logout()"
+                      class="menu-item text-sm">
+                <app-icon name="logout" size="0.95em" />Sign out
+              </button>
+            </div>
+          }
+        </div>
+
+        <button type="button" class="btn btn-ghost btn-icon xl:hidden" (click)="toggleMobile()"
+                aria-label="Menu" [attr.aria-expanded]="mobileOpen()">
+          <app-icon [name]="mobileOpen() ? 'close' : 'menu'" size="1.15em" />
+        </button>
+      </div>
+    </div>
+
+    <!-- MIG-254: a staff member's managed session, for as long as it lasts: whose workspace, and the way back.
+         Inline, not @defer: that would pull Angular's defer runtime into the initial bundle (+8 kB). -->
+    @if (auth.isManagedSession()) {
+      <div class="managed-session-bar" role="status" data-managed-session>
+        <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 py-1.5 flex items-center gap-2 text-sm">
+          <app-icon name="briefcase" class="shrink-0" />
+          <p class="flex-1 min-w-0">
+            Managed session: <b>{{ auth.user()?.tenantName || ('workspace ' + auth.user()?.tenantId) }}</b> — every change is audited
+          </p>
+          <button type="button" class="btn btn-default btn-sm shrink-0" (click)="auth.exitManagedSession()">
+            <app-icon name="logout" />Exit
+          </button>
+        </div>
+      </div>
+    }
+
+    @if (mobileOpen()) {
+      <nav class="mobile-nav xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">
+        @for (item of nav(); track item.label) {
+          @if (item.path) {
+            <a [routerLink]="item.path" (click)="mobileOpen.set(false)"
+               routerLinkActive="nav-child-active"
+               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+               class="nav-child font-medium">
+              @if (item.icon) { <app-icon [name]="item.icon" size="1em" class="nav-child-icon" /> }
+              <span class="text-sm">{{ item.label }}</span>
+            </a>
+          } @else {
+            <div class="pt-1.5">
+              <div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
+                {{ item.label }}
+              </div>
+              @for (child of item.children; track child.path) {
+                <a [routerLink]="child.path" (click)="mobileOpen.set(false)"
+                   routerLinkActive="nav-child-active"
+                   [routerLinkActiveOptions]="{ exact: !!child.exact }" class="nav-child">
+                  <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+                  <span class="min-w-0">
+                    <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+                    @if (child.hint) {
+                      <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
+                        {{ child.hint }}
+                      </span>
+                    }
+                  </span>
+                </a>
+              }
+            </div>
+          }
+        }
+      </nav>
+    }
+  </header>
+
+  <main id="main" tabindex="-1" class="outline-none flex-1 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
+    <router-outlet />
+  </main>
+</div>

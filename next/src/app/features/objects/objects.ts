@@ -1,0 +1,743 @@
+import { instantOf } from '../../core/instant';
+import { localIsoDay } from '../../shared/ui/local-day';
+import { DateField } from '../../shared/ui/date-field';
+import { Component, Injector, OnInit, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
+import { Combobox } from '../../shared/ui/combobox';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { EMPTY, catchError, from, mergeMap, of, tap } from 'rxjs';
+
+import { Dialog } from '@angular/cdk/dialog';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { AuthService } from '../../core/auth/auth.service';
+import { BucketSummary, ObjectSummary, StorageService } from './storage.service';
+import { API_SUCCESS } from '../../core/api/api.config';
+import { ToastService } from '../../shared/ui/toast.service';
+import { confirmWith } from '../../shared/ui/confirm';
+import { copyText } from '../../shared/ui/clipboard.util';
+import { PreviewDialog } from './preview/preview-dialog';
+import { FileDetails, FileDetailsData } from './file-details';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
+import { Donut } from '../../shared/charts/donut';
+import { RankedBar } from '../../shared/charts/ranked-bar';
+import { FileChat } from './chat/file-chat';
+import { PromptDialog } from './dialogs/prompt-dialog';
+import { ShareDialog, ShareResult } from './dialogs/share-dialog';
+import { Icon } from '../../shared/ui/icon';
+import { formatSize } from '../../shared/ui/format-size';
+import { BlurLoader } from '../../shared/ui/blur-loader';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+
+interface Crumb { name: string; prefix: string; }
+
+/** Providers where a request costs a full connect + login, so per-folder work is not free. */
+const SLOW_PROVIDERS = ['FTP', 'FTPS'];
+
+@Component({
+  selector: 'app-objects',
+  imports: [DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
+  templateUrl: './objects.html',
+})
+export class Objects implements OnInit {
+  private readonly storage = inject(StorageService);
+  private readonly auth = inject(AuthService);
+  /** Connecting storage is an administrator's (the connections page is TENANT_ADMIN); others are told whom to ask. */
+  protected readonly canConnectStorage = computed(() => this.auth.isTenantAdmin());
+  private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
+  private readonly injector = inject(Injector);
+
+  readonly buckets = signal<BucketSummary[]>([]);
+  /**
+   * The connection list's own states. Without them the screen said "No storage is connected yet"
+   * while the list was still on its way, and again when it could not be read at all.
+   */
+  readonly bucketsLoading = signal(false);
+  readonly bucketsError = signal('');
+  /**
+   * A ?bucket= link no connection here serves (Jobs' "View in bucket", a run log's path, the
+   * Converter). The picker still shows, but with a word on why the link did not open.
+   */
+  readonly unknownLink = signal<{ bucket: string; prefix: string } | null>(null);
+  readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
+
+  /** FTP is a different kind of thing from an object store, and the card should say so. */
+  /** A connection's last test, in words for its card. */
+  connectionState(status: string | undefined): string {
+    switch ((status ?? '').toUpperCase()) {
+      case 'SUCCESS': return 'Connected';
+      case 'FAILED': return 'Last test failed';
+      default: return 'Not tested';
+    }
+  }
+
+  connectionTone(status: string | undefined): string {
+    switch ((status ?? '').toUpperCase()) {
+      case 'SUCCESS': return 'pill-ok';
+      case 'FAILED': return 'pill-crit';
+      default: return 'pill-neutral';
+    }
+  }
+
+  providerIcon(provider: string): string {
+    const kind = (provider || '').toUpperCase();
+    if (kind === 'FTP' || kind === 'FTPS') return 'server';
+    return 'cloud';
+  }
+
+  readonly bucket = signal('');
+  readonly objects = signal<ObjectSummary[]>([]);
+  readonly crumbs = signal<Crumb[]>([]);
+  readonly prefix = signal('');
+  readonly loading = signal(false);
+  readonly error = signal('');
+  readonly search = signal('');
+  readonly selected = signal<Set<string>>(new Set());
+  readonly nextToken = signal<string | undefined>(undefined);
+
+  /**
+   * Guards removeSelected/newFolder/rename/share against being re-entered while their own
+   * confirm/prompt dialog or the request behind it is still in flight -- none of them had a
+   * reentrancy guard of their own, so a fast double-click opened two confirm dialogs stacked (a
+   * second `removeSelected` while the first was still awaiting its dialog) or, once past the
+   * dialog, fired the same mutating request twice concurrently.
+   */
+  readonly actionBusy = signal(false);
+
+  readonly provider = computed(() =>
+    this.buckets().find(b => b.bucket === this.bucket())?.provider?.toUpperCase() ?? '');
+
+  readonly isSlowProvider = computed(() => SLOW_PROVIDERS.includes(this.provider()));
+
+  readonly dateFrom = signal('');
+  readonly dateTo = signal('');
+
+  readonly hasFilters = computed(() => !!(this.search() || this.dateFrom() || this.dateTo()));
+
+  readonly filtered = computed(() => {
+    const term = this.search().trim().toLowerCase();
+    const from = this.dateFrom();
+    const to = this.dateTo();
+    return this.objects().filter(entry => {
+      if (term && !entry.name.toLowerCase().includes(term)) return false;
+      // Folders carry no modified date, so a date filter would silently hide them all --
+      // keep them visible and let the dates narrow files only.
+      if ((from || to) && !entry.folder) {
+        // The reader's own calendar day, through instantOf: the UTC date cut from the string put an evening upload on tomorrow.
+        const at = instantOf(entry.lastModified);
+        const day = at ? localIsoDay(at) : '';
+        if (!day) return false;
+        if (from && day < from) return false;
+        if (to && day > to) return false;
+      }
+      return true;
+    });
+  });
+
+  readonly counts = computed(() => {
+    const list = this.objects();
+    return {
+      files: list.filter(o => !o.folder).length,
+      folders: list.filter(o => o.folder).length,
+      bytes: list.reduce((sum, o) => sum + (o.size ?? 0), 0),
+    };
+  });
+
+  /** Oldest-first, because the order is the point -- sorting these by size would hide the shape. */
+  private static readonly AGE_BUCKETS: { label: string; maxDays: number }[] = [
+    { label: 'Last 30 days', maxDays: 30 },
+    { label: '1-6 months', maxDays: 182 },
+    { label: '6-12 months', maxDays: 365 },
+    { label: '1-2 years', maxDays: 730 },
+    { label: '2-5 years', maxDays: 1825 },
+    { label: '5+ years', maxDays: Infinity },
+  ];
+
+  readonly showInsights = signal(false);
+
+  readonly mix = computed(() => {
+    const c = this.counts();
+    return [
+      { name: 'Files', value: c.files },
+      { name: 'Folders', value: c.folders },
+    ].filter(s => s.value > 0);
+  });
+
+  readonly byType = computed(() => {
+    const counts = new Map<string, number>();
+    this.objects().filter(o => !o.folder).forEach(o => {
+      const dot = o.name.lastIndexOf('.');
+      const ext = dot > 0 && dot < o.name.length - 1
+        ? o.name.slice(dot + 1).toUpperCase()
+        : 'no extension';
+      counts.set(ext, (counts.get(ext) ?? 0) + 1);
+    });
+    return [...counts.entries()].map(([name, value]) => ({ name, value }));
+  });
+
+  readonly byAge = computed(() => {
+    const now = Date.now();
+    const buckets = new Map<string, number>();
+    this.objects().filter(o => !o.folder).forEach(o => {
+      const modified = o.lastModified ? new Date(o.lastModified).getTime() : NaN;
+      const days = Number.isNaN(modified) ? Infinity : Math.max(0, (now - modified) / 86_400_000);
+      const bucket = Objects.AGE_BUCKETS.find(b => days <= b.maxDays) ?? Objects.AGE_BUCKETS[Objects.AGE_BUCKETS.length - 1];
+      buckets.set(bucket.label, (buckets.get(bucket.label) ?? 0) + 1);
+    });
+    return Objects.AGE_BUCKETS
+      .map(b => ({ name: b.label, value: buckets.get(b.label) ?? 0 }))
+      .filter(b => b.value > 0);
+  });
+
+  readonly bySize = computed(() =>
+    this.objects()
+      .filter(o => !o.folder && (o.size ?? 0) > 0)
+      .map(o => ({ name: o.name, value: o.size!, display: this.humanSize(o.size!), key: o.key })));
+
+  readonly hasInsights = computed(() =>
+    this.objects().some(o => !o.folder) || this.counts().folders > 0);
+
+  /** Bound as a value so the template can hand it to the chart without re-binding `this`. */
+  readonly humanSizeFn = (bytes: number) => this.humanSize(bytes);
+
+  humanSize = formatSize;
+
+  /**
+   * The ticked files the reader can still see. A tick survives a search or date filter that hides
+   * its row -- clearing the filter brings it back ticked -- but nothing acts on a file that is
+   * off the screen: "Delete 5" used to delete files the search had hidden, while Download took
+   * only the visible ones. Every action and every count reads this, so they agree.
+   */
+  readonly visibleSelection = computed(() =>
+    this.filtered().filter(o => !o.folder && this.selected().has(o.key)).map(o => o.key));
+
+  readonly allSelected = computed(() => {
+    const rows = this.filtered().filter(o => !o.folder);
+    return rows.length > 0 && rows.every(o => this.selected().has(o.key));
+  });
+
+  private readonly route = inject(ActivatedRoute);
+
+  ngOnInit(): void { this.loadBuckets(); }
+
+  loadBuckets(): void {
+    this.bucketsLoading.set(true);
+    this.bucketsError.set('');
+    this.storage.buckets().subscribe({
+      next: response => {
+        this.bucketsLoading.set(false);
+        if (response.status !== API_SUCCESS) {
+          this.bucketsError.set(response.message || 'Could not load storage connections.');
+          return;
+        }
+        this.buckets.set(response.data ?? []);
+        this.openDeepLink();
+      },
+      error: err => {
+        this.bucketsLoading.set(false);
+        this.bucketsError.set(err?.error?.message || 'Could not load storage connections.');
+      },
+    });
+  }
+
+  /**
+   * ?bucket=&prefix= opens the browser straight at a folder. A job's row links here with the
+   * bucket its task writes to, and without this the link landed on an empty browser with
+   * nothing selected. Waits for the bucket list so an unknown bucket is not left selected and
+   * failing to load; it is named in a notice over the picker instead, because dropping it
+   * silently left the reader on a list of connections with no idea why.
+   */
+  private openDeepLink(): void {
+    const params = this.route.snapshot.queryParamMap;
+    const bucket = params.get('bucket');
+    if (!bucket) return;
+    const prefix = params.get('prefix') || '';
+    if (!this.buckets().some(b => b.bucket === bucket)) {
+      this.unknownLink.set({ bucket, prefix });
+      return;
+    }
+
+    this.bucket.set(bucket);
+    this.prefix.set(prefix);
+    this.crumbs.set(prefix
+      ? prefix.replace(/\/+$/, '').split('/').map((segment, index, segments) => ({
+          name: segment,
+          prefix: segments.slice(0, index + 1).join('/') + '/',
+        }))
+      : []);
+    this.load();
+  }
+
+  onBucketChange(value: string): void {
+    this.unknownLink.set(null);
+    this.bucket.set(value);
+    this.prefix.set('');
+    this.crumbs.set([]);
+    this.selected.set(new Set());
+    // Every filter, not only the search: a date range carried silently into the next connection.
+    this.clearFilters();
+    if (value) this.load();
+  }
+
+  /** Bumped per listing; a response whose ticket is stale has been superseded. */
+  private listTicket = 0;
+
+  load(append = false): void {
+    if (!this.bucket()) return;
+    // Only the newest listing may write to the screen. Clicking a large folder and then a
+    // small one left the slow response landing last and replacing the fast one, so the rows
+    // showed the folder we had left while the breadcrumb showed the one we were in -- and
+    // every row action, delete included, then pointed somewhere the reader was not looking.
+    const ticket = ++this.listTicket;
+    this.loading.set(true);
+    this.error.set('');
+    this.storage.listObjects(this.bucket(), this.prefix(), append ? this.nextToken() : undefined)
+      .subscribe({
+        next: response => {
+          if (ticket !== this.listTicket) return;
+          this.loading.set(false);
+          if (response.status !== API_SUCCESS) {
+            this.error.set(response.message);
+            return;
+          }
+          const page = response.data?.objects ?? [];
+          this.objects.update(current => (append ? [...current, ...page] : page));
+          this.nextToken.set(response.data?.nextContinuationToken);
+        },
+        error: err => {
+          if (ticket !== this.listTicket) return;
+          this.loading.set(false);
+          this.error.set(err?.error?.message || 'Could not list this location.');
+        },
+      });
+  }
+
+  openFolder(entry: ObjectSummary): void {
+    this.crumbs.update(list => [...list, { name: entry.name, prefix: entry.key }]);
+    this.prefix.set(entry.key);
+    this.selected.set(new Set());
+    this.load();
+  }
+
+  goToCrumb(index: number): void {
+    if (index < 0) {
+      this.crumbs.set([]);
+      this.prefix.set('');
+    } else {
+      const crumbs = this.crumbs().slice(0, index + 1);
+      this.crumbs.set(crumbs);
+      this.prefix.set(crumbs[index].prefix);
+    }
+    this.selected.set(new Set());
+    this.load();
+  }
+
+  toggleSelect(key: string): void {
+    this.selected.update(set => {
+      const next = new Set(set);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
+  }
+
+  toggleSelectAll(): void {
+    const rows = this.filtered().filter(o => !o.folder).map(o => o.key);
+    this.selected.update(set => (rows.every(k => set.has(k)) ? new Set() : new Set(rows)));
+  }
+
+  download(entry: ObjectSummary): void {
+    this.storage.download(this.bucket(), entry.key).subscribe({
+      next: blob => StorageService.saveBlob(blob, StorageService.fileNameOf(entry.key)),
+      error: err => this.toast.error(err?.error?.message || `Could not download ${entry.name}.`),
+    });
+  }
+
+  async copy(value: string, what: string): Promise<void> {
+    if (await copyText(value)) {
+      this.toast.success(`${what} copied.`);
+    } else {
+      this.toast.error(`Could not copy the ${what.toLowerCase()}.`);
+    }
+  }
+
+  async remove(entry: ObjectSummary): Promise<void> {
+    if (this.actionBusy()) return;
+    this.actionBusy.set(true);
+    const ok = await confirmWith(this.dialog, {
+      title: entry.folder ? 'Delete folder' : 'Delete file',
+      body: entry.folder
+        ? `"${entry.name}" and everything inside it will be deleted. This cannot be undone.`
+        : `"${entry.name}" will be deleted. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) { this.actionBusy.set(false); return; }
+
+    const request = entry.folder
+      ? this.storage.deleteFolder(this.bucket(), entry.key)
+      : this.storage.deleteObject(this.bucket(), entry.key);
+
+    request.subscribe({
+      next: response => {
+        this.actionBusy.set(false);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(`${entry.name} deleted.`);
+          this.load();
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => {
+        this.actionBusy.set(false);
+        this.toast.error(err?.error?.message || 'Delete failed.');
+      },
+    });
+  }
+
+  async removeSelected(): Promise<void> {
+    if (this.actionBusy()) return;
+    const keys = this.visibleSelection();
+    if (!keys.length) return;
+    this.actionBusy.set(true);
+    const ok = await confirmWith(this.dialog, {
+      title: `Delete ${keys.length} file${keys.length === 1 ? '' : 's'}`,
+      body: 'The selected files will be deleted. This cannot be undone.',
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) { this.actionBusy.set(false); return; }
+
+    this.storage.deleteObjects(this.bucket(), keys).subscribe({
+      next: response => {
+        this.actionBusy.set(false);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(`${keys.length} file${keys.length === 1 ? '' : 's'} deleted.`);
+          this.selected.set(new Set());
+          this.load();
+        } else {
+          this.toast.error(response.message);
+        }
+      },
+      error: err => {
+        this.actionBusy.set(false);
+        this.toast.error(err?.error?.message || 'Delete failed.');
+      },
+    });
+  }
+
+  /**
+   * How many uploads are in the air at once.
+   *
+   * Sequential would make a 300-file folder feel broken, and unbounded would open 300 sockets at
+   * a bucket that then rate-limits and fails most of them. Three keeps the pipe busy and leaves
+   * the failure list short enough to be about the files rather than about the flood.
+   */
+  private static readonly UPLOAD_LANES = 3;
+
+  /** Files still to land, and the ones that did not, for the bar under the toolbar. */
+  readonly uploadTotal = signal(0);
+  readonly uploadDone = signal(0);
+  readonly uploadFailures = signal<string[]>([]);
+  readonly uploading = computed(() => this.uploadTotal() > 0 && this.uploadDone() < this.uploadTotal());
+
+  onUpload(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const chosen = Array.from(input.files ?? []);
+    input.value = '';
+    if (!chosen.length) return;
+    void this.confirmAndUpload(chosen);
+  }
+
+  /**
+   * The app's own confirmation before a folder goes up.
+   *
+   * The browser shows its own prompt first -- "Upload 135 files to this site?" -- and that one is
+   * a security control rendered outside the page: it cannot be suppressed, restyled or replaced,
+   * and every site that offers folder upload gets it. What it does NOT say is anything useful:
+   * not where the files are going, not how much data that is, not that sub-folders will be
+   * recreated. This says those, in the console's own dialog, and is the last point at which
+   * somebody who picked the wrong folder can stop.
+   *
+   * Only for a real folder pick. A single file needs no ceremony, and asking twice for one file
+   * is how a confirmation becomes something people dismiss without reading.
+   */
+  private async confirmAndUpload(chosen: File[]): Promise<void> {
+    const worth = chosen.filter(file => file.size > 0);
+    if (worth.length > 1) {
+      const folders = new Set(worth.map(file => this.relativeDirOf(file)).filter(Boolean));
+      const bytes = worth.reduce((total, file) => total + file.size, 0);
+      const into = this.prefix() || 'the top of this bucket';
+      const ok = await confirmWith(this.dialog, {
+        title: `Upload ${this.count(worth.length, 'file')}?`,
+        body: `${this.humanSize(bytes)} into ${into}`
+          + (folders.size ? `, recreating ${this.count(folders.size, 'sub-folder')}.` : '.')
+          + (chosen.length > worth.length
+            ? ` ${this.count(chosen.length - worth.length, 'empty file')} will be skipped.` : ''),
+        confirmLabel: 'Upload',
+      });
+      if (!ok) return;
+    }
+    this.uploadAll(chosen);
+  }
+
+  /**
+   * Uploads a file, or a whole folder, keeping the shape the reader picked.
+   *
+   * THE RELATIVE PATH IS SENT AS A DEEPER PREFIX, not as part of the file name. The server takes
+   * `Paths.get(originalFilename).getFileName()` -- it strips any directory off the name on
+   * purpose, as path-traversal defence -- so a name of "sub/a.csv" would land as "a.csv" and a
+   * folder would arrive flattened, with same-named files in different sub-folders silently
+   * overwriting each other. The prefix IS checked for traversal server-side (isSafeKey refuses
+   * "..", ".", a backslash and a leading slash), so composing it this way keeps that defence
+   * rather than working around it, and needs no change on the server at all.
+   *
+   * Empty files are dropped before they are sent: the server answers an empty multipart with
+   * "Uploaded file is empty", and a folder of 300 files containing two .DS_Store entries would
+   * otherwise report two failures that mean nothing to the person who picked the folder.
+   */
+  private uploadAll(files: File[]): void {
+    const worth = files.filter(file => file.size > 0);
+    const skipped = files.length - worth.length;
+    if (!worth.length) {
+      this.toast.error(skipped
+        ? `Nothing to upload — ${this.count(skipped, 'file')} had no content.`
+        : 'Nothing to upload.');
+      return;
+    }
+
+    const bucket = this.bucket();
+    const base = this.prefix();
+    this.uploadTotal.set(worth.length);
+    this.uploadDone.set(0);
+    this.uploadFailures.set([]);
+
+    from(worth).pipe(
+      mergeMap(file => this.storage.upload(bucket, base + this.relativeDirOf(file), file).pipe(
+        tap(response => {
+          if (response.status !== API_SUCCESS) {
+            this.noteFailure(file, response.message);
+          }
+        }),
+        catchError(err => {
+          this.noteFailure(file, err?.error?.message);
+          return of(null);
+        }),
+        tap(() => this.uploadDone.update(done => done + 1)),
+      ), Objects.UPLOAD_LANES),
+      catchError(() => EMPTY),
+    ).subscribe({
+      complete: () => {
+        const failed = this.uploadFailures().length;
+        const landed = worth.length - failed;
+        if (!failed) {
+          this.toast.success(`${this.count(landed, 'file')} uploaded.`
+            + (skipped ? ` ${this.count(skipped, 'empty file')} skipped.` : ''));
+        } else {
+          // Named, not counted. "3 failed" sends someone to compare two listings by eye.
+          this.toast.error(`${this.count(landed, 'file')} uploaded, ${failed} failed: `
+            + this.uploadFailures().slice(0, 3).join(', ')
+            + (failed > 3 ? ` and ${failed - 3} more.` : '.'));
+        }
+        // Once, at the end: a listing refresh per file would be one request per upload again.
+        this.load();
+      },
+    });
+  }
+
+  /**
+   * The sub-folder a picked file came from, ending in "/" so it composes onto the prefix.
+   *
+   * webkitRelativePath is "folder/sub/a.csv" for a directory pick and "" for a plain file pick,
+   * which is exactly the difference between the two cases -- so one method serves both and a
+   * single-file upload keeps landing where it always did.
+   */
+  private relativeDirOf(file: File): string {
+    const path = (file as File & { webkitRelativePath?: string }).webkitRelativePath ?? '';
+    const cut = path.lastIndexOf('/');
+    return cut <= 0 ? '' : path.slice(0, cut + 1);
+  }
+
+  private noteFailure(file: File, message?: string): void {
+    const where = this.relativeDirOf(file) + file.name;
+    this.uploadFailures.update(list => [...list, message ? `${where} (${message})` : where]);
+  }
+
+  private count(n: number, noun: string): string {
+    return `${n} ${noun}${n === 1 ? '' : 's'}`;
+  }
+
+  /** The file the chat panel is bound to; null when the panel is closed. */
+  readonly chatFile = signal<ObjectSummary | null>(null);
+
+  preview(entry: ObjectSummary): void {
+    this.dialog.open<boolean>(PreviewDialog, {
+      data: {
+        bucket: this.bucket(), key: entry.key, name: entry.name,
+        size: entry.size, lastModified: entry.lastModified,
+      },
+      hasBackdrop: true,
+    // An edit saved from the preview overwrites the object, so the row's size and modified
+    // date are stale until the folder is read again.
+    }).closed.subscribe(saved => { if (saved) this.load(); });
+  }
+
+  /**
+   * MIG-253: the file's details beside the list -- its metadata, the run and pipeline that wrote it
+   * when a recent run did, and its data policy and expiry.
+   */
+  details(entry: ObjectSummary): void {
+    this.dialog.open(FileDetails, sidePanelConfig<FileDetailsData>({
+      bucket: this.bucket(), key: entry.key, name: entry.name,
+      size: entry.size, lastModified: entry.lastModified, contentType: entry.contentType,
+    }));
+  }
+
+  /** The FileChat instance currently rendered behind `@if (chatFile(); ...)`, if any. */
+  private readonly chatRef = viewChild(FileChat);
+
+  /**
+   * Rebinding `chatFile` straight to a different entry reuses the same FileChat instance --
+   * `@if` only tears it down on a truthy-to-falsy transition -- so its `ngOnInit`, which loads
+   * agents and prepares the file, never ran again for the new file. The panel kept file A's
+   * messages, agent list and coverage banner visible under file B's header and bucket/key
+   * inputs, and any in-flight request from A's session was left running rather than cancelled.
+   * Routing every switch through the same close() the × button uses closes A's session (with
+   * its own "unsaved conversation" confirm, which the user can decline to stay on A) before B is
+   * ever opened, so there is always at most one file's session open.
+   *
+   * Awaiting close() is not on its own enough to make that teardown happen, and believing it was
+   * is what left this reusing the instance regardless. close() only emits `closed`, whose binding
+   * sets `chatFile` to null; `@if` is re-read by change detection, and under zoneless that is
+   * scheduled rather than run inline. Setting the new entry in the same turn therefore leaves the
+   * signal truthy for the whole of the next cycle, the block never sees a falsy value, and B is
+   * bound onto A's instance -- now carrying A's agent list and coverage figures, no ngOnInit to
+   * replace them, no prepareContext for B on the server, and a persistence effect that close()
+   * has already destroyed, so B's transcript is never saved either. Waiting for the render that
+   * removes the panel is what turns the close into an actual teardown.
+   */
+  async openChat(entry: ObjectSummary): Promise<void> {
+    const current = this.chatFile();
+    if (current?.key === entry.key) return;
+    if (current) {
+      await this.chatRef()?.close();
+      if (this.chatFile()) return; // declined to close -- stay on the current chat
+      await this.chatPanelRemoved();
+    }
+    this.chatFile.set(entry);
+  }
+
+  /**
+   * Resolves once the render that drops the closed panel has run, so the next write to
+   * `chatFile` reaches `@if` as a fresh open rather than a rebind of the panel still on screen.
+   */
+  private chatPanelRemoved(): Promise<void> {
+    return new Promise<void>(resolve =>
+      afterNextRender(() => resolve(), { injector: this.injector }));
+  }
+
+  /** Preview the file the chat is about; the two are independent panels. */
+  previewChatFile(): void {
+    const entry = this.chatFile();
+    if (entry) this.preview(entry);
+  }
+
+  clearFilters(): void {
+    this.search.set('');
+    this.dateFrom.set('');
+    this.dateTo.set('');
+  }
+
+  newFolder(): void {
+    if (this.actionBusy()) return;
+    this.actionBusy.set(true);
+    this.dialog.open<string>(PromptDialog, {
+      hasBackdrop: true,
+      data: {
+        title: 'New folder',
+        label: 'Folder name',
+        placeholder: 'reports',
+        confirmLabel: 'Create',
+        hint: 'Created inside the folder you are currently viewing.',
+      },
+    }).closed.subscribe(name => {
+      if (!name) { this.actionBusy.set(false); return; }
+      this.storage.createFolder(this.bucket(), this.prefix(), name).subscribe({
+        next: response => {
+          this.actionBusy.set(false);
+          if (response.status === API_SUCCESS) {
+            this.toast.success(`Folder "${name}" created.`);
+            this.load();
+          } else { this.toast.error(response.message); }
+        },
+        error: err => {
+          this.actionBusy.set(false);
+          this.toast.error(err?.error?.message || 'Could not create the folder.');
+        },
+      });
+    });
+  }
+
+  rename(entry: ObjectSummary): void {
+    if (this.actionBusy()) return;
+    this.actionBusy.set(true);
+    this.dialog.open<string>(PromptDialog, {
+      hasBackdrop: true,
+      data: {
+        title: 'Rename folder',
+        label: 'New name',
+        initial: entry.name,
+        confirmLabel: 'Rename',
+      },
+    }).closed.subscribe(name => {
+      if (!name || name === entry.name) { this.actionBusy.set(false); return; }
+      this.storage.renameFolder(this.bucket(), entry.key, name).subscribe({
+        next: response => {
+          this.actionBusy.set(false);
+          if (response.status === API_SUCCESS) {
+            this.toast.success(`Renamed to "${name}".`);
+            this.load();
+          } else { this.toast.error(response.message); }
+        },
+        error: err => {
+          this.actionBusy.set(false);
+          this.toast.error(err?.error?.message || 'Rename failed.');
+        },
+      });
+    });
+  }
+
+  /** Emails one file, or the current selection, as a ZIP. */
+  share(entry?: ObjectSummary): void {
+    if (this.actionBusy()) return;
+    const keys = entry ? [entry.key] : this.visibleSelection();
+    if (!keys.length) return;
+    this.actionBusy.set(true);
+    const bucket = this.bucket();
+    // The dialog sends, and stays open until the server answers, so a refusal is shown beside
+    // what was typed rather than after it has gone.
+    const send = (result: ShareResult) => this.storage.share(bucket, keys, result.recipientEmail, result.message);
+    this.dialog.open<ShareResult>(ShareDialog, {
+      hasBackdrop: true,
+      data: { count: keys.length, send },
+    }).closed.subscribe(result => {
+      this.actionBusy.set(false);
+      if (result) this.toast.success(`Sent to ${result.recipientEmail}.`);
+    });
+  }
+
+  /** Downloads each selected file individually; folders are skipped rather than zipped. */
+  downloadSelected(): void {
+    const keys = new Set(this.visibleSelection());
+    const files = this.filtered().filter(o => keys.has(o.key));
+    if (!files.length) return;
+    this.toast.info(`Downloading ${files.length} file${files.length === 1 ? '' : 's'}.`);
+    let failed = 0;
+    files.forEach(file => this.storage.download(this.bucket(), file.key).subscribe({
+      next: blob => StorageService.saveBlob(blob, StorageService.fileNameOf(file.key)),
+      error: () => {
+        // One summary rather than a toast per file: a failed batch of twenty should not
+        // bury the screen in twenty identical messages.
+        if (++failed === 1) this.toast.error('Some files could not be downloaded.');
+      },
+    }));
+  }
+}

@@ -1,0 +1,193 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Data policies</h1>
+      <p class="page-subtitle">
+        For each level of data — public, internal, sensitive — which models may see it, how long a run keeps it, and
+        whether the AI Assistant may change things with it.
+      </p>
+    </div>
+    @if (!waitingForWorkspace()) {
+      <div class="flex items-center gap-2">
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+      </div>
+    }
+  </div>
+
+  @if (isPlatformAdmin()) {
+    <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">
+      <label for="policy-workspace" class="text-sm font-medium">Workspace</label>
+      <app-combobox id="policy-workspace" ariaLabel="Workspace whose data policy to read" class="w-72 max-w-full"
+                    placeholder="Pick a workspace" [allowClear]="false" [options]="tenants()" [selected]="tenantId()"
+                    (selectedChange)="pickWorkspace($event)" />
+    </div>
+  }
+
+  @if (waitingForWorkspace()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick the workspace whose data policy to read.</div>
+  } @else if (error()) {
+    <div class="card p-0"><app-load-error [message]="error()" (retry)="load()" /></div>
+  } @else {
+    <app-blur-loader [active]="loading()" label="Reading the data policy">
+      <div class="flex flex-col gap-4">
+        @if (levels().length) {
+          <div class="card p-4 flex flex-col gap-2" data-state>
+            <div class="flex items-start gap-2">
+              <app-icon [name]="state() === 'defaults' ? 'info' : 'shield'" class="shrink-0 mt-1" />
+              @switch (state()) {
+                @case ('defaults') { <p class="font-medium">Not saved yet — these are the defaults</p> }
+                @case ('partly') { <p class="font-medium">Some levels are saved; the others are their defaults</p> }
+                @default { <p class="font-medium">Saved for this workspace</p> }
+              }
+            </div>
+            <p class="text-sm text-[color:var(--text-secondary)]">
+              @if (state() === 'defaults') {
+                They are what runs today: public and internal data may go to any model and the AI Assistant's write tools may act on it;
+                sensitive data stays on local models and the write tools do not act on it. Saving a level keeps it as you set it.
+              } @else {
+                A level marked Default has not been saved and follows the default.
+              }
+            </p>
+            @if (!canEdit()) {
+              <p class="text-sm text-[color:var(--text-muted)]" data-read-only>
+                <app-icon name="lock" size="0.9em" class="align-[-0.1em]" /> Only a workspace administrator can change the data policy.
+              </p>
+            }
+          </div>
+        }
+        <div class="grid gap-4 xl:grid-cols-3">
+          @for (d of drafts(); track d.sensitivity; let i = $index) {
+            <section class="card p-4 flex flex-col gap-4 min-w-0" [attr.data-level]="d.sensitivity" [attr.aria-labelledby]="'level-' + d.sensitivity">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <h2 class="font-semibold" [id]="'level-' + d.sensitivity">{{ text[d.sensitivity].label }}</h2>
+                  <p class="text-xs text-[color:var(--text-muted)]">{{ text[d.sensitivity].blurb }}</p>
+                </div>
+                @if (changed()[i]) { <span class="pill pill-warn shrink-0">Changed</span> }
+                @else if (levels()[i]?.saved) { <span class="pill pill-ok shrink-0">Saved</span> }
+                @else { <span class="pill pill-neutral shrink-0">Default</span> }
+              </div>
+              @if (canEdit()) {
+                <app-field label="Model rule" [for]="'rule-' + d.sensitivity" [hint]="ruleExplain(d.modelRule)">
+                  <select class="input" name="modelRule" [id]="'rule-' + d.sensitivity" [value]="d.modelRule" (change)="setRule(i, $any($event.target).value)">
+                    @for (r of rules; track r.value) { <option [value]="r.value" [selected]="r.value === d.modelRule">{{ r.label }}</option> }
+                  </select>
+                </app-field>
+                <fieldset class="flex flex-col gap-1.5 min-w-0">
+                  <legend class="label">Allowed models</legend>
+                  <div class="max-h-48 overflow-y-auto rounded-md border border-[color:var(--border-subtle)] px-3 py-2 flex flex-col gap-1.5">
+                    @for (c of choices(); track c.value) {
+                      <label class="flex items-start gap-2 text-sm min-w-0" [class.pl-5]="c.model">
+                        <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="c.value"
+                               [checked]="d.allowedModels.includes(c.value)" [disabled]="!!blocked(d.modelRule, c) && !d.allowedModels.includes(c.value)"
+                               (change)="toggleModel(i, c.value, $any($event.target).checked)" />
+                        <span class="min-w-0 break-words" [class.mono]="c.model" [class.text-xs]="c.model">{{ c.model ?? c.label }}</span>
+                        @if (blocked(d.modelRule, c); as why) { <span class="ml-auto shrink-0 text-xs text-[color:var(--text-muted)]">{{ why }}</span> }
+                      </label>
+                    }
+                    @for (entry of unknownAllowed(i); track entry) {
+                      <label class="flex items-start gap-2 text-sm min-w-0">
+                        <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="entry" checked
+                               (change)="toggleModel(i, entry, $any($event.target).checked)" />
+                        <span class="min-w-0 break-words">{{ allowedName(entry) }}</span>
+                      </label>
+                    }
+                    @if (!choices().length && !unknownAllowed(i).length) {
+                      <p class="text-xs text-[color:var(--text-muted)]">{{ connectionsError() || 'No model connections in this workspace yet.' }}</p>
+                    }
+                  </div>
+                  <p class="field-note text-[color:var(--text-muted)]">
+                    None ticked: any model the rule allows. A ticked connection allows each of its models.
+                  </p>
+                </fieldset>
+                <app-field label="Keep run files (days)" [for]="'retention-' + d.sensitivity" [error]="problems()[i] ?? ''"
+                           hint="Caps how long a run keeps this level's files, 1 to 3650 days. Blank: the pipeline's own retention (24 hours unless it sets another).">
+                  <input class="input" type="number" min="1" max="3650" step="1" name="retention" [id]="'retention-' + d.sensitivity"
+                         placeholder="The pipeline's own" [value]="d.retention" (input)="setRetention(i, $any($event.target).value)" />
+                </app-field>
+                <div class="flex flex-col gap-3">
+                  <label class="flex items-start justify-between gap-3">
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">AI write tools</span>
+                      <span class="block text-xs text-[color:var(--text-muted)]">The assistant may run pipelines, create PDFs, save or delete files and call APIs that change data. It still asks you first.</span>
+                    </span>
+                    <input type="checkbox" class="checkbox mt-0.5 shrink-0" role="switch" name="aiWriteTools" [checked]="d.aiWriteTools"
+                           (change)="setSwitch(i, 'aiWriteTools', $any($event.target).checked)" />
+                  </label>
+                  <label class="flex items-start justify-between gap-3">
+                    <span class="min-w-0">
+                      <span class="block text-sm font-medium">Minimum-fields warning</span>
+                      <span class="block text-xs text-[color:var(--text-muted)]">Remind whoever builds a step to send a model only the fields it needs.</span>
+                    </span>
+                    <input type="checkbox" class="checkbox mt-0.5 shrink-0" role="switch" name="minFieldsWarning" [checked]="d.minFieldsWarning"
+                           (change)="setSwitch(i, 'minFieldsWarning', $any($event.target).checked)" />
+                  </label>
+                </div>
+                @if (!isDefault(i)) {
+                  <button type="button" class="btn btn-ghost btn-sm self-start" data-use-defaults (click)="useDefaults(i)">
+                    <app-icon name="history" />Use the defaults
+                  </button>
+                }
+              } @else {
+                <dl class="grid gap-3 text-sm">
+                  <div>
+                    <dt class="text-[color:var(--text-muted)]">Model rule</dt>
+                    <dd class="font-medium">{{ ruleText(d.modelRule) }}</dd>
+                    <dd class="text-xs text-[color:var(--text-muted)]">{{ ruleExplain(d.modelRule) }}</dd>
+                  </div>
+                  <div>
+                    <dt class="text-[color:var(--text-muted)]">Allowed models</dt>
+                    <dd class="flex flex-wrap gap-1 mt-0.5">
+                      @for (entry of d.allowedModels; track entry) { <span class="pill pill-neutral mono">{{ allowedName(entry) }}</span> }
+                      @empty { <span>Any the rule allows</span> }
+                    </dd>
+                  </div>
+                  <div>
+                    <dt class="text-[color:var(--text-muted)]">Keep run files</dt>
+                    <dd>{{ retentionText(d) }}</dd>
+                  </div>
+                  <div class="flex items-baseline justify-between gap-3">
+                    <dt class="text-[color:var(--text-muted)]">AI write tools</dt>
+                    <dd>{{ d.aiWriteTools ? 'On' : 'Off' }}</dd>
+                  </div>
+                  <div class="flex items-baseline justify-between gap-3">
+                    <dt class="text-[color:var(--text-muted)]">Minimum-fields warning</dt>
+                    <dd>{{ d.minFieldsWarning ? 'On' : 'Off' }}</dd>
+                  </div>
+                </dl>
+              }
+            </section>
+          }
+        </div>
+        @if (rule()) {
+          <section class="card p-4 flex flex-col gap-1" aria-labelledby="policy-rule">
+            <h2 id="policy-rule" class="font-semibold text-sm">How a call's level is decided</h2>
+            <p class="text-sm text-[color:var(--text-secondary)]">{{ rule() }}</p>
+            <p class="text-xs text-[color:var(--text-muted)]">
+              A prompt declares its level on its editor; a pipeline may declare one in its settings; an API collection or a data
+              contract has one of its own.
+              @if (canEdit()) { Mark a hosted connection as covered by a BAA on <a class="link-inline" routerLink="/ai/connections">Model connections</a>. }
+            </p>
+          </section>
+        }
+        @if (canEdit() && levels().length) {
+          <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2 sticky bottom-3 z-10">
+            @if (saveError()) {
+              <p class="text-sm text-crit-500 mr-auto flex items-start gap-1.5" role="alert" data-save-error><app-icon name="alert" size="0.9em" class="mt-0.5 shrink-0" /><span>{{ saveError() }}</span></p>
+            } @else {
+              <p class="text-sm text-[color:var(--text-muted)] mr-auto" data-dirty aria-live="polite">
+                {{ changedCount() ? changedCount() + (changedCount() === 1 ? ' level changed' : ' levels changed') : 'No changes' }}
+              </p>
+            }
+            <button type="button" class="btn btn-ghost btn-sm" data-discard [disabled]="!changedCount() || saving()" (click)="discard()">Discard changes</button>
+            <button type="button" class="btn btn-primary btn-sm" data-save [disabled]="!changedCount() || saving()" (click)="save()">
+              <app-icon name="save" />{{ saving() ? 'Saving…' : 'Save policy' }}
+            </button>
+          </div>
+        }
+      </div>
+    </app-blur-loader>
+  }
+</div>

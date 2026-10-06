@@ -1,0 +1,220 @@
+@if (timeline(); as t) {
+  <!-- MIG-237: the run's result review, when its pipeline requires one (nothing is drawn otherwise). -->
+  <app-run-review [jobQueueId]="jobQueueId()" />
+  <section class="card exec-steps overflow-clip" aria-labelledby="run-steps-heading">
+    <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle">
+      <app-icon name="layers" class="icon-info shrink-0" />
+      <h2 id="run-steps-heading" class="text-sm font-semibold mr-auto">
+        Steps
+        <span class="font-normal text-[color:var(--text-muted)]">· {{ completedCount() }} of {{ t.steps.length }} completed</span>
+      </h2>
+      @if (t.attempts.length > 1) {
+        <app-segmented [value]="shownAttempt()" (valueChange)="chooseAttempt($event)"
+                       [options]="attemptOptions()" ariaLabel="Attempt" />
+      }
+      <app-segmented [(value)]="view" [options]="views" ariaLabel="Step view" />
+    </div>
+
+    @switch (view()) {
+      @case ('timeline') {
+        <ol class="log-timeline">
+          @for (s of t.steps; track s.index) {
+            <li class="log-tl-item exec-step" [attr.data-step]="s.key">
+              <span class="log-tl-rail">
+                <span class="log-tl-dot tone-fill" [class]="toneClass(tone(s.status))"></span>
+              </span>
+              <div class="min-w-0 flex-1">
+                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span class="step-index">{{ s.index + 1 }}</span>
+                  <span class="mono font-medium">{{ s.key }}</span>
+                  <span class="pill pill-neutral mono">{{ s.task }}</span>
+                  <app-status [label]="s.status" />
+                  @if (s.log === 'step' && s.stepExecutionId !== null) {
+                    <button type="button" class="btn btn-ghost btn-sm ml-auto"
+                            [attr.aria-label]="'Show the log of step ' + s.key"
+                            title="This step's own lines, in the Console"
+                            (click)="openLog(s)">
+                      <app-icon name="terminal" /><span class="hidden sm:inline">Log</span>
+                    </button>
+                  }
+                </div>
+
+                <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs tabular text-[color:var(--text-secondary)]">
+                  <span title="Started">
+                    <app-icon name="clock" size="0.85em" class="icon-muted" />
+                    {{ s.startedAt ? (s.startedAt | serverTime:'timeSec') : 'Not started' }}
+                  </span>
+                  <span title="How long the step took">{{ duration(s) }}</span>
+                  <span title="Records in → out">{{ recordsLabel(s) }} records</span>
+                  @if ((s.tries ?? 1) > 1) { <span>{{ s.tries }} tries</span> }
+                  @if (s.onError && s.onError !== 'fail') { <span>On error: {{ s.onError }}</span> }
+                </div>
+
+                @if (errorText(s); as problem) {
+                  <p class="flex items-start gap-1.5 mt-1.5 text-xs text-crit-500 log-message">
+                    <app-icon name="xCircle" size="0.9em" class="mt-px shrink-0" />{{ problem }}
+                  </p>
+                } @else if (showMessage(s)) {
+                  <p class="mt-1.5 text-xs text-[color:var(--text-secondary)] log-message">{{ s.statusMessage }}</p>
+                }
+
+                @if (s.datasets?.length) {
+                  <ul class="flex flex-wrap gap-1.5 mt-1.5" aria-label="Datasets this step wrote">
+                    @for (d of s.datasets; track d.runDatasetId) {
+                      <li class="flex items-center gap-0.5 max-w-full min-w-0">
+                        <span class="pill pill-neutral max-w-full" [title]="columnsTitle(d.columns)">
+                          <app-icon name="table" size="0.85em" />
+                          <span class="truncate">{{ d.name }}</span>
+                          @if (rowsLabel(d.rowCount); as rows) {
+                            <span class="text-[color:var(--text-muted)] whitespace-nowrap">· {{ rows }}</span>
+                          }
+                        </span>
+                        <!-- Wave 4: the dataset as csv, json or jsonl (sourceJob.json/runDataset). -->
+                        <button type="button" class="btn btn-ghost btn-xs shrink-0" [cdkMenuTriggerFor]="formatMenu"
+                                [attr.aria-label]="'Download ' + d.name + ' from step ' + s.key"
+                                title="Download this dataset" [disabled]="busy() !== ''">
+                          <app-icon name="download" />
+                        </button>
+                        <ng-template #formatMenu>
+                          <div cdkMenu class="card shadow-xl py-1 min-w-36 text-sm">
+                            @for (f of formatsFor(d.name); track f.id) {
+                              <button cdkMenuItem class="menu-item" [attr.data-format]="f.id"
+                                      (cdkMenuItemTriggered)="downloadDataset(d.runDatasetId, f.id, d.name)">
+                                <app-icon name="download" />{{ f.label }}
+                              </button>
+                            }
+                          </div>
+                        </ng-template>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            </li>
+          }
+        </ol>
+      }
+
+      @case ('console') {
+        <div class="flex flex-wrap items-center gap-2 px-4 py-2.5">
+          <label class="text-xs text-[color:var(--text-secondary)]" for="run-step-pick">Step</label>
+          <!-- Each option says whether it is the one: a [value] on the select lands before its options exist when
+               the Console opens, and the browser then shows the first step beside another step's lines. -->
+          <select id="run-step-pick" class="input max-w-72" aria-label="Step to show"
+                  (change)="chooseStep($any($event.target).value)">
+            @for (s of t.steps; track s.index) {
+              <option [value]="s.key" [selected]="s.key === selectedStep()?.key"
+                      [disabled]="s.log !== 'step' || s.stepExecutionId === null">
+                {{ s.index + 1 }}. {{ s.key }} ({{ s.task }})
+              </option>
+            }
+          </select>
+          @if (selectedStep(); as s) { <app-status [label]="s.status" /> }
+        </div>
+        <div class="log-console">
+          @if (selectedLines(); as lines) {
+            @if (lines === 'error') {
+              <div class="log-console-line">The step's lines could not be read.</div>
+            } @else {
+              @for (line of lines; track line.lineNo) {
+                <div class="log-console-line">
+                  <span class="log-console-time">[{{ line.loggedAt ? (line.loggedAt | serverTime:'timeSec') : '—' }}]</span>
+                  <span class="shrink-0 tone-text" [class]="toneClass(levelColor(line.level))">{{ line.level || 'INFO' }}</span>
+                  <span class="log-message">{{ line.message }}</span>
+                </div>
+              } @empty {
+                <div class="log-console-line">This step wrote no log lines.</div>
+              }
+            }
+          } @else {
+            <div class="log-console-line">Reading the step's lines…</div>
+          }
+        </div>
+      }
+    }
+
+    <!-- Wave 4: what the run put out (sourceJob.json/runOutputs): kept files download through their dataset until they
+         expire; bucket uploads download from storage, as the object browser does. -->
+    @if (outputs(); as files) {
+      <div class="exec-files border-t border-subtle px-4 py-3" role="region" aria-labelledby="run-files-heading">
+        <div class="detail-head" id="run-files-heading">Files</div>
+        @if (files === 'error') {
+          <p class="text-xs text-[color:var(--text-muted)]">The run's files could not be read.</p>
+        } @else {
+          <ul class="side-panel-list text-xs">
+            @for (o of files; track o.runOutputId) {
+              <li class="exec-file" [attr.data-kind]="o.kind">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <app-icon [name]="o.kind === 'bucket' ? 'upload' : 'file'" size="0.9em" class="icon-muted shrink-0" />
+                    <span class="mono font-medium truncate" [title]="o.name">{{ o.name }}</span>
+                    <span class="pill pill-neutral shrink-0">{{ o.kind === 'bucket' ? 'Uploaded' : 'Kept' }}</span>
+                  </div>
+                  <div class="mt-0.5 text-[color:var(--text-muted)]">
+                    Step <span class="mono">{{ o.stepKey }}</span>
+                    @if (rowsLabel(o.rowCount); as rows) { · {{ rows }} }
+                    @if (o.byteCount) { · {{ formatSize(o.byteCount) }} }
+                    @if (o.kind === 'file') {
+                      @if (o.expired) { · <span class="text-warn-500">Expired</span> }
+                      @else if (o.expiresAt) { · Kept until {{ o.expiresAt | serverTime:'recent' }} }
+                    }
+                  </div>
+                  @if (o.kind === 'bucket') {
+                    <div class="mt-0.5 mono break-all text-[color:var(--text-secondary)]">{{ o.bucket }} / {{ o.key }}</div>
+                  }
+                </div>
+                @if (o.kind === 'file') {
+                  <div class="flex flex-wrap justify-end justify-self-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name + ' as'">
+                    @for (f of formatsFor(o.name, o.format); track f.id) {
+                      <button type="button" class="btn btn-default btn-xs" [attr.data-format]="f.id"
+                              [disabled]="!!o.expired || !o.runDatasetId || busy() !== ''"
+                              [title]="o.expired ? 'This file has expired and can no longer be downloaded' : 'Download as ' + f.label"
+                              (click)="downloadDataset(o.runDatasetId!, f.id, o.name)">
+                        <app-icon name="download" />{{ f.label }}
+                      </button>
+                    }
+                  </div>
+                } @else {
+                  <button type="button" class="btn btn-default btn-xs justify-self-end" [disabled]="!o.bucket || !o.key || busy() !== ''"
+                          [attr.aria-label]="'Download ' + o.name + ' from ' + o.bucket"
+                          (click)="downloadUpload(o)">
+                    <app-icon name="download" />Download
+                  </button>
+                }
+              </li>
+            } @empty {
+              <li class="text-[color:var(--text-muted)]">No files were recorded for this run.</li>
+            }
+          </ul>
+        }
+      </div>
+    }
+
+    @if (aiSteps().length) {
+      <div class="exec-ai-trace border-t border-subtle px-4 py-3">
+        <div class="detail-head">AI trace</div>
+        <ul class="side-panel-list text-xs">
+          @for (a of aiSteps(); track a.stepKey + '-' + (a.attempt ?? 1)) {
+            <li>
+              <div class="min-w-0">
+                <span [class]="outcomePill(a.outcome)">{{ outcomeLabel(a.outcome) }}</span>
+                <span class="ml-1 mono font-medium">&lt;{{ a.stepKey }}&gt;</span>
+                <span class="text-[color:var(--text-secondary)]">
+                  on <span class="mono">{{ a.model || a.modelProfile || 'its default model' }}</span>,
+                  {{ choiceLabel(a) }}
+                  @if (a.modelChoice) { ({{ a.modelChoice }}) }
+                </span>
+                @if (a.error) { <div class="text-crit-500 mt-0.5 log-message">{{ a.error }}</div> }
+              </div>
+              <span class="text-[color:var(--text-muted)] whitespace-nowrap">
+                @if (a.promptId) { prompt #{{ a.promptId }} }
+                @if (a.promptVersion) { v{{ a.promptVersion }} }
+                @if (a.runIn === 'worker') { · in the worker }
+              </span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+  </section>
+}

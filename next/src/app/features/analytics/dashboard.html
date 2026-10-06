@@ -1,0 +1,298 @@
+<div class="page">
+  @if (openId() === null) {
+    <!-- ---- the cards: every board in the workspace ------------------------------------------ -->
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Saved Analyses</h1>
+        <p class="page-subtitle">Pages of saved analyses, re-run each time you open them.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <button type="button" class="btn btn-primary btn-sm" (click)="createOpen() ? createOpen.set(false) : openCreate()" [attr.aria-expanded]="createOpen()">
+          <app-icon name="plus" />New dashboard
+        </button>
+        <a routerLink="/data/analytics" class="btn btn-ghost btn-sm">Analytics Studio</a>
+      </div>
+    </div>
+
+    @if (createOpen()) {
+      <div class="card p-4 flex flex-wrap items-end gap-2">
+        <label class="flex-1 min-w-48"><span class="label">Name</span>
+          <input id="dashName" class="input" placeholder="Sales overview" aria-label="New dashboard name" [value]="newName()" (input)="newName.set($any($event.target).value)" (keydown.enter)="createDashboard()" /></label>
+        <label class="flex-[2] min-w-56"><span class="label">What it is for (optional)</span>
+          <input id="dashDescription" class="input" placeholder="September orders at a glance" aria-label="Dashboard description" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)" /></label>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!canCreate()" (click)="createDashboard()"><app-icon name="plus" [busy]="creating()" />{{ creating() ? 'Creating…' : 'Create' }}</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="createOpen.set(false)">Cancel</button>
+        @if (createError()) { <p class="text-xs text-crit-500 basis-full">{{ createError() }}</p> }
+      </div>
+    }
+
+    @if (loading() && !dashboards().length) {
+      <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the dashboards…</div>
+    } @else if (error()) {
+      <div class="card dash-list-error"><app-load-error [message]="error()" (retry)="loadDashboards()" /></div>
+    } @else if (!dashboards().length) {
+      <!-- An invitation, not a blank page: what a dashboard is and the one button that makes one. -->
+      <div class="card p-10 flex flex-col items-center text-center gap-2 dash-empty">
+        <span class="stat-glyph"><app-icon name="chart" /></span>
+        <h2 class="text-base font-semibold">No dashboards yet</h2>
+        <p class="text-sm text-[color:var(--text-secondary)] max-w-md">
+          A dashboard is a page of saved analyses and queries that runs again each time it is opened.
+          Make one, then add the work you saved in the Analytics Studio.
+        </p>
+        <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openCreate()"><app-icon name="plus" />Create a dashboard</button>
+      </div>
+    } @else {
+      @if (dashboards().length > searchFrom) {
+        <div class="search-field max-w-sm">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" type="search" placeholder="Find a dashboard" aria-label="Filter dashboards by name" [value]="listFilter()" (input)="listFilter.set($any($event.target).value)" />
+        </div>
+      }
+      @if (!visibleDashboards().length) {
+        <p class="text-sm text-[color:var(--text-muted)]">No dashboard's name or description contains "{{ listFilter() }}".</p>
+      }
+      <!-- Three across at most, as the Object Browser's cards: four made each too narrow for a name. -->
+      <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Dashboards">
+        @for (item of visibleDashboards(); track item.analyticsDashboardId) {
+          <li class="min-w-0 flex">
+            <!-- A link, not a button: ?board= is the page's own address for a board, so a card can
+                 be opened in a new tab or copied. -->
+            <a class="dash-card card p-0 flex flex-col flex-1 min-w-0 transition-colors hover:border-[color:var(--border-strong)]"
+               [routerLink]="[]" [queryParams]="{ board: item.analyticsDashboardId }">
+              <span class="flex items-start gap-3 p-4 pb-2 w-full">
+                <span class="stat-glyph"><app-icon name="chart" /></span>
+                <span class="min-w-0 flex-1">
+                  <span class="font-medium line-clamp-2 break-words" [title]="item.dashboardName">{{ item.dashboardName }}</span>
+                  <span class="block text-xs text-[color:var(--text-muted)] mt-0.5 min-h-4 dash-card-facts">{{ cardFacts(item) }}</span>
+                </span>
+              </span>
+              @if (item.dashboardDescription) {
+                <span class="block px-4 pb-4 text-xs text-[color:var(--text-secondary)] line-clamp-2 break-words" [title]="item.dashboardDescription">{{ item.dashboardDescription }}</span>
+              } @else {
+                <span class="block px-4 pb-4 text-xs text-[color:var(--text-muted)]">No description</span>
+              }
+              <span class="mt-auto flex items-center gap-2 px-4 py-2.5 border-t border-subtle text-xs text-[color:var(--text-muted)] w-full">
+                <app-icon name="user" size="0.9em" class="shrink-0" />
+                <span class="min-w-0 truncate">
+                  {{ item.createdByName || 'Unknown owner' }}@if (item.dateUpdated || item.dateCreated) { · updated {{ (item.dateUpdated || item.dateCreated) | serverTime:'date' }} }
+                </span>
+                <app-icon name="chevronRight" size="0.95em" class="ml-auto shrink-0 text-[color:var(--text-secondary)]" />
+              </span>
+            </a>
+          </li>
+        }
+        @if (!listFilter().trim()) {
+          <li class="min-w-0 flex">
+            <button type="button" class="dash-card-new flex-1 min-h-32 rounded-card border border-dashed border-[color:var(--border-strong)] text-sm text-[color:var(--text-secondary)]
+                                         flex flex-col items-center justify-center gap-1 transition-colors hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]"
+                    (click)="openCreate()">
+              <app-icon name="plus" size="1.1rem" />New dashboard
+            </button>
+          </li>
+        }
+      </ul>
+    }
+  } @else {
+    <!-- ---- one board, the whole width ------------------------------------------------------ -->
+    <div class="flex flex-col gap-3">
+      <!-- A real link to the cards (Back does the same); the click also leaves the board at once. -->
+      <a [routerLink]="[]" class="text-sm text-accent hover:underline self-start dash-back" (click)="leaveBoard()">← All dashboards</a>
+
+      @if (boardError()) {
+        <div class="card"><app-load-error [message]="boardError()" (retry)="retryBoard()" /></div>
+      } @else if (board(); as open) {
+        <div class="page-head">
+          <div class="min-w-0">
+            <h1 class="page-title break-words">{{ open.dashboardName }}</h1>
+            @if (open.dashboardDescription) { <p class="page-subtitle">{{ open.dashboardDescription }}</p> }
+            <p class="dash-facts text-xs text-[color:var(--text-muted)] mt-1.5">
+              <span>{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
+              @if (boardFiles().length) { <span>{{ boardFiles().length }} file{{ boardFiles().length === 1 ? '' : 's' }}</span> }
+              @if (open.createdByName) { <span>{{ open.createdByName }}</span> }
+              @if (running()) { <span class="inline-flex items-center gap-1"><app-icon name="refresh" size="0.9em" class="spin" />{{ progress() }}</span> }
+              @else if (lastRun()) {
+                <span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span>
+                <span>{{ lastRunText() }}</span>
+              }
+              @if (boardFilterCount()) { <span><span class="pill pill-brand">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</span></span> }
+            </p>
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0">
+            @if (running()) {
+              <button type="button" class="btn btn-default btn-sm" (click)="stopRun()"><app-icon name="stop" />Stop</button>
+            } @else if (widgets().length) {
+              <button type="button" class="btn btn-primary btn-sm" (click)="runAll()"><app-icon name="refresh" />Run every widget</button>
+            }
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            <ng-template #boardMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button>
+                @if (boardDatasets().length) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="filterOpen.set(!filterOpen())"><app-icon name="filter" />{{ filterOpen() ? 'Hide the board filter' : 'Filter this board' }}</button>
+                }
+                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeDashboard(open)"><app-icon name="trash" class="icon-crit" />Delete this dashboard</button>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+
+        <!-- Reference, not the work: folded away so the widgets start near the top. -->
+        @if (boardFiles().length) {
+          <details class="dash-files text-xs">
+            <summary class="cursor-pointer select-none text-[color:var(--text-secondary)] w-fit">Files this board reads ({{ boardFiles().length }})</summary>
+            <ul class="mt-1.5 flex flex-col gap-0.5 min-w-0">
+              @for (file of boardFiles(); track file) { <li class="mono truncate" [title]="file">{{ file }}</li> }
+            </ul>
+          </details>
+        }
+
+        <!-- ---- the board filter: one dataset, an explicit apply --------------------------- -->
+        @if (boardDatasets().length && filterOpen()) {
+          <div class="card p-4 flex flex-col gap-3 min-w-0">
+            <div class="flex flex-wrap items-end gap-2 min-w-0">
+              <label class="flex flex-col gap-1 min-w-0">
+                <span class="label">Filter the widgets that read</span>
+                <!-- One dataset: a condition naming a column another file lacks is a hard refusal, so an unscoped filter would turn half a board into error tiles. -->
+                <select id="b-filter-dataset" class="input w-auto min-w-0 max-w-full" [value]="boardFilterOn()" (change)="chooseFilterDataset($any($event.target).value)">
+                  <option value="">nothing yet — pick a dataset</option>
+                  @for (dataset of boardDatasets(); track dataset.key) { <option [value]="dataset.key" [selected]="dataset.key === boardFilterOn()">{{ dataset.label }}</option> }
+                </select>
+              </label>
+              <button type="button" class="btn btn-ghost btn-sm ms-auto" (click)="filterOpen.set(false)">Hide</button>
+            </div>
+            @if (boardColumnsLoading()) {
+              <p class="field-note text-[color:var(--text-muted)]">Reading that dataset's columns — one of the four queries this server runs at a time, which is why it is only read when you open this.</p>
+            } @else if (boardColumnsError()) {
+              <p class="text-xs text-crit-500">{{ boardColumnsError() }}</p>
+            } @else if (boardFilterOn()) {
+              <app-filter-builder [model]="boardFilter()" [columns]="boardColumns()" (changed)="boardFilter.set($event)" />
+              <div class="flex flex-wrap items-center gap-2">
+                @if (unfinishedBoardFilters()) { <span class="pill pill-warn">{{ unfinishedBoardFilters() }} not finished, so not applied</span> }
+                <!-- An explicit press: ten widgets is ten governed queries. -->
+                <button type="button" class="btn btn-primary btn-sm" [disabled]="running()" (click)="applyBoardFilter()">Apply to the board</button>
+                <span class="field-note text-[color:var(--text-muted)]">Editing here re-runs nothing until you press this. Clicking a bar on a tile fills this in and applies at once.</span>
+              </div>
+            }
+          </div>
+        }
+
+        <!-- ---- adding a widget ---------------------------------------------------------- -->
+        @if (addOpen()) {
+          <div class="card p-4 flex flex-col gap-3 min-w-0">
+            <!-- app-field and .form-grid, as every other create form: required stars, and an
+                 out-of-range height said beside its box. -->
+            <div class="form-grid">
+              <app-field label="Title" for="w-title" [required]="true"><input id="w-title" class="input" placeholder="Widget title" [value]="addTitle()" (input)="addTitle.set($any($event.target).value)" /></app-field>
+              <app-field label="Shows" for="w-kind">
+                <select id="w-kind" class="input" [value]="addKindOfSource()" (change)="pickSourceKind($any($event.target).value)">
+                  <option value="analysis" [selected]="addKindOfSource() === 'analysis'">A saved analysis</option>
+                  <option value="query" [selected]="addKindOfSource() === 'query'">A saved query</option>
+                </select></app-field>
+              <app-field label="Which one" for="w-source" [required]="true">
+                <select id="w-source" class="input w-full" [value]="addSourceId()" (change)="addSourceId.set($any($event.target).value)">
+                  <option value="" [selected]="!addSourceId()">Pick one…</option>
+                  @if (addKindOfSource() === 'analysis') {
+                    @for (item of analyses(); track item.analyticsAnalysisId) { <option [value]="item.analyticsAnalysisId">{{ item.analysisName }}</option> }
+                  } @else {
+                    @for (item of queries(); track item.analyticsQueryId) { <option [value]="item.analyticsQueryId">{{ item.queryName }}</option> }
+                  }
+                </select></app-field>
+              <app-field label="Drawn as" for="w-viz">
+                <select id="w-viz" class="input" [value]="addVisualization()" (change)="addVisualization.set($any($event.target).value)">
+                  @for (kind of kinds; track kind.id) { <option [value]="kind.id" [selected]="kind.id === addVisualization()">{{ kind.label }}</option> }
+                </select></app-field>
+              <app-field label="Height" for="w-height">
+                <input id="w-height" class="input" type="number" placeholder="180" [class.input-invalid]="!!heightError()"
+                       [attr.aria-invalid]="heightError() ? 'true' : null" [attr.aria-describedby]="heightError() ? 'w-height-error' : null"
+                       [attr.min]="heightMin" [attr.max]="heightMax" [attr.step]="10" [value]="addHeight()" (input)="addHeight.set($any($event.target).value)" />
+                @if (heightError()) { <p id="w-height-error" class="field-note text-crit-500">{{ heightError() }}</p> }
+              </app-field>
+              <app-field label="Caption" for="w-caption" hint="Optional."><input id="w-caption" class="input" placeholder="What the reader should take from it" [value]="addCaption()" (input)="addCaption.set($any($event.target).value)" /></app-field>
+            </div>
+            <div class="form-actions">
+              <button type="button" class="btn btn-ghost btn-sm" (click)="addOpen.set(false)">Cancel</button>
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="!canAdd()" (click)="addWidget()">Add</button>
+            </div>
+            <p class="field-note text-[color:var(--text-muted)]">A widget points at saved work; it never keeps a copy of the result. Adding one runs that widget alone, not the whole board.</p>
+            @if (sourcesError()) { <p class="text-xs text-crit-500">{{ sourcesError() }}</p> }
+            @else if (!analyses().length && !queries().length && sourcesReady()) { <p class="text-xs text-[color:var(--text-muted)]">This workspace has saved neither an analysis nor a query yet, so there is nothing a widget could point at.</p> }
+            @if (addError()) { <p class="text-xs text-crit-500">{{ addError() }}</p> }
+          </div>
+        }
+
+        @if (widgetError()) { <p class="text-xs text-crit-500">{{ widgetError() }}</p> }
+
+        @if (!widgets().length) {
+          <div class="card p-10 flex flex-col items-center text-center gap-2">
+            <app-icon name="layers" size="1.5rem" class="icon-muted" />
+            <p class="text-sm text-[color:var(--text-secondary)]">Nothing on this board yet.</p>
+            <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button>
+          </div>
+        } @else {
+          <!-- Twelve columns: a single figure takes 3, a chart 6, a table the row (spanOf). -->
+          <div class="dash-grid">
+            @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
+              @let run = runs()[widget.analyticsDashboardWidgetId!];
+              <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
+                                    [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                <ng-container actions>
+                  <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"><app-icon name="dots" size="1em" /></button>
+                  <ng-template #tileMenu>
+                    <!-- "Show as" is a section of this menu rather than a submenu: a CDK submenu opens on
+                         hover and a click on its trigger then closed it again. Every kind is listed in
+                         the picker's order; one this result cannot honestly be drawn as stays in the
+                         list, inert, with the reason under it. -->
+                    <div cdkMenu class="card shadow-xl py-1 w-72 max-h-[70vh] overflow-y-auto text-sm">
+                      @if (run?.view; as view) {
+                        <p class="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-muted)]" [id]="'kinds-' + widget.analyticsDashboardWidgetId">Show as</p>
+                        <div cdkMenuGroup [attr.aria-labelledby]="'kinds-' + widget.analyticsDashboardWidgetId">
+                          @for (kind of kinds; track kind.id) {
+                            <button cdkMenuItemRadio class="menu-item items-start dash-kind" [attr.data-kind]="kind.id"
+                                    [cdkMenuItemChecked]="kind.id === drawn(widget, view)" [cdkMenuItemDisabled]="!!view.issues[kind.id]" [disabled]="!!view.issues[kind.id]"
+                                    [title]="view.issues[kind.id] || kind.label" (cdkMenuItemTriggered)="setVisualization(widget, kind.id)">
+                              <app-icon name="check" size="0.9em" class="mt-0.5 shrink-0" [class.invisible]="kind.id !== drawn(widget, view)" />
+                              <span class="min-w-0">
+                                <span class="block">{{ kind.label }}</span>
+                                @if (view.issues[kind.id]) { <span class="block text-[11px] leading-snug text-[color:var(--text-muted)] whitespace-normal">{{ view.issues[kind.id] }}</span> }
+                              </span>
+                            </button>
+                          }
+                        </div>
+                        <div class="my-1 border-t border-subtle"></div>
+                        @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
+                      }
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
+                    </div>
+                  </ng-template>
+                </ng-container>
+
+                @if (run?.view; as view) {
+                  @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
+                  @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
+                  <div [class.dash-rows-open]="isExpanded(widget)">
+                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)" />
+                  </div>
+                  @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
+                }
+
+                <div foot class="widget-foot">
+                  @if (run?.view; as view) {
+                    @let kind = drawn(widget, view);
+                    @if (hiddenRowTotal(view, kind); as total) {
+                      <button type="button" class="btn btn-ghost btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
+                        {{ isExpanded(widget) ? 'Show fewer' : 'Show all ' + total }}
+                      </button>
+                    }
+                    <span class="text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span>
+                  }
+                </div>
+              </app-analytics-widget>
+            }
+          </div>
+        }
+      } @else {
+        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the board…</div>
+      }
+    </div>
+  }
+</div>

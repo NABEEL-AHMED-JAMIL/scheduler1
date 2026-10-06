@@ -1,0 +1,221 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Cost &amp; usage</h1>
+      <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
+    </div>
+    <div class="flex items-center gap-2 flex-wrap">
+      @if (isPlatformAdmin()) {
+        <label for="usageWorkspace" class="sr-only">Workspace</label>
+        <app-combobox id="usageWorkspace" class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
+      }
+      <div class="btn-join" role="group" aria-label="Month">
+        <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
+        <span class="btn btn-default btn-sm btn-label min-w-32" aria-live="polite">{{ monthLabel() }}</span>
+        <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(1)" [disabled]="isCurrentMonth()" aria-label="Next month"><app-icon name="chevronRight" /></button>
+      </div>
+      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()" title="Price the last minutes' events now"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+      <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="loading() || !lines().length" title="The lines below as a CSV"><app-icon name="download" />Export CSV</button>
+    </div>
+  </div>
+
+  @if (notConfigured()) {
+    <div class="card p-8 text-center">
+      <app-icon name="alert" size="1.6rem" class="icon-warn" />
+      <p class="text-sm font-medium mt-2">Metering is not configured</p>
+      <p class="text-xs text-[color:var(--text-muted)] mt-1">Set <code class="mono">METER_URL</code> and <code class="mono">METER_SERVICE_KEY</code> on the billing service to point it at the meter.</p>
+    </div>
+  } @else if (error()) {
+    <div class="card p-8 text-center">
+      <app-icon name="alert" size="1.6rem" class="icon-crit" />
+      <p class="text-sm text-crit-500 mt-2">{{ error() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
+    </div>
+  } @else {
+    <p class="text-xs text-[color:var(--text-muted)]">
+      @if (rateCard(); as card) {
+        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> } · {{ currency() }}
+        @if (isPlatformAdmin()) { · <a routerLink="/billing/rates" class="link-inline">rate cards</a> }
+      } @else { Priced with the rate card in effect · {{ currency() }} }
+      · day {{ daysElapsed() }} of {{ daysInMonth() }}
+      @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
+    </p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <app-stat-tile label="Month to date" [value]="fmtMoney(total())" icon="chart" tone="info"
+                     [foot]="(isCurrentMonth() ? (forecast() !== null ? 'forecast ' + fmtMoney(forecast()!) : 'no forecast yet') : 'closed month') + (previousTotal() !== null ? ' · ' + previousLabel() + ' ' + fmtMoney(previousTotal()!) : '')" />
+      <app-stat-tile label="Data deleted" [value]="fmtBytes(deletedBytes())" icon="trash" [tone]="deletedBytes() > 0 ? 'warn' : 'muted'"
+                     [foot]="(deleteOps() | number: '1.0-0') + ' delete op' + (deleteOps() === 1 ? '' : 's') + ' · ' + fmtMoney(churnAmount()) + ' churn'" />
+      <app-stat-tile label="Storage kept" [value]="fmtGb(storedGbAverage())" icon="cloud" tone="muted"
+                     [foot]="storedNights() ? 'avg of ' + storedNights() + ' night' + (storedNights() === 1 ? '' : 's') + ' measured' : 'not measured yet'" />
+      <app-stat-tile label="Seats" [value]="seats()" icon="users" tone="muted" [foot]="fmtMoney(seatsAmount()) + ' this month'" />
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] mt-4">
+      <div class="card p-4">
+        <h2 class="font-semibold text-sm">Cost by day</h2>
+        <p class="text-xs text-[color:var(--text-muted)] mb-2">Stacked by service, before monthly allowances and tiers — the month's total above is after them. Measured items (storage kept, seats, topics) land on the night they were measured.</p>
+        @if (loading() && !days().length) {
+          <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
+        } @else {
+          <app-bar-chart [data]="dayBars()" [height]="200" [format]="money" emptyMessage="Nothing metered in this month yet." />
+        }
+      </div>
+      <div class="card p-4">
+        <h2 class="font-semibold text-sm mb-2">By service</h2>
+        @if (!byService().length) {
+          <p class="text-sm text-[color:var(--text-muted)]">Nothing metered yet.</p>
+        } @else {
+          <table class="table-modern">
+            <tbody>
+              @for (s of byService(); track s.service) {
+                <tr>
+                  <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}</td>
+                  <td class="text-right tabular">{{ fmtMoney(s.amount) }}</td>
+                  <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ s.share }}%</td>
+                </tr>
+              }
+              <tr class="border-t-2 border-strong"><td class="font-semibold">Month to date</td><td class="text-right tabular font-semibold">{{ fmtMoney(total()) }}</td><td></td></tr>
+            </tbody>
+          </table>
+        }
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <app-table-shell heading="Line by line" [shown]="shownLines().length" [total]="lines().length" [loading]="loading()"
+                       [isEmpty]="!lines().length" emptyMessage="Nothing metered in this month yet — run a pipeline, open a file, delete something." emptyIcon="chart">
+        <ng-container toolbar>
+          <span class="text-xs text-[color:var(--text-muted)]">Click a line for what is behind it — which bucket, which prompt, who deleted what.</span>
+          @if (tinyLines().length) {
+            <!-- Lines under half a cent wait here rather than fill the table with "$0.0000" (UI review U12). -->
+            <button type="button" class="btn btn-default btn-sm" data-tiny-toggle [attr.aria-pressed]="showTinyLines()"
+                    [title]="'Together ' + fmtExact(tinyTotal())" (click)="showTinyLines.set(!showTinyLines())">
+              {{ showTinyLines() ? 'Hide lines under a cent' : 'Show ' + tinyLines().length + (tinyLines().length === 1 ? ' line' : ' lines') + ' under a cent' }}
+            </button>
+          }
+        </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Meter</th>
+              <th class="hidden md:table-cell">Service</th>
+              <th class="text-right">Quantity</th>
+              <th class="text-right hidden md:table-cell">Rate</th>
+              <th class="text-right">Amount</th>
+              <th class="w-8"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (line of shownLines(); track line.meter) {
+              <tr class="cursor-pointer hover-brand" [class.is-open]="openLine()?.meter === line.meter" (click)="toggleLine(line)">
+                <td>
+                  <div class="font-medium">{{ line.label }}</div>
+                  <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ line.meter }}</div>
+                </td>
+                <td class="hidden md:table-cell text-[color:var(--text-secondary)]">{{ line.service }}</td>
+                <td class="text-right tabular">{{ fmtQuantity(line) }}
+                  @if (line.includedQuantity > 0) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ fmtUnits(line, line.includedQuantity) }} included · {{ fmtUnits(line, line.billableQuantity) }} billable</div> }</td>
+                <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtRate(line) }}
+                  @for (t of line.tiers; track t.from) { <div class="text-[11px]">{{ fmtUnits(line, t.units) }} at {{ fmtUnitPrice(t.unit_price, line.per, line.unit) }}</div> }</td>
+                <td class="text-right tabular font-medium" [title]="fmtExact(line.amount)">{{ fmtAmount(line.amount) }}</td>
+                <td><button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-expanded]="openLine()?.meter === line.meter"
+                            [attr.aria-label]="'Show what is behind ' + line.label" (click)="$event.stopPropagation(); toggleLine(line)">
+                  <app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></button></td>
+              </tr>
+              @if (openLine()?.meter === line.meter) {
+                <tr class="bg-sunken">
+                  <td colspan="6" class="!py-3">
+                    @if (subjectsLoading()) {
+                      <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the events…</span>
+                    } @else if (subjectsError()) {
+                      <span class="text-xs text-crit-500" role="alert">{{ subjectsError() }}</span>
+                    } @else if (!subjects().length) {
+                      <span class="text-xs text-[color:var(--text-muted)]">No subject recorded on these events.</span>
+                    } @else {
+                      <table class="table-modern">
+                        <thead><tr><th>{{ line.meter.startsWith('storage.bytes.deleted') ? 'Object deleted' : 'Subject' }}</th><th class="text-right">Quantity</th><th class="text-right">Events</th><th>Last</th><th>By</th></tr></thead>
+                        <tbody>
+                          @for (s of subjects(); track s.subject_type + s.subject_id) {
+                            <tr>
+                              <td class="mono text-xs max-w-96"><span class="block truncate" [title]="s.subject_id">{{ subjectLabel(s) }}</span></td>
+                              <td class="text-right tabular">{{ line.unit === 'GB-hour' ? fmtGb(s.quantity / 24) + ' · day' : fmtUnits(line, s.quantity) }}</td>
+                              <td class="text-right tabular">{{ s.events }}</td>
+                              <td class="text-xs text-[color:var(--text-muted)] tabular">{{ s.last ? (s.last | serverTime: 'recent') : '' }}</td>
+                              <td class="text-xs text-[color:var(--text-muted)]">{{ actorLabel(s) }}</td>
+                            </tr>
+                          }
+                        </tbody>
+                      </table>
+                    }
+                  </td>
+                </tr>
+              }
+            }
+            @if (lines().length) {
+              <tr class="border-t-2 border-strong">
+                <!-- One cell per column, hidden with the same breakpoints as the header: a colspan
+                     counts hidden columns too, which pushed the total past Amount on a phone. -->
+                <td class="font-semibold">Month to date</td>
+                <td class="hidden md:table-cell"></td>
+                <td></td>
+                <td class="hidden md:table-cell"></td>
+                <td class="text-right tabular font-semibold" [title]="fmtExact(total())">{{ fmtAmount(total()) }}</td>
+                <td></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    </div>
+
+    <div class="mt-4">
+      <app-table-shell heading="Cost per run" [shown]="runs().length" [total]="runsTotal()" [loading]="runsLoading() && !runs().length"
+                       [isEmpty]="!runs().length" [error]="runsError()" (retry)="retryRuns()" emptyMessage="No model calls in this month yet." emptyIcon="chart">
+        <ng-container toolbar>
+          <span class="text-xs text-[color:var(--text-muted)]">Each model call at its own model's rate — before the month's allowances and tiers, which the lines above apply.</span>
+        </ng-container>
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Run</th>
+              <th>Model</th>
+              <th class="text-right">Tokens in</th>
+              <th class="text-right">Tokens out</th>
+              <th class="hidden xl:table-cell">Priced at</th>
+              <th class="hidden lg:table-cell">By</th>
+              <th class="text-right">Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of runs(); track r.run) {
+              <tr>
+                <td class="text-xs tabular whitespace-nowrap">{{ r.last | serverTime: 'recent' }}</td>
+                <td>
+                  <div class="font-medium">{{ runLabel(r) }}</div>
+                  <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}@if (r.job_queue_id) { · run {{ r.job_queue_id }} }</div>
+                </td>
+                <td class="mono text-xs">{{ r.model || '—' }}</td>
+                <td class="text-right tabular">{{ r.tokens_in | number: '1.0-0' }}</td>
+                <td class="text-right tabular">{{ r.tokens_out | number: '1.0-0' }}</td>
+                <td class="hidden xl:table-cell text-xs text-[color:var(--text-muted)]">{{ runRates(r) }}</td>
+                <td class="hidden lg:table-cell text-xs text-[color:var(--text-muted)]">{{ runActor(r) }}</td>
+                <td class="text-right tabular font-medium">{{ fmtRunAmount(r.amount) }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        @if (moreRuns()) {
+          <div class="p-3 text-center">
+            <button type="button" class="btn btn-default btn-sm" (click)="loadRuns()" [disabled]="runsLoading()">{{ runsLoading() ? 'Reading…' : 'Show more runs' }}</button>
+          </div>
+        }
+      </app-table-shell>
+    </div>
+
+    <p class="text-xs text-[color:var(--text-muted)] mt-3 max-w-3xl">
+      Deleting data is counted: each delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00.
+    </p>
+  }
+</div>

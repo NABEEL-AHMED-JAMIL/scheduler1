@@ -1,0 +1,427 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { LIST_LIMIT, isProbablyTruncated } from '../../core/api/list-limit';
+import { MineFilter, isMine } from '../../shared/ui/mine-filter';
+import { AuthService } from '../../core/auth/auth.service';
+import { RouterLink } from '@angular/router';
+import { TableShell } from '../../shared/ui/data-table';
+import { StatusPill } from '../../shared/ui/status-pill';
+
+import { Icon } from '../../shared/ui/icon';
+import { Combobox } from '../../shared/ui/combobox';
+import { ViewToggle } from '../../shared/ui/view-toggle';
+import { copyText } from '../../shared/ui/clipboard.util';
+import { Dialog } from '@angular/cdk/dialog';
+import { ToastService } from '../../shared/ui/toast.service';
+import { confirmWith } from '../../shared/ui/confirm';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
+import { createPager } from '../../shared/ui/pager';
+import { Pagination } from '../../shared/ui/pagination';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { parseTopicPartition } from '../../shared/ui/topic';
+import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
+import { ManagedBanner } from '../../shared/ui/managed-banner';
+
+export interface LinkedJob {
+  jobId: number;
+  jobName: string;
+  jobStatus: string;
+  jobRunningStatus?: string;
+  execution?: string;
+  priority?: number;
+  lastJobRun?: string;
+}
+
+interface SourceTask {
+  /** Filled in by the server on the way out; null on rows with no recorded author. */
+  createdByName?: string | null;
+  updatedByName?: string | null;
+  /** The author's id, so "Only mine" matches on identity rather than display text. */
+  createdBy?: number | null;
+  /**
+   * The workspace the task belongs to (MIG-296). The name comes only on a platform administrator's
+   * list, which holds every workspace's tasks; see shared/ui/workspace-name.
+   */
+  tenantId?: number | null;
+  tenantName?: string | null;
+
+  taskDetailId: number;
+  taskName: string;
+  taskStatus: string;
+  pipelineId?: string;
+  groupId?: string;
+  bucket?: string;
+  inputFolder?: string;
+  outputFolder?: string;
+  sourceTaskType?: { sourceTaskTypeId?: number; serviceName?: string; queueTopicPartition?: string };
+  taskPayload?: string;
+  totalLinksJobs?: number;
+}
+
+@Component({
+  selector: 'app-tasks',
+  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
+  templateUrl: './tasks.html',
+})
+export class Tasks implements OnInit {
+  readonly view = signal<'table' | 'cards'>('table');
+  private readonly http = inject(HttpClient);
+  private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
+
+  readonly tasks = signal<SourceTask[]>([]);
+  readonly loading = signal(true);
+  readonly error = signal('');
+  readonly search = signal('');
+
+  /** Public: the template gates every write control on auth.canManageTasks(). */
+  readonly auth = inject(AuthService);
+
+  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
+
+  readonly onlyMine = signal(false);
+
+  /** Narrow by topic, then by one of that topic's pipelines. Options come from the tasks themselves. */
+  readonly topicFilter = signal('');
+  readonly pipelineFilter = signal('');
+  /**
+   * One option per task type, named as the task editor names it -- the service first, its Kafka
+   * topic as the hint -- so the filter can be found by either. The value stays the type id: two
+   * types can share one topic.
+   */
+  readonly topicOptions = computed(() => {
+    const seen = new Map<string, { name: string; topic: string }>();
+    for (const t of this.tasks()) {
+      const id = t.sourceTaskType?.sourceTaskTypeId;
+      if (id != null && !seen.has(String(id))) {
+        seen.set(String(id), { name: t.sourceTaskType?.serviceName ?? `#${id}`, topic: this.topicOf(t.sourceTaskType?.queueTopicPartition) });
+      }
+    }
+    return [...seen].map(([id, option]) => ({ id, ...option })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+  readonly pipelineOptions = computed(() => {
+    const topic = this.topicFilter();
+    const seen = new Set<string>();
+    for (const t of this.tasks()) {
+      if (topic && String(t.sourceTaskType?.sourceTaskTypeId ?? '') !== topic) continue;
+      if (t.pipelineId) seen.add(t.pipelineId);
+    }
+    return [...seen].sort().map(id => ({ id, name: id }));
+  });
+  readonly topicComboOptions = computed(() => this.topicOptions().map(t => ({ value: t.id, label: t.name, hint: t.topic })));
+  readonly pipelineComboOptions = computed(() => this.pipelineOptions().map(p => ({ value: p.id, label: p.name })));
+  setTopicFilter(value: string): void {
+    this.topicFilter.set(value);
+    // A pipeline that is not on the newly chosen topic cannot stay selected.
+    if (this.pipelineFilter() && !this.pipelineOptions().some(p => p.id === this.pipelineFilter())) this.pipelineFilter.set('');
+    this.pager.reset();
+  }
+  /**
+   * A platform administrator's list mixes every workspace's tasks, and two workspaces can each have
+   * a task of the same name (review tasks#24). Only they get the Workspace column, card line and
+   * filter: everyone else's list is one workspace, where all three would repeat the same name.
+   */
+  readonly seesWorkspaces = computed(() => this.auth.isPlatformAdmin());
+  /** The picked workspace's id as text; empty is "All workspaces". */
+  readonly workspaceFilter = signal('');
+  readonly workspaceOptions = computed(() => this.seesWorkspaces() ? workspaceOptions(this.tasks()) : []);
+  workspaceName(task: SourceTask): string { return workspaceName(task); }
+
+  /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  readonly hasFilters = computed(() =>
+    !!(this.search() || this.topicFilter() || this.pipelineFilter() || this.workspaceFilter() || this.onlyMine()));
+
+  clearFilters(): void {
+    this.search.set(''); this.topicFilter.set(''); this.pipelineFilter.set(''); this.workspaceFilter.set('');
+    this.onlyMine.set(false); this.pager.reset();
+  }
+
+  readonly filtered = computed(() => {
+    const term = this.search().trim().toLowerCase();
+    const topic = this.topicFilter();
+    const pipeline = this.pipelineFilter();
+    const workspaces = this.seesWorkspaces();
+    const workspace = workspaces ? this.workspaceFilter() : '';
+    let rows = this.mine(this.tasks());
+    if (workspace) rows = rows.filter(t => matchesWorkspace(t, workspace));
+    if (topic) rows = rows.filter(t => String(t.sourceTaskType?.sourceTaskTypeId ?? '') === topic);
+    if (pipeline) rows = rows.filter(t => t.pipelineId === pipeline);
+    if (!term) return rows;
+    return rows.filter(task =>
+      String(task.taskDetailId).includes(term)
+      || (task.taskName ?? '').toLowerCase().includes(term)
+      || (task.sourceTaskType?.serviceName ?? '').toLowerCase().includes(term)
+      // The Kafka topic the Topic column shows, which the placeholder promises.
+      || this.topicOf(task.sourceTaskType?.queueTopicPartition).toLowerCase().includes(term)
+      || (task.pipelineId ?? '').toLowerCase().includes(term)
+      // Only where the column shows it, or a row would match on something nobody can see.
+      || (workspaces && workspaceName(task).toLowerCase().includes(term)));
+  });
+
+  readonly pager = createPager<any>();
+  readonly paged = computed(() => this.pager.slice(this.filtered()));
+
+  goToPage(next: number): void { this.pager.goTo(next, this.filtered().length); }
+  setPageSize(size: number): void { this.pager.setSize(size); }
+
+  readonly expanded = signal<Set<number>>(new Set());
+  readonly copiedId = signal<number | null>(null);
+
+  toggleRow(task: SourceTask): void {
+    const opening = !this.expanded().has(task.taskDetailId);
+    this.expanded.update(set => {
+      const next = new Set(set);
+      next.has(task.taskDetailId) ? next.delete(task.taskDetailId) : next.add(task.taskDetailId);
+      return next;
+    });
+    if (opening && !this.linkedJobs()[task.taskDetailId]) this.loadLinkedJobs(task);
+  }
+
+  /** The parameter is sourceTaskId, not taskDetailId -- the same id under a different name. */
+  private loadLinkedJobs(task: SourceTask): void {
+    if (!task.totalLinksJobs) {
+      this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: [] }));
+      return;
+    }
+    this.linkedLoading.set(task.taskDetailId);
+    // LIST_LIMIT, because this endpoint now really pages. It accepted `page` and `limit` and
+    // ignored both, so posting neither returned every linked job by accident; it honours them
+    // now, and PagingUtil defaults an ABSENT limit to ten. Without this the expander would have
+    // silently shown 10 of N -- the third time that default has cost this application a screen,
+    // after the Tasks list and the job editor's task dropdown. See core/api/list-limit.ts.
+    this.http.post<ApiResponse<LinkedJob[]>>(
+      `${API_BASE}/sourceTask.json/fetchAllLinkJobsWithSourceTaskId`, {},
+      { params: {
+        sourceTaskId: String(task.taskDetailId),
+        limit: String(LIST_LIMIT),
+      } }).subscribe({
+      next: response => {
+        this.linkedLoading.set(null);
+        // A refusal settles the drawer like a failed request does, so it says it could not
+        // read the jobs instead of showing the heading over nothing.
+        const jobs = response.status === API_SUCCESS ? response.data ?? [] : [];
+        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: jobs }));
+      },
+      error: () => {
+        this.linkedLoading.set(null);
+        this.linkedJobs.update(map => ({ ...map, [task.taskDetailId]: [] }));
+      },
+    });
+  }
+
+  readonly busyTask = signal<number | null>(null);
+
+  /**
+   * The jobs bound to a task, fetched when its panel opens. The count was already on the
+   * row; "23 linked jobs" tells you the task matters but not which jobs would stop if you
+   * changed it, which is the question anyone opening that panel is actually asking.
+   * Cached per task so re-opening a panel does not re-fetch.
+   */
+  readonly linkedJobs = signal<Record<number, LinkedJob[]>>({});
+  readonly linkedLoading = signal<number | null>(null);
+
+  /** Same approach as jobs: read the task back in full and post it as a new one. */
+  clone(task: SourceTask): void {
+    this.busyTask.set(task.taskDetailId);
+    this.http.get<ApiResponse<any>>(`${API_BASE}/sourceTask.json/fetchSourceTaskWithSourceTaskId`,
+      { params: { sourceTaskId: task.taskDetailId } }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.busyTask.set(null);
+          this.toast.error(response.message || 'That task could not be read.');
+          return;
+        }
+        const source = response.data;
+        const payload = {
+          taskName: `${source.taskName} (copy)`,
+          sourceTaskType: { sourceTaskTypeId: source.sourceTaskType?.sourceTaskTypeId },
+          taskPayload: source.taskPayload,
+          taskStatus: 'Inactive',
+          homePageId: source.homePageId,
+          pipelineId: source.pipelineId,
+          groupId: source.groupId,
+          xmlTagsInfo: source.xmlTagsInfo ?? [],
+        };
+        this.http.post<ApiResponse>(`${API_BASE}/sourceTask.json/addSourceTask`, payload).subscribe({
+          next: created => {
+            this.busyTask.set(null);
+            if (created.status === API_SUCCESS) {
+              this.toast.success(`Copied as "${payload.taskName}" — it starts inactive.`);
+              this.load();
+            } else { this.toast.error(created.message || 'The copy could not be created.'); }
+          },
+          error: err => {
+            this.busyTask.set(null);
+            this.toast.error(err?.error?.message || 'The copy could not be created.');
+          },
+        });
+      },
+      error: err => {
+        this.busyTask.set(null);
+        this.toast.error(err?.error?.message || 'That task could not be read.');
+      },
+    });
+  }
+
+  /**
+   * The tick has to mean the clipboard actually changed.
+   *
+   * copyText returns whether the copy happened, and it genuinely fails: a deployment served over
+   * plain HTTP has no Clipboard API, an unfocused document is refused by the browser, and the
+   * legacy execCommand fallback can be refused too. Showing "Copied" regardless sent people off to
+   * paste a task payload into a ticket or a config file and paste whatever was on the clipboard
+   * before instead -- silently the wrong JSON, with nothing on screen having suggested a problem.
+   */
+  copyPayload(task: SourceTask): void {
+    copyText(task.taskPayload ?? '').then(copied => {
+      if (!copied) {
+        this.toast.error('Could not copy the payload. Select it in the panel and copy it by hand.');
+        return;
+      }
+      this.copiedId.set(task.taskDetailId);
+      // Only clear the tick if this is still the row that was copied, or a slow copy landing late
+      // would wipe the tick off a second, faster one.
+      setTimeout(() => { if (this.copiedId() === task.taskDetailId) this.copiedId.set(null); }, 1500);
+    });
+  }
+
+  /** A task still in use cannot be deleted; the server refuses too, this just says so sooner. */
+  inUse(task: SourceTask): boolean {
+    return (task.totalLinksJobs ?? 0) > 0;
+  }
+
+  async remove(task: SourceTask): Promise<void> {
+    if (task.taskStatus === 'Delete') return;
+    const linked = task.totalLinksJobs ?? 0;
+    if (linked) {
+      // Offering a confirm here would be offering a choice that does not exist -- the server
+      // refuses it. Better to say why, and point at the thing that has to happen first.
+      this.toast.error(
+        `"${task.taskName}" is used by ${linked} job${linked > 1 ? 's' : ''}. ` +
+        `Point those jobs at another task, or delete them, before deleting this one.`);
+      return;
+    }
+    const ok = await confirmWith(this.dialog, {
+      title: 'Delete task',
+      body: `"${task.taskName}" will be deleted. No jobs are bound to it.`,
+      confirmLabel: 'Delete',
+      danger: true,
+    });
+    if (!ok) return;
+
+    this.busyTask.set(task.taskDetailId);
+    this.http.put<ApiResponse>(`${API_BASE}/sourceTask.json/deleteSourceTask`,
+      { taskDetailId: task.taskDetailId, taskStatus: 'Delete' }).subscribe({
+      next: response => {
+        this.busyTask.set(null);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(`${task.taskName} deleted.`);
+          this.load();
+        } else {
+          this.toast.error(response.message || 'Delete failed.');
+        }
+      },
+      error: err => {
+        this.busyTask.set(null);
+        this.toast.error(err?.error?.message || 'Delete failed.');
+      },
+    });
+  }
+
+  ngOnInit(): void { this.load(); }
+
+  load(): void {
+    this.loading.set(true);
+    this.error.set('');
+    // listSourceTask is a POST taking an optional search body; an empty body means "everything".
+    // The LIMIT is not optional though: the endpoint is paged and defaults to ten, so this
+    // screen listed 10 of 21 tasks and paged those ten -- the pager showed "10 of 10" and the
+    // other eleven did not exist as far as the console was concerned.
+    this.http.post<ApiResponse<SourceTask[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {},
+      { params: { limit: LIST_LIMIT } }).subscribe({
+      next: response => {
+        this.loading.set(false);
+        if (response.status === API_SUCCESS) {
+          const rows = response.data ?? [];
+          this.tasks.set(rows);
+          if (isProbablyTruncated(rows.length)) {
+            this.toast.info(`Showing the first ${LIST_LIMIT} tasks. Narrow the search to see the rest.`);
+          }
+        } else this.error.set(response.message);
+      },
+      error: err => {
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Could not load tasks.');
+      },
+    });
+  }
+
+  /**
+   * Whether a task has any storage worth showing.
+   *
+   * Not just `bucket`. <bucket> is optional on every pipeline in the object-storage family --
+   * absent means "the platform bucket" -- so keying the whole cell off it hid the input and
+   * output folders of every task that had not overridden it, and the column read "--" for
+   * tasks that plainly do read and write.
+   */
+  hasStorage(task: any): boolean {
+    return !!(task?.bucket || task?.inputFolder || task?.outputFolder);
+  }
+
+  /**
+   * Why a task shows no bucket of its own.
+   *
+   * source_task.bucket only ever records an explicit <bucket> tag in the payload
+   * (SourceTaskServiceImpl.applyDerivedLocation), and <bucket> is optional on every pipeline in
+   * the object-storage family -- leaving it out is the normal case, and the worker then resolves
+   * it to MINIO_BUCKET_NAME. Every task in this database is in that state, so the column showed
+   * folders with no bucket above them and read as "no bucket configured" for tasks that plainly
+   * have one.
+   *
+   * The name is deliberately not guessed at. The worker's default comes from its own environment,
+   * nothing in this database drives it, and no storage connection is flagged as the default -- so
+   * printing "etl-bucket" here would be a confident claim the console cannot actually stand
+   * behind, and would go silently wrong the day the worker is pointed somewhere else. Saying the
+   * bucket is inherited is the part that is true.
+   */
+  usesDefaultBucket(task: any): boolean {
+    return !task?.bucket && !!(task?.inputFolder || task?.outputFolder);
+  }
+
+  /**
+   * The read -> write line: "in -> out", "in ->", "-> out", or nothing at all.
+   *
+   * One side is legitimately missing on several pipelines -- Postgres to CSV has no input
+   * folder, CSV to Postgres has no output folder -- and the template used to fill the gap
+   * with a lone middot, which read as a rendering fault rather than as "not applicable".
+   * Keeping the arrow on the side that exists says the same thing without the noise.
+   */
+  storageFlow(task: any): string {
+    const from = (task?.inputFolder ?? '').trim();
+    const to = (task?.outputFolder ?? '').trim();
+    if (from && to) return `${from} \u2192 ${to}`;
+    if (from) return `${from} \u2192`;
+    if (to) return `\u2192 ${to}`;
+    return '';
+  }
+
+  /** "topic=scrapping-topic&partitions=[*]" -> "scrapping-topic", read as the editor reads it. */
+  topicOf(raw?: string): string {
+    return parseTopicPartition(raw).topic;
+  }
+
+  /**
+   * Applies the "Only mine" toggle.
+   *
+   * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
+   * count is already on the table header, so nothing needs recording.
+   */
+  private mine<T extends { createdBy?: number | null }>(rows: T[]): T[] {
+    if (!this.onlyMine()) {
+      return rows;
+    }
+    const myId = this.auth.user()?.appUserId ?? null;
+    return rows.filter(row => isMine(row, myId));
+  }
+}

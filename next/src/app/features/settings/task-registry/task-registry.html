@@ -1,0 +1,180 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Task Registry</h1>
+      <p class="page-subtitle">
+        Every task a pipeline's steps can run — what it reads and writes, its settings, how it retries and who may
+        add it — and every existing pipeline as a Legacy task, still edited in its own dialog: its topic, payload
+        fields and AI steps.
+      </p>
+    </div>
+    <div class="flex items-center gap-2 ml-auto">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || tasksLoading()">
+        <app-icon name="refresh" [class.spin]="loading() || tasksLoading()" />Refresh
+      </button>
+      @if (!locked()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+        <app-icon name="plus" />New pipeline
+      </button>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="pipelines and tasks" />
+
+  @if (isPlatformAdmin()) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+      <app-icon name="info" class="text-[color:var(--text-muted)]" />
+      <span>
+        A pipeline belongs to one workspace. One you create here is filed under the default
+        workspace — only its users can use it. Sign in as a specific workspace to create one
+        for them instead.
+      </span>
+    </div>
+  }
+
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+    @for (tile of [
+      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on here', icon: 'layers', tone: 'info' },
+      { label: 'Unavailable', value: taskTiles().unavailable, foot: taskTiles().unavailable ? 'the platform cannot run yet' : 'every task can run', icon: 'alert', tone: taskTiles().unavailable ? 'warn' : 'muted' },
+      { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active', icon: 'send', tone: 'info' },
+      { label: 'No topic', value: summary().untopped, foot: summary().untopped ? 'assign one to use them' : 'every pipeline has one', icon: 'alert', tone: summary().untopped ? 'warn' : 'muted' }
+    ]; track tile.label) {
+      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
+                     [tone]="$any(tile.tone)" [foot]="tile.foot" />
+    }
+  </div>
+
+  @if (tasksError()) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="alert">
+      <app-icon name="alert" class="icon-warn" />
+      <span class="flex-1 min-w-0 [overflow-wrap:anywhere]">The step tasks could not be read: {{ tasksError() }} The pipelines are listed as usual.</span>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="loadTasks()">Try again</button>
+    </div>
+  }
+  @if (truncated()) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="status">
+      <app-icon name="info" class="text-[color:var(--text-muted)]" />
+      <span>Showing the first {{ forms().length }} pipelines. Narrow by topic to see the rest.</span>
+    </div>
+  }
+
+  <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="shown().length" [total]="filtered().length"
+                   [emptyMessage]="hasFilters()
+                      ? 'No task matches the current filters.'
+                      : 'No tasks yet. Create a pipeline to let Source Task offer it, and let a task on it be filled in rather than hand-written.'"
+                   emptyIcon="template"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <select class="input max-w-40" [value]="kindFilter()" aria-label="Kind"
+              (change)="setFilter(kindFilter, $any($event.target).value)">
+        <option value="" [selected]="!kindFilter()">All kinds ({{ counts()[''] }})</option>
+        @for (k of kinds; track k) { <option [value]="k" [selected]="kindFilter() === k">{{ k }} ({{ counts()[k] }})</option> }
+      </select>
+      <select class="input max-w-36" [value]="stateFilter()" aria-label="State"
+              (change)="setFilter(stateFilter, $any($event.target).value)">
+        <option value="" [selected]="!stateFilter()">All states</option>
+        @for (s of states; track s) { <option [value]="s" [selected]="stateFilter() === s">{{ s }}</option> }
+      </select>
+      @if (isPlatformAdmin()) {
+        <div class="w-48">
+          <app-combobox id="pipelines-tenant" ariaLabel="Filter by workspace" [selected]="tenantFilter()" (selectedChange)="setFilter(tenantFilter, $event)"
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
+        </div>
+      }
+      <div class="w-56">
+        <!-- Remote: the box asks for the first fifty topics matching what is typed. A topic narrows to its pipelines. -->
+        <app-combobox id="pipelines-topic" [selected]="topicFilter()" (selectedChange)="setFilter(topicFilter, $event)"
+                      placeholder="All topics" clearLabel="All topics"
+                      [remote]="true" (search)="topicSearch.search($event)" [searching]="topicSearch.searching()"
+                      [options]="topicFilterOptions()" [selectedLabel]="topicSelectedLabel()" />
+      </div>
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, code, service or topic" aria-label="Search tasks"
+               [value]="search()" (input)="setFilter(search, $any($event.target).value)" />
+      </div>
+      <app-mine-filter [only]="onlyMine()" (onlyChange)="setFilter(onlyMine, $event)" />
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Task</th>
+          <th>Kind</th>
+          <th>Service</th>
+          <th>Input → output</th>
+          <th>State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of shown(); track row.id) {
+          <tr [attr.data-row]="row.id">
+            <td class="max-w-80">
+              <div class="flex items-center gap-2 min-w-0">
+                <button type="button" class="link-inline font-medium truncate text-left" [attr.aria-label]="'Open ' + row.name"
+                        [title]="row.name" (click)="open(row)">{{ row.name }}</button>
+                @if (isFetchingFields(row.pipeline)) { <app-icon name="refresh" class="spin shrink-0" size="0.85em" /> }
+                <span class="pipeline-id-chip shrink-0" [title]="row.legacy ? 'Pipeline id — what the worker routes on' : 'Task code — what a step names'">{{ row.code }}</span>
+              </div>
+              @if (row.description) {
+                <div class="text-xs text-[color:var(--text-muted)] line-clamp-1" [title]="row.description">{{ row.description }}</div>
+              }
+            </td>
+            <td><span class="pill" [class.pill-neutral]="!row.legacy" [class.pill-solid-neutral]="row.legacy" [attr.data-kind]="row.kind">{{ row.kind }}</span></td>
+            <td class="text-xs">
+              <span class="mono">{{ row.service || '—' }}</span>
+              @if (row.pipeline; as p) {
+                <div class="mt-0.5">
+                  @if (p.topicName) {
+                    <a class="link-inline" [routerLink]="['/configuration/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
+                       [title]="'Publishes on ' + (p.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ p.topicName }}</a>
+                  } @else {
+                    <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">No topic</span>
+                  }
+                </div>
+              }
+            </td>
+            <td class="text-xs whitespace-nowrap">{{ row.input }} <span class="text-[color:var(--text-muted)]">→</span> {{ row.output }}</td>
+            <td class="text-xs max-w-72">
+              <app-task-state [state]="row.state" [reason]="row.reason" [overridden]="row.overridden" />
+            </td>
+            <td>
+              @if (row.pipeline; as p) {
+                @if (!locked()) {
+                <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                        [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + p.pipelineName">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #rowMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(p)">
+                      <app-icon name="edit" />Edit
+                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="duplicate(p)">
+                      <app-icon name="copy" />Duplicate
+                    </button>
+                    <button cdkMenuItem class="menu-item menu-item-danger"
+                            (cdkMenuItemTriggered)="remove(p)">
+                      <app-icon name="trash" class="icon-crit" />Delete
+                    </button>
+                  </div>
+                </ng-template>
+              }
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>

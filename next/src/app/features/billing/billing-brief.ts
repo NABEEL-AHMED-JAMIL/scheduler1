@@ -1,0 +1,76 @@
+import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+
+import { RouterLink } from '@angular/router';
+import { API_SUCCESS } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
+import { Icon } from '../../shared/ui/icon';
+import { BillingApi, BillingSummary, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { daysOverdue, formatMoney } from './billing-format';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+
+/**
+ * The bill in one glance, wherever a person lands before Billing: this month so far, what is
+ * owed and by when, a slip waiting. Shown to admins only (the API refuses everyone else), and
+ * quietly absent when the console has no meter or the person's workspace has nothing yet.
+ */
+@Component({
+  selector: 'app-billing-brief',
+  imports: [Icon, RouterLink, ServerTimePipe],
+  template: `
+    @if (auth.isTenantAdmin() && hasSomething() && summary(); as s) {
+      <div class="card p-4" [class.chart-card]="!compact()">
+        <div class="flex items-center justify-between gap-2 mb-3">
+          @if (headingLevel() === 2) {
+            <h2 class="text-sm font-semibold">{{ title() }}</h2>
+          } @else {
+            <h3 class="text-sm font-semibold">{{ title() }}</h3>
+          }
+          <a routerLink="/billing/usage" class="btn btn-ghost btn-sm"><app-icon name="chart" size="0.9em" />Cost &amp; usage</a>
+        </div>
+        <dl class="grid grid-cols-[repeat(auto-fit,minmax(9rem,1fr))] gap-x-4 gap-y-3 m-0">
+          <div><dt class="stat-label">This month so far</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ money(s.monthToDate, s.currency) }}</dd>
+            <dd class="m-0 text-[11px] text-[color:var(--text-muted)]">{{ s.meterDown ? 'the meter did not answer' : s.rateCardName ? s.rateCardName + ' v' + s.rateCardVersion : 'from the meter' }}</dd></div>
+          <div><dt class="stat-label">Owed</dt><dd class="m-0 text-[1.05rem] font-semibold tabular" [class.text-crit-500]="s.overdueCount > 0">{{ money(s.openBalance, s.currency) }}</dd>
+            <dd class="m-0 text-[11px] text-[color:var(--text-muted)]">{{ s.openCount ? s.openCount + ' open invoice' + (s.openCount === 1 ? '' : 's') : 'nothing outstanding' }}@if (s.overdueCount) { · <span class="text-crit-500">{{ s.overdueCount }} overdue</span> }</dd></div>
+          @if (s.nextDueNumber) {
+            <div><dt class="stat-label">Next due</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ s.nextDueAt | serverTime: 'day' }}</dd>
+              <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.nextDueNumber]">{{ s.nextDueNumber }}</a> · {{ money(s.nextDueBalance ?? 0, s.currency) }}{{ overdueDays(s.nextDueAt) ? ' · ' + overdueDays(s.nextDueAt) + ' d late' : '' }}</dd></div>
+          } @else if (s.latestNumber) {
+            <div><dt class="stat-label">Last invoice</dt><dd class="m-0 text-[1.05rem] font-semibold"><span class="pill" [class]="'pill ' + statusTone[s.latestStatus ?? '']">{{ statusLabel[s.latestStatus ?? ''] }}</span></dd>
+              <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline mono" [routerLink]="['/billing/invoices', s.latestNumber]">{{ s.latestNumber }}</a> · {{ money(s.latestTotal ?? 0, s.currency) }}</dd></div>
+          }
+          @if (s.pendingSlips) {
+            <div><dt class="stat-label">{{ auth.isPlatformAdmin() ? 'Slips to verify' : 'Awaiting verification' }}</dt><dd class="m-0 text-[1.05rem] font-semibold tabular">{{ s.pendingSlips }}</dd>
+              <dd class="m-0 text-[11px] text-[color:var(--text-muted)]"><a class="link-inline" routerLink="/billing/invoices">{{ auth.isPlatformAdmin() ? 'verify in Invoices' : 'a receipt follows' }}</a></dd></div>
+          }
+        </dl>
+      </div>
+    }
+  `,
+})
+export class BillingBrief implements OnInit {
+  private readonly api = inject(BillingApi);
+  readonly auth = inject(AuthService);
+  /** Tighter spacing when it sits in a row of dashboard cards rather than a side column. */
+  readonly compact = input(false);
+  /**
+   * h2 where the host has no section heading above the brief (the Dashboard, straight under its
+   * h1), h3 under one (Profile, under the person's name). A fixed h3 skipped a level on the Dashboard.
+   */
+  readonly headingLevel = input<2 | 3>(3);
+  readonly title = computed(() => this.auth.isPlatformAdmin() ? 'Billing, every workspace' : 'Your bill');
+  readonly summary = signal<BillingSummary | null>(null);
+  readonly statusLabel = INVOICE_STATUS_LABEL;
+  readonly statusTone = INVOICE_STATUS_TONE;
+  readonly hasSomething = computed(() => { const s = this.summary(); return !!s && (s.monthToDate > 0 || s.openCount > 0 || s.pendingSlips > 0 || !!s.latestNumber); });
+
+  ngOnInit(): void {
+    if (!this.auth.isTenantAdmin()) return;
+    this.api.summary().subscribe({
+      next: r => { if (r.status !== API_SUCCESS || !r.data) return; const d = r.data; this.summary.set({ ...d, monthToDate: Number(d.monthToDate), openBalance: Number(d.openBalance), overdueBalance: Number(d.overdueBalance), nextDueBalance: d.nextDueBalance == null ? undefined : Number(d.nextDueBalance), latestTotal: d.latestTotal == null ? undefined : Number(d.latestTotal) }); },
+      error: () => {},
+    });
+  }
+  money(v: number, currency: string): string { return formatMoney(v, currency); }
+  overdueDays(dueAt?: string): number { return daysOverdue(dueAt); }
+}

@@ -1,0 +1,106 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Notifications</h1>
+      <p class="page-subtitle">Job outcomes and assignments addressed to you.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      @if (unreadCount()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()"
+                [disabled]="markingAll()">
+          <app-icon name="check" [busy]="markingAll()" />
+          {{ markingAll() ? 'Marking…' : 'Mark all read (' + unreadCount() + ')' }}
+        </button>
+      }
+    </div>
+  </div>
+
+  <app-table-shell heading="Recent" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"
+                   [emptyMessage]="hasFilters() ? 'Nothing matches those filters.' : 'No notifications yet.'"
+                   emptyIcon="bell"
+                   (retry)="load()">
+    <ng-container toolbar>
+      @if (types().length > 1) {
+        <select class="input max-w-44" [value]="typeFilter()" aria-label="Filter by kind"
+                (change)="typeFilter.set($any($event.target).value); onFilterChange()">
+          <option value="">All kinds</option>
+          @for (type of types(); track type) {
+            <option [value]="type">{{ typeLabel(type) }}</option>
+          }
+        </select>
+      }
+      <label class="flex items-center gap-2 text-sm text-[color:var(--text-secondary)] cursor-pointer">
+        <input type="checkbox" class="checkbox" [checked]="unreadOnly()"
+               (change)="unreadOnly.set($any($event.target).checked); onFilterChange()" />
+        Unread only
+      </label>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
+          <app-icon name="close" />Clear
+        </button>
+      }
+    </ng-container>
+
+    <!-- divide-y supplies the 1px; its COLOUR is set on .notification-row, because a
+         divide-[color:...] utility is emitted inside :where() at specificity 0,0,0 and loses
+         to that class's border-transparent. `border-subtle` used to sit here and coloured the
+         UL's own border, which has no width -- so nothing was ever drawn. -->
+    <ul class="divide-y">
+      @for (item of paged(); track item.notificationId) {
+        <!-- Below sm the date and buttons wrap to their own line; beside the text they left the
+             message a ~90px column on a phone. gap-y-2 spaces that second line. -->
+        <li class="notification-row flex-wrap sm:flex-nowrap gap-y-2" [class.is-unread]="!item.read"
+            [class]="toneClass(toneOf(item))">
+          <app-icon [name]="glyphOf(item)" [class]="intentOf(item)" size="1.1em"
+                    class="mt-0.5 shrink-0" />
+
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="text-sm font-medium">{{ item.title }}</span>
+              @if (showType(item)) {
+                <span class="pill pill-neutral">{{ typeLabel(item.type) }}</span>
+              }
+              @if (!item.read) { <span class="pill pill-brand">New</span> }
+            </div>
+            @if (item.message) {
+              <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 leading-snug">
+                {{ item.message }}
+              </p>
+            }
+          </div>
+
+          <!-- The indent is the glyph plus the row gap, so the line starts under the title. -->
+          <div class="notification-actions flex items-center gap-1 shrink-0 w-full sm:w-auto pl-[calc(1.1em+0.75rem)] sm:pl-0">
+            <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap mr-auto sm:mr-0">
+              {{ when(item.dateCreated) | serverTime: 'recent' }}
+            </span>
+
+            @if (!item.read) {
+              <button type="button" class="btn btn-ghost btn-icon btn-sm btn-intent-ok max-sm:gap-1"
+                      title="Mark as read" aria-label="Mark as read"
+                      [disabled]="isMarking(item)"
+                      (click)="markRead(item)">
+                <app-icon name="check" [busy]="isMarking(item)" /><span class="sm:hidden">Mark read</span>
+              </button>
+            }
+
+            @if (targetOf(item); as target) {
+              <button type="button" class="btn btn-default btn-sm"
+                      [title]="'Open ' + target"
+                      (click)="open(item)">
+                Open<app-icon name="chevronRight" size="0.85em" />
+              </button>
+            }
+          </div>
+        </li>
+      }
+    </ul>
+
+    <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>

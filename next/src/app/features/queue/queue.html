@@ -1,0 +1,223 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Queue</h1>
+      <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
+    </div>
+    <div class="flex items-center gap-2">
+      @if (live()) {
+        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
+              title="Connected — the list re-reads as runs report in">
+          <span class="live-dot live-on"></span>Live
+        </span>
+      }
+      @if (hasInsights()) {
+        <button type="button" class="btn btn-ghost btn-sm"
+                [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
+                (click)="showInsights.set(!showInsights())">
+          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
+        </button>
+      }
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+    </div>
+  </div>
+  <app-managed-banner what="runs' status" still="You can still see every run and its logs." />
+
+  @if (counts().length) {
+    <div class="flex flex-wrap gap-2">
+      @for (item of counts(); track item.status) {
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="selectedStatuses().includes(item.status)"
+                                 (toggle)="toggleStatus(item.status)" />
+      }
+    </div>
+  }
+
+  @if (hasMore()) {
+    <!-- The window, said where the chips and the charts are: they count the rows read, not the range. -->
+    <p class="text-xs text-[color:var(--text-muted)] m-0 flex items-center gap-1.5" data-queue-window>
+      <app-icon name="info" size="0.9em" class="icon-muted" />
+      The newest {{ rows().length }} of {{ rangeTotal() }} runs in these dates. Narrow the dates to see the rest.
+    </p>
+  }
+
+  @if (activeFilters().length) {
+    <!-- Stated, not implied. The charts and the table describe the same narrowed set now, and
+         the search term that narrows them sits in the toolbar below the charts where a reader
+         looking at the ring cannot see it. -->
+    <div class="flex flex-wrap items-center gap-2">
+      <span class="text-xs text-[color:var(--text-muted)]">Filtered to</span>
+      @for (filter of activeFilters(); track filter.key) {
+        <button type="button" class="pill pill-brand" (click)="clearFilter(filter)"
+                [title]="'Remove the ' + filter.label + ' filter'">
+          {{ filter.label }}: {{ filter.value }}<app-icon name="close" size="0.8em" />
+        </button>
+      }
+      <!-- Only when the two numbers differ. A status chip is applied by the SERVER, so rows()
+           is already narrowed by it and the strip would read "4 of 4 messages" -- a ratio that
+           says nothing and invites the reader to think the search did nothing. -->
+      @if (data().length !== rows().length) {
+        <span class="text-xs text-[color:var(--text-muted)]">
+          {{ data().length }} of {{ rows().length }} messages
+        </span>
+      }
+    </div>
+  }
+
+  @if (showInsights() && hasInsights()) {
+    <div class="grid gap-3 lg:grid-cols-3">
+      <div class="card chart-card">
+        <h3 class="chart-title">Outcomes</h3>
+        <p class="chart-sub">The same messages the table lists, filters included.</p>
+        <app-donut [data]="statusMix()" totalLabel="messages"
+                   [colorFor]="outcomeColor" />
+        <p class="chart-sub mt-2 mb-0 flex items-center gap-1.5 flex-wrap">
+          @if (failureRate()) {
+            <span>{{ failureRate() }}% of these failed.</span>
+          }
+          @if (hasMore()) {
+            <span class="inline-flex items-center gap-1">
+              <app-icon name="info" size="0.85em" class="icon-muted" />
+              Of the newest {{ rows().length }}; the dates hold {{ rangeTotal() }}.
+            </span>
+          }
+        </p>
+      </div>
+
+      <div class="card chart-card">
+        <h3 class="chart-title">Busiest jobs</h3>
+        <p class="chart-sub">Which jobs are producing the queue traffic.</p>
+        <app-ranked-bar [data]="byJob()" [max]="4" />
+      </div>
+
+      <div class="card chart-card">
+        <h3 class="chart-title">Volume by day</h3>
+        <p class="chart-sub">Oldest to newest across the selected range.</p>
+        <app-bar-chart [data]="byDay()" [height]="104" />
+      </div>
+
+      @if (durations().length) {
+        <div class="card chart-card">
+          <h3 class="chart-title">How long runs took</h3>
+          <p class="chart-sub">Shortest to longest, from start and end time.</p>
+          <app-ranked-bar [data]="durations()" [sorted]="false" [max]="6" />
+        </div>
+      }
+
+      <div class="card chart-card">
+        <h3 class="chart-title">How runs were started</h3>
+        <p class="chart-sub">Whether each message was triggered by hand and reached the queue.</p>
+        <app-split-bar [data]="flagSplit()" positiveLabel="yes" negativeLabel="no" />
+      </div>
+    </div>
+  }
+
+  <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!data().length" [shown]="data().length" [total]="rows().length"
+                   emptyMessage="Nothing in the queue for these filters."
+                   emptyIcon="clock" [showSubbar]="!!rangeError()"
+                   (retry)="load()">
+    <ng-container toolbar>
+      <!-- Console-format dates ("5 Oct 2026"), the browser's calendar behind each (UI review U3). -->
+      <app-date-field class="max-w-44" inputId="queue-from" label="From date" [value]="fromDate()" [max]="toDate()"
+                      (valueChange)="setFrom($event)" />
+      <app-date-field class="max-w-44" inputId="queue-to" label="To date" [value]="toDate()" [min]="fromDate()"
+                      (valueChange)="setTo($event)" />
+      <div class="search-field max-w-56">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
+               [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
+      </div>
+      @if (hasFilters()) {
+        <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+      }
+    </ng-container>
+
+    <!-- The range is not read while it makes no sense, so the reason sits right under the boxes. -->
+    <ng-container subbar>
+      @if (rangeError()) {
+        <p id="queue-range-error" class="field-note text-crit-500 mt-0" role="alert">{{ rangeError() }}</p>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
+      }
+    </ng-container>
+
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Run</th>
+          <th>Job</th>
+          <th>Created</th>
+          <!-- Duration waits for lg: below it Message is the column worth the width, and at 768 the
+               table only fits beside the pinned Status without it (UI review U5). -->
+          <th class="hidden lg:table-cell">Duration</th>
+          <th>Message</th>
+          <!-- Status and the in-flight menu share one cell pinned to the right edge, as Failed runs
+               on Reports does: on a phone both sat hundreds of pixels past the screen. -->
+          <th class="text-right col-pin-right">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of paged(); track row.jobQueueId) {
+          <tr>
+            <!-- A run and its job lead to their own screens, for anyone whose profile opens Jobs;
+                 anyone else gets the same words without a link the page guard would bounce. -->
+            <td class="mono text-[color:var(--text-muted)] whitespace-nowrap">
+              @if (canOpenJobs()) {
+                <a class="link-inline" [routerLink]="['/pipelines/schedules', row.jobId, 'runs', row.jobQueueId, 'logs']"
+                   [title]="'Open the run log for #' + row.jobQueueId">#{{ row.jobQueueId }}</a>
+              } @else { #{{ row.jobQueueId }} }
+            </td>
+            <td class="max-w-56">
+              @if (canOpenJobs()) {
+                <a class="link-inline block truncate" [routerLink]="['/pipelines/schedules', row.jobId, 'executions']"
+                   [title]="jobName(row)">{{ jobName(row) }}</a>
+              } @else {
+                <span class="block truncate" [title]="jobName(row)">{{ jobName(row) }}</span>
+              }
+              <span class="mono text-[11px] text-[color:var(--text-muted)]">#{{ row.jobId }}</span>
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+              {{ row.dateCreated ? (row.dateCreated | serverTime:'recentSec') : '—' }}
+            </td>
+            <td class="hidden lg:table-cell tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+              @if (duration(row); as d) { {{ d }} }
+              @else if (inFlight(row)) { <span class="text-warn-500">in flight</span> }
+              @else { — }
+            </td>
+            <!-- The column that gives: it takes the width the others leave and ends in an ellipsis
+                 there, so it never runs on under the pinned Status column (UI review U5). -->
+            <td class="w-full max-w-0 min-w-40">
+              <span class="truncate block" [title]="row.jobStatusMessage">
+                {{ row.jobStatusMessage || '—' }}
+              </span>
+            </td>
+            <td class="text-right col-pin-right">
+              <div class="flex items-center justify-end gap-1">
+                <app-status [label]="row.jobStatus" />
+                @if (inFlight(row) && !locked()) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
+                          [attr.aria-label]="'Actions for run #' + row.jobQueueId">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #menu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <button cdkMenuItem class="menu-item menu-item-danger"
+                              (cdkMenuItemTriggered)="forceStatus(row, 'Failed')"><app-icon name="alert" />Mark as failed</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger"
+                              (cdkMenuItemTriggered)="forceStatus(row, 'Interrupt')"><app-icon name="alert" />Mark as interrupted</button>
+                    </div>
+                  </ng-template>
+                }
+              </div>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+
+    <app-pagination pager [total]="data().length" [page]="pager.page()" [size]="pager.size()"
+                    (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
+  </app-table-shell>
+</div>

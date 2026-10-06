@@ -1,0 +1,249 @@
+<div class="page-form">
+  <div>
+    <a routerLink="/pipelines/schedules" class="text-sm text-accent hover:underline">← Back to schedules</a>
+    <h1 class="page-title mt-1">
+      {{ isEdit() ? 'Edit schedule' : 'New schedule' }}
+    </h1>
+    <p class="page-subtitle">
+      A schedule binds a pipeline to a timetable and decides who hears about the outcome.
+    </p>
+  </div>
+  <app-managed-banner what="schedules" />
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (loadError()) {
+    <div class="card">
+      <app-load-error [message]="loadError()" [retryable]="!loadMissing()" (retry)="retryLoad()">
+        @if (loadMissing()) {
+          <a routerLink="/pipelines/schedules" class="btn btn-default btn-sm mt-4">Back to schedules</a>
+        }
+      </app-load-error>
+    </div>
+  } @else {
+    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4">
+      <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
+      <fieldset class="form-lock" [disabled]="locked()">
+      <div class="form-section">
+        <h2 class="form-section-title">Basics</h2>
+        <div class="form-grid">
+          <app-field label="Job name" for="jobName" [required]="true"
+                     [control]="form.get('jobName')" [submitted]="submitted()">
+            <input id="jobName" class="input" formControlName="jobName"
+                   [class.input-invalid]="form.get('jobName')?.invalid && (form.get('jobName')?.touched || submitted())"
+                   placeholder="Nightly hurricane export" />
+          </app-field>
+
+          <app-field label="Task" for="task" [required]="true"
+                     [control]="form.get('taskDetailId')" [submitted]="submitted()"
+                     hint="The work this job runs.">
+            <app-combobox id="task" formControlName="taskDetailId" [numeric]="true"
+                          placeholder="Search tasks…" [allowClear]="false" [options]="taskOptions()" />
+          </app-field>
+
+          <app-field label="Execution" for="execution" [required]="true"
+                     [control]="form.get('executionType')" [submitted]="submitted()"
+                     hint="Manual jobs run only when you trigger them.">
+            <select id="execution" class="input" formControlName="executionType">
+              <option value="Auto">Auto — on a schedule</option>
+              <option value="Manual">Manual — on demand</option>
+            </select>
+          </app-field>
+
+          <app-field label="Priority" for="priority" [required]="true"
+                     [control]="form.get('priority')" [submitted]="submitted()"
+                     hint="1 is highest.">
+            <input id="priority" type="number" min="1" max="9" class="input" formControlName="priority" placeholder="1 = highest" />
+          </app-field>
+
+          <app-field label="Attempts" for="maxAttempts" [required]="true"
+                     [control]="form.get('maxAttempts')" [submitted]="submitted()"
+                     hint="1 means a failed run is not retried.">
+            <input id="maxAttempts" type="number" min="1" max="10" class="input"
+                   formControlName="maxAttempts" placeholder="1 = no retry" />
+          </app-field>
+
+          @if (retryEnabled()) {
+            <app-field label="Retry after" for="retryBackoffSeconds" [required]="true"
+                       [control]="form.get('retryBackoffSeconds')" [submitted]="submitted()"
+                       hint="Seconds before the next try. The wait doubles each attempt, up to an hour.">
+              <input id="retryBackoffSeconds" type="number" min="1" max="3600" class="input"
+                     formControlName="retryBackoffSeconds" placeholder="60" />
+            </app-field>
+          }
+
+          <app-field label="State" for="jobStatus" [required]="true"
+                     [control]="form.get('jobStatus')" [submitted]="submitted()">
+            <select id="jobStatus" class="input" formControlName="jobStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </app-field>
+        </div>
+      </div>
+
+      @if (isScheduled()) {
+        <div class="form-section" formGroupName="scheduler">
+          <h2 class="form-section-title">Schedule</h2>
+          <div class="form-grid">
+            <app-field label="Frequency" for="frequency" [required]="true"
+                       [control]="scheduler.get('frequency')" [submitted]="submitted()">
+              <select id="frequency" class="input" formControlName="frequency">
+                @for (frequency of frequencies; track frequency.value) {
+                  <option [value]="frequency.value">{{ frequency.label }}</option>
+                }
+              </select>
+            </app-field>
+
+            @if (isCron()) {
+              <!-- Wave 4: the expression replaces Repeat every, the weekdays and the day of the month. Core's refusal
+                   ("Schedules run at most once a minute...") is shown here, under the field it is about. -->
+              <app-field label="Cron expression" for="cronExpression" [required]="true"
+                         [control]="scheduler.get('cronExpression')" [submitted]="submitted()" [error]="cronError()"
+                         hint="minute hour day-of-month month day-of-week, in server time (Chicago).">
+                <input id="cronExpression" class="input mono" formControlName="cronExpression"
+                       placeholder="0 3 * * *" autocomplete="off" spellcheck="false" />
+              </app-field>
+            } @else {
+              <app-field label="Repeat every" for="interval" [required]="true"
+                         [control]="scheduler.get('intervalValue')" [submitted]="submitted()"
+                         [hint]="unit()">
+                <input id="interval" type="number" min="1" class="input" formControlName="intervalValue"
+                       placeholder="e.g. 5" />
+              </app-field>
+            }
+
+            <app-field label="Start date" for="startDate" [required]="!isCron()"
+                       [control]="scheduler.get('startDate')" [submitted]="submitted()"
+                       [hint]="isCron() ? 'Optional. Blank starts it today.' : ''">
+              <app-date-field inputId="startDate" label="Start date" formControlName="startDate" [clearable]="isCron()" />
+            </app-field>
+
+            <app-field label="Start time" for="startTime" [required]="!isCron()"
+                       [control]="scheduler.get('startTime')" [submitted]="submitted()"
+                       [hint]="isCron() ? 'Optional. Runs are not before this moment.' : ''">
+              <app-time-field inputId="startTime" label="Start time" formControlName="startTime" [clearable]="isCron()" />
+            </app-field>
+
+            <app-field label="End date" for="endDate" [control]="scheduler"
+                       [submitted]="submitted()"
+                       hint="Optional. Inclusive — the job still runs on this day.">
+              <app-date-field inputId="endDate" label="End date" formControlName="endDate" [clearable]="true"
+                              [class.input-invalid]="scheduler.errors?.['endBeforeStart']" />
+            </app-field>
+
+            @if (frequencyValue() === 'Monthly') {
+              <app-field label="Day of month" for="dayOfMonth"
+                         [control]="scheduler.get('dayOfMonth')" [submitted]="submitted()">
+                <select id="dayOfMonth" class="input" formControlName="dayOfMonth">
+                  <option [ngValue]="null">Same day as the start date</option>
+                  @for (day of monthDays; track day) { <option [ngValue]="day">{{ day }}</option> }
+                </select>
+              </app-field>
+            }
+          </div>
+
+          @if (isCron()) {
+            <div class="mt-3.5 text-xs text-[color:var(--text-secondary)]">
+              <span class="label">Examples</span>
+              <ul class="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+                @for (example of cronExamples; track example.expression) {
+                  <li><span class="mono text-[color:var(--text-primary)]">{{ example.expression }}</span> — {{ example.means }}</li>
+                }
+              </ul>
+              <p class="mt-1">Five fields, or six with a seconds field of 0: a schedule runs at most once a minute.</p>
+            </div>
+          }
+
+          @if (frequencyValue() === 'Weekly') {
+            <!-- A multi-select .seg: each day is a toggle that says whether it is on, and the
+                 group is named. An "on" day is filled with the primary colours (see the component
+                 styles) and carries a check, so the state is not read by colour alone. -->
+            <div class="mt-3.5">
+              <span class="label" id="days-of-week">Days of the week</span>
+              <div class="seg seg-multi flex-wrap mt-1" role="group" aria-labelledby="days-of-week">
+                @for (day of days; track day.value) {
+                  <button type="button" class="seg-btn"
+                          [attr.aria-pressed]="selectedDays().includes(day.value)"
+                          (click)="toggleDay(day.value)">
+                    @if (selectedDays().includes(day.value)) { <app-icon name="check" size="0.85em" /> }
+                    {{ day.label }}
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
+          <p class="text-sm mt-3.5 rounded-md px-3 py-2 bg-sunken">
+            {{ summary() }}
+          </p>
+          @if (endPassed()) {
+            <!-- Saving stays allowed: extending or clearing the date later is a fair plan. -->
+            <p class="text-sm mt-2 text-warn-500" role="status">
+              This end date has passed, so the job will not run again until you extend or clear it.
+            </p>
+          }
+        </div>
+      }
+
+      <!-- MIG-251 on MIG-239: the Event start, beside the timetable -- a Manual job can have one too. -->
+      <div class="form-section">
+        <h2 class="form-section-title">Event</h2>
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" class="checkbox" id="onArrival"
+                 [checked]="onArrival()" (change)="onArrival.set($any($event.target).checked)" />
+          Start when a file arrives in the inbox
+        </label>
+        @if (onArrival()) {
+          <div class="form-grid mt-3">
+            <app-field label="File pattern" for="filePattern" [error]="patternError()"
+                       hint="Matched against the file's name: * for any run of characters, ? for one. Blank for every file.">
+              <input id="filePattern" class="input mono" placeholder="*.csv"
+                     [class.input-invalid]="!!patternError()"
+                     [value]="filePattern()" (input)="filePattern.set($any($event.target).value)" />
+            </app-field>
+          </div>
+          <p class="field-note text-[color:var(--text-muted)] mt-2">
+            Each file starts its own run, on the same terms as Run now: not while a run is still in flight, and only
+            while the job is Active. A file that cannot start a run is recorded as skipped, with the reason, on the
+            job's Executions.
+          </p>
+        }
+      </div>
+
+      @if (aiSteps().length) {
+        <!-- MIG-251 on MIG-242: what the schedule's runs use; Run with… on the list chooses for one run. -->
+        <div class="form-section">
+          <h2 class="form-section-title">AI models</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-3">
+            The model each AI step runs on when this schedule runs it. Run with… on the schedules list chooses for a
+            single run instead.
+          </p>
+          <app-ai-model-picks [steps]="aiSteps()" [(picks)]="modelPicks" idPrefix="schedule-model" />
+        </div>
+      }
+
+      <div class="form-section">
+        <h2 class="form-section-title">Email me when</h2>
+        <div class="flex flex-wrap gap-4">
+          @for (option of notifyOptions; track option.control) {
+            <label class="flex items-center gap-2 text-sm">
+              <input type="checkbox" class="checkbox" [formControlName]="option.control" />
+              {{ option.label }}
+            </label>
+          }
+        </div>
+      </div>
+
+      </fieldset>
+      <div class="form-actions">
+        <a routerLink="/pipelines/schedules" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
+        <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
+          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create schedule') }}
+        </button>
+      </div>
+    </form>
+  }
+</div>

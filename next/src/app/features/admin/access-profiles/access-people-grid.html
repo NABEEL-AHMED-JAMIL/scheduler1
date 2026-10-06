@@ -1,0 +1,125 @@
+<div class="card overflow-hidden">
+  <div class="overflow-x-auto">
+    <table class="table-modern access-grid">
+      <thead>
+        <!-- Two full-width bands: the menu sections, then every column's name. The left cells of
+             the top band are blank on purpose -- Person and Profile belong to no section -- but
+             they share the band and its hairline, so the header reads as two rows, not a
+             right-hand block hanging off an empty corner. -->
+        <tr class="access-grid-head-sections">
+          <th class="access-grid-person" aria-hidden="true"></th>
+          <th class="access-grid-profile" aria-hidden="true"></th>
+          @for (group of groupsOfColumns(); track group.section) {
+            <th class="access-grid-section" [attr.colspan]="group.pages.length" [title]="group.section">{{ group.section }}</th>
+          }
+        </tr>
+        <tr class="access-grid-head-columns">
+          <th class="access-grid-person">Person</th>
+          <th class="access-grid-profile">Profile</th>
+          @for (page of columns(); track page.key) {
+            <th class="access-grid-page" [class.access-grid-first]="isFirstOfSection($index)">
+              <span>{{ page.label }}</span>
+            </th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (group of groups(); track group.key) {
+          <!-- The profile's own row: what everyone beneath it gets. -->
+          <tr class="access-grid-group">
+            <td class="access-grid-person">
+              <div class="flex items-center gap-2 whitespace-nowrap">
+                <app-icon name="shield" size="0.95rem" class="opacity-70 shrink-0" />
+                <span class="font-semibold truncate">{{ group.title }}</span>
+              </div>
+              <div class="text-xs text-[color:var(--text-muted)] mt-0.5 truncate" [title]="group.subtitle">
+                {{ group.rows.length }} {{ group.rows.length === 1 ? 'person' : 'people' }}{{ group.subtitle ? ' · ' + group.subtitle : '' }}
+              </div>
+            </td>
+            <td class="access-grid-profile"></td>
+            @for (open of group.opens; track $index) {
+              <td class="access-grid-cell" [class.access-grid-first]="isFirstOfSection($index)">
+                <span class="access-mark" [class.access-mark-on]="open" [class.access-mark-off]="!open">
+                  @if (open) { <app-icon name="check" size="0.85rem" /> } @else { <app-icon name="minus" size="0.85rem" /> }
+                </span>
+              </td>
+            }
+          </tr>
+          @for (row of group.rows; track row.person.appUserId) {
+            <tr [class.opacity-55]="busy() === row.person.appUserId" [attr.data-person]="row.person.username">
+              <td class="access-grid-person">
+                <div class="flex items-center gap-2.5 pl-6">
+                  <app-avatar [appUserId]="row.person.avatarKey ? row.person.appUserId : null" [name]="row.person.fullName" [size]="1.9" />
+                  <div class="min-w-0">
+                    <div class="font-medium truncate leading-tight">{{ row.person.fullName }}</div>
+                    <div class="text-xs text-[color:var(--text-muted)] truncate">{{ row.person.position || row.person.username }}</div>
+                  </div>
+                </div>
+              </td>
+              <td class="access-grid-profile">
+                <select class="input py-1 text-xs" (change)="pick(row.person, $any($event.target).value, $any($event.target))"
+                        [disabled]="busy() === row.person.appUserId" [attr.aria-label]="'Profile for ' + row.person.fullName">
+                  <option value="" [selected]="row.person.pageAccessProfileId == null">Default{{ defaultProfile() ? ' · ' + defaultProfile()!.profileName : '' }}</option>
+                  @for (profile of profiles(); track profile.pageAccessProfileId) {
+                    <option [value]="profile.pageAccessProfileId" [selected]="profile.pageAccessProfileId === row.person.pageAccessProfileId">{{ profile.profileName }}</option>
+                  }
+                </select>
+                @if (row.exceptions) {
+                  <button type="button" class="mt-1 text-[11px] text-[color:var(--text-muted)] hover:text-[color:var(--text-primary)] hover:underline inline-flex items-center gap-1"
+                          (click)="reset.emit(row.person)" [disabled]="busy() === row.person.appUserId"
+                          [attr.data-reset]="row.person.username">
+                    <span class="access-exception-dot"></span>{{ row.exceptions }} {{ row.exceptions === 1 ? 'exception' : 'exceptions' }} · reset to profile
+                  </button>
+                }
+              </td>
+              @for (cell of row.cells; track cell.page.key) {
+                <td class="access-grid-cell" [class.access-grid-first]="isFirstOfSection($index)"
+                    [class.access-cell-exception]="cell.exception">
+                  <label class="access-cell" [title]="cell.exception
+                        ? (cell.open ? 'Opened for ' + row.person.fullName + ' — the profile withholds it' : 'Withheld from ' + row.person.fullName + ' — the profile opens it')
+                        : (cell.open ? 'Open, as the profile says' : 'Withheld, as the profile says')">
+                    <input type="checkbox" class="checkbox" [checked]="cell.open"
+                           [disabled]="busy() === row.person.appUserId"
+                           (change)="onToggle(row.person, cell.page, $any($event.target).checked)"
+                           [attr.aria-label]="cell.page.label + ' for ' + row.person.fullName"
+                           [attr.data-cell]="row.person.username + '|' + cell.page.key" [attr.data-open]="cell.open"
+                           [attr.data-exception]="cell.exception" />
+                    @if (cell.exception) { <span class="access-exception-dot" aria-hidden="true"></span> }
+                  </label>
+                </td>
+              }
+            </tr>
+          }
+        }
+        @if (shown() === 0) {
+          <tr><td [attr.colspan]="columns().length + 2" class="text-center text-[color:var(--text-muted)] py-10">
+            @if (search()) { Nobody matches “{{ search() }}”. } @else { No tenant users in this workspace yet. }
+          </td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <!-- P2 #34: a page of people at a time; hidden while everyone fits on one. -->
+  <app-pagination [total]="matchCount()" [page]="page()" [size]="pageSize()" (goTo)="page.set($event)"
+                  (setSize)="pageSize.set($event); page.set(1)" />
+  <div class="flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
+    <!-- Samples look exactly like the cells they explain. They used to be disabled inputs, and
+         the disabled fade made the ticked "open" sample read as an empty grey box -- the same
+         as "withheld". Inert via tabindex/pointer-events instead, so they keep the real colours. -->
+    <span class="inline-flex items-center gap-1.5">
+      <input type="checkbox" class="checkbox access-legend-sample" checked tabindex="-1" aria-hidden="true" /> open
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <input type="checkbox" class="checkbox access-legend-sample" tabindex="-1" aria-hidden="true" /> withheld
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <span class="access-mark access-mark-on"><app-icon name="check" size="0.85rem" /></span> profile baseline
+    </span>
+    <span class="inline-flex items-center gap-1.5">
+      <span class="access-mark access-mark-off"><app-icon name="minus" size="0.85rem" /></span> not in profile
+    </span>
+    <span class="inline-flex items-center gap-1.5"><span class="access-exception-dot"></span> exception to the profile</span>
+    <span>Tick a box to open or withhold that page for that person; the profile row above shows the baseline.</span>
+    <span class="ml-auto">Admins are not listed — they open everything.</span>
+  </div>
+</div>

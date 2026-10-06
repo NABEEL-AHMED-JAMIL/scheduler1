@@ -1,0 +1,261 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <a routerLink="/ai/prompts" class="text-sm text-accent hover:underline">← Back to prompts</a>
+      <h1 class="page-title mt-1 flex items-center gap-2">
+        {{ isEdit() ? (loaded()?.name || 'Edit prompt') : 'New prompt' }}
+        @if (isPlatformAdmin() && isEdit() && workspaceName()) { <span class="pill pill-neutral" title="Workspace">{{ workspaceName() }}</span> }
+        @if (loaded(); as p) { <span class="pill pill-neutral mono">v{{ p.version }}</span> <span class="pill" [class]="'pill ' + (p.status === 'Active' ? 'pill-ok' : 'pill-neutral')">{{ p.status }}</span> }
+      </h1>
+      <p class="page-subtitle">
+        Instructions, a message with <span class="mono">{{ '{{' }}variables{{ '}}' }}</span>, and the shape of the answer.
+        Try it runs what is on this page with the samples; nothing is saved until you say so.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <a routerLink="/ai/prompts" class="btn btn-ghost btn-sm">Cancel</a>
+      <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError() || locked()">
+        {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="save(true)" [disabled]="saving() || !!loadError() || locked()">
+        @if (saving()) { <app-icon name="refresh" class="spin" /> }Save &amp; activate
+      </button>
+    </div>
+  </div>
+  <app-managed-banner what="prompts" />
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…</div>
+  } @else if (loadError()) {
+    <div class="card p-12 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm">{{ loadError() }}</p>
+      <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()">
+        <app-icon name="refresh" />Try again
+      </button>
+    </div>
+  } @else {
+    <div class="prompt-editor">
+      <!-- ── Definition ─────────────────────────────────────────────────────────────── -->
+      <form [formGroup]="form" class="card p-4 form-stack min-w-0" (ngSubmit)="save(true)">
+        <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
+        <fieldset class="form-lock" [disabled]="locked()">
+        <div class="form-grid">
+          <app-field label="Name" for="pName" [required]="true" [control]="form.get('name')" [submitted]="submitted()">
+            <input id="pName" class="input" formControlName="name" placeholder="Summarise claim file" />
+          </app-field>
+          <app-field label="Description" for="pDesc" [control]="form.get('description')" [submitted]="submitted()">
+            <input id="pDesc" class="input" formControlName="description" placeholder="What this prompt is for" />
+          </app-field>
+        </div>
+        @if (isPlatformAdmin() && !isEdit()) {
+          <app-field label="Workspace" for="pTenant" [required]="true" [control]="form.get('tenantId')" [submitted]="submitted()"
+                     hint="A prompt belongs to one workspace and runs on that workspace's connections.">
+            <app-combobox id="pTenant" formControlName="tenantId" [numeric]="true" placeholder="Search workspaces…" [allowClear]="false" [options]="tenantOptions()" />
+          </app-field>
+        }
+        <div class="form-grid">
+          <app-field label="Connection" for="pConnection" [control]="form.get('connectionId')" [submitted]="submitted()"
+                     hint="Blank runs on the workspace default.">
+            <app-combobox id="pConnection" formControlName="connectionId" [numeric]="true" placeholder="Workspace default" clearLabel="Workspace default" [options]="connectionOptions()" />
+          </app-field>
+          <app-field label="Model" for="pModel" [control]="form.get('model')" [submitted]="submitted()" [hint]="modelHint()">
+            <input id="pModel" class="input mono" formControlName="model" [placeholder]="connection()?.defaultModel || 'connection default'" list="pModels" />
+            <datalist id="pModels">@for (m of connection()?.models ?? []; track m) { <option [value]="m"></option> }</datalist>
+          </app-field>
+        </div>
+
+        <app-field label="System instructions" for="pSystem" [control]="form.get('systemInstructions')" [submitted]="submitted()"
+                   hint="Who the model is and how it should behave — the same for every run.">
+          <textarea id="pSystem" class="input resize-y min-h-20" formControlName="systemInstructions"
+                    placeholder="You are a claims analyst for a US health network. Be terse. Never invent a claim number."></textarea>
+        </app-field>
+
+        <app-field label="Message template" for="pTemplate" [required]="true" [control]="form.get('userTemplate')" [submitted]="submitted()"
+                   hint="What is sent each run, with the variables filled in. Type {{ '{{' }}name{{ '}}' }} or click a variable to insert it.">
+          <textarea #templateBox id="pTemplate" class="input resize-y min-h-32 mono" formControlName="userTemplate"
+                    placeholder="Claim {{ '{{' }}claim_id{{ '}}' }}. Summarise the attached file in four keys: diagnosis, procedures, total_billed, flags.&#10;&#10;{{ '{{' }}document_text{{ '}}' }}"></textarea>
+          <div class="flex flex-wrap items-center gap-1 mt-1.5">
+            <span class="text-xs text-[color:var(--text-muted)]">Insert:</span>
+            @for (name of declaredNames(); track name) {
+              <button type="button" class="pill pill-brand hover-brand mono" (click)="insertVariable(name, templateBox)">{{ '{{' }}{{ name }}{{ '}}' }}</button>
+            }
+            @if (!declaredNames().length) { <span class="text-xs text-[color:var(--text-muted)]">add a variable below first</span> }
+          </div>
+        </app-field>
+
+        <div>
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="label">Variables</span>
+            <span class="text-xs text-[color:var(--text-muted)]">what the pipeline fills in; the sample is what Try it runs with</span>
+            <button type="button" class="btn btn-default btn-sm ml-auto" (click)="addVariable()"><app-icon name="plus" />Add variable</button>
+          </div>
+          @if (!variables.length) {
+            <p class="text-sm text-[color:var(--text-muted)] rounded-md px-3 py-2 bg-sunken">No variables yet. A prompt without any always says the same thing.</p>
+          } @else {
+            <!-- relative: the scroller contains the sr-only Actions span, which otherwise widened the
+                 whole page by 90px on a phone. The floors stop auto layout crushing the controls;
+                 the table scrolls inside its card instead. -->
+            <div class="overflow-x-auto relative">
+              <table class="table-modern prompt-vars min-w-[36rem]" formArrayName="variables">
+                <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20"><span class="sr-only">Actions</span></th></tr></thead>
+                <tbody>
+                  @for (g of variables.controls; track g; let i = $index) {
+                    <tr [formGroupName]="i">
+                      <td><input class="input mono min-w-28" formControlName="name" placeholder="claim_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()"
+                                 [class.input-invalid]="(submitted() || g.get('name')!.touched) && g.get('name')!.invalid"
+                                 [attr.aria-invalid]="(submitted() || g.get('name')!.touched) && g.get('name')!.invalid ? 'true' : null"
+                                 [attr.aria-describedby]="submitted() && variables.invalid ? 'pVarsError' : null" /></td>
+                      <td>
+                        <select class="input min-w-32" formControlName="type" [attr.aria-label]="'Variable ' + (i + 1) + ' type'">
+                          <option value="text">text</option>
+                          <option value="number">number</option>
+                          <option value="url">url</option>
+                          <option value="file">file → text</option>
+                        </select>
+                      </td>
+                      <td class="text-center"><input type="checkbox" class="checkbox" formControlName="required" [attr.aria-label]="'Variable ' + (i + 1) + ' required'" /></td>
+                      <td>
+                        @if (sourceOf(g.get('name')!.value); as src) {
+                          <span class="var-source" [title]="src.bucket + '/' + src.key">
+                            <app-icon [name]="src.kind === 'transcript' ? 'volume' : src.kind === 'description' ? 'image' : 'file'" size="0.9em" />
+                            <span class="mono">{{ src.name }}</span>
+                            <span>· {{ src.kind === 'name' ? 'name' : src.kind }} · {{ src.chars | number }}{{ src.truncated ? ' of ' + (src.totalChars | number) : '' }} chars</span>
+                            <button type="button" class="btn btn-ghost btn-icon btn-xs" aria-label="Use the sample instead" (click)="clearSource(g.get('name')!.value)"><app-icon name="close" size="0.8em" /></button>
+                          </span>
+                        } @else {
+                          <input class="input" formControlName="sample" placeholder="what Try it uses" [attr.aria-label]="'Variable ' + (i + 1) + ' sample value'" />
+                        }
+                      </td>
+                      <td class="whitespace-nowrap">
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Fill from a file'" title="Try it with a file from a bucket: any type the file chat can read"
+                                [disabled]="reading() === g.get('name')!.value" (click)="fromFile(g.get('name')!.value)">
+                          <app-icon name="folder" [busy]="reading() === g.get('name')!.value" />
+                        </button>
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Remove variable" (click)="removeVariable(i)"><app-icon name="trash" class="icon-crit" /></button>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          }
+          @if (submitted() && variables.invalid) {
+            <p id="pVarsError" class="text-xs text-crit-500 mt-1.5" role="alert">Variable names use letters, digits and underscores, start with a letter or underscore, and cannot be blank.</p>
+          }
+          @if (undeclared().length) {
+            <p class="text-xs text-warn-500 mt-1.5">The template names {{ undeclared().join(', ') }} — rows were added above; give them a sample.</p>
+          }
+        </div>
+
+        <div class="form-grid">
+          <app-field label="Output" for="pOutput" [control]="form.get('outputMode')" [submitted]="submitted()"
+                     [hint]="outputMode() === 'json' ? 'The answer must be a JSON object; the keys below are asked for out loud and checked, with one repair round.' : 'Free text, used as-is.'">
+            <select id="pOutput" class="input" formControlName="outputMode">
+              <option value="text">Text</option>
+              <option value="json">JSON object</option>
+            </select>
+          </app-field>
+          <app-field label="Tags" for="pTags" [control]="form.get('tags')" [submitted]="submitted()" hint="Comma-separated. File types here (pdf, docx) offer the prompt in the file chat.">
+            <input id="pTags" class="input" formControlName="tags" placeholder="pdf, docx" />
+          </app-field>
+          <app-field label="Data sensitivity" for="pSensitivity" [control]="form.get('dataSensitivity')" [submitted]="submitted()"
+                     hint="The level of the data this prompt is sent. The workspace's data policy for it decides which models may run it.">
+            <select id="pSensitivity" class="input" formControlName="dataSensitivity">
+              @for (s of sensitivities; track s.value) { <option [value]="s.value">{{ s.label }}</option> }
+            </select>
+          </app-field>
+        </div>
+        @if (outputMode() === 'json') {
+          <app-field label="Output schema" for="pSchema" [control]="form.get('outputSchema')" [submitted]="submitted()"
+                     hint='A JSON object with "required": [keys] (or "properties"). Blank accepts any JSON object.'>
+            <textarea id="pSchema" class="input resize-y min-h-20 mono" formControlName="outputSchema"
+                      placeholder='{ "required": ["diagnosis", "procedures", "total_billed", "flags"] }'></textarea>
+          </app-field>
+        }
+        <div class="form-grid">
+          <app-field label="Temperature" for="pTemp" [control]="form.get('temperature')" [submitted]="submitted()" hint="0 is deterministic; blank is the provider's default.">
+            <input id="pTemp" type="number" min="0" max="2" step="0.1" class="input" formControlName="temperature" placeholder="0.2" />
+          </app-field>
+          <app-field label="Max tokens" for="pMax" [control]="form.get('maxTokens')" [submitted]="submitted()" hint="Caps the answer's length; blank is the provider's default.">
+            <input id="pMax" type="number" min="1" step="50" class="input" formControlName="maxTokens" placeholder="800" />
+          </app-field>
+        </div>
+      </fieldset>
+      </form>
+
+      <!-- ── Try it ─────────────────────────────────────────────────────────────────── -->
+      <aside class="card p-4 prompt-try min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
+          <h2 class="section-title">Try it</h2>
+          <span class="text-xs text-[color:var(--text-muted)]">runs the page as it is, with the samples · recorded as a try</span>
+          <button type="button" class="btn btn-primary btn-sm ml-auto" (click)="tryIt()" [disabled]="trying() || locked()">
+            <app-icon name="play" [busy]="trying()" />{{ trying() ? 'Running…' : 'Run' }}
+          </button>
+        </div>
+        @if (connection(); as c) {
+          <p class="text-xs text-[color:var(--text-muted)] mt-1">On <b>{{ c.name }}</b>@if (isPlatformAdmin() && workspaceName()) { · {{ workspaceName() }} } · {{ c.provider }} · <span class="mono">{{ form.get('model')?.value || c.defaultModel }}</span>@if (c.dailyTokenBudget) { · {{ c.tokensToday | number }} of {{ c.dailyTokenBudget | number }} tokens today }</p>
+        } @else if (needsWorkspace()) {
+          <p class="text-xs text-[color:var(--text-muted)] mt-1">Pick a workspace first; the prompt runs on that workspace's connections.</p>
+        } @else {
+          <p class="text-xs text-warn-500 mt-1">No connection to run on — pick one above, or set a workspace default under Model connections.</p>
+        }
+
+        @if (trySourceList().length) {
+          <ul class="mt-2 flex flex-wrap gap-1.5" aria-label="Values taken from files">
+            @for (src of trySourceList(); track src.variable) {
+              <li class="var-source" [title]="src.bucket + '/' + src.key">
+                <span class="mono">{{ '{{' + src.variable + '}}' }}</span> ← <span class="mono">{{ src.name }}</span>
+                <span>· {{ src.kind === 'name' ? 'name' : src.kind }}{{ src.truncated ? ' · cut at ' + (src.chars | number) : '' }}</span>
+              </li>
+            }
+          </ul>
+        }
+
+        @if (lastRun(); as run) {
+          <div class="mt-4">
+            <div class="flex items-center gap-2 flex-wrap text-xs">
+              <span class="pill" [class]="'pill ' + (run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ run.status === 'ok' ? 'Answered' : 'Failed' }}</span>
+              @if (run.latencyMs != null) { <span>{{ (run.latencyMs / 1000) | number: '1.1-1' }} s</span> }
+              @if (run.tokensIn != null) { <span class="text-[color:var(--text-muted)]">{{ run.tokensIn | number }} in · {{ run.tokensOut | number }} out</span> }
+              @if ((run.attempts ?? 1) > 1) { <span class="text-[color:var(--text-muted)]">{{ run.attempts }} attempts</span> }
+              <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="showRendered.set(!showRendered())">{{ showRendered() ? 'Hide input' : 'Show rendered input' }}</button>
+            </div>
+            @if (showRendered()) {
+              <pre class="prompt-out mt-2" [attr.aria-label]="'Rendered input'">{{ run.renderedInput }}</pre>
+            }
+            @if (run.status === 'ok') {
+              <pre class="prompt-out mt-2">{{ prettyOutput(run) }}</pre>
+            } @else {
+              <p class="text-sm text-crit-500 mt-2">{{ run.error }}</p>
+            }
+          </div>
+        } @else {
+          <div class="mt-4 rounded-md px-3 py-6 bg-sunken text-center text-sm text-[color:var(--text-muted)]">
+            The rendered input, the answer, tokens and time land here.
+          </div>
+        }
+
+        @if (runs().length) {
+          <h3 class="section-title mt-5">Recent runs</h3>
+          <ul class="side-panel-list mt-1 text-xs">
+            @for (r of runs(); track r.runId) {
+              <li>
+                <div class="min-w-0">
+                  <span class="pill" [class]="'pill ' + (r.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ r.status }}</span>
+                  <span class="ml-1">{{ r.kind === 'try' ? 'try' : 'step' }} · v{{ r.promptVersion }}</span>
+                  <span class="text-[color:var(--text-muted)]"> · {{ r.dateCreated | serverTime: 'recent' }}</span>
+                  @if (r.error) { <div class="text-crit-500 truncate" [title]="r.error">{{ r.error }}</div> }
+                </div>
+                <span class="text-[color:var(--text-muted)] whitespace-nowrap">
+                  @if (r.latencyMs != null) { {{ (r.latencyMs / 1000) | number: '1.1-1' }} s }
+                  @if (r.tokensIn != null) { · {{ r.tokensIn }}→{{ r.tokensOut }} }
+                </span>
+              </li>
+            }
+          </ul>
+        }
+      </aside>
+    </div>
+  }
+</div>

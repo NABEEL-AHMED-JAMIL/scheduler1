@@ -1,0 +1,69 @@
+import { Component, inject, signal } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { AuthService, PASSWORD_CHANGED_NOTICE, PASSWORD_CHANGED_REASON } from '../../core/auth/auth.service';
+import { API_SUCCESS } from '../../core/api/api.config';
+import { ThemeService } from '../../core/theme.service';
+import { ConsolePreview } from '../landing/console-preview';
+import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
+import { Field } from '../../shared/ui/field';
+
+@Component({
+  selector: 'app-login',
+  imports: [ConsolePreview, Icon, BrandMark, ReactiveFormsModule, Field, RouterLink],
+  templateUrl: './login.html',
+})
+export class Login {
+  private readonly fb = inject(FormBuilder);
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
+  readonly theme = inject(ThemeService);
+
+  readonly submitting = signal(false);
+  readonly error = signal('');
+
+  /**
+   * Why the person is here, when a session ended under them: a password change signed it out and the
+   * server handed back no new pair. Only reasons this console sends are shown; anything else in the
+   * address is ignored rather than printed.
+   */
+  readonly notice = this.route.snapshot.queryParamMap.get('reason') === PASSWORD_CHANGED_REASON
+    ? PASSWORD_CHANGED_NOTICE : '';
+
+  readonly form = this.fb.nonNullable.group({
+    username: ['', Validators.required],
+    password: ['', Validators.required],
+  });
+
+  submit(): void {
+    this.error.set('');
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    this.submitting.set(true);
+    const { username, password } = this.form.getRawValue();
+    this.auth.login(username, password).subscribe({
+      next: response => {
+        this.submitting.set(false);
+        if (response.status === API_SUCCESS) {
+          // Land where they were headed before the guard intervened, when there was somewhere.
+          // Only a path from this application is followed, so a crafted returnUrl cannot send
+          // someone to another site after signing in.
+          const requested = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
+          const safe = requested.startsWith('/') && !requested.startsWith('//')
+            ? requested : '/';
+          void this.router.navigateByUrl(safe);
+        } else {
+          this.error.set(response.message || 'Sign in failed.');
+        }
+      },
+      error: err => {
+        this.submitting.set(false);
+        this.error.set(err?.error?.message || 'Could not reach the server.');
+      },
+    });
+  }
+}

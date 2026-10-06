@@ -1,0 +1,400 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Browse files</h1>
+      <p class="page-subtitle">
+        Browse the storage behind any connection.
+      </p>
+    </div>
+    <div class="w-full sm:w-72 2xl:w-96">
+      <label class="label" for="bucket">Connection</label>
+      <!-- [selected] per option rather than [value] on the select: the options come from an
+           async list, and a value set on the select before they exist does not stick. -->
+      <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
+                    placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
+    </div>
+  </div>
+
+  @if (!bucket()) {
+    @if (unknownLink(); as link) {
+      <!-- A sibling in the page stack, so it sits above whichever branch follows: the
+           connections grid or the empty card. -->
+      <div class="card p-4 flex items-start gap-3" role="status">
+        <app-icon name="alert" class="icon-warn shrink-0 mt-0.5" />
+        <div class="text-sm min-w-0">
+          <p class="font-medium break-words">
+            No connection in this workspace serves <span class="mono">{{ link.bucket }}</span>
+          </p>
+          <p class="text-[color:var(--text-secondary)] mt-1 break-words">
+            The link pointed at <span class="mono">{{ link.bucket }}/{{ link.prefix }}</span>.
+            @if (canConnectStorage()) {
+              Add a connection for that bucket to browse it here, or pick one below.
+            } @else {
+              An administrator of your workspace can add a connection for it; meanwhile pick one below.
+            }
+          </p>
+          @if (canConnectStorage()) {
+            <a routerLink="/integration/storage-connections" class="link-inline mt-2">Storage connections</a>
+          }
+        </div>
+      </div>
+    }
+    <!-- The connections themselves, rather than a line of text telling you to go and find them
+         in the select. There are usually more than a handful, and picking one is the only thing
+         to do on this screen until something is chosen. -->
+    @if (bucketsLoading() && !buckets().length) {
+      <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">
+        <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
+        Loading connections…
+      </div>
+    } @else if (bucketsError()) {
+      <div class="card p-10 text-center">
+        <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
+        <p class="text-sm text-crit-500">{{ bucketsError() }}</p>
+        <button type="button" class="btn btn-default btn-sm mt-4" (click)="loadBuckets()"><app-icon name="refresh" />Try again</button>
+      </div>
+    } @else if (buckets().length) {
+      <div class="flex flex-col gap-3">
+        <div class="flex flex-wrap items-baseline gap-2">
+          <h2 class="text-sm font-semibold">Connections</h2>
+          <span class="text-sm text-[color:var(--text-muted)]">
+            {{ buckets().length }} configured — pick one to browse it
+          </span>
+        </div>
+
+        <!-- At most three across: four made each card too narrow for its name and footer. -->
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-5">
+          @for (b of buckets(); track b.bucket) {
+            <!-- Each card says what the connection is and whose it is, not only its name: the
+                 bucket and region it reads, how its last test went, and who made it when. -->
+            <button type="button" class="connection-card card p-0 text-left flex flex-col transition-colors
+                                         hover:border-[color:var(--border-strong)]"
+                    [attr.aria-label]="'Browse ' + b.label"
+                    (click)="onBucketChange(b.bucket)">
+              <span class="flex items-start gap-3 p-4 pb-3 w-full">
+                <span class="stat-glyph shrink-0">
+                  <app-icon [name]="providerIcon(b.provider)" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block font-medium truncate" [title]="b.label">{{ b.label }}</span>
+                  <span class="flex items-center gap-2 mt-0.5 min-w-0">
+                    <span class="mono text-xs text-[color:var(--text-muted)] truncate"
+                          [title]="b.bucket">{{ b.bucket }}</span>
+                    <span class="pill shrink-0" [class]="connectionTone(b.connectionStatus)">{{ connectionState(b.connectionStatus) }}</span>
+                  </span>
+                </span>
+              </span>
+              @if (b.description) {
+                <span class="block px-4 text-xs text-[color:var(--text-secondary)] line-clamp-2 break-words"
+                      [title]="b.description">{{ b.description }}</span>
+              }
+              <span class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 px-4 pt-3 pb-4 text-xs w-full">
+                @if (b.bucketName) {
+                  <span class="text-[color:var(--text-muted)]">Bucket</span>
+                  <span class="mono truncate" [title]="b.bucketName">{{ b.bucketName }}</span>
+                }
+                @if (b.region) {
+                  <span class="text-[color:var(--text-muted)]">Region</span>
+                  <span class="truncate">{{ b.region }}</span>
+                }
+                <span class="text-[color:var(--text-muted)]">Provider</span>
+                <span>{{ b.provider }}</span>
+              </span>
+              <span class="mt-auto flex items-center gap-2 px-4 py-2.5 border-t border-subtle text-xs text-[color:var(--text-muted)] w-full">
+                @if (b.createdByName || b.dateCreated) {
+                  <app-icon name="user" size="0.9em" class="shrink-0" />
+                  <span class="min-w-0 truncate"
+                        [title]="'Created' + (b.createdByName ? ' by ' + b.createdByName : '') + (b.dateCreated ? ' on ' + (b.dateCreated | serverTime:'date') : '')">
+                    Created{{ b.createdByName ? ' by ' + b.createdByName : '' }}{{ b.dateCreated ? ' · ' + (b.dateCreated | serverTime:'date') : '' }}
+                  </span>
+                }
+                <!-- The whole card opens the connection (its label says so); the arrow only hints it. -->
+                <app-icon name="chevronRight" size="0.95em" class="ml-auto shrink-0 text-[color:var(--text-secondary)]" />
+              </span>
+            </button>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="card p-10 flex flex-col items-center gap-3 text-center">
+        <span class="stat-glyph"><app-icon name="cloud" /></span>
+        <div>
+          <h2 class="text-base font-semibold">No storage is connected yet</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-sm">
+            A connection tells the console where a job may read from and write to. Add one and
+            it appears here.
+          </p>
+        </div>
+        @if (canConnectStorage()) {
+          <a routerLink="/integration/storage-connections" class="btn btn-primary btn-sm">
+            <app-icon name="plus" />Add a connection
+          </a>
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)]">Ask an administrator of your workspace to connect storage.</p>
+        }
+      </div>
+    }
+  } @else {
+    <div class="card overflow-hidden">
+      <!-- Path + actions -->
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle"
+          >
+        <nav class="flex items-center gap-1 text-sm mr-auto min-w-0 flex-wrap">
+          <button type="button" class="mono text-accent hover:underline" (click)="goToCrumb(-1)">
+            {{ bucket() }}
+          </button>
+          @for (crumb of crumbs(); track crumb.prefix; let i = $index) {
+            <span class="text-[color:var(--text-muted)]">/</span>
+            <button type="button" class="hover:underline truncate max-w-40"
+                    [class.text-accent]="i < crumbs().length - 1"
+                    (click)="goToCrumb(i)">{{ crumb.name }}</button>
+          }
+        </nav>
+
+        @if (visibleSelection().length) {
+          <button type="button" class="btn btn-default btn-sm" (click)="downloadSelected()">
+            Download {{ visibleSelection().length }}
+          </button>
+          <button type="button" class="btn btn-default btn-sm" (click)="share()" [disabled]="actionBusy()">
+            Email {{ visibleSelection().length }}
+          </button>
+          <!-- btn-danger is the confirm's; the confirm that follows is the destructive step. -->
+          <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="removeSelected()"
+                  [disabled]="actionBusy()">
+            <app-icon name="trash" />Delete {{ visibleSelection().length }}
+          </button>
+        }
+
+        <button type="button" class="btn btn-default btn-sm" (click)="newFolder()"
+                [disabled]="actionBusy()">New folder</button>
+
+        <!-- Two inputs rather than one: webkitdirectory is a property of the INPUT, not of the
+             click, so a single control cannot offer both a file picker and a folder picker. The
+             browser also words the dialogs differently, which is the clearer of the two. -->
+        <!-- sr-only, not hidden: display:none takes the input out of the tab order, and the
+             label cannot be reached or pressed from the keyboard. The ring shows on the label. -->
+        <label class="btn btn-default btn-sm cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--focus-ring)]"
+               [class.opacity-60]="uploading()" [class.pointer-events-none]="uploading()">
+          <app-icon name="upload" />Upload
+          <input type="file" multiple class="sr-only" (change)="onUpload($event)" />
+        </label>
+
+        <label class="btn btn-default btn-sm cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-[color:var(--focus-ring)]"
+               [class.opacity-60]="uploading()" [class.pointer-events-none]="uploading()"
+               title="Every file inside the folder, keeping its sub-folders">
+          <app-icon name="folder" />Upload folder
+          <input type="file" webkitdirectory multiple class="sr-only" (change)="onUpload($event)" />
+        </label>
+
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+      </div>
+
+      @if (uploading()) {
+        <!-- A folder can be hundreds of files, and a spinner that says only "working" leaves the
+             reader unable to tell a slow upload from a stuck one. -->
+        <div class="flex items-center gap-3 px-4 py-2 border-b border-subtle text-xs text-[color:var(--text-muted)]">
+          <div class="progress flex-1" role="progressbar" aria-label="Upload" [attr.aria-valuenow]="uploadDone()" aria-valuemin="0" [attr.aria-valuemax]="uploadTotal()">
+            <div class="progress-bar" [style.width.%]="(uploadDone() / uploadTotal()) * 100"></div>
+          </div>
+          <span class="tabular shrink-0">
+            {{ uploadDone() }} of {{ uploadTotal() }} uploaded@if (uploadFailures().length) {
+              <span class="text-crit-500">, {{ uploadFailures().length }} failed</span>
+            }
+          </span>
+        </div>
+      }
+
+      <!-- Filter bar -->
+      <div class="flex flex-wrap items-center gap-3 px-4 py-2.5 border-b text-sm border-subtle"
+          >
+        <div class="search-field max-w-56">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Find a file…" aria-label="Filter by name"
+                 [value]="search()" (input)="search.set($any($event.target).value)" />
+        </div>
+        <app-date-field label="Modified from" placeholder="Modified from" [clearable]="true" [value]="dateFrom()"
+                        (valueChange)="dateFrom.set($event)" />
+        <app-date-field label="Modified to" placeholder="Modified to" [clearable]="true" [value]="dateTo()"
+                        (valueChange)="dateTo.set($event)" />
+        @if (hasFilters()) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
+        }
+        <span class="text-[color:var(--text-muted)] text-xs">
+          {{ counts().folders }} folder{{ counts().folders === 1 ? '' : 's' }} ·
+          {{ counts().files }} file{{ counts().files === 1 ? '' : 's' }}
+          @if (counts().bytes) { · {{ humanSize(counts().bytes) }} }
+        </span>
+        @if (hasInsights()) {
+          <button type="button" class="btn btn-ghost btn-sm ml-auto"
+                  [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
+                  (click)="showInsights.set(!showInsights())">
+            <app-icon name="chart" />{{ showInsights() ? 'Hide' : 'Insights' }}
+          </button>
+        }
+        @if (isSlowProvider()) {
+          <span class="pill pill-warn" title="Each request opens a new connection">
+            {{ provider() }} · slower
+          </span>
+        }
+      </div>
+
+      @if (showInsights() && hasInsights()) {
+        <div class="grid gap-3 p-3.5 border-b md:grid-cols-2 xl:grid-cols-4 border-subtle bg-page"
+            >
+          <div class="card chart-card">
+            <h3 class="chart-title">What is here</h3>
+            <app-donut [data]="mix()" totalLabel="entries" />
+          </div>
+
+          <div class="card chart-card">
+            <h3 class="chart-title">File types</h3>
+            <app-ranked-bar [data]="byType()" [max]="6" />
+          </div>
+
+          <div class="card chart-card">
+            <h3 class="chart-title">Last modified</h3>
+            <p class="chart-sub">Oldest data is usually the first worth archiving.</p>
+            <app-ranked-bar [data]="byAge()" [sorted]="false" [max]="6" />
+          </div>
+
+          <div class="card chart-card">
+            <h3 class="chart-title">Largest files</h3>
+            <app-ranked-bar [data]="bySize()" [max]="6" [showPercent]="false"
+                            [formatValue]="humanSizeFn" />
+          </div>
+        </div>
+      }
+
+      @if (error()) {
+        <div class="px-6 py-14 text-center">
+          <app-icon name="alert" size="1.75rem" class="icon-crit block mx-auto mb-3" />
+          <p class="text-sm text-crit-500">{{ error() }}</p>
+          <button type="button" class="btn btn-default btn-sm mt-4" (click)="load()"><app-icon name="refresh" />Try again</button>
+        </div>
+      } @else if (loading() && !objects().length) {
+        <div class="px-6 py-14 text-center text-sm text-[color:var(--text-muted)]">
+          <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>
+          Loading…
+        </div>
+      } @else {
+        <!-- A reload keeps the rows but blurs and blocks them: the previous folder's Delete must
+             not stay clickable while the next listing is on its way. -->
+        <app-blur-loader [active]="loading()" label="Loading…">
+        <div class="overflow-x-auto scroll-table">
+          <table class="table-modern">
+            <thead>
+              <tr>
+                <th class="w-10">
+                  <input type="checkbox" class="checkbox" [checked]="allSelected()" (change)="toggleSelectAll()"
+                         aria-label="Select all files" />
+                </th>
+                <th>Name</th>
+                <th class="w-40">Modified</th>
+                <th class="w-24 text-right">Size</th>
+                <th class="w-36">Type</th>
+                <th class="w-16"><span class="sr-only">Actions</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (entry of filtered(); track entry.key) {
+                <tr [class.row-selected]="!entry.folder && selected().has(entry.key)">
+                  <td>
+                    @if (!entry.folder) {
+                      <input type="checkbox" class="checkbox" [checked]="selected().has(entry.key)"
+                             (change)="toggleSelect(entry.key)"
+                             [attr.aria-label]="'Select ' + entry.name" />
+                    }
+                  </td>
+                  <td class="max-w-md">
+                    <button type="button" class="flex items-center gap-2 text-left w-full min-w-0"
+                            (click)="entry.folder ? openFolder(entry) : preview(entry)">
+                      @if (entry.folder) {
+                        <app-icon name="folder" class="text-accent" />
+                      } @else {
+                        <app-icon name="file" class="text-[color:var(--text-muted)]" />
+                      }
+                      <span class="truncate" [class.font-medium]="entry.folder" [title]="entry.name">
+                        {{ entry.name }}
+                      </span>
+                    </button>
+                  </td>
+                  <td class="text-[color:var(--text-secondary)] whitespace-nowrap">
+                    {{ entry.lastModified ? (entry.lastModified | serverTime:'dateTime') : '—' }}
+                  </td>
+                  <td class="text-right text-[color:var(--text-secondary)] tabular">
+                    {{ entry.folder ? '—' : humanSize(entry.size) }}
+                  </td>
+                  <td class="text-[color:var(--text-muted)] max-w-36 truncate"
+                      [title]="entry.contentType">{{ entry.folder ? '—' : (entry.contentType || '—') }}</td>
+                  <td class="text-right">
+                    <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="rowMenu"
+                            [disabled]="actionBusy()" [attr.aria-label]="'Actions for ' + entry.name">
+                      <app-icon name="dots" size="1.05em" />
+                    </button>
+
+                    <!-- CDK positions this itself and flips near the viewport edge, so the
+                         last row needs no special handling. -->
+                    <ng-template #rowMenu>
+                      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                        @if (!entry.folder) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="preview(entry)"><app-icon name="eye" />View</button>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="details(entry)"><app-icon name="info" />Details</button>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openChat(entry)"><app-icon name="chat" />Chat with this file</button>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="download(entry)"><app-icon name="download" />Download</button>
+                        }
+                        @if (!entry.folder) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="share(entry)"><app-icon name="send" />Email this file</button>
+                        }
+                        @if (entry.folder) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rename(entry)"><app-icon name="edit" />Rename</button>
+                        }
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.key, 'Path')"><app-icon name="copy" />Copy path</button>
+                        @if (entry.etag) {
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(entry.etag!, 'ETag')"><app-icon name="copy" />Copy checksum (ETag)</button>
+                        }
+                        <div class="my-1 border-t border-subtle"></div>
+                        <button cdkMenuItem class="menu-item menu-item-danger"
+                                (cdkMenuItemTriggered)="remove(entry)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                      </div>
+                    </ng-template>
+                  </td>
+                </tr>
+              } @empty {
+                <tr>
+                  <td colspan="6" class="!py-14 text-center">
+                    <p class="text-sm text-[color:var(--text-secondary)]">
+                      @if (hasFilters()) { No files match these filters. }
+                      @else { This folder is empty. }
+                    </p>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        </app-blur-loader>
+
+        @if (nextToken()) {
+          <div class="px-4 py-3 border-t text-center border-subtle">
+            <!-- P2 #33: the filters read only the pages listed so far; with more in the folder, say so. -->
+            @if (hasFilters()) {
+              <p class="text-xs text-[color:var(--text-muted)] mb-2" data-partial-search>
+                The search and dates look at the {{ objects().length.toLocaleString('en-US') }} items listed so far; this folder has more. Load more to look further.
+              </p>
+            }
+            <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
+              {{ loading() ? 'Loading…' : 'Load more' }}
+            </button>
+          </div>
+        }
+      }
+    </div>
+  }
+</div>
+
+@if (chatFile(); as file) {
+  <app-file-chat [bucket]="bucket()" [fileKey]="file.key" [fileName]="file.name"
+                 (closed)="chatFile.set(null)" (viewRequested)="previewChatFile()" />
+}

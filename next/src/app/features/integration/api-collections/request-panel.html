@@ -1,0 +1,207 @@
+<app-side-panel [heading]="heading()" [subtitle]="data.collection.name">
+  @if (loading()) {
+    <div class="py-14 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (loadError()) {
+    <p class="text-sm text-crit-500" role="alert">{{ loadError() }}</p>
+  } @else if (edit(); as e) {
+    <div class="flex flex-col gap-4 min-w-0">
+      <fieldset class="flex flex-col gap-3 min-w-0" [disabled]="!data.canManage">
+        <div class="flex gap-2 items-end">
+          <app-field class="w-28 shrink-0" label="Method" for="apiMethod">
+            <select id="apiMethod" class="input mono" [value]="e.method" (change)="patch({ method: $any($event.target).value })">
+              @for (m of methods; track m) { <option [value]="m" [selected]="m === e.method">{{ m }}</option> }
+            </select>
+          </app-field>
+          <app-field class="flex-1 min-w-0" label="URL" for="apiUrl" [required]="true">
+            <input id="apiUrl" class="input mono" [value]="e.urlTemplate" autocomplete="off" [placeholder]="urlPlaceholder"
+                   (input)="patch({ urlTemplate: $any($event.target).value })" />
+          </app-field>
+        </div>
+        <div class="form-grid">
+          <app-field label="Name" for="apiName" [required]="true">
+            <input id="apiName" class="input" [value]="e.name" placeholder="Patients API" (input)="patch({ name: $any($event.target).value })" />
+          </app-field>
+          <app-field label="Folder" for="apiFolder">
+            <select id="apiFolder" class="input" [value]="e.folderId ?? ''" (change)="patch({ folderId: $any($event.target).value ? +$any($event.target).value : null })">
+              <option value="">Top level</option>
+              @for (f of folders; track f.id) { <option [value]="f.id" [selected]="f.id === e.folderId">{{ f.label }}</option> }
+            </select>
+          </app-field>
+        </div>
+        <app-field label="Description" for="apiDescription">
+          <input id="apiDescription" class="input" [value]="e.description" placeholder="What it returns, and for what" (input)="patch({ description: $any($event.target).value })" />
+        </app-field>
+      </fieldset>
+
+      <div class="tabs" role="tablist" aria-label="API settings">
+        @for (t of tabs; track t.id) {
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="tab.set(t.id)">{{ t.label }}</button>
+        }
+      </div>
+
+      <fieldset class="flex flex-col gap-3 min-w-0" [disabled]="!data.canManage">
+        @switch (tab()) {
+          @case ('params') {
+            <app-pairs-editor label="Query parameter" addLabel="Add parameter" emptyText="No query parameters." [readonly]="!data.canManage"
+                              [rows]="e.queryParams" (rowsChange)="patch({ queryParams: $event })" />
+            <p class="text-xs text-[color:var(--text-muted)]">{{ variableHint }}</p>
+          }
+          @case ('headers') {
+            <app-pairs-editor label="Header" addLabel="Add header" emptyText="No headers." keyPlaceholder="Accept" valuePlaceholder="application/json"
+                              [readonly]="!data.canManage" [rows]="e.headers" (rowsChange)="patch({ headers: $event })" />
+            <p class="text-xs text-[color:var(--text-muted)]">{{ variableHint }}</p>
+          }
+          @case ('auth') {
+            <app-field label="Authentication" for="apiAuth" hint="Most APIs take the collection's scheme; the settings for every scheme are the collection's.">
+              <select id="apiAuth" class="input" [value]="e.authMode" (change)="patch({ authMode: $any($event.target).value })">
+                @for (m of authModes; track m) { <option [value]="m" [selected]="m === e.authMode">{{ authText(m) }}</option> }
+              </select>
+            </app-field>
+            @let auth = authView();
+            <div class="rounded-md border border-subtle px-3 py-2.5 text-sm">
+              <div class="font-medium mb-1">{{ auth.mode === 'NONE' ? 'Sends no credentials' : 'Signs in with ' + authText(auth.mode) }}</div>
+              @if (auth.settings.length) {
+                <dl class="grid grid-cols-[minmax(0,10rem)_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs">
+                  @for (s of auth.settings; track s.key) {
+                    <dt class="text-[color:var(--text-muted)] mono">{{ s.key }}</dt>
+                    <dd class="mono min-w-0 [overflow-wrap:anywhere]">
+                      {{ s.value }}
+                      @if (s.secret === 'configured') { <span class="ml-1 text-[color:var(--text-secondary)]"><span class="secret-mask" aria-hidden="true">•••</span> configured</span> }
+                      @else if (s.secret === 'not set' || s.secret === 'missing') { <span class="ml-1 text-warn-600">{{ s.secret === 'missing' ? 'not in this environment' : 'not set' }}</span> }
+                    </dd>
+                  }
+                </dl>
+              } @else if (auth.mode !== 'NONE') {
+                <p class="text-xs text-warn-600">The collection has no settings for this scheme yet: add them in the collection's details.</p>
+              }
+            </div>
+          }
+          @case ('body') {
+            <app-field label="Body" for="apiBodyType">
+              <select id="apiBodyType" class="input" [value]="e.bodyType" (change)="patch({ bodyType: $any($event.target).value })">
+                @for (b of bodyTypes; track b) { <option [value]="b" [selected]="b === e.bodyType">{{ bodyText(b) }}</option> }
+              </select>
+            </app-field>
+            @if (e.bodyType !== 'NONE') {
+              @let fileBody = fileBodies[e.bodyType];
+              <app-field label="Body template" for="apiBody" [hint]="fileBody ? fileBody.hint : variableHint">
+                <textarea id="apiBody" class="input mono text-xs" rows="10" [value]="e.bodyTemplate" [placeholder]="fileBody ? fileBody.example : ''"
+                          (input)="patch({ bodyTemplate: $any($event.target).value })"></textarea>
+              </app-field>
+            }
+          }
+          @case ('schemas') {
+            <app-field label="Params schema" for="apiParamsSchema" hint="JSON Schema for the values a caller passes in: a pipeline step, a source or the AI.">
+              <textarea id="apiParamsSchema" class="input mono text-xs" rows="6" [value]="e.paramsSchema" placeholder='{"type":"object"}' (input)="patch({ paramsSchema: $any($event.target).value })"></textarea>
+            </app-field>
+            <app-field label="Extract rules" for="apiExtract" hint='Named values from the response, e.g. {"firstId": "$.items[0].id"}.'>
+              <textarea id="apiExtract" class="input mono text-xs" rows="4" [value]="e.extractRules" (input)="patch({ extractRules: $any($event.target).value })"></textarea>
+            </app-field>
+            <app-field label="Assert rules" for="apiAssert" hint='Checks a test and a run must pass, e.g. [{"status": 200}, {"path": "$.items", "notEmpty": true}].'>
+              <textarea id="apiAssert" class="input mono text-xs" rows="4" [value]="e.assertRules" (input)="patch({ assertRules: $any($event.target).value })"></textarea>
+            </app-field>
+          }
+          @case ('settings') {
+            <div class="form-grid">
+              <app-field label="Timeout (seconds)" for="apiTimeout">
+                <input id="apiTimeout" class="input" type="number" min="1" max="300" [value]="e.timeoutSeconds" (input)="patch({ timeoutSeconds: num($event) })" />
+              </app-field>
+              <app-field label="Retry attempts" for="apiRetry" hint="Tries in all, on a timeout, 429 or 5xx.">
+                <input id="apiRetry" class="input" type="number" min="1" max="10" [value]="e.retryAttempts" placeholder="1" (input)="patch({ retryAttempts: num($event) })" />
+              </app-field>
+              <app-field label="Backoff (ms)" for="apiBackoff">
+                <input id="apiBackoff" class="input" type="number" min="0" [value]="e.retryBackoffMs" placeholder="500" (input)="patch({ retryBackoffMs: num($event) })" />
+              </app-field>
+              <app-field label="Paging" for="apiPaging">
+                <select id="apiPaging" class="input" [value]="e.pagingType" (change)="patch({ pagingType: $any($event.target).value })">
+                  @for (p of pagingTypes; track p) { <option [value]="p" [selected]="p === e.pagingType">{{ p === 'NONE' ? 'None' : p === 'PAGE' ? 'Page number' : p === 'CURSOR' ? 'Cursor' : 'Link header' }}</option> }
+                </select>
+              </app-field>
+            </div>
+            @if (e.pagingType !== 'NONE') {
+              <div class="form-grid">
+                @if (e.pagingType !== 'LINK') {
+                  <app-field label="Page parameter" for="apiPageParam">
+                    <input id="apiPageParam" class="input mono" [value]="e.pagingParam" [placeholder]="e.pagingType === 'PAGE' ? 'page' : 'cursor'" (input)="patch({ pagingParam: $any($event.target).value })" />
+                  </app-field>
+                }
+                @if (e.pagingType === 'PAGE') {
+                  <app-field label="Size parameter" for="apiSizeParam">
+                    <input id="apiSizeParam" class="input mono" [value]="e.pagingSizeParam" placeholder="limit" (input)="patch({ pagingSizeParam: $any($event.target).value })" />
+                  </app-field>
+                  <app-field label="Page size" for="apiPageSize">
+                    <input id="apiPageSize" class="input" type="number" min="1" [value]="e.pagingSize" placeholder="50" (input)="patch({ pagingSize: num($event) })" />
+                  </app-field>
+                }
+                @if (e.pagingType === 'CURSOR') {
+                  <app-field label="Next cursor at" for="apiNextPath">
+                    <input id="apiNextPath" class="input mono" [value]="e.pagingNextPath" placeholder="$.next_cursor" (input)="patch({ pagingNextPath: $any($event.target).value })" />
+                  </app-field>
+                }
+                <app-field label="Items at" for="apiItemsPath">
+                  <input id="apiItemsPath" class="input mono" [value]="e.pagingItemsPath" placeholder="$.items" (input)="patch({ pagingItemsPath: $any($event.target).value })" />
+                </app-field>
+                <app-field label="Most pages" for="apiMaxPages">
+                  <input id="apiMaxPages" class="input" type="number" min="1" [value]="e.pagingMaxPages" placeholder="10" (input)="patch({ pagingMaxPages: num($event) })" />
+                </app-field>
+              </div>
+            }
+            <div class="flex flex-col gap-2 text-sm">
+              <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="e.aiCallable" (change)="patch({ aiCallable: $any($event.target).checked, aiWriteAllowed: $any($event.target).checked && e.aiWriteAllowed })" />The AI Assistant may call it</label>
+              <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="e.aiWriteAllowed" [disabled]="!e.aiCallable" (change)="patch({ aiWriteAllowed: $any($event.target).checked })" />The AI may use it to change data (asks first)</label>
+            </div>
+          }
+        }
+      </fieldset>
+
+      <section class="flex flex-col gap-3 border-t border-subtle pt-4" aria-label="Test">
+        <h3 class="text-sm font-semibold">Test</h3>
+        @if (data.canManage) {
+          <div class="form-grid">
+            <app-field label="Environment" for="apiEnv" [hint]="envHint">
+              <select id="apiEnv" class="input" [value]="environmentId() ?? ''" (change)="environmentId.set($any($event.target).value ? +$any($event.target).value : null)">
+                <option value="">No environment</option>
+                @for (env of data.environments; track env.environmentId) { <option [value]="env.environmentId" [selected]="env.environmentId === environmentId()">{{ env.name }}{{ env.isDefault ? ' (default)' : '' }}</option> }
+              </select>
+            </app-field>
+          </div>
+          <details class="text-sm">
+            <summary class="cursor-pointer text-[color:var(--text-secondary)]">Values for this test only ({{ runVariables().length }})</summary>
+            <div class="mt-2">
+              <app-pairs-editor label="Test variable" addLabel="Add value" emptyText="None: the environment's values are used." [rows]="runVariables()" (rowsChange)="runVariables.set($event)" />
+            </div>
+          </details>
+          @if (testing()) {
+            <p class="text-sm text-[color:var(--text-muted)]" role="status"><app-icon name="refresh" class="spin" /> Calling the API…</p>
+          } @else if (result(); as r) {
+            <app-response-viewer [result]="r" />
+          } @else {
+            <p class="text-xs text-[color:var(--text-muted)]">Test makes one real call through the runner, with the environment's secrets. The answer comes back masked.</p>
+          }
+        } @else {
+          <p class="text-xs text-[color:var(--text-muted)]">A test makes a real call with the workspace's secrets, so it is for a workspace administrator.</p>
+        }
+      </section>
+    </div>
+  }
+
+  <ng-container foot>
+    @if (edit(); as e) {
+      @if (data.canManage) {
+        <label class="flex items-center gap-2 text-sm text-[color:var(--text-secondary)]">
+          <input type="checkbox" class="checkbox" role="switch" [checked]="e.enabled" (change)="patch({ enabled: $any($event.target).checked })" />Enabled
+        </label>
+      } @else {
+        <span class="text-sm text-[color:var(--text-secondary)]">{{ e.enabled ? 'Enabled' : 'Disabled' }}</span>
+      }
+    }
+    <span class="flex-1 min-w-0 text-xs text-crit-500 truncate" role="alert" [attr.title]="error() || null">{{ error() }}</span>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="close()">{{ data.canManage && dirty() ? 'Discard' : 'Close' }}</button>
+    @if (data.canManage && edit()) {
+      <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="test()"><app-icon name="play" [class.spin]="testing()" />{{ testLabel() }}</button>
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || (!dirty() && !!edit()?.requestId)" (click)="save()"><app-icon name="save" />{{ saving() ? 'Saving…' : 'Save' }}</button>
+    }
+  </ng-container>
+</app-side-panel>

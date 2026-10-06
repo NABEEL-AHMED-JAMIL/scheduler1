@@ -1,0 +1,172 @@
+<!-- The whole width (UI review U13): at 2560 a 72rem column left two-thirds of the screen empty. The answer's sources
+     stand beside it from 1280px, and its text keeps a readable measure. -->
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Ask your data</h1>
+      <p class="page-subtitle">
+        Ask in plain language. Answers come only from what you can open in this workspace (documents, forms, pipeline results
+        and datasets), and every answer shows its sources, or the query it ran.
+      </p>
+    </div>
+    @if (searchedLabel()) {
+      <span class="pill pill-neutral !whitespace-normal max-w-full" data-test="searched"><app-icon name="database" size="0.85em" />Searching {{ searchedLabel() }}</span>
+    }
+  </div>
+
+  <app-model-setup-banner what="Ask your data" />
+
+  <section class="card p-4 flex flex-col gap-3" aria-label="Ask a question">
+    <label class="sr-only" for="ask-question">Your question</label>
+    <div class="flex items-start gap-2">
+      <textarea id="ask-question" class="input flex-1 min-w-0 resize-y" rows="2" data-test="question"
+                placeholder="For example: which records changed this week?" [attr.maxlength]="max"
+                [value]="question()" (input)="question.set($any($event.target).value)" (keydown)="onKey($event)"></textarea>
+      <button type="button" class="btn btn-primary shrink-0" data-test="ask" [disabled]="!canAsk()" (click)="ask()">
+        <app-icon name="send" />Ask
+      </button>
+    </div>
+    <div class="flex flex-wrap items-center gap-1.5" data-test="suggestions">
+      @if (suggestionsLoading()) {
+        <span class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5"><app-icon name="refresh" class="spin" size="0.9em" />Looking at what your workspace has…</span>
+      } @else if (suggestionsError()) {
+        <span class="text-xs text-crit-500 flex items-center gap-1.5"><app-icon name="alert" class="icon-crit" size="0.9em" />{{ suggestionsError() }}</span>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="loadSuggestions()"><app-icon name="refresh" />Try again</button>
+      } @else if (nothingToSearch()) {
+        <span class="text-xs text-[color:var(--text-muted)]" data-test="nothing">
+          Nothing to ask about yet: read a document in Document Intelligence or run a pipeline, then come back.
+        </span>
+      } @else {
+        @if (suggestions().length) {
+          <span class="text-xs text-[color:var(--text-muted)] mr-1">Try:</span>
+        }
+        @for (s of suggestions(); track s) {
+          <button type="button" class="pill pill-neutral hover-brand text-left whitespace-normal break-words max-w-full" [disabled]="asking()" (click)="use(s)">{{ s }}</button>
+        }
+      }
+    </div>
+    @for (w of warnings(); track w) {
+      <p class="text-xs text-warn-600 flex items-start gap-1.5" data-test="warning"><app-icon name="info" size="0.9em" class="mt-0.5 shrink-0" />{{ w }}</p>
+    }
+  </section>
+
+  @if (isAdmin()) {
+    <app-ask-index />
+  }
+
+  @if (turns().length) {
+    <div class="flex items-center justify-between mt-5 mb-2">
+      <h2 class="text-sm font-semibold text-[color:var(--text-secondary)]">This session</h2>
+      <button type="button" class="btn btn-ghost btn-sm" [disabled]="asking()" (click)="clear()"><app-icon name="trash" />Clear</button>
+    </div>
+  }
+
+  <div class="flex flex-col gap-3" aria-live="polite">
+    @for (t of turns(); track t.id) {
+      <article class="card p-4 flex flex-col gap-3" [attr.data-turn]="t.id" [attr.data-state]="t.state">
+        <h3 class="font-semibold break-words flex items-start gap-2">
+          <app-icon name="chat" class="mt-0.5 shrink-0 text-[color:var(--text-muted)]" />{{ t.question }}
+        </h3>
+
+        @switch (t.state) {
+          @case ('asking') {
+            <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2" data-test="asking">
+              <app-icon name="refresh" class="spin" />Reading your data and asking the model… {{ elapsed() }}s
+            </p>
+          }
+          @case ('failed') {
+            <div class="rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2" data-test="error">
+              <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />
+              <span class="flex-1">{{ t.error }}</span>
+              <button type="button" class="btn btn-default btn-sm" [disabled]="asking()" (click)="retry(t)"><app-icon name="refresh" />Try again</button>
+            </div>
+          }
+          @case ('answered') {
+            @if (t.answer; as a) {
+              @if (a.query; as q) {
+                <div class="flex flex-col gap-3" data-test="query-answer">
+                  <p class="text-sm leading-relaxed" data-test="answer">{{ a.answer }}</p>
+                  <div class="flex flex-col gap-3 2xl:grid 2xl:grid-cols-2 2xl:items-start">
+                  @if (chartItems(q).length) {
+                    <div class="card p-4" data-test="query-chart">
+                      <p class="text-xs text-[color:var(--text-muted)] mb-2">{{ q.chart!.value }} by {{ q.chart!.label }}</p>
+                      <app-ranked-bar [data]="chartItems(q)" [sorted]="false" [max]="12" [showPercent]="false" />
+                    </div>
+                  }
+                  @if (q.rows.length) {
+                    <div class="min-w-0 flex flex-col gap-2">
+                    <div class="overflow-x-auto">
+                      <table class="table-modern" data-test="query-rows">
+                        <thead><tr>@for (c of q.columns; track $index) { <th>{{ c }}</th> }</tr></thead>
+                        <tbody>
+                          @for (r of shownRows(q); track $index) {
+                            <tr>@for (v of r; track $index) { <td class="text-xs">{{ v ?? '—' }}</td> }</tr>
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                    @if (q.rows.length > 20 || q.truncated) {
+                      <p class="text-xs text-[color:var(--text-muted)]">The first {{ shownRows(q).length }} of {{ q.rowCount }} rows{{ q.truncated ? ' (more were cut at the row limit)' : '' }}.</p>
+                    }
+                    </div>
+                  }
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <p class="text-xs font-medium">The query, run as you over "{{ q.dataset.name }}"</p>
+                    <pre class="mono text-xs whitespace-pre-wrap break-words card p-4" data-test="query-sql">{{ q.sql }}</pre>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <a class="btn btn-default btn-sm" routerLink="/data/analytics" [queryParams]="analyticsParams(q)" data-test="open-analytics">
+                      <app-icon name="chart" />Open in Analytics Studio</a>
+                    @if (q.rows.length) {
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="downloadCsv(q)" data-test="download-csv"><app-icon name="download" />Download CSV</button>
+                    }
+                  </div>
+                </div>
+              } @else if (a.notFound) {
+                <div class="rounded-lg px-3 py-2 text-sm bg-accent-soft flex items-start gap-2" data-test="not-found">
+                  <app-icon name="info" class="mt-0.5 shrink-0" size="0.9em" />
+                  <div>
+                    <p>{{ a.answer }}</p>
+                    <p class="text-xs text-[color:var(--text-muted)] mt-1">
+                      Try naming what you are after — a document, a schedule, a column or a value.
+                    </p>
+                  </div>
+                </div>
+              } @else {
+                <div class="flex flex-col gap-3" [class.ask-split]="a.sources.length">
+                <p class="text-sm leading-relaxed whitespace-pre-wrap break-words max-w-[100ch]" data-test="answer">@for (p of parts(a); track $index) {@if (p.cite !== undefined) {<button type="button" class="text-xs font-semibold text-accent hover:underline" [attr.aria-label]="'Source ' + p.cite" (click)="showSource(t, p.cite)">[{{ p.cite }}]</button>} @else {<span>{{ p.text }}</span>}}</p>
+                @if (a.sources.length) {
+                  <ol class="ask-sources flex flex-col gap-2 border-t border-subtle pt-3" data-test="sources" aria-label="Sources">
+                    @for (s of a.sources; track s.n) {
+                      <li class="flex items-start gap-2 text-sm rounded-lg -mx-1 px-1 transition-colors" [class.bg-accent-soft]="highlighted() === anchor(t, s.n)"
+                          [id]="anchor(t, s.n)" [attr.data-source]="s.n">
+                        <span class="pill pill-brand shrink-0 tabular-nums">{{ s.n }}</span>
+                        <div class="min-w-0 flex-1">
+                          <div class="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                            <app-icon [name]="s.kind === 'document' ? 'file' : s.kind === 'form' ? 'edit' : s.kind === 'file' ? 'folder' : 'table'" size="0.9em" class="shrink-0 text-[color:var(--text-muted)]" />
+                            <a class="font-medium hover-brand break-words" [routerLink]="linkOf(s).path" [queryParams]="linkOf(s).query">{{ s.title }}</a>
+                            <span class="text-[11px] text-[color:var(--text-muted)]">{{ kindLabel(s) }}{{ s.cited ? '' : ' · given, not cited' }}</span>
+                          </div>
+                          @if (s.excerpt) {
+                            <p class="text-xs text-[color:var(--text-secondary)] mt-0.5 break-words line-clamp-3">{{ s.excerpt }}</p>
+                          }
+                        </div>
+                      </li>
+                    }
+                  </ol>
+                }
+                </div>
+              }
+              <p class="text-[11px] text-[color:var(--text-muted)]" data-test="meta">
+                @if (a.model) { Answered by {{ a.model }}{{ a.connection ? ' on ' + a.connection : '' }} in {{ seconds(a.latencyMs) }}. }
+                @else { No model was asked: nothing in your data matched. }
+                Searched {{ searchedOf(a) }}.
+              </p>
+            }
+          }
+        }
+      </article>
+    }
+  </div>
+</div>

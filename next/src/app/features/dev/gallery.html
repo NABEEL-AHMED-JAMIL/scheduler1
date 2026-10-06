@@ -1,0 +1,257 @@
+<div class="min-h-screen bg-page">
+  <!-- Top bar, drawn with the shell's own classes and a sample menu held open. -->
+  <header class="border-b bg-raised border-subtle" data-gallery="top-bar">
+    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
+      <span class="mr-4 shrink-0"><app-brand-mark /></span>
+      <nav class="hidden xl:flex items-center gap-0.5 flex-1">
+        <span class="px-2 py-1.5 rounded-md text-sm font-medium text-accent bg-accent-soft">Dashboard</span>
+        <span class="px-2 py-1.5 rounded-md text-sm font-medium text-[color:var(--text-secondary)]">Jobs</span>
+        <span class="px-2 py-1.5 rounded-md text-sm font-medium text-[color:var(--text-secondary)] inline-flex items-center gap-1">
+          Settings <app-icon name="chevronDown" size="0.85em" class="icon-muted" />
+        </span>
+      </nav>
+      <div class="flex-1 xl:hidden"></div>
+      <span class="pill pill-warn mr-2">Dev only</span>
+      <app-segmented [value]="themeChoice()" (valueChange)="setTheme($event)" [options]="themes" ariaLabel="Theme" />
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 py-6 page">
+    <div class="page-head" data-gallery="page-head">
+      <div>
+        <h1 class="page-title">Component gallery</h1>
+        <p class="page-subtitle">Every shared component and dashboard widget, with sample data. Development builds only.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" class="btn btn-default btn-sm"><app-icon name="refresh" />Refresh</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="showToasts()"><app-icon name="bell" />Show toasts</button>
+      </div>
+    </div>
+
+    <!-- Menus ------------------------------------------------------------------------------ -->
+    <section class="space-y-3" data-gallery="menus">
+      <h2 class="section-title">Dropdowns and row menus</h2>
+      <div class="flex flex-wrap items-start gap-4">
+        <div class="min-w-72 rounded-lg border shadow-lg p-1 bg-raised border-subtle">
+          <span class="nav-child nav-child-active">
+            <app-icon name="database" size="1em" class="nav-child-icon" />
+            <span class="min-w-0"><span class="block text-sm leading-tight">Storage</span>
+              <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">Buckets, connections and files</span></span>
+          </span>
+          <span class="nav-child">
+            <app-icon name="plug" size="1em" class="nav-child-icon" />
+            <span class="min-w-0"><span class="block text-sm leading-tight">Kafka <span class="pill pill-neutral ml-0.5">Soon</span></span>
+              <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">Topics and profiles</span></span>
+          </span>
+        </div>
+        <div class="card cdk-menu shadow-xl py-1 min-w-48 text-sm">
+          <button type="button" class="menu-item"><app-icon name="edit" />Edit</button>
+          <button type="button" class="menu-item is-active"><app-icon name="play" />Run now</button>
+          <button type="button" class="menu-item" disabled><app-icon name="pause" />Pause (already paused)</button>
+          <button type="button" class="menu-item menu-item-danger"><app-icon name="trash" />Delete</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Buttons ---------------------------------------------------------------------------- -->
+    <section class="card p-4 space-y-4" data-gallery="buttons">
+      <h2 class="section-title">Buttons</h2>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" class="btn btn-primary">Primary</button>
+        <button type="button" class="btn btn-default">Default</button>
+        <button type="button" class="btn btn-ghost">Ghost</button>
+        <button type="button" class="btn btn-danger">Danger</button>
+        <button type="button" class="btn btn-default btn-intent-crit"><app-icon name="trash" />Intent crit</button>
+        <button type="button" class="btn btn-primary" disabled>Primary disabled</button>
+        <button type="button" class="btn btn-default" disabled>Default disabled</button>
+        <button type="button" class="btn btn-danger" disabled>Danger disabled</button>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" class="btn btn-primary btn-sm"><app-icon name="plus" />Small</button>
+        <button type="button" class="btn btn-default btn-sm">Small</button>
+        <button type="button" class="btn btn-default btn-xs">Extra small</button>
+        <button type="button" class="btn btn-ghost btn-icon" aria-label="Settings"><app-icon name="settings" /></button>
+        <span class="btn-join">
+          <button type="button" class="btn btn-default btn-sm">Left</button>
+          <button type="button" class="btn btn-default btn-sm">Right</button>
+        </span>
+        <button type="button" class="btn-circle" aria-label="Add"><app-icon name="plus" /></button>
+        <button type="button" class="btn-circle btn-circle-ok" aria-label="Open"><app-icon name="check" /></button>
+        <button type="button" class="btn-circle btn-circle-info" aria-label="Edit"><app-icon name="edit" /></button>
+        <button type="button" class="btn-circle btn-circle-danger" aria-label="Delete"><app-icon name="trash" /></button>
+        <button type="button" class="btn-circle" disabled aria-label="Disabled"><app-icon name="minus" /></button>
+      </div>
+    </section>
+
+    <!-- Inputs ----------------------------------------------------------------------------- -->
+    <section class="card p-4" data-gallery="inputs">
+      <h2 class="section-title mb-4">Inputs, labels and combobox</h2>
+      <form class="form-grid" (submit)="$event.preventDefault()">
+        <app-field label="Job name" for="g-name" hint="Shown in lists and notifications." [required]="true">
+          <input id="g-name" class="input" value="Nightly CSV import" />
+        </app-field>
+        <app-field label="Schedule" for="g-cron" error="Enter a cron expression.">
+          <input id="g-cron" class="input input-invalid" value="every tuesday" />
+        </app-field>
+        <app-field label="Frequency" for="g-freq">
+          <select id="g-freq" class="input"><option>Daily</option><option>Weekly</option></select>
+        </app-field>
+        <app-field label="Start date" for="g-date">
+          <input id="g-date" type="date" class="input" value="2026-09-29" />
+        </app-field>
+        <app-field label="Disabled" for="g-dis">
+          <input id="g-dis" class="input" value="Read only" disabled />
+        </app-field>
+        <app-field label="Task" for="g-task">
+          <app-combobox id="g-task" ariaLabel="Task" [options]="options" selected="1" />
+        </app-field>
+        <app-field label="Search" for="g-search">
+          <span class="search-field"><app-icon name="search" size="0.95em" /><input id="g-search" class="input" placeholder="Find a job" /></span>
+        </app-field>
+        <app-field label="Notes" for="g-notes">
+          <textarea id="g-notes" class="input" rows="2">Two lines of notes.</textarea>
+        </app-field>
+        <label class="flex items-center gap-2 text-sm"><input type="checkbox" class="checkbox" checked />Email me when it fails</label>
+      </form>
+    </section>
+
+    <!-- Tabs and segmented ----------------------------------------------------------------- -->
+    <section class="card p-4 space-y-4" data-gallery="tabs">
+      <h2 class="section-title">Tabs, segmented and view toggle</h2>
+      <div class="tabs">
+        <span class="tab tab-active"><app-icon name="list" />Runs</span>
+        <span class="tab"><app-icon name="history" />History</span>
+        <span class="tab"><app-icon name="settings" />Settings</span>
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <app-segmented [value]="range()" (valueChange)="range.set($event)" [options]="ranges" ariaLabel="Range" />
+        <app-view-toggle />
+        @for (s of ['Completed', 'Failed', 'Running']; track s; let i = $index) {
+          <app-status-filter-chip [status]="s" [count]="[1190, 42, 21][i]" [selected]="i === 1" />
+        }
+      </div>
+    </section>
+
+    <!-- Status pills ----------------------------------------------------------------------- -->
+    <section class="card p-4 space-y-3" data-gallery="pills">
+      <h2 class="section-title">Status pills</h2>
+      <div class="flex flex-wrap items-center gap-2">
+        @for (s of statuses; track s) { <app-status [label]="s" /> }
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <app-status label="Active" [quiet]="true" />
+        <app-status label="Queue" [showIcon]="false" />
+        <span class="pill pill-neutral">Neutral</span>
+        <span class="pill pill-brand">Brand</span>
+        <span class="pill pill-info">Info</span>
+        <span class="pill pill-solid-neutral">Legacy</span>
+      </div>
+    </section>
+
+    <!-- KPI -------------------------------------------------------------------------------- -->
+    <section class="space-y-3" data-gallery="kpi">
+      <h2 class="section-title">KPI strip and stat tiles</h2>
+      <app-stat-strip [items]="strip" [smCols]="5" label="Runs this week" [summary]="{ label: 'Success rate', value: '96.6%' }" />
+      <app-stat-strip [items]="strip" [smCols]="5" size="md" align="start" label="Runs, larger" />
+      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <app-stat-tile label="Completed" value="1,190" icon="checkCircle" tone="ok" foot="92.7% of runs" />
+        <app-stat-tile label="Failed" value="42" icon="xCircle" tone="crit" foot="3.3% of runs" />
+        <app-stat-tile label="Skipped" value="31" icon="skip" tone="warn" />
+        <app-stat-tile label="Running" value="21" icon="zap" tone="info" />
+        <app-stat-tile label="Cost" value="103,909,527.58" icon="chart" />
+      </div>
+    </section>
+
+    <!-- Cards and notices ------------------------------------------------------------------ -->
+    <section class="grid gap-3 lg:grid-cols-3" data-gallery="cards">
+      <div class="card p-4">
+        <h3 class="section-title">A card</h3>
+        <p class="section-sub">Raised surface, the strong border, the card radius.</p>
+        <div class="progress mt-3"><div class="progress-bar w-48"></div></div>
+        <div class="flex items-center gap-3 mt-3"><span class="spinner"></span><span class="typing"><span></span><span></span><span></span></span></div>
+      </div>
+      <div class="guide">
+        <p class="guide-lead">A guide: a short procedure inside a form.</p>
+        <ol class="guide-steps"><li>Create the bucket.</li><li>Paste the policy: <code class="guide-inline">s3:GetObject</code></li></ol>
+      </div>
+      <div class="space-y-2">
+        <div class="step-notice"><app-icon name="info" />A neutral notice.</div>
+        <div class="step-notice step-notice-ok"><app-icon name="checkCircle" class="icon-ok" />Saved and validated.</div>
+        <div class="step-notice step-notice-warn"><app-icon name="alert" class="icon-warn" />Two fields are unmapped.</div>
+        <div class="step-notice step-notice-crit"><app-icon name="xCircle" class="icon-crit" />The step has no input.</div>
+      </div>
+    </section>
+
+    <!-- Table ------------------------------------------------------------------------------ -->
+    <section data-gallery="table">
+      <app-table-shell heading="Table shell and table-modern" [shown]="3" [total]="1284">
+        <button toolbar type="button" class="btn btn-default btn-sm"><app-icon name="download" />Export</button>
+        <table class="table-modern">
+          <thead><tr><th>Job</th><th>Status</th><th>Started</th><th class="text-right">Rows</th><th><span class="sr-only">Actions</span></th></tr></thead>
+          <tbody>
+            @for (s of statuses.slice(2, 6); track s; let i = $index) {
+              <tr [class.row-selected]="i === 1">
+                <td><a class="link-inline">Job {{ 2833 + i }}</a><div class="text-[11px] text-[color:var(--text-muted)]">csv-import</div></td>
+                <td><app-status [label]="s" /></td>
+                <td class="mono">2026-09-29 14:0{{ i }}</td>
+                <td class="text-right tabular">{{ (i + 1) * 1204 }}</td>
+                <td class="text-right"><button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Row menu"><app-icon name="dots" /></button></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        <app-pagination pager [total]="1284" [page]="page()" [size]="size()" (goTo)="page.set($event)" (setSize)="size.set($event)" />
+      </app-table-shell>
+    </section>
+
+    <!-- Empty and error -------------------------------------------------------------------- -->
+    <section class="grid gap-3 lg:grid-cols-3" data-gallery="states">
+      <app-table-shell heading="Empty state" [isEmpty]="true" emptyMessage="No runs in this range." />
+      <app-table-shell heading="Error state" error="Could not load the runs." />
+      <div class="card p-4"><app-load-error message="The storage service did not answer." /></div>
+    </section>
+
+    <!-- Dropzone and dialogs --------------------------------------------------------------- -->
+    <section class="grid gap-3 lg:grid-cols-2 items-start" data-gallery="dialogs">
+      <div class="card p-4 space-y-3">
+        <h2 class="section-title">Dropzone</h2>
+        <app-file-dropzone prompt="Drop a CSV here" hint="Up to 50 MB" accept=".csv" />
+      </div>
+      <app-confirm />
+      <app-form-dialog heading="New schedule" subtitle="Runs the task on a timetable." confirmLabel="Create">
+        <div class="form-grid">
+          <app-field label="Name" for="g-dlg-name"><input id="g-dlg-name" class="input" value="Nightly" /></app-field>
+          <app-field label="Time" for="g-dlg-time"><input id="g-dlg-time" type="time" class="input" value="02:30" /></app-field>
+        </div>
+      </app-form-dialog>
+      <div class="h-80 overflow-hidden rounded-card border border-subtle">
+        <app-side-panel heading="Run 7331" subtitle="Nightly CSV import">
+          <ul class="side-panel-list">
+            <li><span>Status</span><app-status label="Completed" /></li>
+            <li><span>Rows read</span><span class="tabular">4,816</span></li>
+          </ul>
+          <button foot type="button" class="btn btn-default btn-sm">Open job</button>
+        </app-side-panel>
+      </div>
+    </section>
+
+    <!-- Dashboard widgets ------------------------------------------------------------------ -->
+    <section class="space-y-3" data-gallery="charts">
+      <h2 class="section-title">Dashboard widgets</h2>
+      <div class="widget-grid">
+        <div class="card chart-card"><h3 class="chart-title">Donut</h3><app-donut [data]="slices" totalLabel="cost" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Donut, categorical</h3><app-donut [data]="categorical" totalLabel="files" /></div>
+        <div class="card chart-card"><h3 class="chart-title">KPI card</h3><app-kpi-card value="96.6%" label="Success rate" caption="Last 7 days" size="lg" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Bar</h3><app-bar-chart [data]="bars" [height]="120" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Bar, status colours</h3><app-bar-chart [data]="statusBars" [height]="120" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Line</h3><app-line-chart [data]="line" [filled]="true" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Ranked bar</h3><app-ranked-bar [data]="ranked" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Grouped bar</h3><app-grouped-bar [groupNames]="groupNames" [series]="grouped" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Split bar</h3><app-split-bar [data]="split" positiveLabel="succeeded" negativeLabel="failed" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Histogram</h3><app-histogram [values]="durations" /></div>
+        <div class="card chart-card"><h3 class="chart-title">Scatter</h3><app-scatter-plot [data]="scatter" xLabel="rows" yLabel="seconds" /></div>
+      </div>
+      <div class="card chart-card"><h3 class="chart-title">Heatmap</h3><app-heatmap [data]="heat" /></div>
+    </section>
+  </main>
+</div>

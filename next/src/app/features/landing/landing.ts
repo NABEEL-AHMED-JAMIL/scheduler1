@@ -1,0 +1,267 @@
+import { Component, inject } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Icon } from '../../shared/ui/icon';
+import { BrandMark } from '../../shared/ui/brand-mark';
+import { ConsolePreview } from './console-preview';
+import { ThemeService } from '../../core/theme.service';
+
+/**
+ * The public front door.
+ *
+ * Everything named here is something the console genuinely does -- the capabilities come from
+ * the endpoints and the scheduler's real behaviour, so a visitor who signs in finds what the
+ * page promised. The hero shows the product rather than describing it: the panel on the right
+ * carries the jobs table's own shape, built from the same tokens.
+ */
+@Component({
+  selector: 'app-landing',
+  imports: [RouterLink, Icon, BrandMark, ConsolePreview],
+  styleUrls: ['./landing.tokens.css'],
+  styles: [`
+    :host { display: block; }
+
+    /* The hero is one deep surface in both themes rather than a tint of the page, so the
+       product panel on it reads as lit from within. Stated explicitly -- a transparent hero
+       would borrow whichever ground happened to sit behind it. */
+    .hero {
+      background:
+        radial-gradient(70rem 40rem at 12% -20%, color-mix(in srgb, var(--hero-glow-a) 55%, transparent), transparent 62%),
+        radial-gradient(55rem 32rem at 88% 4%, color-mix(in srgb, var(--hero-glow-b) 20%, transparent), transparent 60%),
+        linear-gradient(180deg, var(--hero-top) 0%, var(--hero-bottom) 100%);
+      color: var(--hero-fg);
+    }
+    .hero-sub     { color: color-mix(in srgb, var(--hero-fg) 72%, transparent); }
+    .hero-eyebrow { color: color-mix(in srgb, var(--hero-eyebrow) 95%, transparent); }
+    /* A ghost button on the hero takes the hero's text colour, not the theme's. */
+    .hero .btn-ghost { color: inherit; }
+    .rise-late { animation-delay: .12s; }
+    .step-marker { background: var(--surface-raised); border: 1px solid var(--border-subtle); color: var(--accent-text); }
+
+    /* The capabilities are one ruled block rather than nine cards, so they read as a table of
+       contents instead of nine boxes competing for attention. */
+    .cap { border-color: var(--border-subtle); }
+    @media (min-width: 640px) {
+      .cap { border-left-width: 1px; }
+      .cap:nth-child(2n+1) { border-left-width: 0; }
+    }
+    @media (min-width: 1024px) {
+      .cap:nth-child(2n+1) { border-left-width: 1px; }
+      .cap:nth-child(3n+1) { border-left-width: 0; }
+    }
+
+    /* The steps are a sequence, so a rule runs behind them and the markers sit on it. */
+    @media (min-width: 1024px) {
+      .step-line::before {
+        content: ''; position: absolute; left: 1rem; right: 1rem; top: 1.05rem; height: 1px;
+        background: var(--border-subtle);
+      }
+    }
+
+    .rise { animation: rise .55s cubic-bezier(.22,.61,.36,1) both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .rise { animation: none; } }
+  `],
+  template: `
+    <div class="min-h-screen flex flex-col bg-page">
+
+      <!-- Hero ------------------------------------------------------------------- -->
+      <div class="hero">
+        <header>
+          <div class="mx-auto w-full max-w-6xl px-5 h-16 flex items-center gap-3">
+            <app-brand-mark />
+            <div class="ml-auto flex items-center gap-1.5">
+              <a routerLink="/docs" class="btn btn-ghost btn-sm hidden sm:inline-flex">Setup guide</a>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                      [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
+                      (click)="theme.toggle()">
+                <app-icon [name]="theme.theme() === 'dark' ? 'sun' : 'moon'" />
+              </button>
+              <a routerLink="/login" class="btn btn-primary btn-sm">Sign in</a>
+            </div>
+          </div>
+        </header>
+
+        <div class="mx-auto w-full max-w-6xl px-5 pt-14 pb-16 sm:pt-20 sm:pb-24
+                    grid gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] lg:items-center">
+          <div class="rise">
+            <p class="hero-eyebrow text-xs uppercase tracking-[0.14em] mb-4">
+              Data pipeline operations
+            </p>
+            <h1 class="text-4xl sm:text-5xl font-semibold leading-[1.08] tracking-tight text-balance">
+              Put your pipelines on a timetable.
+            </h1>
+            <p class="hero-sub mt-5 text-base sm:text-lg leading-relaxed max-w-xl">
+              Define a task once, bind it to a schedule, and let it run. Every run keeps its
+              logs, its output and its outcome — so a question about last Tuesday has an answer.
+            </p>
+            <div class="mt-8 flex flex-wrap items-center gap-3">
+              <a routerLink="/login" class="btn btn-primary">
+                Sign in<app-icon name="arrowRight" size="0.95em" />
+              </a>
+              <a routerLink="/request-workspace" class="btn btn-default btn-sm">
+                Request a workspace
+              </a>
+              <a routerLink="/docs" class="link-inline hero-eyebrow text-sm">
+                Read the setup guide
+              </a>
+            </div>
+
+            <dl class="mt-10 flex flex-wrap gap-x-10 gap-y-4">
+              @for (fact of facts; track fact.label) {
+                <div>
+                  <dt class="hero-sub text-xs uppercase tracking-wider">{{ fact.label }}</dt>
+                  <dd class="text-xl font-semibold mt-0.5">{{ fact.value }}</dd>
+                </div>
+              }
+            </dl>
+          </div>
+
+          <!-- The preview is its own component: it is a small app in itself, with three views
+               and their data, and the landing page should not carry that. -->
+          <div class="rise rise-late" aria-hidden="true">
+            <app-console-preview />
+          </div>
+        </div>
+      </div>
+
+      <!-- Capabilities ------------------------------------------------------------ -->
+      <section class="mx-auto w-full max-w-6xl px-5 py-16 sm:py-20">
+        <div class="max-w-2xl">
+          <h2 class="text-2xl font-semibold tracking-tight">Everything a run needs, in one place</h2>
+          <p class="mt-2 text-[color:var(--text-secondary)] leading-relaxed">
+            Scheduling, storage, reporting and access — so operating a pipeline does not mean
+            stitching four tools together.
+          </p>
+        </div>
+
+        <div class="mt-10 grid sm:grid-cols-2 lg:grid-cols-3">
+          @for (item of capabilities; track item.title) {
+            <div class="cap border-t sm:border-t-0 sm:border-b py-6 sm:px-6">
+              <span class="stat-glyph"><app-icon [name]="item.icon" /></span>
+              <h3 class="mt-3 text-sm font-semibold">{{ item.title }}</h3>
+              <p class="mt-1.5 text-sm text-[color:var(--text-secondary)] leading-relaxed">
+                {{ item.body }}
+              </p>
+            </div>
+          }
+        </div>
+      </section>
+
+      <!-- How a run happens -------------------------------------------------------- -->
+      <!-- Raised, not inset: --surface-inset sits two shades from the page, so as a full-width
+           band it was invisible. Alternating with the raised surface gives the page its rhythm. -->
+      <section class="border-y bg-raised border-subtle">
+        <div class="mx-auto w-full max-w-6xl px-5 py-16 sm:py-20">
+          <h2 class="text-2xl font-semibold tracking-tight">How a run happens</h2>
+          <p class="mt-2 text-[color:var(--text-secondary)]">
+            Four steps, and the console shows you each of them.
+          </p>
+
+          <ol class="mt-10 relative step-line grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+            @for (step of steps; track step.title; let i = $index) {
+              <li class="relative">
+                <div class="size-[2.1rem] rounded-full grid place-items-center text-xs font-semibold relative z-10 step-marker">
+                  {{ i + 1 }}
+                </div>
+                <h3 class="mt-3.5 text-sm font-semibold">{{ step.title }}</h3>
+                <p class="mt-1.5 text-sm text-[color:var(--text-secondary)] leading-relaxed">
+                  {{ step.body }}
+                </p>
+              </li>
+            }
+          </ol>
+        </div>
+      </section>
+
+      <!-- Close -------------------------------------------------------------------- -->
+      <section class="mx-auto w-full max-w-6xl px-5 py-16 sm:py-20">
+        <div class="card p-8 sm:p-10 flex flex-wrap items-center gap-6">
+          <div class="min-w-0">
+            <h2 class="text-xl font-semibold tracking-tight">Ready when you are</h2>
+            <p class="mt-1.5 text-sm text-[color:var(--text-secondary)]">
+              Sign in to see your jobs, their history and what they wrote.
+            </p>
+          </div>
+          <a routerLink="/login" class="btn btn-primary ml-auto">
+            Sign in<app-icon name="arrowRight" size="0.95em" />
+          </a>
+        </div>
+      </section>
+
+      <footer class="mt-auto border-t border-subtle">
+        <div class="mx-auto w-full max-w-6xl px-5 py-6 flex flex-wrap items-center gap-3">
+          <span class="text-sm text-[color:var(--text-muted)]">
+            ETL Console — pipeline scheduling and run history.
+          </span>
+          <a routerLink="/docs" class="link-inline ml-auto text-sm">Setup guide</a>
+          <a routerLink="/login" class="link-inline text-sm">Sign in</a>
+        </div>
+      </footer>
+    </div>
+  `,
+})
+export class Landing {
+  readonly theme = inject(ThemeService);
+
+  /**
+   * What the console supports, not how much anyone has run through it. A landing page claiming
+   * "12,000 pipelines run daily" would be describing somebody else's install.
+   */
+  readonly facts = [
+    { label: 'Schedule types', value: '5' },
+    { label: 'Storage backends', value: '4' },
+    { label: 'Export formats', value: 'CSV · XLSX' },
+    { label: 'Run outcomes reported', value: '5' },
+  ];
+
+  readonly capabilities = [
+    { icon: 'clock', title: 'Schedules that fit the work',
+      body: 'By the minute, hour, day, chosen weekdays, or a date each month — including the '
+          + 'last day. Give a schedule an end date and it stops on its own.' },
+    { icon: 'play', title: 'Run on demand, or skip one',
+      body: 'Start any job by hand without disturbing its timetable, or skip the next run and '
+          + 'leave the rest in place.' },
+    { icon: 'history', title: 'Every run accounted for',
+      body: 'Queued, running, completed, failed, interrupted and skipped are all recorded, and a '
+          + 'run missed during downtime is written down rather than quietly forgotten.' },
+    { icon: 'terminal', title: 'Logs while it runs',
+      body: 'Each run keeps its own log, streamed as it happens and kept afterwards, so a '
+          + 'failure can be read rather than guessed at.' },
+    { icon: 'cloud', title: 'Storage where you keep it',
+      body: 'S3, Azure, MinIO and FTP connections. Browse buckets, upload, preview a file and '
+          + 'send a job’s output straight to one.' },
+    { icon: 'chart', title: 'Reports you can take away',
+      body: 'Every task with its completed, failed, interrupted, skipped and missed runs side by '
+          + 'side. Group by task, outcome or day, measure how you like, and export as CSV or '
+          + 'XLSX — to your machine or to a bucket.' },
+    { icon: 'database', title: 'Queries on a timetable',
+      body: 'Register a database, save a query, preview it, and have it run to a bucket on a '
+          + 'schedule of its own.' },
+    { icon: 'inbox', title: 'Pipelines that configure work',
+      body: 'Define a pipeline once — its id, the topic it publishes on, the fields it asks for — '
+          + 'and every task on it is filled in field by field instead of hand-written XML.' },
+    { icon: 'sparkle', title: 'A model as a pipeline step',
+      body: 'Connect a provider once, write a prompt with variables and try it, then put it on a '
+          + 'pipeline: it runs before each dispatch and its answer arrives as a tag — with every '
+          + 'call’s tokens and time on record.' },
+    { icon: 'shield', title: 'Separated by tenant',
+      body: 'Every job, task, bucket and user belongs to a tenant. Roles decide how much a '
+          + 'person may do, and access profiles decide which pages they see — with a per-person '
+          + 'exception when one is needed.' },
+    { icon: 'key', title: 'Workers prove themselves per run',
+      body: 'Each dispatch carries a token good for that run alone, echoed back on every '
+          + 'callback. Nothing to hand out, nothing to rotate, and a finished run’s token is '
+          + 'dead.' },
+  ];
+
+  readonly steps = [
+    { title: 'Describe the task',
+      body: 'What to fetch or process, where it reads from and where it writes.' },
+    { title: 'Bind it to a job',
+      body: 'A job gives the task a timetable, a priority and someone responsible for it.' },
+    { title: 'Let it run',
+      body: 'The scheduler queues it when due; workers pick it up and report as they go.' },
+    { title: 'Read the outcome',
+      body: 'Status, logs and output are kept against that run, and roll up into the reports.' },
+  ];
+}

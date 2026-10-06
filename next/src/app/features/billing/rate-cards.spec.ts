@@ -1,0 +1,289 @@
+import { describe, it, expect, vi } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { of } from 'rxjs';
+import { RateCards } from './rate-cards';
+import { RateCardEditor } from './rate-card-editor';
+import { BillingApi, RateCard } from './billing.service';
+import { priceDigits } from './billing-format';
+import { WorkspacePicker } from './workspace-picker';
+import { ToastService } from '../../shared/ui/toast.service';
+import { API_SUCCESS } from '../../core/api/api.config';
+
+/**
+ * Rate cards: every version listed with who it is for and whether it prices today; a new
+ * version is drafted from an existing one and saved as its own, never edited in place.
+ */
+const ITEMS = [
+  { meter: 'seats.user_days', label: 'Seats', service: 'Seats', unit: 'user-day', per: 1, unit_price: '0.33', included_quantity: '0', tiers: [] },
+  { meter: 'ai.tokens.in', label: 'Model tokens in', service: 'Model calls', unit: 'token', per: 1000, unit_price: '0.05', included_quantity: '1000', tiers: [{ from: '0', unit_price: '0.05' }, { from: '1500', unit_price: '0.02' }] },
+  { meter: 'storage.bytes.deleted', label: 'Bytes deleted (data churn)', service: 'Storage', unit: 'byte', per: 1073741824, unit_price: '0.01', included_quantity: '0', tiers: [] },
+];
+const CARDS = [
+  { version: 4, name: 'October', tenant_id: null, tenantName: null, effective_from: '2099-10-01', currency: 'USD', based_on_version: 2, note: '', items: ITEMS },
+  { version: 3, name: 'MedAxis contract', tenant_id: 2905, tenantName: 'MedAxis', effective_from: '2026-09-01', currency: 'USD', based_on_version: 1, note: 'seats at 0.20', items: [{ ...ITEMS[0], unit_price: '0.20' }, ITEMS[1], ITEMS[2]] },
+  { version: 2, name: 'Standard, churn free', tenant_id: null, tenantName: null, effective_from: '2026-09-01', currency: 'USD', based_on_version: 1, note: '', items: [ITEMS[0], ITEMS[1], { ...ITEMS[2], unit_price: '0' }] },
+  { version: 1, name: 'Standard', tenant_id: null, tenantName: null, effective_from: '2026-01-01', currency: 'USD', based_on_version: null, note: '', items: ITEMS },
+];
+
+function page() {
+  const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+  const dialog = { open: vi.fn(() => ({ closed: of(null) })) };
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ providers: [
+    { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: dialog },
+    { provide: WorkspacePicker, useValue: { tenantId: () => '2905', options: () => [{ value: '2905', label: 'MedAxis' }], ready: (then: () => void) => then() } },
+  ] });
+  const component = TestBed.runInInjectionContext(() => new RateCards());
+  component.ngOnInit();
+  return { component, api, dialog };
+}
+
+describe('RateCards', () => {
+  it('lists every version, knows which price today, and selects the default in effect', () => {
+    const { component } = page();
+    expect(component.cards().map(c => c.version)).toEqual([4, 3, 2, 1]);
+    expect(component.today().defaultCard?.version).toBe(2);           // v4 is dated ahead; v2 prices today
+    expect(component.today().own.map(c => c.tenant_id)).toEqual([2905]);
+    expect(component.upcoming()).toBe(1);
+    expect(component.selectedVersion()).toBe(2);
+    expect(component.isInEffect(component.cards()[0])).toBe(false);
+    expect(component.isInEffect(component.cards()[1])).toBe(true);
+    expect(component.forLabel(component.cards()[1])).toBe('MedAxis');
+    expect(component.forLabel(component.cards()[3])).toBe('Every workspace');
+  });
+
+  it('filters by scope and search, and says what a version changed against its base', () => {
+    const { component } = page();
+    component.setScope('workspace');
+    expect(component.visible().map(c => c.version)).toEqual([3]);
+    component.setScope('workspace');                                   // toggles off
+    component.search.set('churn');
+    expect(component.visible().map(c => c.version)).toEqual([2]);
+    expect(component.changedAgainstBase(component.cards()[2])).toEqual(['Bytes deleted (data churn)']);
+    expect(component.changedAgainstBase(component.cards()[1])).toEqual(['Seats']);
+    expect(component.changedAgainstBase(component.cards()[3])).toEqual([]);
+  });
+
+  it('shows prices, allowances and tiers as a person reads them, grouped by service', () => {
+    const { component } = page();
+    const c = component.cards()[3];
+    expect(component.groups(c).map(g => g.service)).toEqual(['Seats', 'Model calls', 'Storage']);
+    expect(component.price(c.items[2], 'USD')).toBe('$0.01 per GB');
+    expect(component.price(c.items[0], 'USD')).toBe('$0.33 per user-day');
+    expect(component.price({ ...c.items[0], unit_price: 0.045 }, 'USD')).toBe('$0.045 per user-day');
+    expect([priceDigits(0.05), priceDigits(0.045), priceDigits(0.000032), priceDigits(3), priceDigits(0.0000001)]).toEqual([2, 3, 6, 2, 2]);
+    expect(component.units(c.items[1], 1000)).toBe('1,000');
+    expect(component.units(c.items[2], 2 * 1024 ** 3)).toBe('2 GB');
+    expect(component.tierText(c.items[1], 'USD')).toEqual(['0 – 1,500: $0.05 per 1,000 tokens', '1,500 and up: $0.02 per 1,000 tokens']);
+  });
+
+  it('drafts a new version from the selected card in the side panel and reloads on save', () => {
+    const { component, dialog, api } = page();
+    component.select(component.cards()[3]);
+    component.newVersion();
+    expect(dialog.open).toHaveBeenCalledTimes(1);
+    const config = (dialog.open as ReturnType<typeof vi.fn>).mock.calls[0][1] as { data: { base: RateCard; tenantId: number | null } };
+    expect(config.data.base.version).toBe(1);
+    expect(config.data.tenantId).toBeNull();
+    expect(api.rateCards).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** MIG-211: the card reads in sentence case, a free meter says Free, and "today" is the viewer's day, not UTC's. */
+describe('RateCards, as rendered', () => {
+  function rendered() {
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [RateCards], providers: [
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: { open: vi.fn() } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => '2905', options: () => [{ value: '2905', label: 'MedAxis' }], ready: (then: () => void) => then() } },
+    ] });
+    const fixture = TestBed.createComponent(RateCards);
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('writes chips and rail states in sentence case', () => {
+    const { el } = rendered();
+    const pills = [...el.querySelectorAll('.lookup-detail-head .pill')].map(p => p.textContent!.trim());
+    expect(pills).toEqual(['Every workspace', 'In effect', 'USD']);
+    const subs = [...el.querySelectorAll('.lookup-rail-sub')].map(s => s.textContent!.replace(/\s+/g, ' ').trim());
+    expect(subs[0]).toMatch(/^Scheduled · from 1 Oct 2099/);
+    expect(subs[1]).toMatch(/^In effect · from 1 Sep 2026/);
+    expect(subs[3]).toMatch(/^From 1 Jan 2026/);
+    expect(el.textContent).toContain('A period is priced after the allowance');
+  });
+
+  it('a meter priced at nothing reads Free, and a tiered one Tiered', () => {
+    const { el } = rendered();                                   // v2, the default in effect, has free churn
+    const cells = [...el.querySelectorAll('.lookup-entry-table tbody td:nth-child(2)')].map(td => td.textContent!.trim());
+    expect(cells).toContain('Free');
+    // A tiered cell now also carries its bands below lg; the label still leads it.
+    expect(cells.some(c => c.startsWith('Tiered'))).toBe(true);
+    expect(cells.some(c => c.startsWith('tiered'))).toBe(false);
+  });
+
+  it("dates today by the viewer's calendar, so a card starting tomorrow is not in effect tonight", () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      vi.setSystemTime(new Date(2026, 7, 31, 23, 30));           // 31 Aug, 23:30 local: UTC is already 1 Sep in the Americas
+      const { component } = rendered();
+      expect(component.todayIso).toBe('2026-08-31');
+      expect(component.today().defaultCard?.version).toBe(1);    // v2 starts 1 Sep: tomorrow, not today
+      expect(component.upcoming()).toBe(3);                      // v2 and v3 (1 Sep) and v4 (2099)
+    } finally { vi.useRealTimers(); }
+  });
+});
+
+function editor(base: RateCard, saved = { status: API_SUCCESS, data: { ...base, version: 9, name: 'Nine' } }) {
+  const api = { saveRateCard: vi.fn(() => of(saved)) };
+  const ref = { close: vi.fn() };
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ providers: [
+    { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+    { provide: DialogRef, useValue: ref }, { provide: DIALOG_DATA, useValue: { base, workspaces: [{ value: '2905', label: 'MedAxis' }] } },
+  ] });
+  const component = TestBed.runInInjectionContext(() => new RateCardEditor());
+  return { component, api, ref };
+}
+
+describe('RateCardEditor', () => {
+  it('starts from the base card, marks what changed, and refuses a nameless or negative version', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component } = editor(base);
+    expect(component.items().length).toBe(3);
+    expect(component.changed().size).toBe(0);
+    expect(component.effectiveFrom()).toMatch(/^\d{4}-\d{2}-01$/);
+    expect(component.draft()).toBe('Give the version a name.');
+    component.name.set('Cheaper seats');
+    component.set(0, 'unit_price', '-1');
+    expect(component.draft()).toBe('Seats: nothing can be negative.');
+    component.set(0, 'unit_price', '0.20');
+    expect([...component.changed()]).toEqual(['seats.user_days']);
+    component.set(0, 'included_quantity', '10');
+    component.addTier(0); component.setTier(0, 0, 'from', '100'); component.setTier(0, 0, 'unit_price', '0.10');
+    const draft = component.draft();
+    expect(typeof draft).toBe('object');
+    if (typeof draft === 'string') return;
+    expect(draft.based_on_version).toBe(1);
+    expect(draft.tenant_id).toBeNull();
+    expect(draft.items[0]).toEqual({ meter: 'seats.user_days', unit: 'user-day', per: 1, unit_price: 0.2, included_quantity: 10, tiers: [{ from: 100, unit_price: 0.1 }] });
+    expect(draft.items[1].tiers).toEqual([{ from: 0, unit_price: 0.05 }, { from: 1500, unit_price: 0.02 }]);
+  });
+
+  it('shows a byte meter priced per GB as "GB", not a disabled 1073741824', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    editor(base);
+    const fixture = TestBed.createComponent(RateCardEditor);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const perCells = [...el.querySelectorAll('.rate-edit tbody tr')].map(tr => tr.querySelectorAll('td')[2]);
+    expect(perCells[2].textContent!.trim()).toBe('GB');
+    expect(perCells[2].querySelector('input')).toBeNull();
+    expect((perCells[1].querySelector('input') as HTMLInputElement).value).toBe('1000');
+    expect([...el.querySelectorAll('.rate-edit th')].map(th => th.textContent!.trim())).toContain('Per');
+    expect((el.querySelector('#rcNote') as HTMLInputElement).placeholder).toBe('Why — the agreement, the ticket, the reason');
+  });
+
+  // MIG-308: a model priced on its own is a `<meter>@<model>` item next to its meter; removing one sends it as removed.
+  it('prices a model on its own next to its meter, refuses a bad name, and removes a saved one', () => {
+    const base = RateCards.numeric({ ...CARDS[3], items: [ITEMS[0], ITEMS[1], { ...ITEMS[1], meter: 'ai.tokens.in@qwen2.5:7b', label: 'Model tokens in (qwen2.5:7b)', tiers: [], included_quantity: '0', unit_price: '0.4' }, ITEMS[2]] } as unknown as RateCard);
+    const { component } = editor(base);
+    component.name.set('Per-model AI');
+    component.addModel();
+    expect(component.modelError()).toBe('Name the model.');
+    component.modelName.set('a@b'); component.addModel();
+    expect(component.modelError()).toBe('A model name cannot contain @.');
+    component.modelName.set('qwen2.5:7b'); component.addModel();
+    expect(component.modelError()).toBe('That model already has its own price here.');
+    component.modelName.set(' llama3.2:3b '); component.modelPrice.set('0.02'); component.addModel();
+    expect(component.modelError()).toBe('');
+    expect(component.items().map(i => i.meter)).toEqual(['seats.user_days', 'ai.tokens.in', 'ai.tokens.in@qwen2.5:7b', 'ai.tokens.in@llama3.2:3b', 'storage.bytes.deleted']);
+    const added = component.items()[3];
+    expect(added).toMatchObject({ label: 'Model tokens in (llama3.2:3b)', unit: 'token', per: 1000, unit_price: '0.02', included_quantity: '', tiers: [] });
+    expect(component.changed().has('ai.tokens.in@llama3.2:3b')).toBe(true);
+    // A meter's own item has no remove; a saved model price does, and goes as removed.
+    component.removeItem(1);
+    expect(component.items()).toHaveLength(5);
+    component.removeItem(2);
+    const draft = component.draft();
+    if (typeof draft === 'string') throw new Error(draft);
+    expect(draft.removed).toEqual(['ai.tokens.in@qwen2.5:7b']);
+    expect(draft.items.map(i => i.meter)).toContain('ai.tokens.in@llama3.2:3b');
+    expect(draft.items.find(i => i.meter === 'ai.tokens.in@llama3.2:3b')).toMatchObject({ unit_price: 0.02, per: 1000 });
+  });
+
+  it('saves for a workspace and closes with the version the meter assigned', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component, api, ref } = editor(base);
+    component.name.set('MedAxis contract'); component.tenantId.set('2905');
+    component.save();
+    expect(api.saveRateCard).toHaveBeenCalledTimes(1);
+    const sent = (api.saveRateCard as ReturnType<typeof vi.fn>).mock.calls[0][0] as { tenant_id: number | null; name: string };
+    expect(sent.tenant_id).toBe(2905);
+    expect(ref.close).toHaveBeenCalledWith(expect.objectContaining({ version: 9 }));
+  });
+});
+
+/** Audit 09-22: the page as drawn -- one primary action, tier prices at any width, neutral workspace glyph. */
+describe('RateCards, rendered', () => {
+  function view() {
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+    const dialog = { open: vi.fn(() => ({ closed: of(null) })) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: dialog },
+      { provide: WorkspacePicker, useValue: { tenantId: () => '2905', options: () => [{ value: '2905', label: 'MedAxis' }], ready: (then: () => void) => then() } },
+    ] });
+    const fixture = TestBed.createComponent(RateCards);
+    fixture.detectChanges();
+    return { fixture, dialog, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('has one primary action in view: the pane\'s New version from this', () => {
+    const { el } = view();
+    const primaries = [...el.querySelectorAll('.btn-primary')].map(b => b.textContent!.trim());
+    expect(primaries).toEqual(['New version from this']);
+  });
+
+  it('prints a tiered meter\'s bands under its price, for widths that hide the Tiers column', () => {
+    const { el } = view();
+    const row = [...el.querySelectorAll('.lookup-entry-table tbody tr')].find(tr => tr.textContent!.includes('Model tokens in'))!;
+    const price = row.querySelectorAll('td')[1];
+    const narrow = price.querySelector('.lg\\:hidden');
+    expect(narrow?.textContent).toContain('1,500 and up: $0.02 per 1,000 tokens');
+  });
+
+  it('draws a workspace card with a neutral glyph, not the warning amber of a managed lookup', () => {
+    const { el } = view();
+    const glyphs = [...el.querySelectorAll('.lookup-rail-glyph')];
+    expect(glyphs.some(g => g.classList.contains('is-managed'))).toBe(false);
+  });
+
+  it('starts "A card for one workspace" with no workspace chosen, rather than one picked on another screen', () => {
+    const { component, dialog } = view();
+    component.forOneWorkspace(component.cards()[3]);
+    const data = (dialog.open.mock.calls[0] as unknown as [unknown, { data: { tenantId: number | null } }])[1].data;
+    expect(data.tenantId).toBeNull();
+  });
+});
+
+describe('RateCardEditor, rendered', () => {
+  it('labels its fields with app-field: required stars, hints as field notes, no local .hint', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    editor(base);
+    const fixture = TestBed.createComponent(RateCardEditor);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const label = (id: string) => el.querySelector(`label[for="${id}"]`)!;
+    expect(label('rcName').textContent).toContain('(required)');
+    expect(label('rcFrom').textContent).toContain('(required)');
+    expect(label('rcNote').textContent).not.toContain('(required)');
+    expect(el.querySelector('.hint')).toBeNull();
+    expect([...el.querySelectorAll('.field-note')].map(n => n.textContent!.trim())).toContain('Prices bills for periods that start on or after this day.');
+    // The changed-row rule is the console's one (styles.css .lookup-entry-table tr.is-changed), not a near-black local copy.
+    expect(el.querySelector('table.rate-edit')!.classList).toContain('lookup-entry-table');
+  });
+});
+

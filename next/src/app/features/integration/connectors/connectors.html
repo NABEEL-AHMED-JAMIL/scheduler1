@@ -1,0 +1,102 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">Connector Hub</h1>
+      <p class="page-subtitle">
+        Ready-made connectors for databases, SaaS apps and files. Connect once; sync on a schedule or continuously into this
+        workspace's own storage, where the Data Catalog, Sources and pipelines pick the data up.
+      </p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
+      @if (canBuild()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="custom()" data-custom-rest><app-icon name="code" />Build custom (REST)</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="connect(null)" data-new-connection><app-icon name="plus" />New connection</button>
+      }
+    </div>
+  </div>
+  <app-managed-banner what="connections and what they sync" still="Testing a connection, granting access and syncing now" />
+
+  @if (kpis().length) {
+    <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Connections at a glance" />
+  }
+
+  <section class="flex flex-col gap-3" aria-label="Connectors" data-gallery>
+    <div class="flex flex-wrap items-center gap-2">
+      <app-segmented [value]="chip()" (valueChange)="chip.set($event)" [options]="chips()" ariaLabel="Category" />
+      <span class="flex-1"></span>
+      <label class="sr-only" for="connectorSearch">Search connectors</label>
+      <input id="connectorSearch" class="input input-sm w-56" type="search" placeholder="Search connectors" [value]="search()"
+             (input)="search.set($any($event.target).value)" />
+    </div>
+    @if (galleryError()) {
+      <p class="text-sm text-[color:var(--crit-text)]" role="alert">{{ galleryError() }}</p>
+    }
+    <div class="connector-gallery">
+      @for (c of shownCards(); track c.spec.key) {
+        <div class="connector-card" [class.is-unavailable]="!!blocked(c)" [attr.data-connector]="c.spec.key">
+          <span class="connector-logo" aria-hidden="true"><app-icon [name]="categoryIcon(c.spec.category)" /></span>
+          <div class="min-w-0 flex-1">
+            <div class="font-medium">{{ c.spec.label }}</div>
+            <div class="text-xs text-[color:var(--text-muted)] truncate" [title]="c.spec.summary">{{ c.spec.summary }}</div>
+          </div>
+          @if (!c.spec.available) {
+            <span class="pill pill-neutral" [title]="blocked(c)">Not yet</span>
+          } @else if (!c.oauthRegistered) {
+            <span class="pill pill-neutral" [title]="blocked(c)" data-on-request>On request</span>
+          } @else if (c.connections > 0) {
+            <span class="pill pill-ok" [title]="c.connections + ' connection' + (c.connections === 1 ? '' : 's')"><app-icon name="check" size="0.85em" />Connected</span>
+          } @else if (canBuild()) {
+            <button type="button" class="btn btn-default btn-xs" (click)="connect(c)" [attr.aria-label]="'Connect ' + c.spec.label">Connect</button>
+          }
+        </div>
+      } @empty {
+        <p class="text-sm text-[color:var(--text-muted)]">No connector matches.</p>
+      }
+    </div>
+  </section>
+
+  <app-table-shell heading="Connections" columnsKey="connector-hub" [loading]="loading()" [error]="error()" [isEmpty]="!shownConnections().length"
+                     [shown]="shownConnections().length" [total]="connections().length" emptyIcon="plug" (retry)="load()"
+                     [emptyMessage]="connections().length ? 'No connection in that state.' : canBuild() ? 'No connections yet: choose a connector above.' : 'No connections yet. A workspace administrator makes them.'">
+      <ng-container toolbar>
+        <label class="sr-only" for="connectionState">State</label>
+        <select id="connectionState" class="input input-sm w-auto" (change)="stateFilter.set($any($event.target).value)" data-state-filter>
+          @for (s of states; track s.id) { <option [value]="s.id" [selected]="stateFilter() === s.id">{{ s.label }}</option> }
+        </select>
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr><th>Connection</th><th>Connector</th><th>Mode</th><th>Last sync</th><th class="text-right">Rows</th><th class="text-right">Lag</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          @for (c of shownConnections(); track c.id) {
+            <tr class="cursor-pointer" [attr.data-connection]="c.id" (click)="open(c.id, c.name)" tabindex="0" (keydown.enter)="open(c.id, c.name)">
+              <td class="min-w-0">
+                <button type="button" class="link-inline font-medium text-left truncate max-w-md block" [title]="c.name"
+                        (click)="open(c.id, c.name); $event.stopPropagation()">{{ c.name }}</button>
+                <div class="text-xs mono text-[color:var(--text-muted)] truncate max-w-md" [title]="c.targetAlias + '/' + c.folder">{{ c.targetAlias }}/{{ c.folder }}</div>
+              </td>
+              <td class="whitespace-nowrap">{{ c.connectorLabel }}</td>
+              <td class="whitespace-nowrap">
+                @if (c.health?.streams) {
+                  {{ c.health!.modes?.includes('CDC') ? 'CDC' : c.health!.modes?.includes('INCREMENTAL') ? 'Incremental' : 'Full refresh' }}
+                  <div class="text-xs text-[color:var(--text-muted)]">{{ scheduleText(c.health!.scheduleMinutes) }}</div>
+                } @else {
+                  <span class="text-[color:var(--text-muted)]">Nothing synced yet</span>
+                }
+              </td>
+              <td class="whitespace-nowrap">{{ ago(c.health?.lastSyncAt ?? null) }}</td>
+              <td class="text-right tabular">{{ c.health?.streams ? countText(c.health!.rows) : '—' }}</td>
+              <td class="text-right tabular">{{ lagText(c.health?.lagSeconds) }}</td>
+              <td class="whitespace-nowrap">
+                <span class="pill" [class]="(state(c) === 'Error' || state(c) === 'Needs you' ? 'pill-solid-' : 'pill-') + stateTone(state(c))" [title]="c.lastError || ''">
+                  <app-icon [name]="stateIcon(state(c))" size="0.85em" />{{ state(c) }}</span>
+                @if (c.health?.schemaPending) { <span class="pill pill-warn" title="A schema change waits for you">Schema change</span> }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+</div>

@@ -1,0 +1,52 @@
+<app-side-panel [heading]="data.name" [subtitle]="data.bucket + ' / ' + folder()">
+  <div class="flex flex-col gap-5 min-w-0" data-file-details>
+    <section aria-labelledby="fd-file">
+      <h3 id="fd-file" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-2">File</h3>
+      @if (metaError()) {
+        <p class="text-sm text-crit-500 mb-2" role="alert">{{ metaError() }}</p>
+      }
+      <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm m-0 [&>dt]:text-[color:var(--text-muted)] [&>dd]:m-0 [&>dd]:min-w-0">
+        <dt>Size</dt><dd class="tabular">{{ size(meta().size) }}</dd>
+        <dt>Type</dt><dd class="break-all">{{ meta().contentType || '—' }}</dd>
+        <dt>Modified</dt><dd>{{ meta().lastModified ? (meta().lastModified | serverTime: 'dateTimeSec') : '—' }}</dd>
+        <dt>Path</dt><dd class="mono text-xs break-all">{{ data.key }}</dd>
+        <dt>Checksum</dt><dd class="mono text-xs break-all">{{ checksum() }}</dd>
+        <dt>Uploaded by</dt>
+        <dd>Not recorded <span class="block text-xs text-[color:var(--text-muted)]">Storage keeps no uploader for an object.</span></dd>
+      </dl>
+    </section>
+
+    <section aria-labelledby="fd-run">
+      <h3 id="fd-run" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-2">Made by</h3>
+      @if (run(); as r) {
+        <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm m-0 [&>dt]:text-[color:var(--text-muted)] [&>dd]:m-0 [&>dd]:min-w-0">
+          <dt>Execution</dt>
+          <dd>
+            <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId, 'logs']">Run #{{ r.jobQueueId }}</a>
+            @if (r.created) { <span class="text-xs text-[color:var(--text-muted)]"> · {{ r.created | serverTime: 'dateTime' }}</span> }
+          </dd>
+          <dt>Pipeline</dt><dd class="break-words">{{ r.pipeline || '—' }}</dd>
+          <dt>Schedule</dt><dd class="break-words">{{ r.jobName || '—' }}</dd>
+          <dt>Owner</dt><dd>{{ r.owner || '—' }}</dd>
+        </dl>
+      } @else if (runsSearched() === null) {
+        <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><app-icon name="refresh" class="spin" size="0.9em" />Looking through recent runs…</p>
+      } @else if (runsSearched() === -1) {
+        <p class="text-sm text-[color:var(--text-muted)]">Recent runs could not be read, so which run wrote this is not known.</p>
+      } @else {
+        <p class="text-sm text-[color:var(--text-secondary)]">
+          Not written by any of the {{ runsSearched() }} most recent runs.
+          <span class="block text-xs text-[color:var(--text-muted)] mt-1">An upload by hand, or by an older run: there is no lookup from a file to the run that wrote it yet.</span>
+        </p>
+      }
+    </section>
+
+    <section aria-labelledby="fd-policy">
+      <h3 id="fd-policy" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-2">Retention</h3>
+      <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm m-0 [&>dt]:text-[color:var(--text-muted)] [&>dd]:m-0 [&>dd]:min-w-0">
+        <dt>Policy</dt><dd>No policy</dd>
+        <dt>Expires</dt><dd>Never <span class="block text-xs text-[color:var(--text-muted)]">Data policies are not live yet; a file is kept until it is deleted.</span></dd>
+      </dl>
+    </section>
+  </div>
+</app-side-panel>
