@@ -5,6 +5,9 @@
  */
 export const API_BASE = `${window.location.protocol}//${window.location.hostname}:9098/api/v1`;
 
+/** The customer API (/v1, ADR-025) on the same gateway: the embeddable run view (MIG-335) reads its signed routes. */
+export const CUSTOMER_API_BASE = `${window.location.protocol}//${window.location.hostname}:9098/v1`;
+
 /** Every endpoint answers with this envelope; `status` is the real success signal, not the HTTP code. */
 export interface ApiResponse<T = unknown> {
   status: 'SUCCESS' | 'ERROR';

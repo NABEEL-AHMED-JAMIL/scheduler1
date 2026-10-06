@@ -57,6 +57,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/forms/public-form').then(m => m.PublicForm),
   },
   {
+    // MIG-335: one run's read-only view, for a customer's portal to frame or open. Public on purpose, like a shared form:
+    // the view link's token is the only key and Core decides what it opens; no shell, no sign-in, no session. Where it may
+    // be framed is the console server's answer (nginx: frame-ancestors from the API client's allow-list).
+    path: 'embed/runs/:token',
+    title: 'Run',
+    loadComponent: () => import('./features/embed/run-view').then(m => m.EmbedRunViewPage),
+  },
+  {
     path: '',
     component: Shell,
     canActivate: [authGuard],

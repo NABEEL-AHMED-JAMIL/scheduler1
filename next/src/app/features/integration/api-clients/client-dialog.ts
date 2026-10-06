@@ -12,7 +12,10 @@ export interface ClientDialogData {
   client?: ApiClientRow | null;
   /** MIG-337: the workspace's bounds, which a client's own limit stays within; none when they could not be read. */
   bounds?: ApiLimitBounds | null;
-  /** MIG-337: whether this person may change a limit (not a customer in a MANAGED workspace). */
+  /**
+   * MIG-337: whether this person may change a limit (not a customer in a MANAGED workspace). MIG-335: the same rule holds
+   * the frame allow-list of its run views.
+   */
   canSetLimits?: boolean;
 }
 
@@ -31,11 +34,24 @@ export function dayOf(serverTime: string | null | undefined): string {
   return serverTime && /^\d{4}-\d{2}-\d{2}/.test(serverTime) ? serverTime.substring(0, 10) : '';
 }
 
+/** The allow-list as the field shows it, and whether the text the person wrote says the same. */
+export function framesText(origins: string[] | null | undefined): string {
+  return (origins ?? []).join('\n');
+}
+
+export function sameFrames(text: string, origins: string[] | null | undefined): boolean {
+  const words = text.split(/[\s,]+/).map(w => w.trim()).filter(Boolean);
+  const had = origins ?? [];
+  return words.length === had.length && words.every((w, i) => w === had[i]);
+}
+
 /**
  * MIG-332: make or change an API client -- a name, the scopes it holds, an optional IP allowlist (addresses and CIDR
  * ranges) and an optional last day. A change of scopes ends the client's tokens; the portal asks for a new one.
  * MIG-337: and its own rate limit -- calls a minute and a burst, within the workspace's bounds (empty: the bound). Read-only
  * to the customer in a MANAGED workspace, where our team sets it.
+ * MIG-335: and the sites that may frame its run views (view links, POST /v1/runs/{runId}/view-links) -- origins, checked by
+ * Identity; our team's in a MANAGED workspace too.
  */
 @Component({
   selector: 'app-api-client-dialog',
@@ -87,6 +103,16 @@ export function dayOf(serverTime: string | null | undefined): string {
         <textarea id="clientAllowlist" class="input mono text-xs" rows="3" [value]="allowlist()"
                   (input)="allowlist.set($any($event.target).value)"></textarea>
       </app-field>
+      <div class="mt-4" data-client-frames>
+        <app-field label="Sites that may embed its run views (optional)" for="clientFrames"
+            hint="One origin per line, such as https://portal.example.com or https://*.example.com. Empty: a view link opens on its own, but no site can show it in a frame.">
+          <textarea id="clientFrames" class="input mono text-xs" rows="2" [value]="frames()" [disabled]="!canSetLimits"
+                    (input)="frames.set($any($event.target).value)"></textarea>
+        </app-field>
+        @if (!canSetLimits) {
+          <p class="text-xs text-[color:var(--text-muted)] mt-1">Our team sets which sites may embed this workspace's run views.</p>
+        }
+      </div>
       @if (!limitsValid()) {
         <p class="text-sm text-[color:var(--color-crit-500)]" role="alert">
           A limit is a whole number up to the workspace's most ({{ data.bounds?.clientRateMax }} a minute, burst {{ data.bounds?.clientBurstMax }}), or empty.
@@ -105,6 +131,7 @@ export class ClientDialog {
   readonly name = signal(this.data.client?.name ?? '');
   readonly chosen = signal<string[]>(this.data.client?.scopes ?? []);
   readonly allowlist = signal((this.data.client?.ipAllowlist ?? []).join('\n'));
+  readonly frames = signal(framesText(this.data.client?.frameAncestors));
   readonly expires = signal(dayOf(this.data.client?.expiresAt));
   readonly canSetLimits = this.data.canSetLimits !== false;
   readonly rateHint = `Its own rate limit, up to ${this.data.bounds?.clientRateMax ?? 600}. Empty: ${this.data.bounds?.clientRateMax ?? 600}, `
@@ -139,6 +166,8 @@ export class ClientDialog {
       const burst = limitValue(this.burst()) ?? 0;
       if (rate !== (client?.ratePerMinute ?? 0)) input.ratePerMinute = rate;
       if (burst !== (client?.burst ?? 0)) input.burst = burst;
+      // The allow-list goes only when it says something new; Identity checks and normalises it.
+      if (!sameFrames(this.frames(), client?.frameAncestors)) input.frameAncestors = this.frames();
     }
     if (client) {
       this.api.update({ clientId: client.clientId, ...input }).subscribe({

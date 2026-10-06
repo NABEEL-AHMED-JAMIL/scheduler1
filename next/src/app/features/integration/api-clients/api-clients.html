@@ -79,7 +79,12 @@
                 @for (s of c.scopes; track s) { <span class="pill pill-neutral mono">{{ s }}</span> }
               </div>
             </td>
-            <td class="text-sm text-[color:var(--text-secondary)]">{{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}</td>
+            <td class="text-sm text-[color:var(--text-secondary)]" data-client-allowed>
+              {{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}
+              @if (c.frameAncestors?.length) {
+                <div class="text-xs text-[color:var(--text-muted)] mt-0.5" data-client-embeds>Run views embed on {{ c.frameAncestors!.join(', ') }}</div>
+              }
+            </td>
             <td class="text-sm text-[color:var(--text-secondary)] whitespace-nowrap" data-client-limit>
               {{ limitOf(c) }}
               @if (c.ratePerMinute == null && c.burst == null) { <div class="text-xs text-[color:var(--text-muted)]">the workspace's most</div> }

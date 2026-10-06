@@ -41,6 +41,12 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/embed/runs/:token",
+      "title": "Run",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/",
       "guards": [
         "authGuard",

@@ -234,6 +234,37 @@ describe('MIG-337: a client\'s own limit in the client dialog', () => {
     d.save();
     expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }));
   });
+
+  it('MIG-335: the sites that may embed its run views go only when changed, and are locked where our team sets them', () => {
+    let { d, api, fixture } = dialog({ client: { ...CLIENTS[0], frameAncestors: ['https://portal.example.com'] }, canSetLimits: true });
+    expect(d.frames()).toBe('https://portal.example.com');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ frameAncestors: expect.anything() }));
+    d.frames.set('https://portal.example.com\nhttps://*.example.org');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ frameAncestors: 'https://portal.example.com\nhttps://*.example.org' }));
+    d.frames.set('');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ frameAncestors: '' }));
+    ({ d, api, fixture } = dialog({ client: CLIENTS[0], canSetLimits: false }));
+    expect((fixture.nativeElement.querySelector('#clientFrames') as HTMLTextAreaElement).disabled).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Our team sets which sites may embed');
+    d.frames.set('https://elsewhere.example.com');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ frameAncestors: expect.anything() }));
+  });
+});
+
+describe('MIG-335: the embed allow-list in the clients table', () => {
+  it('says where a client\'s run views may be embedded, and nothing for one with no list', () => {
+    const { fixture, page } = setup();
+    page.clients.set([{ ...CLIENTS[0], frameAncestors: ['https://portal.example.com'] } as any,
+      { ...CLIENTS[0], clientId: 'cl_second00000000000000000000', frameAncestors: [] } as any]);
+    fixture.detectChanges();
+    const cells = (fixture.nativeElement as HTMLElement).querySelectorAll('[data-client-allowed]');
+    expect(cells[0].querySelector('[data-client-embeds]')?.textContent).toContain('Run views embed on https://portal.example.com');
+    expect(cells[1].querySelector('[data-client-embeds]')).toBeNull();
+  });
 });
 
 describe('MIG-333: webhooks on Integration › API Clients', () => {

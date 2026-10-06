@@ -24,6 +24,8 @@ export interface ApiClientRow {
   limit?: { ratePerMinute: number; burst: number; capped: boolean } | null;
   /** Null when the count cannot be read just now. */
   callsThisMonth?: number | null;
+  /** MIG-335: the origins that may frame the client's run views (CSP frame-ancestors); empty: none. */
+  frameAncestors?: string[];
 }
 
 /** MIG-337: a workspace's API bounds (the platform administrator's) and this month's calls against its quota. */
@@ -74,6 +76,8 @@ export interface ApiClientInput {
   /** MIG-337: 0 is the workspace's bound; left out keeps it. */
   ratePerMinute?: number;
   burst?: number;
+  /** MIG-335: the origins that may frame its run views, one per line; empty: none; left out keeps them. */
+  frameAncestors?: string;
 }
 
 /** One event route (MIG-332): an event type of the organisation's and what it starts. */
