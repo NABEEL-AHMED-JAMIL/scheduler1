@@ -172,7 +172,7 @@ export function durationLabel(ms: number | null | undefined): string {
                     <p class="text-xs text-[color:var(--text-muted)] mt-0.5">
                       @if (s.startedAt) { {{ s.startedAt | serverTime:'time' }} }
                       @if (durationLabel(s.durationMs); as d) { · {{ d }} }
-                      @if (s.rowsOut !== null && s.rowsOut !== undefined) { · {{ s.rowsOut.toLocaleString() }} rows }
+                      @if (s.rowsOut !== null && s.rowsOut !== undefined) { · {{ s.rowsOut.toLocaleString() }} {{ s.rowsOut === 1 ? 'row' : 'rows' }} }
                     </p>
                     @if (s.message && s.status === 'failed') { <p class="text-xs text-[color:var(--color-crit-500)] mt-1">{{ s.message }}</p> }
                   </div>

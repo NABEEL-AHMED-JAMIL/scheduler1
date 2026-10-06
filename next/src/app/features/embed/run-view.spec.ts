@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { CUSTOMER_API_BASE } from '../../core/api/api.config';
+import { isEmbedded } from '../../app';
 import { EmbedRunView, EmbedRunViewPage, accentOf, durationLabel, refusalOf, statusLabel, themeOf } from './run-view';
 
 /**
@@ -113,6 +114,12 @@ describe('Embedded run view (view link)', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('the console\'s progress bar stays out of a portal\'s frame', () => {
+    expect(isEmbedded('/embed/runs/tok.sig')).toBe(true);
+    expect(isEmbedded('/dashboard')).toBe(false);
+    expect(isEmbedded('/embedded-things')).toBe(false);
   });
 
   it('words', () => {
