@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
+import { provideRouter } from '@angular/router';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { Reliability, budgetLeft, dayBars, formatRate } from './reliability';
@@ -45,7 +46,7 @@ const burn = (sli: string, rule: string, firing: boolean, rate: number | null): 
 
 function screen() {
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ imports: [Reliability], providers: [provideHttpClient(), provideHttpClientTesting()] });
+  TestBed.configureTestingModule({ imports: [Reliability], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
   const fixture = TestBed.createComponent(Reliability);
   fixture.detectChanges();
   const http = TestBed.inject(HttpTestingController);
@@ -75,13 +76,15 @@ describe('Reliability', () => {
   it('shows each rate against its target, and the budget left', () => {
     const s = screen();
     answerAll(s);
-    const runs = s.el.querySelector('[data-testid="slo-runs"]')!.textContent!;
-    expect(runs).toContain('99.985%');
-    expect(runs).toContain('target 99.990%');
-    expect(runs).toContain('None left');
-    expect(runs).toContain('19,997 / 20,000');
+    // The rate, the target and the budget lead the page in each objective's status card (redesign, 2026-10-06).
+    // The counts stay with the objective's section.
+    const runsStatus = s.el.querySelector('[data-testid="status-runs"]')!.textContent!;
+    expect(runsStatus).toContain('99.985%');
+    expect(runsStatus).toContain('target 99.990%');
+    expect(runsStatus).toContain('None left');
+    expect(s.el.querySelector('[data-testid="slo-runs"]')!.textContent).toContain('19,997 / 20,000');
+    expect(s.el.querySelector('[data-testid="status-billing"]')!.textContent).toContain('100%');
     const billing = s.el.querySelector('[data-testid="slo-billing"]')!.textContent!;
-    expect(billing).toContain('100%');
     expect(billing).toContain('priced / accepted');
     expect(s.el.querySelector('[data-meter="pipeline.runs"]')).not.toBeNull();
   });
@@ -112,7 +115,9 @@ describe('Reliability', () => {
     s.http.expectOne(r => r.url === BILLING_URL).flush({ message: 'Billing is down.' }, { status: 502, statusText: 'Bad Gateway' });
     s.http.expectOne(r => r.url === BURN_URL).flush({ status: API_SUCCESS, message: '', data: [] });
     s.fixture.detectChanges();
-    expect(s.el.querySelector('[data-testid="slo-runs"]')!.textContent).toContain('99.985%');
+    expect(s.el.querySelector('[data-testid="status-runs"]')!.textContent).toContain('99.985%');
+    expect(s.el.querySelector('[data-testid="slo-runs"]')!.textContent).toContain('19,997 / 20,000');
+    expect(s.el.querySelector('[data-testid="status-billing"]')!.textContent).toContain('Billing is down.');
     expect(s.el.querySelector('[data-testid="slo-billing"]')!.textContent).toContain('Billing is down.');
   });
 

@@ -1,6 +1,7 @@
 import {
   Component, DestroyRef, ElementRef, afterNextRender, computed, inject, input, output, signal,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 
 import { compactNumber, compactTenths } from './number-format';
 import { shortLabel } from './short-label';
@@ -80,13 +81,80 @@ const BAR_MAX_PX = 64;
 const RESERVE_WITH_VALUES = 32;
 const RESERVE_AXIS_ONLY = 18;
 
+/** The column the y-axis's figures take at the chart's left when [axis] is on, in px: w-11 / ml-11 in the template. */
+export const AXIS_PX = 44;
+
+/**
+ * Round ticks from 0 up to at least `max`, about four steps of 1, 2 or 5 times a power of ten.
+ *
+ * `whole` keeps the step at 1 or more, so a count axis never reads "0.5 runs". The last tick is the top of the scale
+ * the bars are drawn against when the axis is on, so a gridline is exactly the value it is labelled with.
+ */
+export function axisTicks(max: number, whole = true): number[] {
+  if (!(max > 0) || !Number.isFinite(max)) return [0];
+  const raw = max / 4;
+  const power = 10 ** Math.floor(Math.log10(raw));
+  let step = [1, 2, 5, 10].map(m => m * power).find(candidate => candidate >= raw) ?? 10 * power;
+  if (whole) step = Math.max(1, Math.round(step));
+  const top = Math.ceil(max / step - 1e-9) * step;
+  const ticks: number[] = [];
+  for (let i = 0; i * step <= top + step / 1e6; i++) ticks.push(Number((i * step).toPrecision(12)));
+  return ticks;
+}
+
 @Component({
   selector: 'app-bar-chart',
   // The host must be a block for getBoundingClientRect to report the width the bars actually
   // get; an inline host measures its content, not its column.
   styles: [':host { display: block; }'],
+  imports: [NgTemplateOutlet],
   template: `
     @if (bars().length) {
+      @if (axis()) {
+        <!-- [axis]: figures up the left, a gridline at each, and the day's figures where the pointer is. The bars row
+             itself is the same template as without, so a chart that does not ask for an axis renders exactly as before. -->
+        <div class="flex min-w-0" data-chart-axis>
+          <div class="relative shrink-0 w-11" [style.height.px]="height()" aria-hidden="true">
+            @for (tick of tickMarks(); track tick.value) {
+              <span class="absolute right-2 text-[11px] leading-none tabular-nums text-[color:var(--text-muted)]"
+                    data-axis-tick [style.bottom.px]="tick.px - 5">{{ tick.figure }}</span>
+            }
+          </div>
+          <div class="relative flex-1 min-w-0" (pointermove)="pointAt($event)" (pointerdown)="pointAt($event)"
+               (pointerleave)="hovered.set(-1)">
+            @for (tick of tickMarks(); track tick.value) {
+              <!-- The baseline solid and stronger, the gridlines above it dashed and quiet. -->
+              <span aria-hidden="true" [style.bottom.px]="tick.px"
+                    [class]="tick.value === 0
+                      ? 'absolute inset-x-0 border-t pointer-events-none border-[color:var(--border-strong)]'
+                      : 'absolute inset-x-0 border-t border-dashed pointer-events-none border-[color:var(--border-subtle)]'"></span>
+            }
+            @if (readout(); as point) {
+              <!-- The hovered day's column, behind its bar. -->
+              <span class="absolute inset-y-0 rounded-sm pointer-events-none bg-[color:var(--surface-sunken)]" aria-hidden="true"
+                    [style.left.%]="point.slotLeft" [style.width.%]="point.slotWidth"></span>
+            }
+            <ng-container [ngTemplateOutlet]="row" />
+            @if (readout(); as point) {
+              <div class="absolute top-0 z-10 pointer-events-none rounded-md border px-2.5 py-1.5 text-xs shadow-sm
+                          whitespace-nowrap bg-[color:var(--surface-raised)] border-[color:var(--border-subtle)]"
+                   data-chart-readout [style.left.%]="point.left" [style.transform]="point.shift">
+                <div class="font-semibold">{{ point.heading }}</div>
+                <div class="tabular-nums text-[color:var(--text-secondary)]">Total {{ point.total }}</div>
+                @for (part of point.parts; track part.caption) {
+                  <div class="flex items-center gap-1.5 tabular-nums">
+                    <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0" [style.background]="part.color"></span>
+                    {{ part.caption }} {{ part.value }}
+                  </div>
+                }
+              </div>
+            }
+          </div>
+        </div>
+      } @else {
+        <ng-container [ngTemplateOutlet]="row" />
+      }
+      <ng-template #row>
       <!-- One role="img" for the whole chart, matching app-histogram. Each bar used to be a
            button whether or not it did anything, so a non-interactive chart put N dead tab
            stops in the keyboard order and read as N buttons to a screen reader. -->
@@ -117,7 +185,9 @@ const RESERVE_AXIS_ONLY = 18;
                   [disabled]="!clickable() || !!bar.inert"
                   [attr.tabindex]="clickable() && !bar.inert ? 0 : -1"
                   [attr.aria-hidden]="clickable() ? null : 'true'"
-                  [title]="bar.hint"
+                  [title]="axis() ? '' : bar.hint"
+                  [class.relative]="axis()"
+                  [class.pointer-events-none]="axis() && !clickable()"
                   (click)="barClicked.emit(bar)">
             @if (showValues()) {
               <span class="text-[11px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.display }}</span>
@@ -172,6 +242,7 @@ const RESERVE_AXIS_ONLY = 18;
           </button>
         }
       </div>
+      </ng-template>
 
       @if (legend().length) {
         <!--
@@ -186,7 +257,8 @@ const RESERVE_AXIS_ONLY = 18;
           aria-hidden because the same names and figures are already in the chart's own
           description, and a screen reader does not need the swatches read out a second time.
         -->
-        <ul class="flex flex-wrap gap-x-3 gap-y-1 mt-2 list-none" aria-hidden="true">
+        <ul class="flex flex-wrap gap-x-3 gap-y-1 mt-2 list-none" aria-hidden="true"
+            [class.ml-11]="axis()">
           @for (entry of legend(); track entry.label) {
             <li class="flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)]"
                 [title]="title(entry.label)">
@@ -226,6 +298,15 @@ export class BarChart {
    */
   readonly unit = input<'number' | 'duration'>('number');
   readonly barClicked = output<Bar>();
+
+  /**
+   * A y-axis: round figures up the left with a gridline at each, the bars scaled to the top tick, and the bar's figures
+   * (its total and each segment) shown where the pointer is rather than in a title. The figures above the bars are left
+   * off, because the axis carries the scale. Off by default: every chart that does not ask renders as before.
+   */
+  readonly axis = input(false);
+  /** The bar under the pointer while [axis] is on; -1 for none. */
+  readonly hovered = signal(-1);
 
   /** How a value is written above its bar, before any fallback for width. */
   private readonly labelFormat = computed(() =>
@@ -293,7 +374,9 @@ export class BarChart {
   }
 
   private remeasure(): void {
-    const width = Math.round((this.host.nativeElement as HTMLElement).getBoundingClientRect().width);
+    const box = Math.round((this.host.nativeElement as HTMLElement).getBoundingClientRect().width);
+    // The axis column is not bar room: measured with it, the pitch was 44px / n too wide.
+    const width = this.axis() ? box - AXIS_PX : box;
     if (width > 0) this.measured.set(width);
   }
 
@@ -318,6 +401,63 @@ export class BarChart {
     const scaled = data.filter(bar => !bar.inert);
     const measured = scaled.length ? scaled : data;
     return Math.max(0, ...measured.map(bar => bar.value ?? 0));
+  });
+
+  /** The axis's figures, when [axis] is on; none otherwise. */
+  private readonly ticks = computed(() => this.axis()
+    ? axisTicks(this.maxValue(), this.data().every(bar => Number.isInteger(bar.value ?? 0)))
+    : []);
+
+  /** The value the full track stands for: the axis's top tick when there is one, else the tallest bar. */
+  private readonly scaleMax = computed(() => {
+    const ticks = this.ticks();
+    return ticks.length > 1 ? ticks[ticks.length - 1] : this.maxValue();
+  });
+
+  /** The bars' own height: the chart's, less the label line and (when drawn) the value line. */
+  private readonly track = computed(() =>
+    Math.max(this.height() - (this.showValues() ? RESERVE_WITH_VALUES : RESERVE_AXIS_ONLY), 18));
+
+  /** Each tick with the px above the chart's bottom its gridline sits at: the label line, then its share of the track. */
+  protected readonly tickMarks = computed(() => {
+    const ticks = this.ticks();
+    const top = this.scaleMax();
+    const format = this.labelFormat();
+    return ticks.map(value => ({
+      value,
+      figure: format(value),
+      px: RESERVE_AXIS_ONLY + (top > 0 ? Math.round((value / top) * this.track()) : 0),
+    }));
+  });
+
+  /** Which bar the pointer is over, from where it is across the row: each bar has an equal slot. */
+  protected pointAt(event: PointerEvent): void {
+    const count = this.data().length;
+    const target = event.currentTarget as HTMLElement | null;
+    if (!count || !target) return;
+    const box = target.getBoundingClientRect();
+    if (!box.width) return;
+    const index = Math.floor(((event.clientX - box.left) / box.width) * count);
+    this.hovered.set(Math.min(count - 1, Math.max(0, index)));
+  }
+
+  /** What the readout says about the hovered bar, and where it sits: over the bar, kept inside the chart at the ends. */
+  protected readonly readout = computed(() => {
+    const index = this.hovered();
+    const data = this.data();
+    const bar = index >= 0 ? data[index] : undefined;
+    if (!bar) return null;
+    const format = this.hintFormat();
+    const left = ((index + 0.5) / data.length) * 100;
+    return {
+      heading: capTitle(bar.name),
+      total: format(bar.value),
+      parts: (bar.segments ?? []).map(part => ({ caption: capTitle(part.label), color: part.color, value: format(part.value) })),
+      left,
+      slotLeft: (index / data.length) * 100,
+      slotWidth: 100 / data.length,
+      shift: left < 15 ? 'translateX(-10%)' : left > 85 ? 'translateX(-90%)' : 'translateX(-50%)',
+    };
   });
 
   /**
@@ -363,7 +503,7 @@ export class BarChart {
    * hint either way, so nothing is lost -- only the collision.
    */
   private readonly valueFormat = computed<((value: number) => string) | null>(() => {
-    if (this.hideValues()) return null;
+    if (this.hideValues() || this.axis()) return null;
     const data = this.data();
     if (!data.length) return null;
     const pitch = this.pitch();
@@ -401,11 +541,11 @@ export class BarChart {
   readonly bars = computed(() => {
     const data = this.data();
     if (!data.length) return [];
-    const max = this.maxValue();
+    const max = this.scaleMax();
     const format = this.labelFormat();
     // The reserve has to match the branch the template actually renders. It was a flat 32
     // even when no value line was drawn, which shortened every bar on a >24-bar chart by 14px.
-    const track = Math.max(this.height() - (this.showValues() ? RESERVE_WITH_VALUES : RESERVE_AXIS_ONLY), 18);
+    const track = this.track();
     const every = this.every();
 
     // The first index of each run of equal names. Twenty-four bars from one day all read
@@ -502,7 +642,7 @@ export class BarChart {
   private hintFor(bar: Bar, format: (value: number) => string): string {
     // The whole name, capped like any tooltip: the label under the bar is only its first words.
     const head = `${capTitle(bar.name)}: ${format(bar.value)}`
-      + (bar.value > this.maxValue() ? ' \u2014 taller than this chart\u2019s scale, drawn cut' : '');
+      + (bar.value > this.scaleMax() ? ' \u2014 taller than this chart\u2019s scale, drawn cut' : '');
     const parts = (bar.segments ?? []).filter(part => part.value > 0);
     return parts.length
       ? head + ' — ' + parts.map(part => `${capTitle(part.label)} ${format(part.value)}`).join(', ')
