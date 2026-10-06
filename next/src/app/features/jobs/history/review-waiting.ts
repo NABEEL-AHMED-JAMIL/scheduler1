@@ -1,4 +1,4 @@
-import { Component, DestroyRef, OnInit, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
@@ -40,7 +40,7 @@ interface WaitingAnswer {
           </h2>
         </div>
         <ul class="divide-y divide-[color:var(--border-subtle)]">
-          @for (run of runs(); track run.jobQueueId) {
+          @for (run of shown(); track run.jobQueueId) {
             <li class="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm">
               <span class="font-medium min-w-0 truncate">{{ run.jobName || 'Job ' + run.jobId }}</span>
               <span class="mono text-[color:var(--text-muted)]">run #{{ run.jobQueueId }}</span>
@@ -55,7 +55,12 @@ interface WaitingAnswer {
             </li>
           }
         </ul>
-        @if (more()) {
+        @if (runs().length > FIRST) {
+          <button type="button" class="btn btn-ghost btn-sm" (click)="expanded.set(!expanded())" [attr.aria-expanded]="expanded()">
+            {{ expanded() ? 'Show the newest ' + FIRST : 'Show all ' + runs().length }}
+          </button>
+        }
+        @if (more() && expanded()) {
           <p class="text-xs text-[color:var(--text-muted)]">Showing the newest {{ runs().length }}. Review these to see older ones.</p>
         }
       </section>
@@ -68,6 +73,10 @@ export class ReviewWaiting implements OnInit {
 
   readonly runs = signal<WaitingRun[]>([]);
   readonly more = signal(false);
+  /** The newest few, so a long backlog never pushes Executions' own table off the screen; the rest on request. */
+  readonly FIRST = 5;
+  readonly expanded = signal(false);
+  readonly shown = computed(() => this.expanded() ? this.runs() : this.runs().slice(0, this.FIRST));
 
   ngOnInit(): void {
     this.load();

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { ApplicationRef, provideZonelessChangeDetection } from '@angular/core';
 import { provideRouter } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { ReviewWaiting } from './review-waiting';
@@ -29,13 +29,24 @@ describe('waiting for review', () => {
     expect(el.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2853/runs/7542/logs');
   });
 
+  it('shows the newest five and the rest on request, so Executions keeps its own table in view', () => {
+    const runs = Array.from({ length: 8 }, (_, i) => ({ jobQueueId: 100 + i, jobId: 2, jobName: 'Job', finishedAt: null,
+      required: ['internal'], decisions: [] }));
+    const el = render({ status: API_SUCCESS, data: { more: false, runs } });
+    expect(el.querySelectorAll('[data-review-waiting] li').length).toBe(5);
+    const toggle = Array.from(el.querySelectorAll('button')).find(b => b.textContent!.includes('Show all 8'))!;
+    toggle.click();
+    TestBed.inject(ApplicationRef).tick();
+    expect(el.querySelectorAll('[data-review-waiting] li').length).toBe(8);
+  });
+
   it('names only the parties still to decide', () => {
     const el = render({ status: API_SUCCESS, data: { more: true, runs: [
       { jobQueueId: 1, jobId: 2, jobName: null, finishedAt: null, required: ['internal', 'customer'], decisions: [{ party: 'internal' }] },
     ] } });
     expect(el.textContent).toContain('Needs the customer review');
     expect(el.textContent).toContain('Job 2');
-    expect(el.textContent).toContain('Showing the newest 1');
+    expect(el.textContent).not.toContain('Show all');
   });
 
   it('draws nothing when no run waits, or when the list cannot load', () => {
