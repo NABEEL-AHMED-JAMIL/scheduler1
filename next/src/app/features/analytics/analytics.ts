@@ -2932,8 +2932,12 @@ export class Analytics implements OnInit {
   /** The ECharts kind on screen now -- hovered, else chosen -- when the result can carry it. */
   readonly echartShown = computed(() => {
     const view = this.studioView();
-    const kind = this.echartHover() ?? this.echartChoice();
-    return view && kind && kindInfo(kind)?.engine === 'echarts' && !view.issues[kind as keyof WidgetView['issues']] ? kind : null;
+    // A hovered kind that cannot draw this result leaves the chosen one on screen: the picker
+    // already says why it does not fit.
+    const fits = (kind: string | null) =>
+      !!view && !!kind && kindInfo(kind)?.engine === 'echarts' && !view.issues[kind as keyof WidgetView['issues']];
+    const hovered = this.echartHover();
+    return fits(hovered) ? hovered : fits(this.echartChoice()) ? this.echartChoice() : null;
   });
 
   chooseClassicKind(id: ChartKind): void {
