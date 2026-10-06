@@ -64,7 +64,8 @@ test.describe('Inbox (live storage-service)', () => {
     const row = page.getByRole('list', { name: 'Uploads' }).locator('li').filter({ hasText: name });
     await expect(row).toHaveAttribute('data-state', 'done');
     await expect(row.getByText('File uploaded to the inbox.')).toBeVisible();
-    await expect(page.getByRole('table').getByText(name)).toBeVisible();
+    // exact: the list also shows each arrival's storage key, which ends in the file's name.
+    await expect(page.getByRole('table').getByText(name, { exact: true })).toBeVisible();
     await expect(page.getByRole('table').locator('tr').filter({ hasText: name }).getByText('You')).toBeVisible();
     await shot(page, info, 'inbox-uploaded');
   });

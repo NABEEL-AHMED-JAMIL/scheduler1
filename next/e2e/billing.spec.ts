@@ -53,8 +53,9 @@ test.describe('cost & usage', () => {
     // The delete is on the page as a line... A 12 KB delete costs less than a cent, and lines under a cent are folded
     // away behind one button now; unfold them.
     const tiny = page.locator('[data-tiny-toggle]');
-    if (await tiny.count() && (await tiny.getAttribute('aria-pressed')) !== 'true') await tiny.click();
     const deletedLine = page.getByRole('row').filter({ hasText: 'Bytes deleted (data churn)' });
+    await expect(tiny.or(deletedLine).first()).toBeVisible();   // the lines have arrived, folded or not
+    if (await tiny.count() && (await tiny.getAttribute('aria-pressed')) !== 'true') await tiny.click();
     await expect(deletedLine).toBeVisible();
     // ...and behind the line, the object by name and the person who deleted it.
     await deletedLine.click();
