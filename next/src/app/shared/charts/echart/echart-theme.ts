@@ -235,6 +235,11 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     candlestick: {
       itemStyle: { color: tokens.up, color0: tokens.down, borderColor: tokens.up, borderColor0: tokens.down },
     },
+    // Labels beside a mark are text on the card: the card's text colour, and no halo. ECharts 6
+    // draws a dark outline round them by default, which read as smudged bold type in both modes.
+    ...Object.fromEntries(['pie', 'tree', 'sankey', 'chord'].map(type =>
+      [type, { label: { color: tokens.textSecondary, textBorderWidth: 0 }, labelLine: { lineStyle: { color: tokens.border } } }])),
+    ...Object.fromEntries(['bar', 'line', 'scatter', 'pictorialBar'].map(type => [type, { label: { textBorderWidth: 0 } }])),
     markLine: { label: { color: tokens.textSecondary, fontSize: 11 }, lineStyle: { color: tokens.muted } },
     markPoint: { label: { color: tokens.surface, fontSize: 11 } },
     animationDuration: 280,

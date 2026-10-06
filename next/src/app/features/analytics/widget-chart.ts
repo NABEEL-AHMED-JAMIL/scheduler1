@@ -26,6 +26,11 @@ import type { Mark, WidgetView } from './dashboard';
 /** How many rows a tile's table shows; the rest are one click away. */
 export const WIDGET_ROWS = 8;
 export const WIDGET_HEIGHT = 180;
+/**
+ * The default for a kind ECharts draws. Taller than the SVG kinds' 180: a legend, a toolbox and a
+ * slider share the box with the plot, and a sunburst or a calendar at 180 is a thumbnail.
+ */
+export const ECHART_HEIGHT = 260;
 export const WIDGET_HEIGHT_MIN = 120;
 export const WIDGET_HEIGHT_MAX = 600;
 
@@ -165,7 +170,7 @@ export class WidgetChart {
     if (!kind) return null;
     const theme = this.theme();
     return optionFor(this.view(), kind, this.settings(), { palette: theme.palette, tokens: theme.tokens },
-      { interactive: this.interactive(), name: this.name() });
+      { interactive: this.interactive(), name: this.name(), height: this.height() });
   });
 
   readonly chartLabel = computed(() => `${kindInfo(this.drawn())?.label ?? 'Chart'}: ${this.measureName(this.view())} by ${this.dimensionName(this.view())}`);

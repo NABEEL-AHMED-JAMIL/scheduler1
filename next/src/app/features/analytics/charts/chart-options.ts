@@ -40,6 +40,8 @@ export interface OptionTheme {
 export interface OptionContext {
   /** Whether to offer the toolbox (save as image, data view, restore). Off for previews. */
   interactive?: boolean;
+  /** The drawing's height in px, for the kinds that lay out rows of their own (the calendar). */
+  height?: number;
   /** The file name a saved image takes, and the data view's heading. */
   name?: string;
 }
@@ -136,7 +138,8 @@ function legend(settings: ChartSettings, count: number, fallbackShow: boolean): 
     type: settings.legend?.scroll === false ? 'plain' : 'scroll',
     orient,
     [position]: position === 'top' && settings.title?.text ? 40 : 0,
-    ...(orient === 'horizontal' ? { left: 'center' } : { top: 'middle' }),
+    // Not the full width: the toolbox sits at the top right, and a long legend scrolls before reaching it.
+    ...(orient === 'horizontal' ? { left: 'center', width: '74%' } : { top: 'middle' }),
     itemWidth: 12, itemHeight: 8, itemGap: 12,
   };
 }
@@ -239,7 +242,7 @@ function tooltip(settings: ChartSettings, trigger: 'axis' | 'item', unit = ''): 
 
 // ---- the kinds ------------------------------------------------------------------------------
 
-type Builder = (table: ChartTable, s: ChartSettings, theme: OptionTheme) => EOption;
+type Builder = (table: ChartTable, s: ChartSettings, theme: OptionTheme, context: OptionContext) => EOption;
 
 const unitOf = (s: ChartSettings) => s.yAxis?.unit ?? s.xAxis?.unit ?? '';
 
@@ -440,8 +443,8 @@ const polarBar: Builder = (table0, s) => {
   const xs = labels(table);
   return {
     tooltip: tooltip(s, 'item', unitOf(s)),
-    polar: { radius: ['14%', '80%'] },
-    angleAxis: { type: 'value', startAngle: 90, axisLabel: { formatter: axisNumber('compact') }, splitLine: { show: false } },
+    polar: { radius: ['12%', '78%'] },
+    angleAxis: { type: 'value', startAngle: 90, splitNumber: 4, axisLabel: { formatter: axisNumber('compact') }, splitLine: { show: false } },
     radiusAxis: { type: 'category', data: xs, axisLabel: { interval: 0, fontSize: 11 }, z: 10 },
     series: [{
       type: 'bar', coordinateSystem: 'polar', name: primary(table)?.name ?? '', data: figures(table),
@@ -472,11 +475,12 @@ function pie(variant: 'rose' | 'half'): Builder {
     const xs = labels(table);
     const values = figures(table);
     const total = values.reduce((sum, v) => sum + v, 0) || 1;
-    const lg = legend(s, xs.length, true);
+    // Off unless asked: every slice is labelled with its name already.
+    const lg = legend(s, xs.length, false);
     const inner = s.pie?.inner ?? (variant === 'half' ? 50 : 18);
     const outer = s.pie?.outer ?? (variant === 'half' ? 95 : 72);
     return {
-      legend: lg ? { ...lg, [s.legend?.position ?? 'bottom']: 0 } : undefined,
+      legend: lg,
       tooltip: {
         trigger: 'item', confine: true,
         formatter: (p: { name: string; value: number }) =>
@@ -513,7 +517,9 @@ const nestedPie: Builder = (table, s, theme) => {
   return {
     tooltip: { trigger: 'item', confine: true, formatter: (p: { name: string; value: number; percent: number }) => `${p.name}<br>${fmt(p.value)} · ${Math.round(p.percent)}%` },
     series: [
-      { type: 'pie', radius: [0, `${s.pie?.inner ?? 34}%`], label: { position: 'inner', fontSize: 11, color: theme.tokens.surface }, data: inner, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
+      { type: 'pie', radius: [0, `${s.pie?.inner ?? 34}%`], data: inner,
+        // Named inside the slice only where the slice is wide enough to hold the name.
+        label: { position: 'inner', fontSize: 11, color: theme.tokens.surface, formatter: (p: { name: string; percent: number }) => (p.percent >= 9 ? p.name : '') }, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
       { type: 'pie', radius: [`${(s.pie?.inner ?? 34) + 8}%`, `${s.pie?.outer ?? 72}%`], label: { show: s.labels?.show ?? outer.length <= 16, fontSize: 11 }, data: outer, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
     ],
   };
@@ -583,7 +589,7 @@ function scatterKind(variant: 'trend' | 'bubble' | 'effect'): Builder {
         formatter: (p: { name: string; value: number[] }) => [p.name, ...axes.map((axis, i) => `${axis}: ${fmt(p.value[i])}`)].filter(Boolean).join('<br>'),
       },
       xAxis: axisFrom({ type: 'value', scale: true, name: axes[0], nameLocation: 'middle', nameGap: 26, splitLine: { show: false } }, s.xAxis, true),
-      yAxis: axisFrom({ type: 'value', scale: true, name: axes[1], nameLocation: 'end' }, s.yAxis, true),
+      yAxis: axisFrom({ type: 'value', scale: true, name: axes[1], nameLocation: 'middle', nameGap: 44, nameRotate: 90 }, s.yAxis, true),
       dataZoom: zoom ? [{ type: 'inside', xAxisIndex: 0 }, { type: 'inside', yAxisIndex: 0 }, { type: 'slider', xAxisIndex: 0, height: 18, bottom: 6, showDetail: false }] : undefined,
       series,
     };
@@ -693,7 +699,7 @@ export function treeOf(table: ChartTable): TreeNode[] {
   return roots;
 }
 
-const treemap: Builder = (table0, s) => {
+const treemap: Builder = (table0, s, theme) => {
   const table = table0.dims.length === 1 ? cut(table0, s, 'desc') : table0;
   const fmt = (v: number) => formatNumber(v, s.tooltip?.format, unitOf(s));
   return {
@@ -704,8 +710,12 @@ const treemap: Builder = (table0, s) => {
       breadcrumb: { show: table.dims.length > 1, height: 18, itemStyle: { textStyle: { fontSize: 11 } } },
       label: { show: s.labels?.show ?? true, fontSize: 11, formatter: (p: { name: string; value: number }) => `${p.name}\n${formatNumber(p.value, s.labels?.format ?? 'compact')}` },
       upperLabel: { show: table.dims.length > 1, height: 18, fontSize: 11 },
-      itemStyle: { borderWidth: 1, gapWidth: 1 },
-      levels: [{ itemStyle: { gapWidth: 2 } }, { colorSaturation: [0.35, 0.6], itemStyle: { gapWidth: 1, borderColorSaturation: 0.6 } }],
+      // Gaps in the card's colour: ECharts paints them white, a grid of white lines on a dark card.
+      itemStyle: { borderWidth: 1, gapWidth: 1, borderColor: theme.tokens.surface },
+      levels: [
+        { itemStyle: { gapWidth: 2, borderColor: theme.tokens.surface }, upperLabel: { show: false } },
+        { colorSaturation: [0.35, 0.6], itemStyle: { gapWidth: 1, borderColorSaturation: 0.6 } },
+      ],
     }],
   };
 };
@@ -723,16 +733,20 @@ const sunburst: Builder = (table, s, theme) => {
   };
 };
 
-const tree: Builder = (table, s) => ({
+const tree: Builder = (table, s) => {
+  // Opened one level down when there are more leaves than lines to give them; a click opens a branch.
+  const leaves = table.length;
+  return {
   tooltip: { trigger: 'item', confine: true, formatter: (p: { name: string; value: number }) => `${p.name}<br>${formatNumber(p.value, s.tooltip?.format, unitOf(s))}` },
   series: [{
     type: 'tree', data: [{ name: primary(table)?.name ?? 'All', children: treeOf(table) }],
-    top: 8, bottom: 8, left: 80, right: 140, symbolSize: 7, initialTreeDepth: -1,
+    top: 8, bottom: 8, left: 80, right: 140, symbolSize: 7, initialTreeDepth: leaves > 24 ? 1 : -1,
     label: { position: 'left', verticalAlign: 'middle', align: 'right', fontSize: 11 },
     leaves: { label: { position: 'right', align: 'left', formatter: (p: { name: string; value: number }) => `${p.name}  ${formatNumber(p.value, 'compact')}` } },
     expandAndCollapse: true, animationDuration: 280,
   }],
-});
+  };
+};
 
 /**
  * Sankey nodes have to be unique by name, and the same value can stand at two stages ("north"
@@ -817,7 +831,7 @@ const heatmap: Builder = (table, s) => {
   };
 };
 
-const calendar: Builder = (table, s) => {
+const calendar: Builder = (table, s, _theme, context) => {
   const values = figures(table);
   const byDay = new Map<string, number>();
   table.dims[0].values.forEach((value, row) => {
@@ -826,6 +840,9 @@ const calendar: Builder = (table, s) => {
   });
   const years = distinct([...byDay.keys()].map(day => day.split('-')[0])).sort();
   const all = [...byDay.values()];
+  // Each year a band of the drawing's height, a week's seven rows to fit it, the scale below.
+  const band = Math.max(60, ((context.height ?? 220) - 54) / Math.max(1, years.length));
+  const cell = Math.max(6, Math.floor((band - 20) / 7));
   return {
     tooltip: {
       trigger: 'item', confine: true,
@@ -836,7 +853,7 @@ const calendar: Builder = (table, s) => {
       itemHeight: 120, itemWidth: 10,
     },
     calendar: years.map((year, i) => ({
-      range: year, top: 26 + i * 130, left: 36, right: 12, cellSize: ['auto', 13], orient: 'horizontal',
+      range: year, top: 20 + i * band, left: 36, right: 12, cellSize: ['auto', cell], orient: 'horizontal',
       yearLabel: { show: years.length > 1, position: 'left' },
     })),
     series: years.map((year, i) => ({
@@ -884,10 +901,10 @@ const gauge: Builder = (table, s, theme) => {
     axisLine: { lineStyle: { width: 14, color: [[1, theme.tokens.sunken]] }, roundCap: true },
     pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false },
     axisLabel: { distance: 18, fontSize: 11, color: theme.tokens.muted, formatter: axisNumber('compact', unit) },
-    anchor: { show: false }, title: { show: true, offsetCenter: [0, '34%'], fontSize: 11, color: theme.tokens.muted },
+    anchor: { show: false }, title: { show: true, offsetCenter: [0, '26%'], fontSize: 11, color: theme.tokens.muted },
     detail: {
-      valueAnimation: true, offsetCenter: [0, '2%'], fontSize: 22, fontWeight: 600, color: theme.tokens.text,
-      formatter: (v: number) => formatNumber(v, s.labels?.format ?? 'auto', unit),
+      valueAnimation: true, offsetCenter: [0, '-4%'], fontSize: 18, fontWeight: 600, color: theme.tokens.text,
+      formatter: (v: number) => formatNumber(v, s.labels?.format ?? 'compact', unit),
     },
     data: [{ value, name: target !== null && target !== undefined ? `of ${formatNumber(target, 'auto', unit)} target` : primary(table)?.name ?? '' }],
   }];
@@ -1020,7 +1037,7 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
   const builder = BUILDERS[kind];
   if (!builder || !table0.length) return {};
   const table = table0;
-  const option = builder(table, settings, theme);
+  const option = builder(table, settings, theme, context);
   const animate = settings.animation ?? pointCount(table) < ANIMATE_BELOW;
   const out: EOption = {
     color: theme.palette,
@@ -1034,6 +1051,7 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
   }
   const tools = settings.toolbox ?? {};
   if (context.interactive && (tools.saveImage !== false || tools.dataView !== false)) {
+    makeRoomForToolbox(out);
     const t = theme.tokens;
     out['toolbox'] = {
       show: true, right: 0, top: 0, itemSize: 13, itemGap: 8, showTitle: true,
@@ -1053,6 +1071,19 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
     };
   }
   return out;
+}
+
+/**
+ * The toolbox takes the top right corner. A plot area with no legend above it, or a layout series
+ * placed from the top, is moved down a line so the icons do not sit on the data.
+ */
+function makeRoomForToolbox(option: EOption): void {
+  const box = option['grid'] as Obj | undefined;
+  const legendOnTop = !!option['legend'] && (option['legend'] as Obj)['top'] !== undefined;
+  if (box && typeof box['top'] === 'number' && !legendOnTop) box['top'] = (box['top'] as number) + 18;
+  for (const one of (option['series'] as Obj[] | undefined) ?? []) {
+    if (typeof one['top'] === 'number' && !option['grid']) one['top'] = (one['top'] as number) + 22;
+  }
 }
 
 /** The option straight from a view: the table it already carries, or one read from it. */

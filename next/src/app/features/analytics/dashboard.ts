@@ -13,7 +13,7 @@ import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
-import { WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN } from './widget-chart';
+import { ECHART_HEIGHT, WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN } from './widget-chart';
 import {
   FilterBuilder, asFilterGroup, countFilterClauses, describeClause, emptyFilterGroup,
   isNumericType, pruneFilters,
@@ -37,7 +37,7 @@ import { KindPickerData, KindPickerPanel } from './charts/kind-picker-panel';
 import { ThemePicker } from '../../shared/charts/echart/theme-picker';
 import { themeLabel } from '../../shared/charts/echart/echart-theme';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
-import { CATEGORIES } from './widget-kinds';
+import { CATEGORIES, kindInfo } from './widget-kinds';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -2326,7 +2326,9 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   heightOf(widget: DashboardWidget): number {
     const asked = widgetConfigOf(widget).height;
-    if (typeof asked !== 'number' || !Number.isFinite(asked)) return WIDGET_HEIGHT;
+    if (typeof asked !== 'number' || !Number.isFinite(asked)) {
+      return kindInfo(widget.visualizationType)?.engine === 'echarts' ? ECHART_HEIGHT : WIDGET_HEIGHT;
+    }
     return Math.min(WIDGET_HEIGHT_MAX, Math.max(WIDGET_HEIGHT_MIN, Math.round(asked)));
   }
 

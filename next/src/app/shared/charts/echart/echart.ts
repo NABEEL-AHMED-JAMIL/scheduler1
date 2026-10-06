@@ -120,7 +120,8 @@ export class EChart {
     const renderer = this.renderer();
     this.chart = this.lib.echarts.init(this.canvas().nativeElement, theme?.key, { renderer });
     this.madeWith = renderer;
-    this.chart.on('finished', () => { if (!this.drawn()) this.drawn.set(true); });
+    // 'rendered', not 'finished': a chart with a looping effect (the top-five ripple) never finishes.
+    this.chart.on('rendered', () => { if (!this.drawn()) this.drawn.set(true); });
     this.apply(this.option());
     if (!this.resizer && typeof ResizeObserver !== 'undefined') {
       this.resizer = new ResizeObserver(() => {
