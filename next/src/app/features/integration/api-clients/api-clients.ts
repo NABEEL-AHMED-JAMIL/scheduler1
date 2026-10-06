@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -21,7 +22,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
  */
 @Component({
   selector: 'app-api-clients',
-  imports: [TableShell, Icon, ServerTimePipe, ManagedBanner],
+  imports: [TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './api-clients.html',
 })
 export class ApiClients implements OnInit {

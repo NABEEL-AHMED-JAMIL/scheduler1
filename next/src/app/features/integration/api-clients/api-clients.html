@@ -59,19 +59,21 @@
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.expiresAt ? (c.expiresAt | serverTime: 'date') : '—' }}</td>
             <td class="text-right"><span [class]="statusPill(c)">{{ c.status }}</span></td>
-            <td class="text-right whitespace-nowrap">
+            <td class="text-right">
               @if (c.status !== 'Revoked') {
-                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Change ' + c.name" (click)="openClient(c)">
-                  <app-icon name="edit" />Change
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="clientMenu"
+                        [attr.aria-label]="'Actions for ' + c.name" [disabled]="busy() === c.clientId">
+                  <app-icon name="dots" size="1em" [busy]="busy() === c.clientId" />
                 </button>
-                <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === c.clientId"
-                        [attr.aria-label]="'New secret for ' + c.name" (click)="rotate(c)">
-                  <app-icon name="refresh" [busy]="busy() === c.clientId" />New secret
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="busy() === c.clientId"
-                        [attr.aria-label]="'Revoke ' + c.name" (click)="revoke(c)">
-                  <app-icon name="power" />Revoke
-                </button>
+                <ng-template #clientMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openClient(c)"><app-icon name="edit" />Change</button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotate(c)"><app-icon name="refresh" />New secret</button>
+                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="revoke(c)">
+                      <app-icon name="power" class="icon-crit" />Revoke
+                    </button>
+                  </div>
+                </ng-template>
               }
             </td>
           </tr>

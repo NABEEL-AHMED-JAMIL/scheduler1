@@ -41,7 +41,7 @@ export function dayOf(serverTime: string | null | undefined): string {
           <input id="clientExpires" type="date" class="input" [value]="expires()" (input)="expires.set($any($event.target).value)" />
         </app-field>
       </div>
-      <fieldset class="form-lock">
+      <fieldset class="form-lock mt-4 mb-4">
         <legend class="text-sm font-medium mb-2">Scopes</legend>
         <div class="flex flex-col gap-1.5" data-scopes>
           @for (s of data.scopes; track s.scope) {
