@@ -61,7 +61,7 @@ function screen(link?: number) {
       ...(link ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ task: String(link) }), routeConfig: { path: 'workflows/inbox' } } } }] : []),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), groups: signal(0) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), groups: signal(0), done: signal(1), requests: signal(1) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
     ],
   });

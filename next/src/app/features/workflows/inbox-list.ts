@@ -12,8 +12,10 @@ export type RowTone = 'ok' | 'crit' | 'warn' | 'brand' | 'neutral';
 export interface ListItem {
   id: number;
   kind: 'task' | 'request';
-  /** What tells rows apart: the request's title. */
+  /** What tells rows apart: the request's title -- whole, and split into its name and a trailing reference (splitRef). */
   title: string;
+  name: string;
+  ref: string;
   /** Step · workflow, muted. */
   sub: string;
   status: string;
@@ -101,4 +103,40 @@ export function nextAfter(ids: number[], current: number): number | null {
   const at = ids.indexOf(current);
   if (at < 0) return ids[0] ?? null;
   return ids[at + 1] ?? ids[at - 1] ?? null;
+}
+
+/**
+ * A title's trailing reference -- a last word of # and letters or digits, "#1016" -- apart from the name before it, so a
+ * narrow list cuts the name and never the reference, often the one thing that tells rows apart. No reference: all name.
+ */
+export function splitRef(title: string): { name: string; ref: string } {
+  const m = /^(.*\S)\s+(#[A-Za-z0-9]+)$/.exec(title.trim());
+  return m ? { name: m[1], ref: m[2] } : { name: title, ref: '' };
+}
+
+/** The one value every row shares (two rows at least), or '' when they differ. */
+export function commonOf(values: string[]): string {
+  if (values.length < 2) return '';
+  const first = values[0];
+  return first && values.every(v => v === first) ? first : '';
+}
+
+/**
+ * A fresh first page laid over the rows already loaded, so the pages a person loaded stay: the fresh page is the truth
+ * up to its last row (a loaded row in that stretch it no longer holds has left the list), and the loaded rows after that
+ * point follow it -- without the one that left (a task acted on). A fresh page that is the whole list is all of it.
+ */
+export function mergeHead<T extends { id: number }>(head: T[], loaded: T[], gone: number | null, headIsAll: boolean): T[] {
+  if (headIsAll) return head.filter(r => r.id !== gone);
+  const position = new Map(loaded.map((r, i) => [r.id, i]));
+  let cut = -1;
+  for (let i = head.length - 1; i >= 0 && cut < 0; i--) cut = position.get(head[i].id) ?? -1;
+  const fresh = new Set(head.map(r => r.id));
+  return [...head, ...loaded.slice(cut + 1).filter(r => !fresh.has(r.id))].filter(r => r.id !== gone);
+}
+
+/** The next page under the rows loaded (Load more); a row already there is not drawn twice. */
+export function appendPage<T extends { id: number }>(loaded: T[], page: T[]): T[] {
+  const have = new Set(loaded.map(r => r.id));
+  return [...loaded, ...page.filter(r => !have.has(r.id))];
 }

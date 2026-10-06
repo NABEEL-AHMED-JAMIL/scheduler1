@@ -42,7 +42,7 @@
           <app-icon name="search" size="0.95em" />
           <input #search class="input input-sm" type="search" [placeholder]="tab() === 'requests' ? 'Search requests — press /' : 'Search tasks — press /'"
                  aria-label="Search the list by request, step, workflow or person" aria-keyshortcuts="/"
-                 [value]="query()" (input)="query.set($any($event.target).value)" data-test="inbox-search" />
+                 [value]="query()" (input)="setQuery($any($event.target).value)" data-test="inbox-search" />
         </div>
         <div class="inbox-filters">
           <select class="input input-sm" aria-label="Filter by status" [value]="statusFilter()"
@@ -61,11 +61,24 @@
           </select>
         </div>
         <div class="inbox-count">
-          <span data-test="shown-line">{{ shownLine() }}</span>
+          <span class="inbox-count-line">
+            <span data-test="shown-line">{{ shownLine() }}</span>
+            <!-- What every row shares, said once rather than on each row's second line. -->
+            @if (commonLine()) { <span class="inbox-common" [title]="commonLine()" data-test="list-common">· {{ commonLine() }}</span> }
+          </span>
           @if (hasFilters()) {
             <button type="button" class="link-inline" (click)="clearFilters()" data-test="clear-filters">Clear filters</button>
           }
         </div>
+        @if (partialNote()) {
+          <!-- More rows are on the service: a search over what is loaded says so, and can ask the service instead. -->
+          <p class="inbox-partial" role="status" data-test="partial-search">
+            <span>{{ partialNote() }}</span>
+            @if (canSearchAll()) {
+              <button type="button" class="link-inline" [disabled]="loadingMore()" (click)="searchAll()" data-test="search-all">Search all</button>
+            }
+          </p>
+        }
       </div>
 
       <div class="inbox-scroll">
@@ -77,7 +90,8 @@
             <button type="button" class="inbox-row" [class.is-on]="selectedId() === item.id" [class.is-crit]="item.crit"
                     [attr.aria-current]="selectedId() === item.id ? 'true' : null" (click)="openItem(item)"
                     [attr.data-task]="item.kind === 'task' ? item.id : null" [attr.data-request]="item.kind === 'request' ? item.id : null">
-              <span class="inbox-row-title">{{ item.title }}</span>
+              <!-- The name is cut, never its trailing reference (#1016): often the one thing that tells rows apart. -->
+              <span class="inbox-row-title" [title]="item.title"><span class="inbox-title-name">{{ item.name }}</span>@if (item.ref) {<span class="inbox-title-ref">{{ ' ' + item.ref }}</span>}</span>
               <span class="inbox-row-time" [title]="item.timeTitle">{{ item.time }}</span>
               <span class="inbox-row-sub">{{ item.sub }}</span>
               <span class="inbox-row-status"><span [class]="'inbox-dot is-' + item.tone"></span>{{ item.status }}</span>
@@ -93,13 +107,17 @@
             @else { You have not acted on any task yet. }
           </div>
         }
-        @if (listCapped()) {
-          <!-- P2 #31: the list stops at the service's limit; say so rather than pass it off as all. -->
-          <p class="inbox-capped" data-capped>
-            @if (tab() === 'done') { The {{ items().length }} you acted on most recently. }
-            @else if (tab() === 'requests') { Your {{ items().length }} most recent requests. }
-            @else { The {{ items().length }} due soonest; act on these and the rest move up. }
-          </p>
+        @if (hasMore()) {
+          <!-- P2 #31: the service pages the list; the rest is a click away, never passed off as all there is. -->
+          <div class="inbox-more" data-test="load-more-bar">
+            <button type="button" class="btn btn-default btn-sm" [disabled]="loadingMore()" (click)="loadMore()" data-test="load-more">
+              <app-icon name="refresh" [class.spin]="loadingMore()" />Load more</button>
+            <span class="inbox-capped" data-capped>
+              @if (tab() === 'done') { The {{ items().length }} you acted on most recently are loaded. }
+              @else if (tab() === 'requests') { Your {{ items().length }} most recent requests are loaded. }
+              @else { The {{ items().length }} due soonest are loaded. }
+            </span>
+          </div>
         }
       </div>
     </section>
@@ -110,7 +128,7 @@
         @if (detail(); as d) {
           <div class="inbox-detail-head">
             <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
-            <h2 class="inbox-detail-title">{{ d.requestTitle || d.name }}</h2>
+            <h2 class="inbox-detail-title"><ng-container *ngTemplateOutlet="titled; context: { $implicit: d.requestTitle || d.name }" /></h2>
             <p class="inbox-detail-sub">{{ d.name }} · {{ d.workflowName }}</p>
             <div class="inbox-chips">
               <app-status [label]="stateLabel(d)" />
@@ -206,7 +224,7 @@
             <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
             <div class="flex items-start gap-3 flex-wrap">
               <div class="min-w-0 flex-1">
-                <h2 class="inbox-detail-title">{{ r.title }}</h2>
+                <h2 class="inbox-detail-title"><ng-container *ngTemplateOutlet="titled; context: { $implicit: r.title }" /></h2>
                 <p class="inbox-detail-sub">{{ r.workflow }} · version {{ r.version }}</p>
               </div>
               @if (r.state === 'Running' || r.state === 'Waiting') {
@@ -243,6 +261,12 @@
     }
   </div>
 </div>
+
+<!-- A heading's title: its trailing reference (#1016) never breaks across lines. -->
+<ng-template #titled let-title>
+  @let parts = refOf(title);
+  @if (parts.ref) {<ng-container>{{ parts.name + ' ' }}</ng-container><span class="inbox-title-ref">{{ parts.ref }}</span>} @else {<ng-container>{{ title }}</ng-container>}
+</ng-template>
 
 <!-- A request's details: each value as its shape reads (value-kind.ts). -->
 <ng-template #fieldList let-fields>

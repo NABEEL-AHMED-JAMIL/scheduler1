@@ -5,7 +5,7 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
-import { TaskInbox, INBOX_LIST_LIMIT } from './task-inbox';
+import { TaskInbox } from './task-inbox';
 import { TaskCountService } from './task-count.service';
 import { InboxTask, TaskDetail, WorkflowsApi } from './workflows.api';
 import { compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
@@ -48,7 +48,7 @@ function screenWith(detail: TaskDetail = DETAIL) {
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
       { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
     ],
   });
@@ -158,11 +158,11 @@ describe('The task\'s own history lines', () => {
 });
 
 describe('P2 #31 and #36: the inbox at the edges', () => {
-  it('reads a full tab from the count service, or "200+", never a silent 200', () => {
+  it('reads a tab with more to load from the count service, or "100+", never a page size as the total', () => {
     const { screen } = screenWith();
-    expect(screen.tabCount(12, 0)).toBe('12');
-    expect(screen.tabCount(INBOX_LIST_LIMIT, 0)).toBe('200+');
-    expect(screen.tabCount(INBOX_LIST_LIMIT, 1240)).toBe('1,240');
+    expect(screen.tabCount(12, 0, true)).toBe('12');
+    expect(screen.tabCount(100, 0, false)).toBe('100+');
+    expect(screen.tabCount(100, 1240, false)).toBe('1,240');
   });
 
   it('explains a request of one\'s own in a workspace with no one else to approve it', () => {

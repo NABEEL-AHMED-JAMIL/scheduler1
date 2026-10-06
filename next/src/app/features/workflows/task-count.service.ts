@@ -17,9 +17,11 @@ export class TaskCountService {
 
   readonly count = signal(0);
   readonly overdue = signal(0);
-  /** Open tasks per tab, counted by the service (P2 #31): the lists themselves stop at 200. */
+  /** Each tab's total, counted by the service (P2 #31): the lists come a page at a time. */
   readonly mine = signal(0);
   readonly groups = signal(0);
+  readonly done = signal(0);
+  readonly requests = signal(0);
 
   constructor() {
     effect(() => {
@@ -47,6 +49,8 @@ export class TaskCountService {
           this.overdue.set(r.data.overdue);
           this.mine.set(r.data.mine);
           this.groups.set(r.data.groups);
+          this.done.set(r.data.done ?? 0);
+          this.requests.set(r.data.requests ?? 0);
         }
       },
       error: () => {},

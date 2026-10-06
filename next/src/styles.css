@@ -2280,6 +2280,10 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .inbox-tools { flex: none; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle); }
 .inbox-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; }
 .inbox-count { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; color: var(--text-muted); }
+.inbox-count-line { display: flex; gap: 0.3em; min-width: 0; white-space: nowrap; }
+.inbox-common { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A search over a list not all loaded says so (and offers Search all). */
+.inbox-partial { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; font-size: 0.75rem; color: var(--text-secondary); }
 .inbox-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .inbox-day { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 1rem;
   background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); font-size: 0.6875rem; font-weight: 600;
@@ -2293,7 +2297,10 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .inbox-row.is-crit { box-shadow: inset 3px 0 0 var(--crit-text); }
 .inbox-row.is-on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent-mark-strong); }
 .inbox-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.inbox-row-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
+/* The title's name is cut; its trailing reference (#1016) never is. */
+.inbox-row-title { display: flex; align-items: baseline; gap: 0.3em; min-width: 0; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
+.inbox-title-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.inbox-title-ref { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .inbox-row-time { white-space: nowrap; font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; justify-self: end; }
 .inbox-row.is-crit .inbox-row-time { color: var(--crit-text); font-weight: 600; }
 .inbox-row-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--text-muted); }
@@ -2304,6 +2311,9 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .inbox-dot.is-warn { background: var(--warn-text); }
 .inbox-dot.is-brand { background: var(--accent-mark); }
 .inbox-capped { padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-muted); }
+/* Load more, under the rows loaded. */
+.inbox-more { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.75rem 1rem; }
+.inbox-more .inbox-capped { padding: 0; }
 
 /* The task: its title, the decisions straight under it, then the request and its history; scrolls on its own. */
 .inbox-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }

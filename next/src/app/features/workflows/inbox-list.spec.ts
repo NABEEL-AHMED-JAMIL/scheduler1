@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { choicesOf, dueGroup, groupRows, matchesSearch, nextAfter, pastGroup, stepFrom } from './inbox-list';
+import { appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
 
 /** The Task inbox's list for hundreds of rows (owner, 2026-10-06): day headers, search, filters, and moving through it. */
 const TZ = 'America/Chicago';
@@ -66,5 +66,46 @@ describe('Moving through the list', () => {
     expect(nextAfter([5, 6, 7], 6)).toBe(7);
     expect(nextAfter([5, 6, 7], 7)).toBe(6);
     expect(nextAfter([5], 5)).toBeNull();
+  });
+});
+
+describe('A title\'s trailing reference', () => {
+  it('splits a last word of # and letters or digits from the name, and leaves anything else whole', () => {
+    expect(splitRef('MIG-277 visit check (synthetic) #1016')).toEqual({ name: 'MIG-277 visit check (synthetic)', ref: '#1016' });
+    expect(splitRef('Laptop for Sam #A7f')).toEqual({ name: 'Laptop for Sam', ref: '#A7f' });
+    expect(splitRef('Laptop for Sam')).toEqual({ name: 'Laptop for Sam', ref: '' });
+    expect(splitRef('Order#12')).toEqual({ name: 'Order#12', ref: '' });
+    expect(splitRef('#1016')).toEqual({ name: '#1016', ref: '' });
+    expect(splitRef('Ticket #12 reopened')).toEqual({ name: 'Ticket #12 reopened', ref: '' });
+    expect(splitRef('Costs #12-b')).toEqual({ name: 'Costs #12-b', ref: '' });
+  });
+
+  it('finds what every row shares, two rows at least', () => {
+    expect(commonOf(['A', 'A', 'A'])).toBe('A');
+    expect(commonOf(['A', 'B'])).toBe('');
+    expect(commonOf(['A'])).toBe('');
+    expect(commonOf(['', ''])).toBe('');
+  });
+});
+
+describe('Pages of a list', () => {
+  const rows = (...ids: number[]) => ids.map(id => ({ id }));
+  const ids = (list: { id: number }[]) => list.map(r => r.id);
+
+  it('appends a page without drawing a row twice', () => {
+    expect(ids(appendPage(rows(1, 2, 3), rows(3, 4)))).toEqual([1, 2, 3, 4]);
+  });
+
+  it('lays a fresh first page over the loaded pages: true up to its last row, the loaded rows after it kept', () => {
+    // 2 acted on: 4 slides onto the fresh first page; 5 and 6, loaded on page two, stay.
+    expect(ids(mergeHead(rows(1, 3, 4), rows(1, 2, 3, 4, 5, 6), 2, false))).toEqual([1, 3, 4, 5, 6]);
+    // 5 acted on, on page two: the fresh page is as before, 5 leaves the rows kept.
+    expect(ids(mergeHead(rows(1, 2, 3), rows(1, 2, 3, 4, 5, 6), 5, false))).toEqual([1, 2, 3, 4, 6]);
+    // Someone else's decision took 2 away: the fresh page drops it although it was loaded.
+    expect(ids(mergeHead(rows(1, 3, 4), rows(1, 2, 3, 4, 5), null, false))).toEqual([1, 3, 4, 5]);
+    // A new task due first: on the fresh page, and 3 that slid off it is kept after.
+    expect(ids(mergeHead(rows(9, 1, 2), rows(1, 2, 3, 4), null, false))).toEqual([9, 1, 2, 3, 4]);
+    // A fresh page that is the whole list is all of it.
+    expect(ids(mergeHead(rows(1, 3), rows(1, 2, 3, 4), 2, true))).toEqual([1, 3]);
   });
 });

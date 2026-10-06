@@ -57,7 +57,14 @@ export interface TaskDetail extends InboxTask {
 
 export interface Colleague { userId: number; fullName?: string | null; username: string; }
 
-export interface TaskCount { mine: number; groups: number; total: number; overdue: number; }
+/** The tabs' totals: open in Mine and My groups (total is the two, the menu's badge), overdue, Done and My requests. */
+export interface TaskCount { mine: number; groups: number; total: number; overdue: number; done?: number; requests?: number; }
+
+/** Which page of an inbox list to read: after a cursor, how many (1..200, the service's default 100), and a search. */
+export interface InboxQuery { cursor?: string | null; limit?: number; q?: string | null; }
+
+/** A page of an inbox list: the rows are the data, and paging says where the next page starts (null on the last). */
+export type InboxPage<T> = ApiResponse<T[]> & { paging?: { nextCursor?: string | null; limit?: number } };
 
 export interface WorkflowSummary {
   id: number;
@@ -105,9 +112,9 @@ export class WorkflowsApi {
   private readonly inbox = `${API_BASE}/taskInbox.json`;
   private readonly workflows = `${API_BASE}/workflow.json`;
 
-  mine(): Observable<ApiResponse<InboxTask[]>> { return this.http.get<ApiResponse<InboxTask[]>>(`${this.inbox}/mine`); }
-  groups(): Observable<ApiResponse<InboxTask[]>> { return this.http.get<ApiResponse<InboxTask[]>>(`${this.inbox}/groups`); }
-  done(): Observable<ApiResponse<InboxTask[]>> { return this.http.get<ApiResponse<InboxTask[]>>(`${this.inbox}/done`); }
+  mine(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('mine', page); }
+  groups(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('groups', page); }
+  done(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('done', page); }
   count(): Observable<ApiResponse<TaskCount>> { return this.http.get<ApiResponse<TaskCount>>(`${this.inbox}/count`); }
   task(id: number): Observable<ApiResponse<TaskDetail>> { return this.http.get<ApiResponse<TaskDetail>>(`${this.inbox}/task`, { params: { id } }); }
   colleagues(): Observable<ApiResponse<Colleague[]>> { return this.http.get<ApiResponse<Colleague[]>>(`${this.inbox}/colleagues`); }
@@ -142,8 +149,15 @@ export class WorkflowsApi {
   }
 
   /** My requests: what the reader started. Under the task inbox, so a requester needs no other page to follow them. */
-  requests(): Observable<ApiResponse<RequestRow[]>> {
-    return this.http.get<ApiResponse<RequestRow[]>>(`${this.inbox}/requests`);
+  requests(page: InboxQuery = {}): Observable<InboxPage<RequestRow>> { return this.page<RequestRow>('requests', page); }
+
+  /** One page of an inbox list; only what is asked goes on the URL. */
+  private page<T>(list: 'mine' | 'groups' | 'done' | 'requests', page: InboxQuery): Observable<InboxPage<T>> {
+    const params: Record<string, string | number> = {};
+    if (page.cursor) params['cursor'] = page.cursor;
+    if (page.limit) params['limit'] = page.limit;
+    if (page.q?.trim()) params['q'] = page.q.trim();
+    return this.http.get<InboxPage<T>>(`${this.inbox}/${list}`, { params });
   }
 
   request(id: number): Observable<ApiResponse<RequestDetail>> {
