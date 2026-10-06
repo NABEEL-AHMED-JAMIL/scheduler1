@@ -8,7 +8,7 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadRoutes()" [disabled]="loading()">
+      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadRoutes(); loadWebhooks()" [disabled]="loading()">
         <app-icon name="refresh" [class.spin]="loading()" />Refresh
       </button>
       <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
@@ -123,6 +123,86 @@
                   <app-icon name="trash" />Remove
                 </button>
               }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+
+  <div class="flex items-center justify-between gap-2 mt-6 mb-2">
+    <div>
+      <h2 class="text-base font-semibold">Webhooks</h2>
+      <p class="text-sm text-[color:var(--text-muted)]">
+        Where the platform tells your systems what happened (a run started, finished or failed, a review, a file ready), as a
+        signed POST to a URL of yours.
+      </p>
+    </div>
+    @if (auth.canBuild()) {
+      <button type="button" class="btn btn-default btn-sm" (click)="openWebhook(null)" [disabled]="!eventTypes().length">
+        <app-icon name="plus" />New webhook
+      </button>
+    }
+  </div>
+  <app-managed-banner what="webhooks" still="You can still see what was sent and send a delivery again." />
+  <app-table-shell heading="Webhooks" [loading]="webhooksLoading()" [error]="webhooksError()"
+                   [isEmpty]="!webhooks().length" [shown]="webhooks().length"
+                   emptyMessage="No webhooks yet. Add one to be told when runs finish, fail or wait for your review."
+                   emptyIcon="send" (retry)="loadWebhooks()">
+    <table class="table-modern" data-webhooks>
+      <thead>
+        <tr>
+          <th>URL</th>
+          <th>Events</th>
+          <th>Last delivered</th>
+          <th class="text-right">State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (w of webhooks(); track w.id) {
+          <tr [class.opacity-70]="!w.active">
+            <td class="max-w-96">
+              <div class="mono text-sm truncate" [title]="w.url">{{ w.url }}</div>
+              <div class="text-xs text-[color:var(--text-muted)] truncate">
+                {{ w.createdBy ? 'Added by ' + w.createdBy : '' }}
+                @if (w.pausedReason) { <span [title]="w.pausedReason"> · {{ w.pausedReason }}</span> }
+              </div>
+            </td>
+            <td class="max-w-96">
+              <div class="flex flex-wrap gap-1">
+                @for (t of w.eventTypes; track t) { <span class="pill pill-neutral mono">{{ t }}</span> }
+              </div>
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+              {{ w.lastSuccessAt ? (w.lastSuccessAt | serverTime: 'dateTime') : 'Never' }}
+              @if (w.failingSince) {
+                <div class="text-xs text-[color:var(--color-warn-600)]">failing since {{ w.failingSince | serverTime: 'dateTime' }}</div>
+              }
+            </td>
+            <td class="text-right"><span [class]="webhookPill(w)">{{ webhookState(w) }}</span></td>
+            <td class="text-right">
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="webhookMenu"
+                      [attr.aria-label]="'Actions for the webhook to ' + w.url" [disabled]="webhookBusy() === w.id">
+                <app-icon name="dots" size="1em" [busy]="webhookBusy() === w.id" />
+              </button>
+              <ng-template #webhookMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openDeliveries(w)"><app-icon name="list" />Deliveries</button>
+                  @if (auth.canBuild()) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openWebhook(w)"><app-icon name="edit" />Change</button>
+                    @if (w.active) {
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setWebhookActive(w, false)"><app-icon name="pause" />Pause</button>
+                    } @else {
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setWebhookActive(w, true)"><app-icon name="play" />Resume</button>
+                    }
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotateWebhook(w)"><app-icon name="refresh" />New secret</button>
+                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWebhook(w)">
+                      <app-icon name="trash" class="icon-crit" />Remove
+                    </button>
+                  }
+                </div>
+              </ng-template>
             </td>
           </tr>
         }

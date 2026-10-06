@@ -62,15 +62,72 @@ export interface EventRouteInput {
 
 export interface RouteTarget { jobId: number; name: string }
 
+/** MIG-333: an event type of the catalogue a webhook may subscribe to. */
+export interface EventTypeRow { type: string; description: string }
+
+/** MIG-333: a webhook subscription, as integration-service lists it: never its secret. Times are UTC instants. */
+export interface WebhookRow {
+  id: string;
+  url: string;
+  eventTypes: string[];
+  active: boolean;
+  pausedReason: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  failingSince: string | null;
+  lastSuccessAt: string | null;
+  secretRotatedAt: string | null;
+  previousSecretValidUntil: string | null;
+  tenantId: number;
+  createdBy: string | null;
+}
+
+/** A webhook as made or rotated: its secret, once. */
+export interface WebhookWithSecret extends WebhookRow { secret: string }
+
+export interface WebhookInput {
+  webhookId?: string | null;
+  url?: string;
+  eventTypes?: string[];
+  active?: boolean;
+}
+
+/** One event sent (or being sent) to one webhook. */
+export interface DeliveryRow {
+  id: string;
+  eventId: string;
+  eventType: string;
+  attempt: number;
+  status: 'pending' | 'retrying' | 'delivered' | 'failed';
+  responseStatus: number | null;
+  durationMs: number | null;
+  nextAttemptAt: string | null;
+  createdAt: string | null;
+  lastAttemptAt: string | null;
+  deliveredAt: string | null;
+  error: string | null;
+  redeliveryOf: string | null;
+}
+
+export interface AttemptRow {
+  attempt: number;
+  at: string | null;
+  outcome: 'delivered' | 'failed' | 'blocked';
+  responseStatus: number | null;
+  durationMs: number | null;
+  error: string | null;
+}
+
 /**
  * MIG-332: the customer API's API clients (identity-service, apiClient.json) and event routes (Core, eventRoute.json),
- * a workspace administrator's.
+ * a workspace administrator's; MIG-333: its webhooks and their deliveries (integration-service, webhook.json).
  */
 @Injectable({ providedIn: 'root' })
 export class ApiClientsApi {
   private readonly http = inject(HttpClient);
   private readonly clients = `${API_BASE}/apiClient.json`;
   private readonly routes = `${API_BASE}/eventRoute.json`;
+  private readonly webhooks = `${API_BASE}/webhook.json`;
 
   scopes(): Observable<ApiResponse<ScopeRow[]>> {
     return this.http.get<ApiResponse<ScopeRow[]>>(`${this.clients}/scopes`);
@@ -110,5 +167,44 @@ export class ApiClientsApi {
 
   deleteRoute(routeId: number): Observable<ApiResponse> {
     return this.http.post<ApiResponse>(`${this.routes}/delete`, { routeId });
+  }
+
+  eventTypes(): Observable<ApiResponse<EventTypeRow[]>> {
+    return this.http.get<ApiResponse<EventTypeRow[]>>(`${this.webhooks}/eventTypes`);
+  }
+
+  webhookList(): Observable<ApiResponse<WebhookRow[]>> {
+    return this.http.get<ApiResponse<WebhookRow[]>>(`${this.webhooks}/list`);
+  }
+
+  createWebhook(input: WebhookInput): Observable<ApiResponse<WebhookWithSecret>> {
+    return this.http.post<ApiResponse<WebhookWithSecret>>(`${this.webhooks}/create`, input);
+  }
+
+  updateWebhook(input: WebhookInput): Observable<ApiResponse<WebhookRow>> {
+    return this.http.post<ApiResponse<WebhookRow>>(`${this.webhooks}/update`, input);
+  }
+
+  deleteWebhook(webhookId: string): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.webhooks}/delete`, { webhookId });
+  }
+
+  rotateWebhookSecret(webhookId: string): Observable<ApiResponse<WebhookWithSecret>> {
+    return this.http.post<ApiResponse<WebhookWithSecret>>(`${this.webhooks}/rotateSecret`, { webhookId });
+  }
+
+  /** Newest first; `before` is the last id of the page shown. */
+  deliveries(webhookId: string, before?: string | null, limit = 50): Observable<ApiResponse<DeliveryRow[]>> {
+    const params: Record<string, string> = { webhookId, limit: String(limit) };
+    if (before) params['before'] = before;
+    return this.http.get<ApiResponse<DeliveryRow[]>>(`${this.webhooks}/deliveries`, { params });
+  }
+
+  attempts(webhookId: string, deliveryId: string): Observable<ApiResponse<AttemptRow[]>> {
+    return this.http.get<ApiResponse<AttemptRow[]>>(`${this.webhooks}/attempts`, { params: { webhookId, deliveryId } });
+  }
+
+  redeliver(webhookId: string, deliveryId: string): Observable<ApiResponse<DeliveryRow>> {
+    return this.http.post<ApiResponse<DeliveryRow>>(`${this.webhooks}/redeliver`, { webhookId, deliveryId });
   }
 }

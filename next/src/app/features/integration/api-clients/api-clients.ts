@@ -9,16 +9,24 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
-import { ApiClientRow, ApiClientWithSecret, ApiClientsApi, EventRouteRow, RouteTarget, ScopeRow } from './api-clients.api';
+import {
+  ApiClientRow, ApiClientWithSecret, ApiClientsApi, EventRouteRow, EventTypeRow, RouteTarget, ScopeRow, WebhookRow, WebhookWithSecret,
+} from './api-clients.api';
 import { ClientDialog, ClientDialogData, ClientDialogResult } from './client-dialog';
+import { DeliveriesDialog, DeliveriesDialogData } from './deliveries-dialog';
 import { RouteDialog, RouteDialogData } from './route-dialog';
 import { SecretDialog, SecretDialogData } from './secret-dialog';
+import { WebhookDialog, WebhookDialogData, WebhookDialogResult } from './webhook-dialog';
+import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-dialog';
 
 /**
  * MIG-332: Integration › API Clients (workspace administrators). The workspace's API clients for the customer API --
  * the machine identities its own systems (a portal, a partner's sync) use -- each with its scopes, IP allowlist and last
  * day; New, Change, Rotate secret and Revoke. The secret is shown once. Below, the event routes: which pipeline or
  * workflow each of the organisation's event types starts (POST /v1/events); in a MANAGED workspace our team sets them.
+ * MIG-333: then the webhooks -- where the platform tells the organisation's systems what happened (the event catalogue's
+ * types), each signed with a secret shown once -- with New, Change, Pause/Resume, New secret and Remove (our team's in a
+ * MANAGED workspace), and each webhook's deliveries, their attempts and Send again (the customer's in either mode).
  */
 @Component({
   selector: 'app-api-clients',
@@ -47,9 +55,16 @@ export class ApiClients implements OnInit {
   readonly routesError = signal('');
   readonly routeBusy = signal<number | null>(null);
 
+  readonly webhooks = signal<WebhookRow[]>([]);
+  readonly eventTypes = signal<EventTypeRow[]>([]);
+  readonly webhooksLoading = signal(true);
+  readonly webhooksError = signal('');
+  readonly webhookBusy = signal<string | null>(null);
+
   ngOnInit(): void {
     this.load();
     this.loadRoutes();
+    this.loadWebhooks();
     this.api.scopes().subscribe({
       next: r => this.scopes.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.scopes.set([]),
@@ -192,6 +207,128 @@ export class ApiClients implements OnInit {
         }
       },
       error: err => { this.routeBusy.set(null); this.toast.error(err?.error?.message || 'The route could not be removed.'); },
+    });
+  }
+
+  // ------------------------------------------------------------------------------------------------ webhooks (MIG-333)
+
+  loadWebhooks(): void {
+    this.webhooksLoading.set(true);
+    this.webhooksError.set('');
+    this.api.webhookList().subscribe({
+      next: r => {
+        this.webhooksLoading.set(false);
+        if (r.status === API_SUCCESS) this.webhooks.set(r.data ?? []);
+        else this.webhooksError.set(r.message || 'The webhooks could not be read.');
+      },
+      error: err => {
+        this.webhooksLoading.set(false);
+        this.webhooksError.set(err?.error?.message || 'The webhooks could not be read.');
+      },
+    });
+    this.api.eventTypes().subscribe({
+      next: r => this.eventTypes.set(r.status === API_SUCCESS ? r.data ?? [] : []),
+      error: () => this.eventTypes.set([]),
+    });
+  }
+
+  webhookState(w: WebhookRow): string {
+    return w.active ? (w.failingSince ? 'Failing' : 'Active') : 'Paused';
+  }
+
+  webhookPill(w: WebhookRow): string {
+    return !w.active ? 'pill pill-neutral' : w.failingSince ? 'pill pill-warn' : 'pill pill-ok';
+  }
+
+  openWebhook(webhook: WebhookRow | null): void {
+    const data: WebhookDialogData = { eventTypes: this.eventTypes(), webhook };
+    this.dialog.open<WebhookDialogResult>(WebhookDialog, { data, hasBackdrop: true }).closed.subscribe(result => {
+      if (!result) return;
+      this.loadWebhooks();
+      if ('made' in result) this.showWebhookSecret(result.made, false);
+    });
+  }
+
+  openDeliveries(webhook: WebhookRow): void {
+    const data: DeliveriesDialogData = { webhook };
+    this.dialog.open<boolean>(DeliveriesDialog, { data, hasBackdrop: true }).closed.subscribe(sent => {
+      if (sent) this.loadWebhooks();
+    });
+  }
+
+  private showWebhookSecret(webhook: WebhookWithSecret, rotated: boolean): void {
+    const data: WebhookSecretDialogData = { url: webhook.url, secret: webhook.secret, rotated };
+    this.dialog.open(WebhookSecretDialog, { data, hasBackdrop: true, disableClose: true });
+  }
+
+  async setWebhookActive(webhook: WebhookRow, active: boolean): Promise<void> {
+    if (!active) {
+      const ok = await confirmWith(this.dialog, {
+        title: 'Pause this webhook?',
+        body: `Nothing more is sent to ${webhook.url} until it is resumed, and what is still waiting to be sent is dropped.`,
+        confirmLabel: 'Pause',
+        danger: true,
+      });
+      if (!ok) return;
+    }
+    this.webhookBusy.set(webhook.id);
+    this.api.updateWebhook({ webhookId: webhook.id, active }).subscribe({
+      next: r => {
+        this.webhookBusy.set(null);
+        if (r.status === API_SUCCESS) {
+          this.toast.success(active ? 'Webhook resumed: new events are sent to it.' : 'Webhook paused.');
+          this.loadWebhooks();
+        } else {
+          this.toast.error(r.message || 'The webhook could not be changed.');
+        }
+      },
+      error: err => { this.webhookBusy.set(null); this.toast.error(err?.error?.message || 'The webhook could not be changed.'); },
+    });
+  }
+
+  async rotateWebhook(webhook: WebhookRow): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: 'New signing secret?',
+      body: 'Requests are signed with the new secret from now on, and with the old one too for 24 hours, so your receiver can '
+        + 'switch over.',
+      confirmLabel: 'Make a new secret',
+    });
+    if (!ok) return;
+    this.webhookBusy.set(webhook.id);
+    this.api.rotateWebhookSecret(webhook.id).subscribe({
+      next: r => {
+        this.webhookBusy.set(null);
+        if (r.status === API_SUCCESS && r.data) {
+          this.loadWebhooks();
+          this.showWebhookSecret(r.data, true);
+        } else {
+          this.toast.error(r.message || 'The secret could not be changed.');
+        }
+      },
+      error: err => { this.webhookBusy.set(null); this.toast.error(err?.error?.message || 'The secret could not be changed.'); },
+    });
+  }
+
+  async removeWebhook(webhook: WebhookRow): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: 'Remove this webhook?',
+      body: `Nothing more is sent to ${webhook.url}. Its delivery log goes with it.`,
+      confirmLabel: 'Remove',
+      danger: true,
+    });
+    if (!ok) return;
+    this.webhookBusy.set(webhook.id);
+    this.api.deleteWebhook(webhook.id).subscribe({
+      next: r => {
+        this.webhookBusy.set(null);
+        if (r.status === API_SUCCESS) {
+          this.toast.success(r.message || 'Webhook removed.');
+          this.loadWebhooks();
+        } else {
+          this.toast.error(r.message || 'The webhook could not be removed.');
+        }
+      },
+      error: err => { this.webhookBusy.set(null); this.toast.error(err?.error?.message || 'The webhook could not be removed.'); },
     });
   }
 }
