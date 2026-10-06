@@ -403,7 +403,7 @@
               <span class="pill pill-warn designer-foot-chip"><app-icon name="edit" size="0.9em" />Unpublished changes</span>
               <div class="designer-foot-note">
                 <label class="sr-only" for="wf-note">What changed</label>
-                <input id="wf-note" class="input input-sm" maxlength="500" placeholder="What changed: a note for the version history (optional)" [ngModel]="note()" (ngModelChange)="note.set($event)" data-test="publish-note" />
+                <input id="wf-note" class="input input-sm" maxlength="500" placeholder="What changed (optional, for the version history)" [ngModel]="note()" (ngModelChange)="note.set($event)" data-test="publish-note" />
               </div>
               <button type="button" class="btn btn-ghost btn-sm" (click)="discard()" data-test="discard">Discard changes</button>
             } @else {

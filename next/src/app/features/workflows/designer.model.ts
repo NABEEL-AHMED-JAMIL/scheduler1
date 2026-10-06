@@ -44,7 +44,7 @@ export type StepTone = 'ok' | 'info' | 'warn' | 'brand' | 'neutral';
 export const STEP_TYPES: { type: StepType; label: string; icon: string; hint: string; tone: StepTone }[] = [
   { type: 'approval', label: 'Approval', icon: 'checkCircle', hint: 'Someone approves, rejects or asks for changes', tone: 'ok' },
   { type: 'task', label: 'Task', icon: 'list', hint: 'Someone does a piece of work and marks it done', tone: 'info' },
-  { type: 'condition', label: 'Condition', icon: 'selector', hint: 'Goes one of two ways on the request\'s fields', tone: 'warn' },
+  { type: 'condition', label: 'Condition', icon: 'filter', hint: 'Goes one of two ways on the request\'s fields', tone: 'warn' },
   { type: 'notify', label: 'Notify', icon: 'bell', hint: 'Tells someone, and goes on', tone: 'brand' },
   { type: 'run_pipeline', label: 'Run pipeline', icon: 'play', hint: 'Starts a schedule\'s run', tone: 'info' },
   { type: 'save_dataset', label: 'Save to dataset', icon: 'database', hint: 'Keeps the request as a row', tone: 'neutral' },
