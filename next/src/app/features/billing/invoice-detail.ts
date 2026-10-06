@@ -14,7 +14,8 @@ import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
 import { DOC_VIEW_TITLE_ID, DocumentViewDialog } from './document-view-dialog';
-import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
+import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
+import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -37,6 +38,9 @@ export class InvoicePane implements OnDestroy {
   /** MIG-214: a blob that arrives after this is gone would make a URL nothing releases. */
   private readonly destroyRef = inject(DestroyRef);
   private readonly api = inject(BillingApi);
+  private readonly apiClients = inject(ApiClientsApi);
+  /** MIG-337: the invoice's workspace's API clients by id, for the "by client" lines; empty when they cannot be read. */
+  readonly clientNames = signal<Record<string, string>>({});
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
@@ -136,6 +140,7 @@ export class InvoicePane implements OnDestroy {
           documents: d.documents ?? [], payments: d.payments ?? [],
           lines: (d.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), amount: Number(l.amount) })) });
         if (!this.payAmount()) this.payAmount.set(String(Number(d.balance).toFixed(2)));
+        if ((d.lines ?? []).some(l => !!l.breakdown)) this.loadClientNames(d.tenantId);
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the invoice.'); },
     });
@@ -167,6 +172,29 @@ export class InvoicePane implements OnDestroy {
     catch { return []; }
   }
   quantity(l: { quantity: number; unit?: string }): string { return formatQuantity(Number(l.quantity), l.unit); }
+  /** MIG-337: who used a line's meter -- each API client's calls, each webhook's deliveries -- as the draft froze it. */
+  subjects(l: InvoiceLine): LineSubject[] {
+    if (!l.breakdown) return [];
+    try { return (JSON.parse(l.breakdown) as LineSubject[]).map(x => ({ ...x, quantity: Number(x.quantity) })); }
+    catch { return []; }
+  }
+  subjectName(x: LineSubject): string {
+    if (x.subjectType === 'others') return 'Others';
+    if (x.subjectType === 'api_client') return this.clientNames()[x.subjectId ?? ''] ?? `API client ${x.subjectId}`;
+    if (x.subjectType === 'webhook') return `Webhook ${x.subjectId}`;
+    return x.subjectId ?? '—';
+  }
+  private loadClientNames(tenantId: number): void {
+    // A platform administrator names the workspace; a workspace administrator reads their own whatever is named.
+    this.apiClients.listOf(this.auth.isPlatformAdmin() ? tenantId : null).subscribe({
+      next: r => {
+        const names: Record<string, string> = {};
+        if (r.status === API_SUCCESS) (r.data ?? []).forEach(c => names[c.clientId] = c.name);
+        this.clientNames.set(names);
+      },
+      error: () => this.clientNames.set({}),
+    });
+  }
   overdueDays(): number { return daysOverdue(this.invoice()?.dueAt); }
 
   // ---- documents ----

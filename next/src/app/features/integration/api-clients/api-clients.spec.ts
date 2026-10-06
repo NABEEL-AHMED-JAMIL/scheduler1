@@ -37,10 +37,18 @@ const WEBHOOKS = [
     previousSecretValidUntil: null, tenantId: 2946, createdBy: 'API client cl_portal' },
 ];
 const MADE_HOOK = { ...WEBHOOKS[0], id: '1002', secret: 'whsec_shown-once' };
+// MIG-337: the workspace's limits and this month's calls; the first client's own limit and calls.
+const LIMITS = { tenantId: 2946, bounds: { clientRateMax: 600, clientBurstMax: 100, workspaceRate: 1200, workspaceBurst: 200, monthlyCalls: 10000 },
+  defaults: { clientRateMax: 600, clientBurstMax: 100, workspaceRate: 1200, workspaceBurst: 200, monthlyCalls: null }, custom: true,
+  month: '2026-10', monthEndsAt: '2026-11-01T00:00:00Z', callsThisMonth: 8500, quotaUsedPercent: 85, quotaWarning: true, updatedAt: null,
+  updatedBy: null };
+Object.assign(CLIENTS[0], { ratePerMinute: 6, burst: 2, limit: { ratePerMinute: 6, burst: 2, capped: false }, callsThisMonth: 812 });
+Object.assign(CLIENTS[1], { ratePerMinute: null, burst: null, limit: { ratePerMinute: 600, burst: 100, capped: false }, callsThisMonth: 0 });
 
 function setup(options: { confirm?: boolean; locked?: boolean } = {}) {
   const api = {
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: CLIENTS })),
+    limits: vi.fn(() => of({ status: 'SUCCESS', message: '', data: LIMITS })),
     scopes: vi.fn(() => of({ status: 'SUCCESS', message: '', data: SCOPES })),
     routesList: vi.fn(() => of({ status: 'SUCCESS', message: '', data: ROUTES })),
     routeTargets: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { pipelines: [{ jobId: 42, name: 'Orders' }] } })),
@@ -138,6 +146,93 @@ describe('MIG-332: Integration › API Clients', () => {
   it('a last day is the server\'s own wall-clock day', () => {
     expect(dayOf('2026-12-31T23:59:59')).toBe('2026-12-31');
     expect(dayOf(null)).toBe('');
+  });
+});
+
+describe('MIG-337: limits and usage on Integration › API Clients', () => {
+  it('shows each client\'s limit and calls this month, and the workspace\'s limits and quota with its warning', () => {
+    const { fixture, page } = setup();
+    page.showRevoked.set(true);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const limits = el.querySelectorAll('[data-client-limit]');
+    expect(limits[0].textContent).toContain('6 a minute · burst 2');
+    expect(limits[1].textContent).toContain('600 a minute · burst 100');
+    expect(limits[1].textContent).toContain('the workspace\'s most');
+    expect(el.querySelectorAll('[data-client-calls]')[0].textContent!.trim()).toBe('812');
+    const strip = el.querySelector('[data-api-limits]')!.textContent ?? '';
+    expect(strip).toContain('at most 600 calls a minute · burst 100');
+    expect(strip).toContain('1,200 calls a minute');
+    expect(strip).toContain('8,500 of 10,000 calls (85%)');
+    expect(strip).toContain('Nearly used up');
+  });
+
+  it('Change hands the dialog the workspace\'s bounds, and a customer in a MANAGED workspace cannot set a limit', () => {
+    let { page, opened } = setup();
+    page.openClient(CLIENTS[0] as any);
+    expect(opened[0].data.bounds).toEqual(LIMITS.bounds);
+    expect(opened[0].data.canSetLimits).toBe(true);
+    ({ page, opened } = setup({ locked: true }));
+    page.openClient(CLIENTS[0] as any);
+    expect(opened[0].data.canSetLimits).toBe(false);
+  });
+
+  it('a count that cannot be read shows a dash, not 0', () => {
+    const { fixture, page } = setup();
+    page.clients.set([{ ...CLIENTS[0], callsThisMonth: null } as any]);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-client-calls]')!.textContent!.trim()).toBe('—');
+  });
+});
+
+describe('MIG-337: a client\'s own limit in the client dialog', () => {
+  function dialog(data: Record<string, unknown>) {
+    const api = {
+      create: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MADE })),
+      update: vi.fn(() => of({ status: 'SUCCESS', message: 'Saved.', data: CLIENTS[0] })),
+    };
+    const ref = { close: vi.fn() };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      provideZonelessChangeDetection(),
+      { provide: DIALOG_DATA, useValue: { scopes: SCOPES, bounds: LIMITS.bounds, ...data } },
+      { provide: DialogRef, useValue: ref },
+      { provide: ApiClientsApi, useValue: api },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+    ] });
+    const fixture = TestBed.createComponent(ClientDialog);
+    fixture.detectChanges();
+    return { fixture, d: fixture.componentInstance, api, ref };
+  }
+
+  it('sends a limit only when it changed, 0 for the workspace\'s bound, and refuses one above the bound', () => {
+    const { d, api } = dialog({ client: CLIENTS[0], canSetLimits: true });
+    expect(d.rate()).toBe('6');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }));
+    d.rate.set('');
+    d.burst.set('50');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: CLIENTS[0].clientId, ratePerMinute: 0, burst: 50 }));
+    d.rate.set('601');
+    expect(d.ready()).toBe(false);
+    d.rate.set('6.5');
+    expect(d.ready()).toBe(false);
+  });
+
+  it('a new client may start with a limit; a customer of a MANAGED workspace sends none and sees the fields locked', () => {
+    let { d, api, fixture } = dialog({ canSetLimits: true });
+    d.name.set('Tiny portal');
+    d.toggle('pipelines:read');
+    d.rate.set('6');
+    d.save();
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Tiny portal', ratePerMinute: 6 }));
+    ({ d, api, fixture } = dialog({ client: CLIENTS[0], canSetLimits: false }));
+    expect((fixture.nativeElement.querySelector('#clientRate') as HTMLInputElement).disabled).toBe(true);
+    expect(fixture.nativeElement.textContent).toContain('Our team sets this workspace\'s API limits.');
+    d.rate.set('30');
+    d.save();
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }));
   });
 });
 

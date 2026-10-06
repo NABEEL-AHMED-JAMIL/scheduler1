@@ -9,6 +9,7 @@ import { BillingApi } from './billing.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 
 /** One invoice in the pane: what is paid, what is open, the story in order, and who may do what. */
 const DETAIL = {
@@ -29,7 +30,7 @@ const DETAIL = {
 @Component({ imports: [InvoicePane], template: `<app-invoice-pane [number]="number" (changed)="changes = changes + 1" />` })
 class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) pane!: InvoicePane; }
 
-function page(platformAdmin: boolean, detail: object = DETAIL) {
+function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [] })) }) {
   // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
   const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))) };
@@ -38,6 +39,7 @@ function page(platformAdmin: boolean, detail: object = DETAIL) {
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
     // Every dialog answers yes: verify and void are asked first now, in the app's own dialog.
     { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+    { provide: ApiClientsApi, useValue: clients },
   ] });
   const fixture = TestBed.createComponent(Host);
   fixture.detectChanges();
@@ -46,6 +48,19 @@ function page(platformAdmin: boolean, detail: object = DETAIL) {
 }
 
 describe('InvoicePane', () => {
+  it('MIG-337: an API line says which client made the calls, by name, and the others by id', () => {
+    const lines = [{ invoiceLineId: 9, sort: 0, meter: 'api.calls', description: 'API calls', quantity: '852', unit: 'call', per: 1000, unitPrice: '0.1',
+      amount: '0.0852', manual: false, breakdown: '[{"subjectType":"api_client","subjectId":"cl_portal","quantity":"812"},'
+        + '{"subjectType":"api_client","subjectId":"cl_gone","quantity":"40"}]' }];
+    const clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [{ clientId: 'cl_portal', name: 'Order portal' }] })) };
+    const { component, fixture } = page(true, { ...DETAIL, lines }, clients as any);
+    expect(clients.listOf).toHaveBeenCalledWith(2905);
+    fixture.detectChanges();
+    const said = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-line-subject]')).map(e => e.textContent!.trim());
+    expect(said).toEqual(['Order portal: 812', 'API client cl_gone: 40']);
+    expect(component.subjects(component.invoice()!.lines[0])[0].quantity).toBe(812);
+  });
+
   it('reads the invoice, sums verified payments only, and tells the story in order', () => {
     const { component, api } = page(false);
     expect(api.invoice).toHaveBeenCalledWith('INV-2026-08-0006');

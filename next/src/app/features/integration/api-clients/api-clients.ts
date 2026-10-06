@@ -10,7 +10,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import {
-  ApiClientRow, ApiClientWithSecret, ApiClientsApi, EventRouteRow, EventTypeRow, RouteTarget, ScopeRow, WebhookRow, WebhookWithSecret,
+  ApiClientRow, ApiClientWithSecret, ApiClientsApi, ApiLimitsRow, EventRouteRow, EventTypeRow, RouteTarget, ScopeRow, WebhookRow,
+  WebhookWithSecret,
 } from './api-clients.api';
 import { ClientDialog, ClientDialogData, ClientDialogResult } from './client-dialog';
 import { DeliveriesDialog, DeliveriesDialogData } from './deliveries-dialog';
@@ -27,6 +28,8 @@ import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-d
  * MIG-333: then the webhooks -- where the platform tells the organisation's systems what happened (the event catalogue's
  * types), each signed with a secret shown once -- with New, Change, Pause/Resume, New secret and Remove (our team's in a
  * MANAGED workspace), and each webhook's deliveries, their attempts and Send again (the customer's in either mode).
+ * MIG-337: each client's limit and calls this month, and the workspace's limits and monthly quota above the list; a client's
+ * own limit is set in Change (our team's in a MANAGED workspace), the workspace's bounds in Administration › Tenants.
  */
 @Component({
   selector: 'app-api-clients',
@@ -61,6 +64,9 @@ export class ApiClients implements OnInit {
   readonly webhooksError = signal('');
   readonly webhookBusy = signal<string | null>(null);
 
+  /** MIG-337: the workspace's API limits and this month's calls; null until read (or when they cannot be). */
+  readonly limits = signal<ApiLimitsRow | null>(null);
+
   ngOnInit(): void {
     this.load();
     this.loadRoutes();
@@ -74,6 +80,10 @@ export class ApiClients implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
+    this.api.limits().subscribe({
+      next: r => this.limits.set(r.status === API_SUCCESS ? r.data ?? null : null),
+      error: () => this.limits.set(null),
+    });
     this.api.list().subscribe({
       next: r => {
         this.loading.set(false);
@@ -107,6 +117,20 @@ export class ApiClients implements OnInit {
     });
   }
 
+  /** "600 a minute · burst 100", with "(the workspace's most)" when the client has no limit of its own. */
+  limitOf(client: ApiClientRow): string {
+    if (!client.limit) return '—';
+    return `${client.limit.ratePerMinute.toLocaleString()} a minute · burst ${client.limit.burst.toLocaleString()}`;
+  }
+
+  /** The quota line: "812 of 10,000 calls (8%)", or "812 calls" with no quota. */
+  quotaLine(limits: ApiLimitsRow): string {
+    const used = limits.callsThisMonth == null ? '—' : limits.callsThisMonth.toLocaleString();
+    if (limits.bounds.monthlyCalls == null) return `${used} calls, no monthly quota`;
+    const pct = limits.quotaUsedPercent == null ? '' : ` (${limits.quotaUsedPercent}%)`;
+    return `${used} of ${limits.bounds.monthlyCalls.toLocaleString()} calls${pct}`;
+  }
+
   statusPill(client: ApiClientRow): string {
     return client.status === 'Active' ? 'pill pill-ok' : client.status === 'Expired' ? 'pill pill-warn' : 'pill pill-neutral';
   }
@@ -116,7 +140,7 @@ export class ApiClients implements OnInit {
   }
 
   openClient(client: ApiClientRow | null): void {
-    const data: ClientDialogData = { scopes: this.scopes(), client };
+    const data: ClientDialogData = { scopes: this.scopes(), client, bounds: this.limits()?.bounds ?? null, canSetLimits: this.auth.canBuild() };
     this.dialog.open<ClientDialogResult>(ClientDialog, { data, hasBackdrop: true }).closed.subscribe(result => {
       if (!result) return;
       this.load();

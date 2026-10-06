@@ -173,6 +173,9 @@
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTenant(tenant)">
                       <app-icon name="edit" />Edit
                     </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="apiLimits(tenant)">
+                      <app-icon name="zap" />API limits
+                    </button>
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="switchMode(tenant)">
                       <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
                     </button>
@@ -285,6 +288,9 @@
             </button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="editTenant(tenant)">
               <app-icon name="edit" />Edit
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="apiLimits(tenant)" title="Rate limits and the monthly quota of its API clients">
+              <app-icon name="zap" />API limits
             </button>
             <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="switchMode(tenant)"
                     [title]="tenant.managementMode === 'MANAGED' ? 'Let its own administrators build it (signs its people out)' : 'Our team builds it (signs its people out)'">

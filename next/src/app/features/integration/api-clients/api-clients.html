@@ -17,6 +17,30 @@
     </div>
   </div>
 
+  @if (limits(); as l) {
+    <div class="card p-4 mb-3 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm" data-api-limits>
+      <div>
+        <div class="text-xs text-[color:var(--text-muted)]">Each client</div>
+        <div>at most {{ l.bounds.clientRateMax.toLocaleString() }} calls a minute · burst {{ l.bounds.clientBurstMax.toLocaleString() }}</div>
+      </div>
+      <div>
+        <div class="text-xs text-[color:var(--text-muted)]">All clients together</div>
+        <div>{{ l.bounds.workspaceRate.toLocaleString() }} calls a minute · burst {{ l.bounds.workspaceBurst.toLocaleString() }}</div>
+      </div>
+      <div>
+        <div class="text-xs text-[color:var(--text-muted)]">This month{{ l.month ? ' (' + l.month + ', UTC)' : '' }}</div>
+        <div [class]="l.quotaWarning ? 'text-[color:var(--color-warn-600)]' : ''" data-api-quota>
+          {{ quotaLine(l) }}
+          @if (l.quotaWarning) { <span class="pill pill-warn ml-1">{{ (l.quotaUsedPercent ?? 0) >= 100 ? 'Quota used up' : 'Nearly used up' }}</span> }
+        </div>
+      </div>
+      <p class="text-xs text-[color:var(--text-muted)] basis-full">
+        Past a limit the API answers 429 with Retry-After. API calls are billed per 1,000 (Billing › Cost &amp; usage). Our team sets these
+        limits; ask your account team to change them.
+      </p>
+    </div>
+  }
+
   <app-table-shell heading="API clients" [loading]="loading()" [error]="error()"
                    [isEmpty]="!shown().length" [shown]="shown().length"
                    [emptyMessage]="clients().length ? 'Every client here is revoked.' : 'No API clients yet. Make one for each system that calls the API.'"
@@ -35,6 +59,8 @@
           <th>Client</th>
           <th>Scopes</th>
           <th>Allowed from</th>
+          <th>Limit</th>
+          <th class="text-right">Calls this month</th>
           <th>Last used</th>
           <th>Last day</th>
           <th class="text-right">State</th>
@@ -54,6 +80,12 @@
               </div>
             </td>
             <td class="text-sm text-[color:var(--text-secondary)]">{{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}</td>
+            <td class="text-sm text-[color:var(--text-secondary)] whitespace-nowrap" data-client-limit>
+              {{ limitOf(c) }}
+              @if (c.ratePerMinute == null && c.burst == null) { <div class="text-xs text-[color:var(--text-muted)]">the workspace's most</div> }
+              @if (c.limit?.capped) { <div class="text-xs text-[color:var(--color-warn-600)]">capped by the workspace's limit</div> }
+            </td>
+            <td class="text-right tabular-nums" data-client-calls>{{ c.callsThisMonth == null ? '—' : c.callsThisMonth.toLocaleString() }}</td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ c.lastUsedAt ? (c.lastUsedAt | serverTime: 'dateTime') : 'Never' }}
             </td>

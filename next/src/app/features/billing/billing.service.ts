@@ -20,7 +20,11 @@ export interface InvoiceLine {
   unitPrice: number; amount: number; periodLabel?: string; manual: boolean;
   /** What the calculation applied when the line was frozen: the allowance and, as JSON, the tier bands. */
   includedQuantity?: number | null; billableQuantity?: number | null; pricingDetail?: string | null;
+  /** MIG-337: who used the line's meter, as JSON [{subjectType, subjectId, quantity}] -- an API client's calls, a webhook's deliveries. */
+  breakdown?: string | null;
 }
+/** One subject of a line's breakdown (MIG-337). */
+export interface LineSubject { subjectType: string; subjectId: string | null; quantity: number }
 /** One band of a graduated price: units from `from` (to the next band's `from`) cost `unit_price` per `per`. */
 export interface RateTier { from: number; unit_price: number; }
 /** A tier band as it was applied to a period's quantity. */

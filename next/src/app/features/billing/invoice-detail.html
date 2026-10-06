@@ -135,6 +135,7 @@
                   <td>{{ l.description }}@if (l.periodLabel) { <span class="pill pill-neutral ml-1">{{ l.periodLabel }}</span> }@if (l.manual) { <span class="pill pill-neutral ml-1">Manual</span> }
                     @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }
                     @if (l.includedQuantity) { <div class="text-[11px] text-[color:var(--text-muted)]">Includes {{ quantity({ quantity: l.includedQuantity, unit: l.unit }) }} at no charge · {{ quantity({ quantity: l.billableQuantity ?? l.quantity, unit: l.unit }) }} billable</div> }
+                    @for (x of subjects(l); track $index) { <div class="text-[11px] text-[color:var(--text-muted)]" data-line-subject>{{ subjectName(x) }}: {{ quantity({ quantity: x.quantity, unit: l.unit }) }}</div> }
                     @for (t of tiers(l); track t.from) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ quantity({ quantity: t.units, unit: l.unit }) }} from {{ quantity({ quantity: t.from, unit: l.unit }) }}{{ t.to === null ? ' up' : ' to ' + quantity({ quantity: t.to, unit: l.unit }) }} at {{ rate({ unitPrice: t.unit_price, per: l.per, unit: l.unit }) }}</div> }</td>
                   <td class="text-right tabular">{{ quantity(l) }}</td>
                   <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ rate(l) }}</td>

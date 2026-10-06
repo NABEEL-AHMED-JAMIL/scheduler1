@@ -20,6 +20,7 @@ import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { TenantDialog } from './tenant-dialog';
+import { ApiLimitsDialog, ApiLimitsDialogData } from './api-limits-dialog';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagementMode } from '../../../core/auth/auth.models';
 
@@ -254,6 +255,12 @@ export class Tenants implements OnInit {
     this.dialog.open<boolean>(TenantDialog, { data: { tenant } }).closed.subscribe(saved => {
       if (saved) this.listTenants();
     });
+  }
+
+  /** MIG-337: the workspace's bounds for the customer API -- the most a client may have, the ceiling, the monthly quota. */
+  apiLimits(tenant: Tenant): void {
+    const data: ApiLimitsDialogData = { tenantId: tenant.tenantId, tenantName: tenant.tenantName };
+    this.dialog.open<boolean>(ApiLimitsDialog, { data, hasBackdrop: true });
   }
 
   viewUsers(tenant: Tenant): void {

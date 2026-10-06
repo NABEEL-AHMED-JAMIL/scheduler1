@@ -18,6 +18,46 @@ export interface ApiClientRow {
   revokedAt: string | null;
   lastUsedAt: string | null;
   lastUsedIp: string | null;
+  /** MIG-337: the client's own limit (null: the workspace's bound), the limit in force, and this month's calls (UTC month). */
+  ratePerMinute?: number | null;
+  burst?: number | null;
+  limit?: { ratePerMinute: number; burst: number; capped: boolean } | null;
+  /** Null when the count cannot be read just now. */
+  callsThisMonth?: number | null;
+}
+
+/** MIG-337: a workspace's API bounds (the platform administrator's) and this month's calls against its quota. */
+export interface ApiLimitBounds {
+  clientRateMax: number;
+  clientBurstMax: number;
+  workspaceRate: number;
+  workspaceBurst: number;
+  monthlyCalls: number | null;
+}
+
+export interface ApiLimitsRow {
+  tenantId: number;
+  bounds: ApiLimitBounds;
+  defaults: ApiLimitBounds;
+  /** Whether the platform administrator set any bound (otherwise the defaults hold). */
+  custom: boolean;
+  /** "2026-10": the bill's month, in UTC. */
+  month: string | null;
+  monthEndsAt: string | null;
+  callsThisMonth: number | null;
+  quotaUsedPercent: number | null;
+  quotaWarning: boolean;
+  updatedAt: string | null;
+  updatedBy: number | null;
+}
+
+export interface ApiLimitsInput {
+  tenantId: number;
+  clientRateMax?: number | null;
+  clientBurstMax?: number | null;
+  workspaceRate?: number | null;
+  workspaceBurst?: number | null;
+  monthlyCalls?: number | null;
 }
 
 /** A client as created or rotated: the secret, once. */
@@ -31,6 +71,9 @@ export interface ApiClientInput {
   scopes?: string[];
   ipAllowlist?: string;
   expiresAt?: string;
+  /** MIG-337: 0 is the workspace's bound; left out keeps it. */
+  ratePerMinute?: number;
+  burst?: number;
 }
 
 /** One event route (MIG-332): an event type of the organisation's and what it starts. */
@@ -151,6 +194,23 @@ export class ApiClientsApi {
 
   revoke(clientId: string): Observable<ApiResponse<ApiClientRow>> {
     return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revoke`, { clientId });
+  }
+
+  /** MIG-337: the workspace's API limits; a platform administrator names the workspace. */
+  limits(tenantId?: number | null): Observable<ApiResponse<ApiLimitsRow>> {
+    const params: Record<string, string> = tenantId ? { tenantId: String(tenantId) } : {};
+    return this.http.get<ApiResponse<ApiLimitsRow>>(`${this.clients}/limits`, { params });
+  }
+
+  /** MIG-337: a workspace's bounds -- the platform administrator's. 0 or null: the default; monthlyCalls 0: no quota. */
+  saveLimits(input: ApiLimitsInput): Observable<ApiResponse<ApiLimitsRow>> {
+    return this.http.post<ApiResponse<ApiLimitsRow>>(`${this.clients}/limits`, input);
+  }
+
+  /** MIG-337: a workspace's clients, for a platform administrator naming it (an invoice's "by client" lines). */
+  listOf(tenantId?: number | null): Observable<ApiResponse<ApiClientRow[]>> {
+    const params: Record<string, string> = tenantId ? { tenantId: String(tenantId) } : {};
+    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`, { params });
   }
 
   routesList(): Observable<ApiResponse<EventRouteRow[]>> {
