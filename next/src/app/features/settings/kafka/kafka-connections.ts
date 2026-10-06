@@ -99,7 +99,7 @@ export interface TopicHealth {
   lag: number;
   readers: number;
   consumers: TopicReader[];
-  /** Healthy, Under-replicated, Offline, No consumer, Missing. */
+  /** Healthy, Under-replicated, Offline, No consumer, Idle, Missing. */
   state: string;
 }
 
@@ -140,6 +140,8 @@ export function healthTone(state: string | null | undefined): 'ok' | 'warn' | 'c
     case 'Healthy': case 'Stable': return 'ok';
     case 'Under-replicated': case 'No consumer': case 'Empty': case 'Preparing rebalance': case 'Completing rebalance': return 'warn';
     case 'Offline': case 'Missing': case 'Dead': return 'crit';
+    // Idle: nothing kept and nothing reading, as a step pipeline's topic is (MIG-321) -- nothing for anyone to fix.
+    case 'Idle': return 'neutral';
     default: return 'neutral';
   }
 }
