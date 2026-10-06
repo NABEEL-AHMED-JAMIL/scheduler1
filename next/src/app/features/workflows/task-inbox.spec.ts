@@ -115,6 +115,8 @@ describe('Task history in words', () => {
       ['Manager approves: approved by Nabeel (for Alex)', 'ok', 'ok'],
       ['Request approved', 'ok', undefined],
     ]);
+    // A byline only where a person acted; the request's end is the workflow's.
+    expect(lines.map(l => l.actor)).toEqual(['Nabeel (for Alex)', undefined]);
     // Naive times are Chicago wall-clock; offset times are taken at their word.
     expect(shortTime('2026-10-01T08:05:00', 'America/Chicago')).toBe('1 Oct, 08:05');
     expect(shortTime('2026-09-30T22:20:57.914+00:00', 'America/Chicago')).toBe('30 Sep, 17:20');
@@ -148,6 +150,7 @@ describe('The task\'s own history lines', () => {
     expect(exactTime('2026-10-06T19:05:00+00:00', tz)).toBe('Tue 6 Oct 2026, 14:05');
     expect(compactTime('2026-10-06T08:00:00', now, tz)).toBe('08:00');
     expect(compactTime('2026-10-05T08:00:00', now, tz)).toBe('Yesterday');
+    expect(compactTime('2026-10-05T08:00:00', now, tz, true)).toBe('08:00');
     expect(compactTime('2026-10-07T08:00:00', now, tz)).toBe('Tomorrow');
     expect(compactTime('2026-10-02T08:00:00', now, tz)).toBe('Fri');
     expect(compactTime('2026-09-20T08:00:00', now, tz)).toBe('20 Sep');

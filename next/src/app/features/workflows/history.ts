@@ -18,6 +18,9 @@ export interface HistoryLine {
 
 type Names = (id: number | null | undefined) => string;
 
+/** The events a person made: the rest (a task opening, a reminder, the end) are the workflow's, and carry no byline. */
+const BY_A_PERSON = new Set(['Started', 'Approved', 'Rejected', 'ChangesRequested', 'Done', 'Reassigned', 'Cancelled']);
+
 export function historyLines(events: HistoryEvent[], name: Names, stepName: (key: string | null | undefined) => string): HistoryLine[] {
   const lines: HistoryLine[] = [];
   for (const e of events) {
@@ -25,7 +28,7 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
     const step = stepName(e.stepKey);
     const who = e.onBehalfOf ? `${name(e.actor)} (for ${name(e.onBehalfOf)})` : name(e.actor);
     const line = (text: string, tone: HistoryLine['tone'] = 'plain', comment?: string) =>
-      lines.push({ id: e.id, at: e.at, text, tone, comment, actor: e.actor != null ? who : undefined });
+      lines.push({ id: e.id, at: e.at, text, tone, comment, actor: e.actor != null && BY_A_PERSON.has(e.type) ? who : undefined });
     switch (e.type) {
       case 'Started': line(e.actor ? `Requested by ${name(e.actor)}` : 'Started', 'ok'); break;
       case 'TaskOpened': line(`${step}: waiting for ${assignee(d, name)}${d['due'] ? ' · due ' + shortTime(String(d['due'])) : ''}`, 'now'); break;
@@ -170,14 +173,15 @@ export function relativeTime(iso: string | null | undefined, now: number = Date.
 }
 
 /**
- * A list row's time, as a mail client puts it: the time today, "Yesterday" or "Tomorrow", the weekday within a week
- * either way, else the day and month.
+ * A list row's time, as a mail client puts it: the time today, "Yesterday" or "Tomorrow" (or their time, where the
+ * row's day header says the day), the weekday within a week either way, else the day and month.
  */
-export function compactTime(iso: string | null | undefined, now: number = Date.now(), timeZone?: string): string {
+export function compactTime(iso: string | null | undefined, now: number = Date.now(), timeZone?: string, clockNextDoor = false): string {
   const at = instantOf(iso);
   if (!at) return '';
   const days = dayNumber(new Date(now), timeZone) - dayNumber(at, timeZone);
-  if (days === 0) return clock(at, timeZone);
+  // Under a "Yesterday" or "Due tomorrow" header the day is said already: the time says more.
+  if (days === 0 || (clockNextDoor && Math.abs(days) === 1)) return clock(at, timeZone);
   if (days === 1) return 'Yesterday';
   if (days === -1) return 'Tomorrow';
   if (Math.abs(days) < 7) return WEEKDAYS[(dayNumber(at, timeZone) + 4) % 7];

@@ -80,6 +80,8 @@ export class TaskInbox implements OnInit {
   private readonly searchBox = viewChild<ElementRef<HTMLInputElement>>('search');
   /** The selection moved by keyboard: the row takes the focus as well as the scroll. */
   private focusRow = false;
+  /** A ?task= link: once the lists are in, show the tab that task is on (a done task's link opens Done). */
+  private followLinkedTask = false;
 
   readonly me = computed(() => this.auth.user()?.appUserId ?? null);
 
@@ -184,7 +186,7 @@ export class TaskInbox implements OnInit {
       if (id) this.openRequest(id);
     }
     const task = Number(params.get('task'));
-    if (task) this.openTask(task, true);
+    if (task) { this.followLinkedTask = true; this.openTask(task, true); }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     this.load();
   }
@@ -194,7 +196,11 @@ export class TaskInbox implements OnInit {
     this.loading.set(true);
     this.error.set('');
     let pending = 4;
-    const settle = () => { if (--pending === 0) this.loading.set(false); };
+    const settle = () => {
+      if (--pending > 0) return;
+      this.loading.set(false);
+      if (this.followLinkedTask) { this.followLinkedTask = false; this.showLinkedTab(); }
+    };
     const take = <T>(target: (rows: T[]) => void) => ({
       next: (r: ApiResponse<T[]>) => {
         if (r.status === API_SUCCESS) target(r.data ?? []);
@@ -209,7 +215,11 @@ export class TaskInbox implements OnInit {
     }));
     this.api.groups().subscribe(take<InboxTask>(rows => this.groups.set(rows)));
     this.api.done().subscribe(take<InboxTask>(rows => this.done.set(rows)));
-    this.api.requests().subscribe(take<RequestRow>(rows => this.requests.set(rows)));
+    this.api.requests().subscribe(take<RequestRow>(rows => {
+      this.requests.set(rows);
+      // My requests opens on the newest, as the inbox opens on the first task.
+      if (this.selectedRequest() === null && this.tab() === 'requests' && rows.length) this.openRequest(rows[0].id);
+    }));
     this.badge.refresh();
   }
 
@@ -228,6 +238,13 @@ export class TaskInbox implements OnInit {
     const first = this.shownIds()[0];
     if (first) this.openTask(first);
     else { this.selectedTask.set(null); this.detail.set(null); }
+  }
+
+  private showLinkedTab(): void {
+    const id = this.selectedTask();
+    if (this.tab() !== 'mine' || id == null || this.mine().some(t => t.id === id)) return;
+    if (this.groups().some(t => t.id === id)) this.tab.set('groups');
+    else if (this.done().some(t => t.id === id)) this.tab.set('done');
   }
 
   /** A row clicked: open it, and below 1024 px show it in place of the list. */
@@ -463,7 +480,7 @@ export class TaskInbox implements OnInit {
     const sub = [t.name, t.workflowName, t.standingInFor ? `for ${this.name(t.standingInFor)}` : ''].filter(Boolean).join(' · ');
     return {
       id: t.id, kind: 'task', title: t.requestTitle || t.name, sub, status, tone: this.toneOf(status),
-      time: at ? (open ? 'Due ' : '') + compactTime(at, now) : '',
+      time: at ? (open ? 'Due ' : '') + compactTime(at, now, undefined, true) : '',
       timeTitle: at ? (open ? 'Due ' : 'Acted ') + exactTime(at) : '',
       crit: open && !!t.overdue, workflow: t.workflowName ?? '',
       group: open ? dueGroup(t.dueAt, t.overdue, now) : pastGroup(t.actedAt, now),
@@ -475,7 +492,7 @@ export class TaskInbox implements OnInit {
     const at = r.startedAt ?? r.endedAt;
     return {
       id: r.id, kind: 'request', title: r.title, sub: r.workflowName, status: r.state, tone: this.toneOf(r.state),
-      time: compactTime(at, now), timeTitle: at ? 'Started ' + exactTime(at) : '', crit: false, workflow: r.workflowName,
+      time: compactTime(at, now, undefined, true), timeTitle: at ? 'Started ' + exactTime(at) : '', crit: false, workflow: r.workflowName,
       group: pastGroup(at, now), haystack: [r.title, r.workflowName, r.currentStep, this.name(r.requestedBy)].join(' ').toLowerCase(),
     };
   }

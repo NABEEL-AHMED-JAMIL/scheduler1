@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -41,11 +41,11 @@ const REQUESTS: RequestRow[] = [
     state: 'Running', startedAt: '2026-10-06T09:00:00' },
 ];
 
-function screen() {
+function screen(link?: number) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MINE })),
     groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
-    done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [task(90, 'Visit check #1069', { state: 'ChangesRequested', actedAt: '2026-10-06T11:31:00' })] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: REQUESTS })),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: detailOf(MINE.find(t => t.id === id) ?? MINE[0]) })),
     request: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...REQUESTS[0], id, subject: { amount: 3 }, tasks: [], history: [] } })),
@@ -58,6 +58,7 @@ function screen() {
     providers: [
       provideZonelessChangeDetection(),
       provideRouter([]),
+      ...(link ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({ task: String(link) }), routeConfig: { path: 'workflows/inbox' } } } }] : []),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
       { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), groups: signal(0) } },
@@ -190,6 +191,13 @@ describe('Task inbox, the design', () => {
     inbox.decide('approve');
     expect(api.act).toHaveBeenCalledWith(11, 'approve', null, expect.any(String));
     expect(inbox.selectedTask()).toBe(12);
+  });
+
+  it('opens a ?task= link on the tab that task is on, a done one on Done', () => {
+    const { inbox, el } = screen(90);
+    expect(inbox.selectedTask()).toBe(90);
+    expect(inbox.tab()).toBe('done');
+    expect(el.querySelector('.inbox-split')!.getAttribute('data-pane')).toBe('detail');
   });
 
   it('gives My requests the same list, and Cancel request in the request\'s header', () => {

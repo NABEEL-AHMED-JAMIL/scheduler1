@@ -50,6 +50,9 @@ const LOOK: Record<string, StatusLook> = {
   waiting:   { tone: 'warn', glyph: 'clock' },
   approved:  { tone: 'ok',   glyph: 'checkCircle' },
   rejected:  { tone: 'crit', glyph: 'xCircle' },
+  // A workflow task's own (MIG-276): sent back to the requester, or past its due time.
+  'changes asked': { tone: 'warn', glyph: 'chat' },
+  overdue:   { tone: 'crit', glyph: 'clock' },
 
   // An entity's state, which is a different question from how a run went.
   active:    { tone: 'ok',   glyph: 'checkCircle' },
