@@ -145,8 +145,8 @@ export const PINNED: Record<string, unknown> = {
       "Hourly",
       "Minutes",
       "Monthly",
-      "On a timetableBy itself: every few minutes, daily, weekly or monthly.",
-      "Only when startedFrom Run now, or when a workflow starts it.",
+      "On a timetable",
+      "Only when started",
       "Start date: 28 Sep 2026",
       "Weekly"
     ],
@@ -248,8 +248,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Clear",
-      "On a timetableBy itself: every few minutes, daily, weekly or monthly.",
-      "Only when startedFrom Run now, or when a workflow starts it.",
+      "On a timetable",
+      "Only when started",
       "Save changes"
     ],
     "columns": [],

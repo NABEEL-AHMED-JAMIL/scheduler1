@@ -54,6 +54,7 @@
         <div class="choice-cards" role="radiogroup" aria-label="When it runs" id="execution">
           @for (option of executionOptions; track option.value) {
             <button type="button" class="choice-card" role="radio" [attr.aria-checked]="executionValue() === option.value"
+                    [attr.aria-label]="option.label" [attr.aria-description]="option.text"
                     [attr.data-execution]="option.value" (click)="setExecution(option.value)">
               <app-icon [name]="option.icon" class="choice-icon" />
               <span class="min-w-0">
@@ -87,7 +88,8 @@
           <div class="schedule-box mt-5" formGroupName="scheduler">
             <span class="label" id="how-often">How often</span>
             <!-- The frequencies as one row of choices; the select they replace stays the form's control. -->
-            <div class="seg flex-wrap mt-1" role="radiogroup" aria-labelledby="how-often" id="frequency-choices">
+            <!-- Filled when chosen, as the weekdays are: the shared white-on-grey "on" read as two choices at once. -->
+            <div class="seg seg-solid flex-wrap mt-1" role="radiogroup" aria-labelledby="how-often" id="frequency-choices">
               @for (frequency of frequencies; track frequency.value) {
                 <button type="button" class="seg-btn" role="radio" [attr.aria-checked]="frequencyValue() === frequency.value"
                         [class.seg-on]="frequencyValue() === frequency.value" [attr.data-frequency]="frequency.value"

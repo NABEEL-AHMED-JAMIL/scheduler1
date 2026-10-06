@@ -144,6 +144,16 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
       background: var(--btn-primary-hover);
       color: var(--btn-primary-fg);
     }
+    /* How often: the chosen frequency filled as a chosen weekday is, so it never reads as two choices. */
+    .seg-solid .seg-btn[aria-checked="true"] {
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-fg);
+      box-shadow: none;
+    }
+    .seg-solid .seg-btn[aria-checked="true"]:hover:not(:disabled) {
+      background: var(--btn-primary-hover);
+      color: var(--btn-primary-fg);
+    }
   `,
 })
 export class JobEdit implements OnInit {
