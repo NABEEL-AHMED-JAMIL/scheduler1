@@ -114,6 +114,16 @@ export function splitRef(title: string): { name: string; ref: string } {
   return m ? { name: m[1], ref: m[2] } : { name: title, ref: '' };
 }
 
+/**
+ * A name's trailing reference -- a #reference as splitRef finds, or a last word with a digit in it ("E2E purchase
+ * 1006022333", "Claims v2") -- apart from the name before it, so a narrow list cuts the name in the middle and keeps the
+ * part that tells near-identical names apart. A one-word name, or one whose last word has no digit, is all name.
+ */
+export function splitTail(title: string): { name: string; ref: string } {
+  const m = /^(.*\S)\s+(#?[A-Za-z0-9._-]*\d[A-Za-z0-9._-]*)$/.exec(title.trim());
+  return m ? { name: m[1], ref: m[2] } : { name: title, ref: '' };
+}
+
 /** The one value every row shares (two rows at least), or '' when they differ. */
 export function commonOf(values: string[]): string {
   if (values.length < 2) return '';

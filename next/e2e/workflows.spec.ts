@@ -87,7 +87,7 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await page.getByLabel('What changed').fill('E2E: Alex approves, then the requester is told');
     await page.locator('[data-test="publish"]').click();
     await expect(page.getByText('Published as version 1.')).toBeVisible();
-    await expect(page.locator('[data-workflow="' + KEY + '"]')).toContainText('Version 1');
+    await expect(page.locator('[data-workflow="' + KEY + '"]')).toContainText('v1');
 
     approved = await startTest(page, `po-${stamp}-a`, 1200);
     await page.getByRole('tab', { name: 'Steps' }).click();

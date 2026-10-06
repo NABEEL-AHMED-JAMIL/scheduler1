@@ -35,14 +35,20 @@ export interface DraftStep {
   hours?: number | null;
 }
 
-export const STEP_TYPES: { type: StepType; label: string; icon: string; hint: string }[] = [
-  { type: 'approval', label: 'Approval', icon: 'checkCircle', hint: 'Someone approves, rejects or asks for changes' },
-  { type: 'task', label: 'Task', icon: 'list', hint: 'Someone does a piece of work and marks it done' },
-  { type: 'condition', label: 'Condition', icon: 'selector', hint: 'Goes one of two ways on the request\'s fields' },
-  { type: 'notify', label: 'Notify', icon: 'bell', hint: 'Tells someone, and goes on' },
-  { type: 'run_pipeline', label: 'Run pipeline', icon: 'play', hint: 'Starts a schedule\'s run' },
-  { type: 'save_dataset', label: 'Save to dataset', icon: 'database', hint: 'Keeps the request as a row' },
-  { type: 'wait', label: 'Wait', icon: 'clock', hint: 'Pauses for some hours' },
+/**
+ * A step type's tone: the pill family its badge on the canvas is drawn in, so an approval reads apart from a notice at a
+ * glance. People's steps (approval, task) and the fork (condition) each have their own; the rest share quieter ones.
+ */
+export type StepTone = 'ok' | 'info' | 'warn' | 'brand' | 'neutral';
+
+export const STEP_TYPES: { type: StepType; label: string; icon: string; hint: string; tone: StepTone }[] = [
+  { type: 'approval', label: 'Approval', icon: 'checkCircle', hint: 'Someone approves, rejects or asks for changes', tone: 'ok' },
+  { type: 'task', label: 'Task', icon: 'list', hint: 'Someone does a piece of work and marks it done', tone: 'info' },
+  { type: 'condition', label: 'Condition', icon: 'selector', hint: 'Goes one of two ways on the request\'s fields', tone: 'warn' },
+  { type: 'notify', label: 'Notify', icon: 'bell', hint: 'Tells someone, and goes on', tone: 'brand' },
+  { type: 'run_pipeline', label: 'Run pipeline', icon: 'play', hint: 'Starts a schedule\'s run', tone: 'info' },
+  { type: 'save_dataset', label: 'Save to dataset', icon: 'database', hint: 'Keeps the request as a row', tone: 'neutral' },
+  { type: 'wait', label: 'Wait', icon: 'clock', hint: 'Pauses for some hours', tone: 'neutral' },
 ];
 
 export const OPERATORS: { op: string; label: string; needsValue: boolean }[] = [

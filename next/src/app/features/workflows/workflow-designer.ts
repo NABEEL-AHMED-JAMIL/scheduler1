@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -16,6 +16,7 @@ import { AccessProfilesService } from '../admin/access-profiles/access-profiles.
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi } from './workflows.api';
 import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, toJson } from './designer.model';
 import { shortTime } from './history';
+import { splitTail } from './inbox-list';
 
 /**
  * The Workflow designer (MIG-276): an administrator lays out a workflow's steps as a chain of cards -- who approves,
@@ -23,11 +24,17 @@ import { shortTime } from './history';
  * The server checks the steps (WorkflowSteps) and names each problem where it is; the designer puts it on its card.
  * Running requests keep the version they started with. A test run starts a request as the administrator and opens it.
  * Everyone else with the page reads the workflows but changes nothing.
+ *
+ * Laid out as the Task inbox is (owner, 2026-10-06: "redesign the page"): two panes that fill the screen and scroll on
+ * their own -- the workflows, with a pinned search and status filter, and the workflow opened from them, its header and
+ * tabs on top, the canvas and the step's properties side by side, and the publish bar pinned at its foot. Below 1024 px
+ * one pane shows at a time (data-pane) and the properties slide over from the right (data-sheet).
  */
 @Component({
   selector: 'app-workflow-designer',
   imports: [FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner],
   templateUrl: './workflow-designer.html',
+  host: { '(document:keydown)': 'onKey($event)' },
 })
 export class WorkflowDesigner implements OnInit {
   private readonly api = inject(WorkflowsApi);
@@ -55,7 +62,19 @@ export class WorkflowDesigner implements OnInit {
   readonly note = signal('');
   readonly busy = signal(false);
   readonly adding = signal(false);
+  /** Where the Add a step menu inserts: before the step at this index (the length is the end); null is after the
+   *  selected step, as before. */
+  readonly insertAt = signal<number | null>(null);
   readonly view = signal<'steps' | 'history' | 'test' | 'new'>('steps');
+
+  // the list's search and status filter
+  readonly query = signal('');
+  readonly statusFilter = signal<'' | 'Active' | 'Inactive'>('');
+  /** Below 1024 px one pane shows at a time: the list, or the workflow opened from it. */
+  readonly pane = signal<'list' | 'detail'>('list');
+  /** Below 1024 px the step's properties slide over the canvas; open once a step is picked, until closed. */
+  readonly sheet = signal(false);
+  private readonly searchBox = viewChild<ElementRef<HTMLInputElement>>('search');
 
   readonly colleagues = signal<Colleague[]>([]);
   private readonly colleaguesLoaded = signal(false);
@@ -82,6 +101,34 @@ export class WorkflowDesigner implements OnInit {
   readonly emptyText = computed(() => this.canEdit()
     ? 'No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.'
     : 'No workflows yet. A workspace administrator makes them.');
+
+  /** The workflows the search and status filter leave, in the service's order (by name). */
+  readonly shown = computed(() => {
+    const words = this.query().trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const status = this.statusFilter();
+    return this.workflows().filter(w => (!status || w.status === status)
+      && words.every(word => `${w.name} ${w.key} ${w.description ?? ''}`.toLowerCase().includes(word)));
+  });
+
+  readonly statusChoices: { value: '' | 'Active' | 'Inactive'; label: string }[] = [
+    { value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }, { value: '', label: 'All' }];
+
+  readonly statusCounts = computed<Record<'' | 'Active' | 'Inactive', number>>(() => {
+    const rows = this.workflows();
+    return { '': rows.length, Active: rows.filter(w => w.status === 'Active').length, Inactive: rows.filter(w => w.status === 'Inactive').length };
+  });
+
+  readonly hasFilters = computed(() => !!this.query().trim() || !!this.statusFilter());
+
+  /** "28 workflows", or "3 of 28" while the search or filter leaves some out. */
+  readonly shownLine = computed(() => {
+    const all = this.workflows().length;
+    const shown = this.shown().length;
+    return this.hasFilters() ? `${shown} of ${all}` : `${all} workflow${all === 1 ? '' : 's'}`;
+  });
+
+  /** The platform made it (a service's built-in workflow); the workspace may still change it. */
+  readonly builtIn = computed(() => this.current()?.createdBy === 0);
 
   readonly step = computed<DraftStep | null>(() => {
     const i = this.selected();
@@ -113,7 +160,10 @@ export class WorkflowDesigner implements OnInit {
       next: r => { if (r.status === API_SUCCESS) this.jobs.set(Array.isArray(r.data) ? r.data : []); },
       error: () => {},
     });
-    this.loadList(this.route.snapshot.queryParamMap.get('key'));
+    const linked = this.route.snapshot.queryParamMap.get('key');
+    // A link to one workflow opens on it, below 1024 px too.
+    if (linked) this.pane.set('detail');
+    this.loadList(linked);
   }
 
   loadList(open?: string | null): void {
@@ -133,10 +183,45 @@ export class WorkflowDesigner implements OnInit {
   }
 
   async choose(key: string): Promise<void> {
-    if (key === this.current()?.key && this.view() !== 'new') return;
+    if (key === this.current()?.key && this.view() !== 'new') { this.pane.set('detail'); return; }
     if (this.dirty() && !(await confirmWith(this.dialog, { title: 'Leave without publishing?',
       body: 'The changes to these steps are not published and will be lost.', confirmLabel: 'Leave', danger: true }))) return;
+    this.sheet.set(false);
+    this.pane.set('detail');
     this.open(key);
+  }
+
+  /** Back to the list, below 1024 px. */
+  backToList(): void {
+    this.sheet.set(false);
+    this.pane.set('list');
+  }
+
+  setQuery(value: string): void {
+    this.query.set(value);
+  }
+
+  clearFilters(): void {
+    this.query.set('');
+    this.statusFilter.set('');
+  }
+
+  /** A workflow's name, split so a narrow row cuts its middle and keeps a trailing number ("E2E purchase 1006022333"). */
+  nameParts(name: string): { name: string; ref: string } {
+    return splitTail(name);
+  }
+
+  /** / searches the list; Escape closes the step's slide-over, then the Add a step menu. */
+  onKey(e: KeyboardEvent): void {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target?.closest('.cdk-overlay-container')) return;
+    if (e.key === 'Escape') {
+      if (this.sheet()) { this.closeSheet(); return; }
+      if (this.adding()) { this.cancelAdd(); return; }
+    }
+    if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
+    if (e.key === '/') { e.preventDefault(); this.searchBox()?.nativeElement.focus(); }
   }
 
   open(key: string, quiet = false): void {
@@ -171,12 +256,34 @@ export class WorkflowDesigner implements OnInit {
 
   // ---- editing the chain ------------------------------------------------------------------------------------------
 
+  /** A step picked on the canvas: its properties beside it, or sliding over below 1024 px. */
+  pick(i: number): void {
+    this.selected.set(i);
+    this.sheet.set(true);
+  }
+
+  closeSheet(): void {
+    this.sheet.set(false);
+  }
+
+  /** Opens the Add a step menu where it inserts: before step `at`, or at the end. */
+  openAdd(at: number): void {
+    this.insertAt.set(at);
+    this.adding.set(true);
+  }
+
+  cancelAdd(): void {
+    this.adding.set(false);
+    this.insertAt.set(null);
+  }
+
   add(type: StepType): void {
     const step = newStep(type, this.keys());
-    const at = this.selected() === null ? this.steps().length : this.selected()! + 1;
+    const at = this.insertAt() ?? (this.selected() === null ? this.steps().length : this.selected()! + 1);
     this.steps.update(list => [...list.slice(0, at), step, ...list.slice(at)]);
     this.selected.set(at);
-    this.adding.set(false);
+    this.cancelAdd();
+    this.sheet.set(true);
     this.touch();
   }
 
@@ -304,6 +411,8 @@ export class WorkflowDesigner implements OnInit {
   // ---- a new workflow -------------------------------------------------------------------------------------------
 
   startNew(): void {
+    this.sheet.set(false);
+    this.pane.set('detail');
     this.newName.set('');
     this.newKey.set('');
     this.newDescription.set('');
@@ -367,6 +476,11 @@ export class WorkflowDesigner implements OnInit {
 
   typeOf(type: StepType) {
     return STEP_TYPES.find(t => t.type === type)!;
+  }
+
+  /** A step's name as the canvas and screen readers say it. */
+  stepName(s: DraftStep): string {
+    return s.name || s.key;
   }
 
   problemsOf(i: number): string[] {

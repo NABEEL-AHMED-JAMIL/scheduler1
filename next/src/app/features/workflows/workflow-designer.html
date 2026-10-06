@@ -1,4 +1,4 @@
-<div class="page">
+<div class="page inbox-page designer-page">
   <div class="page-head">
     <div>
       <h1 class="page-title">Workflow designer</h1>
@@ -18,291 +18,321 @@
     <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}</p>
   }
 
-  <div class="designer-grid">
-    <!-- The workflows -->
-    <section class="card overflow-clip self-start" aria-label="Workflows">
-      @for (w of workflows(); track w.key) {
-        <button type="button" class="inbox-row" [class.is-on]="current()?.key === w.key && view() !== 'new'" (click)="choose(w.key)" [attr.data-workflow]="w.key">
-          <app-icon name="layers" class="icon-muted shrink-0 mt-0.5" />
-          <span class="min-w-0 flex-1">
-            <span class="block font-medium text-sm truncate">{{ w.name }}</span>
-            <span class="block text-xs text-[color:var(--text-muted)] truncate">
-              @if (w.currentVersion) { Version {{ w.currentVersion }} } @else { Not published }@if (w.running) { · {{ w.running }} running }
-            </span>
-          </span>
-          <app-status [label]="w.status" [quiet]="true" />
-        </button>
-      } @empty {
-        <div class="p-6 text-center text-sm text-[color:var(--text-muted)]">
-          @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading workflows… } @else { {{ emptyText() }} }
+  <div class="inbox-split designer-split" [attr.data-pane]="pane()">
+    <!-- The workflows: search and status pinned on top, rows scrolling on their own, as the Task inbox's list. -->
+    <section class="card inbox-list" aria-label="Workflows" data-test="workflow-list">
+      <div class="inbox-tools">
+        <div class="search-field">
+          <app-icon name="search" size="0.95em" />
+          <input #search class="input input-sm" type="search" placeholder="Search workflows — press /" aria-keyshortcuts="/"
+                 aria-label="Search the workflows by name, key or description" [value]="query()" (input)="setQuery($any($event.target).value)"
+                 data-test="workflow-search" />
         </div>
-      }
+        <div class="seg designer-status" role="radiogroup" aria-label="Show workflows" data-test="status-filter">
+          @for (o of statusChoices; track o.value) {
+            <button type="button" class="seg-btn" role="radio" [class.seg-on]="statusFilter() === o.value" [attr.aria-checked]="statusFilter() === o.value"
+                    (click)="statusFilter.set(o.value)" [attr.data-status]="o.value || 'all'">
+              {{ o.label }} <span class="designer-seg-count">{{ statusCounts()[o.value] }}</span></button>
+          }
+        </div>
+        <div class="inbox-count">
+          <span data-test="shown-line">{{ shownLine() }}</span>
+          @if (hasFilters()) {
+            <button type="button" class="link-inline" (click)="clearFilters()" data-test="clear-filters">Clear filters</button>
+          }
+        </div>
+      </div>
+
+      <div class="inbox-scroll">
+        @for (w of shown(); track w.key) {
+          <button type="button" class="inbox-row designer-row" [class.is-on]="current()?.key === w.key && view() !== 'new'"
+                  [attr.aria-current]="current()?.key === w.key && view() !== 'new' ? 'true' : null" (click)="choose(w.key)" [attr.data-workflow]="w.key">
+            <!-- The name is cut in its middle, never its trailing number: often all that tells two workflows apart. -->
+            @let parts = nameParts(w.name);
+            <span class="inbox-row-title" [title]="w.name"><span class="inbox-title-name">{{ parts.name }}</span>@if (parts.ref) {<span class="inbox-title-ref">{{ ' ' + parts.ref }}</span>}</span>
+            <span class="inbox-row-time">@if (w.running) { {{ w.running }} running }</span>
+            <span class="inbox-row-sub">@if (w.currentVersion) { v{{ w.currentVersion }} } @else { Not published }</span>
+            <span class="inbox-row-status"><span class="inbox-dot" [class.is-ok]="w.status === 'Active'"></span>{{ w.status }}</span>
+          </button>
+        } @empty {
+          <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">
+            @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading workflows… }
+            @else if (hasFilters()) { Nothing matches. <button type="button" class="link-inline" (click)="clearFilters()">Clear filters</button> }
+            @else { {{ emptyText() }} }
+          </div>
+        }
+      </div>
     </section>
 
-    @if (view() === 'new') {
-      <!-- A new workflow -->
-      <section class="card p-4 flex flex-col gap-4 max-w-2xl" aria-label="New workflow" data-test="new-form">
-        <h2 class="text-base font-semibold">New workflow</h2>
-        <div>
-          <label class="label" for="wf-name">Name</label>
-          <input id="wf-name" class="input" maxlength="200" [value]="newName()" (input)="nameChanged($any($event.target).value)" placeholder="Purchase approval" />
-        </div>
-        <div class="grid gap-4 md:grid-cols-2">
-          <div>
-            <label class="label" for="wf-key">Key</label>
-            <input id="wf-key" class="input font-mono" maxlength="64" [value]="newKey()" (input)="newKey.set($any($event.target).value)" />
-            <p class="text-xs text-[color:var(--text-muted)] mt-1">How other screens and the API name it. It cannot change later.</p>
+    <!-- The workflow: its header and tabs, the view under them, the publish bar at the foot. -->
+    <section class="card inbox-detail designer-detail" aria-label="Workflow" data-test="workflow-detail">
+      @if (view() === 'new') {
+        <div class="designer-scroll">
+          <div class="inbox-detail-head">
+            <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+            <h2 class="inbox-detail-title">New workflow</h2>
+            <p class="inbox-detail-sub">Name it and say what it approves; you lay out its steps next.</p>
           </div>
-          <div>
-            <label class="label" for="wf-subject">What it approves</label>
-            <input id="wf-subject" class="input" maxlength="64" [value]="newSubject()" (input)="newSubject.set($any($event.target).value)" />
-            <p class="text-xs text-[color:var(--text-muted)] mt-1">A word for the thing requested: request, purchase, form, dataset.</p>
-          </div>
+          <section class="p-6 flex flex-col gap-4 max-w-2xl" aria-label="New workflow" data-test="new-form">
+            <div>
+              <label class="label" for="wf-name">Name</label>
+              <input id="wf-name" class="input" maxlength="200" [value]="newName()" (input)="nameChanged($any($event.target).value)" placeholder="Purchase approval" />
+            </div>
+            <div class="grid gap-4 md:grid-cols-2">
+              <div>
+                <label class="label" for="wf-key">Key</label>
+                <input id="wf-key" class="input font-mono" maxlength="64" [value]="newKey()" (input)="newKey.set($any($event.target).value)" />
+                <p class="text-xs text-[color:var(--text-muted)] mt-1">How other screens and the API name it. It cannot change later.</p>
+              </div>
+              <div>
+                <label class="label" for="wf-subject">What it approves</label>
+                <input id="wf-subject" class="input" maxlength="64" [value]="newSubject()" (input)="newSubject.set($any($event.target).value)" />
+                <p class="text-xs text-[color:var(--text-muted)] mt-1">A word for the thing requested: request, purchase, form, dataset.</p>
+              </div>
+            </div>
+            <div>
+              <label class="label" for="wf-desc">Description</label>
+              <textarea id="wf-desc" class="input resize-y min-h-16" rows="2" maxlength="1000" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)"></textarea>
+            </div>
+            <div class="flex gap-2">
+              <button type="button" class="btn btn-primary" [disabled]="!newName().trim() || !newKey().trim() || busy()" (click)="create()">Create and design</button>
+              @if (current()) { <button type="button" class="btn btn-ghost" (click)="view.set('steps')">Cancel</button> }
+            </div>
+          </section>
         </div>
-        <div>
-          <label class="label" for="wf-desc">Description</label>
-          <textarea id="wf-desc" class="input resize-y min-h-16" rows="2" maxlength="1000" [value]="newDescription()" (input)="newDescription.set($any($event.target).value)"></textarea>
-        </div>
-        <div class="flex gap-2">
-          <button type="button" class="btn btn-primary" [disabled]="!newName().trim() || !newKey().trim() || busy()" (click)="create()">Create and design</button>
-          @if (current()) { <button type="button" class="btn btn-ghost" (click)="view.set('steps')">Cancel</button> }
-        </div>
-      </section>
-    } @else if (current(); as wf) {
-      <div class="flex flex-col gap-4 min-w-0">
-        <!-- The workflow's header -->
-        <section class="card p-4 flex items-start gap-3 flex-wrap" aria-label="Workflow">
-          <div class="min-w-0 flex-1">
-            <h2 class="text-base font-semibold flex items-center gap-2">{{ wf.name }} <app-status [label]="wf.status" [quiet]="true" /></h2>
-            <p class="text-xs text-[color:var(--text-muted)]">
-              {{ wf.key }} · @if (wf.currentVersion) { version {{ wf.currentVersion }} } @else { not published yet }
-              @if (dirty()) { · <span class="text-warn-500">unpublished changes</span> }
-            </p>
-            @if (wf.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ wf.description }}</p> }
+      } @else if (current(); as wf) {
+        <!-- The header strip: what it is, its state, its actions, and the tabs along its foot. -->
+        <header class="designer-head" data-test="workflow-head">
+          <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="backToList()" data-test="back-to-list"><app-icon name="arrowLeft" />Back to list</button>
+          <div class="designer-head-top">
+            <div class="min-w-0 flex-1">
+              <h2 class="inbox-detail-title">@let title = nameParts(wf.name);{{ title.ref ? title.name + ' ' : wf.name }}@if (title.ref) {<span class="inbox-title-ref">{{ title.ref }}</span>}</h2>
+              <p class="inbox-detail-sub"><span class="font-mono">{{ wf.key }}</span> · @if (wf.currentVersion) { version {{ wf.currentVersion }} } @else { not published yet }@if (wf.running) { · {{ wf.running }} running }</p>
+            </div>
+            @if (canEdit()) {
+              <div class="designer-head-actions">
+                <button type="button" class="btn btn-default btn-sm" (click)="toggleStatus()" data-test="toggle-status">
+                  <app-icon [name]="wf.status === 'Active' ? 'pause' : 'play'" />{{ wf.status === 'Active' ? 'Make inactive' : 'Make active' }}</button>
+              </div>
+            }
           </div>
-          <div class="seg" role="tablist" aria-label="View">
-            <button type="button" class="seg-btn" role="tab" [class.seg-on]="view() === 'steps'" [attr.aria-selected]="view() === 'steps'" (click)="view.set('steps')">Steps</button>
-            <button type="button" class="seg-btn" role="tab" [class.seg-on]="view() === 'history'" [attr.aria-selected]="view() === 'history'" (click)="view.set('history')" data-test="tab-history">Versions ({{ wf.versions.length }})</button>
-            <button type="button" class="seg-btn" role="tab" [class.seg-on]="view() === 'test'" [attr.aria-selected]="view() === 'test'" (click)="view.set('test')" data-test="tab-test"
-                    [disabled]="!wf.currentVersion">Test run</button>
+          <div class="inbox-chips">
+            <app-status [label]="wf.status" />
+            @if (builtIn()) { <span class="pill pill-neutral" title="Made by the platform for a feature that relies on it; this workspace may still change it" data-test="built-in"><app-icon name="layers" size="0.9em" />Built in</span> }
+            @if (dirty()) { <span class="pill pill-warn" data-test="unpublished-chip"><app-icon name="edit" size="0.9em" />Unpublished changes</span> }
           </div>
-          @if (canEdit()) {
-            <button type="button" class="btn btn-default btn-sm" (click)="toggleStatus()" data-test="toggle-status">
-              <app-icon [name]="wf.status === 'Active' ? 'pause' : 'play'" />{{ wf.status === 'Active' ? 'Make inactive' : 'Make active' }}</button>
-          }
-        </section>
+          @if (wf.description) { <p class="designer-desc">{{ wf.description }}</p> }
+          <div class="tabs designer-tabs" role="tablist" aria-label="View">
+            <button type="button" class="tab" role="tab" [class.tab-active]="view() === 'steps'" [attr.aria-selected]="view() === 'steps'" (click)="view.set('steps')" data-test="tab-steps">
+              <app-icon name="layers" />Steps <span class="pill pill-neutral">{{ steps().length }}</span></button>
+            <button type="button" class="tab" role="tab" [class.tab-active]="view() === 'history'" [attr.aria-selected]="view() === 'history'" (click)="view.set('history')" data-test="tab-history">
+              <app-icon name="history" />Versions <span class="pill pill-neutral">{{ wf.versions.length }}</span></button>
+            <button type="button" class="tab" role="tab" [class.tab-active]="view() === 'test'" [attr.aria-selected]="view() === 'test'" (click)="view.set('test')" data-test="tab-test"
+                    [disabled]="!wf.currentVersion" [title]="wf.currentVersion ? '' : 'Publish a version first'"><app-icon name="play" />Test run</button>
+          </div>
+        </header>
 
         @if (view() === 'steps') {
-          <div class="designer-body">
-            <!-- The chain -->
-            <section class="flex flex-col gap-0 min-w-0" aria-label="Steps" data-test="chain">
-              <div class="designer-end"><app-icon name="send" size="0.9em" />Request starts</div>
-              @for (s of steps(); track s.key; let i = $index; let last = $last) {
-                <div class="designer-link" aria-hidden="true"></div>
-                <div class="card designer-step" [class.is-on]="selected() === i" [class.has-problem]="problemsOf(i).length" [attr.data-step]="s.key">
-                  <button type="button" class="designer-step-main" (click)="selected.set(i)">
-                    <span class="designer-step-icon"><app-icon [name]="typeOf(s.type).icon" /></span>
-                    <span class="min-w-0 flex-1 text-left">
-                      <span class="block text-xs uppercase tracking-wide text-[color:var(--text-muted)]">{{ typeOf(s.type).label }}</span>
-                      <span class="block font-medium text-sm truncate">{{ s.name || s.key }}</span>
-                      <span class="block text-xs text-[color:var(--text-secondary)] truncate">{{ summary(s) }}</span>
-                      @if (s.type === 'condition') { <span class="block text-xs text-[color:var(--text-muted)] truncate">{{ branches(s) }}</span> }
-                      @else if (s.next) { <span class="block text-xs text-[color:var(--text-muted)]">Then → {{ targetName(s.next) }}</span> }
-                      @if (s.type === 'approval' && s.onReject && s.onReject !== 'end') { <span class="block text-xs text-[color:var(--text-muted)]">If rejected → {{ targetName(s.onReject) }}</span> }
-                    </span>
-                  </button>
-                  @if (canEdit()) {
-                    <span class="flex flex-col gap-0.5 shrink-0">
-                      <button type="button" class="btn btn-ghost btn-xs" [disabled]="i === 0" (click)="move(i, -1)" aria-label="Move up"><app-icon name="arrowUp" /></button>
-                      <button type="button" class="btn btn-ghost btn-xs" [disabled]="last" (click)="move(i, 1)" aria-label="Move down"><app-icon name="arrowDown" /></button>
-                    </span>
+          <div class="designer-body" [attr.data-sheet]="sheet() ? 'open' : 'closed'">
+            <!-- The canvas: the chain of steps, centred, scrolling on its own. -->
+            <section class="designer-canvas" aria-label="Steps" data-test="chain">
+              <div class="designer-flow">
+                <div class="designer-end"><app-icon name="send" size="0.9em" />Request starts</div>
+                @for (s of steps(); track s.key; let i = $index; let first = $first; let last = $last) {
+                  @if (first) {
+                    <div class="designer-link" aria-hidden="true"></div>
+                  } @else {
+                    <ng-container *ngTemplateOutlet="slot; context: { at: i, after: steps()[i - 1] }" />
                   }
-                  @for (p of problemsOf(i); track p) {
-                    <p class="designer-problem"><app-icon name="alert" size="0.9em" />{{ p }}</p>
-                  }
-                </div>
-              }
-              <div class="designer-link" aria-hidden="true"></div>
-              @if (canEdit()) {
-                @if (adding()) {
-                  <div class="card p-4 designer-add" data-test="add-menu">
-                    @for (t of types; track t.type) {
-                      <button type="button" class="designer-add-item" (click)="add(t.type)" [attr.data-add]="t.type">
-                        <app-icon [name]="t.icon" class="icon-muted" />
-                        <span class="text-left"><span class="block text-sm font-medium">{{ t.label }}</span><span class="block text-xs text-[color:var(--text-muted)]">{{ t.hint }}</span></span>
-                      </button>
+                  <div class="card designer-step" [class.is-on]="selected() === i" [class.has-problem]="problemsOf(i).length" [attr.data-step]="s.key" [attr.data-type]="s.type">
+                    <div class="designer-step-top">
+                      <span [class]="'pill designer-type pill-' + typeOf(s.type).tone" data-test="step-type"><app-icon [name]="typeOf(s.type).icon" size="0.95em" />{{ typeOf(s.type).label }}</span>
+                      <span class="designer-step-no" aria-hidden="true">{{ i + 1 }}</span>
+                      @if (canEdit()) {
+                        <span class="designer-move">
+                          <button type="button" class="btn-circle" [disabled]="first" (click)="move(i, -1)" [attr.aria-label]="'Move “' + stepName(s) + '” up'" title="Move up" data-test="move-up"><app-icon name="arrowUp" size="0.95em" /></button>
+                          <button type="button" class="btn-circle" [disabled]="last" (click)="move(i, 1)" [attr.aria-label]="'Move “' + stepName(s) + '” down'" title="Move down" data-test="move-down"><app-icon name="arrowDown" size="0.95em" /></button>
+                        </span>
+                      }
+                    </div>
+                    <button type="button" class="designer-step-main" (click)="pick(i)" [attr.aria-pressed]="selected() === i" [attr.aria-label]="typeOf(s.type).label + ': ' + stepName(s) + ' — edit'">
+                      <span class="designer-step-name">{{ stepName(s) }}</span>
+                      <span class="designer-step-sub">{{ summary(s) }}</span>
+                      @if (s.type === 'condition') { <span class="designer-step-link">{{ branches(s) }}</span> }
+                      @else if (s.next) { <span class="designer-step-link">Then → {{ targetName(s.next) }}</span> }
+                      @if (s.type === 'approval' && s.onReject && s.onReject !== 'end') { <span class="designer-step-link">If rejected → {{ targetName(s.onReject) }}</span> }
+                    </button>
+                    @for (p of problemsOf(i); track p) {
+                      <p class="designer-problem"><app-icon name="alert" size="0.9em" />{{ p }}</p>
                     }
-                    <button type="button" class="btn btn-ghost btn-sm justify-self-start" (click)="adding.set(false)">Cancel</button>
                   </div>
-                } @else {
-                  <button type="button" class="btn btn-default btn-sm self-center" (click)="adding.set(true)" data-test="add-step">
-                    <app-icon name="plus" />Add a step @if (selected() !== null) { after “{{ step()?.name || step()?.key }}” }</button>
+                }
+                <div class="designer-link" aria-hidden="true"></div>
+                @if (canEdit()) {
+                  @if (adding() && insertAt() === steps().length) {
+                    <ng-container *ngTemplateOutlet="addMenu" />
+                  } @else {
+                    <button type="button" class="btn btn-default btn-sm self-center" (click)="openAdd(steps().length)" data-test="add-step">
+                      <app-icon name="plus" />Add a step</button>
+                  }
                   <div class="designer-link" aria-hidden="true"></div>
                 }
-              }
-              <div class="designer-end"><app-icon name="checkCircle" size="0.9em" />Request ends</div>
-
-              @if (workflowProblems().length) {
-                <div class="mt-4 flex flex-col gap-1">
-                  @for (p of workflowProblems(); track p) { <p class="designer-problem"><app-icon name="alert" size="0.9em" />{{ p }}</p> }
-                </div>
-              }
-
-              @if (canEdit()) {
-                <div class="card p-4 mt-4 flex items-end gap-3 flex-wrap" data-test="publish-bar">
-                  <div class="flex-1 min-w-64">
-                    <label class="label" for="wf-note">What changed</label>
-                    <input id="wf-note" class="input" maxlength="500" placeholder="A note for the version history (optional)" [ngModel]="note()" (ngModelChange)="note.set($event)" />
-                  </div>
-                  @if (dirty()) { <button type="button" class="btn btn-ghost" (click)="discard()">Discard changes</button> }
-                  <button type="button" class="btn btn-primary" [disabled]="!dirty() || !steps().length || busy()" (click)="publish()" data-test="publish">
-                    <app-icon name="upload" />Publish version {{ (wf.currentVersion || 0) + 1 }}</button>
-                </div>
-              }
+                <div class="designer-end"><app-icon name="checkCircle" size="0.9em" />Request ends</div>
+              </div>
             </section>
 
-            <!-- The step panel -->
-            <section class="card p-4 flex flex-col gap-3 self-start designer-panel" aria-label="Step" data-test="step-panel">
+            <!-- The step's properties: beside the canvas, or sliding over it below 1024 px. -->
+            <div class="designer-scrim" aria-hidden="true" (click)="closeSheet()"></div>
+            <section class="designer-props" [class.is-open]="sheet()" aria-label="Step" data-test="step-panel">
               @if (step(); as s) {
-                <div class="flex items-center gap-2">
-                  <app-icon [name]="typeOf(s.type).icon" class="icon-muted" />
-                  <h3 class="text-sm font-semibold flex-1">{{ typeOf(s.type).label }}</h3>
+                <div class="designer-props-head">
+                  <span [class]="'designer-props-icon pill-' + typeOf(s.type).tone"><app-icon [name]="typeOf(s.type).icon" /></span>
+                  <div class="min-w-0 flex-1">
+                    <h3 class="text-sm font-semibold">{{ typeOf(s.type).label }}</h3>
+                    <p class="text-xs text-[color:var(--text-muted)]">Step {{ selected()! + 1 }} of {{ steps().length }}</p>
+                  </div>
                   @if (canEdit()) {
-                    <button type="button" class="btn btn-ghost btn-xs" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
+                    <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
                   }
+                  <button type="button" class="btn btn-ghost btn-icon designer-props-close" (click)="closeSheet()" aria-label="Close the step's properties" data-test="close-props"><app-icon name="close" /></button>
                 </div>
-                <fieldset class="form-lock flex flex-col gap-3" [disabled]="!canEdit()">
-                  <div>
-                    <label class="label" for="st-name">Name</label>
-                    <input id="st-name" class="input" maxlength="200" [ngModel]="s.name" (ngModelChange)="set('name', $event)" />
-                  </div>
-                  <div>
-                    <label class="label" for="st-key">Key</label>
-                    <input id="st-key" class="input font-mono" maxlength="64" [ngModel]="s.key" (change)="rekey($any($event.target).value)" />
-                  </div>
-
-                  @if (s.type === 'approval' || s.type === 'task') {
-                    <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'assignee', who: s.assignee, label: s.type === 'approval' ? 'Who approves' : 'Who does it', allowNone: false }" />
-                    <div class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="label" for="st-sla">Due in (hours)</label>
-                        <input id="st-sla" type="number" min="1" max="2160" class="input" placeholder="No due time" [ngModel]="s.slaHours" (ngModelChange)="set('slaHours', numberOrNull($event))" />
-                      </div>
-                      <div>
-                        <label class="label" for="st-rem">Remind before (hours)</label>
-                        <input id="st-rem" type="number" min="1" class="input" [disabled]="!s.slaHours" [ngModel]="s.reminderHours" (ngModelChange)="set('reminderHours', numberOrNull($event))" />
-                      </div>
+                <div class="designer-props-body">
+                  <fieldset class="form-lock flex flex-col gap-3" [disabled]="!canEdit()">
+                    <div>
+                      <label class="label" for="st-name">Name</label>
+                      <input id="st-name" class="input" maxlength="200" [ngModel]="s.name" (ngModelChange)="set('name', $event)" />
                     </div>
-                    @if (s.slaHours) {
-                      <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'escalateTo', who: s.escalateTo ?? { kind: 'manager' }, label: 'When overdue, it goes to', allowNone: false, noRequester: true }" />
+                    <div>
+                      <label class="label" for="st-key">Key</label>
+                      <input id="st-key" class="input font-mono" maxlength="64" [ngModel]="s.key" (change)="rekey($any($event.target).value)" />
+                    </div>
+
+                    @if (s.type === 'approval' || s.type === 'task') {
+                      <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'assignee', who: s.assignee, label: s.type === 'approval' ? 'Who approves' : 'Who does it', allowNone: false }" />
+                      <div class="grid grid-cols-2 gap-3">
+                        <div>
+                          <label class="label" for="st-sla">Due in (hours)</label>
+                          <input id="st-sla" type="number" min="1" max="2160" class="input" placeholder="No due time" [ngModel]="s.slaHours" (ngModelChange)="set('slaHours', numberOrNull($event))" />
+                        </div>
+                        <div>
+                          <label class="label" for="st-rem">Remind before (hours)</label>
+                          <input id="st-rem" type="number" min="1" class="input" [disabled]="!s.slaHours" [ngModel]="s.reminderHours" (ngModelChange)="set('reminderHours', numberOrNull($event))" />
+                        </div>
+                      </div>
+                      @if (s.slaHours) {
+                        <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'escalateTo', who: s.escalateTo ?? { kind: 'manager' }, label: 'When overdue, it goes to', allowNone: false, noRequester: true }" />
+                      }
+                      @if (s.type === 'approval' && soleMember()) {
+                        <!-- P2 #36: no one approves their own request, so with one person nothing would ever be decided. -->
+                        <p class="flex items-start gap-2 rounded-md px-3 py-2 text-xs bg-sunken text-[color:var(--text-secondary)]" role="note" data-sole-member>
+                          <app-icon name="info" size="0.95em" class="mt-px shrink-0" />
+                          <span>You are the only person in this workspace. No one approves their own request, so a request you start here waits
+                            until someone else joins and can decide it.</span>
+                        </p>
+                      }
+                      @if (s.type === 'approval') {
+                        <label class="flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="s.rejectNeedsComment" (ngModelChange)="set('rejectNeedsComment', $event)" />A rejection needs a reason</label>
+                        <div>
+                          <label class="label" for="st-onreject">If rejected</label>
+                          <select id="st-onreject" class="input" [ngModel]="s.onReject || 'end'" (ngModelChange)="set('onReject', $event)">
+                            <option value="end">The request ends, rejected</option>
+                            @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">Go to {{ t.label }}</option> } }
+                          </select>
+                        </div>
+                      }
                     }
-                    @if (s.type === 'approval' && soleMember()) {
-                      <!-- P2 #36: no one approves their own request, so with one person nothing would ever be decided. -->
-                      <p class="flex items-start gap-2 rounded-md px-3 py-2 text-xs bg-sunken text-[color:var(--text-secondary)]" role="note" data-sole-member>
-                        <app-icon name="info" size="0.95em" class="mt-px shrink-0" />
-                        <span>You are the only person in this workspace. No one approves their own request, so a request you start here waits
-                          until someone else joins and can decide it.</span>
-                      </p>
-                    }
-                    @if (s.type === 'approval') {
-                      <label class="flex items-center gap-2 text-sm"><input type="checkbox" [ngModel]="s.rejectNeedsComment" (ngModelChange)="set('rejectNeedsComment', $event)" />A rejection needs a reason</label>
+
+                    @if (s.type === 'condition') {
                       <div>
-                        <label class="label" for="st-onreject">If rejected</label>
-                        <select id="st-onreject" class="input" [ngModel]="s.onReject || 'end'" (ngModelChange)="set('onReject', $event)">
-                          <option value="end">The request ends, rejected</option>
+                        <label class="label" for="st-field">Field of the request</label>
+                        <input id="st-field" class="input font-mono" placeholder="amount, or patient.age" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
+                      </div>
+                      <div class="grid grid-cols-2 gap-3">
+                        <div>
+                          <label class="label" for="st-op">Test</label>
+                          <select id="st-op" class="input" [ngModel]="s.condition?.op" (ngModelChange)="setCondition('op', $event)">
+                            @for (o of operators; track o.op) { <option [value]="o.op">{{ o.label }}</option> }
+                          </select>
+                        </div>
+                        @if (needsValue(s)) {
+                          <div>
+                            <label class="label" for="st-val">Value</label>
+                            <input id="st-val" class="input" [placeholder]="s.condition?.op === 'in' ? 'a, b, c' : ''" [ngModel]="conditionValue(s)" (change)="setCondition('value', $any($event.target).value)" />
+                          </div>
+                        }
+                      </div>
+                      <div class="grid grid-cols-2 gap-3">
+                        <div>
+                          <label class="label" for="st-yes">If yes, go to</label>
+                          <select id="st-yes" class="input" [ngModel]="s.whenTrue || 'end'" (ngModelChange)="set('whenTrue', $event)">
+                            <option value="end">End</option>
+                            @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">{{ t.label }}</option> } }
+                          </select>
+                        </div>
+                        <div>
+                          <label class="label" for="st-no">If no, go to</label>
+                          <select id="st-no" class="input" [ngModel]="s.whenFalse || 'end'" (ngModelChange)="set('whenFalse', $event)">
+                            <option value="end">End</option>
+                            @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">{{ t.label }}</option> } }
+                          </select>
+                        </div>
+                      </div>
+                    }
+
+                    @if (s.type === 'notify') {
+                      <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'to', who: s.to, label: 'Tell', allowNone: false }" />
+                      <div>
+                        <label class="label" for="st-msg">Message</label>
+                        <textarea id="st-msg" class="input resize-y min-h-16" rows="3" maxlength="500" [ngModel]="s.message" (ngModelChange)="set('message', $event)"></textarea>
+                      </div>
+                    }
+
+                    @if (s.type === 'run_pipeline') {
+                      <div>
+                        <label class="label" for="st-job">Schedule to run</label>
+                        <app-combobox id="st-job" [numeric]="true" placeholder="Search schedules…" [allowClear]="false" [disabled]="!canEdit()"
+                                      [options]="jobOptions()" [ngModel]="s.jobId == null ? null : s.jobId" (ngModelChange)="set('jobId', numberOrNull($event))" />
+                      </div>
+                      <div>
+                        <label class="label" for="st-err">If it cannot start</label>
+                        <select id="st-err" class="input" [ngModel]="s.onError || 'fail'" (ngModelChange)="set('onError', $event)">
+                          <option value="fail">Stop the request</option>
+                          <option value="continue">Carry on</option>
+                        </select>
+                      </div>
+                    }
+
+                    @if (s.type === 'save_dataset') {
+                      <div>
+                        <label class="label" for="st-ds">Dataset</label>
+                        <input id="st-ds" class="input font-mono" maxlength="100" [ngModel]="s.dataset" (ngModelChange)="set('dataset', $event)" />
+                      </div>
+                    }
+
+                    @if (s.type === 'wait') {
+                      <div>
+                        <label class="label" for="st-hours">Hours</label>
+                        <input id="st-hours" type="number" min="1" class="input" [ngModel]="s.hours" (ngModelChange)="set('hours', numberOrNull($event))" />
+                      </div>
+                    }
+
+                    @if (s.type !== 'condition') {
+                      <div>
+                        <label class="label" for="st-next">Then</label>
+                        <select id="st-next" class="input" [ngModel]="s.next || ''" (ngModelChange)="set('next', $event || null)">
+                          <option value="">The step below</option>
+                          <option value="end">End the request</option>
                           @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">Go to {{ t.label }}</option> } }
                         </select>
                       </div>
                     }
-                  }
-
-                  @if (s.type === 'condition') {
-                    <div>
-                      <label class="label" for="st-field">Field of the request</label>
-                      <input id="st-field" class="input font-mono" placeholder="amount, or patient.age" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="label" for="st-op">Test</label>
-                        <select id="st-op" class="input" [ngModel]="s.condition?.op" (ngModelChange)="setCondition('op', $event)">
-                          @for (o of operators; track o.op) { <option [value]="o.op">{{ o.label }}</option> }
-                        </select>
-                      </div>
-                      @if (needsValue(s)) {
-                        <div>
-                          <label class="label" for="st-val">Value</label>
-                          <input id="st-val" class="input" [placeholder]="s.condition?.op === 'in' ? 'a, b, c' : ''" [ngModel]="conditionValue(s)" (change)="setCondition('value', $any($event.target).value)" />
-                        </div>
-                      }
-                    </div>
-                    <div class="grid grid-cols-2 gap-3">
-                      <div>
-                        <label class="label" for="st-yes">If yes, go to</label>
-                        <select id="st-yes" class="input" [ngModel]="s.whenTrue || 'end'" (ngModelChange)="set('whenTrue', $event)">
-                          <option value="end">End</option>
-                          @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">{{ t.label }}</option> } }
-                        </select>
-                      </div>
-                      <div>
-                        <label class="label" for="st-no">If no, go to</label>
-                        <select id="st-no" class="input" [ngModel]="s.whenFalse || 'end'" (ngModelChange)="set('whenFalse', $event)">
-                          <option value="end">End</option>
-                          @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">{{ t.label }}</option> } }
-                        </select>
-                      </div>
-                    </div>
-                  }
-
-                  @if (s.type === 'notify') {
-                    <ng-container *ngTemplateOutlet="whoPicker; context: { field: 'to', who: s.to, label: 'Tell', allowNone: false }" />
-                    <div>
-                      <label class="label" for="st-msg">Message</label>
-                      <textarea id="st-msg" class="input resize-y min-h-16" rows="3" maxlength="500" [ngModel]="s.message" (ngModelChange)="set('message', $event)"></textarea>
-                    </div>
-                  }
-
-                  @if (s.type === 'run_pipeline') {
-                    <div>
-                      <label class="label" for="st-job">Schedule to run</label>
-                      <app-combobox id="st-job" [numeric]="true" placeholder="Search schedules…" [allowClear]="false" [disabled]="!canEdit()"
-                                    [options]="jobOptions()" [ngModel]="s.jobId == null ? null : s.jobId" (ngModelChange)="set('jobId', numberOrNull($event))" />
-                    </div>
-                    <div>
-                      <label class="label" for="st-err">If it cannot start</label>
-                      <select id="st-err" class="input" [ngModel]="s.onError || 'fail'" (ngModelChange)="set('onError', $event)">
-                        <option value="fail">Stop the request</option>
-                        <option value="continue">Carry on</option>
-                      </select>
-                    </div>
-                  }
-
-                  @if (s.type === 'save_dataset') {
-                    <div>
-                      <label class="label" for="st-ds">Dataset</label>
-                      <input id="st-ds" class="input font-mono" maxlength="100" [ngModel]="s.dataset" (ngModelChange)="set('dataset', $event)" />
-                    </div>
-                  }
-
-                  @if (s.type === 'wait') {
-                    <div>
-                      <label class="label" for="st-hours">Hours</label>
-                      <input id="st-hours" type="number" min="1" class="input" [ngModel]="s.hours" (ngModelChange)="set('hours', numberOrNull($event))" />
-                    </div>
-                  }
-
-                  @if (s.type !== 'condition') {
-                    <div>
-                      <label class="label" for="st-next">Then</label>
-                      <select id="st-next" class="input" [ngModel]="s.next || ''" (ngModelChange)="set('next', $event || null)">
-                        <option value="">The step below</option>
-                        <option value="end">End the request</option>
-                        @for (t of targets(); track t.key) { @if (t.key !== s.key) { <option [value]="t.key">Go to {{ t.label }}</option> } }
-                      </select>
-                    </div>
-                  }
-                </fieldset>
+                  </fieldset>
+                </div>
               } @else {
-                <p class="py-10 text-center text-sm text-[color:var(--text-muted)]">
+                <div class="designer-props-head designer-props-head-empty">
+                  <button type="button" class="btn btn-ghost btn-icon designer-props-close" (click)="closeSheet()" aria-label="Close the step's properties"><app-icon name="close" /></button>
+                </div>
+                <p class="py-10 px-4 text-center text-sm text-[color:var(--text-muted)]">
                   @if (steps().length) { Pick a step to change it. } @else { No steps yet. @if (canEdit()) { Add the first one. } }
                 </p>
               }
@@ -311,60 +341,121 @@
         }
 
         @if (view() === 'history') {
-          <section class="card overflow-clip" aria-label="Versions" data-test="versions">
-            @for (v of wf.versions; track v.version) {
-              <div class="inbox-row cursor-default">
-                <app-icon name="history" class="icon-muted shrink-0 mt-0.5" />
-                <span class="min-w-0 flex-1">
-                  <span class="block font-medium text-sm">Version {{ v.version }} @if (v.version === wf.currentVersion) { <span class="text-xs text-[color:var(--text-muted)]">· current</span> }</span>
-                  <span class="block text-xs text-[color:var(--text-muted)]">{{ stepCount(v.steps) }} steps · {{ when(v.dateCreated) }}@if (v.createdBy) { · {{ personName(v.createdBy) }} }</span>
-                  @if (v.note) { <span class="block text-xs text-[color:var(--text-secondary)]">{{ v.note }}</span> }
-                </span>
-                @if (canEdit() && v.version !== wf.currentVersion) {
-                  <button type="button" class="btn btn-default btn-sm" (click)="restore(v.version)">Load into the draft</button>
-                }
-              </div>
-            } @empty {
-              <p class="p-6 text-center text-sm text-[color:var(--text-muted)]">Nothing published yet.</p>
-            }
-          </section>
+          <div class="designer-scroll">
+            <ol class="designer-versions" aria-label="Versions" data-test="versions">
+              @for (v of wf.versions; track v.version) {
+                <li class="designer-version" [attr.data-version]="v.version">
+                  <span class="min-w-0 flex-1">
+                    <span class="flex items-center gap-2 font-medium text-sm">Version {{ v.version }}
+                      @if (v.version === wf.currentVersion) { <span class="pill pill-ok">Current</span> }</span>
+                    <span class="block text-xs text-[color:var(--text-muted)]">{{ stepCount(v.steps) }} steps · {{ when(v.dateCreated) }}@if (v.createdBy) { · {{ personName(v.createdBy) }} }</span>
+                    @if (v.note) { <span class="block text-sm text-[color:var(--text-secondary)] mt-0.5">{{ v.note }}</span> }
+                  </span>
+                  @if (canEdit() && v.version !== wf.currentVersion) {
+                    <button type="button" class="btn btn-default btn-sm" (click)="restore(v.version)">Load into the draft</button>
+                  }
+                </li>
+              } @empty {
+                <li class="inbox-empty">Nothing published yet.</li>
+              }
+            </ol>
+          </div>
         }
 
         @if (view() === 'test') {
-          <section class="card p-4 flex flex-col gap-4 max-w-2xl" aria-label="Test run" data-test="test-form">
-            <p class="text-sm text-[color:var(--text-secondary)]">Starts a real request on version {{ wf.currentVersion }}, as you. Its tasks go to the people the steps name.</p>
-            @if (wf.status !== 'Active') { <p class="text-sm text-warn-500">This workflow is inactive: make it active to start a request.</p> }
-            <div class="grid gap-4 md:grid-cols-2">
-              <div>
-                <label class="label" for="t-title">Title</label>
-                <input id="t-title" class="input" maxlength="200" [placeholder]="'Test of ' + wf.name" [ngModel]="testTitle()" (ngModelChange)="testTitle.set($event)" />
+          <div class="designer-scroll">
+            <section class="p-6 flex flex-col gap-4 max-w-2xl" aria-label="Test run" data-test="test-form">
+              <p class="text-sm text-[color:var(--text-secondary)]">Starts a real request on version {{ wf.currentVersion }}, as you. Its tasks go to the people the steps name.</p>
+              @if (wf.status !== 'Active') { <p class="text-sm text-warn-500">This workflow is inactive: make it active to start a request.</p> }
+              <div class="grid gap-4 md:grid-cols-2">
+                <div>
+                  <label class="label" for="t-title">Title</label>
+                  <input id="t-title" class="input" maxlength="200" [placeholder]="'Test of ' + wf.name" [ngModel]="testTitle()" (ngModelChange)="testTitle.set($event)" />
+                </div>
+                <div>
+                  <label class="label" for="t-sid">Reference</label>
+                  <input id="t-sid" class="input font-mono" maxlength="100" placeholder="Made up if empty" [ngModel]="testSubjectId()" (ngModelChange)="testSubjectId.set($event)" />
+                </div>
               </div>
               <div>
-                <label class="label" for="t-sid">Reference</label>
-                <input id="t-sid" class="input font-mono" maxlength="100" placeholder="Made up if empty" [ngModel]="testSubjectId()" (ngModelChange)="testSubjectId.set($event)" />
+                <label class="label" for="t-subject">The request's fields (JSON)</label>
+                <textarea id="t-subject" class="input font-mono text-xs resize-y min-h-32" rows="6" [ngModel]="testSubject()" (ngModelChange)="testSubject.set($event)"></textarea>
               </div>
-            </div>
-            <div>
-              <label class="label" for="t-subject">The request's fields (JSON)</label>
-              <textarea id="t-subject" class="input font-mono text-xs resize-y min-h-32" rows="6" [ngModel]="testSubject()" (ngModelChange)="testSubject.set($event)"></textarea>
-            </div>
-            <div class="flex items-center gap-3 flex-wrap">
-              <button type="button" class="btn btn-primary" [disabled]="busy() || wf.status !== 'Active'" (click)="testRun()" data-test="start-test"><app-icon name="play" />Start test request</button>
-              @if (testStarted(); as t) {
-                <a class="text-sm text-accent hover:underline" [routerLink]="['/workflows/requests']" [queryParams]="{ id: t.id }" data-test="test-link">{{ t.title }} · request #{{ t.id }} is {{ t.state.toLowerCase() }} — open it</a>
-              }
-            </div>
-          </section>
+              <div class="flex items-center gap-3 flex-wrap">
+                <button type="button" class="btn btn-primary" [disabled]="busy() || wf.status !== 'Active'" (click)="testRun()" data-test="start-test"><app-icon name="play" />Start test request</button>
+                @if (testStarted(); as t) {
+                  <a class="text-sm text-accent hover:underline" [routerLink]="['/workflows/requests']" [queryParams]="{ id: t.id }" data-test="test-link">{{ t.title }} · request #{{ t.id }} is {{ t.state.toLowerCase() }} — open it</a>
+                }
+              </div>
+            </section>
+          </div>
         }
-      </div>
-    } @else if (!loading()) {
-      <section class="card p-10 text-center text-sm text-[color:var(--text-muted)]">
-        <app-icon name="layers" size="1.6rem" class="icon-muted block mx-auto mb-2" />
-        @if (canEdit()) { Create a workflow to start. } @else { No workflows in this workspace yet. }
-      </section>
-    }
+
+        <!-- Publishing, pinned at the pane's foot: never lost below the canvas, and loud once something is unpublished. -->
+        @if (canEdit() && (view() === 'steps' || dirty())) {
+          <footer class="designer-foot" [class.is-dirty]="dirty()" data-test="publish-bar">
+            @if (workflowProblems().length) {
+              <div class="designer-foot-problems" role="alert">
+                @for (p of workflowProblems(); track p) { <p class="designer-problem"><app-icon name="alert" size="0.9em" />{{ p }}</p> }
+              </div>
+            }
+            @if (dirty()) {
+              <span class="pill pill-warn designer-foot-chip"><app-icon name="edit" size="0.9em" />Unpublished changes</span>
+              <div class="designer-foot-note">
+                <label class="sr-only" for="wf-note">What changed</label>
+                <input id="wf-note" class="input input-sm" maxlength="500" placeholder="What changed: a note for the version history (optional)" [ngModel]="note()" (ngModelChange)="note.set($event)" data-test="publish-note" />
+              </div>
+              <button type="button" class="btn btn-ghost btn-sm" (click)="discard()" data-test="discard">Discard changes</button>
+            } @else {
+              <p class="designer-foot-quiet" data-test="publish-clean">
+                @if (wf.currentVersion) { Version {{ wf.currentVersion }} is live. A change here stays a draft until you publish it. }
+                @else { Nothing published yet. }
+              </p>
+            }
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="!dirty() || !steps().length || busy()" (click)="publish()" data-test="publish">
+              <app-icon name="upload" />Publish version {{ (wf.currentVersion || 0) + 1 }}</button>
+          </footer>
+        }
+      } @else if (!loading()) {
+        <div class="inbox-empty">
+          <app-icon name="layers" size="1.6rem" class="icon-muted block mx-auto mb-2" />
+          @if (canEdit()) { Create a workflow to start. } @else { No workflows in this workspace yet. }
+        </div>
+      }
+    </section>
   </div>
 </div>
+
+<!-- Where a step goes in between two others: the connector, with an add button on it, or the menu once pressed. -->
+<ng-template #slot let-at="at" let-after="after">
+  @if (canEdit()) {
+    @if (adding() && insertAt() === at) {
+      <div class="designer-link" aria-hidden="true"></div>
+      <ng-container *ngTemplateOutlet="addMenu" />
+      <div class="designer-link" aria-hidden="true"></div>
+    } @else {
+      <div class="designer-gap">
+        <button type="button" class="btn-circle designer-insert" (click)="openAdd(at)" [attr.aria-label]="'Add a step after “' + stepName(after) + '”'"
+                title="Add a step here" data-test="insert-step" [attr.data-at]="at"><app-icon name="plus" size="0.9em" /></button>
+      </div>
+    }
+  } @else {
+    <div class="designer-link" aria-hidden="true"></div>
+  }
+</ng-template>
+
+<!-- The step types to add, each with what it does. -->
+<ng-template #addMenu>
+  <div class="card designer-add" data-test="add-menu" role="group" aria-label="Add a step">
+    @for (t of types; track t.type) {
+      <button type="button" class="designer-add-item" (click)="add(t.type)" [attr.data-add]="t.type">
+        <span [class]="'designer-props-icon pill-' + t.tone"><app-icon [name]="t.icon" size="0.95em" /></span>
+        <span class="text-left"><span class="block text-sm font-medium">{{ t.label }}</span><span class="block text-xs text-[color:var(--text-muted)]">{{ t.hint }}</span></span>
+      </button>
+    }
+    <button type="button" class="btn btn-ghost btn-sm justify-self-start" (click)="cancelAdd()">Cancel</button>
+  </div>
+</ng-template>
 
 <!-- Who a step is for: a person, a role, a group, the requester's manager, or the requester -->
 <ng-template #whoPicker let-field="field" let-who="who" let-label="label" let-noRequester="noRequester">
