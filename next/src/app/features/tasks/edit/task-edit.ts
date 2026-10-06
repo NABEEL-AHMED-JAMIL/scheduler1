@@ -148,6 +148,21 @@ export class TaskEdit implements OnInit {
   private profilesLoaded = false;
   readonly selectedProfileId = signal<number | null>(null);
   readonly topicsLoading = signal(false);
+  /** The connection whose topics last arrived (null until one has): an empty list is only "none" once it is an answer. */
+  private readonly topicsAnsweredFor = signal<number | null>(null);
+  /**
+   * MIG-324: the picked connection has answered, with no topic. A new workspace starts here, and the box alone only said
+   * "No matches"; the hint now says where a topic is added.
+   */
+  readonly noTopicsHere = computed(() => {
+    const profile = this.selectedProfileId();
+    return profile != null && !this.topicsLoading() && this.topicsAnsweredFor() === profile && this.taskTypes().length === 0;
+  });
+  readonly topicHint = computed(() => this.topicsLoading()
+    ? 'Loading this connection’s topics…'
+    : this.noTopicsHere()
+      ? 'No topic publishes through this connection yet. Add one under Configuration › Kafka & Topics, then pick it here.'
+      : 'Where this pipeline publishes. The registry tasks on it come next.');
   /** The topic the task was opened with, named before its profile's list has arrived. */
   readonly loadedTopicLabel = signal('');
   readonly profileOptions = computed<ComboboxOption[]>(() => this.profiles().map(p => ({
@@ -186,7 +201,7 @@ export class TaskEdit implements OnInit {
       next: response => {
         if (ticket !== this.topicsTicket) return;
         this.topicsLoading.set(false);
-        if (response.status === API_SUCCESS) this.taskTypes.set(response.data ?? []);
+        if (response.status === API_SUCCESS) { this.taskTypes.set(response.data ?? []); this.topicsAnsweredFor.set(profileId); }
         else this.toast.error(response.message || 'Could not load the topics.');
       },
       error: () => { if (ticket === this.topicsTicket) { this.topicsLoading.set(false); this.toast.error('Could not load the topics.'); } },
@@ -718,6 +733,14 @@ export class TaskEdit implements OnInit {
   /** Once a legacy pipeline's steps are open, Details is one tab of several rather than the whole page again. */
   private readonly stepsOpened = signal(false);
 
+  /**
+   * MIG-324: Details offers the step builder to a pipeline that has no saved steps. Such a run is handed to whatever
+   * worker reads the topic, and in a new workspace nothing does -- the run sat in Start. The builder was there all
+   * along, but only at ?tab=steps. Not where the builder is locked (a MANAGED workspace) or before the task exists.
+   */
+  readonly offerSteps = computed(() =>
+    this.isEdit() && !this.locked() && !this.stepsMode() && this.stepsView()?.legacy === true);
+
   readonly pageTabs = PAGE_TABS;
 
   readonly activeTab = computed<PageTab>(() => {
@@ -853,7 +876,10 @@ export class TaskEdit implements OnInit {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {
           this.toast.success(this.isEdit() ? 'Task updated.' : 'Task created.');
-          this.router.navigate(['/pipelines']);
+          // MIG-324: a new pipeline opens on its own page, where its steps are built next. Core names the new id only
+          // in its message ("... saved with ID 1877."); without one, the list as before.
+          const created = this.isEdit() ? null : /\bID (\d+)\b/.exec(response.message ?? '');
+          this.router.navigate(created ? ['/pipelines', Number(created[1]), 'edit'] : ['/pipelines']);
         } else {
           this.toast.error(response.message || 'The task could not be saved.');
         }

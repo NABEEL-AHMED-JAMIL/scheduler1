@@ -168,6 +168,14 @@
               <td class="min-w-44 max-w-96">
                 <app-data-text class="block font-medium" [value]="f.fileName" label="File" />
                 @if (f.contentType) { <span class="block text-xs text-[color:var(--text-muted)]">{{ f.contentType }}</span> }
+                <!-- MIG-324: the key a pipeline's Read step names this file by. -->
+                @if (f.key) {
+                  <span class="flex items-center gap-1 min-w-0 text-xs text-[color:var(--text-muted)]">
+                    <span class="mono truncate" [title]="f.key">{{ f.key }}</span>
+                    <app-copy-button [value]="'the key of ' + f.fileName" [copied]="copiedKey() === f.arrivalId"
+                                     copiedLabel="Key copied" (copy)="copyKey(f)" />
+                  </span>
+                }
               </td>
               <td class="text-right tabular whitespace-nowrap">{{ formatSize(f.bytes) }}</td>
               <td class="whitespace-nowrap">{{ uploader(f) }}</td>

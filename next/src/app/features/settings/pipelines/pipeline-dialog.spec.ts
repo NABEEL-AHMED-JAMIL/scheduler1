@@ -21,8 +21,9 @@ import { API_SUCCESS } from '../../../core/api/api.config';
  * them all saved without complaint before this and produced a blank <select> on somebody else's
  * screen, hours later, with nothing pointing back at the form that caused it.
  */
-function dialogFor(form?: Pipeline) {
+function dialogFor(form?: Pipeline, topics: unknown[] = []) {
   const post = vi.fn(() => of({ status: API_SUCCESS, message: 'saved' }));
+  const get = vi.fn(() => of({ status: API_SUCCESS, data: topics }));
   const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
   const close = vi.fn();
   TestBed.resetTestingModule();
@@ -30,13 +31,38 @@ function dialogFor(form?: Pipeline) {
     providers: [
       { provide: DIALOG_DATA, useValue: form ? { form } : {} },
       { provide: DialogRef, useValue: { close } },
-      { provide: HttpClient, useValue: { post } },
+      { provide: HttpClient, useValue: { post, get } },
       { provide: ToastService, useValue: toast },
     ],
   });
   const dialog = TestBed.runInInjectionContext(() => new PipelineDialog());
-  return { dialog, post, toast, close };
+  return { dialog, post, get, toast, close };
 }
+
+/**
+ * MIG-324: in a new workspace the topic box was empty and only said "No matches" -- a dead end for an administrator
+ * who did not yet know topics are added under Kafka & Topics. A new pipeline asks once whether the workspace has any.
+ */
+describe('PipelineDialog -- a workspace with no topic yet', () => {
+  it('says where a topic is added when the workspace has none', () => {
+    const { dialog, get } = dialogFor();
+    expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/setting\.json\/topics$/), { params: { q: '', limit: 1 } });
+    expect(dialog.noTopicsYet()).toBe(true);
+    expect(dialog.topicHint()).toContain('Kafka & Topics');
+  });
+
+  it('keeps the usual hint when the workspace has a topic', () => {
+    const { dialog } = dialogFor(undefined, [{ sourceTaskTypeId: 1, serviceName: 'Orders intake' }]);
+    expect(dialog.noTopicsYet()).toBe(false);
+    expect(dialog.topicHint()).not.toContain('Kafka & Topics');
+  });
+
+  it('does not ask when an existing pipeline is edited: it has its topic', () => {
+    const { dialog, get } = dialogFor(selectForm(null));
+    expect(get).not.toHaveBeenCalled();
+    expect(dialog.noTopicsYet()).toBe(false);
+  });
+});
 
 function selectForm(fieldOptions: string | null, defaultValue: string | null = null): Pipeline {
   return {

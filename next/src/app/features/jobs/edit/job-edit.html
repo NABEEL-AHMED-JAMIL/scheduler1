@@ -33,7 +33,7 @@
                      [control]="form.get('jobName')" [submitted]="submitted()">
             <input id="jobName" class="input" formControlName="jobName"
                    [class.input-invalid]="form.get('jobName')?.invalid && (form.get('jobName')?.touched || submitted())"
-                   placeholder="Nightly hurricane export" />
+                   placeholder="Nightly orders export" />
           </app-field>
 
           <app-field label="Task" for="task" [required]="true"

@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -200,11 +201,11 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
 
 @Component({
   selector: 'app-pipeline-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog, Icon, Combobox],
+  imports: [ReactiveFormsModule, RouterLink, Field, FormDialog, Icon, Combobox],
   template: `
     <app-form-dialog
         [heading]="isEdit() ? 'Edit pipeline' : 'New pipeline'"
-        subtitle="A pipeline is its id, the topic it publishes on, and the fields a task on it fills in — creating one here is what makes it choosable on Source Task, in place of a hand-written XML tag."
+        subtitle="A pipeline is its id, the topic it publishes on, and the fields a task on it fills in. Creating one here is what makes it choosable under Pipelines › New pipeline, as its registry task."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create pipeline'"
         [saving]="saving()" size="xwide"
         (cancelled)="ref.close(false)" (confirmed)="save()">
@@ -212,25 +213,28 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
         <div class="form-grid">
           <app-field label="Pipeline ID" for="pipelineId" [required]="true"
                      [control]="form.get('pipelineId')" [submitted]="submitted()"
-                     hint="The id the worker routes on, and what Source Task's Pipeline field will show. One form per pipeline.">
+                     hint="The id runs know it by, and what a pipeline's Registry task box shows. One form per pipeline.">
             <input id="pipelineId" class="input mono" formControlName="pipelineId"
-                   placeholder="F768926" />
+                   placeholder="ORDERS_IMPORT" />
           </app-field>
 
           <app-field label="Name" for="pipelineName" [required]="true"
                      [control]="form.get('pipelineName')" [submitted]="submitted()">
             <input id="pipelineName" class="input" formControlName="pipelineName"
-                   placeholder="Hurricane season collection" />
+                   placeholder="Orders import" />
           </app-field>
         </div>
 
         <app-field label="Topic" for="pipelineTopic" [required]="true"
                    [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
-                   hint="The Kafka topic this pipeline's messages go out on. Many pipelines can share one; a task picks the topic first, then the pipeline.">
+                   [hint]="topicHint()">
           <app-combobox id="pipelineTopic" formControlName="sourceTaskTypeId" [numeric]="true"
                         placeholder="Search topics…" [allowClear]="false"
                         [remote]="true" (search)="topicSearch.search($event)" [searching]="topicSearch.searching()"
                         [options]="topicSearch.options()" [selectedLabel]="topicLabel()" />
+          @if (noTopicsYet()) {
+            <a routerLink="/configuration/kafka" class="link-inline text-xs mt-1 inline-block" (click)="ref.close(false)">Open Kafka &amp; Topics</a>
+          }
         </app-field>
 
         <div class="form-grid">
@@ -300,13 +304,13 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                 <app-field label="XML tag" [for]="'tagKey' + i" [required]="true"
                            [control]="row.get('tagKey')" [submitted]="submitted()">
                   <input [id]="'tagKey' + i" class="input mono" formControlName="tagKey"
-                         placeholder="start_year" />
+                         placeholder="region" />
                 </app-field>
 
                 <app-field label="Label" [for]="'label' + i" [required]="true"
                            [control]="row.get('label')" [submitted]="submitted()">
                   <input [id]="'label' + i" class="input" formControlName="label"
-                         placeholder="First season" />
+                         placeholder="Region" />
                 </app-field>
               </div>
 
@@ -468,6 +472,22 @@ export class PipelineDialog {
    */
   readonly topicSearch = createTopicSearch(this.http);
   readonly topicLabel = computed(() => this.topicSearch.selectedLabel() || this.data.form?.topicName || '');
+  /**
+   * MIG-324: the workspace has no topic at all, so the box can only say "No matches". A new workspace starts here; a new
+   * pipeline asks once (the first topic, if any) and the hint then says where a topic is added.
+   */
+  readonly noTopicsYet = signal(false);
+  readonly topicHint = computed(() => this.noTopicsYet()
+    ? 'This workspace has no topic yet. Add one under Configuration › Kafka & Topics (it publishes through the platform’s connection unless you add your own), then come back.'
+    : 'The Kafka topic this pipeline\'s messages go out on. Many pipelines can share one; a task picks the topic first, then the pipeline.');
+
+  constructor() {
+    if (this.data.form?.pipelineKey) return;
+    this.http.get<ApiResponse<unknown[]>>(`${API_BASE}/setting.json/topics`, { params: { q: '', limit: 1 } }).subscribe({
+      next: r => this.noTopicsYet.set(r.status === API_SUCCESS && (r.data ?? []).length === 0),
+      error: () => this.noTopicsYet.set(false),
+    });
+  }
 
   readonly fieldTypes = FIELD_TYPES;
   readonly saving = signal(false);

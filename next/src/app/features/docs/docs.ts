@@ -394,7 +394,7 @@ export class Docs implements AfterViewInit {
            + 'describe any task.',
       where: 'Configuration → Kafka & Topics, then a profile’s Topics section → Add topic',
       fields: [
-        { name: 'Name', required: true, note: 'How the topic appears when a task picks it — usually the consumer’s name. For example ETL Scraping Pipeline.' },
+        { name: 'Name', required: true, note: 'How the topic appears when a task picks it — usually the consumer’s name. For example Orders intake.' },
         { name: 'Kafka topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
         { name: 'Partition', required: false, note: '* for every partition, or one index from 0 to 10. A comma-separated list is not supported.' },
         { name: 'Workspace', required: true, note: 'Which workspace owns it. A tenant administrator gets their own and is not asked; a platform administrator has to say.' },

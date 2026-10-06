@@ -18,6 +18,9 @@ import {
 import { InboxApi, InboxArrival } from './inbox.service';
 import { InboxSettingsDialog, InboxSettingsData } from './inbox-settings-dialog';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { CopyButton } from '../../../shared/ui/copy-button';
+import { copyText } from '../../../shared/ui/clipboard.util';
+import { ToastService } from '../../../shared/ui/toast.service';
 
 /** One file on its way to the inbox. */
 export interface QueuedUpload {
@@ -45,13 +48,14 @@ const LIST_LIMIT = 50;
  */
 @Component({
   selector: 'app-inbox',
-  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner],
+  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton],
   templateUrl: './inbox.html',
 })
 export class Inbox implements OnInit {
   private readonly api = inject(InboxApi);
   private readonly dialog = inject(Dialog);
   private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
 
   readonly settings = signal<InboxSettings | null>(null);
   readonly files = signal<InboxFile[]>([]);
@@ -61,6 +65,8 @@ export class Inbox implements OnInit {
   readonly filesError = signal('');
   readonly queue = signal<QueuedUpload[]>([]);
   readonly showKinds = signal(false);
+  /** The arrival whose key was just copied, so exactly one row ticks. */
+  readonly copiedKey = signal<string | null>(null);
   private readonly names = signal(new Map<number, string>());
   private nextId = 1;
   private sending = false;
@@ -94,6 +100,17 @@ export class Inbox implements OnInit {
         error: () => { /* the user numbers stand in for the names */ },
       });
     }
+  }
+
+  /**
+   * MIG-324: a pipeline's Read step names its file by the key the inbox stored it under (intake/<date>/<arrival>-<name>),
+   * which the list did not show: a new administrator could upload a file and then not tell a step where it was.
+   */
+  async copyKey(f: InboxFile): Promise<void> {
+    if (!f.key) return;
+    if (!(await copyText(f.key))) { this.toast.error('Could not copy the key. Select it and copy by hand.'); return; }
+    this.copiedKey.set(f.arrivalId);
+    setTimeout(() => { if (this.copiedKey() === f.arrivalId) this.copiedKey.set(null); }, 1500);
   }
 
   load(): void {

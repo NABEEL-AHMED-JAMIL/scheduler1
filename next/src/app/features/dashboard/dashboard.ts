@@ -49,9 +49,10 @@ const BREAKDOWN_COLUMNS = [
 
 type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
+import { GetStarted } from './get-started';
 @Component({
   selector: 'app-dashboard',
-  imports: [ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
+  imports: [ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {

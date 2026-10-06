@@ -33,6 +33,20 @@
         }
       </div>
     }
+    @if (offerSteps()) {
+      <!-- MIG-324: a pipeline with no saved steps runs by handing its payload to the worker that reads its topic. In a
+           new workspace nothing reads it, and the step builder was only reachable at ?tab=steps. -->
+      <div class="card p-4 flex flex-wrap items-center gap-3" role="note" aria-labelledby="offer-steps-title">
+        <div class="flex-1 basis-80 min-w-0">
+          <h2 id="offer-steps-title" class="text-sm font-semibold">This pipeline has no steps yet</h2>
+          <p class="text-sm text-[color:var(--text-muted)] mt-0.5">
+            Until it has, a run hands this payload to the worker that reads its topic and waits for that worker to report
+            back. Build its steps to run it on the platform instead: read a file, work on the rows, keep the result.
+          </p>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" (click)="setTab('steps')"><app-icon name="layers" />Build its steps</button>
+      </div>
+    }
     <form [formGroup]="form" (ngSubmit)="save()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
       <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
       <fieldset class="form-lock" [disabled]="locked()">
@@ -54,11 +68,14 @@
 
           <app-field label="Topic" for="taskType" [required]="true"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
-                     [hint]="topicsLoading() ? 'Loading this connection’s topics…' : 'Where this pipeline publishes. The registry tasks on it come next.'">
+                     [hint]="topicHint()">
             <app-combobox id="taskType" formControlName="sourceTaskTypeId" [numeric]="true"
                           [placeholder]="selectedProfileId() == null ? 'Pick a Kafka connection first' : 'Search this connection’s topics…'"
                           clearLabel="None" [selectedLabel]="loadedTopicLabel()"
                           [options]="topicOptions()" />
+            @if (noTopicsHere()) {
+              <a routerLink="/configuration/kafka" class="link-inline text-xs mt-1 inline-block">Add a topic</a>
+            }
           </app-field>
 
           <!-- "Registry task", not "Pipeline": this page's own record is the pipeline (UI review U11). -->

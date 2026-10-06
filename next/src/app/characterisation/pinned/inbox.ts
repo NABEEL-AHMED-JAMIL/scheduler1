@@ -57,6 +57,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
+      "Copy the key of live-customers.csv",
       "Refresh",
       "What the inbox accepts"
     ],
@@ -112,6 +113,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
+      "Copy the key of live-customers.csv",
       "Inbox settings",
       "Refresh",
       "What the inbox accepts"

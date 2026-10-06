@@ -20,14 +20,14 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Default value",
       "Description",
-      "F768926",
-      "First season",
       "Help text",
-      "Hurricane season collection",
       "Label *(required)",
       "Name *(required)",
       "Nested under",
+      "ORDERS_IMPORT",
+      "Orders import",
       "Pipeline ID *(required)",
+      "Region",
       "Required",
       "Search topics…",
       "Shown under the field",
@@ -36,7 +36,7 @@ export const PINNED: Record<string, unknown> = {
       "Type",
       "What a task on this pipeline collects",
       "XML tag *(required)",
-      "start_year"
+      "region"
     ],
     "links": [],
     "items": []
