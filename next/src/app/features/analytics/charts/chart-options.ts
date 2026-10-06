@@ -404,7 +404,7 @@ const pareto: Builder = (table, s, theme) => {
         type: 'line', name: 'Running share', yAxisIndex: 1, data: share, smooth: 0.2, symbolSize: 4, showSymbol: n <= 40,
         tooltip: { valueFormatter: (v: number) => formatNumber(v, 'percent') },
         lineStyle: { width: 2, color: theme.palette[1] }, itemStyle: { color: theme.palette[1] },
-        markLine: { silent: true, symbol: 'none', lineStyle: { type: 'dashed', width: 1 }, label: { formatter: '80%' }, data: [{ yAxis: 80 }] },
+        markLine: { silent: true, symbol: 'none', lineStyle: { type: 'dashed', width: 1 }, label: { show: false }, data: [{ yAxis: 80 }] },
       },
     ],
   };
@@ -422,8 +422,9 @@ const barLine: Builder = (table, s) => {
     tooltip: tooltip(s, 'axis', unitOf(s)),
     xAxis: axisFrom({ type: 'category', data: xs }, s.xAxis, false),
     yAxis: [
-      axisFrom({ type: 'value', name: bars.name, nameTextStyle: { align: 'left' } }, s.yAxis, true),
-      { type: 'value', name: line.name, splitLine: { show: false }, axisLabel: { formatter: axisNumber('compact') } },
+      // Unnamed: the legend names both, and a name on the right axis sat under the toolbox.
+      axisFrom({ type: 'value' }, s.yAxis, true),
+      { type: 'value', splitLine: { show: false }, axisLabel: { formatter: axisNumber('compact') } },
     ],
     dataZoom: dataZoom(zoom, 'x', n),
     series: [
@@ -457,7 +458,8 @@ const pictorialBar: Builder = (table0, s) => {
   const table = cut(table0, s);
   const xs = labels(table);
   return {
-    grid: gridBox(s, undefined, false, true),
+    // Room on the right for the value written past the longest bar.
+    grid: { ...gridBox(s, undefined, false, true), right: 48 },
     tooltip: tooltip(s, 'axis', unitOf(s)),
     xAxis: axisFrom({ type: 'value', splitLine: { show: false } }, s.xAxis, true),
     yAxis: axisFrom({ type: 'category', data: xs, inverse: true, axisTick: { show: false } }, s.yAxis, false),
@@ -1049,6 +1051,7 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
   if (settings.title?.text || settings.title?.subtext) {
     out['title'] = { text: settings.title.text ?? '', subtext: settings.title.subtext ?? '', left: 'left', top: 0, itemGap: 4 };
   }
+  quietLabels(out, theme.tokens);
   const tools = settings.toolbox ?? {};
   if (context.interactive && (tools.saveImage !== false || tools.dataView !== false)) {
     makeRoomForToolbox(out);
@@ -1071,6 +1074,22 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
     };
   }
   return out;
+}
+
+/**
+ * A label written beside a mark rather than on it is text on the card: the card's secondary text
+ * colour and no halo. ECharts 6 outlines such labels in a dark stroke by default, which read as
+ * smudged bold type on the dark card. Labels inside a mark keep ECharts' own contrast choice.
+ */
+function quietLabels(option: EOption, tokens: ChartTokenSet): void {
+  const inside = new Set(['inside', 'inner', 'insideTop', 'insideBottom', 'insideLeft', 'insideRight', 'middle', 'center']);
+  for (const one of (option['series'] as Obj[] | undefined) ?? []) {
+    const label = one['label'] as Obj | undefined;
+    if (!label || one['type'] === 'treemap' || one['type'] === 'sunburst' || one['type'] === 'heatmap' || one['type'] === 'funnel') continue;
+    if (inside.has(String(label['position'] ?? ''))) continue;
+    if (label['color'] === undefined) label['color'] = tokens.textSecondary;
+    label['textBorderWidth'] = 0;
+  }
 }
 
 /**
