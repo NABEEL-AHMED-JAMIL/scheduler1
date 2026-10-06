@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext, Browser, Page, Response } from '@playwright/test';
+import { test, expect, Browser, Page, Response } from '@playwright/test';
+import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
 
 /**
  * MIG-248: Sources end to end, as a workspace administrator -- create a FILE source on the workspace's own storage
@@ -19,31 +20,14 @@ import { test, expect, APIRequestContext, Browser, Page, Response } from '@playw
  * in place: the workspace's owner clears test data.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 const STORAGE = process.env['E2E_SOURCE_STORAGE'] ?? 'ui-review-s3';
 const CSV_PATH = process.env['E2E_SOURCE_PATH'] ?? 'sources-live-check/live-customers.csv';
 
 const STAMP = Date.now().toString(36);
-const SOURCE = `UI-CHECK e2e source ${STAMP}`;
-const CONNECTION = `UI-CHECK e2e db ${STAMP}`;
-const CONTRACT = `UI-CHECK e2e contract ${STAMP}`;
+const SOURCE = `E2E source ${STAMP}`;
+const CONNECTION = `E2E db ${STAMP}`;
+const CONTRACT = `E2E contract ${STAMP}`;
 const PASSWORD = `e2e-db-password-${STAMP}-${Math.random().toString(36).slice(2)}`;
-
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
 
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
   const context = await browser.newContext();
@@ -69,10 +53,10 @@ function watchForPassword(page: Page): { leaks: string[]; scanned: () => number 
 }
 
 test.describe('Sources', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
 
   test('a file source: create → test → preview → schema', async ({ browser }) => {
     test.setTimeout(120_000);

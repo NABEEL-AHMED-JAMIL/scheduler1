@@ -1,53 +1,43 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { getJson, jobNamed } from './support/workspace';
 
 /**
  * Wave 5 by Friday (owner 2026-09-29): Forms (lite) and the result review (MIG-237) as workspace 2924's administrator
  * (4537), and the menu without the deferred modules (Data Catalog, Connector Hub). Read-only: it submits
  * nothing, decides no review and saves no form.
  *
- * Live data it reads: the Active form "Wound follow-up (synthetic, demo)" (form 1000, linked to job 2853, the wound
- * assessment), and job 2853's newest run whose review is still pending (found at start through the API; a form
- * submission or an inbox batch makes one). Sign-in: E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh
- * 4537 900).
+ * Live data it reads, found by name (MIG-330: the job was pinned as 2853): the Active form "Wound follow-up (synthetic,
+ * demo)", linked to the job "Wound intake job (synthetic, MIG-255)", the wound assessment, and that job's newest run
+ * whose review is still pending (found at start through the API; a form submission or an inbox batch makes one).
+ * Sign-in through support/session.ts: E2E_TENANT_ADMIN_TOKEN (4537 of 2924), or E2E_TENANT_ADMIN(_PASSWORD).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const FORM = 'Wound follow-up (synthetic, demo)';
-const WOUND_JOB = 2853;
-
-interface Session { data: Record<string, unknown>; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-}
+const WOUND_JOB_NAME = 'Wound intake job (synthetic, MIG-255)';
+let WOUND_JOB = 0;
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height: 900 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  return signedIn(browser, s, { viewport: { width, height: 900 } });
 }
 
-/** Job 2853's newest run (of its latest ten) whose review is still pending, or 0. */
-async function pendingReview(request: APIRequestContext): Promise<number> {
-  const headers = { Authorization: `Bearer ${token}` };
-  const runs = await (await request.get(`${api}/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=${WOUND_JOB}`, { headers })).json();
+/** The wound job's newest run (of its latest ten) whose review is still pending, or 0. */
+async function pendingReview(request: APIRequestContext, s: Session): Promise<number> {
+  const runs = await getJson(request, s, `/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=${WOUND_JOB}`);
   for (const run of (runs?.data?.jobQueues ?? []).slice(0, 10)) {
     if (run.jobStatus !== 'Completed') continue;
-    const review = await (await request.get(`${api}/sourceJob.json/review?jobQueueId=${run.jobQueueId}`, { headers })).json();
+    const review = await getJson(request, s, `/sourceJob.json/review?jobQueueId=${run.jobQueueId}`);
     if (review?.data?.reviewStatus === 'PENDING') return run.jobQueueId;
   }
   return 0;
 }
 
 test.describe('Forms (lite), the result review, and the Friday menu (live)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => {
+    s = await sessionFor(request, 'admin');
+    WOUND_JOB = (await jobNamed(request, s, WOUND_JOB_NAME)).jobId;
+  });
 
   test('the menu offers every Wave 5 module: forms, the Task inbox, Data Catalog and Connector Hub', async ({ browser }) => {
     const page = await pageAs(browser, s, 390);
@@ -82,8 +72,8 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
   });
 
   test('a wound run waiting for review shows who must review, and Approve / Reject', async ({ browser, request }) => {
-    const run = await pendingReview(request);
-    test.skip(!run, `Job ${WOUND_JOB} has no completed run pending review: send the wound form once, then run this spec.`);
+    const run = await pendingReview(request, s);
+    test.skip(!run, `"${WOUND_JOB_NAME}" has no completed run pending review: send the wound form once, then run this spec.`);
     const page = await pageAs(browser, s);
     await page.goto(`/pipelines/schedules/${WOUND_JOB}/runs/${run}/logs`);
     const review = page.locator('[data-review]');

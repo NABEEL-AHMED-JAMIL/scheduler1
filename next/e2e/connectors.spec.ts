@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 
 /**
@@ -12,7 +13,6 @@ import { join } from 'path';
  * Leaves the connection it makes ("E2E Connector Hub <stamp>") in place.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const demoPassword = process.env['E2E_DEMO_DB_PASSWORD'];
 
 async function sessionOf(request: APIRequestContext, token: string): Promise<Record<string, unknown>> {
@@ -42,12 +42,12 @@ async function noSidewaysScroll(page: Page): Promise<void> {
 }
 
 test.describe('Connector Hub', () => {
-  test.skip(!adminToken, 'needs E2E_TENANT_ADMIN_TOKEN');
+  test.skip(!hasToken('admin'), NEEDS.admin);
 
   for (const [width, height, label, scheme] of [[1920, 1080, 'wide', 'light'], [2560, 1440, 'wide-2560-dark', 'dark'],
     [1024, 768, 'tablet', 'light'], [768, 1024, 'tablet-portrait-dark', 'dark']] as const) {
     test(`the gallery, the connections and a connection (${label})`, async ({ browser, request }, info) => {
-      const page = await pageAs(browser, await sessionOf(request, adminToken!), width, height, scheme);
+      const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!), width, height, scheme);
       await page.goto('/integration/connectors');
       await page.getByRole('heading', { name: 'Connector Hub' }).waitFor();
       await expect(page.locator('[data-connector="postgres"]')).toContainText('Connected');
@@ -78,7 +78,7 @@ test.describe('Connector Hub', () => {
   test('connecting the demo database: a wrong password says why and what to do, the right one syncs', async ({ browser, request }, info) => {
     test.skip(!demoPassword, 'needs E2E_DEMO_DB_PASSWORD');
     test.setTimeout(180_000);
-    const page = await pageAs(browser, await sessionOf(request, adminToken!));
+    const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     const name = `E2E Connector Hub ${Date.now()}`;
     await page.goto('/integration/connectors');
     await page.locator('[data-new-connection]').click();

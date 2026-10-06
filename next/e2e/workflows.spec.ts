@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { hasToken, NEEDS, tokenFor } from './support/session';
 
 /**
  * Workflows (MIG-276), live, in workspace 2924: the administrator (4537) designs a workflow in the designer -- an
@@ -11,8 +12,6 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
  * E2E_TENANT_USER_TOKEN (mint-test-token.sh 4597 900).
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const userToken = process.env['E2E_TENANT_USER_TOKEN'];
 const stamp = new Date().toISOString().slice(5, 19).replace(/[-:T]/g, '');
 const NAME = `E2E purchase ${stamp}`;
 const KEY = `e2e-purchase-${stamp}`;
@@ -46,15 +45,15 @@ async function startTest(page: Page, reference: string, amount: number): Promise
 }
 
 test.describe.serial('Workflows: design, publish, submit, approve, reject (live)', () => {
-  test.skip(!adminToken || !userToken, 'Set E2E_TENANT_ADMIN_TOKEN and E2E_TENANT_USER_TOKEN to run this.');
+  test.skip(!hasToken('admin') || !hasToken('user'), `${NEEDS.admin}; ${NEEDS.user}`);
   let admin: Session;
   let user: Session;
   let approved = 0;
   let rejected = 0;
 
   test.beforeAll(async ({ request }) => {
-    admin = await session(request, adminToken!);
-    user = await session(request, userToken!);
+    admin = await session(request, tokenFor('admin')!);
+    user = await session(request, tokenFor('user')!);
   });
 
   test('the administrator designs and publishes a workflow, then starts two requests', async ({ browser }) => {

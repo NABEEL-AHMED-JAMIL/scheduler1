@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
 
 /**
  * A model as a pipeline step, end to end, as a tenant administrator: a model connection is added
@@ -8,13 +9,11 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
  * answer in its history. Cleans up in reverse through the API.
  *
  * Needs:
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD   a TENANT_ADMIN whose workspace has a
- *                                                  default Kafka profile and a topic
+ *   a TENANT_ADMIN whose workspace has a default Kafka profile and a topic (support/session.ts:
+ *   E2E_TENANT_ADMIN_TOKEN, 4537 of 2924, or E2E_TENANT_ADMIN(_PASSWORD)); every row it makes is named "E2E ..."
  *   a local Ollama the server can reach (host.docker.internal:11434) with E2E_OLLAMA_MODEL
  *   (default gemma3:1b) pulled -- the Try it and the run make real calls
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 const MODEL = process.env['E2E_OLLAMA_MODEL'] ?? 'gemma3:1b';
 
 const STAMP = Date.now().toString(36);
@@ -25,22 +24,6 @@ const PIPELINE_NAME = `E2E AI pipeline ${STAMP}`;
 const TASK_NAME = `E2E AI task ${STAMP}`;
 const JOB_NAME = `E2E AI job ${STAMP}`;
 
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function signIn(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const answer = await request.post(`${api}/auth.json/login`, { data: { username, password }, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, session: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session.data);
-  return page;
-}
 
 /** Types into a searchable box and picks the row whose label contains `label`. */
 async function pick(page: Page, boxId: string, typed: string, label: string): Promise<void> {
@@ -52,7 +35,7 @@ async function pick(page: Page, boxId: string, typed: string, label: string): Pr
 }
 
 test.describe('AI prompts in pipelines', () => {
-  test.skip(!admin.username || !admin.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let session: Session;
   let headers: Record<string, string>;
@@ -63,8 +46,8 @@ test.describe('AI prompts in pipelines', () => {
   let jobId: number | null = null;
 
   test.beforeAll(async ({ request }) => {
-    session = await signIn(request, admin.username!, admin.password!);
-    headers = { Authorization: `Bearer ${session.token}` };
+    session = await sessionFor(request, 'admin');
+    headers = authOf(session);
   });
 
   test.afterAll(async ({ request }) => {
@@ -167,7 +150,7 @@ test.describe('AI prompts in pipelines', () => {
     await expect(page.locator('.ai-step-card')).toContainText(PROMPT);
     await page.locator('[id="ff-|claim_id"]').fill('CLM-E2E-2');
     await page.locator('[id="ff-|document"]').fill('Patient seen for a fracture of the left tibia; total billed 412.');
-    await page.getByRole('button', { name: 'Create task' }).click();
+    await page.getByRole('button', { name: 'Create pipeline' }).click();
     await expect(page.getByText('Task created.')).toBeVisible();
     const tasks = await (await request.post(`${api}/sourceTask.json/listSourceTask?page=1&limit=1000`, { headers, data: {} })).json();
     taskId = tasks.data.find((t: any) => t.taskName === TASK_NAME)?.taskDetailId ?? null;

@@ -1,10 +1,11 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { authOf, hasToken, NEEDS, pageAs, sessionFor, tokenFor } from './support/session';
 import { join } from 'path';
 
 /**
  * MIG-239: Documents › Inbox, as workspace 2924's administrator (4537), against the live storage-service.
  *
- * Uploads only files that match no job trigger: job 2848 starts on *.csv, so these send a small UI-CHECK-<stamp>.json
+ * Uploads only files that match no job trigger: the step engine job starts on *.csv, so these send a small E2E-inbox-<stamp>.json
  * (which is kept, and listed) and UI-CHECK-evil.exe (which the service refuses, so nothing is stored). The settings
  * dialog is opened and cancelled; the test fails if the page ever asks to configure or turn off the inbox.
  *
@@ -13,18 +14,9 @@ import { join } from 'path';
  *   E2E_SHOTS                optional: a folder the screenshots are also written to
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 
 async function signedIn(browser: Browser, request: APIRequestContext, width = 1440): Promise<Page> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  const user = { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys };
-  const context = await browser.newContext({ viewport: { width, height: width < 600 ? 844 : 900 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(u => window.localStorage.setItem('etl_auth_user', JSON.stringify(u)), user);
-  return page;
+  return pageAs(browser, await sessionFor(request, 'admin'), { viewport: { width, height: width < 600 ? 844 : 900 } });
 }
 
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -45,7 +37,7 @@ function settingsWrites(page: Page): string[] {
 }
 
 test.describe('Inbox (live storage-service)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!hasToken('admin'), NEEDS.admin);
 
   test('shows the configured inbox, its limit and its arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
@@ -56,7 +48,7 @@ test.describe('Inbox (live storage-service)', () => {
     // The newest arrival the service reports, whatever put it there: a fixed name (live-customers.csv) fell off the
     // list once a soak run uploaded a file every five minutes, and the page is right to show the newest first.
     const newest = (await (await request.get(`${api}/storage.json/inbox/files?limit=1`,
-      { headers: { Authorization: `Bearer ${token}` } })).json())?.data?.[0];
+      { headers: authOf(tokenFor('admin')!) })).json())?.data?.[0];
     expect(newest?.fileName, 'the inbox has at least one arrival').toBeTruthy();
     await expect(page.getByRole('table').getByText(newest.fileName).first()).toBeVisible();
     await shot(page, info, 'inbox-1440');
@@ -65,7 +57,7 @@ test.describe('Inbox (live storage-service)', () => {
   test('uploads a small JSON file and lists it', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
     await page.goto('/documents/inbox');
-    const name = `UI-CHECK-${Date.now()}.json`;
+    const name = `E2E-inbox-${Date.now()}.json`;
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
       name, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({ check: 'inbox e2e', at: new Date().toISOString() })),
     });

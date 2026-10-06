@@ -1,12 +1,13 @@
-import { test, expect, Page } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { expect, Page } from '@playwright/test';
+import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
+import { analyticsFixtures } from './support/analytics-fixtures';
 
 /**
  * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
  * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
  * alias nobody has fails every spec at the first select, which looks nothing like what it is.
  */
-const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
 
 /**
  * The screen driven without a pointer.
@@ -22,26 +23,23 @@ const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
  * @author Nabeel Ahmed
  */
 
-function signedIn(): boolean {
-  try {
-    const state = JSON.parse(readFileSync('e2e/.auth/state.json', 'utf8'));
-    return (state.origins ?? []).length > 0;
-  } catch {
-    return false;
-  }
-}
+test.skip(!signedIn(), NO_SESSION);
 
-test.beforeEach(async () => {
-  test.skip(!signedIn(),
-    'No session. Start the stack and run with E2E_PASSWORD=… npx playwright test');
+// The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(600_000);   // the first run of all uploads 45 MB and saves ten boards; every later one only reads
+  const made = await analyticsFixtures(request, await defaultSession(request));
+  CONNECTION ||= made.connection;
 });
 
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption(CONNECTION);
+  // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await page.locator('#a-conn').selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
-  await expect(page.getByText(/150K/)).toBeVisible();
+  await expect(page.getByText('150K rows')).toBeVisible();
 }
 
 /** The id of whatever currently has focus, which is how the roving tabindex is observed. */
@@ -91,7 +89,7 @@ test('arrowing does NOT open a tab — the scan is not spent on tabs passed over
 
   // Focus has moved twice; the view has not moved at all.
   expect(await focusedId(page)).toBe('a-tab-compact');
-  await expect(page.locator('#a-tab-overview')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('#a-tab-overview')).toHaveAttribute('aria-selected', 'true');
 });
 
 test('Enter opens the tab the reader arrowed to', async ({ page }) => {
@@ -101,13 +99,13 @@ test('Enter opens the tab the reader arrowed to', async ({ page }) => {
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Enter');
 
-  await expect(page.locator('#a-tab-data')).toHaveAttribute('aria-current', 'true');
+  await expect(page.locator('#a-tab-data')).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByPlaceholder(/Search all rows/)).toBeVisible();
 });
 
 test('a column can be resized with the keyboard, and says what it is doing', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
 
   const handle = page.getByRole('separator', { name: /Resize amount/ }).first();
   await expect(handle).toBeVisible();

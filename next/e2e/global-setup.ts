@@ -1,5 +1,6 @@
-import { chromium, FullConfig } from '@playwright/test';
+import { chromium, request as requests, FullConfig } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
+import { sessionOf, tokenFor } from './support/session';
 
 /**
  * Signs in once and leaves the session where every spec can pick it up.
@@ -12,6 +13,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
  * the setup writes an empty session and the specs skip themselves with a reason. A test suite that
  * fails because a machine has no stack running teaches people to ignore it; one that says why it
  * skipped teaches them how to run it.
+ *
+ * <b>With no password, a minted token does the same job</b> (MIG-330): E2E_TENANT_ADMIN_TOKEN, the
+ * TENANT_ADMIN of workspace 2924 that final-regression.sh passes in, is written into the same
+ * state.json. Specs importing `test` from support/session.ts re-seed it per test from a fresh token,
+ * because a token lives fifteen minutes and a full run is longer.
  */
 async function globalSetup(config: FullConfig) {
   const base = process.env['E2E_BASE_URL'] ?? 'http://localhost:4400';
@@ -22,6 +28,21 @@ async function globalSetup(config: FullConfig) {
   mkdirSync('e2e/.auth', { recursive: true });
   const blank = { cookies: [], origins: [] };
   const statePath = 'e2e/.auth/state.json';
+
+  // No password but a minted token (final-regression.sh): the token's session, written fresh every run.
+  if (!password && process.env['E2E_TENANT_ADMIN_TOKEN']) {
+    const token = tokenFor('admin')!;
+    const context = await requests.newContext();
+    try {
+      const session = await sessionOf(context, token);
+      writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [{ origin: new URL(base).origin,
+        localStorage: [{ name: 'etl_auth_user', value: JSON.stringify(session.data) }] }] }));
+      console.log(`\n[e2e] Signed in from E2E_TENANT_ADMIN_TOKEN (appUserId ${session.appUserId}).\n`);
+    } finally {
+      await context.dispose();
+    }
+    return;
+  }
 
   // An existing session is honoured rather than overwritten. Someone who already has one -- from
   // a previous run, or lifted out of a browser they are signed into -- should not have to hand

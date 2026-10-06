@@ -1,14 +1,15 @@
-import { test, expect, Page } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { expect, Page } from '@playwright/test';
+import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
+import { analyticsFixtures, boardName, ordersTotalRevenue } from './support/analytics-fixtures';
 import { KIND_IDS } from '../src/app/features/analytics/widget-kinds';
 
 /**
  * The five seeded reports, opened the way a person opens them.
  *
- * <b>These reports are real rows, not fixtures this file creates.</b> They were written by
- * process/src/test/java/process/e2e/AnalyticsReportsE2EIT#seedTheFiveReports against the live
- * database, and every one of their twenty-seven widgets was proved to RUN against the real
- * 150,000-row object in MinIO before being saved. What is left to check is the half that Java
+ * <b>These reports are real rows, made by the suite.</b> support/analytics-fixtures.ts saves them
+ * (named "E2E ...") in the signed-in workspace the first time they are missing, with the widgets
+ * analytics-service's AnalyticsReportsE2EIT and OrdersReportsE2EIT prove runnable, over datasets it
+ * uploads itself -- no longer the platform administrator's rows, which a tenant cannot see. What is left to check is the half that Java
  * suite structurally cannot see: whether opening the page draws them.
  *
  * <b>Dashboards cache nothing.</b> The page says so in as many words, and it is the reason these
@@ -27,18 +28,12 @@ const REPORTS = [
   { name: 'Executive summary',    widgets: 6, tell: 'Distinct customers' },
 ];
 
-function signedIn(): boolean {
-  try {
-    const state = JSON.parse(readFileSync('e2e/.auth/state.json', 'utf8'));
-    return (state.origins ?? []).length > 0;
-  } catch {
-    return false;
-  }
-}
+test.skip(!signedIn(), NO_SESSION);
 
-test.beforeEach(async () => {
-  test.skip(!signedIn(),
-    'No session. Start the stack and run with E2E_PASSWORD=… npx playwright test');
+// The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(600_000);   // the first run of all uploads 45 MB and saves ten boards; every later one only reads
+  await analyticsFixtures(request, await defaultSession(request));
 });
 
 async function openLibrary(page: Page) {
@@ -51,7 +46,7 @@ async function openLibrary(page: Page) {
  * is enough: nothing here is named as a prefix of anything else.
  */
 function boardCard(page: Page, name: string) {
-  return page.locator('a.dash-card', { hasText: name });
+  return page.locator('a.dash-card', { hasText: boardName(name) });
 }
 
 async function openBoard(page: Page, name: string) {
@@ -160,8 +155,9 @@ test('a single-figure tile draws the figure, and says it showed one row', async 
 
   await (await kindsOf(page, 'Total revenue')).and(page.locator('[data-kind="kpi"]')).click();
 
-  // Grouped, not raw: the engine returns 103909527.57999787 over the CSV.
-  await expect(page.getByText('103,909,527.58')).toBeVisible();
+  // Grouped, not raw: the engine returns a long float over the CSV; the tile prints it to the cent, which is the sum
+  // the fixture computes independently.
+  await expect(page.getByText(ordersTotalRevenue())).toBeVisible();
   // "0 of 1 rows shown" was the first version of this: a no-dimension analysis has no marks.
   await expect(page.getByText('0 of 1 rows shown')).toHaveCount(0);
 });

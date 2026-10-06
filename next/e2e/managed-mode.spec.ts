@@ -1,4 +1,5 @@
 import { test, expect, Browser, Page, Route, TestInfo } from '@playwright/test';
+import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 import { LIVE, LIVE_IDS } from '../src/app/characterisation/fixtures.live';
 
@@ -10,7 +11,6 @@ import { LIVE, LIVE_IDS } from '../src/app/characterisation/fixtures.live';
  * leaves the browser. One live smoke runs as a SELF workspace's administrator (E2E_TENANT_ADMIN_TOKEN, minted with
  * etl-platform/scripts/mint-test-token.sh 4537) and shows the console exactly as before: no banner.
  */
-const liveToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const REFUSAL = 'This workspace is managed by our team, so this cannot be changed here. Contact your account team to request the change.';
 
 function token(claims: Record<string, unknown>): string {
@@ -253,12 +253,13 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
 });
 
 test.describe('MIG-254: live smoke, a SELF workspace', () => {
-  test.skip(!liveToken, 'E2E_TENANT_ADMIN_TOKEN is not set');
+  test.skip(!hasToken('admin'), NEEDS.admin);
 
   test('4537 (SELF) sees no banner and builds as before', async ({ browser }) => {
-    const claims = JSON.parse(Buffer.from(liveToken!.split('.')[1], 'base64url').toString('utf8'));
+    const live = tokenFor('admin')!;
+    const claims = JSON.parse(Buffer.from(live.split('.')[1], 'base64url').toString('utf8'));
     const page = await pageAs(browser, { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: liveToken, refreshToken: '', pageKeys: null });
+      tenantId: claims.tenantId, accessToken: live, refreshToken: '', pageKeys: null });
     expect(claims.mgmt ?? 'SELF').toBe('SELF');
     await page.goto('/pipelines');
     await expect(page.getByRole('heading', { name: 'Pipelines', level: 1 })).toBeVisible();

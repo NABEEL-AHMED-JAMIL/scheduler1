@@ -1,37 +1,37 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { formNamed, getJson } from './support/workspace';
 
 /**
- * MIG-279, live and read-only: form 1001 ("MIG-277 visit check (synthetic)") starts the workflow
- * mig279-visit-approval; submission 1004's request was approved by Alex (4597). The administrator (4537) sees the
- * workflow on the form, the approval on Submissions, and opens the form's rows in Analytics Studio.
- * Sign-in: E2E_TENANT_ADMIN_TOKEN (mint-test-token.sh 4537 900).
+ * MIG-279, live and read-only: the form "MIG-277 visit check (synthetic)" starts the workflow mig279-visit-approval,
+ * and one of its submissions was approved by Alex (4597). Both are FOUND (MIG-330: they were pinned as form 1001 and
+ * submission 1004). The administrator (4537) sees the workflow on the form, the approval on Submissions, and opens the
+ * form's rows in Analytics Studio.
+ * Sign-in through support/session.ts: E2E_TENANT_ADMIN_TOKEN (mint-test-token.sh 4537 900), or E2E_TENANT_ADMIN(_PASSWORD).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
+const FORM_NAME = 'MIG-277 visit check (synthetic)';
+let s: Session;
 
 async function pageAs(browser: Browser, request: APIRequestContext): Promise<Page> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), {
-    username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId, tenantId: claims.tenantId,
-    accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys });
-  return page;
+  s ??= await sessionFor(request, 'admin');
+  return signedIn(browser, s, { viewport: { width: 1440, height: 1000 } });
 }
 
 test.describe('Forms: approval and dataset (live, read-only)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   test('the approval shows on Submissions, and the rows open in Analytics Studio', async ({ browser, request }) => {
     const page = await pageAs(browser, request);
-    await page.goto('/forms/submissions?formId=1001');
-    await expect(page.locator('[data-submission="1004"] [data-approval] .pill')).toHaveText('Approved');
+    const form = (await formNamed(request, s, FORM_NAME)).formId;
+    const approved = ((await getJson(request, s, `/formSubmission.json/list?formId=${form}&limit=50`)).data ?? [])
+      .find((x: { workflowStatus?: string }) => x.workflowStatus === 'Approved')?.submissionId;
+    expect(approved, `a submission of "${FORM_NAME}" whose approval was given`).toBeTruthy();
+    await page.goto(`/forms/submissions?formId=${form}`);
+    await expect(page.locator(`[data-submission="${approved}"] [data-approval] .pill`)).toHaveText('Approved');
 
     await page.locator('[data-open-analytics]').click();
     await expect(page).toHaveURL(/\/data\/analytics\?connection=/);
-    await expect(page.getByText('datasets/forms/form-1001/*.json').first()).toBeVisible();
+    await expect(page.getByText(`datasets/forms/form-${form}/*.json`).first()).toBeVisible();
   });
 
   test('the form names its approval workflow in the builder', async ({ browser, request }) => {

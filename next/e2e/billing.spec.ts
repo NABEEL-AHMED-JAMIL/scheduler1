@@ -1,50 +1,34 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/session';
 
 /**
  * Cost & usage, end to end: a tenant administrator uploads a file of a known size and deletes it, and
  * the same month's page carries the delete -- as an operation, as bytes, and in the drill-down
  * under the object's own name with the person who did it.
  *
- * Needs a running metering service (etl_meter) behind the console, and:
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD   a TENANT_ADMIN with a bucket of their own
- *   E2E_BUCKET                                     that bucket's alias (default: the first one listed)
+ * Needs a running metering service (etl_meter) behind the console, and a TENANT_ADMIN with a bucket of their own
+ * (support/session.ts: E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD)); E2E_BUCKET names that bucket's alias
+ * (default: ui-review-s3 or worker-store when the workspace has one, else the first listed). The file it uploads is
+ * deleted again by the test -- that delete is what is being measured.
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 
-interface Session { data: Record<string, any>; token: string; }
-
-async function signIn(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const answer = await request.post(`${api}/auth.json/login`, { data: { username, password }, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, session: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session.data);
-  return page;
-}
 
 test.describe('cost & usage', () => {
-  test.skip(!admin.username || !admin.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   test('a delete is counted, priced, and named on the page', async ({ browser, request }) => {
     test.setTimeout(120_000);
-    const session = await signIn(request, admin.username!, admin.password!);
-    const auth = { Authorization: `Bearer ${session.token}` };
+    const session = await sessionFor(request, 'admin');
+    const auth = authOf(session);
 
     const health = await (await request.get(`${api}/billing.json/health`, { headers: auth })).json();
     test.skip(health.status !== 'SUCCESS' || health.data?.status !== 'ok', 'The metering service is not reachable from the console.');
 
     const buckets = await (await request.get(`${api}/storage.json/buckets`, { headers: auth })).json();
-    // The worker bucket when the workspace has it: the first alias in the list is whatever sorts
+    // The workspace's test bucket when it has one: the first alias in the list is whatever sorts
     // first, and after a configuration test that is a connection made to fail on purpose.
     const listed: string[] = (buckets.data ?? []).map((b: { bucket: string }) => b.bucket);
-    const bucket = process.env['E2E_BUCKET'] ?? (listed.includes('worker-store') ? 'worker-store' : listed[0]);
+    const bucket = process.env['E2E_BUCKET'] ?? ['ui-review-s3', 'worker-store'].find(b => listed.includes(b)) ?? listed[0];
     expect(bucket, 'a bucket to work in').toBeTruthy();
 
     // A file of a known size, uploaded then deleted through the same API the browser uses.
@@ -66,7 +50,10 @@ test.describe('cost & usage', () => {
     await expect(page.getByRole('heading', { name: 'Cost & usage' })).toBeVisible();
     await expect(page.getByText(/Priced with/)).toBeVisible();
 
-    // The delete is on the page as a line...
+    // The delete is on the page as a line... A 12 KB delete costs less than a cent, and lines under a cent are folded
+    // away behind one button now; unfold them.
+    const tiny = page.locator('[data-tiny-toggle]');
+    if (await tiny.count() && (await tiny.getAttribute('aria-pressed')) !== 'true') await tiny.click();
     const deletedLine = page.getByRole('row').filter({ hasText: 'Bytes deleted (data churn)' });
     await expect(deletedLine).toBeVisible();
     // ...and behind the line, the object by name and the person who deleted it.
@@ -75,7 +62,7 @@ test.describe('cost & usage', () => {
     const detail = page.getByRole('row', { name: new RegExp(`^[\\w./-]*${name} `) });
     await expect(detail).toBeVisible();
     await expect(detail).toContainText('12 KB');
-    await expect(detail).toContainText(String(session.data['fullName'] ?? session.data['username']));
+    await expect(detail).toContainText(String(session.fullName ?? session.data['fullName'] ?? session.username));
 
     // The tiles agree with the lines.
     await expect(page.getByText('Data deleted')).toBeVisible();

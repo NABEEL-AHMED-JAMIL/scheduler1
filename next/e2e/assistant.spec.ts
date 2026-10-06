@@ -1,4 +1,6 @@
 import { test, expect, APIRequestContext, Browser, Page, Route, TestInfo } from '@playwright/test';
+import { api, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { getJson } from './support/workspace';
 import { join } from 'path';
 
 /**
@@ -8,30 +10,31 @@ import { join } from 'path';
  * confirm-then-run flow is driven with the assistant's own send and decide answered by page.route -- ai-service's
  * shapes (3e9f6ee), with a fake conversation, card and runs -- so nothing is sent to a model and nothing runs. The
  * execution the fake result links is the live run 7404 (conversation 1000's), only opened. The live smoke opens the
- * pages against the real service and fails if the page ever asks to send, decide or switch a tool.
+ * pages against the real service and fails if the page ever asks to send, decide or switch a tool; the conversation it
+ * opens is FOUND -- the newest one whose run_pipeline card was confirmed and linked its execution (MIG-330: it was
+ * pinned as conversation 1000).
  *
  * Needs ai-service and Core behind :9098 and a console at E2E_BASE_URL with MIG-252 (`ng serve --port 4420`). Sign-in:
- *   E2E_TENANT_ADMIN_TOKEN   a TENANT_ADMIN access token (etl-platform/scripts/mint-test-token.sh 4537 900)
+ *   support/session.ts       E2E_TENANT_ADMIN_TOKEN (mint-test-token.sh 4537 900), or E2E_TENANT_ADMIN(_PASSWORD)
  *   E2E_SHOTS                optional: a folder the screenshots are also written to
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { token: token!, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-}
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height: width < 600 ? 844 : 900 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  return signedIn(browser, s, { viewport: { width, height: width < 600 ? 844 : 900 } });
+}
+
+/** The newest conversation whose run_pipeline card was confirmed and linked the execution it started. */
+async function confirmedConversation(request: APIRequestContext, s: Session): Promise<{ id: number; href: string } | null> {
+  for (const c of (await getJson(request, s, '/aiPrompt.json/assistant/conversations?limit=50')).data ?? []) {
+    const messages = (await getJson(request, s, `/aiPrompt.json/assistant/conversation?conversationId=${c.conversationId}`)).data?.messages ?? [];
+    for (const m of messages) {
+      const run = (m.links ?? []).find((l: { kind: string; jobQueueId?: number }) => l.kind === 'execution' && l.jobQueueId);
+      if (run && messages.some((x: { card?: { tool?: string; state?: string } }) => x.card?.tool === 'run_pipeline' && x.card?.state === 'confirmed')) {
+        return { id: c.conversationId, href: `/pipelines/schedules/${run.jobId}/runs/${run.jobQueueId}/logs` };
+      }
+    }
+  }
+  return null;
 }
 
 async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
@@ -126,10 +129,10 @@ async function ask(page: Page, text: string): Promise<void> {
 // ------------------------------------------------------------------------------------------ tests
 
 test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
 
   test('asks first, runs on confirm, and links the execution', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
@@ -227,18 +230,20 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
 });
 
 test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
 
-  test('conversation 1000: confirmed, run, and its execution', async ({ browser }, info) => {
+  test('a confirmed conversation: confirmed, run, and its execution', async ({ browser, request }, info) => {
+    const found = await confirmedConversation(request, s);
+    test.skip(!found, 'No assistant conversation in this workspace has confirmed a run yet: ask it to run a job once.');
     const page = await pageAs(browser, s);
     const writes = forbidWrites(page);
-    await page.goto('/ai/assistant?c=1000');
-    await expect(page.locator('[data-card]')).toHaveAttribute('data-state', 'confirmed');
-    await expect(page.locator('[data-link="execution"]').getByRole('link', { name: 'Open execution' }))
-      .toHaveAttribute('href', '/pipelines/schedules/2848/runs/7404/logs');
+    await page.goto(`/ai/assistant?c=${found!.id}`);
+    await expect(page.locator('[data-card]').first()).toHaveAttribute('data-state', 'confirmed');
+    await expect(page.locator('[data-link="execution"]').getByRole('link', { name: 'Open execution' }).first())
+      .toHaveAttribute('href', found!.href);
     await page.getByRole('button', { name: 'Show tool calls' }).click();
     await expect(page.locator('[data-call="get_jobs"]')).toHaveAttribute('data-outcome', 'allowed');
     await expect(page.locator('[data-call="run_pipeline"]')).toHaveAttribute('data-outcome', 'confirmed');
@@ -272,10 +277,10 @@ test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
  * workspace ends as it began.
  */
 test.describe('Tool Registry: last used and Reset (live, restores what it changes)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
 
   test('no run or trace is read, and Reset puts a switch back to its default', async ({ browser, request }, info) => {
     const off = await request.post(`${api}/aiPrompt.json/tools/setEnabled`, { headers: { Authorization: `Bearer ${s.token}` },

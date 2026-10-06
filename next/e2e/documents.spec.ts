@@ -1,4 +1,6 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { getJson, jobNamed, keptRun as keptRunOf } from './support/workspace';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
@@ -7,49 +9,35 @@ import { join } from 'path';
  * Storage's file details, as workspace 2924's administrator (4537), against the live media-service render (MIG-232)
  * and Core's run outputs.
  *
- * Live data it reads: schedule 2849 "UI-CHECK registry chain job 0929" and its latest run that still keeps
- * customers-clean.json (found at start through the API, or E2E_FILES_RUN), which kept a 3-row dataset (3 rows,
- * customers-clean.json) and uploaded ui-review-s3/registry-live-check/customers-clean.json. What it writes, and leaves:
- * one PDF, ui-review-s3/reports/UI-CHECK run 7405 e2e.pdf (overwritten on each run). Nothing else is saved.
+ * Live data it reads: the schedule "UI-CHECK registry chain job 0929" (found by name) and its latest run that still
+ * keeps customers-clean.json (found at start through the API, or E2E_FILES_RUN; when none does any more, the job is
+ * run once to make one), which kept a 3-row dataset (customers-clean.json) and uploaded
+ * ui-review-s3/registry-live-check/customers-clean.json. What it writes, and leaves: one PDF,
+ * ui-review-s3/reports/E2E run report.pdf (overwritten on each run), and that run when it had to make one.
  *
  * Needs media-service and Core behind :9098 and a console at E2E_BASE_URL with MIG-253 (`ng serve --port 4422`). Sign-in:
- *   E2E_TENANT_ADMIN_TOKEN   a TENANT_ADMIN access token (etl-platform/scripts/mint-test-token.sh 4537 900)
+ *   support/session.ts       E2E_TENANT_ADMIN_TOKEN (mint-test-token.sh 4537 900), or E2E_TENANT_ADMIN(_PASSWORD)
  *   E2E_SHOTS                optional: a folder the screenshots are also written to
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const SCHEDULE = 'UI-CHECK registry chain job 0929';
-const SAVED = 'UI-CHECK run 7405 e2e';
-
-interface Session { data: Record<string, unknown>; }
+const SAVED = 'E2E run report';
+let s: Session;
 
 /** The schedule's latest completed run that still keeps customers-clean.json, and that dataset's id. */
 let RUN = 0;
 let DATASET = 0;
 
 async function keptRun(request: APIRequestContext): Promise<{ run: number; dataset: number }> {
-  const headers = { Authorization: `Bearer ${token}` };
   const pinned = Number(process.env['E2E_FILES_RUN'] ?? 0);
-  const runs = pinned ? [{ jobQueueId: pinned, jobStatus: 'Completed' }]
-    : (await (await request.get(`${api}/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849`, { headers })).json())?.data?.jobQueues ?? [];
-  for (const run of runs.filter((r: { jobStatus: string }) => r.jobStatus === 'Completed').slice(0, 3)) {
-    const outputs = (await (await request.get(`${api}/sourceJob.json/runOutputs?jobQueueId=${run.jobQueueId}`, { headers })).json())?.data?.outputs ?? [];
-    const kept = outputs.find((o: { kind: string; name: string; expired?: boolean }) => o.kind === 'file' && o.name === 'customers-clean.json' && !o.expired);
-    if (kept) return { run: run.jobQueueId, dataset: kept.runDatasetId };
+  if (pinned) {
+    const outputs = (await getJson(request, s, `/sourceJob.json/runOutputs?jobQueueId=${pinned}`)).data?.outputs ?? [];
+    return { run: pinned, dataset: outputs.find((o: { name: string }) => o.name === 'customers-clean.json')?.runDatasetId ?? 0 };
   }
-  throw new Error('Schedule 2849 has no recent run that still keeps customers-clean.json: run it once (Run now), then run this spec.');
-}
-
-async function session(request: APIRequestContext): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
+  return keptRunOf(request, s, (await jobNamed(request, s, SCHEDULE)).jobId, 'customers-clean.json');
 }
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height: width < 600 ? 844 : 900 }, acceptDownloads: true });
-  const page = await context.newPage();
+  const page = await signedIn(browser, s, { viewport: { width, height: width < 600 ? 844 : 900 }, acceptDownloads: true });
   // A worktree's node_modules is a symlink out of the project, so `ng serve` answers pdf.js's worker at its /@fs/
   // path with 403 and every preview says "could not be opened". The same worker is served as an asset
   // (angular.json copies it to /pdfjs-dist/build/); hand that over. A built console never asks for /@fs/.
@@ -57,8 +45,6 @@ async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page>
     const worker = await page.request.get('/pdfjs-dist/build/pdf.worker.mjs');
     await route.fulfill({ status: 200, contentType: 'text/javascript', body: await worker.body() });
   });
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
   return page;
 }
 
@@ -92,7 +78,7 @@ async function nextRender(seen: RenderAnswer[], before: number): Promise<RenderA
 /** Whether ui-review-s3 can be listed right now (LocalStack is not persistent and is sometimes down). */
 async function bucketReadable(request: APIRequestContext): Promise<boolean> {
   const r = await request.get(`${api}/storage.json/listObjects?bucket=ui-review-s3&prefix=&maxKeys=1`,
-    { headers: { Authorization: `Bearer ${token}` } });
+    { headers: authOf(s) });
   return (await r.json().catch(() => ({})))?.status === 'SUCCESS';
 }
 
@@ -106,10 +92,10 @@ async function expectPdfPreview(page: Page): Promise<void> {
 }
 
 test.describe('Documents: converter, Reports and file details (live)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
-  let s: Session;
+  test.skip(!canSignIn('admin'), NEEDS.admin);
   test.beforeAll(async ({ request }) => {
-    s = await session(request);
+    test.setTimeout(240_000);   // a fresh run of the schedule, when no recent one keeps its file
+    s = await sessionFor(request, 'admin');
     // The run is found, not pinned: Reports reads each schedule's latest runs, so a pinned run drops out of it as soon
     // as the schedule runs a few more times (run 7405 did on 2026-09-29).
     const kept = await keptRun(request);
@@ -143,7 +129,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     expect(readFileSync((await file.path())!).subarray(0, 5).toString()).toBe('%PDF-');
   });
 
-  /** Schedule 2849 → its latest kept run → that run's one kept dataset, picked in the converter. */
+  /** The schedule → its latest kept run → that run's one kept dataset, picked in the converter. */
   async function pickKeptRun(page: Page): Promise<void> {
     await page.goto('/documents/converter');
     await page.getByRole('button', { name: 'From an execution' }).click();

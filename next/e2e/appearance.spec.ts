@@ -1,9 +1,10 @@
-import { test, expect, Page } from '@playwright/test';
+import { expect, Page } from '@playwright/test';
+import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
+import { analyticsFixtures, boardName } from './support/analytics-fixtures';
 import AxeBuilder from '@axe-core/playwright';
-import { readFileSync } from 'fs';
 
 /** The console's alias for the MinIO bucket that holds the fixtures; see analytics-workspace.spec.ts. */
-const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
 
 /**
  * How the workspace holds up in the dark, and on a small screen.
@@ -19,26 +20,23 @@ const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
  * @author Nabeel Ahmed
  */
 
-function signedIn(): boolean {
-  try {
-    const state = JSON.parse(readFileSync('e2e/.auth/state.json', 'utf8'));
-    return (state.origins ?? []).length > 0;
-  } catch {
-    return false;
-  }
-}
+test.skip(!signedIn(), NO_SESSION);
 
-test.beforeEach(async () => {
-  test.skip(!signedIn(),
-    'No session. Start the stack and run with E2E_PASSWORD=… npx playwright test');
+// The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(600_000);   // the first run of all uploads 45 MB and saves ten boards; every later one only reads
+  const made = await analyticsFixtures(request, await defaultSession(request));
+  CONNECTION ||= made.connection;
 });
 
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption(CONNECTION);
+  // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await page.locator('#a-conn').selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
-  await expect(page.getByText(/250K/)).toBeVisible();
+  await expect(page.getByText('250K rows')).toBeVisible();
 }
 
 /** Every element whose box escapes the viewport horizontally. */
@@ -62,7 +60,7 @@ test('the workspace fits a phone without the page scrolling sideways', async ({ 
   // wide thing has its own scroller, which is what the check above allows for.
   await page.setViewportSize({ width: 390, height: 844 });
   await openFixture(page);
-  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
   await expect(page.getByPlaceholder(/Search all rows/)).toBeVisible();
 
   expect(await overflowing(page), 'these escape the viewport').toEqual([]);
@@ -74,7 +72,7 @@ test('the workspace fits a phone without the page scrolling sideways', async ({ 
 test('a dashboard fits a phone too', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/objects/analytics/dashboards');
-  await page.locator('a.dash-card', { hasText: '01 Overall KPI summary' }).click();
+  await page.locator('a.dash-card', { hasText: boardName('01 Overall KPI summary') }).click();
   await expect(page.getByText('Total revenue', { exact: true })).toBeVisible();
   await page.waitForTimeout(6000);
 
@@ -97,7 +95,7 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
   await openFixture(page);
 
   for (const tab of ['Overview', 'Data', 'Compact', 'Quality', 'Canvas']) {
-    await page.getByRole('button', { name: tab, exact: true }).click();
+    await page.getByRole('tab', { name: tab, exact: true }).click();
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     expect(results.violations.map(v => `${tab}: ${v.id} — ${v.help}`)).toEqual([]);
@@ -107,7 +105,7 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
 test('a dashboard has no WCAG A/AA violations in dark mode', async ({ page }) => {
   await page.emulateMedia({ colorScheme: 'dark', reducedMotion: 'reduce' });
   await page.goto('/objects/analytics/dashboards');
-  await page.locator('a.dash-card', { hasText: '04 Category distribution' }).click();
+  await page.locator('a.dash-card', { hasText: boardName('04 Category distribution') }).click();
   await expect(page.getByText('Revenue share by category', { exact: true })).toBeVisible();
   await page.waitForTimeout(8000);
 

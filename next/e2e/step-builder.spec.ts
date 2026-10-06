@@ -1,29 +1,27 @@
-import { test, expect, APIRequestContext, Browser, Page, Response } from '@playwright/test';
+import { test, expect, APIRequestContext, Page, Response } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { pipelineById, tasks } from './support/workspace';
 
 /**
- * MIG-249: the step builder end to end, as a workspace administrator, on the UI-CHECK pipeline 100175
- * (UI_CHECK_STEPS_0928), its task 1864 and the manual job 2848 that runs it: add a step from the Task Registry and
+ * MIG-249: the step builder end to end, as a workspace administrator, on the UI-CHECK pipeline UI_CHECK_STEPS_0928,
+ * its task and the manual job that runs it (FOUND by that pipeline id at start -- MIG-330; they were pinned as 100175,
+ * 1864 and 2848): add a step from the Task Registry and
  * fill it in the side panel, reorder by button and by drag, delete, see a validation error land on its step, edit the
  * YAML and save it, save a builder edit, prove the YAML and the builder store the same definition, then Run now and
  * watch every step complete. A Filter step is built with the registry's widgets (a repeatable group, a column picked
  * from the rows before it).
  *
- * Every save writes a new version of 100175 -- a UI-CHECK pipeline, left in place for the owner to clear. The shared
- * legacy pipeline 100167 (REF_CSV_CHECK_V1, used by 15 jobs) is never saved to: this spec refuses to run if 1864 has
- * been moved onto another pipeline.
+ * Every save writes a new version of UI_CHECK_STEPS_0928 -- a UI-CHECK pipeline, left in place for the owner to clear. The shared
+ * legacy pipeline 100167 (REF_CSV_CHECK_V1, used by 15 jobs) is never saved to: this spec refuses to run if the task found
+ * has been moved onto another pipeline.
  *
  * Needs Core (MIG-230) behind :9098 and a console at E2E_BASE_URL that has MIG-249 (e.g. `ng serve --port 4415`).
- * Sign-in, either:
- *   E2E_TENANT_ADMIN_TOKEN                          a TENANT_ADMIN access token (e.g. from
- *                                                   etl-platform/scripts/mint-test-token.sh 4537 900), or
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD    a TENANT_ADMIN's credentials
+ * Sign-in through support/session.ts: E2E_TENANT_ADMIN_TOKEN (4537 of 2924), or E2E_TENANT_ADMIN(_PASSWORD).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
-const TASK = Number(process.env['E2E_STEPS_TASK'] ?? 1864);
-const PIPELINE_KEY = Number(process.env['E2E_STEPS_PIPELINE_KEY'] ?? 100175);
 const PIPELINE_ID = process.env['E2E_STEPS_PIPELINE_ID'] ?? 'UI_CHECK_STEPS_0928';
+/** Found at start by PIPELINE_ID unless pinned: the pipeline's key, and the task on it. */
+let TASK = Number(process.env['E2E_STEPS_TASK'] ?? 0);
+let PIPELINE_KEY = Number(process.env['E2E_STEPS_PIPELINE_KEY'] ?? 0);
 const STAMP = Date.now().toString(36);
 
 /** The two steps the pipeline is put back to before the run: a sample, then a select that renames name. */
@@ -35,28 +33,6 @@ const BASELINE = {
   ],
 };
 
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
-}
 
 /** The save's own answer, not its CORS preflight (which has no body). */
 const saveAnswer = (r: Response) => r.url().includes('/pipeline.json/steps/save') && r.request().method() === 'POST';
@@ -79,19 +55,25 @@ const cards = (page: Page) => page.locator('.step-card').evaluateAll(els => els.
 
 async function stored(request: APIRequestContext, s: Session): Promise<{ definition: unknown; version: number }> {
   const body = await (await request.get(`${api}/pipeline.json/steps/definition?pipelineKey=${PIPELINE_KEY}`,
-    { headers: { Authorization: `Bearer ${s.token}` } })).json();
+    { headers: authOf(s) })).json();
   expect(body.status).toBe('SUCCESS');
   return { definition: body.data.definition, version: body.data.version };
 }
 
 test.describe('Step builder', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
   test.beforeAll(async ({ request }) => {
-    s = await session(request);
-    const headers = { Authorization: `Bearer ${s.token}` };
-    // Never the shared legacy pipeline: 1864 must still be on the UI-CHECK one.
+    s = await sessionFor(request, 'admin');
+    const headers = authOf(s);
+    PIPELINE_KEY ||= (await pipelineById(request, s, PIPELINE_ID)).pipelineKey;
+    if (!TASK) {
+      const task = (await tasks(request, s)).find(t => t.pipelineId === PIPELINE_ID);
+      expect(task, `a task on ${PIPELINE_ID}`).toBeTruthy();
+      TASK = task!.taskDetailId;
+    }
+    // Never the shared legacy pipeline: the task must still be on the UI-CHECK one.
     const task = await (await request.get(`${api}/sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=${TASK}`, { headers })).json();
     expect(task.data?.pipelineId, `task ${TASK} is on ${PIPELINE_ID}`).toBe(PIPELINE_ID);
     // A known start: the two baseline steps (no new version when they are already the latest).
@@ -256,7 +238,7 @@ test.describe('Step builder', () => {
     await page.getByRole('tab', { name: 'Settings' }).click();
     await row.getByRole('button', { name: 'Put Aggregate back to its default' }).click();
     await expect(row).not.toContainText('Switched here');
-    const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: { Authorization: `Bearer ${s.token}` } })).json())
+    const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: authOf(s) })).json())
       .data.find((t: { code: string }) => t.code === 'aggregate');
     expect(line).toMatchObject({ enabled: true, overridden: false });
   });

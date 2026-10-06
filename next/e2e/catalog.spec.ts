@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 
 /**
@@ -10,7 +11,6 @@ import { join } from 'path';
  * Reads only: nothing is created or changed.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
 
 async function sessionOf(request: APIRequestContext, token: string): Promise<Record<string, unknown>> {
   const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
@@ -34,11 +34,11 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
 }
 
 test.describe('Data Catalog', () => {
-  test.skip(!adminToken, 'needs E2E_TENANT_ADMIN_TOKEN');
+  test.skip(!hasToken('admin'), NEEDS.admin);
 
   for (const [width, height, label] of [[1920, 1080, 'wide'], [1024, 768, 'tablet']] as const) {
     test(`the list, the strip and an asset's panel (${label})`, async ({ browser, request }, info) => {
-      const page = await pageAs(browser, await sessionOf(request, adminToken!), width, height);
+      const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!), width, height);
       await page.goto('/data/catalog');
       await page.getByRole('heading', { name: 'Data Catalog' }).waitFor();
       await expect(page.getByText('With sensitive fields')).toBeVisible();
@@ -70,7 +70,7 @@ test.describe('Data Catalog', () => {
   }
 
   test('the prompt editor names the variable a file fills, without template braces', async ({ browser, request }, info) => {
-    const page = await pageAs(browser, await sessionOf(request, adminToken!));
+    const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     await page.goto('/ai/prompts/new');
     await page.getByRole('heading', { name: 'New prompt' }).waitFor();
     await page.locator('#pTemplate').fill('Summarise {{file_name}}');
@@ -84,13 +84,20 @@ test.describe('Data Catalog', () => {
 
   test('Ask your data answers a question about numbers with a query it shows, and hands it to Analytics Studio (MIG-283)',
     async ({ browser, request }, info) => {
-      test.setTimeout(300_000);
-      const page = await pageAs(browser, await sessionOf(request, adminToken!));
+      // The local model can take minutes to load when Ollama swaps models. The same question is asked through the API
+      // first, which loads it; the page's own question then answers in seconds. Well inside a token's fifteen minutes.
+      test.setTimeout(480_000);
+      const question = 'Which city has the largest total amount among UI-REVIEW customers?';
+      const token = tokenFor('admin')!;
+      const warm = await request.post(`${api}/askData.json/ask`, { headers: { Authorization: `Bearer ${token}` },
+        data: { question }, timeout: 300_000, failOnStatusCode: false });
+      expect(warm.status(), 'the warm-up question was answered').toBeLessThan(500);
+      const page = await pageAs(browser, await sessionOf(request, token));
       await page.goto('/data/ask');
-      await page.locator('[data-test="question"]').fill('Which city has the largest total amount among UI-REVIEW customers?');
+      await page.locator('[data-test="question"]').fill(question);
       await page.locator('[data-test="ask"]').click();
       const answer = page.locator('[data-test="query-answer"]');
-      await expect(answer).toBeVisible({ timeout: 240_000 });
+      await expect(answer).toBeVisible({ timeout: 150_000 });
       await expect(answer.locator('[data-test="query-sql"]')).toContainText('GROUP BY');
       await expect(answer.locator('[data-test="query-rows"]')).toContainText('Nairobi');
       await shot(page, info, 'ask-query-answer');

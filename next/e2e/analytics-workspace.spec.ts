@@ -1,12 +1,13 @@
-import { test, expect, Page } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { expect, Page } from '@playwright/test';
+import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
+import { analyticsFixtures } from './support/analytics-fixtures';
 
 /**
  * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
  * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
  * alias nobody has fails every spec at the first select, which looks nothing like what it is.
  */
-const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
 
 /**
  * The flow recorded in .ai/spec/E2E-FLOW.md, automated.
@@ -28,28 +29,24 @@ const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
 const DATASET = 'sales-10mb.csv';
 const ROWS = '150,000';
 
-function signedIn(): boolean {
-  try {
-    const state = JSON.parse(readFileSync('e2e/.auth/state.json', 'utf8'));
-    return (state.origins ?? []).length > 0;
-  } catch {
-    return false;
-  }
-}
+test.skip(!signedIn(), NO_SESSION);
 
-test.beforeEach(async () => {
-  test.skip(!signedIn(),
-    'No session. Start the stack and run with E2E_PASSWORD=… npx playwright test');
+// The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(600_000);   // the first run of all uploads 45 MB and saves ten boards; every later one only reads
+  const made = await analyticsFixtures(request, await defaultSession(request));
+  CONNECTION ||= made.connection;
 });
 
 /** Opens the fixture and waits for the workspace to describe it. */
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.getByLabel(/connection/i).or(page.locator('select').first())
-    .selectOption(CONNECTION);
+  // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await page.locator('#a-conn').selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: new RegExp(DATASET.replace('.', '\\.')) }).click();
-  await expect(page.getByText(/150K/)).toBeVisible();
+  await expect(page.getByText('150K rows')).toBeVisible();
 }
 
 test('1 — the workspace opens a real dataset and offers all nine tabs', async ({ page }) => {
@@ -58,7 +55,7 @@ test('1 — the workspace opens a real dataset and offers all nine tabs', async 
   await openFixture(page);
   for (const tab of ['Overview', 'Data', 'Compact', 'Profile',
                      'Quality', 'Canvas', 'SQL', 'Charts', 'Activity']) {
-    await expect(page.getByRole('button', { name: tab, exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: tab, exact: true })).toBeVisible();
   }
 });
 
@@ -66,7 +63,7 @@ test('2 — sorting is the dataset’s, not the page’s', async ({ page }) => {
   // The most convincing wrong answer this screen could give: a grid that sorts the hundred rows
   // it happens to be holding looks exactly like one that sorted the hundred and fifty thousand.
   await openFixture(page);
-  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
 
   const header = page.locator('th button').filter({ hasText: /^amount/ });
   await header.click();
@@ -80,7 +77,7 @@ test('2 — sorting is the dataset’s, not the page’s', async ({ page }) => {
 
 test('3 — a search narrows on the server and says so against the whole file', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
 
   await page.getByPlaceholder(/Search all rows/).fill('cust-26813');
   // "3 of 150,000" and not a bare "3": a narrowed count must never read as the size of the file.
@@ -92,7 +89,7 @@ test('4 — clearing a search restores the dataset rather than leaving it shrunk
   // request used to take the trusting branch while the client still held the filtered total, and
   // pages that exist stopped being offered.
   await openFixture(page);
-  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
 
   const search = page.getByPlaceholder(/Search all rows/);
   await search.fill('cust-26813');
@@ -107,7 +104,7 @@ test('5 — a drill narrows, and the breadcrumb takes you back where you started
   // grouped by the column they had drilled INTO, so the crumb promised a return and delivered a
   // different analysis.
   await openFixture(page);
-  await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+  await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
 
   await page.locator('#a-dim-0').selectOption('region');
   await page.getByRole('button', { name: /Run analysis/ }).click();
@@ -126,17 +123,18 @@ test('5 — a drill narrows, and the breadcrumb takes you back where you started
 
 test('6 — Quality names what it checked instead of showing a green tick', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Quality', exact: true }).click();
+  await page.getByRole('tab', { name: 'Quality', exact: true }).click();
 
   await expect(page.getByText(/Nothing needs attention/)).toBeVisible();
   await expect(page.getByText(/Checked 6 columns/)).toBeVisible();
-  // The limit it states about itself. A clean bill that hid this would be overclaiming.
-  await expect(page.getByText(/Duplicate rows are not part of this check/)).toBeVisible();
+  // The limit it states about itself. A clean bill that hid this would be overclaiming. It is the line's tooltip now
+  // (owner, 2026-09-28: one line under a heading, the longer account on hover).
+  await expect(page.getByText(/Checked 6 columns/)).toHaveAttribute('title', /Duplicate rows are not part of this check/);
 });
 
 test('7 — Compact labels its estimates as estimates', async ({ page }) => {
   await openFixture(page);
-  await page.getByRole('button', { name: 'Compact', exact: true }).click();
+  await page.getByRole('tab', { name: 'Compact', exact: true }).click();
 
   await expect(page.getByText(/COLUMN/i).first()).toBeVisible();
   // The distinct figures come from a HyperLogLog sketch and must never render as exact counts.
@@ -164,7 +162,7 @@ test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page })
   // the SERVER narrowing and not the page hiding rows is the count: 150,000 has to become the
   // number of rows in one region, over the whole file, not a filtered view of the hundred in hand.
   await openFixture(page);
-  await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+  await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
   await page.locator('#a-dim-0').selectOption('region');
   await page.getByRole('button', { name: /Run analysis/ }).click();
   await expect(page.locator('h4', { hasText: /by region/ })).toBeVisible();
@@ -173,7 +171,7 @@ test('10 — a Canvas drill narrows the Data tab, and says so', async ({ page })
   await page.getByRole('button', { name: 'Drill', exact: true }).first().click();
   await expect(page.getByText('Filtered to', { exact: true })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Data', exact: true }).click();
+  await page.getByRole('tab', { name: 'Data', exact: true }).click();
   await expect(page.getByText('Narrowed by the Canvas')).toBeVisible();
   // The fixture holds five regions of 30,000 rows each. 30,000 is therefore the whole of one
   // region and not a filtered view of the hundred the page was holding -- the difference between
@@ -194,11 +192,13 @@ test('11 — a date column can be bucketed by month, and the heading says so', a
   // The gap that limited this module most: grouping a DATE column gave one bucket per day, so
   // "revenue by month" -- the grain a business reads -- was not expressible at all.
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption(CONNECTION);
+  // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await page.locator('#a-conn').selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
-  await expect(page.getByText(/250K/)).toBeVisible();
-  await page.getByRole('button', { name: 'Canvas', exact: true }).click();
+  await expect(page.getByText('250K rows')).toBeVisible();
+  await page.getByRole('tab', { name: 'Canvas', exact: true }).click();
 
   // A text column is offered no bucket: the server refuses a grain on one, rightly, and the
   // picker must not walk anybody into that.

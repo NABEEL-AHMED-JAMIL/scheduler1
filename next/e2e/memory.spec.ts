@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext, Browser, CDPSession, Page } from '@playwright/test';
+import { test, expect, Browser, CDPSession, Page } from '@playwright/test';
+import { hasToken, NEEDS, Session, sessionFor } from './support/session';
 
 /**
  * MIG-214, the console's half: cycle the main screens as workspace 2924's administrator (4537) and check that what a
@@ -9,8 +10,6 @@ import { test, expect, APIRequestContext, Browser, CDPSession, Page } from '@pla
  * Opt-in (it takes a few minutes and reads every screen): E2E_MEMORY=1 plus E2E_TENANT_ADMIN_TOKEN
  * (etl-platform/scripts/mint-test-token.sh 4537 900). Read-only: it opens screens and saves nothing.
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const CYCLES = Number(process.env['E2E_MEMORY_CYCLES'] ?? 5);
 
 // The screens a workspace administrator opens most; each one loads its data and draws its tables or charts.
@@ -22,15 +21,7 @@ const SCREENS = [
   '/administration/access-profiles', '/notifications',
 ];
 
-interface Session { data: Record<string, unknown>; }
 interface Counters { heapMb: number; nodes: number; listeners: number; documents: number; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-}
 
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
@@ -50,11 +41,12 @@ async function counters(cdp: CDPSession): Promise<Counters> {
 }
 
 test.describe('Console memory while cycling screens (MIG-214, opt-in)', () => {
-  test.skip(!token || process.env['E2E_MEMORY'] !== '1', 'Set E2E_MEMORY=1 and E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(process.env['E2E_MEMORY'] !== '1', 'Opt-in: set E2E_MEMORY=1 to run this (it takes a few minutes).');
+  test.skip(!hasToken('admin'), NEEDS.admin);
   test.setTimeout(20 * 60_000);
 
   test('what the screens leave behind does not pile up across cycles', async ({ browser, request }, info) => {
-    const page = await pageAs(browser, await session(request));
+    const page = await pageAs(browser, await sessionFor(request, 'admin'));
     const cdp = await page.context().newCDPSession(page);
     await cdp.send('Performance.enable');
     // One page load, then the router moves between screens the way a click does (a full reload would throw every

@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
 
 /**
  * MIG-272: Document Intelligence's review flow end to end, as a workspace administrator.
@@ -20,27 +21,11 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
  * "UI-CHECK e2e" vendor: the workspace's owner clears test data.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 const BUCKET = process.env['E2E_OCR_BUCKET'] ?? 'ui-review-s3';
 const KEY = process.env['E2E_OCR_KEY'] ?? 'ocr-live-check/ocr-live-check.png';
-const VENDOR = `UI-CHECK e2e vendor ${Date.now().toString(36)}`;
+const VENDOR = `E2E vendor ${Date.now().toString(36)}`;
 
-interface Session { data: Record<string, unknown>; token: string; }
 interface Field { fieldId: number; fieldKey: string; tableKey?: string | null; label?: string; value: string | null; page?: number | null; box?: unknown; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
 
 async function pageAs(browser: Browser, s: Session, width = 1440, height = 900): Promise<Page> {
   const context = await browser.newContext({ viewport: { width, height } });
@@ -95,10 +80,10 @@ async function seed(request: APIRequestContext, s: Session): Promise<number> {
 }
 
 test.describe('Document Intelligence', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
 
   test('review: a field\'s box is highlighted, a value corrected, the document approved into its dataset', async ({ browser, request }, info) => {
     test.setTimeout(300_000);

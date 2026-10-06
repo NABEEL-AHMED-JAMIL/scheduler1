@@ -1,4 +1,5 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 
 /**
@@ -15,8 +16,6 @@ import { join } from 'path';
  *   E2E_SHOTS                optional: a folder the screenshots are also written to
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const userToken = process.env['E2E_TENANT_USER_TOKEN'];
 
 interface Level { sensitivity: string; modelRule: string; allowedModels: string[]; retentionDays: number | null;
   aiWriteTools: boolean; minFieldsWarning: boolean; saved: boolean; deliveryOptions?: unknown; }
@@ -44,7 +43,7 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
 }
 
 async function policy(request: APIRequestContext): Promise<Level[]> {
-  const r = await (await request.get(`${api}/aiPrompt.json/dataPolicy`, { headers: { Authorization: `Bearer ${adminToken}` } })).json();
+  const r = await (await request.get(`${api}/aiPrompt.json/dataPolicy`, { headers: { Authorization: `Bearer ${tokenFor('admin')}` } })).json();
   expect(r.status, r.message).toBe('SUCCESS');
   return r.data.levels as Level[];
 }
@@ -56,7 +55,7 @@ const effective = (l: Level) => ({ sensitivity: l.sensitivity, modelRule: l.mode
 test.describe.configure({ mode: 'serial' });
 
 test.describe('MIG-254: Administration › Data policies', () => {
-  test.skip(!adminToken, 'E2E_TENANT_ADMIN_TOKEN is not set');
+  test.skip(!hasToken('admin'), NEEDS.admin);
   let before: Level[] = [];
 
   test.beforeAll(async ({ request }) => { before = await policy(request); });
@@ -68,13 +67,13 @@ test.describe('MIG-254: Administration › Data policies', () => {
     const changed = before.filter(b => JSON.stringify(effective(b)) !== JSON.stringify(effective(now.find(n => n.sensitivity === b.sensitivity)!)));
     if (!changed.length) return;
     const levels = changed.map(effective);
-    const r = await (await request.post(`${api}/aiPrompt.json/dataPolicy`, { headers: { Authorization: `Bearer ${adminToken}` }, data: { levels } })).json();
+    const r = await (await request.post(`${api}/aiPrompt.json/dataPolicy`, { headers: { Authorization: `Bearer ${tokenFor('admin')}` }, data: { levels } })).json();
     expect(r.status, r.message).toBe('SUCCESS');
     expect((await policy(request)).map(effective)).toEqual(before.map(effective));
   });
 
   test('shows the policy the workspace has -- the defaults when nothing is saved', async ({ browser, request }, info) => {
-    const page = await pageAs(browser, await sessionOf(request, adminToken!));
+    const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     await page.goto('/administration/data-policies');
     await expect(page.getByRole('heading', { name: 'Data policies', level: 1 })).toBeVisible();
     for (const name of ['Public', 'Internal', 'Sensitive']) await expect(page.getByRole('heading', { name, level: 2 })).toBeVisible();
@@ -93,7 +92,7 @@ test.describe('MIG-254: Administration › Data policies', () => {
 
   test('saves Internal\'s retention as 7 days, and a reload shows it saved', async ({ browser, request }, info) => {
     test.skip(before.find(l => l.sensitivity === 'internal')?.retentionDays === 7, 'Internal already keeps 7 days');
-    const page = await pageAs(browser, await sessionOf(request, adminToken!));
+    const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     await page.goto('/administration/data-policies');
     const internal = page.locator('[data-level="internal"]');
     await internal.locator('input[name="retention"]').fill('7');
@@ -113,10 +112,10 @@ test.describe('MIG-254: Administration › Data policies', () => {
   });
 
   test('a member holding Prompts reads it and changes nothing; one without it is refused', async ({ browser, request }, info) => {
-    test.skip(!userToken, 'E2E_TENANT_USER_TOKEN is not set');
+    test.skip(!hasToken('user'), NEEDS.user);
     // 4597's profile does not hold Prompts; the console's gate reads the session's pages, so a profile that grants it is
     // simulated by adding the key. ai-service answers the read for any member either way.
-    const reader = await pageAs(browser, await sessionOf(request, userToken!, ['ai-prompts']));
+    const reader = await pageAs(browser, await sessionOf(request, tokenFor('user')!, ['ai-prompts']));
     await reader.goto('/administration/data-policies');
     await expect(reader.locator('[data-read-only]')).toContainText('Only a workspace administrator can change the data policy.');
     await expect(reader.locator('[data-level="internal"]')).toContainText('Keep run files');
@@ -125,14 +124,14 @@ test.describe('MIG-254: Administration › Data policies', () => {
     await shot(reader, info, 'data-policies-member');
     await reader.context().close();
 
-    const refused = await pageAs(browser, await sessionOf(request, userToken!));
+    const refused = await pageAs(browser, await sessionOf(request, tokenFor('user')!));
     await refused.goto('/administration/data-policies');
     await expect(refused).toHaveURL(/\/unauthorized\?page=ai-prompts/);
     await refused.context().close();
   });
 
   test('the AI Assistant names the policy it works under', async ({ browser, request }) => {
-    const page = await pageAs(browser, await sessionOf(request, adminToken!));
+    const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     await page.goto('/ai/assistant');
     const context = page.locator('[data-context]');
     await expect(context).not.toContainText('None configured');

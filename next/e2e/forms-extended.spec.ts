@@ -1,33 +1,27 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { canSignIn, NEEDS, pageAs as signedIn, sessionFor } from './support/session';
+import { formNamed } from './support/workspace';
 
 /**
- * MIG-277, live: a member (4597) fills in "MIG-277 visit check (synthetic)" (form 1001, made for this check): picks a
+ * MIG-277, live: a member (4597) fills in "MIG-277 visit check (synthetic)" (found by name; made for this check): picks a
  * patient from the lookup, sees Antibiotic appear (and become required) when infection is Yes, adds table rows, uploads a
  * photo, draws a signature, and sends. It SUBMITS one submission and uploads two files, and leaves them.
- * Sign-in: E2E_TENANT_USER_TOKEN (mint-test-token.sh 4597 900).
+ * Sign-in through support/session.ts: E2E_TENANT_USER_TOKEN (mint-test-token.sh 4597 900), or E2E_TENANT_USER(_PASSWORD).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_USER_TOKEN'];
-const FORM = Number(process.env['E2E_EXTENDED_FORM'] ?? 1001);
+const FORM_NAME = 'MIG-277 visit check (synthetic)';
 
-async function pageAs(browser: Browser, request: APIRequestContext): Promise<Page> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), {
-    username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId, tenantId: claims.tenantId,
-    accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys });
-  return page;
+async function pageAs(browser: Browser, request: APIRequestContext): Promise<{ page: Page; form: number }> {
+  const s = await sessionFor(request, 'user');
+  const form = Number(process.env['E2E_EXTENDED_FORM'] ?? 0) || (await formNamed(request, s, FORM_NAME)).formId;
+  return { page: await signedIn(browser, s, { viewport: { width: 1440, height: 1000 } }), form };
 }
 
 test.describe('Forms: lookup, rules, table, file, signature (live)', () => {
-  test.skip(!token, 'Set E2E_TENANT_USER_TOKEN to run this.');
+  test.skip(!canSignIn('user'), NEEDS.user);
 
   test('a member fills in every new field type and sends it', async ({ browser, request }) => {
-    const page = await pageAs(browser, request);
-    await page.goto(`/forms/${FORM}/fill`);
+    const { page, form } = await pageAs(browser, request);
+    await page.goto(`/forms/${form}/fill`);
     await expect(page.getByRole('heading', { level: 1, name: 'MIG-277 visit check (synthetic)' })).toBeVisible();
 
     await page.locator('[data-field="patient"]').selectOption('SYN-001');

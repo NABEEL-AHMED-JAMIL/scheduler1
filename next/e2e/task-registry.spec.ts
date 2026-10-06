@@ -1,45 +1,39 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, APIRequestContext, Page } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { pipelineById } from './support/workspace';
 
 /**
  * MIG-250: Configuration › Task Registry end to end, as a workspace administrator of workspace 2924: the list shows
  * every kind (Read, Process, Output and a Legacy row per pipeline), a task's side panel, an administrator's switch
  * off and back to its default (restored in afterAll whatever happens), and a Legacy row opening the existing pipeline
- * dialog. The shared legacy pipeline 100167 (REF_CSV_CHECK_V1, used by 15 jobs) is only viewed; the save test saves
+ * dialog. The shared legacy pipeline REF_CSV_CHECK_V1 (used by 15 jobs) is only viewed; the save test saves
  * the spec's own "UI-CHECK legacy pipeline" (created once, left in place for the owner to clear).
  *
  * Needs Core behind :9098 and a console at E2E_BASE_URL with MIG-250 (e.g. `ng serve --port 4418`). Sign-in:
- *   E2E_TENANT_ADMIN_TOKEN   a TENANT_ADMIN access token (etl-platform/scripts/mint-test-token.sh 4537 900)
+ *   support/session.ts: E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh 4537 900), or a password
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const SWITCHED = 'aggregate';
 const CHECK_ID = 'UI_CHECK_LEGACY_0929';
 
-interface Session { data: Record<string, unknown>; token: string; }
 
-async function session(request: APIRequestContext): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { token: token!, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-}
-
-async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
-}
-
-const headers = (s: Session) => ({ Authorization: `Bearer ${s.token}` });
+const headers = (s: Session) => authOf(s);
+/** The workspace's pipelines this spec names, by id (MIG-330: they were pinned by key, 100167/100175/100177). */
+const SHARED_ID = 'REF_CSV_CHECK_V1';
+const LISTED = [SHARED_ID, 'UI_CHECK_STEPS_0928', 'UI_CHECK_REGISTRY_0929'];
+const KEY: Record<string, number> = {};
+let TOPIC = 0;
 const row = (page: Page, id: string) => page.locator(`tr[data-row="${id}"]`);
 
 test.describe('Task Registry', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => {
+    s = await sessionFor(request, 'admin');
+    for (const id of LISTED) KEY[id] = (await pipelineById(request, s, id)).pipelineKey;
+    // The topic the legacy pipelines publish on: the shared one's, which every legacy pipeline here shares.
+    TOPIC = (await pipelineById(request, s, SHARED_ID)).sourceTaskTypeId;
+  });
 
   test.afterAll(async ({ request }) => {
     // Never leave a task switched: back to its default, whatever the test did.
@@ -53,8 +47,8 @@ test.describe('Task Registry', () => {
     for (const kind of ['Read', 'Process', 'Output', 'Legacy']) {
       await expect(page.locator(`tbody [data-kind="${kind}"]`).first()).toBeVisible();
     }
-    for (const key of [100167, 100175, 100177]) await expect(row(page, `legacy:${key}`)).toContainText('Legacy');
-    await expect(row(page, 'legacy:100167')).toContainText('REF_CSV_CHECK_V1');
+    for (const id of LISTED) await expect(row(page, `legacy:${KEY[id]}`)).toContainText('Legacy');
+    await expect(row(page, `legacy:${KEY[SHARED_ID]}`)).toContainText(SHARED_ID);
     await expect(row(page, 'write_database')).toContainText('Unavailable');
     await page.getByLabel('Kind').selectOption('Legacy');
     await expect(page.locator('tbody tr[data-row]').first()).toHaveAttribute('data-row', /^legacy:/);
@@ -122,7 +116,7 @@ test.describe('Task Registry', () => {
     const sent = page.waitForRequest(r => r.url().includes('/pipeline.json/save') && r.method() === 'POST');
     await dialog.getByRole('button', { name: 'Save changes' }).click();
     const body = JSON.parse((await sent).postData() ?? '{}');
-    expect(body).toMatchObject({ pipelineKey: key, pipelineId: CHECK_ID, pipelineName: 'UI-CHECK legacy pipeline', sourceTaskTypeId: 11831, status: 'Active' });
+    expect(body).toMatchObject({ pipelineKey: key, pipelineId: CHECK_ID, pipelineName: 'UI-CHECK legacy pipeline', sourceTaskTypeId: TOPIC, status: 'Active' });
     expect(body.fields.map((f: { tagKey: string; position: number }) => `${f.position}:${f.tagKey}`)).toEqual(before.map(f => `${f.position}:${f.tagKey}`));
     await expect(dialog).toHaveCount(0);
     // Saved untouched: the stored fields are what they were.
@@ -145,7 +139,7 @@ async function checkPipeline(request: APIRequestContext, s: Session): Promise<nu
   const found = (list.data?.rows ?? []).find((p: { pipelineId: string }) => p.pipelineId === CHECK_ID);
   if (found) return found.pipelineKey;
   const saved = await (await request.post(`${api}/pipeline.json/save`, { headers: headers(s), data: {
-    pipelineId: CHECK_ID, pipelineName: 'UI-CHECK legacy pipeline', sourceTaskTypeId: 11831, status: 'Active',
+    pipelineId: CHECK_ID, pipelineName: 'UI-CHECK legacy pipeline', sourceTaskTypeId: TOPIC, status: 'Active',
     description: 'MIG-250 e2e: a legacy dialog saved from the Task Registry. Safe to delete.',
     fields: [
       { tagKey: 'inputKey', label: 'Input CSV', fieldType: 'text', required: true, position: 0 },

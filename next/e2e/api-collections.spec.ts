@@ -1,4 +1,5 @@
-import { test, expect, APIRequestContext, Browser, Page, Response } from '@playwright/test';
+import { test, expect, Browser, Page, Response } from '@playwright/test';
+import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
 
 /**
  * MIG-247: API Collections end to end, as a workspace administrator -- create a collection, give it an
@@ -18,32 +19,15 @@ import { test, expect, APIRequestContext, Browser, Page, Response } from '@playw
  * at the end through the API.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 const ECHO = process.env['E2E_ECHO_URL'] ?? 'https://httpbin.org';
 
 const STAMP = Date.now().toString(36);
-const COLLECTION = `UI-CHECK e2e ${STAMP}`;
-const IMPORTED = `UI-CHECK e2e import ${STAMP}`;
+const COLLECTION = `E2E collection ${STAMP}`;
+const IMPORTED = `E2E import ${STAMP}`;
 const SECRET = `e2e-secret-${STAMP}-${Math.random().toString(36).slice(2)}`;
 const IMPORT_TOKEN = `e2e-import-token-${STAMP}`;
 const IMPORT_ENV_SECRET = `e2e-import-env-${STAMP}`;
 const SECRETS = [SECRET, IMPORT_TOKEN, IMPORT_ENV_SECRET];
-
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
 
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
   const context = await browser.newContext();
@@ -67,12 +51,12 @@ function watchForSecrets(page: Page): string[] {
 }
 
 test.describe('API Collections', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let s: Session;
   const made: number[] = [];
 
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
 
   test.afterAll(async ({ request }) => {
     if (!s) return;
@@ -102,7 +86,7 @@ test.describe('API Collections', () => {
     // ---- an environment: a plain base URL, and a secret that is shown only as configured from now on
     await page.getByRole('button', { name: 'New environment' }).click();
     const env = page.locator('app-environment-dialog');
-    await env.locator('#envName').fill('UI-CHECK e2e');
+    await env.locator('#envName').fill('E2E env');
     await env.getByRole('button', { name: 'Add variable' }).click();
     await env.getByLabel('Name of variable 1').fill('baseUrl');
     await env.getByLabel('Value of baseUrl', { exact: true }).fill(ECHO);
@@ -120,7 +104,7 @@ test.describe('API Collections', () => {
     // ---- add an API that signs in with the secret, and Save & test it
     await page.getByRole('button', { name: 'Add API' }).click();
     const panel = page.locator('app-side-panel');
-    await panel.locator('#apiName').fill('UI-CHECK e2e echo');
+    await panel.locator('#apiName').fill('E2E echo');
     await panel.locator('#apiUrl').fill('{{baseUrl}}/anything');
     await panel.getByRole('tab', { name: 'Headers' }).click();
     await panel.getByRole('button', { name: 'Add header' }).click();
@@ -135,7 +119,7 @@ test.describe('API Collections', () => {
     // The echo sends the Authorization header back; the runner masks the token before it leaves the service.
     await expect(panel.locator('app-response-viewer pre')).toContainText('"Authorization"');
     await expect(panel.locator('app-response-viewer')).not.toContainText(SECRET);
-    await expect(panel.getByRole('heading', { name: 'Edit API · UI-CHECK e2e echo' })).toBeVisible();
+    await expect(panel.getByRole('heading', { name: 'Edit API · E2E echo' })).toBeVisible();
 
     // ---- change it and save: saved means nothing left to save, and the button is Test again
     await panel.locator('#apiDescription').fill('Echoes the request back');
@@ -144,17 +128,17 @@ test.describe('API Collections', () => {
     await expect(panel.getByRole('button', { name: 'Test', exact: true })).toBeVisible();
     await panel.locator('.side-panel-foot').getByRole('button', { name: 'Close', exact: true }).click();
 
-    const row = page.locator('[data-test="apis"] tbody tr', { hasText: 'UI-CHECK e2e echo' });
+    const row = page.locator('[data-test="apis"] tbody tr', { hasText: 'E2E echo' });
     await expect(row).toContainText('200');
 
     // ---- disable and enable
-    await row.getByRole('switch', { name: 'Disable UI-CHECK e2e echo' }).click();
+    await row.getByRole('switch', { name: 'Disable E2E echo' }).click();
     await expect(row).toContainText('Disabled');
-    await row.getByRole('switch', { name: 'Enable UI-CHECK e2e echo' }).click();
+    await row.getByRole('switch', { name: 'Enable E2E echo' }).click();
     await expect(row).toContainText('Enabled');
 
     // ---- a stored secret is replace-only
-    await page.getByRole('button', { name: 'Actions for the UI-CHECK e2e environment' }).click();
+    await page.getByRole('button', { name: 'Actions for the E2E env environment' }).click();
     await page.getByRole('menuitem', { name: 'Edit or replace secrets' }).click();
     await expect(env).toContainText('configured');
     await expect(env.getByLabel('Value of token', { exact: true })).toHaveCount(0);
@@ -172,7 +156,7 @@ test.describe('API Collections', () => {
       item: [{ name: 'Echo', item: [{ name: 'Get anything', request: { method: 'GET', url: '{{baseUrl}}/anything' } }] }],
     })) });
     await dialog.locator('#impEnvironments').setInputFiles({ name: 'e2e.postman_environment.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({
-      name: 'UI-CHECK e2e imported', values: [{ key: 'baseUrl', value: ECHO, enabled: true }, { key: 'apiSecret', value: IMPORT_ENV_SECRET, type: 'secret', enabled: true }],
+      name: 'E2E imported', values: [{ key: 'baseUrl', value: ECHO, enabled: true }, { key: 'apiSecret', value: IMPORT_ENV_SECRET, type: 'secret', enabled: true }],
     })) });
     await dialog.getByRole('button', { name: 'Import', exact: true }).click();
     await expect(dialog.getByRole('heading', { name: 'Import report' })).toBeVisible({ timeout: 30_000 });

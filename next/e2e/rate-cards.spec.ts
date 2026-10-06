@@ -1,49 +1,32 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/session';
 
 /**
  * Rate cards, end to end: the platform administrator saves a new version of the calculation through the
  * editor, the page lists it with what changed, a bill drafted before keeps its version, and a
  * fresh draft is priced with the new one. A tenant administrator never sees the page.
  *
- * Needs a running metering service (etl_meter) behind the console, and:
- *   E2E_PLATFORM_ADMIN / E2E_PLATFORM_ADMIN_PASSWORD   a PLATFORM_ADMIN
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD       a TENANT_ADMIN, for the negative case
+ * Needs a running metering service (etl_meter) behind the console. Sign-in through support/session.ts:
+ *   platform  a TEST platform administrator (E2E_PLATFORM_ADMIN_TOKEN) -- never the owner's own account; the version
+ *             it saves (named "e2e <stamp>: images at 0.02") is left in place
+ *   admin     a TENANT_ADMIN, for the negative case (E2E_TENANT_ADMIN_TOKEN, 4537 of 2924)
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const platform = { username: process.env['E2E_PLATFORM_ADMIN'], password: process.env['E2E_PLATFORM_ADMIN_PASSWORD'] };
-const tenant = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 
-interface Session { data: Record<string, any>; token: string; }
-
-async function signIn(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const answer = await request.post(`${api}/auth.json/login`, { data: { username, password }, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, session: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session.data);
-  return page;
-}
 
 test.describe('rate cards', () => {
-  test.skip(!platform.username || !platform.password, 'Set E2E_PLATFORM_ADMIN(_PASSWORD) to run this.');
 
   test('a new version is saved from the editor, listed, and prices only the bills that come after', async ({ browser, request }) => {
+    test.skip(!canSignIn('platform'), NEEDS.platform);
     test.setTimeout(120_000);
-    const session = await signIn(request, platform.username!, platform.password!);
-    const auth = { Authorization: `Bearer ${session.token}` };
+    const session = await sessionFor(request, 'platform');
+    const auth = authOf(session);
     const health = await (await request.get(`${api}/billing.json/health`, { headers: auth })).json();
     test.skip(health.status !== 'SUCCESS' || health.data?.status !== 'ok', 'The metering service is not up behind this console.');
 
     const before = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     const versionsBefore: number[] = before.data.cards.map((c: { version: number }) => c.version);
     const stamp = Date.now().toString(36);
-    const name = `e2e ${stamp}: images at 0.02`;
+    const name = `E2E ${stamp}: images at 0.02`;
 
     const page = await pageAs(browser, session);
     await page.goto('/billing/rates');
@@ -94,9 +77,9 @@ test.describe('rate cards', () => {
   });
 
   test('a tenant administrator is kept off the page and cannot change the calculation', async ({ browser, request }) => {
-    test.skip(!tenant.username || !tenant.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
-    const session = await signIn(request, tenant.username!, tenant.password!);
-    const auth = { Authorization: `Bearer ${session.token}` };
+    test.skip(!canSignIn('admin'), NEEDS.admin);
+    const session = await sessionFor(request, 'admin');
+    const auth = authOf(session);
     const refused = await (await request.put(`${api}/billing.json/rateCard`, { headers: auth, data: { name: 'x', effective_from: '2099-01-01', items: [] } })).json();
     expect(refused.status).toBe('ERROR');
     const list = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();

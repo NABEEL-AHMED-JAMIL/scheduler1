@@ -1,42 +1,27 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/session';
 
 /**
  * Invoices and Billing documents as rail + pane: the address names a bill, the pane shows it
  * with the QR code of its number, and the document list reads a PDF in place.
  *
- *   E2E_PLATFORM_ADMIN / E2E_PLATFORM_ADMIN_PASSWORD   a PLATFORM_ADMIN
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD       a TENANT_ADMIN with an issued invoice
+ * Sign-in through support/session.ts:
+ *   admin     a TENANT_ADMIN whose workspace has an issued invoice (E2E_TENANT_ADMIN_TOKEN, 4537 of 2924)
+ *   platform  a TEST platform administrator (E2E_PLATFORM_ADMIN_TOKEN) -- never the owner's own account
+ * Issuing a bill is the platform administrator's, so until a test platform administrator exists and has issued one to
+ * the workspace, the first test skips for want of one; it reads only.
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const platform = { username: process.env['E2E_PLATFORM_ADMIN'], password: process.env['E2E_PLATFORM_ADMIN_PASSWORD'] };
-const tenant = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 
-interface Session { data: Record<string, any>; token: string; }
-
-async function signIn(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const answer = await request.post(`${api}/auth.json/login`, { data: { username, password }, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, session: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session.data);
-  return page;
-}
 
 test.describe('invoices as rail and pane', () => {
-  test.skip(!tenant.username || !tenant.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   test('the address names the bill, the pane carries its QR code, and a document reads in place', async ({ browser, request }) => {
-    const session = await signIn(request, tenant.username!, tenant.password!);
-    const auth = { Authorization: `Bearer ${session.token}` };
+    const session = await sessionFor(request, 'admin');
+    const auth = authOf(session);
     const list = await (await request.get(`${api}/billing.json/invoices`, { headers: auth })).json();
     const issued = (list.data as { number: string; status: string; documentKinds: string[] }[]).find(i => i.status !== 'draft' && i.documentKinds?.includes('invoice'));
-    test.skip(!issued, 'No issued invoice for this workspace yet.');
+    test.skip(!issued, `No issued invoice for workspace ${session.tenantId} yet: issuing one ${NEEDS.platform}.`);
 
     const page = await pageAs(browser, session);
     await page.goto('/billing/invoices');
@@ -77,8 +62,8 @@ test.describe('invoices as rail and pane', () => {
   });
 
   test('the platform administrator drafts from the head and sees every workspace in the rail', async ({ browser, request }) => {
-    test.skip(!platform.username || !platform.password, 'Set E2E_PLATFORM_ADMIN(_PASSWORD) to run this.');
-    const session = await signIn(request, platform.username!, platform.password!);
+    test.skip(!canSignIn('platform'), NEEDS.platform);
+    const session = await sessionFor(request, 'platform');
     const page = await pageAs(browser, session);
     await page.goto('/billing/invoices');
     await expect(page.getByRole('button', { name: /Draft month/ })).toBeVisible();
