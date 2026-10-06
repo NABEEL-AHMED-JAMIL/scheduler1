@@ -24,6 +24,7 @@ class FakeChart {
   resize() { this.assertAlive(); this.calls.push('resize'); }
   dispose() { this.assertAlive(); this.disposed = true; this.calls.push('dispose'); }
   isDisposed() { return this.disposed; }
+  convertFromPixel(_finder: unknown, pixel: number[]) { return [pixel[0] / 100, 0]; }
   fire(event: string, params: unknown) { for (const handler of this.handlers.get(event) ?? []) handler(params); }
   private assertAlive() { if (this.disposed) throw new Error('called on a disposed instance'); }
 }
@@ -87,6 +88,13 @@ describe('app-echart', () => {
     expect(made[0].calls.filter(call => call === 'on:click').length).toBe(1);
     made[0].fire('click', { seriesIndex: 0, dataIndex: 2 });
     expect(host.clicks).toEqual([{ seriesIndex: 0, dataIndex: 2 }]);
+  });
+
+  it('reads the point under the pointer for a click on a line or an area, which ECharts reports without one', async () => {
+    const { host } = await render();
+    made[0].fire('click', { componentType: 'series', seriesType: 'line', seriesIndex: 1, event: { offsetX: 240, offsetY: 30 } });
+    made[0].fire('click', { componentType: 'series', seriesType: 'bar', seriesIndex: 0, dataIndex: 4 });
+    expect(host.clicks.map(click => click.dataIndex)).toEqual([2, 4]);
   });
 
   it('keeps that one handler through a kind switch: a setOption, never a re-bind', async () => {

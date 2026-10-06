@@ -14,7 +14,7 @@ import { analyticsFixtures, ORDERS, PREFIX } from './support/analytics-fixtures'
  *
  * Each tile: find a mark by moving over the chart until ECharts shows the pointer cursor (it shows
  * it only over a mark that narrows), click it, and read the condition the board filter opened with.
- * A narrowing re-runs the board, which is stopped at once so the next click is not ignored.
+ * A narrowing re-runs the board (a click while it runs is ignored), so each kind waits for that run.
  *
  * @author Nabeel Ahmed
  */
@@ -75,9 +75,9 @@ async function ensureBoard(request: APIRequestContext, s: Session, connection: s
 /** A point over a mark that narrows: ECharts shows the pointer there and nowhere else. */
 async function markUnder(page: Page, chart: Locator): Promise<{ x: number; y: number } | null> {
   const box = (await chart.boundingBox())!;
-  for (let gy = 1; gy < 12; gy++) {
-    for (let gx = 1; gx < 16; gx++) {
-      const x = box.x + (box.width * gx) / 16, y = box.y + (box.height * gy) / 12;
+  for (let gy = 1; gy < 20; gy++) {
+    for (let gx = 1; gx < 28; gx++) {
+      const x = box.x + (box.width * gx) / 28, y = box.y + (box.height * gy) / 20;
       await page.mouse.move(x, y);
       const cursor = await chart.evaluate(el => getComputedStyle(el.querySelector('div > div') ?? el).cursor);
       if (cursor === 'pointer') return { x, y };
@@ -94,15 +94,19 @@ test.beforeAll(async ({ request }) => {
   boardId = await ensureBoard(request, session, connection);
 });
 
-test('a click on a mark of every ECharts kind narrows the board to what it stands for', async ({ page }) => {
+// Six kinds a test: each click re-runs the board, and a test is one token's fifteen minutes.
+const GROUPS = Array.from({ length: Math.ceil(KINDS.length / 6) }, (_, i) => KINDS.slice(i * 6, i * 6 + 6).map(([kind]) => kind));
+
+for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.join(', ')}`, async ({ page }) => {
   test.setTimeout(900_000);
   await page.goto(`/data/analytics/dashboards?board=${boardId}`);
   await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 400_000 });
   const builder = page.locator('app-filter-builder');
-  for (const [kind] of KINDS) {
+  for (const kind of group) {
     const tile = page.locator('app-analytics-widget', { hasText: `Events — ${kind}` });
     await tile.scrollIntoViewIfNeeded();
     const chart = tile.locator(`app-echart[data-kind="${kind}"][data-drawn]`);
+    await chart.waitFor({ timeout: 10_000 }).catch(() => undefined);
     await expect.soft(chart, `${kind} is drawn by ECharts`).toBeVisible();
     if (!(await chart.count())) continue;
     const hit = await markUnder(page, chart);
@@ -116,7 +120,7 @@ test('a click on a mark of every ECharts kind narrows the board to what it stand
     await page.mouse.click(hit.x, hit.y);
     expect.soft(await narrowed, `${kind}: a click narrowed the board`).toBe(true);
     await expect.soft(builder.getByLabel('Value for condition 1'), `${kind} shows the condition`).not.toHaveValue('');
-    const stop = page.getByRole('button', { name: 'Stop' });
-    if (await stop.count()) await stop.click();
+    // The narrowed run is let finish: a Stop would leave the tiles after this one undrawn.
+    await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 300_000 });
   }
 });

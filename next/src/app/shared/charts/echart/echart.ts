@@ -177,7 +177,7 @@ export class EChart {
       // 'rendered', not 'finished': a chart with a looping effect (the top-five ripple) never finishes.
       chart.on('rendered', () => { if (!this.drawn()) this.drawn.set(true); });
       // Bound once, here, on this instance: see the class comment.
-      chart.on('click', params => { if (this.chart === chart) this.clicked.emit(params as EChartClick); });
+      chart.on('click', params => { if (this.chart === chart) this.clicked.emit(withIndex(chart, params as EChartClick)); });
     } catch (error) {
       console.error('A chart could not be drawn', error);
       this.failed.set('This chart could not be drawn from this result.');
@@ -238,4 +238,23 @@ export class EChart {
  */
 function themeStamp(theme: EChartThemeRef): string {
   return `${theme.key}\u0000${JSON.stringify(theme.object)}`;
+}
+
+/**
+ * A click on a line or an area (rather than on one of its points) carries no dataIndex: ECharts
+ * reports the series and nothing more. The point it stands for is the category under the pointer,
+ * read back from the pixel -- so a click anywhere along a line narrows to that point, as a click
+ * on a bar narrows to the bar.
+ */
+function withIndex(chart: ECharts, click: EChartClick & { event?: { offsetX?: number; offsetY?: number } }): EChartClick {
+  const at = click.event;
+  if (click.dataIndex !== undefined && click.dataIndex !== null) return click;
+  if (click.componentType !== 'series' || click.seriesType !== 'line' || at?.offsetX === undefined) return click;
+  try {
+    const point = chart.convertFromPixel({ seriesIndex: click.seriesIndex ?? 0 }, [at.offsetX, at.offsetY ?? 0]);
+    const index = Array.isArray(point) ? Math.round(Number(point[0])) : NaN;
+    return Number.isFinite(index) && index >= 0 ? { ...click, dataIndex: index } : click;
+  } catch {
+    return click;
+  }
 }
