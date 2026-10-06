@@ -1323,6 +1323,8 @@ html:not(.dark) .text-warn-500 { color: var(--color-warn-600); }
 
 html.dark .text-ok-500    { color: var(--color-ok-400); }
 html.dark .text-warn-500  { color: var(--color-warn-400); }
+/* MIG-320: -600 too -- Ask your data's warning measured 2.32:1 on the dark card in warn-600. */
+html.dark .text-warn-600  { color: var(--color-warn-400); }
 html.dark .text-crit-500  { color: var(--color-crit-400); }
 
 html.dark .icon-warn { color: var(--color-warn-400); }
