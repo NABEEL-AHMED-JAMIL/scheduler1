@@ -1,4 +1,4 @@
-import { expect, Page } from '@playwright/test';
+import { expect as expectNow, Page } from '@playwright/test';
 import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures } from './support/analytics-fixtures';
 import AxeBuilder from '@axe-core/playwright';
@@ -34,6 +34,8 @@ const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 test.skip(!signedIn(), NO_SESSION);
 // Opening a dataset reads it from S3 (a 38 MB CSV for orders); a slow read is not a failure, so each test has two minutes.
 test.describe.configure({ timeout: 120_000 });
+// ...and an analysis or a scan over it may answer after the usual fifteen seconds.
+const expect = expectNow.configure({ timeout: 45_000 });
 
 // The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
 test.beforeAll(async ({ request }) => {
