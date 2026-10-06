@@ -64,6 +64,7 @@ function describeAll(violations: Awaited<ReturnType<typeof scan>>): string {
 }
 
 test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ page }) => {
+  test.setTimeout(150_000);   // every tab is scanned only once it has finished reading the file
   // axe runs the instant each tab is clicked, so without this it can measure an element part-way
   // through a `transition-colors` and report a contrast ratio between two colours that exist in
   // neither state. That produced an intermittent failure here and in appearance.spec.ts naming
@@ -77,7 +78,11 @@ test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ pa
   const failures: string[] = [];
 
   for (const tab of tabs) {
-    await page.getByRole('tab', { name: tab, exact: true }).click();
+    // By id: Quality's name grows ", N to look at" once its scan finds something (orders.csv has empty ratings).
+    await page.locator(`#a-tab-${tab.toLowerCase()}`).click();
+    // A tab that is still reading keeps its last answer on screen, blurred and dimmed under a spinner (aria-busy):
+    // scanned then, the dimmed headings fail contrast (Profile did, once in three runs). Scan what the reader settles on.
+    await expect(page.locator('#a-panel [aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
     const violations = await scan(page);
     if (violations.length) failures.push(`${tab}:${describeAll(violations)}`);
   }

@@ -14,7 +14,7 @@ import { resolve } from 'node:path';
  *             or E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD
  *   user      E2E_TENANT_USER_TOKEN     (mint-test-token.sh 4597 900: Alex, TENANT_USER of 2924)
  *             or E2E_TENANT_USER / E2E_TENANT_USER_PASSWORD
- *   platform  E2E_PLATFORM_ADMIN_TOKEN  (a TEST platform admin; the owner is creating one)
+ *   platform  E2E_PLATFORM_ADMIN_TOKEN  (a TEST platform administrator; the owner is creating one)
  *             or E2E_PLATFORM_ADMIN / E2E_PLATFORM_ADMIN_PASSWORD
  *
  * <b>Tokens expire after fifteen minutes</b> and a full run is longer than that. A token handed in through the
@@ -43,7 +43,7 @@ const PASSWORD_VARS: Record<Role, [string, string]> = {
 export const NEEDS: Record<Role, string> = {
   admin: 'needs E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh 4537 900) or E2E_TENANT_ADMIN(_PASSWORD)',
   user: 'needs E2E_TENANT_USER_TOKEN (etl-platform/scripts/mint-test-token.sh 4597 900) or E2E_TENANT_USER(_PASSWORD)',
-  platform: 'needs E2E_PLATFORM_ADMIN_TOKEN (a test platform admin; the owner is creating one)',
+  platform: 'needs E2E_PLATFORM_ADMIN_TOKEN (a test platform administrator; the owner is creating one)',
 };
 
 /**

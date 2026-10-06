@@ -82,6 +82,7 @@ test('a dashboard fits a phone too', async ({ page }) => {
 });
 
 test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ page }) => {
+  test.setTimeout(150_000);   // every tab is scanned only once it has finished reading the file
   // The usual way a palette breaks: tokens redefined under a media query, and only the light half
   // ever looked at.
   //
@@ -95,7 +96,9 @@ test('the workspace has no WCAG A/AA violations in DARK mode either', async ({ p
   await openFixture(page);
 
   for (const tab of ['Overview', 'Data', 'Compact', 'Quality', 'Canvas']) {
-    await page.getByRole('tab', { name: tab, exact: true }).click();
+    // By id: Quality's name grows ", N to look at" once its scan finds something (orders.csv has empty ratings).
+    await page.locator(`#a-tab-${tab.toLowerCase()}`).click();
+    await expect(page.locator('#a-panel [aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });   // see accessibility.spec
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
     expect(results.violations.map(v => `${tab}: ${v.id} — ${v.help}`)).toEqual([]);
