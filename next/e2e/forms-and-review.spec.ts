@@ -57,15 +57,20 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     await expect(menu.getByText('Coming soon', { exact: true })).toHaveCount(0);
   });
 
-  test('All forms lists the wound form, and its fill-in page asks for its five fields', async ({ browser }) => {
+  test('All forms lists the wound form, and its fill-in page asks for its five fields', async ({ browser, request }) => {
     const page = await pageAs(browser, s);
     await page.goto('/forms/builder');
     await expect(page.getByRole('heading', { level: 1, name: 'Forms' })).toBeVisible();
     const row = page.locator('tr[data-form]', { hasText: FORM });
     await expect(row).toBeVisible();
     const formId = await row.getAttribute('data-form');
+    // The fields are the form's current version's, read from the service: the form is live and is edited (its photo
+    // field went from "Photo in the inbox" to an upload, "Wound photo", on 2026-10-06 in the middle of a run).
+    const fields: { label: string }[] = (await getJson(request, s, `/form.json/fetch?formId=${formId}`)).data?.fields ?? [];
+    expect(fields.map(f => f.label).slice(0, 4)).toEqual(['Case id', 'Patient id', 'Visit date', 'Wound site']);
+    expect(fields).toHaveLength(5);
     await page.goto(`/forms/${formId}/fill`);
-    for (const label of ['Case id', 'Patient id', 'Visit date', 'Wound site', 'Photo in the inbox']) {
+    for (const { label } of fields) {
       await expect(page.getByText(label, { exact: false }).first()).toBeVisible();
     }
     await expect(page.getByRole('button', { name: /send|submit/i })).toBeVisible();
