@@ -26,16 +26,22 @@ const OWNER_ID = 1000;
 const ADMIN_ID = Number(process.env['E2E_FIRST_HOUR_ADMIN_ID'] ?? 4600);
 const MINT = process.env['E2E_MINT_SCRIPT'] ?? resolve(__dirname, '../../../etl-platform/scripts/mint-test-token.sh');
 
-const STORAGE = 'E2E first-hour storage';
-const ALIAS = 'e2e-first-hour-s3';
+/**
+ * E2E_FIRST_HOUR_SET names a second set of the same objects ("E2E first-hour b ..."), for a walk that has to make
+ * every one of them again -- the path a new workspace takes -- in a workspace where the first set already exists.
+ */
+const SET = (process.env['E2E_FIRST_HOUR_SET'] ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+const NAME = SET ? `E2E first-hour ${SET}` : 'E2E first-hour';
+const STORAGE = `${NAME} storage`;
+const ALIAS = SET ? `e2e-first-hour-${SET}-s3` : 'e2e-first-hour-s3';
 const BUCKET = process.env['E2E_FIRST_HOUR_BUCKET'] ?? 'qa-team-2945';
 const ENDPOINT = process.env['E2E_FIRST_HOUR_S3_ENDPOINT'] ?? 'http://host.docker.internal:4566';
-const TOPIC = 'E2E first-hour topic';
-const KAFKA_TOPIC = 'e2e-first-hour';
-const REGISTRY_ID = 'E2E_FIRST_HOUR';
-const REGISTRY_NAME = 'E2E first-hour orders';
-const PIPELINE = 'E2E first-hour orders task';
-const SCHEDULE = 'E2E first-hour orders schedule';
+const TOPIC = `${NAME} topic`;
+const KAFKA_TOPIC = SET ? `e2e-first-hour-${SET}` : 'e2e-first-hour';
+const REGISTRY_ID = SET ? `E2E_FIRST_HOUR_${SET.toUpperCase()}` : 'E2E_FIRST_HOUR';
+const REGISTRY_NAME = `${NAME} orders`;
+const PIPELINE = `${NAME} orders task`;
+const SCHEDULE = `${NAME} orders schedule`;
 const FILE = 'e2e-first-hour-orders.csv';
 const ROWS = ['order_id,customer,amount,status', 'A-1001,Northwind,120.50,paid', 'A-1002,Contoso,75.00,open',
   'A-1003,Fabrikam,310.25,paid', 'A-1004,Northwind,42.10,refunded'];
@@ -125,6 +131,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await setUp.click();
       const dialog = page.getByRole('dialog').last();
       await dialog.locator('select').first().selectOption({ label: `${STORAGE} (${ALIAS})` });
+      // (A workspace has one inbox: a second set's walk finds it on, on the first set's storage.)
       await dialog.getByRole('button', { name: 'Turn on the inbox' }).click();
       await expect(page.getByText('Drop files here')).toBeVisible();
     }
@@ -166,7 +173,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       const dialog = page.getByRole('dialog').last();
       await dialog.locator('#pipelineId').fill(REGISTRY_ID);
       await dialog.locator('#pipelineName').fill(REGISTRY_NAME);
-      await pick(page, 'pipelineTopic', 'first-hour', TOPIC);
+      await pick(page, 'pipelineTopic', TOPIC, TOPIC);
       await dialog.getByRole('button', { name: /Add (a )?field/i }).first().click();
       await dialog.locator('#tagKey0').fill('input_file');
       await dialog.locator('#label0').fill('Input file');
@@ -185,8 +192,8 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
       await page.locator('#taskName').fill(PIPELINE);
       await expect(page.locator('#taskProfile')).not.toHaveValue('');
-      await pick(page, 'taskType', 'first-hour', TOPIC);
-      await pick(page, 'pipeline', 'first-hour', REGISTRY_NAME);
+      await pick(page, 'taskType', TOPIC, TOPIC);
+      await pick(page, 'pipeline', REGISTRY_NAME, REGISTRY_NAME);
       await page.getByLabel('Input file').fill('intake/');
       await page.getByRole('button', { name: 'Create pipeline' }).click();
       await expect(page.getByText('Task created.')).toBeVisible();
@@ -206,7 +213,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await page.getByRole('option', { name: /^Read CSV/ }).click();
       const read = page.getByRole('dialog', { name: /^Step 1/ });
       await read.locator('#stepKey').fill('orders');
-      await read.locator('#cfg-bucket').fill(ALIAS);
+      await read.locator('#cfg-bucket').fill(arrival.alias);
       await read.locator('#cfg-key').fill(key);
       await read.locator('#cfg-format').selectOption('csv');
       await read.getByRole('button', { name: 'Apply' }).click();
@@ -224,6 +231,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await stepsTab.click();
       await page.getByRole('button', { name: 'Edit step orders' }).click();
       const read = page.getByRole('dialog', { name: /^Step 1/ });
+      await read.locator('#cfg-bucket').fill(arrival.alias);
       await read.locator('#cfg-key').fill(key);
       await read.getByRole('button', { name: 'Apply' }).click();
       await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -236,7 +244,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     if (!job) {
       await page.goto('/pipelines/schedules/new');
       await page.locator('#jobName').fill(SCHEDULE);
-      await pick(page, 'task', 'first-hour', PIPELINE);
+      await pick(page, 'task', PIPELINE, PIPELINE);
       await page.locator('#execution').selectOption('Manual');
       await page.getByRole('button', { name: 'Create schedule' }).click();
       await expect(page.getByText('Job created.')).toBeVisible();
