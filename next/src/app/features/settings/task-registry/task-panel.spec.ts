@@ -137,7 +137,7 @@ describe('TaskPanel -- a Legacy row', () => {
 
   it('asks the page to open the pipeline dialog', () => {
     const { el, close } = open(LEGACY);
-    const edit = Array.from(el.querySelectorAll('button')).find(b => b.textContent!.includes('Edit pipeline'))!;
+    const edit = Array.from(el.querySelectorAll('button')).find(b => b.textContent!.includes('Edit registry task'))!;
     edit.click();
     expect(close).toHaveBeenCalledWith('edit');
   });

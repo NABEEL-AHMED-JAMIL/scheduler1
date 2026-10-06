@@ -130,39 +130,43 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "New schedule",
-      "What runs",
-      "When it runs",
-      "Each run",
-      "Email me when",
-      "Summary"
+      "1What runs",
+      "2When it runs",
+      "3Email me when",
+      "What you will get",
+      "Next runs (server time, Chicago)",
+      "Emails"
     ],
     "buttons": [
+      "Advanced (cron)",
       "Create schedule",
+      "Daily",
       "End date: none picked",
-      "On a timetable",
-      "Only when started",
-      "Start date: 28 Sep 2026"
+      "Hourly",
+      "Minutes",
+      "Monthly",
+      "On a timetableBy itself: every few minutes, daily, weekly or monthly.",
+      "Only when startedFrom Run now, or when a workflow starts it.",
+      "Start date: 28 Sep 2026",
+      "Weekly"
     ],
     "columns": [],
     "fields": [
       "A run completes",
       "A run fails",
       "A run is skipped",
-      "Also start a run when a file arrives in the inbox",
+      "Active: runs as soon as it is saved",
+      "Also when a file arrivesEach file in the workspace inbox starts a run.",
       "Attempts",
-      "End date",
-      "Frequency",
+      "Ends",
       "Nightly orders export",
       "Pipeline *(required)",
       "Priority",
       "Repeat every",
       "Schedule name *(required)",
       "Search pipelines…",
-      "Start date *(required)",
-      "Start time",
       "Start time, hour",
-      "Start time, minute",
-      "State"
+      "Start time, minute"
     ],
     "links": [
       "/pipelines/schedules"
@@ -236,16 +240,16 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Edit schedule",
-      "What runs",
-      "When it runs",
-      "Each run",
-      "Email me when",
-      "Summary"
+      "1What runs",
+      "2When it runs",
+      "3Email me when",
+      "What you will get",
+      "Emails"
     ],
     "buttons": [
       "Clear",
-      "On a timetable",
-      "Only when started",
+      "On a timetableBy itself: every few minutes, daily, weekly or monthly.",
+      "Only when startedFrom Run now, or when a workflow starts it.",
       "Save changes"
     ],
     "columns": [],
@@ -253,14 +257,14 @@ export const PINNED: Record<string, unknown> = {
       "A run completes",
       "A run fails",
       "A run is skipped",
-      "Also start a run when a file arrives in the inbox",
+      "Active: runs as soon as it is saved",
+      "Also when a file arrivesEach file in the workspace inbox starts a run.",
       "Attempts",
       "Nightly orders export",
       "Pipeline *(required)",
       "Priority",
       "Schedule name *(required)",
-      "Search pipelines…",
-      "State"
+      "Search pipelines…"
     ],
     "links": [
       "/pipelines/schedules"

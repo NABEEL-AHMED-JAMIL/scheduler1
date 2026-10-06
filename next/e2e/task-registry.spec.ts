@@ -96,9 +96,9 @@ test.describe('Task Registry', () => {
     await expect(panel).toContainText('REF_CSV_CHECK_V1');
     await expect(panel.locator('.pipeline-fields li').first()).toBeVisible();
     await expect(panel.getByRole('switch')).toHaveCount(0);
-    await panel.getByRole('button', { name: 'Edit pipeline' }).click();
+    await panel.getByRole('button', { name: 'Edit registry task' }).click();
     const dialog = page.locator('app-pipeline-dialog');
-    await expect(dialog.getByRole('heading', { name: 'Edit pipeline' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Edit registry task' })).toBeVisible();
     await expect(dialog.locator('#pipelineId')).toHaveValue('REF_CSV_CHECK_V1');
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);

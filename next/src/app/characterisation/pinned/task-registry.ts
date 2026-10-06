@@ -67,7 +67,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Close",
-      "Edit pipeline"
+      "Edit registry task"
     ],
     "columns": [],
     "fields": [],

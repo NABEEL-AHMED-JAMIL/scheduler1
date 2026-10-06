@@ -1,4 +1,5 @@
-import { Component, ElementRef, Injector, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Injector, OnInit, computed, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
 import { isMissingRecord, isRecordId } from '../../../core/api/missing-record';
 import { HttpClient } from '@angular/common/http';
@@ -19,7 +20,7 @@ import { SERVER_ZONE } from '../../../core/instant';
 import { dayLabel } from '../../../shared/ui/time-format';
 import { clockTime } from '../schedule-labels';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
-import { Observable, catchError, forkJoin, map, of } from 'rxjs';
+import { Observable, Subject, catchError, debounceTime, forkJoin, map, of, switchMap } from 'rxjs';
 import { InboxTrigger, patternProblem, triggerOf } from '../inbox/inbox-trigger';
 import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
 import { AiModelPicks } from '../ai-models/ai-model-picks';
@@ -27,14 +28,19 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { AuthService } from '../../../core/auth/auth.service';
 
 const FREQUENCIES = [
-  { value: 'Mint',    label: 'Every N minutes', unit: 'minutes' },
-  { value: 'Hr',      label: 'Hourly',          unit: 'hours' },
-  { value: 'Daily',   label: 'Daily',           unit: 'days' },
-  { value: 'Weekly',  label: 'Weekly',          unit: 'weeks' },
-  { value: 'Monthly', label: 'Monthly',         unit: 'months' },
+  { value: 'Mint',    label: 'Every N minutes', choice: 'Minutes', unit: 'minute' },
+  { value: 'Hr',      label: 'Hourly',          choice: 'Hourly',  unit: 'hour' },
+  { value: 'Daily',   label: 'Daily',           choice: 'Daily',   unit: 'day' },
+  { value: 'Weekly',  label: 'Weekly',          choice: 'Weekly',  unit: 'week' },
+  { value: 'Monthly', label: 'Monthly',         choice: 'Monthly', unit: 'month' },
   // Wave 4 (Core 6f9261e): the expression is the cadence, so there is no interval and no unit.
-  { value: 'Cron',    label: 'Cron expression', unit: '' },
+  { value: 'Cron',    label: 'Cron expression', choice: 'Advanced (cron)', unit: '' },
 ];
+
+/** The next runs beside the form: what the scheduler would do with the timetable as it stands (schedulePreview). */
+interface Preview { runs: string[]; ends: boolean; error: string; loading: boolean; }
+const NO_PREVIEW: Preview = { runs: [], ends: false, error: '', loading: false };
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** Worked examples under the Cron field: minute hour day-of-month month day-of-week. */
 const CRON_EXAMPLES = [
@@ -96,12 +102,39 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
    * dark. The filled primary-button colours are defined for both themes.
    */
   styles: `
-    /* The form and, on a wide screen, its summary beside it: the summary stays in view while the form scrolls. */
+    /* The form and, on a wide screen, what it makes beside it: in view while the form scrolls. */
     .schedule-layout { display: grid; gap: 1.25rem; align-items: start; }
     @media (min-width: 80rem) {
-      .schedule-layout { grid-template-columns: minmax(0, 1fr) 22rem; }
+      .schedule-layout { grid-template-columns: minmax(0, 1fr) 24rem; }
       .schedule-summary { position: sticky; top: 1rem; }
     }
+    .step-no {
+      display: inline-flex; align-items: center; justify-content: center; width: 1.375rem; height: 1.375rem;
+      margin-right: 0.5rem; border-radius: 9999px; font-size: 0.75rem;
+      background: var(--accent-soft); color: var(--accent-text);
+    }
+    /* Each way it can run is a card to pick: an icon, a name and a line of what it means. */
+    .choice-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+    .choice-card {
+      display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.875rem 1rem; text-align: left; cursor: pointer;
+      border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-raised);
+    }
+    .choice-card:hover:not(:disabled) { border-color: var(--border-strong); }
+    .choice-card[aria-checked="true"], .choice-card[data-checked="true"] {
+      border-color: var(--accent-mark-strong); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-mark-strong);
+    }
+    .choice-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+    .choice-icon { color: var(--accent-text); margin-top: 0.125rem; }
+    .choice-title { display: block; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+    .choice-text { display: block; font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.125rem; }
+    .schedule-box { padding: 1rem; border-radius: var(--radius-card); background: var(--surface-sunken); }
+    /* The timetable read as a sentence, its blanks the fields. */
+    .sentence { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.625rem; font-size: 0.9375rem; }
+    .next-runs li {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.4375rem 0; font-size: 0.875rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .next-runs li:last-child { border-bottom: 0; }
     .seg-multi .seg-btn[aria-pressed="true"] {
       background: var(--btn-primary-bg);
       color: var(--btn-primary-fg);
@@ -130,9 +163,14 @@ export class JobEdit implements OnInit {
   readonly frequencies = FREQUENCIES;
   /** When it runs, in the words of a person choosing: the engine's Auto and Manual. */
   readonly executionOptions = [
-    { value: 'Auto', label: 'On a timetable' },
-    { value: 'Manual', label: 'Only when started' },
+    { value: 'Auto', label: 'On a timetable', text: 'By itself: every few minutes, daily, weekly or monthly.', icon: 'calendar' },
+    { value: 'Manual', label: 'Only when started', text: 'From Run now, or when a workflow starts it.', icon: 'play' },
   ];
+  /** Advanced (priority, attempts, retry): closed until asked for, opened when one of them needs fixing. */
+  readonly advancedOpen = signal(false);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly previewAsks = new Subject<void>();
+  readonly preview = signal<Preview>(NO_PREVIEW);
   readonly days = DAYS;
   readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -209,7 +247,7 @@ export class JobEdit implements OnInit {
   readonly executionValue = signal('Auto');
 
   /** The rest of the form as a signal, for the summary beside it (form values are not signals). */
-  private readonly values = signal<Record<string, any>>({});
+  readonly values = signal<Record<string, any>>({});
   readonly jobStatusValue = computed(() => String(this.values()['jobStatus'] ?? 'Active'));
   readonly pipelineName = computed(() => {
     const id = this.values()['taskDetailId'];
@@ -241,6 +279,36 @@ export class JobEdit implements OnInit {
     this.form.get('executionType')!.setValue(value);
   }
 
+  setFrequency(value: string): void {
+    if (this.locked()) return;
+    this.scheduler.get('frequency')!.setValue(value);
+  }
+
+  useCron(expression: string): void {
+    if (this.locked()) return;
+    this.scheduler.get('cronExpression')!.setValue(expression);
+  }
+
+  setActive(on: boolean): void {
+    this.form.get('jobStatus')!.setValue(on ? 'Active' : 'Inactive');
+  }
+
+  /** "at 02:00" for a day or longer; "from 00:00" when it repeats within a day. */
+  readonly timeWord = computed(() => (['Mint', 'Hr'].includes(this.frequencyValue()) ? 'from' : 'at'));
+
+  readonly attemptsWords = computed(() => {
+    const attempts = Number(this.values()['maxAttempts'] ?? 1);
+    return attempts > 1 ? `${attempts} attempts` : 'no retry';
+  });
+
+  /** A run as the preview lists it: Chicago wall clock, "2026-10-08T02:00", read without a time zone. */
+  runDay(run: string): string {
+    const [y, m, d] = run.slice(0, 10).split('-').map(Number);
+    return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  }
+  runDate(run: string): string { return dayLabel(run.slice(0, 10)); }
+  runTime(run: string): string { return run.slice(11, 16); }
+
   /** Backoff only means anything once there is a second attempt to wait before. */
   readonly retryEnabled = computed(() => Number(this.maxAttemptsValue()) > 1);
   private readonly maxAttemptsValue = signal(1);
@@ -252,8 +320,10 @@ export class JobEdit implements OnInit {
    * frequency -- and went on describing the old interval, time, day or end date.
    */
   private readonly schedule = signal<Record<string, any>>({});
-  readonly unit = computed(() =>
-    FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '');
+  readonly unit = computed(() => {
+    const unit = FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '';
+    return unit && String(this.schedule()['intervalValue'] ?? '1') !== '1' ? `${unit}s` : unit;
+  });
 
   /** Wave 4: a Cron schedule -- the expression replaces the interval, the weekdays and the day of the month. */
   readonly isCron = computed(() => this.frequencyValue() === 'Cron');
@@ -289,6 +359,15 @@ export class JobEdit implements OnInit {
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
     this.values.set(this.form.getRawValue());
     this.form.valueChanges.subscribe(() => this.values.set(this.form.getRawValue()));
+    // The next runs follow the timetable a moment after it stops changing; only the newest question is answered.
+    this.previewAsks.pipe(
+      debounceTime(350),
+      switchMap(() => this.askPreview()),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(preview => this.preview.set(preview));
+    this.scheduler.valueChanges.subscribe(() => this.previewAsks.next());
+    this.form.get('executionType')!.valueChanges.subscribe(() => this.previewAsks.next());
+    this.previewAsks.next();
 
     if (this.isEdit()) {
       this.loadJob();
@@ -358,6 +437,7 @@ export class JobEdit implements OnInit {
           this.selectedDays.set(((job.scheduler.daysOfWeek ?? '') as string).split(',')
             .filter(Boolean).map(normaliseDayCode)
             .filter((code: string) => DAYS.some(day => day.value === code)));
+          this.previewAsks.next();
         }
       },
       error: err => {
@@ -436,6 +516,37 @@ export class JobEdit implements OnInit {
   toggleDay(day: string): void {
     this.selectedDays.update(list =>
       list.includes(day) ? list.filter(d => d !== day) : [...list, day]);
+    this.previewAsks.next();
+  }
+
+  /** The schedule as a save would send it: the preview and the save read the same timetable. */
+  private schedulerPayload(): Record<string, any> {
+    const scheduler = this.scheduler.getRawValue();
+    const { cronExpression, ...timetable } = scheduler;
+    return this.isCron()
+      // Cron: the expression is the cadence. A blank start is left out for Core to default (today, 00:00), and the
+      // weekdays or day of the month a previous frequency picked are not carried along.
+      ? { ...timetable, startDate: timetable.startDate || null, startTime: timetable.startTime || null,
+        cronExpression: String(cronExpression ?? '').trim(), daysOfWeek: null, dayOfMonth: null }
+      : {
+        ...timetable,
+        daysOfWeek: this.selectedDays().length ? this.selectedDays().join(',') : null,
+        dayOfMonth: scheduler.dayOfMonth === '' ? null : scheduler.dayOfMonth,
+      };
+  }
+
+  private askPreview(): Observable<Preview> {
+    if (!this.isScheduled()) return of(NO_PREVIEW);
+    if (this.frequencyValue() === 'Weekly' && !this.selectedDays().length) {
+      return of({ ...NO_PREVIEW, error: 'Pick at least one day to see the runs.' });
+    }
+    this.preview.update(p => ({ ...p, loading: true }));
+    return this.http.post<ApiResponse<{ runs?: string[]; ends?: boolean }>>(`${API_BASE}/sourceJob.json/schedulePreview`,
+      this.schedulerPayload()).pipe(
+      map(response => response.status === API_SUCCESS
+        ? { runs: response.data?.runs ?? [], ends: !!response.data?.ends, error: response.data?.runs?.length ? '' : (response.message || ''), loading: false }
+        : { ...NO_PREVIEW, error: (response.message || '').replace(/^SourceJob schedule: /, '') }),
+      catchError(() => of({ ...NO_PREVIEW, error: 'The next runs could not be worked out right now.' })));
   }
 
   /** Plain-language restatement of the schedule, so the timetable is checkable before saving. */
@@ -531,6 +642,7 @@ export class JobEdit implements OnInit {
     this.submitted.set(true);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      if (['priority', 'maxAttempts', 'retryBackoffSeconds'].some(name => this.form.get(name)?.invalid)) this.advancedOpen.set(true);
       this.toast.error('Check the highlighted fields.');
       // Focus stayed on Save, so a keyboard or screen-reader user had to go looking for the field.
       if (this.host) focusFirstInvalid(this.host.nativeElement, this.injector);
@@ -561,17 +673,7 @@ export class JobEdit implements OnInit {
     };
 
     if (this.isScheduled()) {
-      const { cronExpression, ...timetable } = value.scheduler;
-      payload.schedulers = [this.isCron()
-        // Cron: the expression is the cadence. A blank start is left out for Core to default (today, 00:00), and the
-        // weekdays or day of the month a previous frequency picked are not carried along.
-        ? { ...timetable, startDate: timetable.startDate || null, startTime: timetable.startTime || null,
-          cronExpression: String(cronExpression ?? '').trim(), daysOfWeek: null, dayOfMonth: null }
-        : {
-          ...timetable,
-          daysOfWeek: this.selectedDays().length ? this.selectedDays().join(',') : null,
-          dayOfMonth: value.scheduler.dayOfMonth === '' ? null : value.scheduler.dayOfMonth,
-        }];
+      payload.schedulers = [this.schedulerPayload()];
     }
 
     this.saving.set(true);

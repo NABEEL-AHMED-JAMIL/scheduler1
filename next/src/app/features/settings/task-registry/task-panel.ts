@@ -125,7 +125,7 @@ export type TaskPanelResult = 'edit' | undefined;
       </div>
       <div foot>
         @if (pipeline() && data.isAdmin) {
-          <button type="button" class="btn btn-primary btn-sm" (click)="ref.close('edit')"><app-icon name="edit" />Edit pipeline</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="ref.close('edit')"><app-icon name="edit" />Edit registry task</button>
         }
         <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="ref.close()">Close</button>
       </div>

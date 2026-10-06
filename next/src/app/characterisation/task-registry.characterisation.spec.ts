@@ -131,7 +131,7 @@ describe('MIG-250: Configuration › Task Registry', () => {
   it('Edit pipeline from a Legacy row\'s panel opens the pipeline dialog', async () => {
     const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'Open Reference: CSV check and summarise');
-    const requests = await click(v, 'Edit pipeline');
+    const requests = await click(v, 'Edit registry task');
     pin(FILE, 'Edit pipeline from a Legacy row\'s panel opens the pipeline dialog', { requests, ...overlay() }, PINNED);
   });
 });

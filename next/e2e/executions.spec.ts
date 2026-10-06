@@ -181,7 +181,7 @@ test.describe('Executions', () => {
     await expect(inbox.locator(`a[href$="/runs/${INBOX.run}/logs"]`)).toBeVisible();
 
     await page.goto(`/pipelines/schedules/${INBOX.job}/edit`);
-    await expect(page.getByRole('heading', { name: 'Event' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'When it runs' })).toBeVisible();
     await expect(page.locator('#onArrival')).toBeChecked();
     await expect(page.locator('#filePattern')).not.toHaveValue(/\//);
     await page.context().close();
