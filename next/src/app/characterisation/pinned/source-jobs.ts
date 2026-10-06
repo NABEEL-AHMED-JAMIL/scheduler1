@@ -130,40 +130,39 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "New schedule",
-      "Basics",
-      "Schedule",
-      "Event",
-      "Email me when"
+      "What runs",
+      "When it runs",
+      "Each run",
+      "Email me when",
+      "Summary"
     ],
     "buttons": [
       "Create schedule",
       "End date: none picked",
-      "Start date: none picked"
+      "On a timetable",
+      "Only when started",
+      "Start date: 28 Sep 2026"
     ],
     "columns": [],
     "fields": [
-      "1 = highest",
-      "1 = no retry",
+      "A run completes",
+      "A run fails",
       "A run is skipped",
-      "Attempts *(required)",
+      "Also start a run when a file arrives in the inbox",
+      "Attempts",
       "End date",
-      "Execution *(required)",
-      "Frequency *(required)",
+      "Frequency",
       "Nightly orders export",
       "Pipeline *(required)",
-      "Priority *(required)",
-      "Repeat every *(required)",
+      "Priority",
+      "Repeat every",
       "Schedule name *(required)",
       "Search pipelines…",
       "Start date *(required)",
-      "Start time *(required)",
+      "Start time",
       "Start time, hour",
       "Start time, minute",
-      "Start when a file arrives in the inbox",
-      "State *(required)",
-      "The job completes",
-      "The job fails",
-      "e.g. 5"
+      "State"
     ],
     "links": [
       "/pipelines/schedules"
@@ -237,30 +236,31 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Edit schedule",
-      "Basics",
-      "Event",
-      "Email me when"
+      "What runs",
+      "When it runs",
+      "Each run",
+      "Email me when",
+      "Summary"
     ],
     "buttons": [
       "Clear",
+      "On a timetable",
+      "Only when started",
       "Save changes"
     ],
     "columns": [],
     "fields": [
-      "1 = highest",
-      "1 = no retry",
+      "A run completes",
+      "A run fails",
       "A run is skipped",
-      "Attempts *(required)",
-      "Execution *(required)",
+      "Also start a run when a file arrives in the inbox",
+      "Attempts",
       "Nightly orders export",
       "Pipeline *(required)",
-      "Priority *(required)",
+      "Priority",
       "Schedule name *(required)",
       "Search pipelines…",
-      "Start when a file arrives in the inbox",
-      "State *(required)",
-      "The job completes",
-      "The job fails"
+      "State"
     ],
     "links": [
       "/pipelines/schedules"

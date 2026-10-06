@@ -245,7 +245,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await page.goto('/pipelines/schedules/new');
       await page.locator('#jobName').fill(SCHEDULE);
       await pick(page, 'task', PIPELINE, PIPELINE);
-      await page.locator('#execution').selectOption('Manual');
+      await page.getByRole('radio', { name: 'Only when started' }).click();
       await page.getByRole('button', { name: 'Create schedule' }).click();
       await expect(page.getByText('Schedule created.')).toBeVisible();
       job = ((await getJson(request, s, '/sourceJob.json/listSourceJob?page=1&limit=1000')).data ?? []).find((j: any) => j.jobName === SCHEDULE);

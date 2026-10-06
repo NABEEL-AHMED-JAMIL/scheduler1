@@ -5,7 +5,8 @@
       {{ isEdit() ? 'Edit schedule' : 'New schedule' }}
     </h1>
     <p class="page-subtitle">
-      A schedule binds a pipeline to a timetable and decides who hears about the outcome.
+      A schedule runs a pipeline: on a timetable, when someone starts it, or when a file arrives. It also says who
+      hears how each run went.
     </p>
   </div>
   <app-managed-banner what="schedules" />
@@ -23,11 +24,13 @@
       </app-load-error>
     </div>
   } @else {
-    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4">
+    <!-- The form, and beside it on a wide screen what it will save, in words: checkable before Create. -->
+    <div class="schedule-layout">
+    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4 min-w-0">
       <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
       <fieldset class="form-lock" [disabled]="locked()">
       <div class="form-section">
-        <h2 class="form-section-title">Basics</h2>
+        <h2 class="form-section-title">What runs</h2>
         <div class="form-grid">
           <app-field label="Schedule name" for="jobName" [required]="true"
                      [control]="form.get('jobName')" [submitted]="submitted()">
@@ -42,53 +45,24 @@
             <app-combobox id="task" formControlName="taskDetailId" [numeric]="true"
                           placeholder="Search pipelines…" [allowClear]="false" [options]="taskOptions()" />
           </app-field>
-
-          <app-field label="Execution" for="execution" [required]="true"
-                     [control]="form.get('executionType')" [submitted]="submitted()"
-                     hint="Manual jobs run only when you trigger them.">
-            <select id="execution" class="input" formControlName="executionType">
-              <option value="Auto">Auto — on a schedule</option>
-              <option value="Manual">Manual — on demand</option>
-            </select>
-          </app-field>
-
-          <app-field label="Priority" for="priority" [required]="true"
-                     [control]="form.get('priority')" [submitted]="submitted()"
-                     hint="1 is highest.">
-            <input id="priority" type="number" min="1" max="9" class="input" formControlName="priority" placeholder="1 = highest" />
-          </app-field>
-
-          <app-field label="Attempts" for="maxAttempts" [required]="true"
-                     [control]="form.get('maxAttempts')" [submitted]="submitted()"
-                     hint="1 means a failed run is not retried.">
-            <input id="maxAttempts" type="number" min="1" max="10" class="input"
-                   formControlName="maxAttempts" placeholder="1 = no retry" />
-          </app-field>
-
-          @if (retryEnabled()) {
-            <app-field label="Retry after" for="retryBackoffSeconds" [required]="true"
-                       [control]="form.get('retryBackoffSeconds')" [submitted]="submitted()"
-                       hint="Seconds before the next try. The wait doubles each attempt, up to an hour.">
-              <input id="retryBackoffSeconds" type="number" min="1" max="3600" class="input"
-                     formControlName="retryBackoffSeconds" placeholder="60" />
-            </app-field>
-          }
-
-          <app-field label="State" for="jobStatus" [required]="true"
-                     [control]="form.get('jobStatus')" [submitted]="submitted()">
-            <select id="jobStatus" class="input" formControlName="jobStatus">
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
-          </app-field>
         </div>
       </div>
 
-      @if (isScheduled()) {
-        <div class="form-section" formGroupName="scheduler">
-          <h2 class="form-section-title">Schedule</h2>
-          <div class="form-grid">
-            <app-field label="Frequency" for="frequency" [required]="true"
+      <div class="form-section">
+        <h2 class="form-section-title">When it runs</h2>
+        <!-- One choice, two answers: Auto and Manual as the engine stores them. A file arriving is a third way in, and
+             it adds to either (a Manual job can have one too), so it stays a switch of its own below. -->
+        <div class="seg" role="radiogroup" aria-label="When it runs" id="execution">
+          @for (option of executionOptions; track option.value) {
+            <button type="button" class="seg-btn" role="radio" [attr.aria-checked]="executionValue() === option.value"
+                    [class.seg-on]="executionValue() === option.value" [attr.data-execution]="option.value"
+                    (click)="setExecution(option.value)">{{ option.label }}</button>
+          }
+        </div>
+
+        @if (isScheduled()) {
+          <div class="form-grid mt-5" formGroupName="scheduler">
+            <app-field label="Frequency" for="frequency"
                        [control]="scheduler.get('frequency')" [submitted]="submitted()">
               <select id="frequency" class="input" formControlName="frequency">
                 @for (frequency of frequencies; track frequency.value) {
@@ -107,32 +81,14 @@
                        placeholder="0 3 * * *" autocomplete="off" spellcheck="false" />
               </app-field>
             } @else {
-              <app-field label="Repeat every" for="interval" [required]="true"
-                         [control]="scheduler.get('intervalValue')" [submitted]="submitted()"
-                         [hint]="unit()">
-                <input id="interval" type="number" min="1" class="input" formControlName="intervalValue"
-                       placeholder="e.g. 5" />
+              <app-field label="Repeat every" for="interval"
+                         [control]="scheduler.get('intervalValue')" [submitted]="submitted()">
+                <div class="flex items-center gap-2">
+                  <input id="interval" type="number" min="1" class="input w-24" formControlName="intervalValue" />
+                  <span class="text-sm text-[color:var(--text-secondary)]">{{ unit() }}</span>
+                </div>
               </app-field>
             }
-
-            <app-field label="Start date" for="startDate" [required]="!isCron()"
-                       [control]="scheduler.get('startDate')" [submitted]="submitted()"
-                       [hint]="isCron() ? 'Optional. Blank starts it today.' : ''">
-              <app-date-field inputId="startDate" label="Start date" formControlName="startDate" [clearable]="isCron()" />
-            </app-field>
-
-            <app-field label="Start time" for="startTime" [required]="!isCron()"
-                       [control]="scheduler.get('startTime')" [submitted]="submitted()"
-                       [hint]="isCron() ? 'Optional. Runs are not before this moment.' : ''">
-              <app-time-field inputId="startTime" label="Start time" formControlName="startTime" [clearable]="isCron()" />
-            </app-field>
-
-            <app-field label="End date" for="endDate" [control]="scheduler"
-                       [submitted]="submitted()"
-                       hint="Optional. Inclusive — the job still runs on this day.">
-              <app-date-field inputId="endDate" label="End date" formControlName="endDate" [clearable]="true"
-                              [class.input-invalid]="scheduler.errors?.['endBeforeStart']" />
-            </app-field>
 
             @if (frequencyValue() === 'Monthly') {
               <app-field label="Day of month" for="dayOfMonth"
@@ -143,6 +99,27 @@
                 </select>
               </app-field>
             }
+
+            <!-- Start date and time read as one moment: side by side in one field's width. -->
+            <div class="flex flex-wrap items-start gap-3">
+              <app-field label="Start date" for="startDate" [required]="!isCron()"
+                         [control]="scheduler.get('startDate')" [submitted]="submitted()"
+                         [hint]="isCron() ? 'Optional. Blank starts it today.' : ''">
+                <app-date-field inputId="startDate" label="Start date" formControlName="startDate" [clearable]="isCron()" />
+              </app-field>
+              <app-field label="Start time" for="startTime"
+                         [control]="scheduler.get('startTime')" [submitted]="submitted()"
+                         [hint]="isCron() ? 'Optional.' : 'Server time (Chicago).'">
+                <app-time-field inputId="startTime" label="Start time" formControlName="startTime" [clearable]="isCron()" />
+              </app-field>
+            </div>
+
+            <app-field label="End date" for="endDate" [control]="scheduler"
+                       [submitted]="submitted()"
+                       hint="Optional. It still runs on this day.">
+              <app-date-field inputId="endDate" label="End date" formControlName="endDate" [clearable]="true"
+                              [class.input-invalid]="scheduler.errors?.['endBeforeStart']" />
+            </app-field>
           </div>
 
           @if (isCron()) {
@@ -176,41 +153,78 @@
             </div>
           }
 
-          <p class="text-sm mt-3.5 rounded-md px-3 py-2 bg-sunken">
-            {{ summary() }}
-          </p>
           @if (endPassed()) {
             <!-- Saving stays allowed: extending or clearing the date later is a fair plan. -->
-            <p class="text-sm mt-2 text-warn-500" role="status">
-              This end date has passed, so the job will not run again until you extend or clear it.
+            <p class="text-sm mt-3 text-warn-500" role="status">
+              This end date has passed, so it will not run again until you extend or clear it.
+            </p>
+          }
+        } @else {
+          <p class="text-sm text-[color:var(--text-secondary)] mt-3">
+            It runs when someone presses Run now on the schedules list, or a workflow starts it.
+          </p>
+        }
+
+        <!-- MIG-251 on MIG-239: the Event start, with the timetable it adds to. -->
+        <div class="mt-5">
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" class="checkbox" id="onArrival"
+                   [checked]="onArrival()" (change)="onArrival.set($any($event.target).checked)" />
+            Also start a run when a file arrives in the inbox
+          </label>
+          @if (onArrival()) {
+            <div class="form-grid mt-3">
+              <app-field label="File pattern" for="filePattern" [error]="patternError()"
+                         hint="Matched against the file's name: * for any run of characters, ? for one. Blank for every file.">
+                <input id="filePattern" class="input mono" placeholder="*.csv"
+                       [class.input-invalid]="!!patternError()"
+                       [value]="filePattern()" (input)="filePattern.set($any($event.target).value)" />
+              </app-field>
+            </div>
+            <p class="field-note text-[color:var(--text-muted)] mt-2">
+              Each file starts its own run, on the same terms as Run now: not while a run is still in flight, and only
+              while the schedule is Active. A file that cannot start a run is recorded as skipped, with the reason, on
+              the schedule's Executions.
             </p>
           }
         </div>
-      }
+      </div>
 
-      <!-- MIG-251 on MIG-239: the Event start, beside the timetable -- a Manual job can have one too. -->
       <div class="form-section">
-        <h2 class="form-section-title">Event</h2>
-        <label class="flex items-center gap-2 text-sm">
-          <input type="checkbox" class="checkbox" id="onArrival"
-                 [checked]="onArrival()" (change)="onArrival.set($any($event.target).checked)" />
-          Start when a file arrives in the inbox
-        </label>
-        @if (onArrival()) {
-          <div class="form-grid mt-3">
-            <app-field label="File pattern" for="filePattern" [error]="patternError()"
-                       hint="Matched against the file's name: * for any run of characters, ? for one. Blank for every file.">
-              <input id="filePattern" class="input mono" placeholder="*.csv"
-                     [class.input-invalid]="!!patternError()"
-                     [value]="filePattern()" (input)="filePattern.set($any($event.target).value)" />
+        <h2 class="form-section-title">Each run</h2>
+        <!-- Small numbers in small boxes, side by side: a 585px box for a "1" read as a field still to fill. -->
+        <div class="flex flex-wrap items-start gap-x-5 gap-y-4">
+          <app-field label="Priority" for="priority" class="w-36"
+                     [control]="form.get('priority')" [submitted]="submitted()" hint="1 is highest.">
+            <input id="priority" type="number" min="1" max="9" class="input" formControlName="priority" />
+          </app-field>
+
+          <app-field label="Attempts" for="maxAttempts" class="w-36"
+                     [control]="form.get('maxAttempts')" [submitted]="submitted()" hint="1 means no retry.">
+            <input id="maxAttempts" type="number" min="1" max="10" class="input" formControlName="maxAttempts" />
+          </app-field>
+
+          @if (retryEnabled()) {
+            <app-field label="Retry after" for="retryBackoffSeconds" class="w-56"
+                       [control]="form.get('retryBackoffSeconds')" [submitted]="submitted()"
+                       hint="Doubles each attempt, up to an hour.">
+              <div class="flex items-center gap-2">
+                <input id="retryBackoffSeconds" type="number" min="1" max="3600" class="input w-24"
+                       formControlName="retryBackoffSeconds" />
+                <span class="text-sm text-[color:var(--text-secondary)]">seconds</span>
+              </div>
             </app-field>
-          </div>
-          <p class="field-note text-[color:var(--text-muted)] mt-2">
-            Each file starts its own run, on the same terms as Run now: not while a run is still in flight, and only
-            while the job is Active. A file that cannot start a run is recorded as skipped, with the reason, on the
-            job's Executions.
-          </p>
-        }
+          }
+
+          <app-field label="State" for="jobStatus" class="w-44"
+                     [control]="form.get('jobStatus')" [submitted]="submitted()"
+                     hint="Inactive keeps it, without runs.">
+            <select id="jobStatus" class="input" formControlName="jobStatus">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+            </select>
+          </app-field>
+        </div>
       </div>
 
       @if (aiSteps().length) {
@@ -227,7 +241,7 @@
 
       <div class="form-section">
         <h2 class="form-section-title">Email me when</h2>
-        <div class="flex flex-wrap gap-4">
+        <div class="flex flex-wrap gap-x-6 gap-y-3">
           @for (option of notifyOptions; track option.control) {
             <label class="flex items-center gap-2 text-sm">
               <input type="checkbox" class="checkbox" [formControlName]="option.control" />
@@ -245,5 +259,40 @@
         </button>
       </div>
     </form>
+
+    <aside class="card p-4 schedule-summary" aria-labelledby="schedule-summary-heading" data-schedule-summary>
+      <h2 id="schedule-summary-heading" class="text-sm font-semibold">Summary</h2>
+      <dl class="mt-3 space-y-3 text-sm">
+        <div>
+          <dt class="label">Runs</dt>
+          <dd class="mt-0.5">{{ pipelineName() || 'No pipeline chosen yet' }}</dd>
+        </div>
+        <div>
+          <dt class="label">When</dt>
+          <dd class="mt-0.5" data-summary>{{ summary() }}</dd>
+          @if (startsLine(); as starts) { <dd class="mt-0.5 text-[color:var(--text-secondary)]">{{ starts }}</dd> }
+          @if (onArrival()) {
+            <dd class="mt-0.5 text-[color:var(--text-secondary)]">
+              Also when a file arrives in the inbox{{ filePattern().trim() ? ' matching ' + filePattern().trim() : '' }}.
+            </dd>
+          }
+        </div>
+        <div>
+          <dt class="label">Each run</dt>
+          <dd class="mt-0.5">{{ retryLine() }}</dd>
+        </div>
+        <div>
+          <dt class="label">State</dt>
+          <dd class="mt-0.5">
+            <span class="pill" [class]="jobStatusValue() === 'Active' ? 'pill pill-ok' : 'pill pill-neutral'">{{ jobStatusValue() }}</span>
+          </dd>
+        </div>
+        <div>
+          <dt class="label">Emails</dt>
+          <dd class="mt-0.5">{{ emailLine() }}</dd>
+        </div>
+      </dl>
+    </aside>
+    </div>
   }
 </div>

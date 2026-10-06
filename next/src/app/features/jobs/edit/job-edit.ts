@@ -96,6 +96,12 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
    * dark. The filled primary-button colours are defined for both themes.
    */
   styles: `
+    /* The form and, on a wide screen, its summary beside it: the summary stays in view while the form scrolls. */
+    .schedule-layout { display: grid; gap: 1.25rem; align-items: start; }
+    @media (min-width: 80rem) {
+      .schedule-layout { grid-template-columns: minmax(0, 1fr) 22rem; }
+      .schedule-summary { position: sticky; top: 1rem; }
+    }
     .seg-multi .seg-btn[aria-pressed="true"] {
       background: var(--btn-primary-bg);
       color: var(--btn-primary-fg);
@@ -122,6 +128,11 @@ export class JobEdit implements OnInit {
   readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
 
   readonly frequencies = FREQUENCIES;
+  /** When it runs, in the words of a person choosing: the engine's Auto and Manual. */
+  readonly executionOptions = [
+    { value: 'Auto', label: 'On a timetable' },
+    { value: 'Manual', label: 'Only when started' },
+  ];
   readonly days = DAYS;
   readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -195,7 +206,40 @@ export class JobEdit implements OnInit {
 
   /** A manual job has no timetable, so the whole schedule section is irrelevant. */
   readonly isScheduled = computed(() => this.executionValue() !== 'Manual');
-  private readonly executionValue = signal('Auto');
+  readonly executionValue = signal('Auto');
+
+  /** The rest of the form as a signal, for the summary beside it (form values are not signals). */
+  private readonly values = signal<Record<string, any>>({});
+  readonly jobStatusValue = computed(() => String(this.values()['jobStatus'] ?? 'Active'));
+  readonly pipelineName = computed(() => {
+    const id = this.values()['taskDetailId'];
+    return id == null ? '' : (this.tasks().find(t => String(t.taskDetailId) === String(id))?.taskName ?? `Pipeline #${id}`);
+  });
+  /** The first run as set, for a timetable; nothing for Cron (the expression decides) or a job only started by hand. */
+  readonly startsLine = computed(() => {
+    if (!this.isScheduled() || this.isCron()) return '';
+    const schedule = this.schedule();
+    const date = schedule['startDate'];
+    if (!date) return '';
+    return `Starting ${dayLabel(date)} at ${clockTime(schedule['startTime']) || '00:00'}, server time.`;
+  });
+  readonly retryLine = computed(() => {
+    const v = this.values();
+    const attempts = Number(v['maxAttempts'] ?? 1);
+    const priority = `Priority ${v['priority'] ?? 1}`;
+    if (!(attempts > 1)) return `${priority}; a failed run is not retried.`;
+    return `${priority}; up to ${attempts} attempts, ${v['retryBackoffSeconds'] ?? 60} s apart at first.`;
+  });
+  readonly emailLine = computed(() => {
+    const v = this.values();
+    const on = this.notifyOptions.filter(o => !!v[o.control]).map(o => o.label.toLowerCase());
+    return on.length ? `When ${on.join(', ')}.` : 'Nobody is emailed.';
+  });
+
+  setExecution(value: string): void {
+    if (this.locked()) return;
+    this.form.get('executionType')!.setValue(value);
+  }
 
   /** Backoff only means anything once there is a second attempt to wait before. */
   readonly retryEnabled = computed(() => Number(this.maxAttemptsValue()) > 1);
@@ -243,12 +287,18 @@ export class JobEdit implements OnInit {
     this.schedule.set(this.scheduler.getRawValue());
     this.scheduler.valueChanges.subscribe(() => this.schedule.set(this.scheduler.getRawValue()));
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
+    this.values.set(this.form.getRawValue());
+    this.form.valueChanges.subscribe(() => this.values.set(this.form.getRawValue()));
 
     if (this.isEdit()) {
       this.loadJob();
       if (isRecordId(this.jobId())) this.loadExtras();
     }
-    else if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
+    else {
+      // A new schedule starts today (the server's calendar) unless someone picks another day.
+      this.scheduler.patchValue({ startDate: new Intl.DateTimeFormat('en-CA', { timeZone: SERVER_ZONE }).format(new Date()) });
+      if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
+    }
   }
 
   retryLoad(): void { this.loadJob(); }

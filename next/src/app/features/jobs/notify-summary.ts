@@ -15,8 +15,8 @@
  * completes" beside the form's "The job completes"; both read this list now.
  */
 export const NOTIFY_OPTIONS: { control: 'completeJob' | 'failJob' | 'skipJob'; label: string }[] = [
-  { control: 'completeJob', label: 'The job completes' },
-  { control: 'failJob',     label: 'The job fails' },
+  { control: 'completeJob', label: 'A run completes' },
+  { control: 'failJob',     label: 'A run fails' },
   { control: 'skipJob',     label: 'A run is skipped' },
 ];
 

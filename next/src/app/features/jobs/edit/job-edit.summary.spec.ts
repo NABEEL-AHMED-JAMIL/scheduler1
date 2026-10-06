@@ -47,9 +47,25 @@ describe('JobEdit schedule summary', () => {
     expect(edit.summary()).toBe('Every 1 day at 00:00, until 31 Dec 2026 inclusive.');
   });
 
+  it('starts a new schedule today, on the server\'s calendar', () => {
+    const edit = editor();
+    const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(new Date());
+    expect(edit.scheduler.get('startDate')!.value).toBe(today);
+    expect(edit.startsLine()).toContain('at 00:00, server time.');
+  });
+
+  it('summarises each run and the emails beside the form', () => {
+    const edit = editor();
+    expect(edit.retryLine()).toBe('Priority 1; a failed run is not retried.');
+    expect(edit.emailLine()).toBe('Nobody is emailed.');
+    edit.form.patchValue({ maxAttempts: 3, failJob: true });
+    expect(edit.retryLine()).toBe('Priority 1; up to 3 attempts, 60 s apart at first.');
+    expect(edit.emailLine()).toBe('When a run fails.');
+  });
+
   it('follows the day of the month', () => {
     const edit = editor();
-    edit.scheduler.patchValue({ frequency: 'Monthly' });
+    edit.scheduler.patchValue({ frequency: 'Monthly', startDate: '' });
     // The day is optional: without one the job keeps the start date's day (ProcessTimeUtil's
     // plusMonths), so "pick a day" asked for something nobody has to give (UI review jobs#20).
     expect(edit.summary()).not.toContain('pick a day');
