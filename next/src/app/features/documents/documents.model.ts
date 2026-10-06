@@ -32,7 +32,7 @@ export const AGE_FILTERS = [
 /** The field types a document type may declare (DocumentTypeDefinition). */
 export const FIELD_TYPES = ['text', 'number', 'integer', 'money', 'date', 'boolean', 'choice'] as const;
 /** The rules a document type may keep (DocumentTypes.RULES), each with what it needs. */
-export const RULE_KINDS = ['sumEquals', 'sumOf', 'rowProduct', 'notAfter', 'matches', 'checkDigit'] as const;
+export const RULE_KINDS = ['sumEquals', 'sumOf', 'rowProduct', 'notAfter', 'matches', 'checkDigit', 'duplicate', 'lookup', 'unusual'] as const;
 export type RuleKind = typeof RULE_KINDS[number];
 export const RULE_LABELS: Record<RuleKind, string> = {
   sumEquals: 'A table column adds up to a field',
@@ -41,7 +41,14 @@ export const RULE_LABELS: Record<RuleKind, string> = {
   notAfter: 'One date is on or before another',
   matches: 'Every value has a form (a pattern)',
   checkDigit: 'An ID\'s check digit holds',
+  duplicate: 'Not a duplicate of another document',
+  lookup: 'A value is in a reference list',
+  unusual: 'A number is not unusual for this type',
 };
+/** MIG-319: the rules that look beyond the one document (DocumentContextRules.KINDS): other documents, a list, the history. */
+export const BEYOND_KINDS: readonly string[] = ['duplicate', 'lookup', 'unusual'];
+/** What a lookup's file may be (DocumentContextRules.LIST_FILES). */
+export const LIST_FILES = ['csv', 'tsv', 'json', 'jsonl'];
 /** What OCR reads (media's OcrReader): anything else is refused before it is queued. */
 export const OCR_EXTENSIONS = ['pdf', 'png', 'jpg', 'jpeg', 'tif', 'tiff', 'bmp'];
 
@@ -122,6 +129,10 @@ export interface RuleOutcome {
   status: 'passed' | 'failed' | 'skipped' | string;
   message?: string | null;
   fields?: string[];
+  /** MIG-319: what each named field is told, when it is not the message. */
+  fieldProblem?: string | null;
+  /** MIG-319, duplicate: the other document's extraction. */
+  relatedExtractionId?: number | null;
 }
 
 /** One extraction, as fetchAll, the queue and fetchById share it. */
@@ -242,6 +253,25 @@ export interface TypeRule {
   before?: string | null;
   after?: string | null;
   message?: string | null;
+  /** duplicate: only documents read in the last so many days. */
+  withinDays?: number | null;
+  /** lookup: where the reference list is. */
+  list?: ListSource | null;
+  /** unusual: compare only with approved documents with the same value of this field. */
+  groupBy?: string | null;
+  minHistory?: number | null;
+  ratio?: number | null;
+  mads?: number | null;
+  direction?: 'both' | 'high' | 'low' | null;
+}
+
+/** MIG-319: a lookup's list -- a file's column (bucket + key) or a document type's dataset field (documentTypeId). */
+export interface ListSource {
+  name?: string | null;
+  bucket?: string | null;
+  key?: string | null;
+  documentTypeId?: number | null;
+  column?: string | null;
 }
 
 export interface TypeDefinition {
@@ -515,8 +545,25 @@ export function ruleText(outcome: RuleOutcome, definition?: TypeDefinition | nul
     case 'notAfter': return `${label(rule.before)} is on or before ${label(rule.after).toLowerCase()}`;
     case 'matches': return `${rule.field ? label(rule.field) : column(rule.table, rule.column)} has the expected form`;
     case 'checkDigit': return `${rule.field ? label(rule.field) : column(rule.table, rule.column)} check digit (${rule.algorithm ?? 'luhn'})`;
+    case 'duplicate': return `No other document has the same ${(rule.fields ?? []).map(label).join(', ').toLowerCase()}`;
+    case 'lookup': return `${rule.field ? label(rule.field) : column(rule.table, rule.column)} is in ${listName(rule.list)}`;
+    case 'unusual': return `${label(rule.field)} is not unusual${rule.groupBy ? ` for its ${label(rule.groupBy).toLowerCase()}` : ''}`;
     default: return rule.rule;
   }
+}
+
+/** A lookup's list in words: its own name, else its file's, else the dataset's type. */
+export function listName(list: ListSource | null | undefined): string {
+  if (list?.name?.trim()) return list.name.trim();
+  if (list?.key?.trim()) return fileName(list.key.trim());
+  return list?.documentTypeId != null ? `document type ${list.documentTypeId}'s dataset` : 'the reference list';
+}
+
+/** Why a rule was not checked, in words. */
+export function skippedWhy(outcome: RuleOutcome): string {
+  return outcome.rule === 'unusual'
+    ? 'not checked: a value it needs is missing, or there are not yet enough approved documents to compare with'
+    : 'not checked: a value it needs is missing';
 }
 
 /** The next document to review after this one: the first queue item that is not it. */
@@ -675,6 +722,30 @@ export function definitionProblems(name: string, typeKey: string, d: TypeDefinit
         if (!field(r.field) && !columnOf(r.table, r.column)) out.push(`${at}: pick a field, or a table and its column.`);
         if (r.algorithm !== 'luhn' && r.algorithm !== 'iban') out.push(`${at}: pick luhn or iban.`);
         break;
+      case 'duplicate':
+        if (!(r.fields ?? []).length || !(r.fields ?? []).every(field)) out.push(`${at}: name the fields a duplicate has the same (their keys).`);
+        else if ((r.fields ?? []).length > 6) out.push(`${at}: compare at most 6 fields.`);
+        if (r.withinDays != null && !(r.withinDays >= 1 && r.withinDays <= 3650)) out.push(`${at}: look back 1 to 3650 days, or leave it empty.`);
+        break;
+      case 'lookup': {
+        if (!field(r.field) && !columnOf(r.table, r.column)) out.push(`${at}: pick a field, or a table and its column.`);
+        const l = r.list ?? {};
+        if (l.documentTypeId == null) {
+          if (!l.bucket?.trim() || !l.key?.trim()) out.push(`${at}: name the list's bucket and file, or pick a document type's dataset.`);
+          else if (!LIST_FILES.includes((l.key.trim().split('.').pop() ?? '').toLowerCase())) out.push(`${at}: the list is a .csv, .tsv, .json or .jsonl file.`);
+        }
+        if (!l.column?.trim()) out.push(`${at}: name the list's column.`);
+        break;
+      }
+      case 'unusual': {
+        const f = d.fields.find(x => x.key === r.field);
+        if (!f || !['number', 'integer', 'money'].includes(f.type)) out.push(`${at}: pick a number field.`);
+        if (r.groupBy && (!field(r.groupBy) || r.groupBy === r.field)) out.push(`${at}: group by another field, or none.`);
+        if (r.minHistory != null && !(r.minHistory >= 2 && r.minHistory <= 1000)) out.push(`${at}: wait for 2 to 1000 approved documents.`);
+        if (r.ratio != null && !(r.ratio > 1 && r.ratio <= 1000)) out.push(`${at}: a ratio is more than 1.`);
+        if (r.mads != null && !(r.mads > 0 && r.mads <= 100)) out.push(`${at}: a distance is more than 0 and at most 100 MADs.`);
+        break;
+      }
       default:
         out.push(`${at}: pick a rule.`);
     }
@@ -694,6 +765,16 @@ export function definitionToSave(d: TypeDefinition): TypeDefinition {
     sumEquals: ['table', 'column', 'field', 'tolerance'], sumOf: ['fields', 'field', 'tolerance'],
     rowProduct: ['table', 'columns', 'column', 'tolerance'], notAfter: ['before', 'after'],
     matches: ['field', 'table', 'column', 'pattern'], checkDigit: ['field', 'table', 'column', 'algorithm'],
+    duplicate: ['fields', 'withinDays'], lookup: ['field', 'table', 'column', 'list'],
+    unusual: ['field', 'groupBy', 'minHistory', 'ratio', 'mads', 'direction'],
+  };
+  const listToSave = (l: ListSource): ListSource => {
+    const out: ListSource = {};
+    if (l.name?.trim()) out.name = l.name.trim();
+    if (l.documentTypeId != null) out.documentTypeId = l.documentTypeId;
+    else { out.bucket = l.bucket?.trim() ?? ''; out.key = l.key?.trim() ?? ''; }
+    out.column = l.column?.trim() ?? '';
+    return out;
   };
   return {
     ...(d.description?.trim() ? { description: d.description.trim() } : {}),
@@ -706,7 +787,7 @@ export function definitionToSave(d: TypeDefinition): TypeDefinition {
     rules: d.rules.map(r => {
       const kept: TypeRule = { rule: r.rule };
       for (const k of USES[r.rule] ?? []) {
-        const v = r[k];
+        const v = k === 'list' && r.list ? listToSave(r.list) : r[k];
         if (v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && !v.length)) (kept as unknown as Record<string, unknown>)[k] = v;
       }
       if (r.message?.trim()) kept.message = r.message.trim();

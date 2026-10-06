@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   TypeDefinition, blankDefinition, boxPercent, correctionsOf, definitionProblems, definitionToSave, documentFields,
-  editableDefinition, fieldName, fileName, isLow, lowLine, nextInQueue, nextRowIndex, percent, recentRows, refusalText, ruleText,
-  shortcutOf, statusLabel, stepIndex, tableViews, textList, totalsOf, typeLabel,
+  editableDefinition, fieldName, fileName, isLow, listName, lowLine, nextInQueue, nextRowIndex, percent, recentRows, refusalText, ruleText,
+  shortcutOf, skippedWhy, statusLabel, stepIndex, tableViews, textList, totalsOf, typeLabel,
 } from './documents.model';
 import { PO_DEFINITION, PO_FIELDS } from './documents.fixtures';
 
@@ -211,6 +211,65 @@ describe('the type editor', () => {
     expect(saved.fields[0]).toEqual({ key: 'po_number', label: 'PO number', type: 'text', required: true, aliases: ['PO #', 'Purchase Order No.'] });
     expect(saved.fields[1]).toEqual({ key: 'order_date', label: 'Order date', type: 'date', required: true });
     expect(saved.autoApproveThreshold).toBe(0.9);
+  });
+});
+
+/** MIG-319: the rules that look beyond the one document, in the editor and on the review screen. */
+describe('rules beyond the document', () => {
+  const d = (): ReturnType<typeof editableDefinition> => {
+    const def = editableDefinition(PO_DEFINITION);
+    def.rules = [
+      { rule: 'duplicate', fields: ['supplier_name', 'total'], withinDays: 90 },
+      { rule: 'lookup', field: 'po_number', list: { name: ' Open purchase orders ', bucket: 'demo-s3', key: 'reference/po.csv', column: 'po_number',
+        documentTypeId: null } },
+      { rule: 'unusual', field: 'total', groupBy: 'supplier_name', ratio: 3, minHistory: 3, direction: 'high', tolerance: 0.5 },
+    ];
+    return def;
+  };
+
+  it('says what each checks', () => {
+    const def = d();
+    expect(ruleText({ index: 1, rule: 'duplicate', status: 'passed' }, def)).toBe('No other document has the same supplier, order total');
+    expect(ruleText({ index: 2, rule: 'lookup', status: 'failed' }, def)).toBe('PO number is in Open purchase orders');
+    expect(ruleText({ index: 3, rule: 'unusual', status: 'skipped' }, def)).toBe('Order total is not unusual for its supplier');
+    expect(listName({ key: 'reference/vendors.csv' })).toBe('vendors.csv');
+    expect(listName({ documentTypeId: 1007 })).toBe('document type 1007\'s dataset');
+    expect(skippedWhy({ index: 3, rule: 'unusual', status: 'skipped' })).toContain('not yet enough approved documents');
+    expect(skippedWhy({ index: 1, rule: 'sumOf', status: 'skipped' })).toBe('not checked: a value it needs is missing');
+  });
+
+  it('holds them to what the service accepts', () => {
+    expect(definitionProblems('PO', 'purchase_order', d())).toEqual([]);
+    const bad = d();
+    bad.rules = [
+      { rule: 'duplicate', fields: ['nope'], withinDays: 0 },
+      { rule: 'lookup', field: 'po_number', list: { bucket: 'demo-s3', key: 'reference/po.xlsx', column: '' } },
+      { rule: 'lookup', field: 'po_number', list: { documentTypeId: 1007, column: 'vendor_id' } },
+      { rule: 'unusual', field: 'supplier_name', groupBy: 'supplier_name', ratio: 1, mads: 0, minHistory: 1 },
+    ];
+    expect(definitionProblems('PO', 'purchase_order', bad)).toEqual([
+      'Rule 1: name the fields a duplicate has the same (their keys).',
+      'Rule 1: look back 1 to 3650 days, or leave it empty.',
+      'Rule 2: the list is a .csv, .tsv, .json or .jsonl file.',
+      'Rule 2: name the list\'s column.',
+      'Rule 4: pick a number field.',
+      'Rule 4: group by another field, or none.',
+      'Rule 4: wait for 2 to 1000 approved documents.',
+      'Rule 4: a ratio is more than 1.',
+      'Rule 4: a distance is more than 0 and at most 100 MADs.',
+    ]);
+  });
+
+  it('sends what each uses: a file list without a type, a dataset list without a file', () => {
+    const saved = definitionToSave(d());
+    expect(saved.rules).toEqual([
+      { rule: 'duplicate', fields: ['supplier_name', 'total'], withinDays: 90 },
+      { rule: 'lookup', field: 'po_number', list: { name: 'Open purchase orders', bucket: 'demo-s3', key: 'reference/po.csv', column: 'po_number' } },
+      { rule: 'unusual', field: 'total', groupBy: 'supplier_name', ratio: 3, minHistory: 3, direction: 'high' },
+    ]);
+    const dataset = d();
+    dataset.rules = [{ rule: 'lookup', field: 'po_number', list: { documentTypeId: 1007, bucket: 'x', key: 'y.csv', column: ' vendor_id ' } }];
+    expect(definitionToSave(dataset).rules).toEqual([{ rule: 'lookup', field: 'po_number', list: { documentTypeId: 1007, column: 'vendor_id' } }]);
   });
 });
 

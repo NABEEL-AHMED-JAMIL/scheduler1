@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 import {
   CorrectionSent, DatasetPage, DocumentType, Extraction, IntakeAnswer, IntakeRow, Mailbox, OcrDocument, QueuePage, ReviewDetail, TypeDefinition,
@@ -92,6 +92,12 @@ export class DocumentsApi {
   }
 
   // ------------------------------------------------------------------------------------------ types
+
+  /** MIG-319: the workspace's buckets, which a lookup rule's list file is named by (its alias). */
+  buckets(): Observable<{ alias: string; label: string }[]> {
+    return this.http.get<ApiResponse<{ bucket: string; label?: string }[]>>(`${API_BASE}/storage.json/buckets`).pipe(
+      map(r => (r.data ?? []).filter(b => !!b.bucket).map(b => ({ alias: b.bucket, label: b.label || b.bucket }))));
+  }
 
   types(): Observable<ApiResponse<DocumentType[]>> {
     return this.http.get<ApiResponse<DocumentType[]>>(`${TYPES}/fetchAll`);

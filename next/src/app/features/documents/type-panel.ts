@@ -8,7 +8,7 @@ import { Field } from '../../shared/ui/field';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import {
-  DocumentType, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable,
+  DocumentType, ListSource, RULE_KINDS, RULE_LABELS, RuleKind, TypeDefinition, TypeField, TypeRule, TypeTable, blankDefinition, blankRule, blankTable,
   definitionProblems, definitionToSave, editableDefinition, listText, refusalText, statusOf, textList,
 } from './documents.model';
 import { DocumentsApi, TypeSave } from './documents.service';
@@ -143,7 +143,7 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                 <div class="grid gap-2 sm:grid-cols-2">
                   @if (uses(r, 'table')) {
                     <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' table'" (change)="patchRule(i, { table: $any($event.target).value || null })">
-                      <option value="">{{ r.rule === 'matches' || r.rule === 'checkDigit' ? 'No table (a field)' : 'Pick a table' }}</option>
+                      <option value="">{{ r.rule === 'matches' || r.rule === 'checkDigit' || r.rule === 'lookup' ? 'No table (a field)' : 'Pick a table' }}</option>
                       @for (t of def().tables; track t.key) { <option [value]="t.key" [selected]="t.key === r.table">{{ t.label || t.key }}</option> }
                     </select>
                   }
@@ -157,11 +157,14 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                     <input class="input mono text-xs" [value]="list(r.columns)" placeholder="quantity, unit_price" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' columns that multiply'" (change)="patchRule(i, { columns: split($any($event.target).value) })" />
                   }
                   @if (uses(r, 'fields')) {
-                    <input class="input mono text-xs" [value]="list(r.fields)" placeholder="subtotal, tax" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' fields that add up'" (change)="patchRule(i, { fields: split($any($event.target).value) })" />
+                    <input class="input mono text-xs" [value]="list(r.fields)" [placeholder]="r.rule === 'duplicate' ? 'Same in: vendor_id, invoice_number' : 'subtotal, tax'" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + (r.rule === 'duplicate' ? ' fields a duplicate has the same' : ' fields that add up')" (change)="patchRule(i, { fields: split($any($event.target).value) })" />
+                  }
+                  @if (uses(r, 'withinDays')) {
+                    <input class="input text-xs" type="number" min="1" max="3650" step="1" [value]="r.withinDays ?? ''" placeholder="Within days (all when empty)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' within days'" (input)="patchRule(i, { withinDays: num($any($event.target).value) })" />
                   }
                   @if (uses(r, 'field')) {
                     <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' field'" (change)="patchRule(i, { field: $any($event.target).value || null })">
-                      <option value="">{{ r.rule === 'matches' || r.rule === 'checkDigit' ? 'A field (or a table column)' : 'The total field' }}</option>
+                      <option value="">{{ fieldPrompt(r) }}</option>
                       @for (f of def().fields; track f.key) { <option [value]="f.key" [selected]="f.key === r.field">{{ f.label || f.key }}</option> }
                     </select>
                   }
@@ -179,6 +182,20 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                   @if (uses(r, 'pattern')) {
                     <input class="input mono text-xs" [value]="r.pattern ?? ''" placeholder="[A-Z]{2}[0-9]{6}" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' pattern'" (input)="patchRule(i, { pattern: $any($event.target).value })" />
                   }
+                  @if (uses(r, 'groupBy')) {
+                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' group by'" (change)="patchRule(i, { groupBy: $any($event.target).value || null })">
+                      <option value="">Compared with every approved document</option>
+                      @for (f of def().fields; track f.key) { @if (f.key !== r.field) { <option [value]="f.key" [selected]="f.key === r.groupBy">Only those with the same {{ f.label || f.key }}</option> } }
+                    </select>
+                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' direction'" (change)="patchRule(i, { direction: $any($event.target).value || null })">
+                      <option value="" [selected]="!r.direction || r.direction === 'both'">Unusually high or low</option>
+                      <option value="high" [selected]="r.direction === 'high'">Unusually high only</option>
+                      <option value="low" [selected]="r.direction === 'low'">Unusually low only</option>
+                    </select>
+                    <input class="input text-xs" type="number" min="1.01" step="0.5" [value]="r.ratio ?? ''" placeholder="More than N × the median (e.g. 3)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' ratio'" (input)="patchRule(i, { ratio: num($any($event.target).value) })" />
+                    <input class="input text-xs" type="number" min="0.5" step="0.5" [value]="r.mads ?? ''" placeholder="Or more than k MADs away (3.5 when both empty)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' MADs'" (input)="patchRule(i, { mads: num($any($event.target).value) })" />
+                    <input class="input text-xs" type="number" min="2" max="1000" step="1" [value]="r.minHistory ?? ''" placeholder="Applies after N approved documents (5)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' minimum history'" (input)="patchRule(i, { minHistory: num($any($event.target).value) })" />
+                  }
                   @if (uses(r, 'algorithm')) {
                     <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' algorithm'" (change)="patchRule(i, { algorithm: $any($event.target).value })">
                       <option value="luhn" [selected]="r.algorithm !== 'iban'">Luhn (cards, many account numbers)</option>
@@ -186,6 +203,25 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
                     </select>
                   }
                 </div>
+                @if (uses(r, 'list')) {
+                  <div class="grid gap-2 sm:grid-cols-2" role="group" [attr.aria-label]="'Rule ' + (i + 1) + ' reference list'">
+                    <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list source'" (change)="patchList(i, $any($event.target).value === 'dataset' ? { documentTypeId: otherTypes()[0]?.documentTypeId ?? null, bucket: null, key: null } : { documentTypeId: null })">
+                      <option value="file" [selected]="r.list?.documentTypeId == null">A file in a bucket (CSV, TSV, JSON)</option>
+                      <option value="dataset" [selected]="r.list?.documentTypeId != null">A document type's dataset</option>
+                    </select>
+                    <input class="input text-xs" [value]="r.list?.name ?? ''" placeholder="List name (e.g. Open purchase orders)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list name'" (input)="patchList(i, { name: $any($event.target).value })" />
+                    @if (r.list?.documentTypeId == null) {
+                      <input class="input mono text-xs" [value]="r.list?.bucket ?? ''" placeholder="Bucket alias" [readOnly]="!editing()" [attr.list]="'rule-buckets-' + i" [attr.aria-label]="'Rule ' + (i + 1) + ' list bucket'" (input)="patchList(i, { bucket: $any($event.target).value })" />
+                      <datalist [id]="'rule-buckets-' + i">@for (b of buckets(); track b.alias) { <option [value]="b.alias">{{ b.label }}</option> }</datalist>
+                      <input class="input mono text-xs" [value]="r.list?.key ?? ''" placeholder="reference/purchase_orders.csv" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list file'" (input)="patchList(i, { key: $any($event.target).value })" />
+                    } @else {
+                      <select class="input text-xs" [disabled]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list document type'" (change)="patchList(i, { documentTypeId: +$any($event.target).value })">
+                        @for (t of otherTypes(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId === r.list.documentTypeId">{{ t.name }}</option> }
+                      </select>
+                    }
+                    <input class="input mono text-xs" [value]="r.list?.column ?? ''" [placeholder]="r.list?.documentTypeId == null ? 'Column (e.g. po_number)' : 'Field key (e.g. vendor_id)'" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' list column'" (input)="patchList(i, { column: $any($event.target).value })" />
+                  </div>
+                }
                 <input class="input text-xs" [value]="r.message ?? ''" placeholder="What a reviewer is told when it fails (optional)" [readOnly]="!editing()" [attr.aria-label]="'Rule ' + (i + 1) + ' message'" (input)="patchRule(i, { message: $any($event.target).value })" />
               </div>
             } @empty { <p class="text-xs text-[color:var(--text-muted)]">None.</p> }
@@ -280,6 +316,11 @@ export class TypePanel implements OnInit {
   });
   readonly problems = computed(() => definitionProblems(this.name(), this.typeKey(), this.def()));
   readonly dateFields = computed(() => this.def().fields.filter(f => f.type === 'date'));
+  /** MIG-319: the workspace's buckets, read the first time a lookup rule is edited. */
+  readonly buckets = signal<{ alias: string; label: string }[]>([]);
+  private bucketsAsked = false;
+  /** A lookup's dataset may be any active type this workspace sees but this one. */
+  readonly otherTypes = computed(() => this.data.types.filter(t => t.status === 'Active' && t.documentTypeId !== this.type()?.documentTypeId));
 
   ngOnInit(): void {
     if (this.data.documentTypeId == null) {
@@ -344,7 +385,11 @@ export class TypePanel implements OnInit {
     this.mode.set('copy');
   }
 
-  startEdit(): void { this.backToCurrent(); this.mode.set('edit'); }
+  startEdit(): void {
+    this.backToCurrent();
+    this.mode.set('edit');
+    if (this.def().rules.some(r => r.rule === 'lookup')) this.askBuckets();
+  }
 
   cancelEdit(): void {
     if (this.mode() === 'new') { this.ref.close(this.changed); return; }
@@ -369,7 +414,26 @@ export class TypePanel implements OnInit {
 
   addRule(): void { this.patch({ rules: [...this.def().rules, blankRule()] }); }
   removeRule(i: number): void { this.patch({ rules: this.def().rules.filter((_, x) => x !== i) }); }
-  patchRule(i: number, p: Partial<TypeRule>): void { this.patch({ rules: this.def().rules.map((r, x) => x === i ? { ...r, ...p } : r) }); }
+  patchRule(i: number, p: Partial<TypeRule>): void {
+    this.patch({ rules: this.def().rules.map((r, x) => x === i ? { ...r, ...p } : r) });
+    if (p.rule === 'lookup') this.askBuckets();
+  }
+  /** MIG-319: a lookup's list, changed in part. */
+  patchList(i: number, p: Partial<ListSource>): void { this.patchRule(i, { list: { ...(this.def().rules[i]?.list ?? {}), ...p } }); }
+  num(text: string): number | null { return text.trim() === '' ? null : Number(text); }
+  fieldPrompt(r: TypeRule): string {
+    switch (r.rule) {
+      case 'matches': case 'checkDigit': case 'lookup': return 'A field (or a table column)';
+      case 'unusual': return 'The number field';
+      default: return 'The total field';
+    }
+  }
+
+  private askBuckets(): void {
+    if (this.bucketsAsked || !this.editing()) return;
+    this.bucketsAsked = true;
+    this.api.buckets().subscribe({ next: b => this.buckets.set(b), error: () => this.buckets.set([]) });
+  }
 
   columnsOf(table: string | null | undefined): TypeField[] { return this.def().tables.find(t => t.key === table)?.columns ?? []; }
 
@@ -379,6 +443,7 @@ export class TypePanel implements OnInit {
       sumEquals: ['table', 'column', 'field', 'tolerance'], sumOf: ['fields', 'field', 'tolerance'],
       rowProduct: ['table', 'columns', 'column', 'tolerance'], notAfter: ['before', 'after'],
       matches: ['field', 'table', 'column', 'pattern'], checkDigit: ['field', 'table', 'column', 'algorithm'],
+      duplicate: ['fields', 'withinDays'], lookup: ['field', 'table', 'column', 'list'], unusual: ['field', 'groupBy'],
     };
     return (USES[r.rule] ?? []).includes(what);
   }

@@ -105,8 +105,11 @@
                   }
                   <span>
                     {{ ruleWords(r) }}
-                    <span class="text-[color:var(--text-muted)]">· {{ r.status === 'passed' ? 'holds' : r.status === 'failed' ? 'fails' : 'not checked: a value it needs is missing' }}</span>
+                    <span class="text-[color:var(--text-muted)]">· {{ r.status === 'passed' ? 'holds' : r.status === 'failed' ? 'fails' : skipped(r) }}</span>
                     @if (r.status === 'failed' && r.message) { <span class="block text-crit-500">{{ r.message }}</span> }
+                    @if (r.status === 'failed' && r.relatedExtractionId) {
+                      <a class="link-inline" [routerLink]="['/documents/review', r.relatedExtractionId]" data-test="related-document">Open the other document</a>
+                    }
                   </span>
                 </p>
               } @empty {

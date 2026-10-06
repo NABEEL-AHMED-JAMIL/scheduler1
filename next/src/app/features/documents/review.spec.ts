@@ -159,6 +159,21 @@ describe('DocumentReview -- reading', () => {
     expect(el.querySelector('[data-test="rules"]')?.textContent).toContain('not checked');
   });
 
+  /** MIG-319: a possible duplicate says which document, and opens it. */
+  it('names the other document of a possible duplicate and opens it', async () => {
+    const duplicate: ReviewDetail = {
+      ...CORRECTED,
+      definition: { ...CORRECTED.definition!, rules: [...CORRECTED.definition!.rules, { rule: 'duplicate', fields: ['vendor_name', 'total'] }] },
+      checks: { ...CORRECTED.checks!, anyRuleFailed: true, rules: [CORRECTED.checks!.rules[0], { index: 2, rule: 'duplicate', status: 'failed',
+        message: 'Possible duplicate of INV-NW-1002.pdf: the same Vendor and Total.', fields: ['vendor_name', 'total'], relatedExtractionId: 1003 }] },
+    };
+    const { el } = await screenWith({ api: stubApi(duplicate) });
+    const rules = el.querySelector('[data-test="rules"]')!;
+    expect(rules.textContent).toContain('No other document has the same vendor, total');
+    expect(rules.textContent).toContain('Possible duplicate of INV-NW-1002.pdf: the same Vendor and Total.');
+    expect(rules.querySelector('[data-test="related-document"]')?.getAttribute('href')).toBe('/documents/review/1003');
+  });
+
   it('says so when the document cannot be read', async () => {
     const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404, error: { status: 'ERROR', message: 'No extraction 1005.' } }))) });
     const { el } = await screenWith({ api });

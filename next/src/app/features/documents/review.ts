@@ -13,7 +13,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { confirmWith } from '../../shared/ui/confirm';
 import {
   ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, fieldName, fileName, isLow, lowLine,
-  nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
+  nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, skippedWhy, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { PageViewer, ViewerBox } from './page-viewer';
@@ -216,6 +216,7 @@ export class DocumentReview {
   nameOf(f: ExtractedField): string { return fieldName(f, this.definition()); }
   valueOf(f: ExtractedField): string { return f.fieldId in this.edits() ? this.edits()[f.fieldId] : (f.value ?? ''); }
   ruleWords(r: RuleOutcome): string { return ruleText(r, this.definition()); }
+  skipped(r: RuleOutcome): string { return skippedWhy(r); }
 
   /**
    * Selects a value: the viewer highlights its box and centres it. `reveal` says what else comes into view -- the box,
