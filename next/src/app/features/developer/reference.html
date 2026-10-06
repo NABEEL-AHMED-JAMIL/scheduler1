@@ -22,7 +22,7 @@
     <section [id]="'tag-' + tag.name" class="scroll-mt-20 flex flex-col gap-3" [attr.data-tag]="tag.name">
       <div>
         <h2 class="section-title capitalize">{{ tag.name }}</h2>
-        @if (tag.description) { <p class="section-sub">{{ tag.description }}</p> }
+        @if (tag.description) { <p class="section-sub"><app-inline-text [text]="tag.description" /></p> }
       </div>
 
       @for (v of tag.operations; track v.op.id) {
@@ -68,7 +68,7 @@
                               @if (p.pattern) { <div class="mono break-all text-[color:var(--text-muted)]">{{ p.pattern }}</div> }
                               @if (p.defaultValue) { <div class="text-[color:var(--text-muted)]">Default {{ p.defaultValue }}</div> }
                             </td>
-                            <td class="text-sm align-top">{{ p.description }}</td>
+                            <td class="text-sm align-top"><app-inline-text [text]="p.description" /></td>
                           </tr>
                         }
                       </tbody>
@@ -95,7 +95,7 @@
                         <details class="group">
                           <summary class="cursor-pointer flex flex-wrap items-baseline gap-2 text-sm">
                             <span [class]="r.tone">{{ r.status }}</span>
-                            <span>{{ r.description }}</span>
+                            <span><app-inline-text [text]="r.description" /></span>
                             @if (r.contentType) { <span class="mono text-xs text-[color:var(--text-muted)]">{{ r.contentType }}</span> }
                             @if (r.schema) { <a class="md-link text-xs" [routerLink]="reference" [fragment]="'schema-' + r.schema">{{ r.schema }}</a> }
                           </summary>
@@ -106,7 +106,7 @@
                                 <ul class="text-sm">
                                   @for (h of r.headers; track h.name) {
                                     <li><span class="mono text-xs">{{ h.name }}</span> <span class="text-xs text-[color:var(--text-muted)]">{{ h.type }}</span>
-                                      @if (h.description) { <span class="text-[color:var(--text-secondary)]"> · {{ h.description }}</span> }</li>
+                                      @if (h.description) { <span class="text-[color:var(--text-secondary)]"> · <app-inline-text [text]="h.description" /></span> }</li>
                                   }
                                 </ul>
                               </div>
@@ -118,7 +118,7 @@
                     } @else {
                       <li class="flex flex-wrap items-baseline gap-2 text-sm">
                         <span [class]="r.tone">{{ r.status }}</span>
-                        <span>{{ r.description }}</span>
+                        <span><app-inline-text [text]="r.description" /></span>
                         @if (r.contentType) { <span class="mono text-xs text-[color:var(--text-muted)]">{{ r.contentType }}</span> }
                         @if (r.schema) { <a class="md-link text-xs" [routerLink]="reference" [fragment]="'schema-' + r.schema">{{ r.schema }}</a> }
                       </li>
@@ -139,7 +139,7 @@
                             <a class="md-link mono text-xs" [routerLink]="reference" [fragment]="'problem-' + p.kind">/problems/{{ p.kind }}</a>
                           }
                         } @else {
-                          <span class="text-[color:var(--text-secondary)]">{{ e.description }}</span>
+                          <span class="text-[color:var(--text-secondary)]"><app-inline-text [text]="e.description" /></span>
                         }
                       </li>
                     }
@@ -186,7 +186,7 @@
       @for (s of model.schemas; track s.name) {
         <article class="card p-4 scroll-mt-20 min-w-0" [id]="'schema-' + s.name" [attr.data-schema]="s.name">
           <h3 class="mono font-medium">{{ s.name }}</h3>
-          @if (s.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ s.description }}</p> }
+          @if (s.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1"><app-inline-text [text]="s.description" /></p> }
           <div class="mt-2"><app-schema-fields [root]="s.tree" /></div>
           <details class="mt-2">
             <summary class="cursor-pointer text-xs text-[color:var(--text-muted)]">Example</summary>
@@ -215,7 +215,7 @@
               <thead><tr><th>Header</th><th>Description</th></tr></thead>
               <tbody>
                 @for (h of receiver.headers; track h.name) {
-                  <tr><td class="mono text-xs whitespace-nowrap align-top">{{ h.name }}</td><td class="text-sm">{{ h.description }}</td></tr>
+                  <tr><td class="mono text-xs whitespace-nowrap align-top">{{ h.name }}</td><td class="text-sm"><app-inline-text [text]="h.description" /></td></tr>
                 }
               </tbody>
             </table>
@@ -227,7 +227,7 @@
       @for (e of model.events; track e.type) {
         <article class="card p-4 scroll-mt-20 min-w-0" [id]="'event-' + e.type" [attr.data-event]="e.type">
           <h3 class="mono font-medium">{{ e.type }}</h3>
-          @if (e.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ e.description }}</p> }
+          @if (e.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1"><app-inline-text [text]="e.description" /></p> }
           <p class="text-xs font-medium text-[color:var(--text-muted)] mt-2 mb-1">data</p>
           <app-schema-fields [root]="e.tree" />
           <details class="mt-2">
@@ -258,7 +258,7 @@
                 <td class="align-top"><span class="pill pill-neutral mono">{{ p.status }}</span></td>
                 <td class="text-sm">
                   <div class="font-medium">{{ p.title }}</div>
-                  @if (p.description) { <div class="text-[color:var(--text-secondary)]">{{ p.description }}</div> }
+                  @if (p.description) { <div class="text-[color:var(--text-secondary)]"><app-inline-text [text]="p.description" /></div> }
                   @if (p.operations) {
                     <div class="mt-1 flex flex-wrap gap-x-2 text-xs">
                       @for (id of p.operations; track id) {
@@ -288,7 +288,7 @@
         <tbody>
           @for (h of model.limitHeaders; track h.name) {
             <tr><td class="mono text-xs whitespace-nowrap align-top">{{ h.name }}</td><td class="text-xs align-top">{{ h.type }}</td>
-              <td class="text-sm">{{ h.description }}</td></tr>
+              <td class="text-sm"><app-inline-text [text]="h.description" /></td></tr>
           }
         </tbody>
       </table>

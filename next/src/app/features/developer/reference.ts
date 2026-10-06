@@ -5,6 +5,7 @@ import { Icon } from '../../shared/ui/icon';
 import { DevCode } from './code-block';
 import { DOCS, scrollToFragments } from './developer-docs';
 import { GuideBody } from './guide-body';
+import { InlineText } from './inline-text';
 import { PORTAL } from './guide-markdown';
 import { matchesFilter } from './openapi';
 import { referenceModel } from './reference-model';
@@ -17,7 +18,7 @@ import { SchemaFields } from './schema-fields';
  */
 @Component({
   selector: 'app-developer-reference',
-  imports: [RouterLink, Icon, DevCode, GuideBody, SchemaFields],
+  imports: [RouterLink, Icon, DevCode, GuideBody, InlineText, SchemaFields],
   templateUrl: './reference.html',
   // From 1536px the examples take a column of their own beside the operation's details.
   styles: [`@media (min-width: 1536px) { .op-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 30rem); } }`],
