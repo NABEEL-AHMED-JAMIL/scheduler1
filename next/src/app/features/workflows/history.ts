@@ -12,6 +12,8 @@ export interface HistoryLine {
   text: string;
   tone: 'ok' | 'bad' | 'warn' | 'now' | 'plain';
   comment?: string;
+  /** Who acted, when a person did: the timeline's byline. */
+  actor?: string;
 }
 
 type Names = (id: number | null | undefined) => string;
@@ -23,7 +25,7 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
     const step = stepName(e.stepKey);
     const who = e.onBehalfOf ? `${name(e.actor)} (for ${name(e.onBehalfOf)})` : name(e.actor);
     const line = (text: string, tone: HistoryLine['tone'] = 'plain', comment?: string) =>
-      lines.push({ id: e.id, at: e.at, text, tone, comment });
+      lines.push({ id: e.id, at: e.at, text, tone, comment, actor: e.actor != null ? who : undefined });
     switch (e.type) {
       case 'Started': line(e.actor ? `Requested by ${name(e.actor)}` : 'Started', 'ok'); break;
       case 'TaskOpened': line(`${step}: waiting for ${assignee(d, name)}${d['due'] ? ' · due ' + shortTime(String(d['due'])) : ''}`, 'now'); break;
@@ -51,6 +53,21 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
     }
   }
   return lines;
+}
+
+/**
+ * The task's own lines without its name (owner, 2026-10-06): under "Alex approves the visit", "Alex approves the visit:
+ * went to the administrators" says the name twice. Only a line that starts with exactly that name and a colon loses
+ * it; the rest of the request's history keeps its step names.
+ */
+export function dropOwnStep(lines: HistoryLine[], step: string | null | undefined): HistoryLine[] {
+  if (!step) return lines;
+  const prefix = `${step}: `;
+  return lines.map(l => {
+    if (!l.text.startsWith(prefix)) return l;
+    const rest = l.text.slice(prefix.length);
+    return { ...l, text: rest.charAt(0).toUpperCase() + rest.slice(1) };
+  });
 }
 
 function detailOf(detail: string | null | undefined): Record<string, unknown> {
@@ -102,4 +119,67 @@ export function shortTime(iso: string | null | undefined, timeZone?: string): st
     .formatToParts(at);
   const part = (type: string) => parts.find(p => p.type === type)?.value ?? '';
   return `${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]}, ${part('hour')}:${part('minute')}`;
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** The calendar day an instant falls on, in the viewer's zone (or the one named), as days since 1970. */
+export function dayNumber(at: Date, timeZone?: string): number {
+  const parts = new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone }).formatToParts(at);
+  const part = (type: string) => Number(parts.find(p => p.type === type)?.value ?? 0);
+  return Math.round(Date.UTC(part('year'), part('month') - 1, part('day')) / 86_400_000);
+}
+
+/** Days since Monday (0 on a Monday), in the viewer's zone: where "this week" starts. */
+export function daysIntoWeek(at: Date, timeZone?: string): number {
+  return (dayNumber(at, timeZone) + 3) % 7; // 1 Jan 1970 was a Thursday
+}
+
+function clock(at: Date, timeZone?: string): string {
+  const parts = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone }).formatToParts(at);
+  return `${parts.find(p => p.type === 'hour')?.value}:${parts.find(p => p.type === 'minute')?.value}`;
+}
+
+/**
+ * The exact moment, for a tooltip: "Tue 6 Oct 2026, 14:05", 24-hour, in the viewer's zone.
+ */
+export function exactTime(iso: string | null | undefined, timeZone?: string): string {
+  const at = instantOf(iso);
+  if (!at) return iso ?? '';
+  const parts = new Intl.DateTimeFormat('en-GB', { year: 'numeric', day: 'numeric', month: 'numeric', timeZone }).formatToParts(at);
+  const part = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${WEEKDAYS[(dayNumber(at, timeZone) + 4) % 7]} ${Number(part('day'))} ${MONTHS[Number(part('month')) - 1]} ${part('year')}, ${clock(at, timeZone)}`;
+}
+
+/**
+ * A moment as a person says it, next to now: "just now", "5 min ago", "3 h ago", "Yesterday, 14:05", "in 2 h", or the
+ * day and time when it is further off. The exact time goes in a tooltip (exactTime).
+ */
+export function relativeTime(iso: string | null | undefined, now: number = Date.now(), timeZone?: string): string {
+  const at = instantOf(iso);
+  if (!at) return iso ?? '';
+  const diff = now - at.getTime();
+  const minutes = Math.round(Math.abs(diff) / 60_000);
+  const days = dayNumber(new Date(now), timeZone) - dayNumber(at, timeZone);
+  if (minutes < 1) return 'just now';
+  if (minutes < 60) return diff > 0 ? `${minutes} min ago` : `in ${minutes} min`;
+  if (days === 0) return diff > 0 ? `${Math.floor(minutes / 60)} h ago` : `in ${Math.floor(minutes / 60)} h`;
+  if (days === 1) return `Yesterday, ${clock(at, timeZone)}`;
+  if (days === -1) return `Tomorrow, ${clock(at, timeZone)}`;
+  return shortTime(iso, timeZone);
+}
+
+/**
+ * A list row's time, as a mail client puts it: the time today, "Yesterday" or "Tomorrow", the weekday within a week
+ * either way, else the day and month.
+ */
+export function compactTime(iso: string | null | undefined, now: number = Date.now(), timeZone?: string): string {
+  const at = instantOf(iso);
+  if (!at) return '';
+  const days = dayNumber(new Date(now), timeZone) - dayNumber(at, timeZone);
+  if (days === 0) return clock(at, timeZone);
+  if (days === 1) return 'Yesterday';
+  if (days === -1) return 'Tomorrow';
+  if (Math.abs(days) < 7) return WEEKDAYS[(dayNumber(at, timeZone) + 4) % 7];
+  return shortTime(iso, timeZone).replace(/,.*$/, '');
 }

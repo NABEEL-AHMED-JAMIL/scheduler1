@@ -8,7 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { TaskInbox, INBOX_LIST_LIMIT } from './task-inbox';
 import { TaskCountService } from './task-count.service';
 import { InboxTask, TaskDetail, WorkflowsApi } from './workflows.api';
-import { historyLines, shortTime } from './history';
+import { compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 
 /**
  * The Task inbox (MIG-276): what waits for the reader, the request and its history in words, and the decisions --
@@ -65,7 +65,9 @@ describe('Task inbox', () => {
     expect(detail).toContain('Vendor name');
     expect(detail).toContain('Acme');
     expect(detail).toContain('Requested by Alex');
-    expect(detail).toContain('Manager approves: waiting for you · due ' + shortTime('2026-10-02T16:00:00'));
+    // The task's own lines drop its name: the heading already says it.
+    expect(detail).toContain('Waiting for you · due ' + shortTime('2026-10-02T16:00:00'));
+    expect(detail).not.toContain('Manager approves: waiting');
     expect(el.querySelector('[data-test="decisions"]')!.textContent).toContain('Approve');
   });
 
@@ -117,6 +119,38 @@ describe('Task history in words', () => {
     expect(shortTime('2026-10-01T08:05:00', 'America/Chicago')).toBe('1 Oct, 08:05');
     expect(shortTime('2026-09-30T22:20:57.914+00:00', 'America/Chicago')).toBe('30 Sep, 17:20');
     expect(shortTime('2026-09-30T22:20:57.914+00:00', 'UTC')).toBe('30 Sep, 22:20');
+  });
+});
+
+describe('The task\'s own history lines', () => {
+  it('drops the task\'s name and its colon from the start of a line, and only there', () => {
+    const lines = [
+      { id: 1, at: '', tone: 'now', text: 'Alex approves the visit: went to the administrators' },
+      { id: 2, at: '', tone: 'ok', text: 'Requested by Sam' },
+      { id: 3, at: '', tone: 'plain', text: 'Nurse checks: Alex approves the visit: no' },
+      { id: 4, at: '', tone: 'plain', text: 'Alex approves the visit again' },
+    ] as never;
+    expect(dropOwnStep(lines, 'Alex approves the visit').map(l => l.text)).toEqual([
+      'Went to the administrators', 'Requested by Sam', 'Nurse checks: Alex approves the visit: no', 'Alex approves the visit again']);
+    expect(dropOwnStep(lines, null)).toBe(lines);
+  });
+
+  it('says when relative to now, 24-hour, with the exact time for the tooltip', () => {
+    const now = Date.parse('2026-10-06T19:00:00Z'); // 14:00 in Chicago, a Tuesday
+    const tz = 'America/Chicago';
+    expect(relativeTime('2026-10-06T13:59:40', now, tz)).toBe('just now');
+    expect(relativeTime('2026-10-06T13:35:00', now, tz)).toBe('25 min ago');
+    expect(relativeTime('2026-10-06T09:10:00', now, tz)).toBe('4 h ago');
+    expect(relativeTime('2026-10-05T21:34:00', now, tz)).toBe('Yesterday, 21:34');
+    expect(relativeTime('2026-10-07T08:00:00', now, tz)).toBe('Tomorrow, 08:00');
+    expect(relativeTime('2026-09-30T08:05:00', now, tz)).toBe('30 Sep, 08:05');
+    expect(exactTime('2026-10-06T14:05:00', tz)).toBe('Tue 6 Oct 2026, 14:05');
+    expect(exactTime('2026-10-06T19:05:00+00:00', tz)).toBe('Tue 6 Oct 2026, 14:05');
+    expect(compactTime('2026-10-06T08:00:00', now, tz)).toBe('08:00');
+    expect(compactTime('2026-10-05T08:00:00', now, tz)).toBe('Yesterday');
+    expect(compactTime('2026-10-07T08:00:00', now, tz)).toBe('Tomorrow');
+    expect(compactTime('2026-10-02T08:00:00', now, tz)).toBe('Fri');
+    expect(compactTime('2026-09-20T08:00:00', now, tz)).toBe('20 Sep');
   });
 });
 
