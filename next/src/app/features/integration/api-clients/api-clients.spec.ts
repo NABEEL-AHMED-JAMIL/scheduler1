@@ -306,7 +306,7 @@ describe('MIG-333: the deliveries dialog', () => {
   it('a paused webhook sends nothing again until it is resumed', () => {
     const { fixture } = deliveries(WEBHOOKS[1] as any);
     const buttons = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button'))
-      .filter(b => (b.textContent ?? '').includes('Send again')) as HTMLButtonElement[];
+      .filter(b => (b.getAttribute('aria-label') ?? '').includes('again')) as HTMLButtonElement[];
     expect(buttons.length).toBeGreaterThan(0);
     expect(buttons.every(b => b.disabled)).toBe(true);
   });

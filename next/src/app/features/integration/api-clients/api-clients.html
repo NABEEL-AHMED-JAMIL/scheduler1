@@ -139,7 +139,7 @@
       </p>
     </div>
     @if (auth.canBuild()) {
-      <button type="button" class="btn btn-default btn-sm" (click)="openWebhook(null)" [disabled]="!eventTypes().length">
+      <button type="button" class="btn btn-default btn-sm whitespace-nowrap shrink-0" (click)="openWebhook(null)" [disabled]="!eventTypes().length">
         <app-icon name="plus" />New webhook
       </button>
     }
