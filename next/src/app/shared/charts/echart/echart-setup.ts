@@ -12,7 +12,7 @@
  *
  * @author Nabeel Ahmed
  */
-import * as echarts from 'echarts/core';
+import { init, registerTheme, use } from 'echarts/core';
 import {
   BarChart, BoxplotChart, CandlestickChart, ChordChart, EffectScatterChart, FunnelChart, GaugeChart, HeatmapChart,
   LineChart, ParallelChart, PictorialBarChart, PieChart, RadarChart, SankeyChart, ScatterChart, SunburstChart,
@@ -26,7 +26,7 @@ import {
 import { LabelLayout } from 'echarts/features';
 import { CanvasRenderer, SVGRenderer } from 'echarts/renderers';
 
-echarts.use([
+use([
   BarChart, BoxplotChart, CandlestickChart, ChordChart, EffectScatterChart, FunnelChart, GaugeChart, HeatmapChart,
   LineChart, ParallelChart, PictorialBarChart, PieChart, RadarChart, SankeyChart, ScatterChart, SunburstChart,
   ThemeRiverChart, TreeChart, TreemapChart,
@@ -36,4 +36,10 @@ echarts.use([
   LabelLayout, CanvasRenderer, SVGRenderer,
 ]);
 
-export { echarts };
+/**
+ * The two calls the console makes, as a plain object. One thing does reach the initial bundle:
+ * esbuild's 70-byte namespace helper, which ECharts' own tooltip, polar, radar, box plot,
+ * pictorial bar and single-axis modules need and which the bundler always places in the shared
+ * runtime chunk. Everything else is in the lazy chunk.
+ */
+export const echarts = { init, registerTheme };
