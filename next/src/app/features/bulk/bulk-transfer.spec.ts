@@ -201,3 +201,27 @@ describe('Bulk schedules: the Cron row', () => {
     expect(note?.textContent).toContain('0 3 * * *');
   });
 });
+
+// MIG-320: Harbor Health (MANAGED) walked as its own administrator: the importer refuses the upload (BuilderAction),
+// so the page says so up front, with no dropzone to pick a file into; export still works.
+describe('Bulk import in a MANAGED workspace', () => {
+  it('says importing is our team\'s, and offers no file to pick', async () => {
+    const { AuthService } = await import('../../core/auth/auth.service');
+    const { signal } = await import('@angular/core');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [BulkTransfer], providers: [
+      provideRouter([]),
+      { provide: HttpClient, useValue: {} },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+      { provide: AuthService, useValue: { builderLocked: () => true, managementMode: signal('MANAGED'), isManaged: () => true,
+        user: signal({ managementMode: 'MANAGED' }) } },
+    ] });
+    const fixture = TestBed.createComponent(BulkTransfer);
+    fixture.componentRef.setInput('kind', 'job');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-import-locked]')?.textContent).toContain('done by our team');
+    expect(el.querySelector('app-file-dropzone')).toBeNull();
+    expect(fixture.componentInstance.locked()).toBe(true);
+  });
+});

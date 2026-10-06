@@ -1,6 +1,8 @@
-import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, input, signal, viewChild } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { AuthService } from '../../core/auth/auth.service';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -57,11 +59,12 @@ const ROUTES: Record<Kind, Endpoints> = {
 
 @Component({
   selector: 'app-bulk-transfer',
-  imports: [Icon, RouterLink, FileDropzone],
+  imports: [Icon, RouterLink, FileDropzone, ManagedBanner],
   templateUrl: './bulk-transfer.html',
 })
 export class BulkTransfer {
   private readonly http = inject(HttpClient);
+  private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
   private readonly dropzone = viewChild(FileDropzone);
 
@@ -72,6 +75,8 @@ export class BulkTransfer {
 
   readonly file = signal<File | null>(null);
   readonly uploading = signal(false);
+  /** MIG-320: a MANAGED workspace imports through our team; the server refuses the upload (BuilderAction) as well. */
+  readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
   readonly progress = signal(0);
   readonly downloading = signal('');
   readonly result = signal<{ ok: boolean; message: string; rows: string[] } | null>(null);
@@ -104,7 +109,7 @@ export class BulkTransfer {
 
   upload(): void {
     const file = this.file();
-    if (!file) return;
+    if (!file || this.locked()) return;
     const body = new FormData();
     body.append('file', file);
 

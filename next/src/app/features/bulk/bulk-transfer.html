@@ -10,6 +10,9 @@
       </p>
     </div>
   </div>
+  <!-- MIG-320: a MANAGED workspace's pipelines and schedules are our team's; the importer refuses its upload, so the
+       page says so before a file is chosen rather than after. Export stays open. -->
+  <app-managed-banner [what]="noun()" />
 
   <div class="grid gap-4 lg:grid-cols-2 items-start">
     <div class="card p-4">
@@ -37,10 +40,16 @@
       <!-- The shared dropzone, which this markup was extracted into -- its dragleave handling
            keeps the highlight on while the pointer crosses the icon and text. .xlsx only: the
            importer cannot read an old .xls workbook. -->
+      @if (locked()) {
+        <p class="text-sm text-[color:var(--text-secondary)] mt-4" data-import-locked>
+          Importing is done by our team for this workspace. Export below still works.
+        </p>
+      } @else {
       <app-file-dropzone class="block mt-4" [file]="file()" (fileChange)="onFile($event)"
                          accept=".xlsx" prompt="Drop a spreadsheet here" hint=".xlsx workbook, from the import template" />
+      }
 
-      @if (file()) {
+      @if (file() && !locked()) {
         @if (uploading()) {
           <div class="progress mt-3" role="progressbar" aria-label="Upload progress"
                aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progress()">
