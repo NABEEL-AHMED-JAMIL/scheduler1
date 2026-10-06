@@ -25,8 +25,15 @@ test.describe('rate cards', () => {
 
     const before = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     const versionsBefore: number[] = before.data.cards.map((c: { version: number }) => c.version);
+    // The editor starts from the default card in effect, which an earlier run may have set to these very prices: pick
+    // a price and an allowance that differ from it, or "1 changed" never appears.
+    const today0 = new Date().toISOString().slice(0, 10);
+    const base = (await (await request.get(`${api}/billing.json/rateCard?day=${today0}`, { headers: auth })).json()).data;
+    const baseImages = (base?.items ?? []).find((i: { meter: string }) => i.meter === 'ai.vision.images');
+    const price = Number(baseImages?.unit_price) === 0.02 ? '0.03' : '0.02';
+    const included = Number(baseImages?.included_quantity) === 10 ? '11' : '10';
     const stamp = Date.now().toString(36);
-    const name = `E2E ${stamp}: images at 0.02`;
+    const name = `E2E ${stamp}: images at ${price}`;
 
     const page = await pageAs(browser, session);
     await page.goto('/billing/rates');
@@ -38,9 +45,9 @@ test.describe('rate cards', () => {
     const panel = page.getByRole('dialog');
     await expect(panel.getByRole('heading', { name: /^New version from / })).toBeVisible();
     await panel.locator('#rcName').fill(name);
-    await panel.locator('#rcNote').fill('Playwright: images described at 0.02, 10 free a month');
-    await panel.getByLabel('Images described price').fill('0.02');
-    await panel.getByLabel('Images described included').fill('10');
+    await panel.locator('#rcNote').fill(`Playwright: images described at ${price}, ${included} free a month`);
+    await panel.getByLabel('Images described price').fill(price);
+    await panel.getByLabel('Images described included').fill(included);
     await expect(panel.getByText('1 changed')).toBeVisible();
     await panel.getByRole('button', { name: 'Save version' }).click();
     await expect(page.getByText(new RegExp(`${name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')} saved as v\\d+`))).toBeVisible();
@@ -52,8 +59,8 @@ test.describe('rate cards', () => {
     expect(versionsBefore).not.toContain(saved.version);
     expect(saved.tenant_id).toBeNull();
     const images = saved.items.find((i: { meter: string }) => i.meter === 'ai.vision.images');
-    expect(Number(images.unit_price)).toBe(0.02);
-    expect(Number(images.included_quantity)).toBe(10);
+    expect(Number(images.unit_price)).toBe(Number(price));
+    expect(Number(images.included_quantity)).toBe(Number(included));
     expect(saved.items.length).toBeGreaterThan(10);                     // everything else carried over
     await expect(page.getByRole('heading', { name: `${name} v${saved.version}` })).toBeVisible();
     await expect(page.getByText(/Changed from v\d+: Images described/)).toBeVisible();
