@@ -21,6 +21,8 @@ let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
  */
 
 test.skip(!signedIn(), NO_SESSION);
+// Opening a dataset reads it from S3 (a 38 MB CSV for orders); a slow read is not a failure, so each test has two minutes.
+test.describe.configure({ timeout: 120_000 });
 
 // The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
 test.beforeAll(async ({ request }) => {
@@ -36,7 +38,7 @@ async function openFixture(page: Page) {
   await page.locator('#a-conn').selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-samples/ }).click();
   await page.getByRole('button', { name: /orders\.csv/ }).click();
-  await expect(page.getByText('250K rows')).toBeVisible();
+  await expect(page.getByText('250K rows')).toBeVisible({ timeout: 45_000 });   // the count reads the whole file from S3
 }
 
 /** Every element whose box escapes the viewport horizontally. */

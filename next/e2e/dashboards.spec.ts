@@ -29,6 +29,8 @@ const REPORTS = [
 ];
 
 test.skip(!signedIn(), NO_SESSION);
+// Opening a dataset reads it from S3 (a 38 MB CSV for orders); a slow read is not a failure, so each test has two minutes.
+test.describe.configure({ timeout: 120_000 });
 
 // The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
 test.beforeAll(async ({ request }) => {
