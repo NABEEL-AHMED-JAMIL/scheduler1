@@ -2109,17 +2109,39 @@
                   <div class="seg flex-wrap" role="group" aria-labelledby="a-chart-kind">
                     @for (option of chartKinds(); track option.id) {
                       <button type="button" class="seg-btn"
-                              [class.seg-on]="option.id === chartKind()"
-                              [attr.aria-pressed]="option.id === chartKind()"
+                              [class.seg-on]="option.id === chartKind() && !echartChoice()"
+                              [attr.aria-pressed]="option.id === chartKind() && !echartChoice()"
                               [class.opacity-40]="!!option.issue"
                               [class.cursor-not-allowed]="!!option.issue"
                               [attr.aria-disabled]="option.issue ? true : null"
                               [title]="option.issue || option.label"
-                              (click)="option.issue || chartKindName.set(option.id)">{{ option.label }}</button>
+                              (click)="option.issue || chooseClassicKind(option.id)">{{ option.label }}</button>
                     }
                   </div>
                 </div>
+
+                <!-- The theme and the settings, for whichever chart is drawn. This viewer's own:
+                     the Studio has no widget to store them on, so they are kept in the browser. -->
+                <div class="flex items-center gap-1 ms-auto">
+                  <button type="button" class="btn btn-ghost btn-sm" [cdkMenuTriggerFor]="studioThemeMenu" [attr.aria-label]="'Chart theme: ' + chartThemeLabel()"><app-icon name="sun" />{{ chartThemeLabel() }}</button>
+                  <ng-template #studioThemeMenu>
+                    <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
+                      <app-theme-picker [value]="chartTheme() ?? 'console'" (changed)="setChartTheme($event)" />
+                    </div>
+                  </ng-template>
+                  <button type="button" class="btn btn-ghost btn-sm" [disabled]="!studioView()" (click)="openStudioChartSettings()"><app-icon name="settings" />Chart settings</button>
+                </div>
               </div>
+
+              <!-- Every other kind, by category, each saying what it needs and why it does not fit.
+                   Hovering one draws the result that way below; choosing it keeps it. -->
+              <details class="studio-more-charts" [open]="!!echartChoice()">
+                <summary class="cursor-pointer select-none text-xs font-medium text-[color:var(--text-secondary)] w-fit">More chart types ({{ echartKinds.length }})</summary>
+                <div class="mt-2">
+                  <app-kind-picker [kinds]="echartKinds" [issues]="echartIssues()" [selected]="echartChoice()"
+                                   (chosen)="echartChoice.set($event)" (hover)="echartHover.set($event)" />
+                </div>
+              </details>
 
               <div class="flex flex-wrap items-baseline gap-2 min-w-0">
                 <h4 class="text-sm font-medium min-w-0 truncate">{{ chartCaption() }}</h4>
@@ -2133,6 +2155,13 @@
                 }
               </div>
 
+              @if (echartShown(); as kind) {
+                @if (studioView(); as view) {
+                  <app-widget-chart [view]="view" [kind]="kind" [settings]="chartSettings()" [boardTheme]="chartTheme()" [height]="340"
+                                    [interactive]="true" [name]="chartCaption()" />
+                }
+              } @else {
+              <div [appChartPalette]="chartSettings().colors?.theme ?? chartTheme()" [paletteOrder]="chartSettings().colors?.order">
               @switch (chartKind()) {
                 @case ('bar') {
                   <app-bar-chart [data]="chartData()" [height]="220" [format]="chartNumber" />
@@ -2156,6 +2185,8 @@
                                  [dropBelow]="null" [height]="200" [format]="chartNumber"
                                  emptyMessage="Nothing in this column parses as a number." />
                 }
+              }
+              </div>
               }
 
               <!-- What the picture cannot say about itself. Every line here is a row, a

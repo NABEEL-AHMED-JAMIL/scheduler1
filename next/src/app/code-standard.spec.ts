@@ -60,6 +60,11 @@ const CONSOLE_ALLOWED: { path: string; call: string; reason: string }[] = [
       + 'and the exception -- minified, useless on the tile -- goes where a developer will look',
   },
   {
+    path: 'src/app/shared/charts/echart/echart.ts', call: 'console.error',
+    reason: 'an ECharts option that throws while it is drawn: the tile says in words that the chart could not be '
+      + 'drawn, and the exception goes where a developer will look',
+  },
+  {
     path: 'src/app/shared/ui/icon.ts', call: 'console.error',
     reason: 'an unknown glyph name, in dev mode only: the icon renders nothing, so a typo is otherwise silent',
   },

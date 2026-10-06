@@ -24,8 +24,20 @@ import {
   QueryResult,
   RegisteredDataset,
   SavedAnalysis,
-  SavedQuery, TopN, WidgetVisualization,
+  SavedQuery, TopN, WidgetVisualization, ClassicKind,
 } from './analytics.service';
+import { ChartTable, tableOf } from './charts/chart-table';
+import { fitIssues } from './charts/chart-fit';
+import {
+  ChartSettings, boardSettingsString, compactSettings, parseBoardSettings, parseSettings,
+} from './charts/chart-settings';
+import { KindPicker } from './charts/kind-picker';
+import { ChartSettingsData, ChartSettingsPanel } from './charts/chart-settings-panel';
+import { KindPickerData, KindPickerPanel } from './charts/kind-picker-panel';
+import { ThemePicker } from '../../shared/charts/echart/theme-picker';
+import { themeLabel } from '../../shared/charts/echart/echart-theme';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
+import { CATEGORIES } from './widget-kinds';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -84,6 +96,12 @@ interface WidgetConfig {
   height?: number;
   /** A sentence the author writes under the tile. Absent means none; it is never invented. */
   caption?: string;
+  /**
+   * The "Chart settings" panel's choices, including a theme overriding the board's. Absent means
+   * every default, which is how a widget saved before the panel existed keeps drawing as it did.
+   * Read through parseSettings, never trusted as stored.
+   */
+  chart?: ChartSettings;
 }
 
 /**
@@ -119,6 +137,8 @@ function widgetConfigString(config: WidgetConfig): string | null {
   const kept: WidgetConfig = {};
   if (config.height && config.height !== WIDGET_HEIGHT) kept.height = config.height;
   if (config.caption && config.caption.trim()) kept.caption = config.caption.trim();
+  const chart = config.chart ? compactSettings(config.chart) : undefined;
+  if (chart) kept.chart = chart;
   return Object.keys(kept).length ? JSON.stringify(kept) : null;
 }
 
@@ -326,6 +346,12 @@ export interface WidgetView {
   notes: string[];
   /** Why each kind cannot draw THIS result, or '' when it can. */
   issues: Record<WidgetVisualization, string>;
+  /**
+   * The same rows split into dimensions and measures, for the ECharts kinds (charts/chart-table.ts).
+   * Built with the view, where whether the figures add up is still known. Absent on a view built
+   * by hand (the specs' stubs), and the chart then reads one from the rows.
+   */
+  chart?: ChartTable;
   /** When this ran, so no figure on a board is on screen without a time against it. */
   ranAt: number;
 }
@@ -446,7 +472,7 @@ function nonPositiveNote(marks: Mark[]): string | null {
  * option quietly not being there.
  */
 function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
-    aggregationLabel: string, shape: ResultShape = {}): Record<WidgetVisualization, string> {
+    aggregationLabel: string, shape: ResultShape = {}): Record<ClassicKind, string> {
 
   const categorical = marks.length ? '' : reason;
   /*
@@ -847,7 +873,8 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
     : measureAt < 0 ? 'The result has no measure column to draw a length from.'
     : 'No row in this result has a measure that reads as a number.';
 
-  return {
+  const additive = !aggregation || ADDITIVE.includes(aggregation);
+  const view: WidgetView = {
     columns: columns.map(column => column.name),
     measureColumn: columns.map(column => column.role === 'MEASURE'),
     topNTrimmed: !!shape.topNTrimmed,
@@ -864,11 +891,25 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
     additive: !aggregation || ADDITIVE.includes(aggregation),
     marks,
     notes,
-    issues: issuesFor(marks, reason, !aggregation || ADDITIVE.includes(aggregation),
+    issues: issuesFor(marks, reason, additive,
       (aggregation ?? '').toLowerCase().replace(/_/g, ' ') || 'this measure',
-      { ...shape, rowCount: result.rowCount ?? allRows.length, columnCount: columns.length }),
+      { ...shape, rowCount: result.rowCount ?? allRows.length, columnCount: columns.length }) as WidgetView['issues'],
     ranAt: Date.now(),
   };
+  // The ECharts kinds read the same rows, split by role, with the question's order and totals.
+  return withChartTable(view, {
+    additive,
+    order: shape.sortedBy === 'MEASURE' ? 'rank'
+      : shape.sortedBy === 'DIMENSION' && shape.sortDirection === 'DESC' ? 'reversed' : 'dimension',
+    topNTrimmed: !!shape.topNTrimmed,
+    emptyReason: reason,
+  });
+}
+
+/** A view with its ChartTable, and the ECharts kinds' reasons added to its issues. */
+function withChartTable(view: WidgetView, context: Parameters<typeof tableOf>[1]): WidgetView {
+  const chart = tableOf(view, context);
+  return { ...view, chart, issues: { ...view.issues, ...fitIssues(chart) } };
 }
 
 /**
@@ -967,7 +1008,7 @@ export function queryView(result: QueryResult): WidgetView {
   const issues = issuesFor(
     value && value.negative ? [] : marks, reason, 'unknown', 'this measure');
 
-  return {
+  return withChartTable({
     columns,
     // All true: this path has no roles to read. The server renders every value to text before a
     // query result leaves, so a column of digits here is as likely to be a figure as a label and
@@ -989,9 +1030,9 @@ export function queryView(result: QueryResult): WidgetView {
     additive: false,
     marks,
     notes,
-    issues,
+    issues: issues as WidgetView['issues'],
     ranAt: Date.now(),
-  };
+  }, { additive: 'unknown', emptyReason: reason });
 }
 
 /**
@@ -1128,7 +1169,7 @@ function fileName(path: string | null | undefined): string {
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe],
+  imports: [Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker],
   templateUrl: './dashboard.html',
 })
 export class Dashboards implements OnInit, OnDestroy {
@@ -1147,6 +1188,7 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly kinds = KINDS;
+  readonly categories = CATEGORIES;
   readonly heightMin = WIDGET_HEIGHT_MIN;
   readonly heightMax = WIDGET_HEIGHT_MAX;
   readonly searchFrom = SEARCH_FROM;
@@ -1967,6 +2009,8 @@ export class Dashboards implements OnInit, OnDestroy {
     this.addTitle.set('');
     this.addSourceId.set('');
     this.addVisualization.set('table');
+    this.previewRun?.unsubscribe();
+    this.addPreview.set(null);
     this.addHeight.set('');
     this.addCaption.set('');
   }
@@ -1975,7 +2019,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.addKindOfSource.set(kind === 'query' ? 'query' : 'analysis');
     // The id belongs to the list it came from. Carrying it across would point the widget at
     // whatever saved query happens to share a number with the analysis that was chosen.
-    this.addSourceId.set('');
+    this.chooseAddSource('');
   }
 
   addWidget(): void {
@@ -2083,6 +2127,130 @@ export class Dashboards implements OnInit, OnDestroy {
       error: err => {
         this.widgetError.set(err?.error?.message || 'That choice could not be saved.');
       },
+    });
+  }
+
+  // ---- chart settings, themes, and choosing with a preview -------------------------------
+
+  /**
+   * Each widget's chart settings, parsed once per change to the board rather than per change
+   * detection: a fresh object on every pass would hand every tile a "new" input and rebuild every
+   * chart's option each time anything on the page moved.
+   */
+  private readonly widgetSettings = computed(() => new Map(this.widgets().map(widget =>
+    [widget.analyticsDashboardWidgetId, parseSettings(widgetConfigOf(widget).chart)] as const)));
+
+  private static readonly NO_SETTINGS: ChartSettings = {};
+
+  settingsOf(widget: DashboardWidget): ChartSettings {
+    return this.widgetSettings().get(widget.analyticsDashboardWidgetId) ?? Dashboards.NO_SETTINGS;
+  }
+
+  /** The board's theme, from its dashboard_config; null is the console's own. */
+  readonly boardTheme = computed(() => parseBoardSettings(this.board()?.dashboardConfig).theme ?? null);
+  readonly boardThemeLabel = computed(() => themeLabel(this.boardTheme()));
+
+  /** Whether a kind starts a new category in the menu's list, so it gets a heading. */
+  startsCategory(index: number): boolean {
+    return index === 0 || this.kinds[index].category !== this.kinds[index - 1].category;
+  }
+
+  /**
+   * Sets the theme every tile on the board draws in. RUNS NOTHING: the results in hand are
+   * redrawn in the new colours. Stored on the board (dashboard_config), so everybody who opens it
+   * sees the same board.
+   */
+  setBoardTheme(theme: string | null): void {
+    const board = this.board();
+    if (!board?.analyticsDashboardId || (theme ?? null) === this.boardTheme()) return;
+    const config = boardSettingsString({ theme: theme ?? undefined });
+    const previous = board.dashboardConfig ?? null;
+    this.board.update(open => open ? { ...open, dashboardConfig: config } : open);
+    this.analytics.saveDashboard({ ...board, dashboardConfig: config }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) {
+          this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+          this.widgetError.set(response.message || 'The board\'s theme could not be saved.');
+        }
+      },
+      error: err => {
+        this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+        this.widgetError.set(err?.error?.message || 'The board\'s theme could not be saved.');
+      },
+    });
+  }
+
+  /** Opens "Chart settings" for a tile, over the result it already shows. Saving runs nothing. */
+  openChartSettings(widget: DashboardWidget, view: WidgetView): void {
+    const data: ChartSettingsData = {
+      title: widget.widgetTitle, view, kind: this.drawn(widget, view),
+      settings: this.settingsOf(widget), boardTheme: this.boardTheme(),
+    };
+    this.dialog.open<ChartSettings | undefined, ChartSettingsData>(ChartSettingsPanel, sidePanelConfig(data, 'wide'))
+      .closed.subscribe(settings => { if (settings) this.saveChartSettings(widget, settings); });
+  }
+
+  /** Opens "Choose a chart" for a tile: every kind, drawn from the tile's own result as it is hovered. */
+  openKindPicker(widget: DashboardWidget, view: WidgetView): void {
+    const data: KindPickerData = {
+      title: widget.widgetTitle, view, kind: this.drawn(widget, view),
+      settings: this.settingsOf(widget), boardTheme: this.boardTheme(),
+    };
+    this.dialog.open<string | undefined, KindPickerData>(KindPickerPanel, sidePanelConfig(data, 'wide'))
+      .closed.subscribe(kind => { if (kind) this.setVisualization(widget, kind); });
+  }
+
+  private saveChartSettings(widget: DashboardWidget, settings: ChartSettings): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (!id) return;
+    const widgetConfig = widgetConfigString({ ...widgetConfigOf(widget), chart: settings });
+    if (widgetConfig === (widget.widgetConfig ?? null)) return;
+    this.widgetError.set('');
+    this.analytics.saveWidget({ ...widget, widgetConfig }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.widgetError.set(response.message || 'Those chart settings could not be saved.');
+          return;
+        }
+        const saved = response.data;
+        this.board.update(board => board ? {
+          ...board,
+          widgets: (board.widgets ?? []).map(item =>
+            item.analyticsDashboardWidgetId === id ? { ...item, ...saved } : item),
+        } : board);
+      },
+      error: err => this.widgetError.set(err?.error?.message || 'Those chart settings could not be saved.'),
+    });
+  }
+
+  // ---- the add form's preview ---------------------------------------------------------------
+
+  /** The chosen source, run once so the picker can say what fits and draw what is hovered. */
+  readonly addPreview = signal<WidgetRun | null>(null);
+  private previewRun: Subscription | null = null;
+
+  /**
+   * Picks the source a new widget points at, and runs it ONCE for the picker's preview. One
+   * query, the same one the tile will run when it is added -- and not run at all until a source
+   * is chosen.
+   */
+  chooseAddSource(id: string): void {
+    this.addSourceId.set(id);
+    this.previewRun?.unsubscribe();
+    this.previewRun = null;
+    const sourceId = Number(id);
+    if (!id || !Number.isFinite(sourceId) || sourceId <= 0) { this.addPreview.set(null); return; }
+    const probe: DashboardWidget = {
+      analyticsDashboardId: this.board()?.analyticsDashboardId ?? 0, widgetTitle: 'Preview',
+      analyticsAnalysisId: this.addKindOfSource() === 'analysis' ? sourceId : null,
+      analyticsQueryId: this.addKindOfSource() === 'query' ? sourceId : null,
+    };
+    this.addPreview.set({ state: 'running', error: '', view: null, queryId: '' });
+    this.previewRun = this.runSource(probe, mintQueryId(0), run => {
+      this.addPreview.set(run);
+      this.previewRun = null;
+      // A kind the new result cannot carry is not left chosen: the form falls back to the table.
+      if (run.view?.issues[this.addVisualization()]) this.addVisualization.set('table');
     });
   }
 
@@ -2353,14 +2521,22 @@ export class Dashboards implements OnInit, OnDestroy {
   private run(widget: DashboardWidget, id: number, epoch: number): void {
     const queryId = mintQueryId(id);
     this.mark(id, { state: 'running', error: '', view: null, queryId });
+    this.inFlight = this.runSource(widget, queryId, run => this.settle(id, epoch, run));
+  }
 
+  /**
+   * Runs what a widget points at and hands the outcome to `done`: a view, or the reason there is
+   * none. The board's queue and the add form's preview both run a source through here, so a
+   * preview is the same question, with the same filters, as the tile it would become.
+   */
+  private runSource(widget: DashboardWidget, queryId: string, done: (run: WidgetRun) => void): Subscription | null {
     if (widget.analyticsAnalysisId) {
       const saved = this.analyses().find(
         item => item.analyticsAnalysisId === widget.analyticsAnalysisId);
       if (!saved) {
-        this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+        done({ state: 'failed', view: null, queryId: '',
           error: 'The saved analysis this widget points at is not in this workspace.' });
-        return;
+        return null;
       }
       let config: SavedAnalysisConfig;
       try {
@@ -2369,9 +2545,9 @@ export class Dashboards implements OnInit, OnDestroy {
         // Nothing is sent. A configuration that will not parse cannot be half-applied into a
         // request: a tile running the dimensions without the filters would answer a different
         // question under the same title.
-        this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+        done({ state: 'failed', view: null, queryId: '',
           error: `"${saved.analysisName}" cannot be run: its saved configuration is not readable.` });
-        return;
+        return null;
       }
       const aggregation = config.measure?.aggregation ?? 'COUNT_ROWS';
       const request: AnalysisRequest = {
@@ -2395,14 +2571,14 @@ export class Dashboards implements OnInit, OnDestroy {
       if (config.grains && config.grains.some(grain => !!grain)) {
         request.grains = config.grains;
       }
-      this.inFlight = this.analytics.analyze(request).subscribe({
+      return this.analytics.analyze(request).subscribe({
         next: response => {
           if (response.status !== API_SUCCESS || !response.data) {
-            this.settle(id, epoch, { state: 'failed', view: null, queryId,
+            done({ state: 'failed', view: null, queryId,
               error: response.message || 'That analysis could not be run.' });
             return;
           }
-          this.settle(id, epoch, { state: 'done', error: '', queryId,
+          done({ state: 'done', error: '', queryId,
             view: analysisView(response.data, aggregation, {
               sortedBy: config.sort?.by ?? 'MEASURE',
               // The direction travels with the axis. Without it a dimension sorted Z-A looked
@@ -2416,20 +2592,20 @@ export class Dashboards implements OnInit, OnDestroy {
             }) });
         },
         error: err => {
-          this.settle(id, epoch, { state: 'failed', view: null, queryId,
+          done({ state: 'failed', view: null, queryId,
             error: err?.error?.message || 'That analysis could not be run.' });
         },
       });
-      return;
+      return null;
     }
 
     const saved = this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
     if (!saved) {
-      this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+      done({ state: 'failed', view: null, queryId: '',
         error: 'The saved query this widget points at is not in this workspace.' });
-      return;
+      return null;
     }
-    this.inFlight = this.analytics.query({
+    return this.analytics.query({
       connection: saved.connectionAlias,
       path: saved.datasetPath,
       sql: saved.queryText,
@@ -2446,15 +2622,15 @@ export class Dashboards implements OnInit, OnDestroy {
     }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
-          this.settle(id, epoch, { state: 'failed', view: null, queryId,
+          done({ state: 'failed', view: null, queryId,
             error: response.message || 'That query could not be run.' });
           return;
         }
-        this.settle(id, epoch, { state: 'done', error: '', queryId,
+        done({ state: 'done', error: '', queryId,
           view: queryView(response.data) });
       },
       error: err => {
-        this.settle(id, epoch, { state: 'failed', view: null, queryId,
+        done({ state: 'failed', view: null, queryId,
           error: err?.error?.message || 'That query could not be run.' });
       },
     });

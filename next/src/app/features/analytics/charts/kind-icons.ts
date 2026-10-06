@@ -1,0 +1,62 @@
+import type { WidgetVisualization } from '../analytics.service';
+
+/**
+ * A small line glyph per chart kind, for the picker: one SVG path on a 24-unit box, drawn in
+ * currentColor so it follows the button's text in both themes. A `M x y h0` subpath with round
+ * caps is a dot.
+ *
+ * @author Nabeel Ahmed
+ */
+export const KIND_ICONS: Record<WidgetVisualization, string> = {
+  kpi: 'M5 9l2-1v9M10 9h4l-4 8M16 8h3l-2 4c2 0 2 5-1 5',
+  table: 'M4 6h16v12H4zM4 10h16M4 14h16M10 6v12',
+  pivot: 'M4 6h16v12H4zM4 10h16M9 6v12M14 10v8',
+  comparison: 'M7 18V9M17 18V5M4 18h16',
+  ranked: 'M4 6h15M4 10h11M4 14h7M4 18h4',
+  rankedShare: 'M4 6h11M4 10h8M4 14h5M18 6h2M18 10h2M18 14h2',
+  bar: 'M6 18v-6M10 18V8M14 18V9M18 18v-4M4 18h16',
+  stacked: 'M5 18V9h4v9M5 13h4M11 18V6h4v12M11 11h4M17 18v-7h4v7M17 14h4',
+  shareStacked: 'M5 6h4v12H5zM5 11h4M11 6h4v12h-4zM11 14h4M17 6h4v12h-4zM17 9h4',
+  groupedBar: 'M5 18v-8M8 18v-5M12 18V7M15 18V9M19 18v-6M4 18h16',
+  barH: 'M4 5v14M4 7h12M4 11h16M4 15h8',
+  waterfall: 'M5 18v-6M9 12V8M13 8v3M17 11v7M4 18h16',
+  pareto: 'M5 18V9M9 18v-6M13 18v-3M17 18v-2M5 9l4-3 4-1 6-1',
+  barLine: 'M6 18v-6M11 18V9M16 18v-5M4 10l5 3 5-6 6 2',
+  polarBar: 'M5 12a7 7 0 1 0 14 0a7 7 0 1 0-14 0M12 5v7l5 3',
+  pictorialBar: 'M6 18h0M6 15h0M6 12h0M12 18h0M12 15h0M12 12h0M12 9h0M18 18h0M18 15h0',
+  line: 'M4 16l5-5 4 3 7-7',
+  area: 'M4 18v-4l5-5 4 3 7-6v12z',
+  cumulative: 'M4 18l4-2 4-3 4-4 4-5',
+  lineSmooth: 'M4 16c3 0 4-8 8-8s5 6 8 2',
+  lineStep: 'M4 16h4v-5h5v3h4V7h3',
+  lineMarkers: 'M4 15l5-6 4 4 7-7M9 9h0M20 6h0M4 12h16',
+  areaStacked: 'M4 18v-6l5-3 5 2 6-4v11zM4 15l5-2 5 2 6-3',
+  areaShare: 'M4 6h16v12H4zM4 12l5-2 5 3 6-4',
+  donut: 'M12 4a8 8 0 1 0 8 8M12 4v4a4 4 0 1 0 4 4h4',
+  rose: 'M12 12V3a9 9 0 0 1 6 3zM12 12l7 2a7 7 0 0 1-4 5zM12 12l-3 5a5 5 0 0 1-3-6z',
+  halfDonut: 'M4 16a8 8 0 0 1 16 0h-4a4 4 0 0 0-8 0z',
+  nestedPie: 'M12 3a9 9 0 1 0 9 9M12 7a5 5 0 1 0 5 5h-5z',
+  scatter: 'M6 16h0M9 11h0M13 13h0M16 7h0M18 10h0',
+  scatterTrend: 'M6 15h0M9 13h0M13 10h0M16 9h0M18 6h0M4 18L20 5',
+  bubble: 'M5 14a3 3 0 1 0 6 0a3 3 0 1 0-6 0M14 8a2 2 0 1 0 4 0a2 2 0 1 0-4 0M16 16a1 1 0 1 0 2 0a1 1 0 1 0-2 0',
+  effectScatter: 'M10 12a2 2 0 1 0 4 0a2 2 0 1 0-4 0M6 12a6 6 0 1 0 12 0a6 6 0 1 0-12 0M4 19h0M20 5h0',
+  histogram: 'M4 18v-4h3V9h3V6h3v5h3v4h3v3',
+  boxplot: 'M6 4v4M6 16v4M3 8h6v8H3zM3 12h6M16 6v3M16 15v3M13 9h6v6h-6zM13 12h6',
+  density: 'M3 18c4 0 5-12 9-12s5 12 9 12',
+  treemap: 'M4 4h16v16H4zM12 4v16M12 12h8M4 14h8',
+  sunburst: 'M9 12a3 3 0 1 0 6 0a3 3 0 1 0-6 0M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M12 3v6M21 12h-6',
+  tree: 'M4 12h4M8 6v12M8 6h5M8 12h5M8 18h5M17 6h3M17 12h3M17 18h3',
+  sankey: 'M4 6c8 0 8 8 16 8M4 10c8 0 8 8 16 8M4 16c8 0 8-10 16-10',
+  chord: 'M3 12a9 9 0 1 0 18 0a9 9 0 1 0-18 0M5 8c5 3 9 3 14 8M5 16c5-4 9-6 14-8',
+  heatmap: 'M4 4h5v5H4zM10 4h5v5h-5zM16 4h4v5h-4zM4 10h5v5H4zM10 10h5v5h-5zM16 10h4v5h-4zM4 16h5v4H4zM10 16h5v4h-5z',
+  calendar: 'M4 6h16v14H4zM4 10h16M8 4v4M16 4v4M8 14h0M12 14h0M16 14h0M8 17h0M12 17h0',
+  funnel: 'M3 5h18l-6 7v6l-6 2v-8z',
+  gauge: 'M4 17a8 8 0 1 1 16 0M12 17l4-5',
+  radar: 'M12 3l8 6-3 10H7L4 9zM12 8l4 3-1.5 5h-5L8 11z',
+  parallel: 'M5 4v16M12 4v16M19 4v16M5 7l7 8 7-6M5 14l7-6 7 9',
+  themeRiver: 'M3 12c4-6 8 2 18-4M3 15c5-3 9 3 18-1M3 18c6-2 10 1 18 0',
+  candlestick: 'M7 4v4M7 16v4M5 8h4v8H5zM17 6v3M17 15v3M15 9h4v6h-4z',
+  dimensionSummary: 'M5 7h14M5 12h10M5 17h6',
+  trendSummary: 'M5 7h14M5 12h10M14 18l2-3 3 1',
+  distributionSummary: 'M5 7h14M5 12h10M5 18c3-3 6-3 9 0',
+};

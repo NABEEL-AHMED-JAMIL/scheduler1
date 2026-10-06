@@ -147,8 +147,9 @@ test('the picker offers every kind, and disables the ones this result cannot hon
     // failed on whatever change happened to run next and read as that change's regression.
     expect(kinds.map(kind => kind.value)).toEqual(KIND_IDS);
     const enabled = kinds.filter(kind => !kind.disabled).map(kind => kind.value);
-    // One row, one column, no dimension: a single figure and a table, and nothing else honestly.
-    expect(enabled.sort()).toEqual(['kpi', 'table']);
+    // One row, one column, no dimension: a single figure, a table, and a gauge (one figure against
+    // a target, ECharts, 2026-10-06) -- and nothing else honestly.
+    expect(enabled.sort()).toEqual(['gauge', 'kpi', 'table']);
   });
 
 test('a single-figure tile draws the figure, and says it showed one row', async ({ page }) => {

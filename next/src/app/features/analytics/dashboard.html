@@ -124,6 +124,15 @@
             } @else if (widgets().length) {
               <button type="button" class="btn btn-primary btn-sm" (click)="runAll()"><app-icon name="refresh" />Run every widget</button>
             }
+            <!-- The theme every tile draws in. Stored on the board; choosing one runs nothing. -->
+            <button type="button" class="btn btn-ghost btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
+            <ng-template #themeMenu>
+              <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
+                <p class="px-2 pt-1 pb-2 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-muted)]">Chart theme for every widget</p>
+                <app-theme-picker label="Chart theme for every widget" [value]="boardTheme() ?? 'console'" (changed)="setBoardTheme($event === 'console' ? null : $event)" />
+                <p class="px-2 pt-2 text-[11px] text-[color:var(--text-muted)]">A widget can override it in its Chart settings. Colours are held to 3:1 against the card in light and dark.</p>
+              </div>
+            </ng-template>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
             <ng-template #boardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
@@ -190,17 +199,13 @@
                   <option value="query" [selected]="addKindOfSource() === 'query'">A saved query</option>
                 </select></app-field>
               <app-field label="Which one" for="w-source" [required]="true">
-                <select id="w-source" class="input w-full" [value]="addSourceId()" (change)="addSourceId.set($any($event.target).value)">
+                <select id="w-source" class="input w-full" [value]="addSourceId()" (change)="chooseAddSource($any($event.target).value)">
                   <option value="" [selected]="!addSourceId()">Pick one…</option>
                   @if (addKindOfSource() === 'analysis') {
                     @for (item of analyses(); track item.analyticsAnalysisId) { <option [value]="item.analyticsAnalysisId">{{ item.analysisName }}</option> }
                   } @else {
                     @for (item of queries(); track item.analyticsQueryId) { <option [value]="item.analyticsQueryId">{{ item.queryName }}</option> }
                   }
-                </select></app-field>
-              <app-field label="Drawn as" for="w-viz">
-                <select id="w-viz" class="input" [value]="addVisualization()" (change)="addVisualization.set($any($event.target).value)">
-                  @for (kind of kinds; track kind.id) { <option [value]="kind.id" [selected]="kind.id === addVisualization()">{{ kind.label }}</option> }
                 </select></app-field>
               <app-field label="Height" for="w-height">
                 <input id="w-height" class="input" type="number" placeholder="180" [class.input-invalid]="!!heightError()"
@@ -209,6 +214,26 @@
                 @if (heightError()) { <p id="w-height-error" class="field-note text-crit-500">{{ heightError() }}</p> }
               </app-field>
               <app-field label="Caption" for="w-caption" hint="Optional."><input id="w-caption" class="input" placeholder="What the reader should take from it" [value]="addCaption()" (input)="addCaption.set($any($event.target).value)" /></app-field>
+            </div>
+            <!-- The chart, chosen with the source's own result drawn in the kind under the pointer.
+                 Picking a source runs it once for this; nothing is run before one is picked. -->
+            <div class="flex flex-col gap-1.5 min-w-0">
+              <span class="label">Drawn as</span>
+              <app-kind-picker [issues]="addPreview()?.view?.issues ?? null" [selected]="addVisualization()" [preview]="addPreviewTemplate"
+                               (chosen)="addVisualization.set($any($event))" />
+              <ng-template #addPreviewTemplate let-kind>
+                @if (addPreview(); as preview) {
+                  @if (preview.view) {
+                    <app-widget-chart [view]="preview.view" [kind]="kind" [boardTheme]="boardTheme()" [height]="220" />
+                  } @else if (preview.error) {
+                    <p class="text-xs text-crit-500">{{ preview.error }}</p>
+                  } @else {
+                    <p class="text-xs text-[color:var(--text-muted)]"><app-icon name="refresh" size="0.9em" class="spin" /> Running it once to preview…</p>
+                  }
+                } @else {
+                  <p class="text-xs text-[color:var(--text-muted)]">Pick what it shows, above, and its result is drawn here in the chart under the pointer.</p>
+                }
+              </ng-template>
             </div>
             <div class="form-actions">
               <button type="button" class="btn btn-ghost btn-sm" (click)="addOpen.set(false)">Cancel</button>
@@ -245,9 +270,13 @@
                          list, inert, with the reason under it. -->
                     <div cdkMenu class="card shadow-xl py-1 w-72 max-h-[70vh] overflow-y-auto text-sm">
                       @if (run?.view; as view) {
+                        <button cdkMenuItem class="menu-item dash-choose" (cdkMenuItemTriggered)="openKindPicker(widget, view)"><app-icon name="chart" />Choose a chart, with a preview…</button>
+                        <button cdkMenuItem class="menu-item dash-settings" (cdkMenuItemTriggered)="openChartSettings(widget, view)"><app-icon name="settings" />Chart settings…</button>
+                        <div class="my-1 border-t border-subtle"></div>
                         <p class="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-muted)]" [id]="'kinds-' + widget.analyticsDashboardWidgetId">Show as</p>
                         <div cdkMenuGroup [attr.aria-labelledby]="'kinds-' + widget.analyticsDashboardWidgetId">
-                          @for (kind of kinds; track kind.id) {
+                          @for (kind of kinds; track kind.id; let at = $index) {
+                            @if (startsCategory(at)) { <p class="px-3 pt-2 pb-0.5 text-[11px] text-[color:var(--text-muted)]" aria-hidden="true">{{ kind.category }}</p> }
                             <button cdkMenuItemRadio class="menu-item items-start dash-kind" [attr.data-kind]="kind.id"
                                     [cdkMenuItemChecked]="kind.id === drawn(widget, view)" [cdkMenuItemDisabled]="!!view.issues[kind.id]" [disabled]="!!view.issues[kind.id]"
                                     [title]="view.issues[kind.id] || kind.label" (cdkMenuItemTriggered)="setVisualization(widget, kind.id)">
@@ -271,7 +300,8 @@
                   @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
                   @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
                   <div [class.dash-rows-open]="isExpanded(widget)">
-                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)" />
+                    <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)"
+                                      [settings]="settingsOf(widget)" [boardTheme]="boardTheme()" [interactive]="true" [name]="widget.widgetTitle" />
                   </div>
                   @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
                 }

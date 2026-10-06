@@ -23,7 +23,16 @@ import { WrapToggle } from '../../shared/ui/wrap-toggle';
 import { capTitle } from '../../shared/ui/long-text';
 import { shortLabel } from '../../shared/charts/short-label';
 import { WRAPPED_LINES } from './widget-table';
-import { DatasetRegistry } from './dashboard';
+import { DatasetRegistry, WidgetView, queryView } from './dashboard';
+import { WidgetChart } from './widget-chart';
+import { KINDS, kindInfo } from './widget-kinds';
+import { KindPicker } from './charts/kind-picker';
+import { ChartSettings, parseSettings } from './charts/chart-settings';
+import { ChartSettingsData, ChartSettingsPanel } from './charts/chart-settings-panel';
+import { ThemePicker } from '../../shared/charts/echart/theme-picker';
+import { ChartPalette } from '../../shared/charts/echart/chart-palette';
+import { themeLabel } from '../../shared/charts/echart/echart-theme';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { DatasetOverview } from './dataset-overview';
 import {
   FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, isDateType,
@@ -609,6 +618,7 @@ export const CANVAS_WRAP_KEY = 'result:canvas';
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
     CdkMenu, CdkMenuItem, CdkMenuTrigger, DataText, WrapToggle,
+    WidgetChart, KindPicker, ThemePicker, ChartPalette,
   ],
   templateUrl: './analytics.html',
   host: { '(document:keydown.escape)': 'onEscape()' },
@@ -2888,6 +2898,88 @@ export class Analytics implements OnInit {
   });
 
   readonly chartDrawn = computed(() => !!this.result() && !!this.chartKind());
+
+  // ---- the ECharts kinds, the theme and the chart settings ---------------------------------
+
+  /** Every kind drawn by ECharts: offered under "More chart types" beside the four above. */
+  readonly echartKinds = KINDS.filter(kind => kind.engine === 'echarts');
+
+  /**
+   * The result as a board tile would read it, with the label and value columns chosen here
+   * moved to the front and the back -- which is where a saved query's reading looks for them --
+   * so a kind drawn from it is of the columns the pickers name.
+   */
+  readonly studioView = computed<WidgetView | null>(() => {
+    const result = this.result();
+    if (!result?.columns?.length) return null;
+    const label = this.labelColumn()?.index;
+    const value = this.valueColumn()?.index;
+    const order = result.columns.map((_, i) => i).filter(i => i !== label && i !== value);
+    const at = [...(label !== undefined ? [label] : []), ...order, ...(value !== undefined ? [value] : [])];
+    return queryView({
+      ...result,
+      columns: at.map(i => result.columns[i]),
+      rows: (result.rows ?? []).map(row => at.map(i => row[i] ?? null)),
+    });
+  });
+
+  readonly echartIssues = computed(() => this.studioView()?.issues ?? null);
+  /** An ECharts kind chosen in "More chart types", which then draws instead of the four. */
+  readonly echartChoice = signal<string | null>(null);
+  /** The kind under the pointer in that picker: drawn in place of the chart while it is hovered. */
+  readonly echartHover = signal<string | null>(null);
+
+  /** The ECharts kind on screen now -- hovered, else chosen -- when the result can carry it. */
+  readonly echartShown = computed(() => {
+    const view = this.studioView();
+    const kind = this.echartHover() ?? this.echartChoice();
+    return view && kind && kindInfo(kind)?.engine === 'echarts' && !view.issues[kind as keyof WidgetView['issues']] ? kind : null;
+  });
+
+  chooseClassicKind(id: ChartKind): void {
+    this.chartKindName.set(id);
+    this.echartChoice.set(null);
+  }
+
+  /** The Studio's chart theme and settings: this viewer's, kept in the browser for next time. */
+  private static readonly CHART_PREFS = 'etl_studio_chart';
+  private readonly chartPrefs = (() => {
+    try {
+      const raw = JSON.parse(localStorage.getItem(Analytics.CHART_PREFS) ?? '{}');
+      return { theme: typeof raw?.theme === 'string' ? raw.theme as string : null, settings: parseSettings(raw?.settings) };
+    } catch {
+      return { theme: null, settings: {} as ChartSettings };
+    }
+  })();
+  readonly chartTheme = signal<string | null>(this.chartPrefs.theme);
+  readonly chartSettings = signal<ChartSettings>(this.chartPrefs.settings);
+  readonly chartThemeLabel = computed(() => themeLabel(this.chartTheme()));
+
+  private saveChartPrefs(): void {
+    try {
+      localStorage.setItem(Analytics.CHART_PREFS, JSON.stringify({ theme: this.chartTheme(), settings: this.chartSettings() }));
+    } catch { /* storage refused: the choice lasts this page */ }
+  }
+
+  setChartTheme(theme: string | null): void {
+    this.chartTheme.set(theme === 'console' ? null : theme);
+    this.saveChartPrefs();
+  }
+
+  openStudioChartSettings(): void {
+    const view = this.studioView();
+    if (!view) return;
+    const data: ChartSettingsData = {
+      title: this.chartCaption() || 'Chart', view, kind: this.echartShown() ?? this.chartKind() ?? 'table',
+      settings: this.chartSettings(), boardTheme: this.chartTheme(),
+    };
+    this.dialog.open<ChartSettings | undefined, ChartSettingsData>(ChartSettingsPanel, sidePanelConfig(data, 'wide'))
+      .closed.subscribe(settings => {
+        if (!settings) return;
+        this.chartSettings.set(settings);
+        this.saveChartPrefs();
+      });
+  }
 
   /**
    * The editor has moved on from the statement this chart is of.

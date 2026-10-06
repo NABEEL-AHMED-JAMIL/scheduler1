@@ -755,7 +755,8 @@ describe('the chart kind a tile falls back to', () => {
   });
 
   it('treats a visualization it does not recognise as a table rather than as an error', () => {
-    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'treemap' })] });
+    // 'treemap' was the unknown word here until it became a kind (ECharts, 2026-10-06).
+    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'hologram' })] });
     harness.board.openDashboard(BOARD);
     harness.finishAnalysis();
     const view = harness.runOf(100).view!;

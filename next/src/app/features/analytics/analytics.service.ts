@@ -698,6 +698,12 @@ export interface Dashboard {
   analyticsDashboardId?: number;
   dashboardName: string;
   dashboardDescription?: string | null;
+  /**
+   * The board's presentation settings as JSON -- today only the chart theme every tile draws in
+   * (charts/chart-settings.ts, BoardSettings). The server keeps the row's value when this is
+   * absent from a save, so a client that never heard of it cannot clear it by renaming the board.
+   */
+  dashboardConfig?: string | null;
   dateCreated?: string;
   dateUpdated?: string;
   createdByName?: string;
@@ -722,7 +728,27 @@ export type WidgetVisualization =
   | 'table' | 'ranked' | 'rankedShare' | 'bar' | 'donut'
   | 'kpi' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
   | 'comparison' | 'pivot' | 'groupedBar'
-  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
+  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary'
+  | EChartKind;
+
+/**
+ * The kinds app-echart draws (widget-kinds.ts lists them with their categories). Each id is well
+ * under the column's 32 characters, and analytics-service stores any string that fits, so adding
+ * one needs no server change.
+ */
+export type EChartKind =
+  | 'barH' | 'waterfall' | 'pareto' | 'barLine' | 'polarBar' | 'pictorialBar'
+  | 'lineSmooth' | 'lineStep' | 'lineMarkers' | 'areaStacked' | 'areaShare'
+  | 'rose' | 'halfDonut' | 'nestedPie'
+  | 'scatterTrend' | 'bubble' | 'effectScatter'
+  | 'boxplot' | 'density'
+  | 'treemap' | 'sunburst' | 'tree'
+  | 'sankey' | 'chord'
+  | 'heatmap' | 'calendar'
+  | 'funnel' | 'gauge' | 'radar' | 'parallel' | 'themeRiver' | 'candlestick';
+
+/** The kinds drawn by the console's own SVG components: every kind that existed before ECharts. */
+export type ClassicKind = Exclude<WidgetVisualization, EChartKind>;
 
 /**
  * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.
@@ -1098,6 +1124,8 @@ export class AnalyticsService {
       body['dashboardDescription'] = dashboard.dashboardDescription;
     }
     if (dashboard.analyticsDashboardId) body['analyticsDashboardId'] = dashboard.analyticsDashboardId;
+    // Absent means "leave it as stored"; null or an empty string clears it.
+    if (dashboard.dashboardConfig !== undefined) body['dashboardConfig'] = dashboard.dashboardConfig ?? '';
     return this.http.post<ApiResponse<Dashboard>>(`${this.workspace}/saveDashboard`, body);
   }
 

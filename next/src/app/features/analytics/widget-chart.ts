@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { BarChart, Bar, BarSegment } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
 import { readableCell } from '../../shared/charts/number-format';
@@ -13,8 +13,14 @@ import { chartColor } from '../../shared/charts/status-color';
 import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
 import { WidgetTable } from './widget-table';
 import { DataText } from '../../shared/ui/data-text';
-import { KINDS } from './widget-kinds';
-import type { PivotGrid, WidgetVisualization } from './analytics.service';
+import { KINDS, kindInfo } from './widget-kinds';
+import type { EChartKind, PivotGrid, WidgetVisualization } from './analytics.service';
+import { EChart } from '../../shared/charts/echart/echart';
+import { ChartPalette } from '../../shared/charts/echart/chart-palette';
+import { ChartThemes } from '../../shared/charts/echart/chart-themes';
+import { CONSOLE_THEME } from '../../shared/charts/echart/echart-theme';
+import { ChartSettings } from './charts/chart-settings';
+import { optionFor } from './charts/chart-options';
 import type { Mark, WidgetView } from './dashboard';
 
 /** How many rows a tile's table shows; the rest are one click away. */
@@ -31,14 +37,19 @@ export const WIDGET_HEIGHT_MAX = 600;
  */
 @Component({
   selector: 'app-widget-chart',
-  imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText],
+  imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText, EChart, ChartPalette],
   template: `
     @if (view(); as v) {
       <!-- In a row layout a compact kind (a figure, a ring, ranked bars, a summary) is capped and
            the figure is centred; a table, a line or a bar chart takes the whole row. Without this
            a donut's legend sat at the far right of a 950px tile and a single figure read like the
            first cell of an empty table. -->
-      <div [class]="shell()">
+      <!-- The SVG kinds read --chart-N; a named theme re-points those on this element alone. -->
+      <div [class]="shell()" [appChartPalette]="theme().id" [paletteOrder]="settings().colors?.order">
+      @if (echartKind(); as kind) {
+        <app-echart [option]="echartOption()" [theme]="theme().ref" [renderer]="settings().renderer ?? 'canvas'"
+                    [height]="height()" [label]="chartLabel()" [attr.data-kind]="kind" />
+      } @else {
       @switch (drawn()) {
         @case ('kpi') {
           <app-kpi-card [value]="kpiValue(v)" [label]="measureName(v)" [caption]="kpiCaption(v)"
@@ -111,6 +122,7 @@ export const WIDGET_HEIGHT_MAX = 600;
         @case ('donut') { <app-donut [data]="v.marks" [totalLabel]="''" [format]="figure" /> }
         @default { <app-widget-table [columns]="v.columns" [rows]="tileRows(v)" [measureColumn]="v.measureColumn" /> }
       }
+      }
       </div>
     }
   `,
@@ -127,9 +139,39 @@ export class WidgetChart {
   readonly maxRows = input(WIDGET_ROWS);
   /** 'tile' in a grid cell; 'row' when the widget has a whole row and compact kinds should not sprawl. */
   readonly layout = input<'tile' | 'row'>('tile');
+  /** The widget's "Chart settings" (charts/chart-settings.ts). Empty draws every default. */
+  readonly settings = input<ChartSettings>({});
+  /** The board's theme; the widget's own `settings.colors.theme` wins over it. */
+  readonly boardTheme = input<string | null | undefined>(null);
+  /** Whether the ECharts toolbox (save as PNG, data view, restore zoom) is offered. */
+  readonly interactive = input(false);
+  /** What a saved image and the data view are called. */
+  readonly name = input('');
+
+  private readonly themes = inject(ChartThemes);
+
+  /** The theme this chart draws in, resolved for the mode on screen. */
+  readonly theme = computed(() =>
+    this.themes.resolve(this.settings().colors?.theme ?? this.boardTheme() ?? CONSOLE_THEME, this.settings().colors?.order));
+
+  /** The kind, when app-echart draws it. */
+  readonly echartKind = computed<EChartKind | null>(() => {
+    const kind = this.drawn();
+    return kindInfo(kind)?.engine === 'echarts' ? kind as EChartKind : null;
+  });
+
+  readonly echartOption = computed(() => {
+    const kind = this.echartKind();
+    if (!kind) return null;
+    const theme = this.theme();
+    return optionFor(this.view(), kind, this.settings(), { palette: theme.palette, tokens: theme.tokens },
+      { interactive: this.interactive(), name: this.name() });
+  });
+
+  readonly chartLabel = computed(() => `${kindInfo(this.drawn())?.label ?? 'Chart'}: ${this.measureName(this.view())} by ${this.dimensionName(this.view())}`);
 
   /** The kinds that read best at a bounded width, however wide the row is. */
-  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary']);
+  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary', 'gauge', 'halfDonut', 'rose', 'funnel', 'radar']);
 
   /** The wrapper's classes for the layout: a cap on compact kinds in a row, nothing otherwise. */
   readonly shell = computed(() => {
