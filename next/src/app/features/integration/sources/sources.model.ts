@@ -184,7 +184,8 @@ export interface ValidationResult {
   validationId?: number | null;
 }
 
-export interface TemplateRow { code: string; direction: string; description?: string | null; schema?: unknown; example?: unknown; }
+/** A contract template: group is generic (listed first) or example (a full contract for one domain). */
+export interface TemplateRow { code: string; direction: string; group?: 'generic' | 'example' | null; description?: string | null; schema?: unknown; example?: unknown; }
 
 export const isSchemaReadOnly = (c: Pick<ContractRow, 'system'>) => !!c.system;
 

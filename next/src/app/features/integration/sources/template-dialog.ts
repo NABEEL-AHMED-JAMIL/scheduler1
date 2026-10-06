@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -16,10 +16,14 @@ export interface TemplateDialogData {
   tenants?: ComboboxOption[];
 }
 
+/** The templates of one group, as the dialog lists them. */
+export interface TemplateGroup { key: string; label: string; hint: string; templates: TemplateRow[]; }
+
 /**
- * The contracts a workspace may install (MIG-233): wound_intake and wound_result. Installing makes the template the
- * workspace's own contract with v1 active; the service refuses a name the workspace already has. Closes with whether
- * anything was installed.
+ * The contracts a workspace may install (MIG-233): the generic ones first (record_intake, image_measurement_result),
+ * then the examples for one domain (wound_intake, wound_result). Installing makes the template the workspace's own
+ * contract with v1 active; the service refuses a name the workspace already has. Closes with whether anything was
+ * installed.
  */
 @Component({
   selector: 'app-template-dialog',
@@ -39,25 +43,33 @@ export interface TemplateDialogData {
         @if (loading()) {
           <p class="text-sm text-[color:var(--text-muted)]" role="status">Loading…</p>
         }
-        <ul class="flex flex-col gap-2">
-          @for (t of templates(); track t.code) {
-            <li class="card p-3 flex items-start gap-3">
-              <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
-              <div class="min-w-0 flex-1">
-                <p class="font-medium mono">{{ t.code }}</p>
-                <p class="text-xs text-[color:var(--text-muted)]">{{ directionText(t.direction) }}</p>
-                @if (t.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ t.description }}</p> }
-              </div>
-              @if (isInstalled(t.code)) {
-                <span class="pill pill-ok shrink-0"><app-icon name="check" size="0.85em" />Installed</span>
-              } @else {
-                <button type="button" class="btn btn-primary btn-sm shrink-0" [disabled]="installing() === t.code" [attr.aria-label]="'Install ' + t.code" (click)="install(t.code)">
-                  @if (installing() === t.code) { <app-icon name="refresh" class="spin" /> }Install
-                </button>
+        @for (g of groups(); track g.key) {
+          <section class="flex flex-col gap-2" [attr.aria-labelledby]="'tplGroup-' + g.key">
+            <div>
+              <h3 class="font-medium" [id]="'tplGroup-' + g.key">{{ g.label }}</h3>
+              <p class="text-xs text-[color:var(--text-muted)]">{{ g.hint }}</p>
+            </div>
+            <ul class="flex flex-col gap-2">
+              @for (t of g.templates; track t.code) {
+                <li class="card p-3 flex items-start gap-3">
+                  <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
+                  <div class="min-w-0 flex-1">
+                    <p class="font-medium mono">{{ t.code }}</p>
+                    <p class="text-xs text-[color:var(--text-muted)]">{{ directionText(t.direction) }}</p>
+                    @if (t.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ t.description }}</p> }
+                  </div>
+                  @if (isInstalled(t.code)) {
+                    <span class="pill pill-ok shrink-0"><app-icon name="check" size="0.85em" />Installed</span>
+                  } @else {
+                    <button type="button" class="btn btn-primary btn-sm shrink-0" [disabled]="installing() === t.code" [attr.aria-label]="'Install ' + t.code" (click)="install(t.code)">
+                      @if (installing() === t.code) { <app-icon name="refresh" class="spin" /> }Install
+                    </button>
+                  }
+                </li>
               }
-            </li>
-          }
-        </ul>
+            </ul>
+          </section>
+        }
         @if (error()) { <p class="text-sm text-crit-500" role="alert">{{ error() }}</p> }
       </div>
     </app-form-dialog>
@@ -71,6 +83,16 @@ export class TemplateDialog {
 
   readonly subtitle = 'A template becomes this workspace\'s own contract, with v1 active. Its schema is the one the platform is built around.';
   readonly templates = signal<TemplateRow[]>([]);
+  /** Generic first, examples after; a template without a group is generic. */
+  readonly groups = computed<TemplateGroup[]>(() => {
+    const all = this.templates();
+    const examples = all.filter(t => t.group === 'example');
+    return [
+      { key: 'generic', label: 'Generic', hint: 'A starting point for any contract: install one, then mark the fields your records must have.',
+        templates: all.filter(t => t.group !== 'example') },
+      { key: 'example', label: 'Examples', hint: 'Complete contracts for one domain, to copy from or install as they are.', templates: examples },
+    ].filter(g => g.templates.length);
+  });
   readonly loading = signal(true);
   readonly error = signal('');
   readonly installing = signal('');

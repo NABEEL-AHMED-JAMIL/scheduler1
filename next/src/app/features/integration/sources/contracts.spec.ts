@@ -38,8 +38,10 @@ function stubApi(overrides: Partial<Record<string, unknown>> = {}) {
       fields: [{ path: 'case_id', type: 'string', nullable: false, required: true }, { path: 'notes', type: 'string', nullable: true, required: false }], sample: { case_id: 'x', notes: null } } })),
     saveContract: vi.fn(() => of({ status: 'SUCCESS', message: 'Data contract saved.', data: { contractId: 1002, version: 1, status: 'ACTIVE' } })),
     templates: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [
-      { code: 'wound_intake', direction: 'IN', description: 'A wound assessment request as a clinic sends it.' },
-      { code: 'wound_result', direction: 'OUT', description: 'What the platform answers for one wound case.' },
+      { code: 'wound_intake', direction: 'IN', group: 'example', description: 'Example (wound care): a wound assessment request.' },
+      { code: 'record_intake', direction: 'IN', group: 'generic', description: 'Any record a system sends in.' },
+      { code: 'wound_result', direction: 'OUT', group: 'example', description: 'Example (wound care): the answer for one case.' },
+      { code: 'image_measurement_result', direction: 'OUT', description: 'One row per measured photo.' },
     ] })),
     install: vi.fn(() => of({ status: 'SUCCESS', message: 'Data contract installed.', data: { contractId: 1003, version: 1, status: 'ACTIVE' } })),
     ...overrides,
@@ -179,7 +181,10 @@ describe('TemplateDialog', () => {
   it('lists the templates, marks the installed ones, and installs another', () => {
     const { api, ref } = setup({ installed: ['wound_intake'] } as TemplateDialogData);
     const d = TestBed.runInInjectionContext(() => new TemplateDialog());
-    expect(d.templates().map(t => t.code)).toEqual(['wound_intake', 'wound_result']);
+    expect(d.groups().map(g => [g.label, g.templates.map(t => t.code)])).toEqual([
+      ['Generic', ['record_intake', 'image_measurement_result']],
+      ['Examples', ['wound_intake', 'wound_result']],
+    ]);
     expect(d.isInstalled('wound_intake')).toBe(true);
     d.install('wound_result');
     expect(api.install).toHaveBeenCalledWith('wound_result', null);
