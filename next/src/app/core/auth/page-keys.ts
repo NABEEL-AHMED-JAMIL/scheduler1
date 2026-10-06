@@ -23,7 +23,10 @@ export type PageKey =
   | 'connector-hub' | 'document-intelligence' | 'document-review'
   | 'ask-data' | 'data-catalog'
   | 'forms' | 'form-submissions'
-  | 'task-inbox' | 'workflow-designer';
+  | 'task-inbox' | 'workflow-designer'
+  // MIG-336: Integration > Developer portal. Unlike every other key, a tenant user without an access profile does not
+  // hold it: the owner keeps the API docs to administrators and developers (EXPLICIT_PAGES in auth.service.ts).
+  | 'developer-portal';
 
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
@@ -61,6 +64,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'form-submissions': 'Submissions',
   'task-inbox': 'Task inbox',
   'workflow-designer': 'Workflow designer',
+  'developer-portal': 'Developer portal',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

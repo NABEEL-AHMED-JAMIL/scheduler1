@@ -111,6 +111,11 @@
             <tr [class.opacity-70]="tenant.status !== 'Active'">
               <td class="max-w-72">
                 <div class="font-medium truncate" [title]="tenant.tenantName">{{ tenant.tenantName }}</div>
+                @if (tenant.sandboxOf) {
+                  <div class="flex items-center gap-1 mt-0.5 text-[11px] text-[color:var(--text-muted)] min-w-0" data-sandbox-of>
+                    <span class="pill pill-info">Sandbox</span><span class="truncate">of {{ sandboxParent(tenant) }}</span>
+                  </div>
+                }
                 <div class="flex items-center gap-1 mt-0.5 min-w-0 text-[11px] text-[color:var(--text-muted)]">
                   <span class="mono truncate">{{ tenant.tenantCode }}</span>
                   <app-copy-button [value]="tenant.tenantCode" [copied]="copiedId() === tenant.tenantId"
@@ -176,6 +181,11 @@
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="apiLimits(tenant)">
                       <app-icon name="zap" />API limits
                     </button>
+                    @if (canMakeSandbox(tenant)) {
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="createSandbox(tenant)" data-create-sandbox>
+                        <app-icon name="terminal" />Create sandbox
+                      </button>
+                    }
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="switchMode(tenant)">
                       <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
                     </button>
@@ -205,6 +215,11 @@
               >
             <div class="min-w-0">
               <h3 class="truncate text-sm font-semibold">{{ tenant.tenantName }}</h3>
+              @if (tenant.sandboxOf) {
+                <div class="flex items-center gap-1 mt-0.5 text-[11px] text-[color:var(--text-muted)] min-w-0" data-sandbox-of>
+                  <span class="pill pill-info">Sandbox</span><span class="truncate">of {{ sandboxParent(tenant) }}</span>
+                </div>
+              }
               <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[color:var(--text-muted)]">
                 <span class="inline-flex items-center gap-1 min-w-0">
                   <span class="mono truncate">{{ tenant.tenantCode }}</span>
@@ -292,6 +307,12 @@
             <button type="button" class="btn btn-ghost btn-sm" (click)="apiLimits(tenant)" title="Rate limits and the monthly quota of its API clients">
               <app-icon name="zap" />API limits
             </button>
+            @if (canMakeSandbox(tenant)) {
+              <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="createSandbox(tenant)"
+                      title="A separate, unbilled workspace for its test keys" data-create-sandbox>
+                <app-icon name="terminal" />Create sandbox
+              </button>
+            }
             <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="switchMode(tenant)"
                     [title]="tenant.managementMode === 'MANAGED' ? 'Let its own administrators build it (signs its people out)' : 'Our team builds it (signs its people out)'">
               <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}

@@ -57,7 +57,12 @@ export interface Tenant {
   adminEmail?: string | null;
   /** MIG-244: who builds the workspace -- its own administrators (SELF) or our team (MANAGED). */
   managementMode?: ManagementMode | null;
+  /** MIG-336: the workspace this one is the sandbox of; null for an ordinary workspace. */
+  sandboxOf?: number | null;
 }
+
+/** MIG-336: the sandbox tenant.json/addSandbox made. */
+export interface SandboxTenant { tenantId: number; tenantName: string; tenantCode: string; status: string; sandboxOf: number }
 
 interface ResourceCount {
   key: keyof Tenant;
@@ -261,6 +266,49 @@ export class Tenants implements OnInit {
   apiLimits(tenant: Tenant): void {
     const data: ApiLimitsDialogData = { tenantId: tenant.tenantId, tenantName: tenant.tenantName };
     this.dialog.open<boolean>(ApiLimitsDialog, { data, hasBackdrop: true });
+  }
+
+  /** MIG-336: "of Northwind" under a sandbox's pill: the workspace it is the sandbox of, by name when it is listed. */
+  sandboxParent(tenant: Tenant): string {
+    const parent = this.tenants().find(t => t.tenantId === tenant.sandboxOf);
+    return parent ? parent.tenantName : `workspace ${tenant.sandboxOf}`;
+  }
+
+  /** MIG-336: a workspace may get a sandbox when it is not one itself and the list shows none of its own yet. */
+  canMakeSandbox(tenant: Tenant): boolean {
+    return !tenant.sandboxOf && !this.tenants().some(t => t.sandboxOf === tenant.tenantId);
+  }
+
+  /**
+   * MIG-336: makes the workspace's sandbox -- a separate, unbilled workspace for its test keys. Identity makes it empty;
+   * our team then seeds it with scripts/sandbox-setup.py.
+   */
+  async createSandbox(tenant: Tenant): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Create a sandbox for ${tenant.tenantName}?`,
+      body: `This makes a separate workspace, ${tenant.tenantName} (sandbox), that is never billed. Its administrators make test `
+        + 'keys for it in API Clients, and those keys work only there. It starts empty: our team then runs '
+        + 'scripts/sandbox-setup.py to give it sample pipelines and data.',
+      confirmLabel: 'Create sandbox',
+    });
+    if (!ok) return;
+    this.busy.set(tenant.tenantId);
+    this.http.post<ApiResponse<SandboxTenant>>(`${API_BASE}/tenant.json/addSandbox`, null,
+      { params: { tenantId: String(tenant.tenantId) } }).subscribe({
+      next: response => {
+        this.busy.set(null);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(response.message || `${response.data?.tenantName ?? 'The sandbox'} is made.`);
+          this.listTenants();
+        } else {
+          this.toast.error(response.message || 'The sandbox could not be made.');
+        }
+      },
+      error: err => {
+        this.busy.set(null);
+        this.toast.error(err?.error?.message || 'The sandbox could not be made.');
+      },
+    });
   }
 
   viewUsers(tenant: Tenant): void {

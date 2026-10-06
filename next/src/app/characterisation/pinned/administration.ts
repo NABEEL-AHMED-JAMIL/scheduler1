@@ -138,6 +138,7 @@ export const PINNED: Record<string, unknown> = {
       "Cards",
       "Copy claude-demo-75a611b4",
       "Copy default",
+      "Create sandbox",
       "Delete Claude Demo 75a611b4",
       "Delete Default",
       "Edit",

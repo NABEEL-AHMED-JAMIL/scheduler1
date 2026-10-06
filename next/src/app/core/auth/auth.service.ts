@@ -9,6 +9,13 @@ import { PageKey } from './page-keys';
 
 const STORAGE_KEY = 'etl_auth_user';
 
+/**
+ * MIG-336: the pages a tenant user holds only when their access profile names them -- not by having no profile at all.
+ * Owner decision: the API docs (the developer portal) are for administrators and developers, so a workspace administrator
+ * grants them to a developer by profile; everyone else does not see them.
+ */
+export const EXPLICIT_PAGES: readonly PageKey[] = ['developer-portal'];
+
 /** The login page's `reason` for a session signed out because its password changed. */
 export const PASSWORD_CHANGED_REASON = 'password-changed';
 /** What the login page says for it. */
@@ -185,12 +192,13 @@ export class AuthService {
    * unrestricted rather than as empty: the server still refuses what it should, and a menu
    * that vanished on upgrade would look like a break, not a rule. The list itself comes from
    * sign-in and from every token refresh, so a changed profile reaches the menu within the
-   * access token's lifetime without anyone signing out.
+   * access token's lifetime without anyone signing out. The EXPLICIT_PAGES are the exception: those
+   * need the profile to name them.
    */
   canOpen(page: PageKey): boolean {
     if (this.hasAtLeast('TENANT_ADMIN')) return true;
     const keys = this.currentUser()?.pageKeys;
-    if (!keys) return true;
+    if (!keys) return !EXPLICIT_PAGES.includes(page);
     return keys.includes(page);
   }
 

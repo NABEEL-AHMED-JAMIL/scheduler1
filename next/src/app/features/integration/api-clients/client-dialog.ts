@@ -17,6 +17,8 @@ export interface ClientDialogData {
    * the frame allow-list of its run views.
    */
   canSetLimits?: boolean;
+  /** MIG-336: a test key of the workspace's sandbox (cl_test_...), made and changed there. */
+  sandbox?: boolean;
 }
 
 /** A limit field's text as the request carries it: empty is 0 ("the workspace's bound"); null when it is not a whole number. */
@@ -57,9 +59,11 @@ export function sameFrames(text: string, origins: string[] | null | undefined): 
   selector: 'app-api-client-dialog',
   imports: [Field, FormDialog],
   template: `
-    <app-form-dialog [heading]="data.client ? 'Change ' + data.client.name : 'New API client'"
-        [subtitle]="data.client ? 'Changing the scopes ends its current tokens.' : 'For one of your own systems, such as a portal. The secret is shown once.'"
-        [confirmLabel]="data.client ? 'Save' : 'Make client'" busyLabel="Saving…" size="wide"
+    <app-form-dialog [heading]="data.client ? 'Change ' + data.client.name : data.sandbox ? 'New test key' : 'New API client'"
+        [subtitle]="data.client ? 'Changing the scopes ends its current tokens.' : data.sandbox
+          ? 'A client of your sandbox: its keys work only there, and nothing there is billed. The secret is shown once.'
+          : 'For one of your own systems, such as a portal. The secret is shown once.'"
+        [confirmLabel]="data.client ? 'Save' : data.sandbox ? 'Make test key' : 'Make client'" busyLabel="Saving…" size="wide"
         [saving]="saving()" [confirmDisabled]="!ready()" (cancelled)="ref.close()" (confirmed)="save()">
       <div class="form-grid">
         <app-field label="Name" for="clientName" hint="What the client is for: Order portal, Partner sync." [required]="true">
@@ -159,6 +163,7 @@ export class ClientDialog {
     this.saving.set(true);
     this.error.set('');
     const input: ApiClientInput = { name: this.name().trim(), scopes: this.chosen(), ipAllowlist: this.allowlist(), expiresAt: this.expires() };
+    if (this.data.sandbox) input.sandbox = true;
     const client = this.data.client;
     // A limit goes only from someone who may set it, and only when it says something: 0 is "the workspace's bound".
     if (this.canSetLimits) {

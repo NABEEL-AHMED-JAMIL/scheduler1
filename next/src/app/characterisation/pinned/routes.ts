@@ -85,6 +85,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/integration/developer",
+      "title": "Developer portal",
+      "pageKey": "developer-portal",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": false
+    },
+    {
       "path": "/integration/api-collections",
       "title": "API Collections",
       "pageKey": "api-collections",

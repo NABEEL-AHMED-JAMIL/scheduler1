@@ -60,6 +60,9 @@ function setup(options: { confirm?: boolean; locked?: boolean } = {}) {
     updateWebhook: vi.fn(() => of({ status: 'SUCCESS', message: 'Webhook saved.', data: WEBHOOKS[0] })),
     rotateWebhookSecret: vi.fn(() => of({ status: 'SUCCESS', message: '', data: MADE_HOOK })),
     deleteWebhook: vi.fn(() => of({ status: 'SUCCESS', message: 'Webhook removed.' })),
+    // MIG-336: the sandbox panel below the clients; this workspace has none.
+    sandbox: vi.fn(() => of({ status: 'SUCCESS', message: '', data: null })),
+    sandboxList: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
   };
   const opened: { component: unknown; data: any }[] = [];
   const toasts: string[] = [];
@@ -102,6 +105,15 @@ describe('MIG-332: Integration › API Clients', () => {
     expect(routes).toContain('order.received');
     expect(routes).toContain('Orders');
     expect(el.textContent).not.toContain('cs_');
+  });
+
+  it('MIG-336: shows the sandbox panel below the clients, asking Identity for the sandbox', () => {
+    const { fixture, api } = setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(api.sandbox).toHaveBeenCalled();
+    expect(el.querySelector('#sandbox [data-no-sandbox]')).not.toBeNull();
+    const order = [...el.querySelectorAll('[data-api-clients], #sandbox, [data-event-routes]')].map(e => e.id || e.tagName);
+    expect(order).toEqual(['TABLE', 'sandbox', 'TABLE']);
   });
 
   it('a new client\'s secret is shown once, in its own dialog', () => {
@@ -218,6 +230,20 @@ describe('MIG-337: a client\'s own limit in the client dialog', () => {
     expect(d.ready()).toBe(false);
     d.rate.set('6.5');
     expect(d.ready()).toBe(false);
+  });
+
+  it('MIG-336: a test key is made in the sandbox, and only a test key says so', () => {
+    let { d, api, fixture } = dialog({ sandbox: true, canSetLimits: false });
+    expect(fixture.nativeElement.textContent).toContain('New test key');
+    d.name.set('Portal test');
+    d.toggle('pipelines:read');
+    d.save();
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Portal test', sandbox: true }));
+    ({ d, api } = dialog({ canSetLimits: true }));
+    d.name.set('Portal');
+    d.toggle('pipelines:read');
+    d.save();
+    expect(api.create).toHaveBeenCalledWith(expect.not.objectContaining({ sandbox: expect.anything() }));
   });
 
   it('a new client may start with a limit; a customer of a MANAGED workspace sends none and sees the fields locked', () => {

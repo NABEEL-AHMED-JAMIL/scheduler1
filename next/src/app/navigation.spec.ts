@@ -195,6 +195,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/integration/storage-connections', 'Storage Connections', undefined, 'TENANT_ADMIN'],
     // MIG-332: the customer API's clients and event routes, an administrator's.
     ['/integration/api-clients', 'API Clients', undefined, 'TENANT_ADMIN'],
+    // MIG-336: the developer portal; its pages are lazy children (features/developer/developer.routes.ts).
+    ['/integration/developer', 'Developer portal', 'developer-portal', undefined],
     // MIG-247: built. Read by every member holding the page; the screens hide the administrator's writes.
     ['/integration/api-collections', 'API Collections', 'api-collections', undefined],
     ['/integration/api-collections/:collectionId', 'API collection', 'api-collections', undefined],
@@ -373,6 +375,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DASHBOARD,
       ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
       'Integration › API Clients -> /integration/api-clients',
+      'Integration › Developer portal -> /integration/developer',
       ...PIPELINES,
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
@@ -396,6 +399,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DASHBOARD,
       ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
       'Integration › API Clients -> /integration/api-clients',
+      'Integration › Developer portal -> /integration/developer',
       ...PIPELINES,
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
@@ -417,6 +421,14 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...DOCUMENTS,
       ...DATA,
       'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts',
+    ]);
+  });
+
+  // MIG-336: only a profile that names it gives a tenant user the developer portal; having no profile does not.
+  it('a tenant user whose profile names the developer portal', () => {
+    expect(menuFor('TENANT_USER', ['jobs', 'developer-portal'])).toEqual([
+      ...DASHBOARD, 'Integration › Developer portal -> /integration/developer',
+      'Pipelines › Schedules -> /pipelines/schedules', 'Pipelines › Executions -> /pipelines/executions',
     ]);
   });
 

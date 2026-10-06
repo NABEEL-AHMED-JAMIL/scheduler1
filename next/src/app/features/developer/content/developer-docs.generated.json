@@ -1,0 +1,3867 @@
+{
+ "spec": {
+  "openapi": "3.1.0",
+  "info": {
+   "title": "ETL Console customer API",
+   "version": "1.0.0-draft",
+   "summary": "Start work, follow it, decide on it, and be told when something happens.",
+   "description": "The public contract for an organisation's own portals and systems (ADR-025). Generic: any pipeline, any form,\nany event type. The console is the organisation's admin tool; this API is how their systems reach the platform.\n\n- Auth: OAuth 2.0 client credentials (POST /v1/oauth/token), per-organisation API clients with scopes.\n- Errors: RFC 9457 problem details (application/problem+json).\n- Lists: cursor paging (limit, cursor -> nextCursor).\n- Creating POSTs take an Idempotency-Key header.\n- Times: RFC 3339 in UTC.\n- Rate limits per client and per workspace: RateLimit-* headers on every answer, 429 with Retry-After\n  (`/problems/rate-limited`). A workspace may have a monthly quota of calls: Quota-* headers, a Quota-Warning from 80%,\n  and past it 429 `/problems/quota-exceeded` until the month (UTC) ends.\n- Every call that passes the checks is billed as `api.calls` (per 1,000, on the workspace's rate card); the token\n  endpoint and signed links are not. Webhook deliveries that arrive are billed as `webhook.deliveries`.\n- Embeddable run view: POST /v1/runs/{runId}/view-links answers a 15-minute link to a read-only page of the run that a\n  portal may frame from the origins its API client allows.\n",
+   "contact": {
+    "name": "Platform team"
+   },
+   "license": {
+    "name": "Proprietary",
+    "identifier": "LicenseRef-Proprietary"
+   }
+  },
+  "servers": [
+   {
+    "url": "https://{host}/v1",
+    "variables": {
+     "host": {
+      "default": "localhost:9098"
+     }
+    }
+   }
+  ],
+  "security": [
+   {
+    "clientCredentials": []
+   }
+  ],
+  "tags": [
+   {
+    "name": "auth",
+    "description": "Getting a token."
+   },
+   {
+    "name": "pipelines",
+    "description": "What can be started."
+   },
+   {
+    "name": "runs",
+    "description": "Starting work and following it."
+   },
+   {
+    "name": "files",
+    "description": "Uploading and downloading files."
+   },
+   {
+    "name": "reviews",
+    "description": "The customer's decision on a run's results."
+   },
+   {
+    "name": "forms",
+    "description": "Forms and their submissions."
+   },
+   {
+    "name": "events",
+    "description": "Events in, and the catalogue of events out."
+   },
+   {
+    "name": "webhooks",
+    "description": "Being told when something happens."
+   }
+  ],
+  "paths": {
+   "/oauth/token": {
+    "post": {
+     "tags": [
+      "auth"
+     ],
+     "operationId": "createToken",
+     "summary": "Exchange the client's id and secret for an access token (15 minutes).",
+     "security": [],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/x-www-form-urlencoded": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "grant_type",
+          "client_id",
+          "client_secret"
+         ],
+         "properties": {
+          "grant_type": {
+           "type": "string",
+           "const": "client_credentials"
+          },
+          "client_id": {
+           "type": "string"
+          },
+          "client_secret": {
+           "type": "string",
+           "format": "password"
+          },
+          "scope": {
+           "type": "string",
+           "description": "Space-separated; a subset of the client's scopes. Omit for all."
+          }
+         }
+        }
+       }
+      }
+     },
+     "responses": {
+      "200": {
+       "description": "The token.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "access_token",
+           "token_type",
+           "expires_in",
+           "scope"
+          ],
+          "properties": {
+           "access_token": {
+            "type": "string"
+           },
+           "token_type": {
+            "type": "string",
+            "const": "Bearer"
+           },
+           "expires_in": {
+            "type": "integer",
+            "example": 900
+           },
+           "scope": {
+            "type": "string"
+           }
+          }
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/pipelines": {
+    "get": {
+     "tags": [
+      "pipelines"
+     ],
+     "operationId": "listPipelines",
+     "summary": "The pipelines this client may start or read.",
+     "security": [
+      {
+       "clientCredentials": [
+        "pipelines:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/Limit"
+      },
+      {
+       "$ref": "#/components/parameters/Cursor"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "A page of pipelines.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/PipelinePage"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/pipelines/{pipelineId}": {
+    "get": {
+     "tags": [
+      "pipelines"
+     ],
+     "operationId": "getPipeline",
+     "summary": "One pipeline, with its input contract and the event types its runs emit.",
+     "security": [
+      {
+       "clientCredentials": [
+        "pipelines:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/PipelineId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The pipeline.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Pipeline"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/pipelines/{pipelineId}/runs": {
+    "post": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "startRun",
+     "summary": "Start a run with a record and/or uploaded files (push intake).",
+     "description": "The record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:write"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/PipelineId"
+      },
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StartRun"
+        }
+       }
+      }
+     },
+     "responses": {
+      "202": {
+       "description": "Queued.",
+       "headers": {
+        "Location": {
+         "schema": {
+          "type": "string"
+         },
+         "description": "/v1/runs/{runId}"
+        }
+       },
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Run"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "413": {
+       "$ref": "#/components/responses/TooLarge"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/runs": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "listRuns",
+     "summary": "Runs, newest first.",
+     "description": "Every run of the workspace's pipelines, however it started (the API, an event, the console, a schedule), newest first. The filters combine. updatedAfter compares the run's latest time (its end, else its start, else its creation); createdAfter its creation. Times are RFC 3339 with an offset; a filter that is not one is 400.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/Limit"
+      },
+      {
+       "$ref": "#/components/parameters/Cursor"
+      },
+      {
+       "name": "pipelineId",
+       "in": "query",
+       "schema": {
+        "type": "string"
+       }
+      },
+      {
+       "name": "status",
+       "in": "query",
+       "schema": {
+        "$ref": "#/components/schemas/RunStatus"
+       }
+      },
+      {
+       "name": "createdAfter",
+       "in": "query",
+       "schema": {
+        "type": "string",
+        "format": "date-time"
+       }
+      },
+      {
+       "name": "updatedAfter",
+       "in": "query",
+       "schema": {
+        "type": "string",
+        "format": "date-time"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "A page of runs.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/RunPage"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/runs/{runId}": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "getRun",
+     "summary": "One run, with its status, times (UTC) and review status.",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The run.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Run"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/runs/{runId}/retry": {
+    "post": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "retryRun",
+     "summary": "Run a failed run again, as a new run.",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:write"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      },
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "responses": {
+      "202": {
+       "description": "The new run.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Run"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/runs/{runId}/steps": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "listRunSteps",
+     "summary": "The run's steps in order (its latest attempt).",
+     "description": "The steps of the run's latest attempt, in order, with their status, rows in and out, and times. A run of a pipeline without steps is shown as its one step, key \"legacy\". A new kind of step appears here as it is, with its own task name: there is no endpoint per step kind.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The run's steps in order.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "runId",
+           "attempt",
+           "data"
+          ],
+          "properties": {
+           "runId": {
+            "type": "string"
+           },
+           "attempt": {
+            "type": "integer"
+           },
+           "data": {
+            "type": "array",
+            "items": {
+             "$ref": "#/components/schemas/Step"
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/runs/{runId}/outputs": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "getRunOutputs",
+     "summary": "The run's manifest: the files it received and made, by file id, and its review.",
+     "description": "The files the run's latest attempt made (role result, or report for a PDF) and, for a run started through the API, the files it was given (role input), each by its file id: GET /v1/files/{fileId} downloads it. Never a bucket, a storage key or a connection. A made file is kept as long as the pipeline keeps its run's files (expiresAt); after that it is listed as expired and its download is 410.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The manifest.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Manifest"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/runs/{runId}/review": {
+    "get": {
+     "tags": [
+      "reviews"
+     ],
+     "operationId": "getReview",
+     "summary": "The run's review: who must decide and what they decided.",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The review.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Review"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    },
+    "post": {
+     "tags": [
+      "reviews"
+     ],
+     "operationId": "decideReview",
+     "summary": "The customer's decision on a completed run (the CUSTOMER party).",
+     "description": "The same rules as the console's review: the run is completed, its pipeline asks for a customer review (settings.review.required), the run's results are still pending, and the customer has not decided yet -- otherwise 409. A rejection says why (reason); rerun asks for the pipeline to run again as a new run, which only a run started through the API can be (it is started again with the same intake); a re-run that cannot start leaves the rejection standing and says why in rerun.message. Sending the same Idempotency-Key again returns the first answer.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "reviews:write"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      },
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ReviewDecision"
+        }
+       }
+      }
+     },
+     "responses": {
+      "200": {
+       "description": "The review after the decision.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Review"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/runs/{runId}/view-links": {
+    "post": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "createViewLink",
+     "summary": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.",
+     "description": "A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "runs:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/RunId"
+      }
+     ],
+     "requestBody": {
+      "required": false,
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "properties": {
+          "expiresInSeconds": {
+           "type": "integer",
+           "minimum": 60,
+           "maximum": 900,
+           "default": 900,
+           "description": "A shorter life than 15 minutes, for a link shown once."
+          }
+         }
+        }
+       }
+      }
+     },
+     "responses": {
+      "201": {
+       "description": "The link.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/ViewLink"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/embed/runs/{token}": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "readRunView",
+     "summary": "What a view link's page shows, through the link's own token.",
+     "x-signed-link": true,
+     "description": "No access token: the view link's token is the permission, for that one run, read-only, until it expires. The console's page reads this; a portal's server may too. Times are UTC. Each file the run made carries a download (a signed file link, GET /v1/files/{fileId}/content) that ends no later than the view. refreshSeconds says when a run that is still moving is worth reading again (null once it has settled). Not counted as an API call and not billed: a signed link is free, and only POST view-links is. 410 once expired (`/problems/link-expired`) or when the client that made it was revoked or has expired (`/problems/link-ended`); 404 for a token this API did not make.\n",
+     "security": [],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/ViewToken"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The run as the page shows it.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/RunView"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "410": {
+       "$ref": "#/components/responses/Gone"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/embed/runs/{token}/frame": {
+    "get": {
+     "tags": [
+      "runs"
+     ],
+     "operationId": "readRunViewFrame",
+     "summary": "Who may frame a view link's page -- the console's server asks before serving it.",
+     "x-signed-link": true,
+     "description": "The origins the API client's frame allow-list names, also as the `Embed-Frame-Ancestors` header (a CSP source list, `'none'` when the list is empty), which the console's server sends as Content-Security-Policy frame-ancestors with the page. An expired link still answers its origins (state `expired`), so the portal shows that it expired rather than a broken frame; its data is refused. 404, and frame-ancestors 'none', for a token this API did not make or a revoked client's.\n",
+     "security": [],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/ViewToken"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "Where the page may be framed.",
+       "headers": {
+        "Embed-Frame-Ancestors": {
+         "schema": {
+          "type": "string"
+         },
+         "description": "The frame-ancestors source list, or 'none'."
+        }
+       },
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/RunViewFrame"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/files": {
+    "post": {
+     "tags": [
+      "files"
+     ],
+     "operationId": "uploadFile",
+     "summary": "Upload a file for a run or a form; answers its file id.",
+     "description": "Stored in the workspace's inbox (role input) and named by a ULID, the only id of a file a customer sees; nothing starts because of an upload. Its size is limited by the workspace (413), its kind is checked against its content (422). 409 when the workspace has no inbox yet, or for an Idempotency-Key reused with another file.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "files:write"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "multipart/form-data": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "file"
+         ],
+         "properties": {
+          "file": {
+           "type": "string",
+           "format": "binary"
+          }
+         }
+        }
+       }
+      }
+     },
+     "responses": {
+      "201": {
+       "description": "Stored.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/File"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "413": {
+       "$ref": "#/components/responses/TooLarge"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/files/{fileId}": {
+    "get": {
+     "tags": [
+      "files"
+     ],
+     "operationId": "downloadFile",
+     "summary": "Redirects to a signed link valid 5 minutes.",
+     "description": "A file of the workspace's -- one it uploaded, or one a run made (the manifest's) -- answered with a 302 to its signed link on this API (/v1/files/{fileId}/content?token=...), valid 5 minutes. The link needs no token, so a portal may hand it to a browser; it opens that one file only, and never names a bucket or a storage key. The body says the same for a caller that does not follow redirects. A made file past its expiry is 410.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "files:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/FileId"
+      }
+     ],
+     "responses": {
+      "302": {
+       "description": "The signed link.",
+       "headers": {
+        "Location": {
+         "schema": {
+          "type": "string",
+          "format": "uri-reference"
+         },
+         "description": "/v1/files/{fileId}/content?token=..."
+        }
+       },
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/FileLink"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "410": {
+       "$ref": "#/components/responses/Gone"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/files/{fileId}/content": {
+    "get": {
+     "tags": [
+      "files"
+     ],
+     "operationId": "readFileContent",
+     "summary": "The file's bytes, through the signed link GET /v1/files/{fileId} answered.",
+     "x-signed-link": true,
+     "description": "No access token: the link's signature is the permission, for this file only, until it expires (5 minutes). A link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not one this API made, or names another file, is 404.\n",
+     "security": [],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/FileId"
+      },
+      {
+       "name": "token",
+       "in": "query",
+       "required": true,
+       "schema": {
+        "type": "string"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The bytes, as an attachment named by the file.",
+       "headers": {
+        "Content-Disposition": {
+         "schema": {
+          "type": "string"
+         }
+        }
+       },
+       "content": {
+        "application/octet-stream": {
+         "schema": {
+          "type": "string",
+          "format": "binary"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "410": {
+       "$ref": "#/components/responses/Gone"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/files/{fileId}/meta": {
+    "get": {
+     "tags": [
+      "files"
+     ],
+     "operationId": "getFile",
+     "summary": "A file's facts: name, size, sha256, role.",
+     "security": [
+      {
+       "clientCredentials": [
+        "files:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/FileId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The file's facts.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/File"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/forms": {
+    "get": {
+     "tags": [
+      "forms"
+     ],
+     "operationId": "listForms",
+     "summary": "The active forms this client may fill in.",
+     "security": [
+      {
+       "clientCredentials": [
+        "forms:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/Limit"
+      },
+      {
+       "$ref": "#/components/parameters/Cursor"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "A page of active forms.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "data",
+           "nextCursor"
+          ],
+          "properties": {
+           "data": {
+            "type": "array",
+            "items": {
+             "$ref": "#/components/schemas/Form"
+            }
+           },
+           "nextCursor": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/forms/{formId}": {
+    "get": {
+     "tags": [
+      "forms"
+     ],
+     "operationId": "getForm",
+     "summary": "One form and its fields.",
+     "security": [
+      {
+       "clientCredentials": [
+        "forms:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/FormId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The form and its fields.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Form"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/forms/{formId}/submissions": {
+    "post": {
+     "tags": [
+      "forms"
+     ],
+     "operationId": "submitForm",
+     "summary": "Submit answers (file fields name file ids); starts the form's pipeline or workflow when it has one.",
+     "security": [
+      {
+       "clientCredentials": [
+        "forms:write"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/FormId"
+      },
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "answers"
+         ],
+         "properties": {
+          "answers": {
+           "type": "object",
+           "additionalProperties": true
+          }
+         }
+        }
+       }
+      }
+     },
+     "responses": {
+      "201": {
+       "description": "Received.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Submission"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/forms/{formId}/submissions/{submissionId}": {
+    "get": {
+     "tags": [
+      "forms"
+     ],
+     "operationId": "getSubmission",
+     "summary": "One submission and the run it started.",
+     "security": [
+      {
+       "clientCredentials": [
+        "forms:read"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/FormId"
+      },
+      {
+       "name": "submissionId",
+       "in": "path",
+       "required": true,
+       "schema": {
+        "type": "string"
+       }
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The submission and the run it started.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Submission"
+         }
+        }
+       }
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/events": {
+    "post": {
+     "tags": [
+      "events"
+     ],
+     "operationId": "sendEvent",
+     "summary": "An event from the organisation's systems; the workspace's event routes start what it names.",
+     "description": "The type is the organisation's own; the workspace's event routes (set in the console) say which pipeline or workflow it starts, and may name a data contract the data must meet (422 with each field's path under \"data\", nothing started). A type no route takes is 422 at \"type\". Each route's pipeline gets a run with the data as its record; each workflow route a request whose subject is the event. What could not start is in notStarted, with why (a run of that pipeline still in flight, say).\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "events:write"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "required": [
+          "type",
+          "data"
+         ],
+         "properties": {
+          "type": {
+           "type": "string",
+           "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+           "description": "The organisation's own event type, e.g. \"order.received\"."
+          },
+          "data": {
+           "type": "object",
+           "additionalProperties": true
+          }
+         }
+        }
+       }
+      }
+     },
+     "responses": {
+      "202": {
+       "description": "Accepted; what it started.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "eventId",
+           "started"
+          ],
+          "properties": {
+           "eventId": {
+            "type": "string"
+           },
+           "started": {
+            "type": "array",
+            "items": {
+             "$ref": "#/components/schemas/Run"
+            },
+            "description": "The runs it started."
+           },
+           "workflows": {
+            "type": "array",
+            "description": "The workflow requests it started.",
+            "items": {
+             "type": "object",
+             "required": [
+              "id",
+              "workflowKey"
+             ],
+             "properties": {
+              "id": {
+               "type": "string"
+              },
+              "workflowKey": {
+               "type": "string"
+              },
+              "state": {
+               "type": "string"
+              }
+             }
+            }
+           },
+           "notStarted": {
+            "type": "array",
+            "description": "What a route names that did not start, and why.",
+            "items": {
+             "type": "object",
+             "required": [
+              "kind",
+              "target",
+              "reason"
+             ],
+             "properties": {
+              "kind": {
+               "type": "string",
+               "enum": [
+                "pipeline",
+                "workflow"
+               ]
+              },
+              "target": {
+               "type": "string",
+               "description": "The pipeline's id or the workflow's key."
+              },
+              "reason": {
+               "type": "string"
+              }
+             }
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "413": {
+       "$ref": "#/components/responses/TooLarge"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      },
+      "503": {
+       "$ref": "#/components/responses/Unavailable"
+      }
+     }
+    }
+   },
+   "/event-types": {
+    "get": {
+     "tags": [
+      "events"
+     ],
+     "operationId": "listEventTypes",
+     "summary": "The catalogue of event types the platform sends (each with its JSON Schema).",
+     "description": "A registry, not a fixed list: a new event type appears here, and becomes subscribable, when the platform adds it. Each entry's schema is the JSON Schema of the event's data, self-contained.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The catalogue.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "data"
+          ],
+          "properties": {
+           "data": {
+            "type": "array",
+            "items": {
+             "$ref": "#/components/schemas/EventType"
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/webhooks": {
+    "get": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "listWebhooks",
+     "summary": "The webhook subscriptions.",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The subscriptions, oldest first.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "data"
+          ],
+          "properties": {
+           "data": {
+            "type": "array",
+            "items": {
+             "$ref": "#/components/schemas/Webhook"
+            }
+           }
+          }
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    },
+    "post": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "createWebhook",
+     "summary": "Subscribe a URL to event types; the signing secret is shown once.",
+     "description": "The URL must be https and every address its host resolves to public: a private, loopback, link-local or metadata address is refused here (422 at url), and again at every delivery. A workspace has at most 20 webhooks (409). Only events that happen after the webhook is made are sent to it. In a workspace our team manages, webhooks are set up by our team: making, changing, removing and rotating are 403 there.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/IdempotencyKey"
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookCreate"
+        }
+       }
+      }
+     },
+     "responses": {
+      "201": {
+       "description": "Created.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "allOf": [
+           {
+            "$ref": "#/components/schemas/Webhook"
+           },
+           {
+            "type": "object",
+            "required": [
+             "secret"
+            ],
+            "properties": {
+             "secret": {
+              "type": "string",
+              "description": "Shown once (and in a replay of this request under its Idempotency-Key)."
+             }
+            }
+           }
+          ]
+         }
+        }
+       },
+       "headers": {
+        "Location": {
+         "schema": {
+          "type": "string"
+         },
+         "description": "/v1/webhooks/{webhookId}"
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/webhooks/{webhookId}": {
+    "parameters": [
+     {
+      "$ref": "#/components/parameters/WebhookId"
+     }
+    ],
+    "get": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "getWebhook",
+     "summary": "One subscription.",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The subscription.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Webhook"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    },
+    "patch": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "updateWebhook",
+     "summary": "Change the URL, the event types, or pause it.",
+     "description": "active false pauses the webhook: nothing more is sent to it, and what was still waiting is marked failed. active true resumes it (and clears a pause the platform made after repeated failures); only events after that are sent.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "requestBody": {
+      "required": true,
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/WebhookUpdate"
+        }
+       }
+      }
+     },
+     "responses": {
+      "200": {
+       "description": "Updated.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Webhook"
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "422": {
+       "$ref": "#/components/responses/Unprocessable"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    },
+    "delete": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "deleteWebhook",
+     "summary": "Remove a subscription; nothing more is sent to it.",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "responses": {
+      "204": {
+       "description": "Removed."
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/webhooks/{webhookId}/rotate-secret": {
+    "post": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "rotateWebhookSecret",
+     "summary": "A new secret; the old one is accepted alongside it for 24 hours.",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/WebhookId"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "The new secret, shown once.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "secret",
+           "previousSecretValidUntil"
+          ],
+          "properties": {
+           "secret": {
+            "type": "string"
+           },
+           "previousSecretValidUntil": {
+            "type": "string",
+            "format": "date-time"
+           }
+          }
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/webhooks/{webhookId}/deliveries": {
+    "get": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "listDeliveries",
+     "summary": "A subscription's delivery attempts, newest first.",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/WebhookId"
+      },
+      {
+       "$ref": "#/components/parameters/Limit"
+      },
+      {
+       "$ref": "#/components/parameters/Cursor"
+      }
+     ],
+     "responses": {
+      "200": {
+       "description": "Delivery attempts, newest first.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "type": "object",
+          "required": [
+           "data",
+           "nextCursor"
+          ],
+          "properties": {
+           "data": {
+            "type": "array",
+            "items": {
+             "$ref": "#/components/schemas/Delivery"
+            }
+           },
+           "nextCursor": {
+            "type": [
+             "string",
+             "null"
+            ]
+           }
+          }
+         }
+        }
+       }
+      },
+      "400": {
+       "$ref": "#/components/responses/BadRequest"
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   },
+   "/webhooks/{webhookId}/deliveries/{deliveryId}/redeliver": {
+    "post": {
+     "tags": [
+      "webhooks"
+     ],
+     "operationId": "redeliver",
+     "summary": "Send a delivery again.",
+     "description": "A new delivery of the same event (the same Webhook-Id), sent within seconds and retried like any other; it names the delivery it repeats. The webhook must be active (409 when paused), and the event still kept.\n",
+     "security": [
+      {
+       "clientCredentials": [
+        "webhooks:manage"
+       ]
+      }
+     ],
+     "parameters": [
+      {
+       "$ref": "#/components/parameters/WebhookId"
+      },
+      {
+       "name": "deliveryId",
+       "in": "path",
+       "required": true,
+       "schema": {
+        "type": "string"
+       }
+      }
+     ],
+     "responses": {
+      "202": {
+       "description": "Queued again.",
+       "content": {
+        "application/json": {
+         "schema": {
+          "$ref": "#/components/schemas/Delivery"
+         }
+        }
+       }
+      },
+      "401": {
+       "$ref": "#/components/responses/Unauthorized"
+      },
+      "403": {
+       "$ref": "#/components/responses/Forbidden"
+      },
+      "404": {
+       "$ref": "#/components/responses/NotFound"
+      },
+      "409": {
+       "$ref": "#/components/responses/Conflict"
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   }
+  },
+  "webhooks": {
+   "event": {
+    "post": {
+     "operationId": "receiveEvent",
+     "summary": "What a subscriber receives.",
+     "description": "A POST of the event to the subscription's URL. Verify `Webhook-Signature: t=<unix seconds>, v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed by the subscription's secret>` -- for 24 hours after a rotation there is one v1 per secret, the new one first; accept when any matches -- refuse a t more than 5 minutes from your clock, and answer 2xx within 10 seconds. Anything else (another status, no answer, a redirect) is a failed attempt, retried after 10 s, 30 s, 90 s ... at most an hour apart, for 24 hours; then the delivery is failed. A webhook that has failed for 3 days with no success is paused, and its maker told. Delivery is at least once: deduplicate on Webhook-Id. One webhook's first attempts go out in the order the events happened; a retry does not hold later events back, so order by createdAt.\n",
+     "parameters": [
+      {
+       "name": "Webhook-Signature",
+       "in": "header",
+       "required": true,
+       "schema": {
+        "type": "string"
+       }
+      },
+      {
+       "name": "Webhook-Id",
+       "in": "header",
+       "required": true,
+       "schema": {
+        "type": "string"
+       },
+       "description": "The event id; the same on every retry and redelivery."
+      },
+      {
+       "name": "Webhook-Delivery",
+       "in": "header",
+       "required": true,
+       "schema": {
+        "type": "string"
+       },
+       "description": "This delivery's id, as the delivery log shows it."
+      }
+     ],
+     "requestBody": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Event"
+        }
+       }
+      }
+     },
+     "responses": {
+      "200": {
+       "description": "Received."
+      },
+      "429": {
+       "$ref": "#/components/responses/TooManyRequests"
+      }
+     }
+    }
+   }
+  },
+  "components": {
+   "securitySchemes": {
+    "clientCredentials": {
+     "type": "oauth2",
+     "flows": {
+      "clientCredentials": {
+       "tokenUrl": "/v1/oauth/token",
+       "scopes": {
+        "pipelines:read": "Read pipelines.",
+        "runs:read": "Read runs, steps, outputs and reviews; create view links.",
+        "runs:write": "Start and retry runs.",
+        "files:read": "Download files.",
+        "files:write": "Upload files.",
+        "reviews:write": "Record the customer's review decision.",
+        "forms:read": "Read forms and submissions.",
+        "forms:write": "Submit forms.",
+        "events:write": "Send events.",
+        "webhooks:manage": "Manage webhook subscriptions and read the event catalogue."
+       }
+      }
+     }
+    }
+   },
+   "parameters": {
+    "Limit": {
+     "name": "limit",
+     "in": "query",
+     "schema": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "default": 50
+     }
+    },
+    "Cursor": {
+     "name": "cursor",
+     "in": "query",
+     "schema": {
+      "type": "string"
+     }
+    },
+    "PipelineId": {
+     "name": "pipelineId",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    "RunId": {
+     "name": "runId",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    "FileId": {
+     "name": "fileId",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+     }
+    },
+    "ViewToken": {
+     "name": "token",
+     "in": "path",
+     "required": true,
+     "description": "The token of a view link's URL.",
+     "schema": {
+      "type": "string"
+     }
+    },
+    "FormId": {
+     "name": "formId",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    "WebhookId": {
+     "name": "webhookId",
+     "in": "path",
+     "required": true,
+     "schema": {
+      "type": "string"
+     }
+    },
+    "IdempotencyKey": {
+     "name": "Idempotency-Key",
+     "in": "header",
+     "required": true,
+     "schema": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+     }
+    }
+   },
+   "responses": {
+    "BadRequest": {
+     "description": "Unreadable request.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "Unauthorized": {
+     "description": "No valid token.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "Forbidden": {
+     "description": "A scope is missing or the address is not allowed.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "NotFound": {
+     "description": "Not found, or not yours.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "Conflict": {
+     "description": "An Idempotency-Key reused with a different body, or the wrong state.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "Gone": {
+     "description": "No longer there: a file past its expiry, or a link that has expired.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "TooLarge": {
+     "description": "Too large.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "Unprocessable": {
+     "description": "The input contract refused it; errors name each field.",
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "Unavailable": {
+     "description": "Temporarily unavailable; try again after Retry-After.",
+     "headers": {
+      "Retry-After": {
+       "schema": {
+        "type": "integer"
+       }
+      }
+     },
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    },
+    "TooManyRequests": {
+     "description": "Past a limit. `/problems/rate-limited`: the client's rate limit, or its workspace's limit over all its clients;\ntry again after Retry-After seconds (when a token is back). `/problems/quota-exceeded`: the workspace has used its\nmonthly quota of calls; Retry-After is the seconds until the month (UTC) ends. Nothing was done and nothing billed.\n",
+     "headers": {
+      "Retry-After": {
+       "$ref": "#/components/headers/Retry-After"
+      },
+      "RateLimit-Limit": {
+       "$ref": "#/components/headers/RateLimit-Limit"
+      },
+      "RateLimit-Remaining": {
+       "$ref": "#/components/headers/RateLimit-Remaining"
+      },
+      "RateLimit-Reset": {
+       "$ref": "#/components/headers/RateLimit-Reset"
+      },
+      "RateLimit-Policy": {
+       "$ref": "#/components/headers/RateLimit-Policy"
+      },
+      "Quota-Limit": {
+       "$ref": "#/components/headers/Quota-Limit"
+      },
+      "Quota-Remaining": {
+       "$ref": "#/components/headers/Quota-Remaining"
+      },
+      "Quota-Reset": {
+       "$ref": "#/components/headers/Quota-Reset"
+      },
+      "Quota-Warning": {
+       "$ref": "#/components/headers/Quota-Warning"
+      }
+     },
+     "content": {
+      "application/problem+json": {
+       "schema": {
+        "$ref": "#/components/schemas/Problem"
+       }
+      }
+     }
+    }
+   },
+   "headers": {
+    "Retry-After": {
+     "description": "Seconds to wait before trying again.",
+     "schema": {
+      "type": "integer",
+      "minimum": 1
+     }
+    },
+    "RateLimit-Limit": {
+     "description": "The size of the bucket that allows fewer calls now (the client's burst, or its workspace's): on every answer to a call that was counted.",
+     "schema": {
+      "type": "integer"
+     }
+    },
+    "RateLimit-Remaining": {
+     "description": "Calls you may make right now.",
+     "schema": {
+      "type": "integer",
+      "minimum": 0
+     }
+    },
+    "RateLimit-Reset": {
+     "description": "Seconds until that bucket is full again (or, refused, until one call is allowed).",
+     "schema": {
+      "type": "integer"
+     }
+    },
+    "RateLimit-Policy": {
+     "description": "That bucket's rate: calls a minute, the window, its burst and whose it is, e.g. 600;w=60;burst=100;scope=client.",
+     "schema": {
+      "type": "string",
+      "example": "600;w=60;burst=100;scope=client"
+     }
+    },
+    "Quota-Limit": {
+     "description": "The workspace's monthly quota of calls, when it has one.",
+     "schema": {
+      "type": "integer"
+     }
+    },
+    "Quota-Remaining": {
+     "description": "Calls left in the quota this month (UTC).",
+     "schema": {
+      "type": "integer",
+      "minimum": 0
+     }
+    },
+    "Quota-Reset": {
+     "description": "Seconds until the month (UTC) ends and the quota starts again.",
+     "schema": {
+      "type": "integer"
+     }
+    },
+    "Quota-Warning": {
+     "description": "From 80% of the quota used, e.g. \"85% of this month's 10000 API calls are used.\"",
+     "schema": {
+      "type": "string"
+     }
+    }
+   },
+   "x-problem-types": {
+    "bad-request": {
+     "status": 400,
+     "title": "Bad Request",
+     "description": "The request cannot be read: not JSON, a filter that is not RFC 3339 with an offset, a missing or malformed Idempotency-Key."
+    },
+    "unauthorized": {
+     "status": 401,
+     "title": "Unauthorized",
+     "description": "No valid access token: none, expired (15 minutes), or revoked by a secret rotation, a change of scopes or a revoked client. Ask for a new token. The token endpoint also answers OAuth's own `error` (invalid_client, invalid_scope, ...)."
+    },
+    "forbidden": {
+     "status": 403,
+     "title": "Forbidden",
+     "description": "The caller's address is not on the client's allowlist."
+    },
+    "insufficient-scope": {
+     "status": 403,
+     "title": "Forbidden",
+     "description": "The token does not carry the scope the operation needs. Give the client the scope, then ask for a new token."
+    },
+    "managed-workspace": {
+     "status": 403,
+     "title": "Forbidden",
+     "description": "In a workspace our team manages, making, changing, removing and rotating webhooks is our team's.",
+     "operations": [
+      "createWebhook",
+      "updateWebhook",
+      "deleteWebhook",
+      "rotateWebhookSecret"
+     ]
+    },
+    "not-found": {
+     "status": 404,
+     "title": "Not Found",
+     "description": "Not there, or not yours: the same answer for another workspace's id. An undeclared /v1 path is one too."
+    },
+    "conflict": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "The resource's state refuses it, e.g. a redelivery while the webhook is paused or a workspace's 21st webhook."
+    },
+    "idempotency-conflict": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "This Idempotency-Key was already used with a different request (within 24 hours). Use a new key for new work."
+    },
+    "idempotency-in-progress": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "A request with this Idempotency-Key is still being handled. Try again in a moment with the same key."
+    },
+    "run-in-flight": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "A run of this pipeline is still in flight; one runs at a time. Start the next once it has finished.",
+     "operations": [
+      "startRun"
+     ]
+    },
+    "pipeline-inactive": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "The pipeline is not active.",
+     "operations": [
+      "startRun"
+     ]
+    },
+    "workspace-paused": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "The workspace is suspended or inactive, so its runs are paused.",
+     "operations": [
+      "startRun"
+     ]
+    },
+    "workspace-not-ready": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.",
+     "operations": [
+      "uploadFile",
+      "startRun"
+     ]
+    },
+    "review-not-open": {
+     "status": 409,
+     "title": "Conflict",
+     "description": "The run's review cannot take this decision: not completed, no customer review asked for, or already decided.",
+     "operations": [
+      "decideReview"
+     ]
+    },
+    "file-expired": {
+     "status": 410,
+     "title": "Gone",
+     "description": "The file is past its expiry: still listed (expired true), no longer downloadable. Run the pipeline again for a new one.",
+     "operations": [
+      "downloadFile",
+      "readFileContent"
+     ]
+    },
+    "link-expired": {
+     "status": 410,
+     "title": "Gone",
+     "description": "A signed link (a file link, 5 minutes; a view link, 15 minutes) has expired. Ask for a new one.",
+     "operations": [
+      "readFileContent",
+      "readRunView"
+     ]
+    },
+    "link-ended": {
+     "status": 410,
+     "title": "Gone",
+     "description": "The API client that made the view link was revoked or has expired, so its links ended at once.",
+     "operations": [
+      "readRunView",
+      "readRunViewFrame"
+     ]
+    },
+    "too-large": {
+     "status": 413,
+     "title": "Content Too Large",
+     "description": "An upload over 100 MB, or a JSON body over 1 MB."
+    },
+    "unsupported-media-type": {
+     "status": 415,
+     "title": "Unsupported Media Type",
+     "description": "The body is not the content type the operation takes (JSON, multipart/form-data, or a form for the token)."
+    },
+    "validation": {
+     "status": 422,
+     "title": "Unprocessable Content",
+     "description": "The input contract (or the request's own rules) refused it; `errors[]` names each field by its path (`record.amount`) and why, never echoing a value."
+    },
+    "rate-limited": {
+     "status": 429,
+     "title": "Too Many Requests",
+     "description": "Past the client's rate limit, or its workspace's over all its clients. Wait Retry-After seconds."
+    },
+    "quota-exceeded": {
+     "status": 429,
+     "title": "Too Many Requests",
+     "description": "The workspace has used its monthly quota of calls. Retry-After is the seconds until the month (UTC) ends."
+    },
+    "unavailable": {
+     "status": 503,
+     "title": "Service Unavailable",
+     "description": "Something the answer needs cannot be reached just now (the limits store, an input contract). Try again after Retry-After."
+    }
+   },
+   "schemas": {
+    "Problem": {
+     "type": "object",
+     "required": [
+      "type",
+      "title",
+      "status"
+     ],
+     "properties": {
+      "type": {
+       "type": "string",
+       "format": "uri-reference"
+      },
+      "title": {
+       "type": "string"
+      },
+      "status": {
+       "type": "integer"
+      },
+      "detail": {
+       "type": "string"
+      },
+      "instance": {
+       "type": "string"
+      },
+      "requestId": {
+       "type": "string"
+      },
+      "errors": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "path",
+         "message"
+        ],
+        "properties": {
+         "path": {
+          "type": "string"
+         },
+         "message": {
+          "type": "string"
+         }
+        }
+       }
+      }
+     }
+    },
+    "RunStatus": {
+     "type": "string",
+     "enum": [
+      "queued",
+      "running",
+      "completed",
+      "failed",
+      "skipped",
+      "interrupted"
+     ]
+    },
+    "ReviewStatus": {
+     "type": "string",
+     "enum": [
+      "not_required",
+      "pending",
+      "approved",
+      "rejected"
+     ]
+    },
+    "Pipeline": {
+     "type": "object",
+     "required": [
+      "id",
+      "name"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "name": {
+       "type": "string"
+      },
+      "description": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "inputContract": {
+       "type": [
+        "object",
+        "null"
+       ],
+       "description": "The JSON Schema a started run's record must meet (the data contract the pipeline names); null when it names none."
+      },
+      "acceptsFiles": {
+       "type": "boolean",
+       "description": "Whether a run may name files (a step pipeline reads them from its intake)."
+      },
+      "review": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "internal",
+         "customer"
+        ]
+       }
+      },
+      "emits": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Event types its runs send."
+      }
+     }
+    },
+    "PipelinePage": {
+     "type": "object",
+     "required": [
+      "data",
+      "nextCursor"
+     ],
+     "properties": {
+      "data": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/Pipeline"
+       }
+      },
+      "nextCursor": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     }
+    },
+    "StartRun": {
+     "type": "object",
+     "properties": {
+      "record": {
+       "type": "object",
+       "additionalProperties": true,
+       "description": "Validated against the input contract."
+      },
+      "files": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "File ids from POST /v1/files."
+      },
+      "reference": {
+       "type": "string",
+       "maxLength": 128,
+       "description": "The organisation's own id for this work, echoed back."
+      }
+     }
+    },
+    "Run": {
+     "type": "object",
+     "required": [
+      "id",
+      "pipelineId",
+      "status",
+      "createdAt"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "pipelineId": {
+       "type": "string"
+      },
+      "status": {
+       "$ref": "#/components/schemas/RunStatus"
+      },
+      "reference": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "createdAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "startedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "endedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "message": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "The run's status line."
+      },
+      "attempt": {
+       "type": "integer",
+       "description": "Which attempt the run is on, from 1."
+      },
+      "review": {
+       "$ref": "#/components/schemas/ReviewStatus"
+      }
+     }
+    },
+    "RunPage": {
+     "type": "object",
+     "required": [
+      "data",
+      "nextCursor"
+     ],
+     "properties": {
+      "data": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/Run"
+       }
+      },
+      "nextCursor": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     }
+    },
+    "Step": {
+     "type": "object",
+     "required": [
+      "key",
+      "task",
+      "status"
+     ],
+     "properties": {
+      "key": {
+       "type": "string"
+      },
+      "name": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "task": {
+       "type": "string",
+       "description": "The step's task, e.g. read_file, validate, save_file; legacy for a run without steps."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "pending",
+        "running",
+        "completed",
+        "failed",
+        "skipped",
+        "interrupted"
+       ]
+      },
+      "rowsIn": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "rowsOut": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "startedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "endedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "durationMs": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "message": {
+       "type": [
+        "string",
+        "null"
+       ]
+      }
+     }
+    },
+    "Manifest": {
+     "type": "object",
+     "required": [
+      "runId",
+      "pipelineId",
+      "status",
+      "attempt",
+      "generatedAt",
+      "files",
+      "review"
+     ],
+     "properties": {
+      "runId": {
+       "type": "string"
+      },
+      "pipelineId": {
+       "type": "string"
+      },
+      "status": {
+       "$ref": "#/components/schemas/RunStatus"
+      },
+      "attempt": {
+       "type": "integer",
+       "description": "The attempt whose files are listed: the run's latest."
+      },
+      "generatedAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "files": {
+       "type": "array",
+       "items": {
+        "$ref": "#/components/schemas/ManifestFile"
+       }
+      },
+      "review": {
+       "$ref": "#/components/schemas/Review"
+      }
+     }
+    },
+    "ManifestFile": {
+     "allOf": [
+      {
+       "$ref": "#/components/schemas/File"
+      },
+      {
+       "type": "object",
+       "required": [
+        "expired"
+       ],
+       "properties": {
+        "step": {
+         "type": [
+          "string",
+          "null"
+         ],
+         "description": "The step that made it (null for an input)."
+        },
+        "rows": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "description": "Rows it holds, for a data file."
+        },
+        "expired": {
+         "type": "boolean",
+         "description": "Past expiresAt: listed, no longer downloadable (410)."
+        }
+       }
+      }
+     ]
+    },
+    "File": {
+     "type": "object",
+     "required": [
+      "id",
+      "name",
+      "role",
+      "bytes",
+      "sha256",
+      "createdAt"
+     ],
+     "properties": {
+      "id": {
+       "type": "string",
+       "description": "A ULID; the only id of a file a customer sees."
+      },
+      "name": {
+       "type": "string"
+      },
+      "role": {
+       "type": "string",
+       "enum": [
+        "input",
+        "result",
+        "report",
+        "image"
+       ]
+      },
+      "contentType": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "bytes": {
+       "type": "integer"
+      },
+      "sha256": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Hex; null for a file a run made before files carried one."
+      },
+      "createdAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "expiresAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      }
+     }
+    },
+    "FileLink": {
+     "type": "object",
+     "required": [
+      "url",
+      "expiresAt"
+     ],
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri-reference",
+       "description": "The signed link, as Location says it."
+      },
+      "expiresAt": {
+       "type": "string",
+       "format": "date-time"
+      }
+     }
+    },
+    "ViewLink": {
+     "type": "object",
+     "required": [
+      "url",
+      "expiresAt"
+     ],
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri",
+       "description": "The console's page /embed/runs/{token}; add ?theme= and &accent= to fit."
+      },
+      "expiresAt": {
+       "type": "string",
+       "format": "date-time"
+      }
+     }
+    },
+    "RunView": {
+     "description": "A Run (review as the full Review), with its pipeline's name, steps, made files with downloads, and the view's own expiry.",
+     "allOf": [
+      {
+       "$ref": "#/components/schemas/Run"
+      },
+      {
+       "type": "object",
+       "required": [
+        "steps",
+        "files",
+        "review",
+        "viewExpiresAt",
+        "refreshSeconds"
+       ],
+       "properties": {
+        "pipelineName": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "steps": {
+         "type": "array",
+         "items": {
+          "$ref": "#/components/schemas/Step"
+         }
+        },
+        "files": {
+         "type": "array",
+         "description": "The files the run's latest attempt made (role result or report).",
+         "items": {
+          "allOf": [
+           {
+            "$ref": "#/components/schemas/ManifestFile"
+           },
+           {
+            "type": "object",
+            "required": [
+             "download"
+            ],
+            "properties": {
+             "download": {
+              "oneOf": [
+               {
+                "$ref": "#/components/schemas/FileLink"
+               },
+               {
+                "type": "null"
+               }
+              ],
+              "description": "A signed file link (null once the file has expired), ending no later than the view."
+             }
+            }
+           }
+          ]
+         }
+        },
+        "review": {
+         "$ref": "#/components/schemas/Review"
+        },
+        "viewExpiresAt": {
+         "type": "string",
+         "format": "date-time"
+        },
+        "refreshSeconds": {
+         "type": [
+          "integer",
+          "null"
+         ],
+         "description": "Read again after this many seconds while the run is still moving."
+        }
+       }
+      }
+     ]
+    },
+    "RunViewFrame": {
+     "type": "object",
+     "required": [
+      "state",
+      "frameAncestors",
+      "expiresAt"
+     ],
+     "properties": {
+      "state": {
+       "type": "string",
+       "enum": [
+        "open",
+        "expired"
+       ]
+      },
+      "frameAncestors": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       },
+       "description": "Origins, e.g. https://portal.example.com, https://*.example.com."
+      },
+      "expiresAt": {
+       "type": "string",
+       "format": "date-time"
+      }
+     }
+    },
+    "Review": {
+     "type": "object",
+     "required": [
+      "status",
+      "required",
+      "decisions"
+     ],
+     "properties": {
+      "status": {
+       "$ref": "#/components/schemas/ReviewStatus"
+      },
+      "required": {
+       "type": "array",
+       "items": {
+        "type": "string",
+        "enum": [
+         "internal",
+         "customer"
+        ]
+       }
+      },
+      "decidedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "rerunRunId": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "The run that ran the pipeline again after a rejection."
+      },
+      "decisions": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "party",
+         "decision",
+         "decidedAt"
+        ],
+        "properties": {
+         "party": {
+          "type": "string",
+          "enum": [
+           "internal",
+           "customer"
+          ]
+         },
+         "decision": {
+          "type": "string",
+          "enum": [
+           "approved",
+           "rejected"
+          ]
+         },
+         "reason": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "comment": {
+          "type": [
+           "string",
+           "null"
+          ]
+         },
+         "decidedAt": {
+          "type": "string",
+          "format": "date-time"
+         }
+        }
+       }
+      },
+      "rerun": {
+       "type": "object",
+       "description": "Only in the answer to a rejection with rerun.",
+       "required": [
+        "queued"
+       ],
+       "properties": {
+        "queued": {
+         "type": "boolean"
+        },
+        "runId": {
+         "type": [
+          "string",
+          "null"
+         ]
+        },
+        "message": {
+         "type": [
+          "string",
+          "null"
+         ]
+        }
+       }
+      }
+     }
+    },
+    "ReviewDecision": {
+     "type": "object",
+     "required": [
+      "decision"
+     ],
+     "properties": {
+      "decision": {
+       "type": "string",
+       "enum": [
+        "approved",
+        "rejected"
+       ]
+      },
+      "reason": {
+       "type": "string",
+       "maxLength": 2000,
+       "description": "Required when rejected."
+      },
+      "comment": {
+       "type": "string",
+       "maxLength": 2000
+      },
+      "rerun": {
+       "type": "boolean",
+       "default": false,
+       "description": "On a rejection, run the pipeline again."
+      }
+     }
+    },
+    "Form": {
+     "type": "object",
+     "required": [
+      "id",
+      "name",
+      "fields"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "name": {
+       "type": "string"
+      },
+      "description": {
+       "type": [
+        "string",
+        "null"
+       ]
+      },
+      "fields": {
+       "type": "array",
+       "items": {
+        "type": "object",
+        "required": [
+         "key",
+         "label",
+         "type",
+         "required"
+        ],
+        "properties": {
+         "key": {
+          "type": "string"
+         },
+         "label": {
+          "type": "string"
+         },
+         "type": {
+          "type": "string"
+         },
+         "required": {
+          "type": "boolean"
+         },
+         "options": {
+          "type": "array",
+          "items": {
+           "type": "string"
+          }
+         }
+        }
+       }
+      }
+     }
+    },
+    "Submission": {
+     "type": "object",
+     "required": [
+      "id",
+      "formId",
+      "receivedAt"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "formId": {
+       "type": "string"
+      },
+      "receivedAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "runId": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "The run it started, if the form starts one."
+      }
+     }
+    },
+    "EventType": {
+     "type": "object",
+     "required": [
+      "type",
+      "description",
+      "schema"
+     ],
+     "properties": {
+      "type": {
+       "type": "string",
+       "examples": [
+        "run.completed"
+       ]
+      },
+      "description": {
+       "type": "string"
+      },
+      "schema": {
+       "type": "object",
+       "description": "JSON Schema of the event's data."
+      }
+     }
+    },
+    "Event": {
+     "type": "object",
+     "required": [
+      "id",
+      "type",
+      "createdAt",
+      "workspaceId",
+      "data"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "type": {
+       "type": "string"
+      },
+      "createdAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "workspaceId": {
+       "type": "string"
+      },
+      "data": {
+       "type": "object",
+       "additionalProperties": true
+      }
+     }
+    },
+    "Webhook": {
+     "type": "object",
+     "required": [
+      "id",
+      "url",
+      "eventTypes",
+      "active",
+      "createdAt"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "url": {
+       "type": "string",
+       "format": "uri"
+      },
+      "eventTypes": {
+       "type": "array",
+       "items": {
+        "type": "string"
+       }
+      },
+      "active": {
+       "type": "boolean"
+      },
+      "pausedReason": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Why it is paused: by its owner, or by the platform after 3 days of failures."
+      },
+      "createdAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "updatedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "failingSince": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time",
+       "description": "The first failed attempt since the last success."
+      },
+      "lastSuccessAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "secretRotatedAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "previousSecretValidUntil": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time",
+       "description": "While the previous secret still signs beside the new one."
+      }
+     }
+    },
+    "WebhookCreate": {
+     "type": "object",
+     "required": [
+      "url",
+      "eventTypes"
+     ],
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri",
+       "description": "https; a public address."
+      },
+      "eventTypes": {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "string"
+       }
+      }
+     }
+    },
+    "WebhookUpdate": {
+     "type": "object",
+     "properties": {
+      "url": {
+       "type": "string",
+       "format": "uri"
+      },
+      "eventTypes": {
+       "type": "array",
+       "minItems": 1,
+       "items": {
+        "type": "string"
+       }
+      },
+      "active": {
+       "type": "boolean"
+      }
+     }
+    },
+    "Delivery": {
+     "type": "object",
+     "required": [
+      "id",
+      "eventId",
+      "eventType",
+      "attempt",
+      "status",
+      "createdAt"
+     ],
+     "properties": {
+      "id": {
+       "type": "string"
+      },
+      "eventId": {
+       "type": "string"
+      },
+      "eventType": {
+       "type": "string"
+      },
+      "attempt": {
+       "type": "integer",
+       "description": "Attempts made so far (0 while the first is pending)."
+      },
+      "status": {
+       "type": "string",
+       "enum": [
+        "pending",
+        "delivered",
+        "failed",
+        "retrying"
+       ]
+      },
+      "responseStatus": {
+       "type": [
+        "integer",
+        "null"
+       ],
+       "description": "The last answer's status; null when none came."
+      },
+      "durationMs": {
+       "type": [
+        "integer",
+        "null"
+       ]
+      },
+      "nextAttemptAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "createdAt": {
+       "type": "string",
+       "format": "date-time"
+      },
+      "lastAttemptAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "deliveredAt": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "format": "date-time"
+      },
+      "error": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "Why the last attempt failed, never the answer's body."
+      },
+      "redeliveryOf": {
+       "type": [
+        "string",
+        "null"
+       ],
+       "description": "The delivery this one sends again."
+      }
+     }
+    }
+   }
+  }
+ },
+ "eventTypes": [
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/file.available.json",
+   "title": "file.available",
+   "description": "A file a run produced can be downloaded.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "file.available"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "type": "object",
+     "required": [
+      "runId",
+      "file"
+     ],
+     "properties": {
+      "runId": {
+       "type": "string"
+      },
+      "file": {
+       "$ref": "#/components/schemas/File"
+      }
+     }
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/form.submission.received.json",
+   "title": "form.submission.received",
+   "description": "A form received a submission (from the console, a share link or the API).",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "form.submission.received"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "$ref": "#/components/schemas/Submission"
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/run.completed.json",
+   "title": "run.completed",
+   "description": "A run finished; its outputs and manifest can be read.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "run.completed"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "$ref": "#/components/schemas/Run"
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/run.failed.json",
+   "title": "run.failed",
+   "description": "A run ended in failure; message says why.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "run.failed"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "$ref": "#/components/schemas/Run"
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/run.review.decided.json",
+   "title": "run.review.decided",
+   "description": "A party decided on a run's results; review.status is the state after it.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "run.review.decided"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "type": "object",
+     "required": [
+      "run",
+      "review"
+     ],
+     "properties": {
+      "run": {
+       "$ref": "#/components/schemas/Run"
+      },
+      "review": {
+       "$ref": "#/components/schemas/Review"
+      }
+     }
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/run.review.requested.json",
+   "title": "run.review.requested",
+   "description": "A completed run waits for a review the customer takes part in.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "run.review.requested"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "type": "object",
+     "required": [
+      "run",
+      "review"
+     ],
+     "properties": {
+      "run": {
+       "$ref": "#/components/schemas/Run"
+      },
+      "review": {
+       "$ref": "#/components/schemas/Review"
+      }
+     }
+    }
+   }
+  },
+  {
+   "$schema": "https://json-schema.org/draft/2020-12/schema",
+   "$id": "https://platform/events/run.started.json",
+   "title": "run.started",
+   "description": "A run began its first step.",
+   "type": "object",
+   "required": [
+    "id",
+    "type",
+    "createdAt",
+    "workspaceId",
+    "data"
+   ],
+   "properties": {
+    "id": {
+     "type": "string"
+    },
+    "type": {
+     "const": "run.started"
+    },
+    "createdAt": {
+     "type": "string",
+     "format": "date-time"
+    },
+    "workspaceId": {
+     "type": "string"
+    },
+    "data": {
+     "$ref": "#/components/schemas/Run"
+    }
+   }
+  }
+ ],
+ "guides": [
+  {
+   "slug": "quickstart",
+   "title": "Quickstart",
+   "summary": "Sandbox keys, a token, a pipeline, a file, a run and its results: the whole loop in ten minutes.",
+   "markdown": "# Quickstart\n\nFrom nothing to a finished run and its results, in your sandbox. Every step is one call; each sample comes in curl,\nPython and Node.js, and every one of them is run against the live API before the docs ship.\n\n## Before you start\n\n**A sandbox and a test key.** Your sandbox is a workspace of its own with sample pipelines and data. Nothing you do there\ntouches your organisation's real data, and nothing there is billed. Ask your account team to create it once; after that\nyour workspace administrator makes keys for it in the console, under **Integration › API Clients › Sandbox › New test\nkey**. A test key's client id starts with `cl_test_` and only works in the sandbox: the same calls with it against your\nreal workspace's pipelines answer 404.\n\nFor this guide, give the key the scopes `pipelines:read`, `runs:read`, `runs:write`, `files:read` and `files:write`.\nThe secret is shown once: copy it into your environment, never into code.\n\n```bash\nexport API_URL=\"https://your-console-host/v1\"      # the API's address, as the Developer portal shows it\nexport CLIENT_ID=\"cl_test_...\"                     # your test key's client id\nexport CLIENT_SECRET=\"cs_...\"                      # its secret, shown once\n```\n\n**Tools.** curl and [jq](https://jqlang.org/); Python 3.9+ with `pip install requests`; or Node.js 18+ (its built-in\n`fetch`). Save a Node sample as a `.mjs` file and run it with `node`.\n\n## 1. Get an access token\n\nExchange the client's id and secret for a token (OAuth 2.0 client credentials). It lasts 15 minutes; ask for a new one\nwhen it ends, or when a call answers 401.\n\n<!-- sample id=\"token\" sets=\"TOKEN=access_token\" expect='{\"token_type\":\"Bearer\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/oauth/token\" \\\n  -d grant_type=client_credentials \\\n  -d client_id=\"$CLIENT_ID\" \\\n  --data-urlencode client_secret=\"$CLIENT_SECRET\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/oauth/token\", data={\n    \"grant_type\": \"client_credentials\",\n    \"client_id\": os.environ[\"CLIENT_ID\"],\n    \"client_secret\": os.environ[\"CLIENT_SECRET\"],\n})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/oauth/token`, {\n  method: 'POST',\n  body: new URLSearchParams({\n    grant_type: 'client_credentials',\n    client_id: process.env.CLIENT_ID,\n    client_secret: process.env.CLIENT_SECRET,\n  }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the `access_token` from the answer:\n\n```bash\nexport TOKEN=\"eyJ...\"    # access_token\n```\n\n## 2. Find a pipeline\n\nA pipeline is what a run does. The sandbox has two samples; this guide uses **Sample orders**, which takes an order\nrecord and keeps it as a file. Its `inputContract` says what a record must look like.\n\n<!-- sample id=\"pipelines\" sets=\"PIPELINE_ID=data[name=Sample+orders].id\" -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/pipelines\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/pipelines`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep its id:\n\n```bash\nexport PIPELINE_ID=\"...\"    # the id of \"Sample orders\"\n```\n\n## 3. Upload a file\n\nFiles a run should read are uploaded first; the answer is a `file_id`. Every creating `POST` takes an\n`Idempotency-Key`: send the same key again and you get the same answer, never a second file (see\n[Idempotency](idempotency)).\n\n<!-- sample id=\"upload\" sets=\"FILE_ID=id\" expect='{\"role\":\"input\"}' -->\n```bash\nprintf 'order_id,amount\\nORD-1001,12.50\\n' > order.csv\ncurl -sS --fail-with-body \"$API_URL/files\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -F \"file=@order.csv;type=text/csv\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/files\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n                       files={\"file\": (\"order.csv\", b\"order_id,amount\\nORD-1001,12.50\\n\", \"text/csv\")})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst form = new FormData();\nform.append('file', new Blob(['order_id,amount\\nORD-1001,12.50\\n'], { type: 'text/csv' }), 'order.csv');\nconst answer = await fetch(`${process.env.API_URL}/files`, {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Idempotency-Key': randomUUID() },\n  body: form,\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the file id:\n\n```bash\nexport FILE_ID=\"01J...\"    # id\n```\n\n## 4. Start a run\n\nSend the record and the file ids. The record is checked against the pipeline's input contract first: a record it refuses\nis a 422 that names each field (see [Errors](errors)), and nothing starts. `reference` is your own id for this work; it is\nechoed back on the run and in its events. The answer is 202 with the queued run.\n\n<!-- sample id=\"start\" sets=\"RUN_ID=id\" expect='{\"status\":\"queued\",\"reference\":\"po-1001\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/pipelines/$PIPELINE_ID/runs\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d \"{\\\"record\\\": {\\\"order_id\\\": \\\"ORD-1001\\\", \\\"amount\\\": 12.5, \\\"customer\\\": \\\"Quickstart\\\"},\n       \\\"files\\\": [\\\"$FILE_ID\\\"], \\\"reference\\\": \\\"po-1001\\\"}\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(\n    f\"{os.environ['API_URL']}/pipelines/{os.environ['PIPELINE_ID']}/runs\",\n    headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n    json={\"record\": {\"order_id\": \"ORD-1001\", \"amount\": 12.5, \"customer\": \"Quickstart\"},\n          \"files\": [os.environ[\"FILE_ID\"]], \"reference\": \"po-1001\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst answer = await fetch(`${process.env.API_URL}/pipelines/${process.env.PIPELINE_ID}/runs`, {\n  method: 'POST',\n  headers: {\n    Authorization: `Bearer ${process.env.TOKEN}`,\n    'Idempotency-Key': randomUUID(),\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify({\n    record: { order_id: 'ORD-1001', amount: 12.5, customer: 'Quickstart' },\n    files: [process.env.FILE_ID],\n    reference: 'po-1001',\n  }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the run id:\n\n```bash\nexport RUN_ID=\"...\"    # id\n```\n\nOne run of a pipeline is in flight at a time: a second start while one runs is a 409 (`/problems/run-in-flight`).\n\n## 5. Follow the run\n\nRead the run until its status settles: `queued` and `running` move on; `completed`, `failed`, `skipped` and\n`interrupted` are final. Polling every few seconds is fine for a script; a portal should use\n[webhooks](webhooks) instead.\n\n<!-- sample id=\"follow\" expect='{\"status\":\"completed\"}' -->\n```bash\nwhile :; do\n  run=$(curl -sS --fail-with-body \"$API_URL/runs/$RUN_ID\" -H \"Authorization: Bearer $TOKEN\")\n  status=$(echo \"$run\" | jq -r .status)\n  if [ \"$status\" != queued ] && [ \"$status\" != running ]; then echo \"$run\"; break; fi\n  sleep 3\ndone\n```\n\n```python\nimport json, os, time\nimport requests\n\nwhile True:\n    answer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}\",\n                          headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\n    answer.raise_for_status()\n    run = answer.json()\n    if run[\"status\"] not in (\"queued\", \"running\"):\n        break\n    time.sleep(3)\nprint(json.dumps(run, indent=2))\n```\n\n```javascript\nlet run;\nfor (;;) {\n  const answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}`, {\n    headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n  });\n  if (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\n  run = await answer.json();\n  if (run.status !== 'queued' && run.status !== 'running') break;\n  await new Promise(resolve => setTimeout(resolve, 3000));\n}\nconsole.log(JSON.stringify(run, null, 2));\n```\n\nTimes are RFC 3339 in UTC (`2026-10-06T14:00:00Z`). `GET /runs/{runId}/steps` lists what each step did.\n\n## 6. Read the results\n\nThe run's outputs are its manifest: the files it was given (role `input`) and the files it made (`result`, `report`),\neach with its id, size and sha256.\n\n<!-- sample id=\"outputs\" sets=\"RESULT_FILE_ID=files[role=result].id\" expect='{\"status\":\"completed\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/runs/$RUN_ID/outputs\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/outputs\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/outputs`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nTo download one, see [Files and file links](files). Next: be told when runs finish instead of asking, with\n[Webhooks](webhooks).\n\n## Going live\n\nWhen your integration works in the sandbox, your workspace administrator makes an ordinary key (`cl_...`) under\n**Integration › API Clients** with the same scopes. Change `CLIENT_ID` and `CLIENT_SECRET`, and use your real pipelines'\nids; nothing else changes.\n"
+  },
+  {
+   "slug": "webhooks",
+   "title": "Webhooks",
+   "summary": "Be told when a run finishes: subscribe, verify the signature, and what retries mean for your receiver.",
+   "markdown": "# Webhooks\n\nInstead of asking whether a run has finished, let the platform tell you: subscribe a URL of yours to event types such\nas `run.completed`, and every matching event is POSTed to it, signed. This guide subscribes a receiver, verifies the\nsignatures, sends itself an event and reads the delivery log.\n\nYour test key needs `webhooks:manage` (subscriptions) and `events:write` (step 3) beside the quickstart's scopes. The\nevent types and the shape of each event's `data` are in the API reference under **Event types**.\n\n## 1. Subscribe\n\nGive the URL and the event types. The URL must be `https` on a public address: a private, loopback or link-local one is\nrefused (422 at `url`). The answer carries the subscription's **secret, once**: keep it with your receiver. Only events\nafter the subscription is made are sent.\n\n```bash\nexport WEBHOOK_URL=\"https://hooks.your-portal.example/etl\"    # where your receiver listens\n```\n\n<!-- sample id=\"subscribe\" sets=\"WEBHOOK_ID=id WEBHOOK_SECRET=secret\" expect='{\"active\":true}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/webhooks\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d \"{\\\"url\\\": \\\"$WEBHOOK_URL\\\", \\\"eventTypes\\\": [\\\"run.started\\\", \\\"run.completed\\\", \\\"run.failed\\\"]}\"\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/webhooks\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n                       json={\"url\": os.environ[\"WEBHOOK_URL\"], \"eventTypes\": [\"run.started\", \"run.completed\", \"run.failed\"]})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst answer = await fetch(`${process.env.API_URL}/webhooks`, {\n  method: 'POST',\n  headers: {\n    Authorization: `Bearer ${process.env.TOKEN}`,\n    'Idempotency-Key': randomUUID(),\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify({ url: process.env.WEBHOOK_URL, eventTypes: ['run.started', 'run.completed', 'run.failed'] }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nKeep the id and the secret:\n\n```bash\nexport WEBHOOK_ID=\"...\"           # id\nexport WEBHOOK_SECRET=\"whsec_...\" # secret, shown once\n```\n\n## 2. Receive and verify\n\nEach delivery is a `POST` of the event, `{id, type, createdAt, workspaceId, data}`, where `data` is what a `GET` of the\nresource answers (a run's event carries the run). Three headers come with it:\n\n| Header | What it is |\n|---|---|\n| `Webhook-Signature` | `t=<unix seconds>, v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed by the secret>` |\n| `Webhook-Id` | The event's id: the same on every retry and redelivery. Deduplicate on it. |\n| `Webhook-Delivery` | This delivery's id, as the delivery log shows it. |\n\nBefore trusting a delivery: compute the HMAC over the **raw** body (not re-serialised JSON), compare it in constant time\nwith each `v1` (for 24 hours after you rotate the secret there are two, the new one first: accept either), and refuse a\n`t` more than five minutes from your clock. Then answer `2xx` within 10 seconds and do the work afterwards. These two\nreceivers do exactly that and print each new event:\n\n<!-- sample id=\"receiver\" server=\"true\" -->\n```python\nimport hashlib, hmac, json, os, time\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\n\nSECRET = os.environ[\"WEBHOOK_SECRET\"].encode()\nseen = set()  # Webhook-Id values already handled: delivery is at least once\n\n\ndef verified(header, body):\n    items = [part.strip().split(\"=\", 1) for part in header.split(\",\") if \"=\" in part]\n    t = next((value for key, value in items if key == \"t\"), None)\n    if t is None or not t.isdigit() or abs(time.time() - int(t)) > 300:\n        return False\n    expected = hmac.new(SECRET, t.encode() + b\".\" + body, hashlib.sha256).hexdigest()\n    return any(key == \"v1\" and hmac.compare_digest(value, expected) for key, value in items)\n\n\nclass Receiver(BaseHTTPRequestHandler):\n    def do_POST(self):\n        body = self.rfile.read(int(self.headers.get(\"Content-Length\", 0)))\n        if not verified(self.headers.get(\"Webhook-Signature\", \"\"), body):\n            self.send_response(400)\n            self.end_headers()\n            return\n        self.send_response(204)  # answer first, then work\n        self.end_headers()\n        event_id = self.headers.get(\"Webhook-Id\")\n        if event_id in seen:\n            return\n        seen.add(event_id)\n        event = json.loads(body)\n        print(json.dumps({\"type\": event[\"type\"], \"event\": event[\"id\"], \"run\": event[\"data\"].get(\"id\"),\n                          \"status\": event[\"data\"].get(\"status\")}), flush=True)\n\n    def log_message(self, *args):\n        pass\n\n\nHTTPServer((\"\", int(os.environ.get(\"PORT\", \"8000\"))), Receiver).serve_forever()\n```\n\n```javascript\nimport { createServer } from 'node:http';\nimport { createHmac, timingSafeEqual } from 'node:crypto';\n\nconst secret = process.env.WEBHOOK_SECRET;\nconst seen = new Set(); // Webhook-Id values already handled: delivery is at least once\n\nfunction verified(header, body) {\n  const items = header.split(',').map(part => part.trim().split('=')).filter(pair => pair.length === 2);\n  const t = items.find(([key]) => key === 't')?.[1];\n  if (!t || !/^\\d+$/.test(t) || Math.abs(Date.now() / 1000 - Number(t)) > 300) return false;\n  const expected = createHmac('sha256', secret).update(`${t}.`).update(body).digest();\n  return items.some(([key, value]) => {\n    const given = Buffer.from(value, 'hex');\n    return key === 'v1' && given.length === expected.length && timingSafeEqual(given, expected);\n  });\n}\n\ncreateServer((request, response) => {\n  const chunks = [];\n  request.on('data', chunk => chunks.push(chunk));\n  request.on('end', () => {\n    const body = Buffer.concat(chunks);\n    if (!verified(request.headers['webhook-signature'] ?? '', body)) {\n      response.writeHead(400).end();\n      return;\n    }\n    response.writeHead(204).end(); // answer first, then work\n    const eventId = request.headers['webhook-id'];\n    if (seen.has(eventId)) return;\n    seen.add(eventId);\n    const event = JSON.parse(body);\n    console.log(JSON.stringify({ type: event.type, event: event.id, run: event.data?.id, status: event.data?.status }));\n  });\n}).listen(Number(process.env.PORT ?? 8000));\n```\n\nA real receiver keeps `seen` in its database, and puts the event on its own queue rather than working inside the\nrequest.\n\n## 3. Send yourself an event\n\nAnything that starts a run will do. Here an event of your own, `sample.order.created`, which the sandbox's event route\nhands to **Sample orders** with the event's data as the run's record (`POST /events`, scope `events:write`). Within\nseconds your receiver prints `run.started`, then `run.completed`.\n\n<!-- sample id=\"trigger\" sets=\"RUN_ID=started[0].id\" -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/events\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"type\": \"sample.order.created\", \"data\": {\"order_id\": \"ORD-2001\", \"amount\": 40, \"customer\": \"Webhook guide\"}}'\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/events\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n                       json={\"type\": \"sample.order.created\",\n                             \"data\": {\"order_id\": \"ORD-2001\", \"amount\": 40, \"customer\": \"Webhook guide\"}})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst answer = await fetch(`${process.env.API_URL}/events`, {\n  method: 'POST',\n  headers: {\n    Authorization: `Bearer ${process.env.TOKEN}`,\n    'Idempotency-Key': randomUUID(),\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify({ type: 'sample.order.created', data: { order_id: 'ORD-2001', amount: 40, customer: 'Webhook guide' } }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\n`started` lists the runs it started. A route that could not start (a run of that pipeline still in flight) is in\n`notStarted`, with why.\n\n## 4. The delivery log, and sending one again\n\nEvery delivery and its attempts are kept: status (`pending`, `retrying`, `delivered`, `failed`), your receiver's answer\ncode, how long it took, and when the next attempt is due. A delivery can be sent again on request; it keeps the event's\n`Webhook-Id`, so your deduplication holds.\n\n<!-- sample id=\"deliveries\" await=\"run.completed\" sets=\"DELIVERY_ID=data[0].id\" -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/webhooks/$WEBHOOK_ID/deliveries\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/webhooks/{os.environ['WEBHOOK_ID']}/deliveries\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/webhooks/${process.env.WEBHOOK_ID}/deliveries`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nSend one again (202, the new delivery):\n\n<!-- sample id=\"redeliver\" expect='{\"status\":\"pending\"}' -->\n```bash\ncurl -sS --fail-with-body -X POST \"$API_URL/webhooks/$WEBHOOK_ID/deliveries/$DELIVERY_ID/redeliver\" \\\n  -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(\n    f\"{os.environ['API_URL']}/webhooks/{os.environ['WEBHOOK_ID']}/deliveries/{os.environ['DELIVERY_ID']}/redeliver\",\n    headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst url = `${process.env.API_URL}/webhooks/${process.env.WEBHOOK_ID}/deliveries/${process.env.DELIVERY_ID}/redeliver`;\nconst answer = await fetch(url, { method: 'POST', headers: { Authorization: `Bearer ${process.env.TOKEN}` } });\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\n## Retries, order and pausing\n\n- **Retries.** Anything but a `2xx` within 10 seconds (another status, no answer, a redirect) is a failed attempt. It is\n  tried again after 10 s, 30 s, 90 s and so on, at most an hour apart, for 24 hours; then the delivery is `failed`.\n- **At least once.** A delivery can arrive twice (your answer was lost, or someone sent it again): deduplicate on\n  `Webhook-Id`.\n- **Order.** A subscription's first attempts go out in the order the events happened, but a retry does not hold later\n  events back: order by the event's `createdAt`, not by arrival.\n- **Paused.** A subscription with no successful delivery for 3 days is paused, and the person who made it is told. Fix\n  the receiver, then resume it with `PATCH /webhooks/{webhookId}` and `{\"active\": true}`.\n- **Rotating the secret.** `POST /webhooks/{webhookId}/rotate-secret` answers the new secret once; both secrets sign for\n  24 hours, so you can roll your receiver over without missing a delivery.\n\n## 5. Remove it\n\nA subscription you no longer need: pause it (`PATCH` with `{\"active\": false}`) or remove it (204). A workspace may have\n20.\n\n<!-- sample id=\"remove\" -->\n```bash\ncurl -sS --fail-with-body -X DELETE \"$API_URL/webhooks/$WEBHOOK_ID\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport os\nimport requests\n\nanswer = requests.delete(f\"{os.environ['API_URL']}/webhooks/{os.environ['WEBHOOK_ID']}\",\n                         headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(answer.status_code)\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/webhooks/${process.env.WEBHOOK_ID}`, {\n  method: 'DELETE',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(answer.status);\n```\n"
+  },
+  {
+   "slug": "files",
+   "title": "Files and file links",
+   "summary": "Upload for a run, download what a run made through a short-lived signed link.",
+   "markdown": "# Files and file links\n\nFiles go in through `POST /files` (see the [Quickstart](quickstart), step 3) and come out through short-lived signed\nlinks. You never see a bucket, a storage key or a connection: a file is its id (a 26-character ULID), the only id of a\nfile you will ever be given.\n\n| | |\n|---|---|\n| Upload | `POST /files`, multipart, field `file`, at most 100 MB, with an `Idempotency-Key`. Scope `files:write`. Uploading starts nothing. |\n| Describe | `GET /files/{fileId}/meta`: name, role, content type, bytes, sha256, created and expiry times. Scope `files:read`. |\n| Download | `GET /files/{fileId}`: a `302` to a signed link on this API, valid 5 minutes, that needs no token. Scope `files:read`. |\n\nA run's manifest (`GET /runs/{runId}/outputs`) lists its files by id. The examples below use the file the quickstart's\nrun made:\n\n```bash\nexport RESULT_FILE_ID=\"01J...\"    # from the manifest: the file with role \"result\"\n```\n\n## Describe a file\n\n<!-- sample id=\"meta\" expect='{\"role\":\"result\"}' -->\n```bash\ncurl -sS --fail-with-body \"$API_URL/files/$RESULT_FILE_ID/meta\" -H \"Authorization: Bearer $TOKEN\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/files/{os.environ['RESULT_FILE_ID']}/meta\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/files/${process.env.RESULT_FILE_ID}/meta`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\n## Download it\n\nFollow the redirect. The signed link carries its own proof, so a client that drops the `Authorization` header on a\nredirect still works; check the bytes against the `sha256` the manifest and `meta` give.\n\n<!-- sample id=\"download\" -->\n```bash\ncurl -sS --fail-with-body -L -o result.json \"$API_URL/files/$RESULT_FILE_ID\" -H \"Authorization: Bearer $TOKEN\"\nshasum -a 256 result.json\n```\n\n```python\nimport hashlib, json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/files/{os.environ['RESULT_FILE_ID']}\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nwith open(\"result.json\", \"wb\") as f:\n    f.write(answer.content)\nprint(json.dumps({\"bytes\": len(answer.content), \"sha256\": hashlib.sha256(answer.content).hexdigest()}))\n```\n\n```javascript\nimport { createHash } from 'node:crypto';\nimport { writeFile } from 'node:fs/promises';\n\nconst answer = await fetch(`${process.env.API_URL}/files/${process.env.RESULT_FILE_ID}`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconst bytes = Buffer.from(await answer.arrayBuffer());\nawait writeFile('result.json', bytes);\nconsole.log(JSON.stringify({ bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') }));\n```\n\n## Hand a link to someone else\n\nDon't follow the redirect, and you get the link itself as `{url, expiresAt}` (also in `Location`). It opens the file\nwith no token for 5 minutes, so a browser can download it directly: give it to your user's browser rather than\nproxying the bytes. Ask again for a fresh one when it has expired (410, `/problems/link-expired`).\n\n<!-- sample id=\"link\" sets=\"LINK_URL=url\" -->\n```bash\ncurl -sS \"$API_URL/files/$RESULT_FILE_ID\" -H \"Authorization: Bearer $TOKEN\" -H \"Accept: application/json\"\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/files/{os.environ['RESULT_FILE_ID']}\",\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"}, allow_redirects=False)\nassert answer.status_code == 302, answer.text\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/files/${process.env.RESULT_FILE_ID}`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n  redirect: 'manual',\n});\nif (answer.status !== 302) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nThe `url` is relative to the API's host (`/v1/files/{fileId}/content?token=...`): prefix your API host's origin.\n\n## Expiry\n\nA file a run made can have an expiry (the pipeline keeps its results for a while). Past it, the manifest still lists the\nfile with `\"expired\": true`, and a download is 410 (`/problems/file-expired`): run the pipeline again for a new one.\n"
+  },
+  {
+   "slug": "idempotency",
+   "title": "Idempotency",
+   "summary": "Send a creating request twice and get one result: the Idempotency-Key header.",
+   "markdown": "# Idempotency\n\nNetworks fail halfway: your request reached us, our answer never reached you. Was the run started? With an\n`Idempotency-Key` you simply send the same request again and get the first answer back, never a second run, file or\nwebhook.\n\n## The rules\n\n- **Every `POST` that creates something requires the header** `Idempotency-Key`: 8 to 128 characters of\n  `A-Z a-z 0-9 . _ : -`. A UUID is a good key. Without one the answer is 400.\n- **Same key, same body, within 24 hours:** the first answer again, status and body, with `Idempotent-Replayed: true`.\n  A refusal (a 4xx) is replayed too; a failure of ours (5xx) frees the key, so retrying with it is safe.\n- **Same key, different body:** 409 `/problems/idempotency-conflict`. Make a new key for new work.\n- **Same key while the first is still being handled:** 409 `/problems/idempotency-in-progress`; try again in a moment\n  with the same key.\n- Keys are your client's own: another client's key never collides with yours.\n\nMake the key where the work is decided, store it with your own record of the work (an order, a form), and reuse it on\nevery retry of that work. A key per HTTP attempt defeats the purpose.\n\n## See it\n\nUpload the same file twice with one key: one file, the second answer replayed. Then the same key with another file:\n409.\n\n<!-- sample id=\"replay\" expect='{\"same\":true,\"replayed\":\"true\",\"conflict\":409}' -->\n```bash\nkey=$(uuidgen)\nsend() {\n  curl -sS -D headers.txt -o body.json \"$API_URL/files\" -H \"Authorization: Bearer $TOKEN\" \\\n    -H \"Idempotency-Key: $key\" -F \"file=@$1;type=text/csv\" -w '%{http_code}'\n}\nprintf 'order_id,amount\\nORD-3001,5\\n' > a.csv\nprintf 'order_id,amount\\nORD-3002,6\\n' > b.csv\nsend a.csv > /dev/null; first=$(jq -r .id body.json)\nsend a.csv > /dev/null; second=$(jq -r .id body.json)\nreplayed=$(grep -i '^idempotent-replayed:' headers.txt | tr -d '\\r' | awk '{print $2}')\nconflict=$(send b.csv)\njq -n --arg first \"$first\" --arg second \"$second\" --arg replayed \"$replayed\" --argjson conflict \"$conflict\" \\\n  '{first: $first, same: ($first == $second), replayed: $replayed, conflict: $conflict}'\n```\n\n```python\nimport json, os, uuid\nimport requests\n\nurl = f\"{os.environ['API_URL']}/files\"\nheaders = {\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())}\na = {\"file\": (\"a.csv\", b\"order_id,amount\\nORD-3001,5\\n\", \"text/csv\")}\nb = {\"file\": (\"b.csv\", b\"order_id,amount\\nORD-3002,6\\n\", \"text/csv\")}\n\nfirst = requests.post(url, headers=headers, files=a)\nsecond = requests.post(url, headers=headers, files=a)\nconflict = requests.post(url, headers=headers, files=b)\nprint(json.dumps({\"first\": first.json()[\"id\"], \"same\": first.json()[\"id\"] == second.json()[\"id\"],\n                  \"replayed\": second.headers.get(\"Idempotent-Replayed\"), \"conflict\": conflict.status_code}))\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst key = randomUUID();\nconst upload = text => {\n  const form = new FormData();\n  form.append('file', new Blob([text], { type: 'text/csv' }), 'order.csv');\n  return fetch(`${process.env.API_URL}/files`, {\n    method: 'POST',\n    headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Idempotency-Key': key },\n    body: form,\n  });\n};\nconst first = await upload('order_id,amount\\nORD-3001,5\\n');\nconst second = await upload('order_id,amount\\nORD-3001,5\\n');\nconst conflict = await upload('order_id,amount\\nORD-3002,6\\n');\nconst [one, two] = [await first.json(), await second.json()];\nconsole.log(JSON.stringify({\n  first: one.id,\n  same: one.id === two.id,\n  replayed: second.headers.get('Idempotent-Replayed'),\n  conflict: conflict.status,\n}));\n```\n\n## What has no key\n\nReads (`GET`) are safe to repeat as they are. `POST /oauth/token` gives a new token each time. `POST\n/runs/{runId}/view-links` stores nothing (each call answers a new link), and so takes no key.\n"
+  },
+  {
+   "slug": "paging",
+   "title": "Paging and filters",
+   "summary": "Walk a list with limit and cursor; filter runs by pipeline, status and time.",
+   "markdown": "# Paging and filters\n\nEvery list answers one page: `{\"data\": [...], \"nextCursor\": \"...\" | null}`. Ask for the next page with `?cursor=` set to\n`nextCursor`, until it is `null`. `limit` is 1 to 200 (default 50). Cursors are opaque: pass them back exactly, and\ndon't build or keep them; a list read later starts again from the first page.\n\nLists are newest first. Filters are named query parameters and combine:\n\n| List | Filters |\n|---|---|\n| `GET /runs` | `pipelineId`, `status` (`queued`, `running`, `completed`, `failed`, `skipped`, `interrupted`), `createdAfter`, `updatedAfter` |\n| `GET /pipelines` | (none) |\n| `GET /webhooks/{webhookId}/deliveries` | (none) |\n\n`createdAfter` and `updatedAfter` are RFC 3339 times **with an offset** (`2026-10-06T00:00:00Z`); anything else is a\n400. `updatedAfter` compares a run's latest time (its end, else its start, else its creation), which makes it the filter\nfor \"what changed since I last looked\".\n\n## Walk every completed run of a pipeline\n\nTwo runs a page, to show the cursor at work; in practice ask for up to 200.\n\n<!-- sample id=\"walk\" -->\n```bash\ncursor=\"\"\npages=0; runs=0\nwhile :; do\n  page=$(curl -sS --fail-with-body -G \"$API_URL/runs\" -H \"Authorization: Bearer $TOKEN\" \\\n    --data-urlencode \"pipelineId=$PIPELINE_ID\" --data-urlencode \"status=completed\" \\\n    --data-urlencode \"limit=2\" ${cursor:+--data-urlencode \"cursor=$cursor\"})\n  pages=$((pages + 1)); runs=$((runs + $(echo \"$page\" | jq '.data | length')))\n  cursor=$(echo \"$page\" | jq -r '.nextCursor // empty')\n  [ -z \"$cursor\" ] || [ \"$pages\" -ge 5 ] && break\ndone\necho \"{\\\"pages\\\": $pages, \\\"runs\\\": $runs}\"\n```\n\n```python\nimport json, os\nimport requests\n\nparams = {\"pipelineId\": os.environ[\"PIPELINE_ID\"], \"status\": \"completed\", \"limit\": 2}\npages = runs = 0\nwhile True:\n    answer = requests.get(f\"{os.environ['API_URL']}/runs\", params=params,\n                          headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\n    answer.raise_for_status()\n    page = answer.json()\n    pages, runs = pages + 1, runs + len(page[\"data\"])\n    if not page[\"nextCursor\"] or pages >= 5:\n        break\n    params[\"cursor\"] = page[\"nextCursor\"]\nprint(json.dumps({\"pages\": pages, \"runs\": runs}))\n```\n\n```javascript\nconst params = new URLSearchParams({ pipelineId: process.env.PIPELINE_ID, status: 'completed', limit: '2' });\nlet pages = 0;\nlet runs = 0;\nfor (;;) {\n  const answer = await fetch(`${process.env.API_URL}/runs?${params}`, {\n    headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n  });\n  if (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\n  const page = await answer.json();\n  pages += 1;\n  runs += page.data.length;\n  if (!page.nextCursor || pages >= 5) break;\n  params.set('cursor', page.nextCursor);\n}\nconsole.log(JSON.stringify({ pages, runs }));\n```\n\n(The samples stop after five pages so they finish quickly; drop that condition to read everything.)\n\n## Keep in step without re-reading everything\n\nRemember when you last asked, and ask for what changed since, with a minute's overlap for clocks:\n\n```bash\ncurl -sS --fail-with-body -G \"$API_URL/runs\" -H \"Authorization: Bearer $TOKEN\" \\\n  --data-urlencode \"updatedAfter=2026-10-06T13:59:00Z\"\n```\n\nFor anything a person waits on, [webhooks](webhooks) tell you sooner and cost fewer calls.\n"
+  },
+  {
+   "slug": "errors",
+   "title": "Errors",
+   "summary": "Problem details (RFC 9457): read the type, show the field errors, decide what to retry.",
+   "markdown": "# Errors\n\nEvery error is a problem document (RFC 9457), `Content-Type: application/problem+json`:\n\n```json\n{\n  \"type\": \"/problems/validation\",\n  \"title\": \"Unprocessable Content\",\n  \"status\": 422,\n  \"detail\": \"The record does not meet the pipeline's input contract.\",\n  \"instance\": \"/v1/pipelines/2881/runs\",\n  \"requestId\": \"01JABCDEF0123456789ABCDEFG\",\n  \"errors\": [\n    { \"path\": \"record.amount\", \"message\": \"must be at least 0\" }\n  ]\n}\n```\n\n- **`type`** says what went wrong, and is what your code should branch on: `/problems/<kind>`, relative to the API's\n  host. The list of kinds, with what each means, is in the API reference under **Problem types**.\n- **`status`** is the HTTP status again; **`title`** its fixed phrase; **`detail`** a sentence for a person, which may\n  change: never parse it.\n- **`errors`** comes with a 422: one entry per field, `path` into your request (`record.order_id`, `files[0]`, `url`) and\n  why. It never repeats the value you sent, so it is safe to log.\n- **`requestId`** names the request in our logs: quote it when you ask us about one.\n\n## Read one\n\nStart a run with a record the sample contract refuses (an order id that is not `ORD-` and digits, a negative amount):\n\n<!-- sample id=\"validation\" expect='{\"status\":422,\"type\":\"/problems/validation\"}' -->\n```bash\ncurl -sS \"$API_URL/pipelines/$PIPELINE_ID/runs\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Idempotency-Key: $(uuidgen)\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"record\": {\"order_id\": \"seven\", \"amount\": -1}}'\n```\n\n```python\nimport json, os, sys, uuid\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/pipelines/{os.environ['PIPELINE_ID']}/runs\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", \"Idempotency-Key\": str(uuid.uuid4())},\n                       json={\"record\": {\"order_id\": \"seven\", \"amount\": -1}})\nif answer.headers.get(\"Content-Type\", \"\").startswith(\"application/problem+json\"):\n    problem = answer.json()\n    for error in problem.get(\"errors\", []):\n        print(f\"{error['path']}: {error['message']}\", file=sys.stderr)\n    print(json.dumps(problem, indent=2))\nelse:\n    answer.raise_for_status()\n```\n\n```javascript\nimport { randomUUID } from 'node:crypto';\n\nconst answer = await fetch(`${process.env.API_URL}/pipelines/${process.env.PIPELINE_ID}/runs`, {\n  method: 'POST',\n  headers: {\n    Authorization: `Bearer ${process.env.TOKEN}`,\n    'Idempotency-Key': randomUUID(),\n    'Content-Type': 'application/json',\n  },\n  body: JSON.stringify({ record: { order_id: 'seven', amount: -1 } }),\n});\nif ((answer.headers.get('Content-Type') ?? '').startsWith('application/problem+json')) {\n  const problem = await answer.json();\n  for (const error of problem.errors ?? []) console.error(`${error.path}: ${error.message}`);\n  console.log(JSON.stringify(problem, null, 2));\n} else if (!answer.ok) {\n  throw new Error(`${answer.status} ${await answer.text()}`);\n}\n```\n\n## What to do about each\n\n| Status | Means | Do |\n|---|---|---|\n| 400 | Unreadable: bad JSON, a bad filter, no `Idempotency-Key` | Fix the request. |\n| 401 | No valid token (expired, or revoked by a rotation or a change of scopes) | Get a new token once, then retry once. |\n| 403 | A scope is missing (`/problems/insufficient-scope`), or your address is not on the client's allowlist | Ask your administrator; retrying will not help. |\n| 404 | Not found, **or not yours**: another workspace's id answers the same, and a test key answers it for your real workspace's ids | Check the id and the key. |\n| 409 | A state conflict: a run in flight, an idempotency conflict, a review not open | Read `type`; some clear by themselves (`run-in-flight`, `idempotency-in-progress`), others need a new request. |\n| 410 | Gone: an expired file or link | Ask for a new link, or run the pipeline again. |\n| 413 | Too large: an upload over 100 MB, JSON over 1 MB | Send less. |\n| 422 | Your data did not meet the contract | Show `errors` to whoever sent the data. |\n| 429 | Rate limited or out of quota | Wait `Retry-After` seconds ([Rate limits](limits)). |\n| 503 | Something we need is briefly unavailable | Wait `Retry-After` seconds, then retry with the same `Idempotency-Key`. |\n\nRetry only what can succeed unchanged (401 once with a new token; 409 in-flight or in-progress; 429; 503; and a network\nerror), with the same `Idempotency-Key` for a `POST`, and back off between tries.\n"
+  },
+  {
+   "slug": "limits",
+   "title": "Rate limits and quotas",
+   "summary": "The RateLimit and Quota headers, 429 with Retry-After, and a client that waits politely.",
+   "markdown": "# Rate limits and quotas\n\nEach API client may make **600 calls a minute, with bursts of up to 100**, and all of a workspace's clients together\n**1,200 a minute (burst 200)**, unless your account says otherwise. A workspace may also have a **monthly quota** of\ncalls (a calendar month in UTC). The token endpoint and signed links (file and view links) are not counted.\n\n## The headers\n\nEvery counted answer says where you stand, for whichever bucket (yours or your workspace's) allows fewer calls now:\n\n| Header | Means |\n|---|---|\n| `RateLimit-Limit` | The bucket's size (its burst). |\n| `RateLimit-Remaining` | Calls you may make right now. |\n| `RateLimit-Reset` | Seconds until the bucket is full again. |\n| `RateLimit-Policy` | Its rate, e.g. `600;w=60;burst=100;scope=client`. |\n| `Quota-Limit`, `Quota-Remaining`, `Quota-Reset` | With a monthly quota: its size, what is left, seconds until the month ends. |\n| `Quota-Warning` | From 80% of the quota used. |\n\n<!-- sample id=\"headers\" expect='{\"status\":200}' -->\n```bash\ncurl -sS --fail-with-body -o /dev/null -D - \"$API_URL/pipelines?limit=1\" -H \"Authorization: Bearer $TOKEN\" \\\n  | grep -i -E '^(ratelimit|quota)-' ; echo '{\"status\": 200}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.get(f\"{os.environ['API_URL']}/pipelines\", params={\"limit\": 1},\n                      headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"})\nanswer.raise_for_status()\nlimits = {name: value for name, value in answer.headers.items() if name.lower().startswith((\"ratelimit-\", \"quota-\"))}\nprint(json.dumps({\"status\": answer.status_code, \"limits\": limits}, indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/pipelines?limit=1`, {\n  headers: { Authorization: `Bearer ${process.env.TOKEN}` },\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconst limits = Object.fromEntries([...answer.headers].filter(([name]) => /^(ratelimit|quota)-/i.test(name)));\nconsole.log(JSON.stringify({ status: answer.status, limits }, null, 2));\n```\n\n## When you are over\n\nPast a limit the answer is **429** with `Retry-After` (seconds), and nothing was done or billed:\n\n- `/problems/rate-limited`: wait `Retry-After` seconds (until one call is allowed again), then carry on.\n- `/problems/quota-exceeded`: the month's calls are used up; `Retry-After` is the seconds until the month (UTC) ends.\n  Your account team can raise the quota.\n\nIf the limits cannot be counted for a moment, the answer is **503** with `Retry-After`: the same treatment.\n\n## A client that waits politely\n\nWrap your calls once, and every call honours `Retry-After`, slows down when `RateLimit-Remaining` runs low, and never\nretries forever:\n\n<!-- sample id=\"polite\" expect='{\"status\":200}' -->\n```bash\ncall() {  # call <curl args...>: retries 429 and 503 after Retry-After, at most 5 times\n  for attempt in 1 2 3 4 5; do\n    status=$(curl -sS -o body.json -D headers.txt -w '%{http_code}' -H \"Authorization: Bearer $TOKEN\" \"$@\")\n    if [ \"$status\" != 429 ] && [ \"$status\" != 503 ]; then cat body.json; return; fi\n    wait=$(grep -i '^retry-after:' headers.txt | tr -dc '0-9'); sleep \"${wait:-1}\"\n  done\n  cat body.json; return 1\n}\ncall \"$API_URL/pipelines?limit=1\" > /dev/null && echo '{\"status\": 200}'\n```\n\n```python\nimport json, os, time\nimport requests\n\n\ndef call(method, url, **kwargs):\n    \"\"\"One API call; 429 and 503 wait Retry-After and try again, at most 5 times.\"\"\"\n    headers = {\"Authorization\": f\"Bearer {os.environ['TOKEN']}\", **kwargs.pop(\"headers\", {})}\n    for attempt in range(5):\n        answer = requests.request(method, url, headers=headers, **kwargs)\n        if answer.status_code not in (429, 503):\n            if answer.headers.get(\"RateLimit-Remaining\") == \"0\":\n                time.sleep(int(answer.headers.get(\"RateLimit-Reset\", \"1\")))\n            return answer\n        time.sleep(int(answer.headers.get(\"Retry-After\", \"1\")))\n    return answer\n\n\nanswer = call(\"GET\", f\"{os.environ['API_URL']}/pipelines\", params={\"limit\": 1})\nanswer.raise_for_status()\nprint(json.dumps({\"status\": answer.status_code}))\n```\n\n```javascript\nconst sleep = seconds => new Promise(resolve => setTimeout(resolve, seconds * 1000));\n\n/** One API call; 429 and 503 wait Retry-After and try again, at most 5 times. */\nasync function call(url, init = {}) {\n  let answer;\n  for (let attempt = 0; attempt < 5; attempt++) {\n    answer = await fetch(url, { ...init, headers: { Authorization: `Bearer ${process.env.TOKEN}`, ...init.headers } });\n    if (answer.status !== 429 && answer.status !== 503) {\n      if (answer.headers.get('RateLimit-Remaining') === '0') await sleep(Number(answer.headers.get('RateLimit-Reset') ?? 1));\n      return answer;\n    }\n    await sleep(Number(answer.headers.get('Retry-After') ?? 1));\n  }\n  return answer;\n}\n\nconst answer = await call(`${process.env.API_URL}/pipelines?limit=1`);\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify({ status: answer.status }));\n```\n\nA `POST` retried this way keeps its `Idempotency-Key` (it is in the headers you pass), so a retry never does the work\ntwice.\n\n## Billing\n\nEach counted call is billed as `api.calls`, and each webhook delivery that reaches your receiver as\n`webhook.deliveries`, per 1,000 on your workspace's rate card. Nothing in a sandbox is billed.\n"
+  },
+  {
+   "slug": "embedding",
+   "title": "Embedding a run view",
+   "summary": "Show a run's progress and results inside your own portal with a signed, 15-minute link.",
+   "markdown": "# Embedding a run view\n\nShow a run's progress and results inside your own portal without building the screen: ask for a **view link** and put\nit in an iframe. The page shows the run's status and times, its steps, the files it made (each with a download) and its\nreview, and refreshes itself while the run moves. It has no console navigation, needs no sign-in, sends no cookies, and\nshows that one run only.\n\n## 1. Allow your portal's origin\n\nA view may be framed only by the origins your API client allows. Your workspace administrator sets them on the client,\nunder **Integration › API Clients › Change › Sites that may embed its run views**: `https://portal.example.com`, `https://*.example.com`,\nor plain `http://localhost:<port>` while you build. With none, the link still opens on its own but no page can frame it.\n\n## 2. Ask for a link\n\n`POST /runs/{runId}/view-links` (scope `runs:read`) answers `{url, expiresAt}`: a signed link that lasts 15 minutes,\nor less if you ask (`{\"expiresInSeconds\": 60..900}`). Nothing is stored, so there is no `Idempotency-Key`: each call is\na new link. Ask for it when your page is shown, never in advance.\n\n<!-- sample id=\"view-link\" sets=\"VIEW_URL=url\" -->\n```bash\ncurl -sS --fail-with-body -X POST \"$API_URL/runs/$RUN_ID/view-links\" \\\n  -H \"Authorization: Bearer $TOKEN\" \\\n  -H \"Content-Type: application/json\" \\\n  -d '{\"expiresInSeconds\": 600}'\n```\n\n```python\nimport json, os\nimport requests\n\nanswer = requests.post(f\"{os.environ['API_URL']}/runs/{os.environ['RUN_ID']}/view-links\",\n                       headers={\"Authorization\": f\"Bearer {os.environ['TOKEN']}\"}, json={\"expiresInSeconds\": 600})\nanswer.raise_for_status()\nprint(json.dumps(answer.json(), indent=2))\n```\n\n```javascript\nconst answer = await fetch(`${process.env.API_URL}/runs/${process.env.RUN_ID}/view-links`, {\n  method: 'POST',\n  headers: { Authorization: `Bearer ${process.env.TOKEN}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({ expiresInSeconds: 600 }),\n});\nif (!answer.ok) throw new Error(`${answer.status} ${await answer.text()}`);\nconsole.log(JSON.stringify(await answer.json(), null, 2));\n```\n\nMake this call from your server: your API token never goes to the browser, only the link does.\n\n## 3. Frame it\n\n```html\n<iframe\n  src=\"VIEW_URL?theme=light&accent=%230f766e\"\n  title=\"Order processing\"\n  style=\"width: 100%; height: 640px; border: 0\"\n  referrerpolicy=\"no-referrer\"></iframe>\n```\n\n- `theme=light` or `theme=dark` fits your page (otherwise the visitor's preference); `accent=<hex colour>` colours its\n  highlights.\n- When the link expires the page says so and reads nothing more: ask for a new link and set the iframe's `src` again.\n- Revoking or expiring the API client ends its links at once (410, `/problems/link-ended`).\n\n## What it costs\n\nMaking a link is one counted call (`api.calls`). What the page reads and the files it downloads are signed links: not\ncounted, not billed as calls.\n"
+  }
+ ],
+ "changelog": "# Customer API changelog\n\nAdditive changes stay in /v1; a breaking change goes to /v2, with v1 kept at least 12 months and announced by\n`Deprecation` and `Sunset` headers (ADR-025 decision 8).\n\n## v1.0.0-draft, MIG-336 (2026-10-06): the developer portal and the sandbox\n\n- The contract lists its problem types: `components.x-problem-types`, each `/problems/<kind>` with its status, what it\n  means and, where only some operations answer it, which. Nothing a service answers changed.\n- A **sandbox** per organisation, on request: a workspace of its own with sample pipelines (`Sample orders`, `Sample\n  orders with review`), the data contract `sample_order` and the event route `sample.order.created`. Its keys are **test\n  keys**, client ids beginning `cl_test_`, made by the organisation's administrators (Integration › API Clients ›\n  Sandbox). A test key acts only in the sandbox: the organisation's real pipelines, runs and files are 404 to it, as\n  another workspace's are. A test key outside a sandbox, or an ordinary key inside one, gets no token (401). Nothing in a\n  sandbox is billed; its calls still carry the rate-limit headers and count against its own limits.\n- The **developer portal** in the console (Integration › Developer portal): this reference, guides (quickstart, webhooks,\n  files, idempotency, paging, errors, limits, embedding) with samples in curl, Python and Node.js, the event types, the\n  problem types, this changelog, and downloads of the OpenAPI document and a Postman collection. Every sample is run\n  against the live API in a sandbox (`tests/customer-api/docs_check.py`).\n\n## v1.0.0-draft, MIG-335 (2026-10-06): the embeddable run view\n\n- Served: `POST /runs/{runId}/view-links` (scope `runs:read`): 201 `{url, expiresAt}`, a signed link, valid 15 minutes,\n  to a read-only page of the run on the console (`/embed/runs/{token}`): its status and times, its steps, the files it\n  made with a download each, its review. No console navigation, no sign-in, no cookies. Optional body\n  `{\"expiresInSeconds\": 60..900}` for a shorter life (422 outside it). No `Idempotency-Key`: nothing is stored, each call\n  answers a new link. A run that is not the workspace's is 404.\n- Framing: only the origins the API client's frame allow-list names may show the page in an iframe (set in Integration ›\n  API Clients; in a workspace our team manages, our team sets it); the page answers Content-Security-Policy\n  `frame-ancestors` with them, `'none'` when there are none. Append `?theme=light|dark` and `accent=<hex>` to fit a portal.\n- New, signed (`security: []`, `x-signed-link: true`): `GET /embed/runs/{token}` -- what the page shows (`RunView`), for the\n  link's holder; `GET /embed/runs/{token}/frame` -- where it may be framed (`RunViewFrame`, and the `Embed-Frame-Ancestors`\n  header). 410 once expired (`/problems/link-expired`) or when the client that made the link was revoked or has expired\n  (`/problems/link-ended`); 404 for a token this API did not make, or one changed to name another run.\n- A view link opens that one run only: it is no access token for the API, no file link, and names no other run. The\n  downloads it carries are ordinary signed file links that end no later than the view.\n- Billing: making a link is a counted call (`api.calls`); the page's reads and downloads are signed links, not counted and\n  not billed as calls (a download is a storage read, as before).\n\n## v1.0.0-draft, MIG-337 (2026-10-06): rate limits, a monthly quota, and metering\n\n- Every call that needs a token is held to two token buckets -- its client's (by default 600 calls a minute, burst 100)\n  and its workspace's over all its clients (1,200 a minute, burst 200) -- and, when the workspace has one, a monthly quota\n  of calls (a calendar month in UTC). A workspace administrator may give a client a lower limit of its own; the platform\n  sets a workspace's bounds and quota.\n- Every answer to a counted call carries `RateLimit-Limit`, `RateLimit-Remaining`, `RateLimit-Reset` and\n  `RateLimit-Policy` (e.g. `600;w=60;burst=100;scope=client`), for the bucket that allows fewer calls now. With a quota:\n  `Quota-Limit`, `Quota-Remaining`, `Quota-Reset`, and `Quota-Warning` from 80% used.\n- Past a limit: 429 problem+json with `Retry-After` -- `/problems/rate-limited` (seconds until one call is allowed) or\n  `/problems/quota-exceeded` (seconds until the month ends). Nothing is done, nothing is billed. If the limits cannot be\n  counted the answer is 503 with `Retry-After` (fail closed).\n- Written down: `TooManyRequests` on every operation that needs a token, and the headers above (`components.headers`).\n- Billing: each counted call is `api.calls`, each webhook delivery that arrives `webhook.deliveries`, on the workspace's\n  invoice ($0.10 per 1,000 each on the Standard card). The token endpoint and signed links are not counted.\n\n## v1.0.0-draft, MIG-333 (2026-10-06): the event catalogue and webhooks served\n\n- Served: `GET /event-types`, `GET /webhooks`, `POST /webhooks`, `GET|PATCH|DELETE /webhooks/{webhookId}`,\n  `POST /webhooks/{webhookId}/rotate-secret`, `GET /webhooks/{webhookId}/deliveries`,\n  `POST /webhooks/{webhookId}/deliveries/{deliveryId}/redeliver` (integration-service).\n- The platform sends `run.started`, `run.completed`, `run.failed`, `run.review.requested`, `run.review.decided`,\n  `file.available` and `form.submission.received`. The catalogue's schemas are self-contained (no `$ref`).\n- What a receiver gets is written down (`webhooks.event`): `Webhook-Delivery` beside `Webhook-Id` and\n  `Webhook-Signature`; one `v1` per secret in force for 24 hours after a rotation; the retry schedule (10 s, 30 s, 90 s\n  ... at most an hour apart, for 24 hours); a webhook failing for 3 days is paused; delivery at least once, deduplicate on\n  `Webhook-Id`, order by `createdAt`.\n- `POST /webhooks`: the URL must be https to a public address -- a private, loopback, link-local or metadata one is 422\n  at `url`; at most 20 webhooks a workspace (409); only events after it is made are sent; `Location`. In a workspace our\n  team manages, making, changing, removing and rotating are 403 (`/problems/managed-workspace`).\n- `PATCH /webhooks/{id}`: `active: true` also clears a pause the platform made. `POST .../redeliver` answers 202 with the\n  new `Delivery` (409 when the webhook is paused).\n- `Webhook` has `updatedAt`, `failingSince`, `lastSuccessAt`, `secretRotatedAt`, `previousSecretValidUntil`. `Delivery`\n  has `lastAttemptAt`, `deliveredAt`, `error` and `redeliveryOf`; `attempt` is the attempts made.\n- 400, 401, 403, 404, 409 and 422 written down where they happen.\n\n## v1.0.0-draft, MIG-334 (2026-10-06): the read side served\n\n- Served: `GET /runs`, `GET /runs/{runId}`, `GET /runs/{runId}/steps`, `GET /runs/{runId}/outputs`,\n  `GET /runs/{runId}/review`, `POST /runs/{runId}/review`, `GET /files/{fileId}`, `GET /files/{fileId}/meta`, and the\n  new `GET /files/{fileId}/content`. `POST /runs/{runId}/retry` and `POST /runs/{runId}/view-links` stay planned.\n- New: `GET /files/{fileId}/content?token=` -- the signed link `GET /files/{fileId}` redirects to; no access token\n  (`security: []`, `x-signed-link: true`), 410 once expired. `GET /files/{fileId}` answers `{url, expiresAt}` beside\n  its 302 (`FileLink`), and 410 for a made file past its expiry (the `Gone` response).\n- `GET /runs` takes `createdAfter`; a filter that is not RFC 3339 with an offset is 400.\n- `Run` has `attempt`. `Step` has `durationMs`, `name` may be null, and its status may be `interrupted`. The steps'\n  answer says `runId` and `attempt`.\n- `Manifest` is what a run holds today: `runId`, `pipelineId`, `status` (the run's), `attempt`, `generatedAt`, `files`\n  (`ManifestFile`: a `File` with `step`, `rows` and `expired`) and `review`. The draft's `pipeline`, `contract`,\n  `totals` and `records` are out until something writes per-record results; they come back as added fields.\n- `File`: `sha256` and `contentType` may be null (a file a run made before files carried one).\n- `Review` has `decidedAt` and `rerunRunId`, and in the answer to a decision with `rerun`, `rerun {queued, runId,\n  message}`. A decision the run's state refuses is 409 `/problems/review-not-open`.\n- More of the answers are written down: 400, 401 and 403 where they happen.\n\n## v1.0.0-draft, MIG-332 (2026-10-06): served\n\n- Served: `POST /oauth/token`, `GET /pipelines`, `GET /pipelines/{pipelineId}`, `POST /pipelines/{pipelineId}/runs`,\n  `POST /files`, `POST /events`. Every other operation is a 404 at the edge until its card lands.\n- `POST /events` answers `workflows` (the workflow requests it started) and `notStarted` (what a route names that did\n  not start, and why) beside `started`; `type` has a pattern.\n- More of the answers the served operations give are written down: 400, 401, 403 and 409 on `POST /files`; 400, 401,\n  403, 413 and 503 on `POST /events`; 503 (`Unavailable`, with `Retry-After`) where an input contract cannot be read.\n- The token endpoint's problems also carry OAuth's own `error` code (`invalid_client`, `invalid_scope`, ...).\n\n## v1.0.0-draft (2026-10-06)\n\n- The first draft: auth (client credentials), pipelines, runs, steps, outputs, files, reviews, forms, events in,\n  event types, webhooks. Not served yet; built card by card (MIG-332..338).\n",
+ "sources": {
+  "openapi-v1.yaml": "0a3662c89506ef68ec7ea668b74a0dbe7cdd849482b4c1db97f939048723ed04",
+  "CHANGELOG.md": "d7f686887c24c249dac7d9bfdac6342ca3e55eee10d545a12bd1c6a3be8e96f4",
+  "event-types/file.available.json": "2e82382c21fc8fbbae1731195b5448a6878f68f8bf568b966a7436ee61200310",
+  "event-types/form.submission.received.json": "68a5c549e913f873d3a82e23e6ac9152ad48d22de39f79757e2c88b3f4251ed7",
+  "event-types/run.completed.json": "6f5e8c4e998e3f1ac7b421ec9aa64bfacf6d2dd081ea0d7a871d116449f4fb09",
+  "event-types/run.failed.json": "332a9301c5499dba32c25c7a84387020b97047b175447bdd8c56323ed6cd9b3d",
+  "event-types/run.review.decided.json": "81323e98a5f07b6f9f4f076f548e213c43019f14636e8bd5afe05da70b1cb740",
+  "event-types/run.review.requested.json": "a50cfc3fd25443be2831d90774d9d84e3a8c47334374387726d3fa644c5d240a",
+  "event-types/run.started.json": "7d089e5235d0dce484aaddb467e9851cb02ea46668eb4f65348f96d9e291ec62",
+  "guides/index.json": "09b0069c00439f98d67e39215424dcd9b5fb113fa65420f221770a8e0c692442",
+  "guides/embedding.md": "2a56e7f5e651172d6d57c269fad88cfbd41f81d5651011a99de6666735679c94",
+  "guides/errors.md": "fec46743ce915c8193b4e07093eabcd9b9ab89f87744f23d9b763c2666ecd850",
+  "guides/files.md": "b3f7f0065995b47b8213bb65f40f35357f2d8d64ddc6b593a21d7c3acb87bbfc",
+  "guides/idempotency.md": "815b8c5da4dcd2baecab28893c47b1768d2648581826ddbdf1d9384cd830f6dd",
+  "guides/limits.md": "7524c0d049c07d4d91ef566c053a19b93843a749ed0fe06eeec2dfab910ecf2d",
+  "guides/paging.md": "34fd42099ccfa42bec27b6135290a0c1c1f11d3ab60fcf5be242b32f77d789bb",
+  "guides/quickstart.md": "3bc2cf6cd6382dead09486b70e65a2d8782aa09f3c3670fc03e0072bfb4b9069",
+  "guides/webhooks.md": "c8c4f748a99d220b47a1f9b00f4edb162f1dd48c3007817df3a92d404ec9decd"
+ }
+}

@@ -1,0 +1,297 @@
+<div class="flex flex-col gap-8 min-w-0" data-reference>
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">API reference</h1>
+      <p class="page-subtitle">
+        {{ model.title }} {{ model.version }}. Every path below is under <code class="md-inline-code">{{ base }}</code>; a call needs a
+        token with the scope it names unless it says otherwise.
+      </p>
+    </div>
+    <div class="relative w-full sm:w-80">
+      <app-icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 icon-muted" size="0.9em" />
+      <input class="input pl-8" type="search" placeholder="Filter by path, summary or operation" aria-label="Filter the operations"
+             [value]="filter()" (input)="filter.set($any($event.target).value)" data-reference-filter />
+    </div>
+  </div>
+
+  @if (filter().trim()) {
+    <p class="text-sm text-[color:var(--text-muted)] -mt-4" role="status">{{ shown() }} of {{ total }} operations match.</p>
+  }
+
+  @for (tag of tags(); track tag.name) {
+    <section [id]="'tag-' + tag.name" class="scroll-mt-20 flex flex-col gap-3" [attr.data-tag]="tag.name">
+      <div>
+        <h2 class="section-title capitalize">{{ tag.name }}</h2>
+        @if (tag.description) { <p class="section-sub">{{ tag.description }}</p> }
+      </div>
+
+      @for (v of tag.operations; track v.op.id) {
+        <article class="card p-4 scroll-mt-20 min-w-0" [id]="v.anchor" [attr.data-operation]="v.op.id">
+          <div class="flex flex-wrap items-center gap-2">
+            <span [class]="v.methodClass">{{ v.op.method.toUpperCase() }}</span>
+            <code class="mono text-sm break-all">/v1{{ v.op.path }}</code>
+            <a class="ml-auto btn btn-ghost btn-icon btn-sm" [routerLink]="reference" [fragment]="v.anchor"
+               [attr.aria-label]="'Link to ' + v.op.id"><app-icon name="link" size="0.9em" /></a>
+          </div>
+          <h3 class="mt-2 font-medium">{{ v.op.summary }}</h3>
+          <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[color:var(--text-muted)]" data-access>
+            @if (v.access.kind === 'scopes') {
+              <span>Scope</span>
+              @for (s of v.access.scopes; track s) { <span class="pill pill-brand mono">{{ s }}</span> }
+            } @else {
+              <span class="pill pill-neutral">{{ accessText(v.access.kind) }}</span>
+            }
+            <span class="mono ml-1">{{ v.op.id }}</span>
+          </div>
+
+          <div class="op-grid mt-3 grid gap-4">
+            <div class="flex flex-col gap-4 min-w-0">
+              @if (v.description.length) {
+                <div class="text-sm text-[color:var(--text-secondary)]"><app-guide-body [blocks]="v.description" /></div>
+              }
+
+              @if (v.params.length) {
+                <div>
+                  <h4 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-1">Parameters</h4>
+                  <div class="overflow-x-auto scroll-table">
+                    <table class="table-modern" data-parameters>
+                      <thead><tr><th>Name</th><th>In</th><th>Type</th><th>Description</th></tr></thead>
+                      <tbody>
+                        @for (p of v.params; track p.in + p.name) {
+                          <tr>
+                            <td class="mono text-xs whitespace-nowrap align-top">
+                              {{ p.name }}@if (p.required) {<span class="text-[color:var(--crit-text)]" title="Required"> *</span>}
+                            </td>
+                            <td class="text-xs align-top">{{ p.in }}</td>
+                            <td class="text-xs align-top">
+                              {{ p.type }}
+                              @if (p.pattern) { <div class="mono break-all text-[color:var(--text-muted)]">{{ p.pattern }}</div> }
+                              @if (p.defaultValue) { <div class="text-[color:var(--text-muted)]">Default {{ p.defaultValue }}</div> }
+                            </td>
+                            <td class="text-sm align-top">{{ p.description }}</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              }
+
+              @if (v.body; as body) {
+                <div data-request-body>
+                  <h4 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-1">
+                    Request body · <span class="normal-case font-normal mono">{{ body.contentType }}</span>{{ body.required ? '' : ' (optional)' }}
+                  </h4>
+                  <app-schema-fields [root]="body.tree" />
+                </div>
+              }
+
+              <div data-responses>
+                <h4 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-1">Responses</h4>
+                <ul class="flex flex-col gap-2">
+                  @for (r of v.responses; track r.status) {
+                    @if (r.tree || r.headers.length) {
+                      <li>
+                        <details class="group">
+                          <summary class="cursor-pointer flex flex-wrap items-baseline gap-2 text-sm">
+                            <span [class]="r.tone">{{ r.status }}</span>
+                            <span>{{ r.description }}</span>
+                            @if (r.contentType) { <span class="mono text-xs text-[color:var(--text-muted)]">{{ r.contentType }}</span> }
+                            @if (r.schema) { <a class="md-link text-xs" [routerLink]="reference" [fragment]="'schema-' + r.schema">{{ r.schema }}</a> }
+                          </summary>
+                          <div class="mt-2 ml-1 pl-3 border-l border-subtle flex flex-col gap-2">
+                            @if (r.headers.length) {
+                              <div>
+                                <p class="text-xs font-medium text-[color:var(--text-secondary)]">Headers</p>
+                                <ul class="text-sm">
+                                  @for (h of r.headers; track h.name) {
+                                    <li><span class="mono text-xs">{{ h.name }}</span> <span class="text-xs text-[color:var(--text-muted)]">{{ h.type }}</span>
+                                      @if (h.description) { <span class="text-[color:var(--text-secondary)]"> · {{ h.description }}</span> }</li>
+                                  }
+                                </ul>
+                              </div>
+                            }
+                            @if (r.tree) { <app-schema-fields [root]="r.tree" /> }
+                          </div>
+                        </details>
+                      </li>
+                    } @else {
+                      <li class="flex flex-wrap items-baseline gap-2 text-sm">
+                        <span [class]="r.tone">{{ r.status }}</span>
+                        <span>{{ r.description }}</span>
+                        @if (r.contentType) { <span class="mono text-xs text-[color:var(--text-muted)]">{{ r.contentType }}</span> }
+                        @if (r.schema) { <a class="md-link text-xs" [routerLink]="reference" [fragment]="'schema-' + r.schema">{{ r.schema }}</a> }
+                      </li>
+                    }
+                  }
+                </ul>
+              </div>
+
+              @if (v.errors.length) {
+                <div data-errors>
+                  <h4 class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] mb-1">Errors</h4>
+                  <ul class="flex flex-col gap-1 text-sm">
+                    @for (e of v.errors; track e.status) {
+                      <li class="flex flex-wrap items-baseline gap-x-2">
+                        <span class="mono text-xs">{{ e.status }}</span>
+                        @if (e.problems.length) {
+                          @for (p of e.problems; track p.kind) {
+                            <a class="md-link mono text-xs" [routerLink]="reference" [fragment]="'problem-' + p.kind">/problems/{{ p.kind }}</a>
+                          }
+                        } @else {
+                          <span class="text-[color:var(--text-secondary)]">{{ e.description }}</span>
+                        }
+                      </li>
+                    }
+                  </ul>
+                </div>
+              }
+
+              @if (v.rateLimited) {
+                <p class="text-xs text-[color:var(--text-muted)]" data-rate-limit-headers>
+                  Counted against your rate limits: its answers carry
+                  @for (h of model.rateLimitHeaders; track h.name; let last = $last) {
+                    <span class="mono">{{ h.name }}</span>{{ last ? '' : ', ' }}
+                  }
+                  (<a class="md-link" [routerLink]="reference" fragment="rate-limits">rate limits</a>).
+                </p>
+              }
+            </div>
+
+            <div class="flex flex-col gap-3 min-w-0">
+              <app-dev-code label="Request (curl)" [snippets]="[{ key: 'curl', label: 'curl', code: v.curl }]" />
+              @if (v.body?.example; as example) {
+                <app-dev-code [label]="'Body · ' + v.body!.exampleLang" [snippets]="[{ key: 'body', label: 'Body', code: example }]" />
+              }
+              @for (r of v.responses; track r.status) {
+                @if (r.example) {
+                  <app-dev-code [label]="'Response ' + r.status" [snippets]="[{ key: 'response', label: 'Response', code: r.example }]" />
+                }
+              }
+            </div>
+          </div>
+        </article>
+      }
+    </section>
+  } @empty {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">No operation matches "{{ filter() }}".</div>
+  }
+
+  <section id="schemas" class="scroll-mt-20 flex flex-col gap-3">
+    <div>
+      <h2 class="section-title">Schemas</h2>
+      <p class="section-sub">The shapes the operations above send and answer.</p>
+    </div>
+    <div class="grid gap-3 2xl:grid-cols-2">
+      @for (s of model.schemas; track s.name) {
+        <article class="card p-4 scroll-mt-20 min-w-0" [id]="'schema-' + s.name" [attr.data-schema]="s.name">
+          <h3 class="mono font-medium">{{ s.name }}</h3>
+          @if (s.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ s.description }}</p> }
+          <div class="mt-2"><app-schema-fields [root]="s.tree" /></div>
+          <details class="mt-2">
+            <summary class="cursor-pointer text-xs text-[color:var(--text-muted)]">Example</summary>
+            <div class="mt-2"><app-dev-code label="JSON" [snippets]="[{ key: 'json', label: 'JSON', code: s.example }]" /></div>
+          </details>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section id="events" class="scroll-mt-20 flex flex-col gap-3" data-events>
+    <div>
+      <h2 class="section-title">Event types</h2>
+      <p class="section-sub">
+        What webhooks send. Every event is the envelope {{ '{' }}id, type, createdAt, workspaceId, data{{ '}' }}; data is what a GET of the
+        resource answers.
+      </p>
+    </div>
+    @if (model.receiver; as receiver) {
+      <article class="card p-4 min-w-0" data-receiver>
+        <h3 class="font-medium">{{ receiver.summary || 'What your receiver gets' }}</h3>
+        <div class="mt-1 text-sm text-[color:var(--text-secondary)]"><app-guide-body [blocks]="receiver.description" /></div>
+        @if (receiver.headers.length) {
+          <div class="mt-3 overflow-x-auto scroll-table">
+            <table class="table-modern">
+              <thead><tr><th>Header</th><th>Description</th></tr></thead>
+              <tbody>
+                @for (h of receiver.headers; track h.name) {
+                  <tr><td class="mono text-xs whitespace-nowrap align-top">{{ h.name }}</td><td class="text-sm">{{ h.description }}</td></tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </article>
+    }
+    <div class="grid gap-3 2xl:grid-cols-2">
+      @for (e of model.events; track e.type) {
+        <article class="card p-4 scroll-mt-20 min-w-0" [id]="'event-' + e.type" [attr.data-event]="e.type">
+          <h3 class="mono font-medium">{{ e.type }}</h3>
+          @if (e.description) { <p class="text-sm text-[color:var(--text-secondary)] mt-1">{{ e.description }}</p> }
+          <p class="text-xs font-medium text-[color:var(--text-muted)] mt-2 mb-1">data</p>
+          <app-schema-fields [root]="e.tree" />
+          <details class="mt-2">
+            <summary class="cursor-pointer text-xs text-[color:var(--text-muted)]">Example event</summary>
+            <div class="mt-2"><app-dev-code label="JSON" [snippets]="[{ key: 'json', label: 'JSON', code: e.example }]" /></div>
+          </details>
+        </article>
+      }
+    </div>
+  </section>
+
+  <section id="problems" class="scroll-mt-20 flex flex-col gap-3" data-problems>
+    <div>
+      <h2 class="section-title">Problem types</h2>
+      <p class="section-sub">
+        Every error is application/problem+json (RFC 9457): type, title, status, detail, instance, requestId, and errors with each
+        field's path when a contract refused the input.
+      </p>
+    </div>
+    @if (model.problems.length) {
+      <div class="card p-0 overflow-x-auto scroll-table">
+        <table class="table-modern">
+          <thead><tr><th>Type</th><th>Status</th><th>What it means</th></tr></thead>
+          <tbody>
+            @for (p of model.problems; track p.kind) {
+              <tr [id]="'problem-' + p.kind" class="scroll-mt-20" [attr.data-problem]="p.kind">
+                <td class="mono text-xs whitespace-nowrap align-top">/problems/{{ p.kind }}</td>
+                <td class="align-top"><span class="pill pill-neutral mono">{{ p.status }}</span></td>
+                <td class="text-sm">
+                  <div class="font-medium">{{ p.title }}</div>
+                  @if (p.description) { <div class="text-[color:var(--text-secondary)]">{{ p.description }}</div> }
+                  @if (p.operations) {
+                    <div class="mt-1 flex flex-wrap gap-x-2 text-xs">
+                      @for (id of p.operations; track id) {
+                        <a class="md-link mono" [routerLink]="reference" [fragment]="'op-' + id">{{ id }}</a>
+                      }
+                    </div>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    } @else {
+      <p class="text-sm text-[color:var(--text-muted)]">The contract names no problem types yet; each error's status and title say what went wrong.</p>
+    }
+  </section>
+
+  <section id="rate-limits" class="scroll-mt-20 flex flex-col gap-3">
+    <div>
+      <h2 class="section-title">Rate limits and quota</h2>
+      <p class="section-sub">The headers a counted call answers. Past a limit the answer is 429 with Retry-After; nothing was done.</p>
+    </div>
+    <div class="card p-0 overflow-x-auto scroll-table">
+      <table class="table-modern">
+        <thead><tr><th>Header</th><th>Type</th><th>Description</th></tr></thead>
+        <tbody>
+          @for (h of model.limitHeaders; track h.name) {
+            <tr><td class="mono text-xs whitespace-nowrap align-top">{{ h.name }}</td><td class="text-xs align-top">{{ h.type }}</td>
+              <td class="text-sm">{{ h.description }}</td></tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>

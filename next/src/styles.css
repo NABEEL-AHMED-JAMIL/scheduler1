@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* MIG-336: the developer portal's copied contract (prose, JSON, YAML) is content, not markup. Scanned, its words
+   ("table", "hidden", "italic") would be read as utilities and grow every page's stylesheet. */
+@source not "./app/features/developer/content";
+@source not "../public/developer";
 
 /* ---------------------------------------------------------------------------
    Design tokens -- the Compass palette.

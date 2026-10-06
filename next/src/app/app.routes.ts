@@ -113,6 +113,18 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // MIG-336: the customer API's developer portal -- overview, guides, reference, changelog -- from the contract
+        // bundled into its own lazy chunk (scripts/sync-developer-docs.mjs); its pages are in developer.routes.ts, so the
+        // first load carries one route. Owner: API docs are for administrators and developers only, so its page key is
+        // one a tenant user holds only when their access profile names it (AuthService.canOpen). The guard here covers
+        // every page under it.
+        path: 'integration/developer',
+        title: 'Developer portal',
+        loadChildren: () => import('./features/developer/developer.routes').then(m => m.DEVELOPER_ROUTES),
+        data: { pageKey: 'developer-portal' },
+        canActivate: [pageGuard],
+      },
+      {
         // MIG-247: which APIs exist, tested and versioned. Every member holding the page reads; the pages
         // hide what integration-service answers only for a workspace administrator (writes and Test).
         path: 'integration/api-collections',

@@ -1,0 +1,1112 @@
+{
+  "info": {
+    "name": "ETL Console customer API v1.0.0-draft",
+    "description": "Start work, follow it, decide on it, and be told when something happens.\n\nGet a token first (auth › the token request): it stores accessToken for every other request.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:9098/v1"
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "clientSecret",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "auth",
+      "description": "Getting a token.",
+      "item": [
+        {
+          "name": "Exchange the client's id and secret for an access token (15 minutes).",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/oauth/token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "oauth",
+                "token"
+              ]
+            },
+            "description": "Exchange the client's id and secret for an access token (15 minutes).\n\noperationId: createToken",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{clientId}}"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{clientSecret}}"
+                },
+                {
+                  "key": "scope",
+                  "value": "string",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Keeps the token for the other requests (collection variable accessToken).",
+                  "const body = pm.response.json();",
+                  "if (body.access_token) { pm.collectionVariables.set('accessToken', body.access_token); }"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "pipelines",
+      "description": "What can be started.",
+      "item": [
+        {
+          "name": "The pipelines this client may start or read.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pipelines",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipelines"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The pipelines this client may start or read.\n\noperationId: listPipelines"
+          },
+          "response": []
+        },
+        {
+          "name": "One pipeline, with its input contract and the event types its runs emit.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/pipelines/:pipelineId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipelines",
+                ":pipelineId"
+              ],
+              "variable": [
+                {
+                  "key": "pipelineId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "One pipeline, with its input contract and the event types its runs emit.\n\noperationId: getPipeline"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "runs",
+      "description": "Starting work and following it.",
+      "item": [
+        {
+          "name": "Start a run with a record and/or uploaded files (push intake).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pipelines/:pipelineId/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipelines",
+                ":pipelineId",
+                "runs"
+              ],
+              "variable": [
+                {
+                  "key": "pipelineId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Start a run with a record and/or uploaded files (push intake).\n\nThe record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run.\n\noperationId: startRun",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"record\": {},\n  \"files\": [\n    \"string\"\n  ],\n  \"reference\": \"string\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Runs, newest first.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "pipelineId",
+                  "value": "123",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "queued",
+                  "disabled": true
+                },
+                {
+                  "key": "createdAfter",
+                  "value": "2026-10-06T14:00:00Z",
+                  "disabled": true
+                },
+                {
+                  "key": "updatedAfter",
+                  "value": "2026-10-06T14:00:00Z",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Runs, newest first.\n\nEvery run of the workspace's pipelines, however it started (the API, an event, the console, a schedule), newest first. The filters combine. updatedAfter compares the run's latest time (its end, else its start, else its creation); createdAfter its creation. Times are RFC 3339 with an offset; a filter that is not one is 400.\n\noperationId: listRuns"
+          },
+          "response": []
+        },
+        {
+          "name": "One run, with its status, times (UTC) and review status.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "One run, with its status, times (UTC) and review status.\n\noperationId: getRun"
+          },
+          "response": []
+        },
+        {
+          "name": "Run a failed run again, as a new run.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/retry",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "retry"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Run a failed run again, as a new run.\n\noperationId: retryRun"
+          },
+          "response": []
+        },
+        {
+          "name": "The run's steps in order (its latest attempt).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/steps",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "steps"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "The run's steps in order (its latest attempt).\n\nThe steps of the run's latest attempt, in order, with their status, rows in and out, and times. A run of a pipeline without steps is shown as its one step, key \"legacy\". A new kind of step appears here as it is, with its own task name: there is no endpoint per step kind.\n\noperationId: listRunSteps"
+          },
+          "response": []
+        },
+        {
+          "name": "The run's manifest: the files it received and made, by file id, and its review.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/outputs",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "outputs"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "The run's manifest: the files it received and made, by file id, and its review.\n\nThe files the run's latest attempt made (role result, or report for a PDF) and, for a run started through the API, the files it was given (role input), each by its file id: GET /v1/files/{fileId} downloads it. Never a bucket, a storage key or a connection. A made file is kept as long as the pipeline keeps its run's files (expiresAt); after that it is listed as expired and its download is 410.\n\noperationId: getRunOutputs"
+          },
+          "response": []
+        },
+        {
+          "name": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/view-links",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "view-links"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.\n\nA link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n\noperationId: createViewLink",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expiresInSeconds\": 900\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "What a view link's page shows, through the link's own token.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/embed/runs/:token",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "embed",
+                "runs",
+                ":token"
+              ],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "string",
+                  "description": "The token of a view link's URL."
+                }
+              ]
+            },
+            "description": "What a view link's page shows, through the link's own token.\n\nNo access token: the view link's token is the permission, for that one run, read-only, until it expires. The console's page reads this; a portal's server may too. Times are UTC. Each file the run made carries a download (a signed file link, GET /v1/files/{fileId}/content) that ends no later than the view. refreshSeconds says when a run that is still moving is worth reading again (null once it has settled). Not counted as an API call and not billed: a signed link is free, and only POST view-links is. 410 once expired (`/problems/link-expired`) or when the client that made it was revoked or has expired (`/problems/link-ended`); 404 for a token this API did not make.\n\noperationId: readRunView",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Who may frame a view link's page -- the console's server asks before serving it.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/embed/runs/:token/frame",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "embed",
+                "runs",
+                ":token",
+                "frame"
+              ],
+              "variable": [
+                {
+                  "key": "token",
+                  "value": "string",
+                  "description": "The token of a view link's URL."
+                }
+              ]
+            },
+            "description": "Who may frame a view link's page -- the console's server asks before serving it.\n\nThe origins the API client's frame allow-list names, also as the `Embed-Frame-Ancestors` header (a CSP source list, `'none'` when the list is empty), which the console's server sends as Content-Security-Policy frame-ancestors with the page. An expired link still answers its origins (state `expired`), so the portal shows that it expired rather than a broken frame; its data is refused. 404, and frame-ancestors 'none', for a token this API did not make or a revoked client's.\n\noperationId: readRunViewFrame",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "files",
+      "description": "Uploading and downloading files.",
+      "item": [
+        {
+          "name": "Upload a file for a run or a form; answers its file id.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/files",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files"
+              ]
+            },
+            "description": "Upload a file for a run or a form; answers its file id.\n\nStored in the workspace's inbox (role input) and named by a ULID, the only id of a file a customer sees; nothing starts because of an upload. Its size is limited by the workspace (413), its kind is checked against its content (422). 409 when the workspace has no inbox yet, or for an Idempotency-Key reused with another file.\n\noperationId: uploadFile",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Redirects to a signed link valid 5 minutes.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/:fileId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":fileId"
+              ],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "01JABCDEF0123456789ABCDEFG"
+                }
+              ]
+            },
+            "description": "Redirects to a signed link valid 5 minutes.\n\nA file of the workspace's -- one it uploaded, or one a run made (the manifest's) -- answered with a 302 to its signed link on this API (/v1/files/{fileId}/content?token=...), valid 5 minutes. The link needs no token, so a portal may hand it to a browser; it opens that one file only, and never names a bucket or a storage key. The body says the same for a caller that does not follow redirects. A made file past its expiry is 410.\n\noperationId: downloadFile"
+          },
+          "response": []
+        },
+        {
+          "name": "The file's bytes, through the signed link GET /v1/files/{fileId} answered.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/:fileId/content?token=string",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":fileId",
+                "content"
+              ],
+              "query": [
+                {
+                  "key": "token",
+                  "value": "string"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "01JABCDEF0123456789ABCDEFG"
+                }
+              ]
+            },
+            "description": "The file's bytes, through the signed link GET /v1/files/{fileId} answered.\n\nNo access token: the link's signature is the permission, for this file only, until it expires (5 minutes). A link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not one this API made, or names another file, is 404.\n\noperationId: readFileContent",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "A file's facts: name, size, sha256, role.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/files/:fileId/meta",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "files",
+                ":fileId",
+                "meta"
+              ],
+              "variable": [
+                {
+                  "key": "fileId",
+                  "value": "01JABCDEF0123456789ABCDEFG"
+                }
+              ]
+            },
+            "description": "A file's facts: name, size, sha256, role.\n\noperationId: getFile"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "reviews",
+      "description": "The customer's decision on a run's results.",
+      "item": [
+        {
+          "name": "The run's review: who must decide and what they decided.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "review"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "The run's review: who must decide and what they decided.\n\noperationId: getReview"
+          },
+          "response": []
+        },
+        {
+          "name": "The customer's decision on a completed run (the CUSTOMER party).",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/review",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "review"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "The customer's decision on a completed run (the CUSTOMER party).\n\nThe same rules as the console's review: the run is completed, its pipeline asks for a customer review (settings.review.required), the run's results are still pending, and the customer has not decided yet -- otherwise 409. A rejection says why (reason); rerun asks for the pipeline to run again as a new run, which only a run started through the API can be (it is started again with the same intake); a re-run that cannot start leaves the rejection standing and says why in rerun.message. Sending the same Idempotency-Key again returns the first answer.\n\noperationId: decideReview",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"decision\": \"approved\",\n  \"reason\": \"string\",\n  \"comment\": \"string\",\n  \"rerun\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "forms",
+      "description": "Forms and their submissions.",
+      "item": [
+        {
+          "name": "The active forms this client may fill in.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/forms",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forms"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The active forms this client may fill in.\n\noperationId: listForms"
+          },
+          "response": []
+        },
+        {
+          "name": "One form and its fields.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/forms/:formId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forms",
+                ":formId"
+              ],
+              "variable": [
+                {
+                  "key": "formId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "One form and its fields.\n\noperationId: getForm"
+          },
+          "response": []
+        },
+        {
+          "name": "Submit answers (file fields name file ids); starts the form's pipeline or workflow when it has one.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/forms/:formId/submissions",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forms",
+                ":formId",
+                "submissions"
+              ],
+              "variable": [
+                {
+                  "key": "formId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Submit answers (file fields name file ids); starts the form's pipeline or workflow when it has one.\n\noperationId: submitForm",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"answers\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "One submission and the run it started.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/forms/:formId/submissions/:submissionId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "forms",
+                ":formId",
+                "submissions",
+                ":submissionId"
+              ],
+              "variable": [
+                {
+                  "key": "formId",
+                  "value": "123"
+                },
+                {
+                  "key": "submissionId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "One submission and the run it started.\n\noperationId: getSubmission"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "events",
+      "description": "Events in, and the catalogue of events out.",
+      "item": [
+        {
+          "name": "An event from the organisation's systems; the workspace's event routes start what it names.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "events"
+              ]
+            },
+            "description": "An event from the organisation's systems; the workspace's event routes start what it names.\n\nThe type is the organisation's own; the workspace's event routes (set in the console) say which pipeline or workflow it starts, and may name a data contract the data must meet (422 with each field's path under \"data\", nothing started). A type no route takes is 422 at \"type\". Each route's pipeline gets a run with the data as its record; each workflow route a request whose subject is the event. What could not start is in notStarted, with why (a run of that pipeline still in flight, say).\n\noperationId: sendEvent",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"string\",\n  \"data\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "The catalogue of event types the platform sends (each with its JSON Schema).",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/event-types",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "event-types"
+              ]
+            },
+            "description": "The catalogue of event types the platform sends (each with its JSON Schema).\n\nA registry, not a fixed list: a new event type appears here, and becomes subscribable, when the platform adds it. Each entry's schema is the JSON Schema of the event's data, self-contained.\n\noperationId: listEventTypes"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "webhooks",
+      "description": "Being told when something happens.",
+      "item": [
+        {
+          "name": "The webhook subscriptions.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks"
+              ]
+            },
+            "description": "The webhook subscriptions.\n\noperationId: listWebhooks"
+          },
+          "response": []
+        },
+        {
+          "name": "Subscribe a URL to event types; the signing secret is shown once.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks"
+              ]
+            },
+            "description": "Subscribe a URL to event types; the signing secret is shown once.\n\nThe URL must be https and every address its host resolves to public: a private, loopback, link-local or metadata address is refused here (422 at url), and again at every delivery. A workspace has at most 20 webhooks (409). Only events that happen after the webhook is made are sent to it. In a workspace our team manages, webhooks are set up by our team: making, changing, removing and rotating are 403 there.\n\noperationId: createWebhook",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://portal.example.com/hook\",\n  \"eventTypes\": [\n    \"string\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "One subscription.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/:webhookId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                ":webhookId"
+              ],
+              "variable": [
+                {
+                  "key": "webhookId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "One subscription.\n\noperationId: getWebhook"
+          },
+          "response": []
+        },
+        {
+          "name": "Change the URL, the event types, or pause it.",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/:webhookId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                ":webhookId"
+              ],
+              "variable": [
+                {
+                  "key": "webhookId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Change the URL, the event types, or pause it.\n\nactive false pauses the webhook: nothing more is sent to it, and what was still waiting is marked failed. active true resumes it (and clears a pause the platform made after repeated failures); only events after that are sent.\n\noperationId: updateWebhook",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://portal.example.com/hook\",\n  \"eventTypes\": [\n    \"string\"\n  ],\n  \"active\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Remove a subscription; nothing more is sent to it.",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/:webhookId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                ":webhookId"
+              ],
+              "variable": [
+                {
+                  "key": "webhookId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Remove a subscription; nothing more is sent to it.\n\noperationId: deleteWebhook"
+          },
+          "response": []
+        },
+        {
+          "name": "A new secret; the old one is accepted alongside it for 24 hours.",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/:webhookId/rotate-secret",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                ":webhookId",
+                "rotate-secret"
+              ],
+              "variable": [
+                {
+                  "key": "webhookId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "A new secret; the old one is accepted alongside it for 24 hours.\n\noperationId: rotateWebhookSecret"
+          },
+          "response": []
+        },
+        {
+          "name": "A subscription's delivery attempts, newest first.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/:webhookId/deliveries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                ":webhookId",
+                "deliveries"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "disabled": true
+                }
+              ],
+              "variable": [
+                {
+                  "key": "webhookId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "A subscription's delivery attempts, newest first.\n\noperationId: listDeliveries"
+          },
+          "response": []
+        },
+        {
+          "name": "Send a delivery again.",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/webhooks/:webhookId/deliveries/:deliveryId/redeliver",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "webhooks",
+                ":webhookId",
+                "deliveries",
+                ":deliveryId",
+                "redeliver"
+              ],
+              "variable": [
+                {
+                  "key": "webhookId",
+                  "value": "123"
+                },
+                {
+                  "key": "deliveryId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Send a delivery again.\n\nA new delivery of the same event (the same Webhook-Id), sent within seconds and retried like any other; it names the delivery it repeats. The webhook must be active (409 when paused), and the event still kept.\n\noperationId: redeliver"
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

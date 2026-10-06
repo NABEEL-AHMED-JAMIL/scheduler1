@@ -19,6 +19,7 @@ import { RouteDialog, RouteDialogData } from './route-dialog';
 import { SecretDialog, SecretDialogData } from './secret-dialog';
 import { WebhookDialog, WebhookDialogData, WebhookDialogResult } from './webhook-dialog';
 import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-dialog';
+import { SandboxPanel } from './sandbox-panel';
 
 /**
  * MIG-332: Integration › API Clients (workspace administrators). The workspace's API clients for the customer API --
@@ -30,10 +31,11 @@ import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-d
  * MANAGED workspace), and each webhook's deliveries, their attempts and Send again (the customer's in either mode).
  * MIG-337: each client's limit and calls this month, and the workspace's limits and monthly quota above the list; a client's
  * own limit is set in Change (our team's in a MANAGED workspace), the workspace's bounds in Administration › Tenants.
+ * MIG-336: below the clients, the workspace's sandbox and its test keys (SandboxPanel).
  */
 @Component({
   selector: 'app-api-clients',
-  imports: [TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger, SandboxPanel],
   templateUrl: './api-clients.html',
 })
 export class ApiClients implements OnInit {

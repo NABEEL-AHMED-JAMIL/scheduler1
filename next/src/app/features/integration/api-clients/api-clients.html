@@ -119,6 +119,9 @@
     </table>
   </app-table-shell>
 
+  <!-- MIG-336: the workspace's sandbox and its test keys; #sandbox is linked from the Developer portal. -->
+  <app-sandbox-panel [scopes]="scopes()" />
+
   <div class="flex items-center justify-between gap-2 mt-6 mb-2">
     <div>
       <h2 class="text-base font-semibold">Event routes</h2>

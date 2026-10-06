@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router, UrlTree } from '@angular/router';
-import { AuthService } from './auth.service';
+import { AuthService, EXPLICIT_PAGES } from './auth.service';
 import { AuthUser, ROLE_RANK, UserRole } from './auth.models';
 import { pageGuard } from './auth.guard';
 import { PAGE_LABELS, isPageKey } from './page-keys';
@@ -75,6 +75,25 @@ describe('AuthService.canOpen', () => {
   it('reads an empty list as dashboard-only, not as missing', () => {
     storedUser('TENANT_USER', []);
     expect(service().canOpen('jobs')).toBe(false);
+  });
+
+  // MIG-336, owner: the API docs are for administrators and developers only.
+  it('opens the developer portal to an administrator, and to a tenant user only when their profile names it', () => {
+    storedUser('TENANT_ADMIN', []);
+    expect(service().canOpen('developer-portal')).toBe(true);
+    storedUser('PLATFORM_ADMIN', undefined);
+    expect(service().canOpen('developer-portal')).toBe(true);
+    storedUser('TENANT_USER', ['jobs', 'developer-portal']);
+    expect(service().canOpen('developer-portal')).toBe(true);
+    storedUser('TENANT_USER', ['jobs']);
+    expect(service().canOpen('developer-portal')).toBe(false);
+    // Unlike every other page, no profile at all is not enough.
+    storedUser('TENANT_USER', undefined);
+    const profileless = service();
+    expect(profileless.canOpen('developer-portal')).toBe(false);
+    expect(profileless.canOpen('reports')).toBe(true);
+    expect(EXPLICIT_PAGES).toEqual(['developer-portal']);
+    expect(PAGE_LABELS['developer-portal']).toBe('Developer portal');
   });
 
   it('picks up a changed list from a token refresh through patchUser', () => {

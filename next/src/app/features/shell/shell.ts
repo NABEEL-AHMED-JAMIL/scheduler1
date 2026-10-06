@@ -118,6 +118,9 @@ export class Shell {
         // MIG-332: how the organisation's own systems reach the API (/v1), and the event types they send.
         { label: 'API Clients', path: '/integration/api-clients', icon: 'key', adminOnly: true,
           hint: 'Your systems on the API, and their events' },
+        // MIG-336: the API's docs. Administrators, and a tenant user whose profile names the page (never by default).
+        { label: 'Developer portal', path: '/integration/developer', pageKey: 'developer-portal', icon: 'terminal',
+          hint: 'API reference, guides and sandbox keys' },
       ],
     },
     {

@@ -78,6 +78,20 @@ export interface ApiClientInput {
   burst?: number;
   /** MIG-335: the origins that may frame its run views, one per line; empty: none; left out keeps them. */
   frameAncestors?: string;
+  /** MIG-336: a test key of the workspace's sandbox (cl_test_...), not of the workspace itself. */
+  sandbox?: boolean;
+}
+
+/**
+ * MIG-336: the workspace's sandbox -- a separate, unbilled workspace our team makes on request, with sample pipelines and
+ * data, whose test keys (cl_test_...) work only there. Null when there is none.
+ */
+export interface SandboxInfo {
+  tenantId: number;
+  name: string;
+  code: string;
+  status: string;
+  createdAt: string | null;
 }
 
 /** One event route (MIG-332): an event type of the organisation's and what it starts. */
@@ -192,12 +206,23 @@ export class ApiClientsApi {
     return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/update`, input);
   }
 
-  rotateSecret(clientId: string): Observable<ApiResponse<ApiClientWithSecret>> {
-    return this.http.post<ApiResponse<ApiClientWithSecret>>(`${this.clients}/rotateSecret`, { clientId });
+  /** `sandbox`: a test key of the workspace's sandbox (MIG-336). */
+  rotateSecret(clientId: string, sandbox = false): Observable<ApiResponse<ApiClientWithSecret>> {
+    return this.http.post<ApiResponse<ApiClientWithSecret>>(`${this.clients}/rotateSecret`, sandbox ? { clientId, sandbox } : { clientId });
   }
 
-  revoke(clientId: string): Observable<ApiResponse<ApiClientRow>> {
-    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revoke`, { clientId });
+  revoke(clientId: string, sandbox = false): Observable<ApiResponse<ApiClientRow>> {
+    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revoke`, sandbox ? { clientId, sandbox } : { clientId });
+  }
+
+  /** MIG-336: the workspace's sandbox, or null when our team has not made one. */
+  sandbox(): Observable<ApiResponse<SandboxInfo | null>> {
+    return this.http.get<ApiResponse<SandboxInfo | null>>(`${this.clients}/sandbox`);
+  }
+
+  /** MIG-336: the sandbox's test keys (client ids start cl_test_). */
+  sandboxList(): Observable<ApiResponse<ApiClientRow[]>> {
+    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`, { params: { sandbox: 'true' } });
   }
 
   /** MIG-337: the workspace's API limits; a platform administrator names the workspace. */

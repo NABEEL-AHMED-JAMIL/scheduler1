@@ -1,0 +1,3532 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "ETL Console customer API",
+    "version": "1.0.0-draft",
+    "summary": "Start work, follow it, decide on it, and be told when something happens.",
+    "description": "The public contract for an organisation's own portals and systems (ADR-025). Generic: any pipeline, any form,\nany event type. The console is the organisation's admin tool; this API is how their systems reach the platform.\n\n- Auth: OAuth 2.0 client credentials (POST /v1/oauth/token), per-organisation API clients with scopes.\n- Errors: RFC 9457 problem details (application/problem+json).\n- Lists: cursor paging (limit, cursor -> nextCursor).\n- Creating POSTs take an Idempotency-Key header.\n- Times: RFC 3339 in UTC.\n- Rate limits per client and per workspace: RateLimit-* headers on every answer, 429 with Retry-After\n  (`/problems/rate-limited`). A workspace may have a monthly quota of calls: Quota-* headers, a Quota-Warning from 80%,\n  and past it 429 `/problems/quota-exceeded` until the month (UTC) ends.\n- Every call that passes the checks is billed as `api.calls` (per 1,000, on the workspace's rate card); the token\n  endpoint and signed links are not. Webhook deliveries that arrive are billed as `webhook.deliveries`.\n- Embeddable run view: POST /v1/runs/{runId}/view-links answers a 15-minute link to a read-only page of the run that a\n  portal may frame from the origins its API client allows.\n",
+    "contact": {
+      "name": "Platform team"
+    },
+    "license": {
+      "name": "Proprietary",
+      "identifier": "LicenseRef-Proprietary"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{host}/v1",
+      "variables": {
+        "host": {
+          "default": "localhost:9098"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "clientCredentials": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Getting a token."
+    },
+    {
+      "name": "pipelines",
+      "description": "What can be started."
+    },
+    {
+      "name": "runs",
+      "description": "Starting work and following it."
+    },
+    {
+      "name": "files",
+      "description": "Uploading and downloading files."
+    },
+    {
+      "name": "reviews",
+      "description": "The customer's decision on a run's results."
+    },
+    {
+      "name": "forms",
+      "description": "Forms and their submissions."
+    },
+    {
+      "name": "events",
+      "description": "Events in, and the catalogue of events out."
+    },
+    {
+      "name": "webhooks",
+      "description": "Being told when something happens."
+    }
+  ],
+  "paths": {
+    "/oauth/token": {
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "operationId": "createToken",
+        "summary": "Exchange the client's id and secret for an access token (15 minutes).",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "grant_type",
+                  "client_id",
+                  "client_secret"
+                ],
+                "properties": {
+                  "grant_type": {
+                    "type": "string",
+                    "const": "client_credentials"
+                  },
+                  "client_id": {
+                    "type": "string"
+                  },
+                  "client_secret": {
+                    "type": "string",
+                    "format": "password"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "description": "Space-separated; a subset of the client's scopes. Omit for all."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "access_token",
+                    "token_type",
+                    "expires_in",
+                    "scope"
+                  ],
+                  "properties": {
+                    "access_token": {
+                      "type": "string"
+                    },
+                    "token_type": {
+                      "type": "string",
+                      "const": "Bearer"
+                    },
+                    "expires_in": {
+                      "type": "integer",
+                      "example": 900
+                    },
+                    "scope": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/pipelines": {
+      "get": {
+        "tags": [
+          "pipelines"
+        ],
+        "operationId": "listPipelines",
+        "summary": "The pipelines this client may start or read.",
+        "security": [
+          {
+            "clientCredentials": [
+              "pipelines:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of pipelines.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelinePage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}": {
+      "get": {
+        "tags": [
+          "pipelines"
+        ],
+        "operationId": "getPipeline",
+        "summary": "One pipeline, with its input contract and the event types its runs emit.",
+        "security": [
+          {
+            "clientCredentials": [
+              "pipelines:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PipelineId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The pipeline.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Pipeline"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/runs": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "startRun",
+        "summary": "Start a run with a record and/or uploaded files (push intake).",
+        "description": "The record is validated against the pipeline's input contract first; nothing is stored when it fails (422, each field's path under \"record\"). Every file id must be one of the workspace's own files (422 at \"files[i]\"). The record and the files are handed to the run as its intake: one JSON object with the record's fields and the start's own under names beginning with \"_\" (_reference, _files, _file_ids, _file_bucket, _file_key, ...). One run of a pipeline is in flight at a time (409 while one is). Sending the same Idempotency-Key again returns the first run.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PipelineId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartRun"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "/v1/runs/{runId}"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/runs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "listRuns",
+        "summary": "Runs, newest first.",
+        "description": "Every run of the workspace's pipelines, however it started (the API, an event, the console, a schedule), newest first. The filters combine. updatedAfter compares the run's latest time (its end, else its start, else its creation); createdAfter its creation. Times are RFC 3339 with an offset; a filter that is not one is 400.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "pipelineId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/RunStatus"
+            }
+          },
+          {
+            "name": "createdAfter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "updatedAfter",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of runs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/runs/{runId}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "getRun",
+        "summary": "One run, with its status, times (UTC) and review status.",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/retry": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "retryRun",
+        "summary": "Run a failed run again, as a new run.",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "The new run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Run"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/steps": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "listRunSteps",
+        "summary": "The run's steps in order (its latest attempt).",
+        "description": "The steps of the run's latest attempt, in order, with their status, rows in and out, and times. A run of a pipeline without steps is shown as its one step, key \"legacy\". A new kind of step appears here as it is, with its own task name: there is no endpoint per step kind.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run's steps in order.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "runId",
+                    "attempt",
+                    "data"
+                  ],
+                  "properties": {
+                    "runId": {
+                      "type": "string"
+                    },
+                    "attempt": {
+                      "type": "integer"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Step"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/outputs": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "getRunOutputs",
+        "summary": "The run's manifest: the files it received and made, by file id, and its review.",
+        "description": "The files the run's latest attempt made (role result, or report for a PDF) and, for a run started through the API, the files it was given (role input), each by its file id: GET /v1/files/{fileId} downloads it. Never a bucket, a storage key or a connection. A made file is kept as long as the pipeline keeps its run's files (expiresAt); after that it is listed as expired and its download is 410.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Manifest"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/review": {
+      "get": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "getReview",
+        "summary": "The run's review: who must decide and what they decided.",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "reviews"
+        ],
+        "operationId": "decideReview",
+        "summary": "The customer's decision on a completed run (the CUSTOMER party).",
+        "description": "The same rules as the console's review: the run is completed, its pipeline asks for a customer review (settings.review.required), the run's results are still pending, and the customer has not decided yet -- otherwise 409. A rejection says why (reason); rerun asks for the pipeline to run again as a new run, which only a run started through the API can be (it is started again with the same intake); a re-run that cannot start leaves the rejection standing and says why in rerun.message. Sending the same Idempotency-Key again returns the first answer.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "reviews:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReviewDecision"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The review after the decision.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Review"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/view-links": {
+      "post": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "createViewLink",
+        "summary": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.",
+        "description": "A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "expiresInSeconds": {
+                    "type": "integer",
+                    "minimum": 60,
+                    "maximum": 900,
+                    "default": 900,
+                    "description": "A shorter life than 15 minutes, for a link shown once."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The link.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ViewLink"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/embed/runs/{token}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "readRunView",
+        "summary": "What a view link's page shows, through the link's own token.",
+        "x-signed-link": true,
+        "description": "No access token: the view link's token is the permission, for that one run, read-only, until it expires. The console's page reads this; a portal's server may too. Times are UTC. Each file the run made carries a download (a signed file link, GET /v1/files/{fileId}/content) that ends no later than the view. refreshSeconds says when a run that is still moving is worth reading again (null once it has settled). Not counted as an API call and not billed: a signed link is free, and only POST view-links is. 410 once expired (`/problems/link-expired`) or when the client that made it was revoked or has expired (`/problems/link-ended`); 404 for a token this API did not make.\n",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ViewToken"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The run as the page shows it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunView"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/embed/runs/{token}/frame": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "readRunViewFrame",
+        "summary": "Who may frame a view link's page -- the console's server asks before serving it.",
+        "x-signed-link": true,
+        "description": "The origins the API client's frame allow-list names, also as the `Embed-Frame-Ancestors` header (a CSP source list, `'none'` when the list is empty), which the console's server sends as Content-Security-Policy frame-ancestors with the page. An expired link still answers its origins (state `expired`), so the portal shows that it expired rather than a broken frame; its data is refused. 404, and frame-ancestors 'none', for a token this API did not make or a revoked client's.\n",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ViewToken"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where the page may be framed.",
+            "headers": {
+              "Embed-Frame-Ancestors": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "The frame-ancestors source list, or 'none'."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunViewFrame"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/files": {
+      "post": {
+        "tags": [
+          "files"
+        ],
+        "operationId": "uploadFile",
+        "summary": "Upload a file for a run or a form; answers its file id.",
+        "description": "Stored in the workspace's inbox (role input) and named by a ULID, the only id of a file a customer sees; nothing starts because of an upload. Its size is limited by the workspace (413), its kind is checked against its content (422). 409 when the workspace has no inbox yet, or for an Idempotency-Key reused with another file.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "files:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/files/{fileId}": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "operationId": "downloadFile",
+        "summary": "Redirects to a signed link valid 5 minutes.",
+        "description": "A file of the workspace's -- one it uploaded, or one a run made (the manifest's) -- answered with a 302 to its signed link on this API (/v1/files/{fileId}/content?token=...), valid 5 minutes. The link needs no token, so a portal may hand it to a browser; it opens that one file only, and never names a bucket or a storage key. The body says the same for a caller that does not follow redirects. A made file past its expiry is 410.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "files:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileId"
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "The signed link.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string",
+                  "format": "uri-reference"
+                },
+                "description": "/v1/files/{fileId}/content?token=..."
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FileLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/files/{fileId}/content": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "operationId": "readFileContent",
+        "summary": "The file's bytes, through the signed link GET /v1/files/{fileId} answered.",
+        "x-signed-link": true,
+        "description": "No access token: the link's signature is the permission, for this file only, until it expires (5 minutes). A link that has expired is 410 (ask GET /v1/files/{fileId} for a new one); a link that is not one this API made, or names another file, is 404.\n",
+        "security": [],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileId"
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The bytes, as an attachment named by the file.",
+            "headers": {
+              "Content-Disposition": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "410": {
+            "$ref": "#/components/responses/Gone"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/files/{fileId}/meta": {
+      "get": {
+        "tags": [
+          "files"
+        ],
+        "operationId": "getFile",
+        "summary": "A file's facts: name, size, sha256, role.",
+        "security": [
+          {
+            "clientCredentials": [
+              "files:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FileId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's facts.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/File"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/forms": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "listForms",
+        "summary": "The active forms this client may fill in.",
+        "security": [
+          {
+            "clientCredentials": [
+              "forms:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of active forms.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Form"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/forms/{formId}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "getForm",
+        "summary": "One form and its fields.",
+        "security": [
+          {
+            "clientCredentials": [
+              "forms:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FormId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The form and its fields.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Form"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/forms/{formId}/submissions": {
+      "post": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "submitForm",
+        "summary": "Submit answers (file fields name file ids); starts the form's pipeline or workflow when it has one.",
+        "security": [
+          {
+            "clientCredentials": [
+              "forms:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FormId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "answers"
+                ],
+                "properties": {
+                  "answers": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Received.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/forms/{formId}/submissions/{submissionId}": {
+      "get": {
+        "tags": [
+          "forms"
+        ],
+        "operationId": "getSubmission",
+        "summary": "One submission and the run it started.",
+        "security": [
+          {
+            "clientCredentials": [
+              "forms:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/FormId"
+          },
+          {
+            "name": "submissionId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The submission and the run it started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/events": {
+      "post": {
+        "tags": [
+          "events"
+        ],
+        "operationId": "sendEvent",
+        "summary": "An event from the organisation's systems; the workspace's event routes start what it names.",
+        "description": "The type is the organisation's own; the workspace's event routes (set in the console) say which pipeline or workflow it starts, and may name a data contract the data must meet (422 with each field's path under \"data\", nothing started). A type no route takes is 422 at \"type\". Each route's pipeline gets a run with the data as its record; each workflow route a request whose subject is the event. What could not start is in notStarted, with why (a run of that pipeline still in flight, say).\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "events:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "type",
+                  "data"
+                ],
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$",
+                    "description": "The organisation's own event type, e.g. \"order.received\"."
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted; what it started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "eventId",
+                    "started"
+                  ],
+                  "properties": {
+                    "eventId": {
+                      "type": "string"
+                    },
+                    "started": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Run"
+                      },
+                      "description": "The runs it started."
+                    },
+                    "workflows": {
+                      "type": "array",
+                      "description": "The workflow requests it started.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "workflowKey"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "workflowKey": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "notStarted": {
+                      "type": "array",
+                      "description": "What a route names that did not start, and why.",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "kind",
+                          "target",
+                          "reason"
+                        ],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "pipeline",
+                              "workflow"
+                            ]
+                          },
+                          "target": {
+                            "type": "string",
+                            "description": "The pipeline's id or the workflow's key."
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/event-types": {
+      "get": {
+        "tags": [
+          "events"
+        ],
+        "operationId": "listEventTypes",
+        "summary": "The catalogue of event types the platform sends (each with its JSON Schema).",
+        "description": "A registry, not a fixed list: a new event type appears here, and becomes subscribable, when the platform adds it. Each entry's schema is the JSON Schema of the event's data, self-contained.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The catalogue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/EventType"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/webhooks": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "listWebhooks",
+        "summary": "The webhook subscriptions.",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subscriptions, oldest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Webhook"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "createWebhook",
+        "summary": "Subscribe a URL to event types; the signing secret is shown once.",
+        "description": "The URL must be https and every address its host resolves to public: a private, loopback, link-local or metadata address is refused here (422 at url), and again at every delivery. A workspace has at most 20 webhooks (409). Only events that happen after the webhook is made are sent to it. In a workspace our team manages, webhooks are set up by our team: making, changing, removing and rotating are 403 there.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Webhook"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "secret"
+                      ],
+                      "properties": {
+                        "secret": {
+                          "type": "string",
+                          "description": "Shown once (and in a replay of this request under its Idempotency-Key)."
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "/v1/webhooks/{webhookId}"
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/webhooks/{webhookId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/WebhookId"
+        }
+      ],
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "getWebhook",
+        "summary": "One subscription.",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subscription.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "updateWebhook",
+        "summary": "Change the URL, the event types, or pause it.",
+        "description": "active false pauses the webhook: nothing more is sent to it, and what was still waiting is marked failed. active true resumes it (and clears a pause the platform made after repeated failures); only events after that are sent.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WebhookUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Webhook"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "deleteWebhook",
+        "summary": "Remove a subscription; nothing more is sent to it.",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Removed."
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/webhooks/{webhookId}/rotate-secret": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "rotateWebhookSecret",
+        "summary": "A new secret; the old one is accepted alongside it for 24 hours.",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WebhookId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The new secret, shown once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "secret",
+                    "previousSecretValidUntil"
+                  ],
+                  "properties": {
+                    "secret": {
+                      "type": "string"
+                    },
+                    "previousSecretValidUntil": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/webhooks/{webhookId}/deliveries": {
+      "get": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "listDeliveries",
+        "summary": "A subscription's delivery attempts, newest first.",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WebhookId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Delivery attempts, newest first.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "data",
+                    "nextCursor"
+                  ],
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/Delivery"
+                      }
+                    },
+                    "nextCursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/webhooks/{webhookId}/deliveries/{deliveryId}/redeliver": {
+      "post": {
+        "tags": [
+          "webhooks"
+        ],
+        "operationId": "redeliver",
+        "summary": "Send a delivery again.",
+        "description": "A new delivery of the same event (the same Webhook-Id), sent within seconds and retried like any other; it names the delivery it repeats. The webhook must be active (409 when paused), and the event still kept.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "webhooks:manage"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/WebhookId"
+          },
+          {
+            "name": "deliveryId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Delivery"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {
+    "event": {
+      "post": {
+        "operationId": "receiveEvent",
+        "summary": "What a subscriber receives.",
+        "description": "A POST of the event to the subscription's URL. Verify `Webhook-Signature: t=<unix seconds>, v1=<hex HMAC-SHA256 of \"<t>.<raw body>\" keyed by the subscription's secret>` -- for 24 hours after a rotation there is one v1 per secret, the new one first; accept when any matches -- refuse a t more than 5 minutes from your clock, and answer 2xx within 10 seconds. Anything else (another status, no answer, a redirect) is a failed attempt, retried after 10 s, 30 s, 90 s ... at most an hour apart, for 24 hours; then the delivery is failed. A webhook that has failed for 3 days with no success is paused, and its maker told. Delivery is at least once: deduplicate on Webhook-Id. One webhook's first attempts go out in the order the events happened; a retry does not hold later events back, so order by createdAt.\n",
+        "parameters": [
+          {
+            "name": "Webhook-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Webhook-Id",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "The event id; the same on every retry and redelivery."
+          },
+          {
+            "name": "Webhook-Delivery",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "This delivery's id, as the delivery log shows it."
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Event"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Received."
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "clientCredentials": {
+        "type": "oauth2",
+        "flows": {
+          "clientCredentials": {
+            "tokenUrl": "/v1/oauth/token",
+            "scopes": {
+              "pipelines:read": "Read pipelines.",
+              "runs:read": "Read runs, steps, outputs and reviews; create view links.",
+              "runs:write": "Start and retry runs.",
+              "files:read": "Download files.",
+              "files:write": "Upload files.",
+              "reviews:write": "Record the customer's review decision.",
+              "forms:read": "Read forms and submissions.",
+              "forms:write": "Submit forms.",
+              "events:write": "Send events.",
+              "webhooks:manage": "Manage webhook subscriptions and read the event catalogue."
+            }
+          }
+        }
+      }
+    },
+    "parameters": {
+      "Limit": {
+        "name": "limit",
+        "in": "query",
+        "schema": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200,
+          "default": 50
+        }
+      },
+      "Cursor": {
+        "name": "cursor",
+        "in": "query",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "PipelineId": {
+        "name": "pipelineId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "RunId": {
+        "name": "runId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "FileId": {
+        "name": "fileId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"
+        }
+      },
+      "ViewToken": {
+        "name": "token",
+        "in": "path",
+        "required": true,
+        "description": "The token of a view link's URL.",
+        "schema": {
+          "type": "string"
+        }
+      },
+      "FormId": {
+        "name": "formId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "WebhookId": {
+        "name": "webhookId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "IdempotencyKey": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]{8,128}$"
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Unreadable request.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "No valid token.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "A scope is missing or the address is not allowed.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Not found, or not yours.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "An Idempotency-Key reused with a different body, or the wrong state.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Gone": {
+        "description": "No longer there: a file past its expiry, or a link that has expired.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "TooLarge": {
+        "description": "Too large.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unprocessable": {
+        "description": "The input contract refused it; errors name each field.",
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Temporarily unavailable; try again after Retry-After.",
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Past a limit. `/problems/rate-limited`: the client's rate limit, or its workspace's limit over all its clients;\ntry again after Retry-After seconds (when a token is back). `/problems/quota-exceeded`: the workspace has used its\nmonthly quota of calls; Retry-After is the seconds until the month (UTC) ends. Nothing was done and nothing billed.\n",
+        "headers": {
+          "Retry-After": {
+            "$ref": "#/components/headers/Retry-After"
+          },
+          "RateLimit-Limit": {
+            "$ref": "#/components/headers/RateLimit-Limit"
+          },
+          "RateLimit-Remaining": {
+            "$ref": "#/components/headers/RateLimit-Remaining"
+          },
+          "RateLimit-Reset": {
+            "$ref": "#/components/headers/RateLimit-Reset"
+          },
+          "RateLimit-Policy": {
+            "$ref": "#/components/headers/RateLimit-Policy"
+          },
+          "Quota-Limit": {
+            "$ref": "#/components/headers/Quota-Limit"
+          },
+          "Quota-Remaining": {
+            "$ref": "#/components/headers/Quota-Remaining"
+          },
+          "Quota-Reset": {
+            "$ref": "#/components/headers/Quota-Reset"
+          },
+          "Quota-Warning": {
+            "$ref": "#/components/headers/Quota-Warning"
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
+      }
+    },
+    "headers": {
+      "Retry-After": {
+        "description": "Seconds to wait before trying again.",
+        "schema": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "RateLimit-Limit": {
+        "description": "The size of the bucket that allows fewer calls now (the client's burst, or its workspace's): on every answer to a call that was counted.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "RateLimit-Remaining": {
+        "description": "Calls you may make right now.",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "RateLimit-Reset": {
+        "description": "Seconds until that bucket is full again (or, refused, until one call is allowed).",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "RateLimit-Policy": {
+        "description": "That bucket's rate: calls a minute, the window, its burst and whose it is, e.g. 600;w=60;burst=100;scope=client.",
+        "schema": {
+          "type": "string",
+          "example": "600;w=60;burst=100;scope=client"
+        }
+      },
+      "Quota-Limit": {
+        "description": "The workspace's monthly quota of calls, when it has one.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "Quota-Remaining": {
+        "description": "Calls left in the quota this month (UTC).",
+        "schema": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "Quota-Reset": {
+        "description": "Seconds until the month (UTC) ends and the quota starts again.",
+        "schema": {
+          "type": "integer"
+        }
+      },
+      "Quota-Warning": {
+        "description": "From 80% of the quota used, e.g. \"85% of this month's 10000 API calls are used.\"",
+        "schema": {
+          "type": "string"
+        }
+      }
+    },
+    "x-problem-types": {
+      "bad-request": {
+        "status": 400,
+        "title": "Bad Request",
+        "description": "The request cannot be read: not JSON, a filter that is not RFC 3339 with an offset, a missing or malformed Idempotency-Key."
+      },
+      "unauthorized": {
+        "status": 401,
+        "title": "Unauthorized",
+        "description": "No valid access token: none, expired (15 minutes), or revoked by a secret rotation, a change of scopes or a revoked client. Ask for a new token. The token endpoint also answers OAuth's own `error` (invalid_client, invalid_scope, ...)."
+      },
+      "forbidden": {
+        "status": 403,
+        "title": "Forbidden",
+        "description": "The caller's address is not on the client's allowlist."
+      },
+      "insufficient-scope": {
+        "status": 403,
+        "title": "Forbidden",
+        "description": "The token does not carry the scope the operation needs. Give the client the scope, then ask for a new token."
+      },
+      "managed-workspace": {
+        "status": 403,
+        "title": "Forbidden",
+        "description": "In a workspace our team manages, making, changing, removing and rotating webhooks is our team's.",
+        "operations": [
+          "createWebhook",
+          "updateWebhook",
+          "deleteWebhook",
+          "rotateWebhookSecret"
+        ]
+      },
+      "not-found": {
+        "status": 404,
+        "title": "Not Found",
+        "description": "Not there, or not yours: the same answer for another workspace's id. An undeclared /v1 path is one too."
+      },
+      "conflict": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The resource's state refuses it, e.g. a redelivery while the webhook is paused or a workspace's 21st webhook."
+      },
+      "idempotency-conflict": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "This Idempotency-Key was already used with a different request (within 24 hours). Use a new key for new work."
+      },
+      "idempotency-in-progress": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "A request with this Idempotency-Key is still being handled. Try again in a moment with the same key."
+      },
+      "run-in-flight": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "A run of this pipeline is still in flight; one runs at a time. Start the next once it has finished.",
+        "operations": [
+          "startRun"
+        ]
+      },
+      "pipeline-inactive": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The pipeline is not active.",
+        "operations": [
+          "startRun"
+        ]
+      },
+      "workspace-paused": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The workspace is suspended or inactive, so its runs are paused.",
+        "operations": [
+          "startRun"
+        ]
+      },
+      "workspace-not-ready": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.",
+        "operations": [
+          "uploadFile",
+          "startRun"
+        ]
+      },
+      "review-not-open": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The run's review cannot take this decision: not completed, no customer review asked for, or already decided.",
+        "operations": [
+          "decideReview"
+        ]
+      },
+      "file-expired": {
+        "status": 410,
+        "title": "Gone",
+        "description": "The file is past its expiry: still listed (expired true), no longer downloadable. Run the pipeline again for a new one.",
+        "operations": [
+          "downloadFile",
+          "readFileContent"
+        ]
+      },
+      "link-expired": {
+        "status": 410,
+        "title": "Gone",
+        "description": "A signed link (a file link, 5 minutes; a view link, 15 minutes) has expired. Ask for a new one.",
+        "operations": [
+          "readFileContent",
+          "readRunView"
+        ]
+      },
+      "link-ended": {
+        "status": 410,
+        "title": "Gone",
+        "description": "The API client that made the view link was revoked or has expired, so its links ended at once.",
+        "operations": [
+          "readRunView",
+          "readRunViewFrame"
+        ]
+      },
+      "too-large": {
+        "status": 413,
+        "title": "Content Too Large",
+        "description": "An upload over 100 MB, or a JSON body over 1 MB."
+      },
+      "unsupported-media-type": {
+        "status": 415,
+        "title": "Unsupported Media Type",
+        "description": "The body is not the content type the operation takes (JSON, multipart/form-data, or a form for the token)."
+      },
+      "validation": {
+        "status": 422,
+        "title": "Unprocessable Content",
+        "description": "The input contract (or the request's own rules) refused it; `errors[]` names each field by its path (`record.amount`) and why, never echoing a value."
+      },
+      "rate-limited": {
+        "status": 429,
+        "title": "Too Many Requests",
+        "description": "Past the client's rate limit, or its workspace's over all its clients. Wait Retry-After seconds."
+      },
+      "quota-exceeded": {
+        "status": 429,
+        "title": "Too Many Requests",
+        "description": "The workspace has used its monthly quota of calls. Retry-After is the seconds until the month (UTC) ends."
+      },
+      "unavailable": {
+        "status": 503,
+        "title": "Service Unavailable",
+        "description": "Something the answer needs cannot be reached just now (the limits store, an input contract). Try again after Retry-After."
+      }
+    },
+    "schemas": {
+      "Problem": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "format": "uri-reference"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "path",
+                "message"
+              ],
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RunStatus": {
+        "type": "string",
+        "enum": [
+          "queued",
+          "running",
+          "completed",
+          "failed",
+          "skipped",
+          "interrupted"
+        ]
+      },
+      "ReviewStatus": {
+        "type": "string",
+        "enum": [
+          "not_required",
+          "pending",
+          "approved",
+          "rejected"
+        ]
+      },
+      "Pipeline": {
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "inputContract": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "The JSON Schema a started run's record must meet (the data contract the pipeline names); null when it names none."
+          },
+          "acceptsFiles": {
+            "type": "boolean",
+            "description": "Whether a run may name files (a step pipeline reads them from its intake)."
+          },
+          "review": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "internal",
+                "customer"
+              ]
+            }
+          },
+          "emits": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Event types its runs send."
+          }
+        }
+      },
+      "PipelinePage": {
+        "type": "object",
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Pipeline"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "StartRun": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "object",
+            "additionalProperties": true,
+            "description": "Validated against the input contract."
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "File ids from POST /v1/files."
+          },
+          "reference": {
+            "type": "string",
+            "maxLength": 128,
+            "description": "The organisation's own id for this work, echoed back."
+          }
+        }
+      },
+      "Run": {
+        "type": "object",
+        "required": [
+          "id",
+          "pipelineId",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "reference": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The run's status line."
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "Which attempt the run is on, from 1."
+          },
+          "review": {
+            "$ref": "#/components/schemas/ReviewStatus"
+          }
+        }
+      },
+      "RunPage": {
+        "type": "object",
+        "required": [
+          "data",
+          "nextCursor"
+        ],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Run"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Step": {
+        "type": "object",
+        "required": [
+          "key",
+          "task",
+          "status"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "task": {
+            "type": "string",
+            "description": "The step's task, e.g. read_file, validate, save_file; legacy for a run without steps."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "failed",
+              "skipped",
+              "interrupted"
+            ]
+          },
+          "rowsIn": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "rowsOut": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "Manifest": {
+        "type": "object",
+        "required": [
+          "runId",
+          "pipelineId",
+          "status",
+          "attempt",
+          "generatedAt",
+          "files",
+          "review"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/RunStatus"
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "The attempt whose files are listed: the run's latest."
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManifestFile"
+            }
+          },
+          "review": {
+            "$ref": "#/components/schemas/Review"
+          }
+        }
+      },
+      "ManifestFile": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/File"
+          },
+          {
+            "type": "object",
+            "required": [
+              "expired"
+            ],
+            "properties": {
+              "step": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "The step that made it (null for an input)."
+              },
+              "rows": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Rows it holds, for a data file."
+              },
+              "expired": {
+                "type": "boolean",
+                "description": "Past expiresAt: listed, no longer downloadable (410)."
+              }
+            }
+          }
+        ]
+      },
+      "File": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "role",
+          "bytes",
+          "sha256",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "A ULID; the only id of a file a customer sees."
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "input",
+              "result",
+              "report",
+              "image"
+            ]
+          },
+          "contentType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes": {
+            "type": "integer"
+          },
+          "sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Hex; null for a file a run made before files carried one."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expiresAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FileLink": {
+        "type": "object",
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri-reference",
+            "description": "The signed link, as Location says it."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ViewLink": {
+        "type": "object",
+        "required": [
+          "url",
+          "expiresAt"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "The console's page /embed/runs/{token}; add ?theme= and &accent= to fit."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RunView": {
+        "description": "A Run (review as the full Review), with its pipeline's name, steps, made files with downloads, and the view's own expiry.",
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Run"
+          },
+          {
+            "type": "object",
+            "required": [
+              "steps",
+              "files",
+              "review",
+              "viewExpiresAt",
+              "refreshSeconds"
+            ],
+            "properties": {
+              "pipelineName": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "steps": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Step"
+                }
+              },
+              "files": {
+                "type": "array",
+                "description": "The files the run's latest attempt made (role result or report).",
+                "items": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/ManifestFile"
+                    },
+                    {
+                      "type": "object",
+                      "required": [
+                        "download"
+                      ],
+                      "properties": {
+                        "download": {
+                          "oneOf": [
+                            {
+                              "$ref": "#/components/schemas/FileLink"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ],
+                          "description": "A signed file link (null once the file has expired), ending no later than the view."
+                        }
+                      }
+                    }
+                  ]
+                }
+              },
+              "review": {
+                "$ref": "#/components/schemas/Review"
+              },
+              "viewExpiresAt": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "refreshSeconds": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "Read again after this many seconds while the run is still moving."
+              }
+            }
+          }
+        ]
+      },
+      "RunViewFrame": {
+        "type": "object",
+        "required": [
+          "state",
+          "frameAncestors",
+          "expiresAt"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "open",
+              "expired"
+            ]
+          },
+          "frameAncestors": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Origins, e.g. https://portal.example.com, https://*.example.com."
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Review": {
+        "type": "object",
+        "required": [
+          "status",
+          "required",
+          "decisions"
+        ],
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ReviewStatus"
+          },
+          "required": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "internal",
+                "customer"
+              ]
+            }
+          },
+          "decidedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "rerunRunId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The run that ran the pipeline again after a rejection."
+          },
+          "decisions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "party",
+                "decision",
+                "decidedAt"
+              ],
+              "properties": {
+                "party": {
+                  "type": "string",
+                  "enum": [
+                    "internal",
+                    "customer"
+                  ]
+                },
+                "decision": {
+                  "type": "string",
+                  "enum": [
+                    "approved",
+                    "rejected"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "comment": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "decidedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "rerun": {
+            "type": "object",
+            "description": "Only in the answer to a rejection with rerun.",
+            "required": [
+              "queued"
+            ],
+            "properties": {
+              "queued": {
+                "type": "boolean"
+              },
+              "runId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "message": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      },
+      "ReviewDecision": {
+        "type": "object",
+        "required": [
+          "decision"
+        ],
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 2000,
+            "description": "Required when rejected."
+          },
+          "comment": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "rerun": {
+            "type": "boolean",
+            "default": false,
+            "description": "On a rejection, run the pipeline again."
+          }
+        }
+      },
+      "Form": {
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "fields"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "fields": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "label",
+                "type",
+                "required"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "options": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "Submission": {
+        "type": "object",
+        "required": [
+          "id",
+          "formId",
+          "receivedAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "formId": {
+            "type": "string"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "runId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The run it started, if the form starts one."
+          }
+        }
+      },
+      "EventType": {
+        "type": "object",
+        "required": [
+          "type",
+          "description",
+          "schema"
+        ],
+        "properties": {
+          "type": {
+            "type": "string",
+            "examples": [
+              "run.completed"
+            ]
+          },
+          "description": {
+            "type": "string"
+          },
+          "schema": {
+            "type": "object",
+            "description": "JSON Schema of the event's data."
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "required": [
+          "id",
+          "type",
+          "createdAt",
+          "workspaceId",
+          "data"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "Webhook": {
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "eventTypes",
+          "active",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "eventTypes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "pausedReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it is paused: by its owner, or by the platform after 3 days of failures."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "failingSince": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "The first failed attempt since the last success."
+          },
+          "lastSuccessAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "secretRotatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "previousSecretValidUntil": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "While the previous secret still signs beside the new one."
+          }
+        }
+      },
+      "WebhookCreate": {
+        "type": "object",
+        "required": [
+          "url",
+          "eventTypes"
+        ],
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "https; a public address."
+          },
+          "eventTypes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "WebhookUpdate": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "eventTypes": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string"
+            }
+          },
+          "active": {
+            "type": "boolean"
+          }
+        }
+      },
+      "Delivery": {
+        "type": "object",
+        "required": [
+          "id",
+          "eventId",
+          "eventType",
+          "attempt",
+          "status",
+          "createdAt"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "eventId": {
+            "type": "string"
+          },
+          "eventType": {
+            "type": "string"
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "Attempts made so far (0 while the first is pending)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "delivered",
+              "failed",
+              "retrying"
+            ]
+          },
+          "responseStatus": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "The last answer's status; null when none came."
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "nextAttemptAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastAttemptAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "deliveredAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why the last attempt failed, never the answer's body."
+          },
+          "redeliveryOf": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The delivery this one sends again."
+          }
+        }
+      }
+    }
+  }
+}
