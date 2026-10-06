@@ -177,7 +177,19 @@ export class EChart {
       // 'rendered', not 'finished': a chart with a looping effect (the top-five ripple) never finishes.
       chart.on('rendered', () => { if (!this.drawn()) this.drawn.set(true); });
       // Bound once, here, on this instance: see the class comment.
-      chart.on('click', params => { if (this.chart === chart) this.clicked.emit(withIndex(chart, params as EChartClick)); });
+      let claimed: unknown = null;
+      chart.on('click', params => {
+        claimed = (params as { event?: { event?: unknown } }).event?.event ?? null;
+        if (this.chart === chart) this.clicked.emit(withIndex(chart, params as EChartClick));
+      });
+      // A line or an area is ONE path, and ECharts reports no click on it -- only on its point
+      // markers, which a long or smooth line does not draw. A click on the path that ECharts did
+      // not claim is read as the category under the pointer.
+      chart.getZr().on('click', event => {
+        if (this.chart !== chart || !event.target || event.event === claimed) return;
+        const line = lineClick(chart, this.option(), event.offsetX, event.offsetY);
+        if (line) this.clicked.emit(line);
+      });
     } catch (error) {
       console.error('A chart could not be drawn', error);
       this.failed.set('This chart could not be drawn from this result.');
@@ -246,6 +258,25 @@ function themeStamp(theme: EChartThemeRef): string {
  * read back from the pixel -- so a click anywhere along a line narrows to that point, as a click
  * on a bar narrows to the bar.
  */
+/** The click a line's path stands for: the category under the pointer, on the line kinds' grid. */
+export function lineClick(chart: Pick<ECharts, 'convertFromPixel' | 'containPixel'>, option: Record<string, unknown> | null,
+    x: number, y: number): EChartClick | null {
+  const series = (option?.['series'] as { type?: string }[] | undefined) ?? [];
+  const lines = series.map((one, i) => (one.type === 'line' ? i : -1)).filter(i => i >= 0);
+  const axis = option?.['xAxis'] as { type?: string } | undefined;
+  if (!lines.length || Array.isArray(axis) || axis?.type !== 'category') return null;
+  try {
+    if (!chart.containPixel({ gridIndex: 0 }, [x, y])) return null;
+    const point = chart.convertFromPixel({ gridIndex: 0 }, [x, y]);
+    const index = Array.isArray(point) ? Math.round(Number(point[0])) : NaN;
+    if (!Number.isFinite(index) || index < 0) return null;
+    // One line names its series; over a stack of several, the click names the category alone.
+    return { componentType: 'series', seriesType: 'line', seriesIndex: lines.length === 1 ? lines[0] : undefined, dataIndex: index };
+  } catch {
+    return null;
+  }
+}
+
 function withIndex(chart: ECharts, click: EChartClick & { event?: { offsetX?: number; offsetY?: number } }): EChartClick {
   const at = click.event;
   if (click.dataIndex !== undefined && click.dataIndex !== null) return click;

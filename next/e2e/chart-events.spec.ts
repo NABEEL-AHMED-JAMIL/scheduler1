@@ -12,9 +12,9 @@ import { analyticsFixtures, ORDERS, PREFIX } from './support/analytics-fixtures'
  * returns, are not here. The board and its analyses are made the first time they are missing and
  * kept, like every other "E2E" fixture.
  *
- * Each tile: find a mark by moving over the chart until ECharts shows the pointer cursor (it shows
+ * Each tile: find the marks by moving over the chart where ECharts shows the pointer cursor (it shows
  * it only over a mark that narrows), click it, and read the condition the board filter opened with.
- * A narrowing re-runs the board (a click while it runs is ignored), so each kind waits for that run.
+ * A narrowing re-runs the board with the filter on, so each kind opens the board afresh.
  *
  * @author Nabeel Ahmed
  */
@@ -72,18 +72,22 @@ async function ensureBoard(request: APIRequestContext, s: Session, connection: s
   return id;
 }
 
-/** A point over a mark that narrows: ECharts shows the pointer there and nowhere else. */
-async function markUnder(page: Page, chart: Locator): Promise<{ x: number; y: number } | null> {
+/**
+ * Points where ECharts shows the pointer, at most ten. Not every one is a mark that narrows -- a
+ * legend item toggles its series, a calendar's month name is text -- so each is tried in turn.
+ */
+async function pointerSpots(page: Page, chart: Locator): Promise<{ x: number; y: number }[]> {
   const box = (await chart.boundingBox())!;
-  for (let gy = 1; gy < 20; gy++) {
-    for (let gx = 1; gx < 28; gx++) {
+  const spots: { x: number; y: number }[] = [];
+  for (let gy = 1; gy < 20 && spots.length < 10; gy++) {
+    for (let gx = 1; gx < 28 && spots.length < 10; gx++) {
       const x = box.x + (box.width * gx) / 28, y = box.y + (box.height * gy) / 20;
       await page.mouse.move(x, y);
       const cursor = await chart.evaluate(el => getComputedStyle(el.querySelector('div > div') ?? el).cursor);
-      if (cursor === 'pointer') return { x, y };
+      if (cursor === 'pointer' && !spots.some(s => Math.abs(s.y - y) < 4 && Math.abs(s.x - x) < 30)) spots.push({ x, y });
     }
   }
-  return null;
+  return spots;
 }
 
 let boardId = 0;
@@ -94,33 +98,33 @@ test.beforeAll(async ({ request }) => {
   boardId = await ensureBoard(request, session, connection);
 });
 
-// Six kinds a test: each click re-runs the board, and a test is one token's fifteen minutes.
+// Six kinds a test: each kind opens the board afresh (no filter carried over), and a test is one
+// token's fifteen minutes.
 const GROUPS = Array.from({ length: Math.ceil(KINDS.length / 6) }, (_, i) => KINDS.slice(i * 6, i * 6 + 6).map(([kind]) => kind));
 
 for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.join(', ')}`, async ({ page }) => {
   test.setTimeout(900_000);
-  await page.goto(`/data/analytics/dashboards?board=${boardId}`);
-  await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 400_000 });
-  const builder = page.locator('app-filter-builder');
   for (const kind of group) {
+    await page.goto(`/data/analytics/dashboards?board=${boardId}`);
+    await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 400_000 });
     const tile = page.locator('app-analytics-widget', { hasText: `Events — ${kind}` });
     await tile.scrollIntoViewIfNeeded();
     const chart = tile.locator(`app-echart[data-kind="${kind}"][data-drawn]`);
     await chart.waitFor({ timeout: 10_000 }).catch(() => undefined);
     await expect.soft(chart, `${kind} is drawn by ECharts`).toBeVisible();
     if (!(await chart.count())) continue;
-    const hit = await markUnder(page, chart);
-    expect.soft(hit, `${kind} has a mark that narrows`).not.toBeNull();
-    if (!hit) continue;
+    const spots = await pointerSpots(page, chart);
+    expect.soft(spots.length, `${kind} shows the pointer over a mark`).toBeGreaterThan(0);
     // The click IS the apply: the board re-runs at once, its analyses carrying the clicked value
-    // as an equality. Waited for on the wire, so a click that did nothing cannot pass on a filter
-    // the previous kind left behind.
-    const narrowed = page.waitForRequest(r => r.url().includes('/analytics.json/analyze') && /"operator":"EQ"/.test(r.postData() ?? ''),
-      { timeout: 15_000 }).then(() => true, () => false);
-    await page.mouse.click(hit.x, hit.y);
-    expect.soft(await narrowed, `${kind}: a click narrowed the board`).toBe(true);
-    await expect.soft(builder.getByLabel('Value for condition 1'), `${kind} shows the condition`).not.toHaveValue('');
-    // The narrowed run is let finish: a Stop would leave the tiles after this one undrawn.
-    await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 300_000 });
+    // as an equality. Waited for on the wire.
+    let narrowed = false;
+    for (const spot of spots) {
+      const sent = page.waitForRequest(r => r.url().includes('/analytics.json/analyze') && /"operator":"EQ"/.test(r.postData() ?? ''),
+        { timeout: 4_000 }).then(() => true, () => false);
+      await page.mouse.click(spot.x, spot.y);
+      if ((narrowed = await sent)) break;
+    }
+    expect.soft(narrowed, `${kind}: a click on a mark narrowed the board`).toBe(true);
+    if (narrowed) await expect.soft(page.locator('app-filter-builder').getByLabel('Value for condition 1')).not.toHaveValue('');
   }
 });

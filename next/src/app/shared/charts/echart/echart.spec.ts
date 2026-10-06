@@ -25,6 +25,9 @@ class FakeChart {
   dispose() { this.assertAlive(); this.disposed = true; this.calls.push('dispose'); }
   isDisposed() { return this.disposed; }
   convertFromPixel(_finder: unknown, pixel: number[]) { return [pixel[0] / 100, 0]; }
+  containPixel() { return true; }
+  zrHandlers: Handler[] = [];
+  getZr() { return { on: (_event: string, handler: Handler) => { this.zrHandlers.push(handler); } }; }
   fire(event: string, params: unknown) { for (const handler of this.handlers.get(event) ?? []) handler(params); }
   private assertAlive() { if (this.disposed) throw new Error('called on a disposed instance'); }
 }
@@ -95,6 +98,22 @@ describe('app-echart', () => {
     made[0].fire('click', { componentType: 'series', seriesType: 'line', seriesIndex: 1, event: { offsetX: 240, offsetY: 30 } });
     made[0].fire('click', { componentType: 'series', seriesType: 'bar', seriesIndex: 0, dataIndex: 4 });
     expect(host.clicks.map(click => click.dataIndex)).toEqual([2, 4]);
+  });
+
+  it('reads a click on a line\'s path, which ECharts does not report, as the category under the pointer', async () => {
+    const { fixture, host } = await render();
+    host.option.set({ xAxis: { type: 'category' }, series: [{ type: 'line' }] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    made[0].zrHandlers.forEach(handler => handler({ target: {}, event: 'native', offsetX: 310, offsetY: 40 }));
+    expect(host.clicks).toEqual([{ componentType: 'series', seriesType: 'line', seriesIndex: 0, dataIndex: 3 }]);
+    // On empty canvas, or a click ECharts already reported, nothing more.
+    made[0].zrHandlers.forEach(handler => handler({ target: null, event: 'other', offsetX: 10, offsetY: 10 }));
+    host.option.set({ series: [{ type: 'pie' }] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    made[0].zrHandlers.forEach(handler => handler({ target: {}, event: 'x', offsetX: 10, offsetY: 10 }));
+    expect(host.clicks.length).toBe(1);
   });
 
   it('keeps that one handler through a kind switch: a setOption, never a re-bind', async () => {
