@@ -204,7 +204,7 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
   imports: [ReactiveFormsModule, RouterLink, Field, FormDialog, Icon, Combobox],
   template: `
     <app-form-dialog
-        [heading]="isEdit() ? 'Edit pipeline' : 'New pipeline'"
+        [heading]="isEdit() ? 'Edit registry task' : 'New registry task'"
         subtitle="A pipeline is its id, the topic it publishes on, and the fields a task on it fills in. Creating one here is what makes it choosable under Pipelines › New pipeline, as its registry task."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create pipeline'"
         [saving]="saving()" size="xwide"

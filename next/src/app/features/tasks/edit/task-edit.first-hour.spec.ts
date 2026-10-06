@@ -88,7 +88,7 @@ describe('TaskEdit, a new organisation\'s first hour (MIG-324)', () => {
     const { component, navigate, toast } = editor({ id: '' });
     component.form.patchValue({ taskName: 'Orders', sourceTaskTypeId: 11831, taskStatus: 'Active', taskPayload: '<pipeline/>' });
     component.save();
-    expect(toast.success).toHaveBeenCalledWith('Task created.');
+    expect(toast.success).toHaveBeenCalledWith('Pipeline created.');
     expect(navigate).toHaveBeenCalledWith(['/pipelines', 1877, 'edit']);
   });
 

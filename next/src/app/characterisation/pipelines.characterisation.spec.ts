@@ -52,7 +52,7 @@ describe("MIG-222 (Wave 4) and MIG-266 (Wave 5: Core's form builder): Configurat
 
   it("the dialog, for a new pipeline", async () => {
     const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null);
-    const requests = await click(v, 'New pipeline');
+    const requests = await click(v, 'New registry task');
     pin(FILE, "the dialog, for a new pipeline", { requests, ...overlay() }, PINNED);
   });
 

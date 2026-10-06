@@ -124,7 +124,7 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     await expect(page.getByRole('button', { name: 'New connection' })).toHaveCount(0);
     await page.goto('/configuration/task-registry');
     await expect(page.getByText("this workspace's pipelines and tasks, so they are read-only here")).toBeVisible();
-    await expect(page.getByRole('button', { name: 'New pipeline' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'New registry task' })).toHaveCount(0);
     await shot(page, info, 'managed-task-registry');
     await page.close();
   });

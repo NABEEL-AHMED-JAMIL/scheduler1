@@ -3,7 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "Edit pipeline from a Legacy row's panel opens the pipeline dialog": {
     "requests": [],
     "headings": [
-      "Edit pipeline",
+      "Edit registry task",
       "Fields",
       "Payload preview"
     ],
@@ -205,7 +205,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Aggregate",
       "Open Enrich",
@@ -305,7 +305,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Aggregate",
       "Open Enrich",

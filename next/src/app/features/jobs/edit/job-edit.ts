@@ -542,7 +542,7 @@ export class JobEdit implements OnInit {
         this.saveExtras(jobId).subscribe(problems => {
           this.saving.set(false);
           if (!problems.length) {
-            this.toast.success(this.isEdit() ? 'Job updated.' : 'Job created.');
+            this.toast.success(this.isEdit() ? 'Schedule updated.' : 'Schedule created.');
             this.router.navigate(['/pipelines/schedules']);
             return;
           }

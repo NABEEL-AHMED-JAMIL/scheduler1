@@ -166,7 +166,7 @@ describe('Task Registry -- a Legacy row saves exactly as the Pipelines list did 
     expect(JSON.stringify(post.mock.calls[0][1])).toBe(JSON.stringify(SAVE_REQUEST.body));
   });
 
-  it('Duplicate and New pipeline hand it what they did', async () => {
+  it('Duplicate and New registry task hand it what they did', async () => {
     const { screen, opened } = screenWith();
     await screen.duplicate(screen.rows().find(r => r.code === 'REF_CSV_CHECK_V1')!.pipeline!);
     screen.create();

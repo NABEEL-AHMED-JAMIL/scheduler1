@@ -168,8 +168,8 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     const registry = (await getJson(request, s, '/pipeline.json/list?page=1&limit=1000')).data?.rows ?? [];
     if (!registry.some((p: any) => p.pipelineId === REGISTRY_ID)) {
       await page.goto('/configuration/task-registry');
-      await page.getByRole('button', { name: 'New pipeline' }).click();
-      await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
+      await page.getByRole('button', { name: 'New registry task' }).click();
+      await page.getByRole('heading', { name: 'New registry task' }).waitFor();
       const dialog = page.getByRole('dialog').last();
       await dialog.locator('#pipelineId').fill(REGISTRY_ID);
       await dialog.locator('#pipelineName').fill(REGISTRY_NAME);
@@ -196,7 +196,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await pick(page, 'pipeline', REGISTRY_NAME, REGISTRY_NAME);
       await page.getByLabel('Input file').fill('intake/');
       await page.getByRole('button', { name: 'Create pipeline' }).click();
-      await expect(page.getByText('Task created.')).toBeVisible();
+      await expect(page.getByText('Pipeline created.')).toBeVisible();
       // MIG-324: a new pipeline opens on its own page, where its steps are built next.
       await expect(page).toHaveURL(/\/pipelines\/\d+\/edit/);
     }
@@ -247,7 +247,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await pick(page, 'task', PIPELINE, PIPELINE);
       await page.locator('#execution').selectOption('Manual');
       await page.getByRole('button', { name: 'Create schedule' }).click();
-      await expect(page.getByText('Job created.')).toBeVisible();
+      await expect(page.getByText('Schedule created.')).toBeVisible();
       job = ((await getJson(request, s, '/sourceJob.json/listSourceJob?page=1&limit=1000')).data ?? []).find((j: any) => j.jobName === SCHEDULE);
     }
     expect(job, 'the schedule exists').toBeTruthy();

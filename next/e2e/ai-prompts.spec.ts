@@ -110,8 +110,8 @@ test.describe('AI prompts in pipelines', () => {
     const topic = topics.data.find((t: any) => t.status === 'Active');
     expect(topic, 'the default profile has a topic').toBeTruthy();
     await page.goto('/configuration/pipelines');
-    await page.getByRole('button', { name: 'New pipeline' }).click();
-    await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
+    await page.getByRole('button', { name: 'New registry task' }).click();
+    await page.getByRole('heading', { name: 'New registry task' }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
     await page.locator('#pipelineName').fill(PIPELINE_NAME);
     await pick(page, 'pipelineTopic', topic.serviceName.slice(0, 12), topic.serviceName);
@@ -151,7 +151,7 @@ test.describe('AI prompts in pipelines', () => {
     await page.locator('[id="ff-|claim_id"]').fill('CLM-E2E-2');
     await page.locator('[id="ff-|document"]').fill('Patient seen for a fracture of the left tibia; total billed 412.');
     await page.getByRole('button', { name: 'Create pipeline' }).click();
-    await expect(page.getByText('Task created.')).toBeVisible();
+    await expect(page.getByText('Pipeline created.')).toBeVisible();
     const tasks = await (await request.post(`${api}/sourceTask.json/listSourceTask?page=1&limit=1000`, { headers, data: {} })).json();
     taskId = tasks.data.find((t: any) => t.taskName === TASK_NAME)?.taskDetailId ?? null;
     expect(taskId, 'the task exists').toBeTruthy();

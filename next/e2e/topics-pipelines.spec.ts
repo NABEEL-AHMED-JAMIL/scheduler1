@@ -82,8 +82,8 @@ test.describe('topics and pipelines', () => {
 
     // ── 2. Pipelines: define one on that topic (the topic box is searchable) ─────────────
     await page.goto('/configuration/pipelines');
-    await page.getByRole('button', { name: 'New pipeline' }).click();
-    await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
+    await page.getByRole('button', { name: 'New registry task' }).click();
+    await page.getByRole('heading', { name: 'New registry task' }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
     await page.locator('#pipelineName').fill(PIPELINE_NAME);
     await pick(page, 'pipelineTopic', STAMP, TOPIC_NAME);
@@ -115,7 +115,7 @@ test.describe('topics and pipelines', () => {
     await expect(page.getByText(`Defined for ${PIPELINE_ID}`)).toBeVisible();
     await page.getByLabel('Input folder').fill('e2e/in');
     await page.getByRole('button', { name: 'Create pipeline' }).click();
-    await expect(page.getByText('Task created.')).toBeVisible();
+    await expect(page.getByText('Pipeline created.')).toBeVisible();
     // listSourceTask is a POST with an optional search body; page/limit ride on the query string.
     const tasks = await (await request.post(`${api}/sourceTask.json/listSourceTask?page=1&limit=1000`, { headers, data: {} })).json();
     const taskRow = tasks.data.find((t: any) => t.taskName === TASK_NAME);

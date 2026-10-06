@@ -26,7 +26,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/list"
     ],
     "headings": [
-      "Edit pipeline",
+      "Edit registry task",
       "Fields",
       "Payload preview",
       "AI step · <summary>"
@@ -75,7 +75,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/fields?pipelineKey=100167"
     ],
     "headings": [
-      "Edit pipeline",
+      "Edit registry task",
       "Fields",
       "Payload preview"
     ],
@@ -118,7 +118,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /setting.json/topics?limit=1&q="
     ],
     "headings": [
-      "New pipeline",
+      "New registry task",
       "Fields"
     ],
     "buttons": [
@@ -157,7 +157,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
       "Refresh"
@@ -219,7 +219,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
       "Refresh"
@@ -264,7 +264,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
       "Refresh"
