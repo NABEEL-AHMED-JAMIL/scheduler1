@@ -3,6 +3,8 @@
 // route, a screenshot per route.
 //
 //   ROLE_SWEEP_TOKEN=<token> node scripts/role-sweep.mjs <routes.json> <out-dir> [base]
+//   ROLE_SWEEP_SESSION_FILE=<file> node scripts/role-sweep.mjs ...   # a whole sign-in answer, e.g. a managed-service
+//                                                                      # session (managedService.json/openSession)
 //
 // The token is a test token (etl-platform/scripts/mint-test-token.sh); it is read from the environment, never printed.
 import { chromium } from '@playwright/test';
@@ -10,7 +12,8 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 const [routesFile, out, base = 'http://localhost:4400'] = process.argv.slice(2);
 const api = 'http://localhost:9098/api/v1';
-const token = process.env.ROLE_SWEEP_TOKEN;
+const given = process.env.ROLE_SWEEP_SESSION_FILE ? JSON.parse(readFileSync(process.env.ROLE_SWEEP_SESSION_FILE, 'utf8')) : null;
+const token = given?.accessToken ?? process.env.ROLE_SWEEP_TOKEN;
 if (!token || !routesFile || !out) {
   console.error('usage: ROLE_SWEEP_TOKEN=... node scripts/role-sweep.mjs <routes.json> <out-dir> [base]');
   process.exit(2);
@@ -21,7 +24,7 @@ mkdirSync(out, { recursive: true });
 const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString());
 if (String(claims.appUserId) === '1000') { console.error('refusing: never sweep as user 1000'); process.exit(2); }
 const mine = await (await fetch(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-const session = { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
+const session = given ?? { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
   tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: mine?.data?.pageKeys ?? null,
   pageAccessProfileName: mine?.data?.pageAccessProfileName ?? null };
 

@@ -15,8 +15,11 @@ function editor(preview: unknown = { status: 'SUCCESS', data: { runs: ['2026-10-
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     { provide: HttpClient, useValue: {
-      post: (url: string, body: any) => { posts.push({ url, body }); return of(url.endsWith('/schedulePreview') ? preview : { status: 'SUCCESS', data: [] }); },
-      get: () => of({ status: 'SUCCESS', data: null }),
+      post: (url: string, body: any) => { posts.push({ url, body }); return of({ status: 'SUCCESS', data: [] }); },
+      get: (url: string, options?: { params?: Record<string, string> }) => {
+        if (url.endsWith('/schedulePreview')) { posts.push({ url, body: options?.params ?? {} }); return of(preview); }
+        return of({ status: 'SUCCESS', data: null });
+      },
     } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
     { provide: Router, useValue: { navigate: () => {} } },

@@ -551,8 +551,13 @@ export class JobEdit implements OnInit {
       return of({ ...NO_PREVIEW, error: 'Pick at least one day to see the runs.' });
     }
     this.preview.update(p => ({ ...p, loading: true }));
-    return this.http.post<ApiResponse<{ runs?: string[]; ends?: boolean }>>(`${API_BASE}/sourceJob.json/schedulePreview`,
-      this.schedulerPayload()).pipe(
+    // A GET, the timetable in the query: a read, so a managed-service session's audit does not record each change.
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(this.schedulerPayload())) {
+      if (value !== null && value !== undefined && value !== '' && key !== 'schedulerId') params[key] = String(value);
+    }
+    return this.http.get<ApiResponse<{ runs?: string[]; ends?: boolean }>>(`${API_BASE}/sourceJob.json/schedulePreview`,
+      { params }).pipe(
       map(response => response.status === API_SUCCESS
         ? { runs: response.data?.runs ?? [], ends: !!response.data?.ends, error: response.data?.runs?.length ? '' : (response.message || ''), loading: false }
         : { ...NO_PREVIEW, error: (response.message || '').replace(/^SourceJob schedule: /, '') }),
