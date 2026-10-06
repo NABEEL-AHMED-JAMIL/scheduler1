@@ -95,6 +95,16 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // MIG-332: the customer API's API clients and event routes. Role-gated like Storage Connections: every call
+        // behind it is TENANT_ADMIN (Identity's apiClient.json, Core's eventRoute.json).
+        path: 'integration/api-clients',
+        title: 'API Clients',
+        loadComponent: () =>
+          import('./features/integration/api-clients/api-clients').then(m => m.ApiClients),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         // MIG-247: which APIs exist, tested and versioned. Every member holding the page reads; the pages
         // hide what integration-service answers only for a workspace administrator (writes and Test).
         path: 'integration/api-collections',

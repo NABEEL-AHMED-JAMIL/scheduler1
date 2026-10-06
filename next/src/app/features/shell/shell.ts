@@ -115,6 +115,9 @@ export class Shell {
           hint: 'APIs, files and databases a pipeline reads' },
         { label: 'Storage Connections', path: '/integration/storage-connections', icon: 'cloud', adminOnly: true,
           hint: 'S3, Azure, MinIO, FTP' },
+        // MIG-332: how the organisation's own systems reach the API (/v1), and the event types they send.
+        { label: 'API Clients', path: '/integration/api-clients', icon: 'key', adminOnly: true,
+          hint: 'Your systems on the API, and their events' },
       ],
     },
     {

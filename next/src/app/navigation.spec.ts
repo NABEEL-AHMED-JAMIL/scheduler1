@@ -193,6 +193,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/pipelines/queue', 'Queue', 'queue', undefined],
     ['/pipelines/run-analytics', 'Run analytics', 'reports', undefined],
     ['/integration/storage-connections', 'Storage Connections', undefined, 'TENANT_ADMIN'],
+    // MIG-332: the customer API's clients and event routes, an administrator's.
+    ['/integration/api-clients', 'API Clients', undefined, 'TENANT_ADMIN'],
     // MIG-247: built. Read by every member holding the page; the screens hide the administrator's writes.
     ['/integration/api-collections', 'API Collections', 'api-collections', undefined],
     ['/integration/api-collections/:collectionId', 'API collection', 'api-collections', undefined],
@@ -370,6 +372,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     expect(menuFor('PLATFORM_ADMIN', null)).toEqual([
       ...DASHBOARD,
       ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
+      'Integration › API Clients -> /integration/api-clients',
       ...PIPELINES,
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,
@@ -392,6 +395,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     expect(menuFor('TENANT_ADMIN', null)).toEqual([
       ...DASHBOARD,
       ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
+      'Integration › API Clients -> /integration/api-clients',
       ...PIPELINES,
       ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
       ...DATA_SOON, ...DATA,

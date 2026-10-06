@@ -70,6 +70,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/integration/api-clients",
+      "title": "API Clients",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/integration/api-collections",
       "title": "API Collections",
       "pageKey": "api-collections",

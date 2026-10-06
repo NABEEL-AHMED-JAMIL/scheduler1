@@ -1,0 +1,130 @@
+<div class="page">
+  <div class="page-head">
+    <div>
+      <h1 class="page-title">API clients</h1>
+      <p class="page-subtitle">
+        How your own systems, such as a portal, reach the platform's API (/v1): each client has the scopes it needs and
+        an optional IP allowlist. The secret is shown once.
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadRoutes()" [disabled]="loading()">
+        <app-icon name="refresh" [class.spin]="loading()" />Refresh
+      </button>
+      <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
+        <app-icon name="plus" />New API client
+      </button>
+    </div>
+  </div>
+
+  <app-table-shell heading="API clients" [loading]="loading()" [error]="error()"
+                   [isEmpty]="!shown().length" [shown]="shown().length"
+                   [emptyMessage]="clients().length ? 'Every client here is revoked.' : 'No API clients yet. Make one for each system that calls the API.'"
+                   emptyIcon="key" (retry)="load()">
+    <ng-container toolbar>
+      @if (revokedCount()) {
+        <label class="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+          <input type="checkbox" class="checkbox" [checked]="showRevoked()" (change)="showRevoked.set($any($event.target).checked)" />
+          Show revoked ({{ revokedCount() }})
+        </label>
+      }
+    </ng-container>
+    <table class="table-modern" data-api-clients>
+      <thead>
+        <tr>
+          <th>Client</th>
+          <th>Scopes</th>
+          <th>Allowed from</th>
+          <th>Last used</th>
+          <th>Last day</th>
+          <th class="text-right">State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (c of shown(); track c.clientId) {
+          <tr [class.opacity-70]="c.status !== 'Active'">
+            <td class="max-w-64">
+              <div class="font-medium truncate">{{ c.name }}</div>
+              <div class="mono text-xs text-[color:var(--text-muted)] truncate">{{ c.clientId }}</div>
+            </td>
+            <td class="max-w-80">
+              <div class="flex flex-wrap gap-1">
+                @for (s of c.scopes; track s) { <span class="pill pill-neutral mono">{{ s }}</span> }
+              </div>
+            </td>
+            <td class="text-sm text-[color:var(--text-secondary)]">{{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}</td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+              {{ c.lastUsedAt ? (c.lastUsedAt | serverTime: 'dateTime') : 'Never' }}
+            </td>
+            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.expiresAt ? (c.expiresAt | serverTime: 'date') : '—' }}</td>
+            <td class="text-right"><span [class]="statusPill(c)">{{ c.status }}</span></td>
+            <td class="text-right whitespace-nowrap">
+              @if (c.status !== 'Revoked') {
+                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Change ' + c.name" (click)="openClient(c)">
+                  <app-icon name="edit" />Change
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === c.clientId"
+                        [attr.aria-label]="'New secret for ' + c.name" (click)="rotate(c)">
+                  <app-icon name="refresh" [busy]="busy() === c.clientId" />New secret
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="busy() === c.clientId"
+                        [attr.aria-label]="'Revoke ' + c.name" (click)="revoke(c)">
+                  <app-icon name="power" />Revoke
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+
+  <div class="flex items-center justify-between gap-2 mt-6 mb-2">
+    <div>
+      <h2 class="text-base font-semibold">Event routes</h2>
+      <p class="text-sm text-[color:var(--text-muted)]">Which pipeline or workflow each of your event types starts when your systems send it.</p>
+    </div>
+    @if (auth.canBuild()) {
+      <button type="button" class="btn btn-default btn-sm" (click)="openRoute(null)"><app-icon name="plus" />New event route</button>
+    }
+  </div>
+  <app-managed-banner what="event routes" />
+  <app-table-shell heading="Event routes" [loading]="routesLoading()" [error]="routesError()"
+                   [isEmpty]="!routes().length" [shown]="routes().length"
+                   emptyMessage="No event routes yet. An event of a type no route takes is refused."
+                   emptyIcon="zap" (retry)="loadRoutes()">
+    <table class="table-modern" data-event-routes>
+      <thead>
+        <tr>
+          <th>Event type</th>
+          <th>Starts</th>
+          <th>Contract</th>
+          <th class="text-right">State</th>
+          <th class="w-12"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (r of routes(); track r.routeId) {
+          <tr [class.opacity-70]="!r.active">
+            <td class="mono text-sm">{{ r.eventType }}</td>
+            <td>{{ targetOf(r) }}</td>
+            <td class="text-sm text-[color:var(--text-secondary)]">{{ r.contractName || (r.contractId ? 'Contract ' + r.contractId : '—') }}</td>
+            <td class="text-right"><span [class]="r.active ? 'pill pill-ok' : 'pill pill-neutral'">{{ r.active ? 'Active' : 'Inactive' }}</span></td>
+            <td class="text-right whitespace-nowrap">
+              @if (auth.canBuild()) {
+                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Change the route for ' + r.eventType" (click)="openRoute(r)">
+                  <app-icon name="edit" />Change
+                </button>
+                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="routeBusy() === r.routeId"
+                        [attr.aria-label]="'Remove the route for ' + r.eventType" (click)="removeRoute(r)">
+                  <app-icon name="trash" />Remove
+                </button>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+</div>
