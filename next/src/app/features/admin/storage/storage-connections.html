@@ -196,10 +196,10 @@
           @if (canSeeWorkspace()) { <th>Workspace</th> }
           <th>Credentials</th>
           <th>Last test</th>
-          <th>Created by</th>
-          <th>Updated by</th>
+          <th class="hidden 2xl:table-cell">Created by</th>
+          <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">State</th>
-          <th class="w-12"><span class="sr-only">Actions</span></th>
+          <th class="w-12 col-pin-right"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -263,14 +263,14 @@
                 </div>
               }
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ c.createdByName || '—' }}
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ c.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
-            <td class="text-right">
+            <td class="text-right col-pin-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="testing() === c.storageConnectionId" [attr.aria-label]="'Actions for ' + c.connectionName">
                 <app-icon name="dots" size="1.05em" />
