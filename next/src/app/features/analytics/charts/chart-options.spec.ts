@@ -93,7 +93,11 @@ describe('every ECharts kind builds an option from a result it fits', () => {
 describe('what each kind says about the data', () => {
   it('horizontal bars list the first row at the top, and stack to 100% on request', () => {
     const o = option(twoDims(), 'barH', { bar: { stack: 'percent' } });
-    expect((o['yAxis'] as Record<string, unknown>)['inverse']).toBe(true);
+    // Drawn bottom-up with the order reversed, not on an inverse axis: ECharts 6.1 squeezed an
+    // inverse axis of a few hundred names into a sliver of the grid.
+    const axis = o['yAxis'] as Record<string, unknown>;
+    expect(axis['inverse']).toBeUndefined();
+    expect((axis['data'] as string[]).at(-1)).toBe('north');
     const [a, b] = series(o);
     expect(a['stack']).toBe('total');
     expect((a['data'] as number[])[0] + (b['data'] as number[])[0]).toBeCloseTo(100);
@@ -169,8 +173,8 @@ describe('what each kind says about the data', () => {
 
   it('a tree nests the dimensions and sums up the branches', () => {
     expect(treeOf(twoDims())).toEqual([
-      { name: 'north', value: 3, children: [{ name: 'a', value: 1 }, { name: 'b', value: 2 }] },
-      { name: 'south', value: 7, children: [{ name: 'a', value: 3 }, { name: 'b', value: 4 }] },
+      { name: 'north', value: 3, path: ['north'], children: [{ name: 'a', value: 1, path: ['north', 'a'] }, { name: 'b', value: 2, path: ['north', 'b'] }] },
+      { name: 'south', value: 7, path: ['south'], children: [{ name: 'a', value: 3, path: ['south', 'a'] }, { name: 'b', value: 4, path: ['south', 'b'] }] },
     ]);
   });
 
@@ -182,8 +186,8 @@ describe('what each kind says about the data', () => {
   });
 
   it('a heatmap puts every pair on its cell, and the calendar every day in its year', () => {
-    const cells = series(option(twoDims(), 'heatmap'))[0]['data'];
-    expect(cells).toEqual([[0, 0, 1], [1, 0, 3], [0, 1, 2], [1, 1, 4]]);
+    const cells = series(option(twoDims(), 'heatmap'))[0]['data'] as { value: number[] }[];
+    expect(cells.map(cell => cell.value)).toEqual([[0, 0, 1], [1, 0, 3], [0, 1, 2], [1, 1, 4]]);
     const cal = option(table({ dims: [dim('day', ['2025-12-31', '2026-01-01'], { date: true })], measures: [{ name: 'm', values: [1, 2] }] }), 'calendar');
     expect((cal['calendar'] as { range: string }[]).map(c => c.range)).toEqual(['2025', '2026']);
   });

@@ -18,6 +18,17 @@ import { ChartTable, dayKey, distinct, figures, primary, quantities } from './ch
  * @author Nabeel Ahmed
  */
 
+/**
+ * The most categories a kind draws before the rest are added into "Other" -- where the figures
+ * add up, so the tail has a total to stand for it. Past this a kind whose figures do not add up
+ * is refused instead (chart-fit.ts, with the same numbers): a tail of averages has no sum.
+ */
+export const CATEGORY_LIMIT: Partial<Record<EChartKind, number>> = {
+  rose: 16, halfDonut: CHART_SLOTS,
+  // The funnel draws its largest 12 and says so, rather than adding a tail that is not a stage.
+  funnel: 12, pareto: 60, waterfall: 60, polarBar: 36, pictorialBar: 24,
+};
+
 /** How many series a line or an area can carry before its colours repeat. */
 export const MAX_SERIES = CHART_SLOTS;
 
@@ -77,8 +88,13 @@ export function fitIssues(table: ChartTable): Record<EChartKind, string> {
     : d > 3 ? 'More than three levels cannot be read.' : '')
     || whole('A part-of-a-whole chart') || noNonPositive('an area or a slice cannot be drawn for one');
 
+  // Past a kind's limit the rest are added into "Other" (chart-options.ts, CATEGORY_LIMIT) where
+  // the figures add up; where they do not, a tail has no sum to stand for it and the kind refuses.
   const rowsOfDim = (max: number, min = 1) => oneDim || (n < min
-    ? `This needs at least ${min} rows.` : n > max ? `${n} rows is past the ${max} this chart can label.` : '');
+    ? `This needs at least ${min} rows.`
+    : n > max && table.additive !== true
+      ? `${n} rows is past the ${max} this chart can label, and the rest cannot be added into "Other" because ${totalling ? totalling.replace(/^it adds parts into a whole, and /, '') : 'these figures do not add up'}.`
+      : '');
 
   const date = table.dims[0]?.date;
   // Years counted from the day each value falls on, through instantOf -- never by cutting the text.
@@ -89,19 +105,19 @@ export function fitIssues(table: ChartTable): Record<EChartKind, string> {
   return {
     barH: empty || (d === 0 ? 'Bars need a column of names.' : d > 2 ? 'Three dimensions are too many for one set of bars.'
       : d === 2 && seriesCount > MAX_SERIES ? `${seriesCount} series is past the ${MAX_SERIES} colours this palette can tell apart.` : ''),
-    waterfall: empty || rowsOfDim(60, 2) || whole('A waterfall'),
-    pareto: empty || rowsOfDim(60, 2) || whole('A running share') || noNegative('a share of a total cannot include one'),
+    waterfall: empty || rowsOfDim(CATEGORY_LIMIT.waterfall!, 2) || whole('A waterfall'),
+    pareto: empty || rowsOfDim(CATEGORY_LIMIT.pareto!, 2) || whole('A running share') || noNegative('a share of a total cannot include one'),
     barLine: empty || oneDim || (table.measures.length < 2
       ? 'Bars and a line need two numbers: one for the bars, one for the line.' : ''),
-    polarBar: empty || rowsOfDim(36, 3) || noNegative('a radial bar is measured out from the centre'),
-    pictorialBar: empty || rowsOfDim(24) || noNegative('a pictorial bar is measured up from zero'),
+    polarBar: empty || rowsOfDim(CATEGORY_LIMIT.polarBar!, 3) || noNegative('a radial bar is measured out from the centre'),
+    pictorialBar: empty || rowsOfDim(CATEGORY_LIMIT.pictorialBar!) || noNegative('a pictorial bar is measured up from zero'),
     lineSmooth: lineIssue,
     lineStep: lineIssue,
     lineMarkers: lineIssue,
     areaStacked: areaStack,
     areaShare: areaStack,
-    rose: empty || rowsOfDim(16, 2) || whole('A rose') || noNonPositive('a petal cannot be drawn for one'),
-    halfDonut: empty || rowsOfDim(CHART_SLOTS, 2) || whole('A ring') || noNonPositive('a share of a total cannot include one'),
+    rose: empty || rowsOfDim(CATEGORY_LIMIT.rose!, 2) || whole('A rose') || noNonPositive('a petal cannot be drawn for one'),
+    halfDonut: empty || rowsOfDim(CATEGORY_LIMIT.halfDonut!, 2) || whole('A ring') || noNonPositive('a share of a total cannot include one'),
     nestedPie: empty || (d !== 2 ? 'A nested pie needs exactly two columns of names: the inner ring and the outer.'
       : groups.length > CHART_SLOTS ? `${groups.length} inner slices is past the ${CHART_SLOTS} colours this palette can tell apart.` : '')
       || whole('A pie') || noNonPositive('a slice cannot be drawn for one'),
@@ -129,7 +145,7 @@ export function fitIssues(table: ChartTable): Record<EChartKind, string> {
         ? 'One of these columns has more than 100 values, too many cells to read.' : ''),
     calendar: empty || (d !== 1 || !date ? 'A calendar needs exactly one column, and that a date.'
       : years > 3 ? `These dates span ${years} years; a calendar reads up to three.` : n < 2 ? 'A calendar needs at least two days.' : ''),
-    funnel: empty || rowsOfDim(12, 2) || noNegative('a funnel stage cannot be narrower than nothing'),
+    funnel: empty || rowsOfDim(Number.MAX_SAFE_INTEGER, 2) || noNegative('a funnel stage cannot be narrower than nothing'),
     gauge: n === 1 && table.measures.length ? '' : empty
       || `A gauge shows one figure, and this returned ${n} rows.`,
     radar: empty || (table.measures.length >= 3

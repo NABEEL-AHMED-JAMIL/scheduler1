@@ -99,6 +99,35 @@ function mix(a: Rgb, b: Rgb, t: number): Rgb {
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 }
 
+/** The floor for text on a mark, WCAG 1.4.3 for normal-size text. */
+export const LABEL_CONTRAST = 4.5;
+
+const BLACK: Rgb = [0, 0, 0];
+const WHITE: Rgb = [255, 255, 255];
+
+/**
+ * The ink for a label drawn ON a fill: black or white, whichever has more contrast with it.
+ *
+ * One of the two always clears 4.5:1 -- the worst fill for both is a mid grey near luminance
+ * 0.18, where each sits at about 4.6:1 -- so this never needs a third colour. A fill this cannot
+ * read (a gradient, a pattern) gets the console's dark ink, which is the safe guess on a palette
+ * held to 3:1 against a light card.
+ */
+export function inkOn(fill: string | null | undefined): string {
+  // Black and white are the only inks here, by the owner's rule for labels on a fill: not theme
+  // colours, which flip with the mode while the fill under the label does not.
+  const rgb = toRgb(fill ?? '');
+  if (!rgb) return toHex(BLACK);
+  return toHex(contrast(rgb, BLACK) >= contrast(rgb, WHITE) ? BLACK : WHITE);
+}
+
+/** A colour between two, t of the way from a to b, as hex; a when either cannot be read. */
+export function blend(a: string, b: string, t: number): string {
+  const from = toRgb(a), to = toRgb(b);
+  if (!from || !to) return a;
+  return toHex(mix(from, to, Math.max(0, Math.min(1, t))));
+}
+
 /** The fill floor for a series against the card, as styles.css holds --chart-N to. */
 export const MIN_FILL_CONTRAST = 3;
 
@@ -162,7 +191,9 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
   const axis = (splitLines: boolean) => ({
     axisLine: { show: true, lineStyle: { color: tokens.border } },
     axisTick: { show: false, lineStyle: { color: tokens.border } },
-    axisLabel: { color: tokens.muted, fontSize: 11, fontFamily: tokens.font },
+    // The secondary text colour, not the muted one: muted is held to the 4.5:1 floor for prose
+    // at 12px on the card, and axis text at 11px on a dark card read faint beside it.
+    axisLabel: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
     nameTextStyle: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
     splitLine: { show: splitLines, lineStyle: { color: tokens.border, type: 'dashed' } },
     splitArea: { show: false },
@@ -173,11 +204,11 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     textStyle: { fontFamily: tokens.font, color: tokens.textSecondary, fontSize: 12 },
     title: {
       textStyle: { color: tokens.text, fontSize: 13, fontWeight: 600, fontFamily: tokens.font },
-      subtextStyle: { color: tokens.muted, fontSize: 11, fontFamily: tokens.font },
+      subtextStyle: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
     },
     legend: {
       textStyle: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
-      pageTextStyle: { color: tokens.muted },
+      pageTextStyle: { color: tokens.textSecondary },
       pageIconColor: tokens.textSecondary,
       pageIconInactiveColor: tokens.border,
       inactiveColor: tokens.border,
@@ -188,11 +219,13 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
       borderWidth: 1,
       padding: [6, 10],
       textStyle: { color: tokens.text, fontSize: 12, fontFamily: tokens.font },
+      // A long category name wraps inside the tooltip rather than running it off the chart.
+      extraCssText: 'max-width: min(360px, 90vw); white-space: normal; overflow-wrap: anywhere; box-shadow: 0 4px 12px var(--shadow-color);',
       axisPointer: {
         lineStyle: { color: tokens.muted },
         crossStyle: { color: tokens.muted },
         shadowStyle: { color: tokens.sunken, opacity: 0.6 },
-        label: { backgroundColor: tokens.sunken, color: tokens.text },
+        label: { backgroundColor: tokens.sunken, color: tokens.text, fontFamily: tokens.font },
       },
     },
     categoryAxis: axis(false),
@@ -210,7 +243,7 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     dataZoom: {
       borderColor: tokens.border,
       fillerColor: tokens.sunken,
-      textStyle: { color: tokens.muted, fontSize: 11 },
+      textStyle: { color: tokens.textSecondary, fontSize: 11 },
       handleStyle: { color: tokens.surface, borderColor: tokens.muted },
       moveHandleStyle: { color: tokens.border },
       dataBackground: { lineStyle: { color: tokens.muted }, areaStyle: { color: tokens.sunken } },
@@ -219,7 +252,7 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     },
     visualMap: {
       inRange: { color: [tokens.sunken, tokens.heat] },
-      textStyle: { color: tokens.muted, fontSize: 11 },
+      textStyle: { color: tokens.textSecondary, fontSize: 11 },
     },
     toolbox: {
       iconStyle: { borderColor: tokens.muted },
@@ -228,9 +261,9 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     calendar: {
       itemStyle: { color: tokens.surface, borderColor: tokens.border },
       splitLine: { lineStyle: { color: tokens.muted } },
-      dayLabel: { color: tokens.muted, fontSize: 11 },
+      dayLabel: { color: tokens.textSecondary, fontSize: 10 },
       monthLabel: { color: tokens.textSecondary, fontSize: 11 },
-      yearLabel: { color: tokens.muted, fontSize: 12 },
+      yearLabel: { color: tokens.textSecondary, fontSize: 12 },
     },
     candlestick: {
       itemStyle: { color: tokens.up, color0: tokens.down, borderColor: tokens.up, borderColor0: tokens.down },
@@ -240,8 +273,10 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     ...Object.fromEntries(['pie', 'tree', 'sankey', 'chord'].map(type =>
       [type, { label: { color: tokens.textSecondary, textBorderWidth: 0 }, labelLine: { lineStyle: { color: tokens.border } } }])),
     ...Object.fromEntries(['bar', 'line', 'scatter', 'pictorialBar'].map(type => [type, { label: { textBorderWidth: 0 } }])),
-    markLine: { label: { color: tokens.textSecondary, fontSize: 11 }, lineStyle: { color: tokens.muted } },
-    markPoint: { label: { color: tokens.surface, fontSize: 11 } },
+    markLine: { label: { color: tokens.textSecondary, fontSize: 11, textBorderWidth: 0 }, lineStyle: { color: tokens.muted } },
+    // A pin is filled in its series' colour; the builder sets the ink per series (inkOn).
+    markPoint: { label: { fontSize: 11, textBorderWidth: 0 } },
+    gauge: { axisLabel: { color: tokens.textSecondary }, title: { color: tokens.textSecondary }, detail: { color: tokens.text } },
     animationDuration: 280,
     animationDurationUpdate: 220,
     animationEasing: 'cubicOut',

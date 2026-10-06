@@ -5,11 +5,12 @@ import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { ThemePicker } from '../../../shared/charts/echart/theme-picker';
 import { PaletteOrder } from '../../../shared/charts/echart/palette-order';
 import { ChartThemes } from '../../../shared/charts/echart/chart-themes';
-import { themeLabel } from '../../../shared/charts/echart/echart-theme';
+import { themeLabel, toHex, toRgb } from '../../../shared/charts/echart/echart-theme';
+import { ChartTokens } from '../../../shared/charts/echart/chart-tokens';
 import { WidgetChart } from '../widget-chart';
 import type { WidgetView } from '../dashboard';
 import { kindInfo } from '../widget-kinds';
-import { AxisSettings, ChartSettings, NumberStyle, SettingGroup, compactSettings, parseSettings, settingGroups } from './chart-settings';
+import { AxisSettings, ChartSettings, LabelColor, NumberStyle, SettingGroup, compactSettings, parseSettings, settingGroups } from './chart-settings';
 
 export interface ChartSettingsData {
   title: string;
@@ -119,6 +120,23 @@ export const NUMBER_STYLES: { id: NumberStyle; label: string }[] = [
                 <label class="settings-field"><span>Format</span>
                   <select class="input input-sm" (change)="patch({ labels: { ...draft().labels, format: pick($event) } })">
                     @for (style of styles; track style.id) { <option [value]="style.id" [selected]="(draft().labels?.format ?? 'compact') === style.id">{{ style.label }}</option> }
+                  </select></label>
+                <!-- Auto is the default and the safe one: inside a bar or a slice the label is black or white,
+                     whichever reads on that fill at 4.5:1; beside a mark it is the theme's text colour. -->
+                <label class="settings-field"><span>Text</span>
+                  <select class="input input-sm settings-label-colour" (change)="setLabelColour(pick($event))">
+                    <option value="auto" [selected]="labelColourMode() === 'auto'">Auto (contrast with the mark)</option>
+                    <option value="theme" [selected]="labelColourMode() === 'theme'">Theme text colour</option>
+                    <option value="custom" [selected]="labelColourMode() === 'custom'">Custom colour</option>
+                  </select></label>
+                @if (labelColourMode() === 'custom') {
+                  <label class="settings-field"><span>Colour</span>
+                    <input type="color" class="input input-sm h-7 p-0.5" aria-label="Label colour" [value]="customColour()"
+                           (change)="patch({ labels: { ...draft().labels, color: $any($event.target).value } })" /></label>
+                }
+                <label class="settings-field"><span>Size</span>
+                  <select class="input input-sm" (change)="patch({ labels: { ...draft().labels, size: pick($event) } })">
+                    @for (size of labelSizes; track size.id) { <option [value]="size.id" [selected]="(draft().labels?.size ?? 'normal') === size.id">{{ size.label }}</option> }
                   </select></label>
               </div>
             </section>
@@ -298,6 +316,7 @@ export class ChartSettingsPanel {
   readonly ref = inject<DialogRef<ChartSettings | undefined>>(DialogRef);
   readonly data = inject<ChartSettingsData>(DIALOG_DATA);
   private readonly themes = inject(ChartThemes);
+  private readonly chartTokens = inject(ChartTokens);
 
   readonly draft = signal<ChartSettings>(parseSettings(this.data.settings));
   readonly groups = settingGroups(this.data.kind);
@@ -363,6 +382,30 @@ export class ChartSettingsPanel {
   tri(event: Event): boolean | undefined {
     const value = (event.target as HTMLSelectElement).value;
     return value === '' ? undefined : value === 'true';
+  }
+
+  /** The custom colour, or -- before one is picked -- the theme's text colour on screen, as a colour input needs it. */
+  customColour(): string {
+    const chosen = this.draft().labels?.color;
+    if (chosen?.startsWith('#')) return chosen;
+    const text = toRgb(this.chartTokens.tokens().text);
+    return text ? toHex(text) : toHex([51, 51, 51]);
+  }
+
+  readonly labelSizes = [
+    { id: 'small', label: 'Small' }, { id: 'normal', label: 'Normal' }, { id: 'large', label: 'Large' },
+  ];
+
+  /** Which of the three the Text choice is: a stored #rrggbb is "custom". */
+  labelColourMode(): 'auto' | 'theme' | 'custom' {
+    const colour = this.draft().labels?.color;
+    return !colour || colour === 'auto' ? 'auto' : colour === 'theme' ? 'theme' : 'custom';
+  }
+
+  setLabelColour(mode: 'auto' | 'theme' | 'custom' | undefined): void {
+    const keep = this.draft().labels?.color;
+    const color = mode === 'custom' ? (keep && keep.startsWith('#') ? keep : this.customColour()) : mode === 'theme' ? 'theme' : undefined;
+    this.patch({ labels: { ...this.draft().labels, color: color as LabelColor | undefined } });
   }
 
   pct(value: number | undefined): string {

@@ -1,3 +1,5 @@
+import { InjectionToken } from '@angular/core';
+
 /**
  * The one door to ECharts: a dynamic import, made once and shared.
  *
@@ -18,3 +20,12 @@ export function loadECharts(): Promise<EChartsModule> {
   });
   return loading;
 }
+
+/**
+ * How app-echart gets the library: loadECharts, unless a test hands it a stand-in. A token rather
+ * than a module mock, because the click and theme wiring is worth testing without a canvas.
+ */
+export const ECHARTS_LOADER = new InjectionToken<() => Promise<EChartsModule>>('ECHARTS_LOADER', {
+  providedIn: 'root',
+  factory: () => loadECharts,
+});

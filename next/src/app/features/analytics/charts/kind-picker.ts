@@ -67,16 +67,23 @@ export interface KindPreviewContext { $implicit: string; }
         </div>
         @if (preview(); as template) {
           @let shown = shownKind();
+          @let pointed = hovered() ?? shown;
           <aside class="kind-preview min-w-0" aria-live="polite">
-            @if (info(shown); as kind) {
+            @if (info(pointed); as kind) {
               <p class="text-sm font-semibold">{{ kind.label }}</p>
               <p class="text-[11px] text-[color:var(--text-muted)] mb-2">Needs {{ kind.needs.charAt(0).toLowerCase() + kind.needs.slice(1) }}.</p>
-              @if (reason(shown); as why) {
-                <p class="text-xs text-[color:var(--warn-text)]">Doesn't fit because {{ why.charAt(0).toLowerCase() + why.slice(1) }}</p>
-              } @else {
-                <ng-container [ngTemplateOutlet]="template" [ngTemplateOutletContext]="{ $implicit: shown }" />
+              <!-- A kind under the pointer that cannot draw this result says why in a line and leaves the
+                   chart on screen as it was. Swapping the chart for the reason, as this used to, flashed
+                   a warning across the preview at every refused kind the pointer crossed on its way
+                   to the one it wanted -- which read as the chart failing (owner, 2026-10-06). -->
+              @if (reason(kind.id); as why) {
+                <p class="kind-preview-why text-[11px] leading-snug text-[color:var(--text-secondary)] mb-2">
+                  Not for this result: {{ why.charAt(0).toLowerCase() + why.slice(1) }}
+                  @if (info(shown); as kept) { Showing {{ kept.label.toLowerCase() }}. }
+                </p>
               }
             }
+            <ng-container [ngTemplateOutlet]="template" [ngTemplateOutletContext]="{ $implicit: shown }" />
           </aside>
         }
       </div>
@@ -145,8 +152,16 @@ export class KindPicker {
       .filter(group => group.kinds.length);
   });
 
-  /** The kind the preview shows: the one under the pointer, else the one chosen. */
-  readonly shownKind = computed(() => this.hovered() ?? this.selected() ?? 'table');
+  /**
+   * The kind the preview DRAWS: the one under the pointer when it fits this result, else the one
+   * chosen (when that fits), else the table. Never a kind that cannot draw it.
+   */
+  readonly shownKind = computed(() => {
+    const fits = (kind: string | null): kind is string => !!kind && !this.reason(kind);
+    const hovered = this.hovered();
+    const selected = this.selected();
+    return fits(hovered) ? hovered : fits(selected) ? selected : 'table';
+  });
 
   choose(kind: KindInfo): void {
     if (this.reason(kind.id)) return;

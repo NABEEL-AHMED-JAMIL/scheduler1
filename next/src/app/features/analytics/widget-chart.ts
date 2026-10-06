@@ -9,18 +9,20 @@ import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
 import { Histogram } from '../../shared/charts/histogram';
 import { ResultSummary } from '../../shared/charts/result-summary';
 import { RankedBar } from '../../shared/charts/ranked-bar';
-import { chartColor } from '../../shared/charts/status-color';
+import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
 import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
 import { WidgetTable } from './widget-table';
 import { DataText } from '../../shared/ui/data-text';
 import { KINDS, kindInfo } from './widget-kinds';
 import type { EChartKind, PivotGrid, WidgetVisualization } from './analytics.service';
-import { EChart } from '../../shared/charts/echart/echart';
+import { EChart, EChartClick } from '../../shared/charts/echart/echart';
 import { ChartPalette } from '../../shared/charts/echart/chart-palette';
 import { ChartThemes } from '../../shared/charts/echart/chart-themes';
 import { CONSOLE_THEME } from '../../shared/charts/echart/echart-theme';
 import { ChartSettings } from './charts/chart-settings';
-import { optionFor } from './charts/chart-options';
+import { naturalHeight, optionFor, pickerOf } from './charts/chart-options';
+import { markFor } from './charts/mark-pick';
+import { tableOf } from './charts/chart-table';
 import type { Mark, WidgetView } from './dashboard';
 
 /** How many rows a tile's table shows; the rest are one click away. */
@@ -53,7 +55,7 @@ export const WIDGET_HEIGHT_MAX = 600;
       <div [class]="shell()" [appChartPalette]="theme().id" [paletteOrder]="settings().colors?.order">
       @if (echartKind(); as kind) {
         <app-echart [option]="echartOption()" [theme]="theme().ref" [renderer]="settings().renderer ?? 'canvas'"
-                    [height]="height()" [label]="chartLabel()" [attr.data-kind]="kind" />
+                    [height]="drawHeight()" [label]="chartLabel()" [attr.data-kind]="kind" (clicked)="echartClicked($event)" />
       } @else {
       @switch (drawn()) {
         @case ('kpi') {
@@ -64,7 +66,11 @@ export const WIDGET_HEIGHT_MAX = 600;
         @case ('area') { <app-line-chart [data]="points(v)" [filled]="true" [height]="height()" [format]="figure" /> }
         @case ('cumulative') { <app-line-chart [data]="cumulativePoints(v)" [height]="height()" [format]="figure" /> }
         @case ('groupedBar') {
-          @if (v.pivot; as grid) { <app-grouped-bar [groupNames]="pivotGroupNames(grid)" [series]="pivotSeries(grid)" /> }
+          <!-- A row per group: past the tile's cap it scrolls inside the tile rather than making the
+               tile (and every tile beside it) thousands of pixels tall. -->
+          @if (v.pivot; as grid) {
+            <div class="chart-scroll" [style.max-height.px]="scrollCap"><app-grouped-bar [groupNames]="pivotGroupNames(grid)" [series]="pivotSeries(grid)" /></div>
+          }
         }
         @case ('pivot') {
           @if (v.pivot; as grid) {
@@ -116,21 +122,29 @@ export const WIDGET_HEIGHT_MAX = 600;
         @case ('distributionSummary') { <app-result-summary [data]="v.marks" mode="distribution" [dimensionLabel]="dimensionName(v)" /> }
         @case ('comparison') { <app-comparison [first]="sides(v).first" [second]="sides(v).second" /> }
         @case ('ranked') {
-          <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="false" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          <div class="chart-scroll" [style.max-height.px]="scrollCap">
+            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="false" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          </div>
         }
         @case ('rankedShare') {
-          <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="true" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          <div class="chart-scroll" [style.max-height.px]="scrollCap">
+            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="true" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          </div>
         }
         @case ('bar') {
           <app-bar-chart [data]="v.marks" [height]="height()" [format]="figure" [clickable]="clickable()" (barClicked)="picked.emit($any($event))" />
         }
-        @case ('donut') { <app-donut [data]="v.marks" [totalLabel]="''" [format]="figure" /> }
+        @case ('donut') { <app-donut [data]="donutMarks(v)" [totalLabel]="''" [format]="figure" /> }
         @default { <app-widget-table [columns]="v.columns" [rows]="tileRows(v)" [measureColumn]="v.measureColumn" /> }
       }
       }
       </div>
     }
   `,
+  styles: [`
+    /* A list of rows that outgrew its tile scrolls in place; the page is not scrolled by the wheel at its ends. */
+    .chart-scroll { overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  `],
 })
 export class WidgetChart {
   readonly view = input.required<WidgetView>();
@@ -152,6 +166,14 @@ export class WidgetChart {
   readonly interactive = input(false);
   /** What a saved image and the data view are called. */
   readonly name = input('');
+  /**
+   * Whether a kind that lists categories down the page (horizontal bars) may grow past `height`
+   * to give each bar a readable row, up to WIDGET_HEIGHT_MAX. Off where the author set a height.
+   */
+  readonly autoHeight = input(true);
+
+  /** The tallest a row-per-category SVG kind draws before it scrolls inside the tile. */
+  protected readonly scrollCap = WIDGET_HEIGHT_MAX;
 
   private readonly themes = inject(ChartThemes);
 
@@ -165,13 +187,55 @@ export class WidgetChart {
     return kindInfo(kind)?.engine === 'echarts' ? kind as EChartKind : null;
   });
 
+  /** The result split into dimensions and measures, as the ECharts kinds read it. */
+  private readonly table = computed(() => this.view().chart ?? tableOf(this.view(), { additive: this.view().additive }));
+
+  /**
+   * The drawing's height: what was asked, or -- for horizontal bars -- a row per bar up to the
+   * cap, past which the bars scroll inside the chart (the option's dataZoom) instead.
+   */
+  readonly drawHeight = computed(() => {
+    const asked = this.height();
+    if (!this.autoHeight() || (this.echartKind() !== 'barH' && this.echartKind() !== 'pictorialBar')) return asked;
+    const table = this.table();
+    const categories = table.dims.length ? new Set(table.dims[0].values).size : 0;
+    return naturalHeight(Math.min(categories, (this.settings().topN ?? categories) + 1), asked, Math.max(asked, WIDGET_HEIGHT_MAX));
+  });
+
   readonly echartOption = computed(() => {
     const kind = this.echartKind();
     if (!kind) return null;
     const theme = this.theme();
     return optionFor(this.view(), kind, this.settings(), { palette: theme.palette, tokens: theme.tokens },
-      { interactive: this.interactive(), name: this.name(), height: this.height() });
+      { interactive: this.interactive(), name: this.name(), height: this.drawHeight(), clickable: this.clickable() });
   });
+
+  /**
+   * A click on an ECharts mark, emitted as the SVG kinds emit theirs: the Mark of the row (or the
+   * group of rows) it stands for, and only where that mark can narrow. Read against the option on
+   * screen NOW, so a click that lands as the kind changes maps through the new chart, not the old.
+   */
+  echartClicked(click: EChartClick): void {
+    if (!this.clickable()) return;
+    const mark = markFor(this.view(), pickerOf(this.echartOption())?.(click) ?? null);
+    if (mark?.operands?.length) this.picked.emit(mark);
+  }
+
+  /**
+   * The ring's slices: past the colours the palette can tell apart, the smallest are added into
+   * one "Other" slice -- the rule a Top-N with the bucket on follows -- where the figures add up.
+   * issuesFor refuses the ring for figures that do not, so a tail is only ever summed when it can be.
+   */
+  donutMarks(view: WidgetView): Mark[] {
+    const marks = view.marks;
+    if (marks.length <= CHART_SLOTS || !view.additive) return marks;
+    const sorted = [...marks].sort((a, b) => b.value - a.value);
+    const rolled = sorted.filter(mark => mark.name === 'Other');
+    const ranked = sorted.filter(mark => mark.name !== 'Other');
+    const kept = ranked.slice(0, CHART_SLOTS - 1);
+    const rest = [...ranked.slice(CHART_SLOTS - 1), ...rolled];
+    return [...kept, { name: 'Other', value: rest.reduce((sum, mark) => sum + mark.value, 0), inert: true }];
+  }
 
   readonly chartLabel = computed(() => `${kindInfo(this.drawn())?.label ?? 'Chart'}: ${this.measureName(this.view())} by ${this.dimensionName(this.view())}`);
 

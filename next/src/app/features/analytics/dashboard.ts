@@ -9,7 +9,6 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger } from '@angular/cdk/menu';
 import { LoadError } from '../../shared/ui/load-error';
-import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
@@ -143,16 +142,12 @@ function widgetConfigString(config: WidgetConfig): string | null {
 }
 
 /**
- * Six slices, sixty bars.
+ * Sixty bars in order: where a name under a bar stops fitting.
  *
- * The same two limits the Canvas keeps and for the same reasons, which are facts about the
- * palette and the label width rather than about a dashboard: Donut and RankedBar colour their
- * marks from the categorical ramp, so a slice past the last slot repeats the first one's colour
- * and the legend then has two names against one swatch. The limit therefore IS the slot count --
- * CHART_SLOTS -- rather than a number copied beside it that can fall out of step with the
- * palette. Sixty bars is where a name under a bar stops fitting.
+ * The ring has no refusal by count any more. Donut colours its slices from the categorical ramp,
+ * so past CHART_SLOTS a colour would repeat -- and rather than refuse, the smallest slices are
+ * added into one "Other" (WidgetChart.donutMarks), the Top-N rule, where the figures add up.
  */
-const DONUT_SLICES = CHART_SLOTS;
 const ORDERED_BARS = 60;
 
 /**
@@ -731,8 +726,9 @@ function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
           // A ring asserts that its parts make the whole. A negative part is a share of nothing,
           // and a zero one draws as invisible while still being counted into the total.
           ? `${negative} of these figures is zero or below, and a share of a total cannot include one.`
-          : marks.length > DONUT_SLICES
-            ? `${marks.length} slices is past the ${DONUT_SLICES} colours this palette can tell apart.` : ''),
+          // Past the colours the palette can tell apart the smallest are added into "Other"
+          // (WidgetChart.donutMarks): these figures add up, so the tail has a total.
+          : ''),
   };
 }
 
@@ -2330,6 +2326,12 @@ export class Dashboards implements OnInit, OnDestroy {
       return kindInfo(widget.visualizationType)?.engine === 'echarts' ? ECHART_HEIGHT : WIDGET_HEIGHT;
     }
     return Math.min(WIDGET_HEIGHT_MAX, Math.max(WIDGET_HEIGHT_MIN, Math.round(asked)));
+  }
+
+  /** Whether the author set this tile's height; when not, horizontal bars may grow to fit theirs. */
+  hasOwnHeight(widget: DashboardWidget): boolean {
+    const asked = widgetConfigOf(widget).height;
+    return typeof asked === 'number' && Number.isFinite(asked);
   }
 
   /** The author's own sentence under a tile, or '' when they wrote none. Never invented. */

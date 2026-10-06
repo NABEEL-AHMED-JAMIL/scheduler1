@@ -114,7 +114,18 @@ describe('fit rules, kind by kind', () => {
     no(oneDim([1, -2, 3]), 'polarBar', /below zero/);
     ok(oneDim(), 'pictorialBar');
     const many = table({ dims: [dim('n', Array.from({ length: 30 }, (_, i) => `n${i}`))], measures: [{ name: 'm', values: Array(30).fill(1) }] });
-    no(many, 'pictorialBar', /30 rows is past the 24/);
+    // Past the limit the rest go into "Other" where the figures add up; where they do not, refused.
+    ok(many, 'pictorialBar');
+    no({ ...many, additive: false }, 'pictorialBar', /30 rows is past the 24.*cannot be added into "Other"/);
+    const forty = table({ dims: [dim('n', Array.from({ length: 40 }, (_, i) => `n${i}`))], measures: [{ name: 'm', values: Array(40).fill(1) }] });
+    ok(forty, 'polarBar');
+    no({ ...forty, additive: 'unknown' }, 'polarBar', /40 rows is past the 36.*because a saved query/);
+  });
+
+  it('a funnel of many stages draws the largest, whatever the figures are', () => {
+    const many = table({ dims: [dim('n', Array.from({ length: 40 }, (_, i) => `n${i}`))], measures: [{ name: 'm', values: Array(40).fill(1) }] });
+    ok(many, 'funnel');
+    ok({ ...many, additive: false }, 'funnel');
   });
 
   it('the line family: in the dimension\'s order, one or two dimensions, at most eight series', () => {
@@ -147,7 +158,8 @@ describe('fit rules, kind by kind', () => {
     no(oneDim([1, 0, 2]), 'halfDonut', /zero or below/);
     no(oneDim([1, 2], { topNTrimmed: true }), 'rose', /Top-N with the rest discarded/);
     const nine = table({ dims: [dim('n', Array.from({ length: 9 }, (_, i) => `n${i}`))], measures: [{ name: 'm', values: Array(9).fill(1) }] });
-    no(nine, 'halfDonut', /9 rows is past the 8/);
+    ok(nine, 'halfDonut');
+    no({ ...nine, additive: false }, 'halfDonut', /9 rows is past the 8/);
     ok(twoDims(), 'nestedPie');
     no(oneDim(), 'nestedPie', /exactly two columns/);
   });

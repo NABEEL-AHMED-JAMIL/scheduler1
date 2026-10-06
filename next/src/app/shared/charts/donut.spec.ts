@@ -34,7 +34,7 @@ describe('the total in the middle of the ring', () => {
 
   /** What is actually painted inside the ring. */
   function centreText(fixture: ComponentFixture<Donut>): string {
-    const node = (fixture.nativeElement as HTMLElement).querySelector('.text-xl');
+    const node = (fixture.nativeElement as HTMLElement).querySelector('.text-xl, .text-base');
     return (node?.textContent ?? '').trim();
   }
 

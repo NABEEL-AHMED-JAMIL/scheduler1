@@ -1,4 +1,4 @@
-import { Component, ChangeDetectionStrategy, inject, input, signal } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ElementRef, computed, inject, input, signal, viewChild } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { readableCell } from '../../shared/charts/number-format';
 import { FormDialog } from '../../shared/ui/form-dialog';
@@ -12,6 +12,27 @@ import { readWrap, writeWrap } from './data-grid';
  * already opens the whole value beside the table.
  */
 export const WRAPPED_LINES = 8;
+
+/** Past this many rows the expanded view draws only the rows on screen (and a screen either side). */
+export const VIRTUAL_FROM = 200;
+/** A row's height before one has been measured: one line of 12px type and the table's padding. */
+const ROW_PX = 37;
+/** Rows drawn beyond the visible ones, above and below, so a fast scroll does not show blank. */
+const OVERSCAN = 20;
+
+/**
+ * Each column's width, in ch, from its header and a sample of its cells: wide enough for a date-time
+ * or an id to stand whole, never so wide one long note takes the table. Fixed widths are what keep a
+ * windowed table steady -- with automatic layout every scroll re-measured the columns and they jumped.
+ */
+export function columnWidths(columns: string[], rows: (string | null)[][], wrap = false): number[] {
+  const step = Math.max(1, Math.floor(rows.length / 2000));
+  return columns.map((column, at) => {
+    let longest = column.length;
+    for (let i = 0; i < rows.length; i += step) longest = Math.max(longest, (rows[i][at] ?? '—').length);
+    return Math.min(wrap ? 48 : 36, Math.max(8, longest + 1)) + 4;
+  });
+}
 
 /** Where a result table's "Wrap text" is remembered; see readWrap in data-grid.ts. */
 export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
@@ -30,6 +51,37 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [DataText],
   template: `
+    @if (windowed()) {
+      <!-- Every row of a long result, drawn a screen at a time: the header stays put, the columns keep
+           their widths, and ten thousand rows open as fast as ten (owner review, 2026-10-06). -->
+      <div #scroller class="vt-scroller" data-scroller (scroll)="scrolled()" tabindex="0" role="region"
+           [attr.aria-label]="'Rows ' + (first() + 1) + ' to ' + last() + ' of ' + rows().length">
+        <table class="table-modern vt-table" [style.width.rem]="totalWidth()" [attr.aria-rowcount]="rows().length + 1">
+          <colgroup>@for (width of widths(); track $index) { <col [style.width.rem]="width" /> }</colgroup>
+          <thead>
+            <tr aria-rowindex="1">
+              @for (column of columns(); track column) { <th class="vt-head" [title]="column">{{ column }}</th> }
+            </tr>
+          </thead>
+          <tbody>
+            @if (padTop()) { <tr aria-hidden="true" class="vt-pad"><td [attr.colspan]="columns().length" [style.height.px]="padTop()"></td></tr> }
+            @for (row of shown(); track first() + $index; let i = $index) {
+              <tr [attr.aria-rowindex]="first() + i + 2">
+                @for (cell of row; track $index) {
+                  <td class="tabular align-top">
+                    @if (cell === null) { <span class="text-[color:var(--text-muted)]" title="null">—</span> } @else {
+                      <app-data-text class="min-w-0" [value]="readable(cell, measureColumn()[$index])"
+                                     [hint]="cell" [lines]="wrap() ? wrappedLines : 1" [label]="columns()[$index]" />
+                    }
+                  </td>
+                }
+              </tr>
+            }
+            @if (padBottom()) { <tr aria-hidden="true" class="vt-pad"><td [attr.colspan]="columns().length" [style.height.px]="padBottom()"></td></tr> }
+          </tbody>
+        </table>
+      </div>
+    } @else {
     <div class="overflow-x-auto">
       <table class="table-modern">
         <thead>
@@ -70,7 +122,15 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
         </tbody>
       </table>
     </div>
+    }
   `,
+  styles: [`
+    .vt-scroller { max-height: calc(100vh - 17rem); min-height: 12rem; overflow: auto; overscroll-behavior: contain; }
+    .vt-table { table-layout: fixed; min-width: 100%; }
+    .vt-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface-raised);
+      overflow: hidden; text-overflow: ellipsis; }
+    .vt-pad td { padding: 0; border: 0; }
+  `],
 })
 export class WidgetTable {
   readonly columns = input<string[]>([]);
@@ -85,7 +145,38 @@ export class WidgetTable {
   readonly measureColumn = input<boolean[]>([]);
   /** Several lines of each value rather than one: the "Wrap text" switch, where the host has one. */
   readonly wrap = input(false);
+  /** Draw only the rows on screen once there are more than VIRTUAL_FROM: the expanded view sets it. */
+  readonly virtual = input(false);
   protected readonly wrappedLines = WRAPPED_LINES;
+
+  private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
+  private readonly top = signal(0);
+  private readonly viewport = signal(600);
+  /** The average drawn row height, measured as rows are drawn: a wrapped row is taller. */
+  private readonly rowPx = signal(ROW_PX);
+
+  protected readonly windowed = computed(() => this.virtual() && this.rows().length > VIRTUAL_FROM);
+  /** In rem: a character of the table's 12px type is about half a rem wide. */
+  protected readonly widths = computed(() => columnWidths(this.columns(), this.rows(), this.wrap()).map(ch => ch / 2));
+  protected readonly totalWidth = computed(() => this.widths().reduce((sum, w) => sum + w, 0));
+  protected readonly first = computed(() => Math.max(0, Math.floor(this.top() / this.rowPx()) - OVERSCAN));
+  protected readonly last = computed(() =>
+    Math.min(this.rows().length, Math.ceil((this.top() + this.viewport()) / this.rowPx()) + OVERSCAN));
+  protected readonly shown = computed(() => this.rows().slice(this.first(), this.last()));
+  protected readonly padTop = computed(() => this.first() * this.rowPx());
+  protected readonly padBottom = computed(() => (this.rows().length - this.last()) * this.rowPx());
+
+  protected scrolled(): void {
+    const box = this.scroller()?.nativeElement;
+    if (!box) return;
+    this.viewport.set(box.clientHeight || 600);
+    const drawn = box.querySelectorAll('tbody tr:not(.vt-pad)');
+    if (drawn.length) {
+      const height = Array.from(drawn).reduce((sum, row) => sum + (row as HTMLElement).offsetHeight, 0) / drawn.length;
+      if (height > 8 && Math.abs(height - this.rowPx()) > 1) this.rowPx.set(height);
+    }
+    this.top.set(box.scrollTop);
+  }
 
   protected readable(cell: string, isMeasure: boolean | undefined): string {
     return isMeasure === false ? cell : readableCell(cell);
@@ -137,7 +228,7 @@ export interface WidgetTableData {
       <div class="flex justify-end pb-2">
         <app-wrap-toggle [on]="wrap()" (toggled)="setWrap($event)" />
       </div>
-      <app-widget-table [columns]="data.columns" [rows]="data.rows"
+      <app-widget-table [virtual]="true" [columns]="data.columns" [rows]="data.rows"
                         [measureColumn]="data.measureColumn" [wrap]="wrap()" />
     </app-form-dialog>
   `,

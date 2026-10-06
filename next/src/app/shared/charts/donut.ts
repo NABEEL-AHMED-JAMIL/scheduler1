@@ -33,7 +33,10 @@ export interface Slice { name: string; value: number; }
             }
           </svg>
           <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-3 text-center">
-            <span class="text-xl font-semibold tabular leading-none">{{ compactTotal() }}</span>
+            <!-- The hole is about 66px across: a figure of five characters or more steps down a size
+                 rather than spilling over the ring ("103.4M" did). -->
+            <span class="font-semibold tabular leading-none" [class.text-xl]="compactTotal().length <= 4"
+                  [class.text-base]="compactTotal().length > 4">{{ compactTotal() }}</span>
             @if (totalLabel()) {
               <span class="text-[11px] leading-tight mt-0.5 max-w-[70px] truncate
                            text-[color:var(--text-muted)]" [title]="totalLabel()">

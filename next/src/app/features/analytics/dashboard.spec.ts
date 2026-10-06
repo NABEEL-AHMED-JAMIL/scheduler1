@@ -495,17 +495,19 @@ describe('what a tile is allowed to claim', () => {
     expect(view.issues.bar).toBe('');
   });
 
-  it('allows a ring over a sum, and refuses one over too many slices', () => {
+  it('allows a ring over a sum, past the palette too: the smallest slices go into "Other"', () => {
     expect(analysisView(analysisResult(), 'SUM').issues.donut).toBe('');
 
-    // One past the palette, whatever the palette currently holds. Seven slices used to be the
-    // refusal; the ramp now has eight slots, so seven is drawable and only the ninth is not.
+    // One past the palette used to be refused (owner review, 2026-10-06: a sensible default top-N
+    // with "Other" instead). WidgetChart.donutMarks does the rolling up; a sum has the total for it.
     const tooMany = CHART_SLOTS + 1;
     const many = analysisView(analysisResult({
       rows: Array.from({ length: tooMany }, (_, at) => [`region-${at}`, '10']),
       rowCount: tooMany,
     }), 'SUM');
-    expect(many.issues.donut).toContain(`${CHART_SLOTS} colours`);
+    expect(many.issues.donut).toBe('');
+    // An average has no total to roll a tail into, so it is still refused -- for that reason.
+    expect(analysisView(analysisResult(), 'AVERAGE').issues.donut).toContain('no total');
   });
 
   it('refuses a ring that would have to include a figure of zero or below', () => {
@@ -1247,11 +1249,9 @@ describe('the kinds a result is not allowed to be drawn as', () => {
     expect(flat.issues.line).toBe('');
   });
 
-  it('offers a share over ranked bars where the ring refuses only for want of colours', () => {
-    // The ring was the only share chart, and it stops at the palette. Bars label themselves, so
-    // "what share does each of these forty rows carry" now has a chart.
+  it('offers a share of forty rows both ways: ranked bars, and a ring that rolls its tail into "Other"', () => {
     const many = analysisView(manyRows(40), 'SUM', { sortedBy: 'MEASURE' });
-    expect(many.issues.donut).toContain('colours this palette can tell apart');
+    expect(many.issues.donut).toBe('');
     expect(many.issues.rankedShare).toBe('');
   });
 

@@ -76,18 +76,31 @@ describe('the chart picker', () => {
     expect(ids.length).toBe(KINDS.length - 2);
   });
 
-  it('previews the kind under the pointer, and the reason instead of a chart when it does not fit', () => {
+  it('previews the kind under the pointer; over one that does not fit, keeps the chart and says why in a line', () => {
+    // Owner, 2026-10-06: sweeping the pointer across the grid flashed "Doesn't fit" over the
+    // preview at every refused kind on the way, which read as the chart failing.
     const { fixture, el, host, option } = render({ chord: 'A chord needs exactly two columns of names.' });
     expect(el.querySelector('.preview-of')!.textContent).toBe('Drawn as table');
     option('treemap').dispatchEvent(new Event('mouseenter'));
     fixture.detectChanges();
     expect(el.querySelector('.preview-of')!.textContent).toBe('Drawn as treemap');
     expect(host.hovered).toEqual(['treemap']);
+    option('treemap').dispatchEvent(new Event('mouseleave'));
     option('chord').dispatchEvent(new Event('mouseenter'));
     fixture.detectChanges();
-    expect(el.querySelector('.preview-of')).toBeNull();
-    expect(el.querySelector('.kind-preview')!.textContent).toContain("Doesn't fit because a chord needs exactly two columns of names.");
+    expect(el.querySelector('.preview-of')!.textContent).toBe('Drawn as table');
+    expect(el.querySelector('.kind-preview-why')!.textContent).toContain('Not for this result: a chord needs exactly two columns of names.');
+    expect(el.querySelector('.kind-preview-why')!.textContent).toContain('Showing table.');
+    expect(el.querySelector('.kind-preview')!.textContent).not.toContain("Doesn't fit");
     option('chord').dispatchEvent(new Event('mouseleave'));
+    fixture.detectChanges();
+    expect(el.querySelector('.preview-of')!.textContent).toBe('Drawn as table');
+    expect(el.querySelector('.kind-preview-why')).toBeNull();
+  });
+
+  it('never hands the preview a kind that does not fit, even the chosen one', () => {
+    const { fixture, el, host } = render({ sankey: 'no' });
+    host.selected.set('sankey');
     fixture.detectChanges();
     expect(el.querySelector('.preview-of')!.textContent).toBe('Drawn as table');
   });

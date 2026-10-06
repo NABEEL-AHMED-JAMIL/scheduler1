@@ -301,7 +301,7 @@
                   @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
                   <div [class.dash-rows-open]="isExpanded(widget)">
                     <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)"
-                                      [settings]="settingsOf(widget)" [boardTheme]="boardTheme()" [interactive]="true" [name]="widget.widgetTitle" />
+                                      [settings]="settingsOf(widget)" [boardTheme]="boardTheme()" [interactive]="true" [name]="widget.widgetTitle" [autoHeight]="!hasOwnHeight(widget)" />
                   </div>
                   @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
                 }

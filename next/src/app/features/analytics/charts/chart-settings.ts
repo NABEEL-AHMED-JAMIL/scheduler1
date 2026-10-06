@@ -19,6 +19,11 @@ import { kindInfo } from '../widget-kinds';
 
 export type NumberStyle = 'auto' | 'compact' | 'plain' | 'fixed0' | 'fixed2' | 'percent';
 export type Side = 'top' | 'bottom' | 'left' | 'right';
+/** 'auto' (contrast with the mark), 'theme' (the theme's text colours), or a #rrggbb. */
+export type LabelColor = 'auto' | 'theme' | `#${string}`;
+export type LabelSize = 'small' | 'normal' | 'large';
+/** The px a label size draws at. Never under the console's 10px floor for chart text. */
+export const LABEL_PX: Record<LabelSize, number> = { small: 10, normal: 11, large: 13 };
 
 export interface AxisSettings {
   name?: string;
@@ -40,7 +45,13 @@ export interface ChartSettings {
   grid?: { padding?: 'compact' | 'normal' | 'roomy'; fitLabels?: boolean };
   xAxis?: AxisSettings;
   yAxis?: AxisSettings;
-  labels?: { show?: boolean; position?: 'auto' | 'inside' | 'outside' | 'top'; format?: NumberStyle };
+  /**
+   * `color`: 'auto' (the default) writes a label inside a mark in black or white, whichever reads
+   * on that mark's own fill at 4.5:1 or better, and one beside a mark in the theme's text colour;
+   * 'theme' uses the theme's text colours everywhere; a #rrggbb is used as given. `size` is the
+   * labels' type size.
+   */
+  labels?: { show?: boolean; position?: 'auto' | 'inside' | 'outside' | 'top'; format?: NumberStyle; color?: LabelColor; size?: LabelSize };
   line?: { smooth?: boolean; step?: boolean; width?: number; symbols?: boolean; areaOpacity?: number };
   bar?: { stack?: 'none' | 'stack' | 'percent'; width?: number; radius?: number };
   pie?: { inner?: number; outer?: number; rose?: boolean };
@@ -128,6 +139,11 @@ function axis(value: unknown): AxisSettings | undefined {
   });
 }
 
+function labelColor(value: unknown): LabelColor | undefined {
+  if (value === 'auto' || value === 'theme') return value;
+  return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value.toLowerCase() as LabelColor : undefined;
+}
+
 /** Drops undefined fields, and the object itself when nothing is left. */
 function prune<T extends object>(value: T): T | undefined {
   const kept = Object.fromEntries(Object.entries(value).filter(([, v]) => v !== undefined)) as T;
@@ -153,7 +169,8 @@ export function parseSettings(raw: unknown): ChartSettings {
     yAxis: axis(raw['yAxis']),
     labels: prune({
       show: bool(sub('labels')['show']), position: oneOf(sub('labels')['position'], ['auto', 'inside', 'outside', 'top'] as const),
-      format: oneOf(sub('labels')['format'], STYLES),
+      format: oneOf(sub('labels')['format'], STYLES), color: labelColor(sub('labels')['color']),
+      size: oneOf(sub('labels')['size'], ['small', 'normal', 'large'] as const),
     }),
     line: prune({
       smooth: bool(sub('line')['smooth']), step: bool(sub('line')['step']), width: num(sub('line')['width'], 0.5, 8),

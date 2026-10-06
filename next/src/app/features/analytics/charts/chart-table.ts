@@ -216,6 +216,12 @@ export function sortAndCut(table: ChartTable, sort: 'none' | 'asc' | 'desc', top
   let other = false;
   let otherSum = 0;
   if (topN && topN > 0 && order.length > topN) {
+    // A row the server already rolled up ("Other" from a Top-N with the bucket on) joins the new
+    // tail rather than standing beside it: two slices called Other would each be half the truth.
+    if (withOther && table.additive === true && table.dims.length === 1) {
+      const rolled = order.filter(i => table.dims[0].values[i] === 'Other');
+      if (rolled.length) order = [...order.filter(i => table.dims[0].values[i] !== 'Other'), ...rolled];
+    }
     const tail = order.slice(topN);
     dropped = tail.length;
     if (withOther && table.additive === true) {
