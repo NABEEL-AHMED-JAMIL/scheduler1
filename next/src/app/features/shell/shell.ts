@@ -132,6 +132,10 @@ export class Shell {
           hint: 'What a run does, and where' },
         { label: 'Schedules', path: '/pipelines/schedules', pageKey: 'jobs', icon: 'calendar',
           hint: 'When each pipeline runs, and its runs' },
+        // Every job's newest runs, and the runs waiting for a review (MIG-325): reachable only through a schedule
+        // before, so a reviewer had no way in.
+        { label: 'Executions', path: '/pipelines/executions', pageKey: 'jobs', icon: 'history',
+          hint: 'Recent runs, and what waits for review' },
         { label: 'Queue', path: '/pipelines/queue', pageKey: 'queue', icon: 'clock',
           hint: 'What is in flight right now' },
         { label: 'Run analytics', path: '/pipelines/run-analytics', pageKey: 'reports', icon: 'chart',

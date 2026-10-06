@@ -319,6 +319,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const PIPELINES = [
     'Pipelines › Pipelines -> /pipelines',
     'Pipelines › Schedules -> /pipelines/schedules',
+    'Pipelines › Executions -> /pipelines/executions',
     'Pipelines › Queue -> /pipelines/queue',
     'Pipelines › Run analytics -> /pipelines/run-analytics',
   ];
@@ -423,7 +424,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   it('a tenant user with two pages keeps only those, and drops every empty menu', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'queue'])).toEqual([
-      ...DASHBOARD, 'Pipelines › Schedules -> /pipelines/schedules', 'Pipelines › Queue -> /pipelines/queue',
+      ...DASHBOARD, 'Pipelines › Schedules -> /pipelines/schedules',
+      'Pipelines › Executions -> /pipelines/executions', 'Pipelines › Queue -> /pipelines/queue',
     ]);
   });
 
