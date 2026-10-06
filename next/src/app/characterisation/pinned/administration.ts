@@ -178,7 +178,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the gate, as a tenant user asking for Analytics Studio": {
-    "url": "/unauthorized?page=analytics",
+    "url": "/unauthorized?page=analytics&title=Analytics%20Studio",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

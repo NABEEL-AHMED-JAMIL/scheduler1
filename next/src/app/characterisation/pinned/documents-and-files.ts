@@ -101,7 +101,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the converter, as a tenant user without the page": {
-    "url": "/unauthorized?page=tools-converter",
+    "url": "/unauthorized?page=tools-converter&title=Document%20Converter",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

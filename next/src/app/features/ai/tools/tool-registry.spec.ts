@@ -80,6 +80,11 @@ describe('Tool Registry', () => {
     expect(cells('get_reports')[6]).toBe('Never');
   });
 
+  it('shows every tool in one piece: the page scrolls, not a box inside it (MIG-321)', () => {
+    const { el } = render();
+    expect(el.querySelector('.scroll-table')).toBeNull();
+  });
+
   it('says the service and the output in ai-service\'s words when it gives them', () => {
     const { cells } = render();
     expect(cells('read_s3')[1]).toBe('Object storage');

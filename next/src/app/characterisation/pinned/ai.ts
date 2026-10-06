@@ -272,7 +272,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "prompts, as a tenant user without the page": {
-    "url": "/unauthorized?page=ai-prompts",
+    "url": "/unauthorized?page=ai-prompts&title=Prompts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

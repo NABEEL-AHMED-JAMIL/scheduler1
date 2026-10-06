@@ -271,7 +271,7 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "the sources, as a tenant user without the page": {
-    "url": "/unauthorized?page=sources",
+    "url": "/unauthorized?page=sources&title=Sources",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

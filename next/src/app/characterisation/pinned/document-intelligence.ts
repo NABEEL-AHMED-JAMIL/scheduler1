@@ -344,7 +344,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the overview, as a tenant user without the page": {
-    "url": "/unauthorized?page=document-intelligence",
+    "url": "/unauthorized?page=document-intelligence&title=Document%20Intelligence",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
@@ -414,7 +414,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the review queue, as a tenant user without the page": {
-    "url": "/unauthorized?page=document-review",
+    "url": "/unauthorized?page=document-review&title=Review%20queue",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

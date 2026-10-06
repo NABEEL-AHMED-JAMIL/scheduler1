@@ -6,7 +6,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/inbox",
-      "GET /storage.json/inbox/files?limit=50"
+      "GET /storage.json/inbox/files?limit=50",
+      "GET /taskInbox.json/colleagues"
     ],
     "headings": [
       "Inbox",
@@ -47,7 +48,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/inbox",
-      "GET /storage.json/inbox/files?limit=50"
+      "GET /storage.json/inbox/files?limit=50",
+      "GET /taskInbox.json/colleagues"
     ],
     "headings": [
       "Inbox",
@@ -78,13 +80,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the inbox, as a tenant user without the page": {
-    "url": "/unauthorized?page=objects",
+    "url": "/unauthorized?page=objects&title=Inbox",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Browse files isn't part of your access"
+      "Inbox isn't part of your access"
     ],
     "buttons": [
       "Request access"

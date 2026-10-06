@@ -25,13 +25,13 @@ export const PINNED: Record<string, unknown> = {
     }
   },
   "data policies, as a tenant user without the Prompts page": {
-    "url": "/unauthorized?page=ai-prompts",
+    "url": "/unauthorized?page=ai-prompts&title=Data%20policies",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Prompts isn't part of your access"
+      "Data policies isn't part of your access"
     ],
     "buttons": [
       "Request access"

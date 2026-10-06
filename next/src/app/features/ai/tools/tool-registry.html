@@ -32,7 +32,8 @@
     }
   </div>
 
-  <app-table-shell heading="Tools" [loading]="loading()" [error]="error()"
+  <!-- About twenty tools: read in one piece, the page scrolls (the row box cut three rows off at 1920x1080, MIG-321). -->
+  <app-table-shell heading="Tools" [loading]="loading()" [error]="error()" [scrollRows]="false"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tools().length"
                    [emptyMessage]="needsWorkspace() ? 'Choose a workspace to see its tools.' : hasFilters() ? 'No tool matches the current filters.' : 'No tools registered.'"
                    emptyIcon="plug" (retry)="load()">

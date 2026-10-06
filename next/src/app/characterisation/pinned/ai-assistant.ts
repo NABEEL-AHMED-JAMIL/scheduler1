@@ -190,13 +190,13 @@ export const PINNED: Record<string, unknown> = {
     }
   },
   "the assistant, as a tenant user without the page": {
-    "url": "/unauthorized?page=ai-prompts",
+    "url": "/unauthorized?page=ai-prompts&title=AI%20Assistant",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Prompts isn't part of your access"
+      "AI Assistant isn't part of your access"
     ],
     "buttons": [
       "Request access"

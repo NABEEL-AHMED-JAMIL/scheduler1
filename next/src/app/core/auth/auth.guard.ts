@@ -56,7 +56,10 @@ export const pageGuard: CanActivateFn = (route) => {
 
   const page = route.data?.['pageKey'] as PageKey | undefined;
   if (page && !auth.canOpen(page)) {
-    return router.createUrlTree(['/unauthorized'], { queryParams: { page } });
+    // The screen's own title as well: several screens open with one page's access (the AI Assistant with Prompts),
+    // and "Prompts isn't part of your access" on the AI Assistant names the wrong thing (MIG-321).
+    const title = typeof route.routeConfig?.title === 'string' ? route.routeConfig.title : undefined;
+    return router.createUrlTree(['/unauthorized'], { queryParams: title ? { page, title } : { page } });
   }
   return true;
 };

@@ -88,9 +88,9 @@ describe('AuthService.canOpen', () => {
 });
 
 describe('pageGuard', () => {
-  const snapshotWith = (data: any) => ({ data, url: [] }) as any;
+  const snapshotWith = (data: any, title?: string) => ({ data, url: [], routeConfig: title ? { title } : {} }) as any;
 
-  function run(pageKeys: string[] | undefined, role: UserRole, data: any) {
+  function run(pageKeys: string[] | undefined, role: UserRole, data: any, title?: string) {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -102,14 +102,20 @@ describe('pageGuard', () => {
           },
         },
         { provide: Router, useValue: { createUrlTree: (c: any[], extras?: any) =>
-          ({ toString: () => c.join('/') + (extras?.queryParams?.page ? '?page=' + extras.queryParams.page : '') }) as UrlTree } },
+          ({ toString: () => c.join('/') + (extras?.queryParams?.page ? '?page=' + extras.queryParams.page : '')
+            + (extras?.queryParams?.title ? '&title=' + extras.queryParams.title : '') }) as UrlTree } },
       ],
     });
-    return TestBed.runInInjectionContext(() => pageGuard(snapshotWith(data), {} as any));
+    return TestBed.runInInjectionContext(() => pageGuard(snapshotWith(data, title), {} as any));
   }
 
   it('sends a tenant user without the page to /unauthorized, naming the page', () => {
     expect(String(run(['jobs'], 'TENANT_USER', { pageKey: 'reports' }))).toBe('/unauthorized?page=reports');
+  });
+
+  it('names the screen too, when it opens with another page\'s access (MIG-321)', () => {
+    expect(String(run(['jobs'], 'TENANT_USER', { pageKey: 'ai-prompts' }, 'AI Assistant')))
+      .toBe('/unauthorized?page=ai-prompts&title=AI Assistant');
   });
 
   it('lets a tenant user through a page they hold', () => {

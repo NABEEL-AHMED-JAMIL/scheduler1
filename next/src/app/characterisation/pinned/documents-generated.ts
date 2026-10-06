@@ -1,13 +1,13 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "Reports, as a tenant user without the page": {
-    "url": "/unauthorized?page=tools-converter",
+    "url": "/unauthorized?page=tools-converter&title=Reports",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Document Converter isn't part of your access"
+      "Reports isn't part of your access"
     ],
     "buttons": [
       "Request access"

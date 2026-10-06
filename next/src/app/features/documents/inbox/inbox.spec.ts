@@ -35,12 +35,13 @@ function stubApi(settings: InboxSettings = SETTINGS) {
     settings: vi.fn(() => of({ status: 'SUCCESS', message: '', data: settings })),
     files: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [FILE] })),
     users: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ appUserId: 4597, fullName: 'Alex' }] })),
+    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex' }] })),
     upload: vi.fn(() => { const s = new Subject<unknown>(); uploads.push(s); return s as Observable<unknown>; }),
   };
 }
 
-function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown } = {}) {
-  const api = stubApi(opts.settings);
+function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown; api?: ReturnType<typeof stubApi> } = {}) {
+  const api = opts.api ?? stubApi(opts.settings);
   const toast = { success: vi.fn(), error: vi.fn() };
   const opened: { component: unknown; data: unknown }[] = [];
   const dialog = {
@@ -83,11 +84,20 @@ describe('Inbox -- reading', () => {
     expect(screen.uploader(FILE)).toBe('Alex');
   });
 
-  it('does not ask a member for the member list, which the service refuses them', () => {
+  it('names uploaders for a member from the colleagues, never asking for the member list it would be refused', () => {
     const { api, screen } = screenWith({ admin: false });
     expect(api.users).not.toHaveBeenCalled();
-    expect(screen.uploader(FILE)).toBe('User 4597');
+    expect(api.colleagues).toHaveBeenCalled();
+    expect(screen.uploader(FILE)).toBe('Alex');
     expect(screen.uploader({ ...FILE, uploadedBy: 4537 })).toBe('You');
+  });
+
+  it('keeps the user number when a member may not read the colleagues either', () => {
+    const api = stubApi();
+    api.colleagues.mockReturnValue(throwError(() => ({ status: 403 })) as never);
+    TestBed.resetTestingModule();
+    const { screen } = screenWith({ admin: false, api });
+    expect(screen.uploader(FILE)).toBe('User 4597');
   });
 
   it('explains a missing inbox: an administrator is offered the setup, a member is told whom to ask', () => {

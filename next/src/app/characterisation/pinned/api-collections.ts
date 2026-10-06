@@ -247,7 +247,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a tenant user without the page": {
-    "url": "/unauthorized?page=api-collections",
+    "url": "/unauthorized?page=api-collections&title=API%20Collections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

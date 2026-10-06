@@ -90,14 +90,23 @@ export class Inbox implements OnInit {
 
   ngOnInit(): void {
     this.load();
-    // Names for an administrator, who may list the workspace's people whoever builds it (MIG-254).
+    // Names for an administrator, who may list the workspace's people whoever builds it (MIG-254); a member reads
+    // the colleagues the task inbox offers (MIG-321). Either refused, the user numbers stand in for the names.
     if (this.auth.isTenantAdmin()) {
       this.api.users().subscribe({
         next: r => {
           if (r.status !== API_SUCCESS) return;
           this.names.set(new Map((r.data ?? []).map(u => [u.appUserId, u.fullName || u.username || `User ${u.appUserId}`])));
         },
-        error: () => { /* the user numbers stand in for the names */ },
+        error: () => {},
+      });
+    } else {
+      this.api.colleagues().subscribe({
+        next: r => {
+          if (r.status !== API_SUCCESS) return;
+          this.names.set(new Map((r.data ?? []).map(u => [u.userId, u.fullName || u.username || `User ${u.userId}`])));
+        },
+        error: () => {},
       });
     }
   }
