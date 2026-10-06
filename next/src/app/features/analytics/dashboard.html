@@ -53,6 +53,16 @@
       }
       <!-- Three across at most, as the Object Browser's cards: four made each too narrow for a name. -->
       <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Dashboards">
+        <!-- First, not last (owner 2026-10-06): with many boards the tile was below the fold. -->
+        @if (!listFilter().trim()) {
+          <li class="min-w-0 flex">
+            <button type="button" class="dash-card-new flex-1 min-h-32 rounded-card border border-dashed border-[color:var(--border-strong)] text-sm text-[color:var(--text-secondary)]
+                                         flex flex-col items-center justify-center gap-1 transition-colors hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]"
+                    (click)="openCreate()">
+              <app-icon name="plus" size="1.1rem" />New dashboard
+            </button>
+          </li>
+        }
         @for (item of visibleDashboards(); track item.analyticsDashboardId) {
           <li class="min-w-0 flex">
             <!-- A link, not a button: ?board= is the page's own address for a board, so a card can
@@ -79,15 +89,6 @@
                 <app-icon name="chevronRight" size="0.95em" class="ml-auto shrink-0 text-[color:var(--text-secondary)]" />
               </span>
             </a>
-          </li>
-        }
-        @if (!listFilter().trim()) {
-          <li class="min-w-0 flex">
-            <button type="button" class="dash-card-new flex-1 min-h-32 rounded-card border border-dashed border-[color:var(--border-strong)] text-sm text-[color:var(--text-secondary)]
-                                         flex flex-col items-center justify-center gap-1 transition-colors hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]"
-                    (click)="openCreate()">
-              <app-icon name="plus" size="1.1rem" />New dashboard
-            </button>
           </li>
         }
       </ul>
