@@ -29,18 +29,18 @@
       <div class="form-section">
         <h2 class="form-section-title">Basics</h2>
         <div class="form-grid">
-          <app-field label="Job name" for="jobName" [required]="true"
+          <app-field label="Schedule name" for="jobName" [required]="true"
                      [control]="form.get('jobName')" [submitted]="submitted()">
             <input id="jobName" class="input" formControlName="jobName"
                    [class.input-invalid]="form.get('jobName')?.invalid && (form.get('jobName')?.touched || submitted())"
                    placeholder="Nightly orders export" />
           </app-field>
 
-          <app-field label="Task" for="task" [required]="true"
+          <app-field label="Pipeline" for="task" [required]="true"
                      [control]="form.get('taskDetailId')" [submitted]="submitted()"
-                     hint="The work this job runs.">
+                     hint="The pipeline this schedule runs.">
             <app-combobox id="task" formControlName="taskDetailId" [numeric]="true"
-                          placeholder="Search tasks…" [allowClear]="false" [options]="taskOptions()" />
+                          placeholder="Search pipelines…" [allowClear]="false" [options]="taskOptions()" />
           </app-field>
 
           <app-field label="Execution" for="execution" [required]="true"

@@ -980,6 +980,12 @@ export class Jobs implements OnInit {
   clearSelection(): void { this.selected.set(new Set()); }
 
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  /** MIG-324: the list's own word is the menu's (schedules), and an empty one says what a schedule does. */
+  readonly emptyMessage = computed(() => this.hasFilters()
+    ? 'No schedules match the current filters.'
+    : this.locked()
+      ? 'No schedules yet.'
+      : 'No schedules yet. New schedule runs a pipeline on a timetable, when a file arrives in the inbox, or when you say so.');
   readonly hasFilters = computed(() =>
     !!(this.search() || this.statusFilter() || this.executionFilter() || this.workspaceFilter() || this.onlyMine()));
 

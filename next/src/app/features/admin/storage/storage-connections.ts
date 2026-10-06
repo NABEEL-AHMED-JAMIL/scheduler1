@@ -128,6 +128,11 @@ export class StorageConnections implements OnInit {
   setPageSize(size: number): void { this.pager.setSize(size); }
 
   /** True while anything narrows the table, which is when the tiles need saying out loud. */
+  /** MIG-324: an empty list says what a connection is for, since the inbox, Browse files and Read steps all need one. */
+  readonly emptyMessage = computed(() => this.isFiltered()
+    ? 'No connections match the filters.'
+    : 'No connections yet. New connection adds your S3, Azure, MinIO or FTP storage: '
+      + 'pipelines read files from it and keep what they write there, and the inbox stores uploads in it.');
   readonly isFiltered = computed(() =>
     !!this.search().trim() || !!this.providerFilter() || !!this.workspaceFilter() || this.onlyMine());
 

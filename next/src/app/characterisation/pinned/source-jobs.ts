@@ -8,7 +8,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Schedules",
-      "Jobs (2 of 2)",
+      "Schedules (2 of 2)",
       "Task payload",
       "Recent runs"
     ],
@@ -149,18 +149,18 @@ export const PINNED: Record<string, unknown> = {
       "End date",
       "Execution *(required)",
       "Frequency *(required)",
-      "Job name *(required)",
       "Nightly orders export",
+      "Pipeline *(required)",
       "Priority *(required)",
       "Repeat every *(required)",
-      "Search tasks…",
+      "Schedule name *(required)",
+      "Search pipelines…",
       "Start date *(required)",
       "Start time *(required)",
       "Start time, hour",
       "Start time, minute",
       "Start when a file arrives in the inbox",
       "State *(required)",
-      "Task *(required)",
       "The job completes",
       "The job fails",
       "e.g. 5"
@@ -252,13 +252,13 @@ export const PINNED: Record<string, unknown> = {
       "A run is skipped",
       "Attempts *(required)",
       "Execution *(required)",
-      "Job name *(required)",
       "Nightly orders export",
+      "Pipeline *(required)",
       "Priority *(required)",
-      "Search tasks…",
+      "Schedule name *(required)",
+      "Search pipelines…",
       "Start when a file arrives in the inbox",
       "State *(required)",
-      "Task *(required)",
       "The job completes",
       "The job fails"
     ],
@@ -354,7 +354,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Schedules",
-      "Jobs (2 of 2)"
+      "Schedules (2 of 2)"
     ],
     "buttons": [
       "Actions for Reference CSV check (e2e)",
@@ -405,7 +405,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Schedules",
-      "Jobs (2 of 2)"
+      "Schedules (2 of 2)"
     ],
     "buttons": [
       "Actions for Reference CSV check (e2e)",

@@ -52,7 +52,7 @@
   <app-table-shell heading="Connections" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length"
                    [total]="connections().length"
-                   [emptyMessage]="isFiltered() ? 'No connections match the filters.' : 'No connections configured yet.'"
+                   [emptyMessage]="emptyMessage()"
                    emptyIcon="plug"
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">

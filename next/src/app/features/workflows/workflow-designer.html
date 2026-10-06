@@ -34,7 +34,7 @@
         </button>
       } @empty {
         <div class="p-6 text-center text-sm text-[color:var(--text-muted)]">
-          @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading workflows… } @else { No workflows yet. }
+          @if (loading()) { <div class="spinner mx-auto mb-2"></div>Reading workflows… } @else { {{ emptyText() }} }
         </div>
       }
     </section>

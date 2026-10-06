@@ -129,6 +129,12 @@ export class Tasks implements OnInit {
   workspaceName(task: SourceTask): string { return workspaceName(task); }
 
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  /** MIG-324: the list's own word is the menu's (pipelines), and an empty one says how the first is made. */
+  readonly emptyMessage = computed(() => this.hasFilters()
+    ? 'No pipelines match the filters.'
+    : this.auth.canManageTasks()
+      ? 'No pipelines yet. New pipeline makes one: pick a topic and its registry task, then build its steps.'
+      : 'No pipelines yet. A workspace administrator makes them.');
   readonly hasFilters = computed(() =>
     !!(this.search() || this.topicFilter() || this.pipelineFilter() || this.workspaceFilter() || this.onlyMine()));
 

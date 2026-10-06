@@ -48,7 +48,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Pipelines",
-      "Tasks (2 of 2)"
+      "Pipelines (2 of 2)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
@@ -68,7 +68,7 @@ export const PINNED: Record<string, unknown> = {
         "Pipeline",
         "Type",
         "Topic",
-        "Pipeline",
+        "Registry task",
         "Storage",
         "Created by",
         "Updated by",
@@ -246,7 +246,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Pipelines",
-      "Tasks (2 of 2)"
+      "Pipelines (2 of 2)"
     ],
     "buttons": [
       "Cards",
@@ -262,7 +262,7 @@ export const PINNED: Record<string, unknown> = {
         "Pipeline",
         "Type",
         "Topic",
-        "Pipeline",
+        "Registry task",
         "Storage",
         "Created by",
         "Updated by",
@@ -290,7 +290,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Pipelines",
-      "Tasks (2 of 2)"
+      "Pipelines (2 of 2)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
@@ -308,7 +308,7 @@ export const PINNED: Record<string, unknown> = {
         "Pipeline",
         "Type",
         "Topic",
-        "Pipeline",
+        "Registry task",
         "Storage",
         "Created by",
         "Updated by",

@@ -23,9 +23,9 @@
   </div>
   <app-managed-banner what="pipelines" />
 
-  <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Pipelines" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tasks().length"
-                   [emptyMessage]="hasFilters() ? 'No tasks match the filters.' : 'No tasks yet.'"
+                   [emptyMessage]="emptyMessage()"
                    emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
@@ -131,7 +131,7 @@
                 </dd>
               </div>
               <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Pipeline</dt>
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Registry</dt>
                 <dd class="truncate min-w-0" [title]="task.pipelineId">{{ task.pipelineId || '—' }}</dd>
               </div>
               <!-- Where it reads and writes is the question a task card is usually opened for. -->
@@ -181,7 +181,7 @@
                Topic beside it already says where the work goes. -->
           <th class="hidden xl:table-cell">Type</th>
           <th>Topic</th>
-          <th>Pipeline</th>
+          <th>Registry task</th>
           <th>Storage</th>
           <!-- Metadata, not identity: hidden until there is width for it, so Status and the
                row menu stay on screen instead of behind a horizontal scrollbar. -->

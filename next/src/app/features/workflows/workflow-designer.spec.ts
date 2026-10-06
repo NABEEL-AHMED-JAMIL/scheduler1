@@ -169,3 +169,12 @@ describe('Workflow designer -- the screen', () => {
     expect(el.querySelector('[data-test="test-link"]')!.textContent).toContain('request #1010 is running');
   });
 });
+
+/** MIG-324: an empty workflow list said "No workflows yet." and nothing of what one is or who makes it. */
+describe('Workflow designer -- an empty list', () => {
+  it('tells an administrator what New workflow makes, and a member who makes them', () => {
+    expect(screenWith({ admin: true }).screen.emptyText())
+      .toBe('No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.');
+    expect(screenWith({ admin: false }).screen.emptyText()).toBe('No workflows yet. A workspace administrator makes them.');
+  });
+});

@@ -45,10 +45,9 @@
   <app-stat-strip [items]="liveTiles()" [cols]="2" [smCols]="3" [lgCols]="5" align="start" size="md"
                   label="Live run counts" />
 
-  <app-table-shell heading="Jobs" [scrollRows]="false" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Schedules" [scrollRows]="false" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
-                   [emptyMessage]="hasFilters()
-                      ? 'No jobs match the current filters.' : 'No jobs yet.'"
+                   [emptyMessage]="emptyMessage()"
                    emptyIcon="briefcase"
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">

@@ -78,6 +78,10 @@ export class WorkflowDesigner implements OnInit {
   readonly testStarted = signal<RequestRow | null>(null);
 
   readonly canEdit = computed(() => this.auth.isTenantAdmin() && !this.auth.builderLocked());
+  /** MIG-324: an empty list says what a workflow is and who makes one. */
+  readonly emptyText = computed(() => this.canEdit()
+    ? 'No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.'
+    : 'No workflows yet. A workspace administrator makes them.');
 
   readonly step = computed<DraftStep | null>(() => {
     const i = this.selected();
