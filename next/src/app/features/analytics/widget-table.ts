@@ -5,6 +5,7 @@ import { FormDialog } from '../../shared/ui/form-dialog';
 import { DataText } from '../../shared/ui/data-text';
 import { WrapToggle } from '../../shared/ui/wrap-toggle';
 import { readWrap, writeWrap } from './data-grid';
+import { readsAsYears } from './charts/chart-table';
 
 /**
  * How many lines of a value a result table shows with "Wrap text" on. Not all of it, as the Data
@@ -70,7 +71,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
                 @for (cell of row; track $index) {
                   <td class="tabular align-top">
                     @if (cell === null) { <span class="text-[color:var(--text-muted)]" title="null">—</span> } @else {
-                      <app-data-text class="min-w-0" [value]="readable(cell, measureColumn()[$index])"
+                      <app-data-text class="min-w-0" [value]="readable(cell, figureColumn()[$index])"
                                      [hint]="cell" [lines]="wrap() ? wrappedLines : 1" [label]="columns()[$index]" />
                     }
                   </td>
@@ -111,7 +112,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
                          cap is what keeps one long column from taking every other column's width, and the
                          floor what keeps a squeezed column readable: a value that may wrap anywhere
                          could otherwise be narrowed to one letter when the table outgrows its box. -->
-                    <app-data-text [class]="wrap() ? 'min-w-24 max-w-xl' : 'min-w-24 max-w-sm'" [value]="readable(cell, measureColumn()[$index])"
+                    <app-data-text [class]="wrap() ? 'min-w-24 max-w-xl' : 'min-w-24 max-w-sm'" [value]="readable(cell, figureColumn()[$index])"
                                    [hint]="cell" [lines]="wrap() ? wrappedLines : 1"
                                    [label]="columns()[$index]" />
                   }
@@ -143,6 +144,15 @@ export class WidgetTable {
    * roles to read and says so.
    */
   readonly measureColumn = input<boolean[]>([]);
+  /**
+   * measureColumn, less any column of years (readsAsYears): the saved-query path marks every column a figure, so a
+   * year read "2,002" in a tile's table (MIG-367).
+   */
+  protected readonly figureColumn = computed(() => {
+    const flags = this.measureColumn();
+    const rows = this.rows();
+    return this.columns().map((name, i) => flags[i] !== false && !readsAsYears(name, rows.map(row => row[i] ?? null)));
+  });
   /** Several lines of each value rather than one: the "Wrap text" switch, where the host has one. */
   readonly wrap = input(false);
   /** Draw only the rows on screen once there are more than VIRTUAL_FROM: the expanded view sets it. */

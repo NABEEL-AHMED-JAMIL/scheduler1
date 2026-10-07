@@ -73,6 +73,24 @@ function readsAsDate(values: (string | null)[]): boolean {
   return present.length > 0 && present.every(value => DATE_LIKE.test(value.trim()) && instantOf(value) !== null);
 }
 
+/** A column named as a year: "year", "fiscal_year", "Year of birth", "yr", "fy" -- the word, not a substring of one. */
+const YEAR_NAME = /(^|[^a-z])(year|yr|fy)([^a-z]|$)/i;
+
+/**
+ * Whether a column holds years -- a name that says so, and every value four digits -- so it names rows rather than
+ * measuring them (MIG-367).
+ *
+ * A saved statement's columns arrive as text with no roles, and the split is read from the values: "2002" reads as a
+ * number, so a year column became a MEASURE and a line of health spending by year drew a second line of the years
+ * themselves, or took the country as its axis. The rebuild worked round it with make_date(year, 1, 1), which then put
+ * "1 Jan 2002" on every tick. A year is a label; this says when a column is one.
+ */
+export function readsAsYears(name: string, values: (string | null)[]): boolean {
+  if (!YEAR_NAME.test(name ?? '')) return false;
+  const present = values.filter((value): value is string => value !== null && String(value).trim() !== '');
+  return present.length > 0 && present.every(value => /^\d{4}$/.test(String(value).trim()));
+}
+
 function readsAsNumbers(values: (string | null)[]): boolean {
   const present = values.filter(value => value !== null && String(value).trim() !== '');
   return present.length > 0 && present.every(value => cellNumber(value) !== null);
@@ -115,7 +133,8 @@ export function tableOf(view: WidgetView, context: TableContext): ChartTable {
     dimAt = columns.map((_, i) => i).filter(i => !flagged[i]);
     measureAt = columns.map((_, i) => i).filter(i => flagged[i]);
   } else {
-    const numeric = columns.map((_, i) => readsAsNumbers(cells(i)));
+    // A year column names its rows even though every value parses (readsAsYears).
+    const numeric = columns.map((name, i) => readsAsNumbers(cells(i)) && !readsAsYears(name, cells(i)));
     const label = columns.length < 2 ? -1 : Math.max(0, numeric.findIndex(isNumber => !isNumber));
     dimAt = columns.map((_, i) => i).filter(i => i === label || (!numeric[i] && label >= 0));
     measureAt = columns.map((_, i) => i).filter(i => numeric[i] && i !== label);

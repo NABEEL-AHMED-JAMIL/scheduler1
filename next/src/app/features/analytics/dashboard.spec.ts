@@ -2884,3 +2884,77 @@ describe('adding a widget, audit 09-22', () => {
     expect(rendered.board.canAdd()).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------------------------
+// MIG-367, "Dashboard fixes from the rebuild" (2026-10-07).
+
+describe('the rebuild\'s dashboard fixes (MIG-367)', () => {
+  /** Five cities over fourteen days: seventy rows, fifteen distinct day labels once merged. */
+  const cityDays = () => queryResult({
+    columns: ['day', 'city', 'temp_max'],
+    rows: Array.from({ length: 70 }, (_, at) => [`2026-09-${String(23 + (at % 14)).padStart(2, '0')}`, `city${Math.floor(at / 14)}`, String(20 + at % 7)]),
+    rowCount: 70,
+  });
+
+  it('counts the rows an ECharts tile draws, not the labels its marks merged them into', () => {
+    const board = bareBoard();
+    const view = queryView(cityDays());
+    expect(view.marks.length).toBe(14);
+    // The SVG kinds still draw merged marks and say so; the ECharts line draws every point.
+    expect(board.counted(view, 'lineMarkers')).toBe('70 rows');
+    expect(board.counted(view, 'heatmap')).toBe('70 rows');
+    expect(board.counted(view, 'bar')).toBe('14 of 70 rows shown');
+  });
+
+  it('counts a one-row gauge as its one row, and an author\'s top N where the tail is dropped', () => {
+    const board = bareBoard();
+    const one = analysisView(analysisResult({ rows: [['north', '1200']], rowCount: 1 }), 'SUM');
+    expect(board.counted(one, 'gauge')).toBe('1 row');
+    const forty = analysisView(analysisResult({ rows: Array.from({ length: 40 }, (_, at) => [`r${at}`, String(at + 1)]), rowCount: 40 }), 'AVERAGE');
+    expect(board.counted(forty, 'barH', 5, { topN: 10 })).toBe('10 of 40 rows shown');
+    const summed = analysisView(analysisResult({ rows: Array.from({ length: 40 }, (_, at) => [`r${at}`, String(at + 1)]), rowCount: 40 }), 'SUM');
+    // Summed, the tail is one "Other" bar on the chart: every row is still drawn.
+    expect(board.counted(summed, 'barH', 5, { topN: 10 })).toBe('40 rows');
+  });
+
+  it('says why a saved query asked to draw a ring is shown as a table, and what would draw it', () => {
+    const board = bareBoard();
+    const view = queryView(queryResult({ columns: ['region', 'total'], rows: [['north', '5'], ['south', '7']], rowCount: 2 }));
+    const tile = widgetOn({ analyticsAnalysisId: undefined, analyticsQueryId: 5, visualizationType: 'donut' });
+    expect(board.drawn(tile, view)).toBe('table');
+    const note = board.fallbackNote(tile, view);
+    expect(note).toMatch(/^Shown as a table, not as share of the total: /);
+    expect(note).toContain('a saved query does not say whether its figures add up');
+    expect(note).toContain('Save it as an analysis that sums or counts to draw it this way.');
+    expect(board.fallbackNote(widgetOn({ visualizationType: 'table' }), view)).toBe('');
+    expect(board.fallbackNote(widgetOn({ visualizationType: 'bar' }), view)).toBe('');
+  });
+
+  it('treats a saved query\'s year column as the label, never as a figure', () => {
+    const view = queryView(queryResult({
+      columns: ['year', 'health_spend_gdp_pct', 'country'],
+      rows: [['2002', '14.1', 'United States'], ['2003', '14.6', 'United States'], ['2002', '7.9', 'Germany'], ['2003', '8.1', 'Germany']],
+      rowCount: 4,
+    }));
+    expect(view.chart!.dims.map(dim => dim.name)).toEqual(['year', 'country']);
+    expect(view.chart!.measures.map(measure => measure.name)).toEqual(['health_spend_gdp_pct']);
+    expect(view.chart!.dims[0].date).toBe(false);
+    expect(view.marks.map(mark => mark.name)).toEqual(['2002', '2003']);
+    // A count column that merely holds four digits is still a figure: the name must say year.
+    const counts = queryView(queryResult({ columns: ['region', 'orders'], rows: [['north', '2002'], ['south', '1999']], rowCount: 2 }));
+    expect(counts.chart!.measures.map(measure => measure.name)).toEqual(['orders']);
+  });
+
+  it('shows a yes/no column as Yes and No, from an analysis\'s BOOLEAN or a saved query\'s true/false', () => {
+    const analysed = analysisView(analysisResult({
+      columns: [{ name: 'OverTime', type: 'BOOLEAN', role: 'DIMENSION' }, { name: 'left_count', type: 'BIGINT', role: 'MEASURE' }],
+      rows: [['true', '15'], ['false', '19']], rowCount: 2, measure: 'left_count', dimensions: ['OverTime'],
+    }), 'SUM');
+    expect(analysed.marks.map(mark => mark.name)).toEqual(['Yes', 'No']);
+    // The value a click narrows on is still the one in the data.
+    expect(analysed.marks[0].operands).toEqual([{ field: 'OverTime', value: 'true' }]);
+    const queried = queryView(queryResult({ columns: ['smoker', 'policyholders'], rows: [['true', '23'], ['false', '101']], rowCount: 2 }));
+    expect(queried.marks.map(mark => mark.name)).toEqual(['Yes', 'No']);
+    expect(queried.rows.map(row => row[0])).toEqual(['Yes', 'No']);
+  });
+});

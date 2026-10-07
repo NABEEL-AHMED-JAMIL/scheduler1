@@ -1,6 +1,7 @@
 import type { EChartKind } from '../analytics.service';
 import { CHART_SLOTS } from '../../../shared/charts/status-color';
 import { ChartTable, dayKey, distinct, figures, primary, quantities } from './chart-table';
+import type { ChartSettings } from './chart-settings';
 
 /**
  * Why each ECharts kind cannot draw a result, or '' when it can.
@@ -28,6 +29,29 @@ export const CATEGORY_LIMIT: Partial<Record<EChartKind, number>> = {
   // The funnel draws its largest 12 and says so, rather than adding a tail that is not a stage.
   funnel: 12, pareto: 60, waterfall: 60, polarBar: 36, pictorialBar: 24,
 };
+
+/** The kinds that cut a one-dimension result to a top N (chart-options' cutTable): the rest go into "Other" or are left out. */
+const CUT_KINDS: ReadonlySet<EChartKind> = new Set<EChartKind>(
+  ['barH', 'waterfall', 'pareto', 'polarBar', 'pictorialBar', 'rose', 'halfDonut', 'treemap', 'funnel']);
+
+/**
+ * How many of a table's rows an ECharts kind draws -- the tile's "N of M rows shown" (MIG-367).
+ *
+ * Every kept row is drawn, each its own point, bar or cell: two dimensions are two axes or series, not one label, so
+ * counting the merged marks (one per label) printed "15 of 70 rows shown" under a line chart drawing all seventy. Fewer
+ * only where a top N cuts the tail away: the author's own (settings.topN), or the funnel's twelve stages. A tail rolled
+ * into "Other" is still on the chart, so it still counts.
+ */
+export function rowsDrawn(table: ChartTable, kind: EChartKind, settings: ChartSettings = {}): number {
+  const n = table.length;
+  if (!CUT_KINDS.has(kind) || table.dims.length > 1) return n;
+  const limit = CATEGORY_LIMIT[kind];
+  if (kind === 'funnel' && settings.topN === undefined) return Math.min(n, limit ?? n);
+  const over = limit !== undefined && n > limit && table.additive === true;
+  const topN = settings.topN ?? (over ? limit! - 1 : null);
+  if (!topN || topN <= 0 || n <= topN) return n;
+  return (settings.other ?? true) && table.additive === true ? n : topN;
+}
 
 /** How many series a line or an area can carry before its colours repeat. */
 export const MAX_SERIES = CHART_SLOTS;

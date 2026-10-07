@@ -365,6 +365,9 @@
                     <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)"
                                       [settings]="settingsOf(widget)" [boardTheme]="boardTheme()" [interactive]="true" [name]="widget.widgetTitle" [autoHeight]="!hasOwnHeight(widget)" />
                   </div>
+                  @if (fallbackNote(widget, view); as why) {
+                    <p class="text-xs text-[color:var(--text-muted)] mt-2 flex items-start gap-1.5" data-test="tile-fallback"><app-icon name="info" size="0.95em" class="shrink-0 mt-px" /><span>{{ why }}</span></p>
+                  }
                   @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
                 }
 
@@ -384,7 +387,7 @@
                     } }
                     <!-- New words are a new span (tracked by the words), not the old text edited: right-aligned
                          text that changes length moves its start, which the browser scores as a shift. -->
-                    @let count = counted(view, kind, rowLimit(widget)) + ' · ran ' + clock(view.ranAt);
+                    @let count = counted(view, kind, rowLimit(widget), settingsOf(widget)) + ' · ran ' + clock(view.ranAt);
                     <span class="dash-count text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">@for (words of [count]; track words) {<span>{{ words }}</span>}</span>
                   }
                 </div>

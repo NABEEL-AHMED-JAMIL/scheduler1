@@ -133,9 +133,17 @@ export function formatNumber(value: number | null | undefined, style: NumberStyl
     : unit === '%' ? text + unit : `${text} ${unit}`;
 }
 
-/** An axis label short enough for an axis: compact unless the author chose a style. */
-function axisNumber(style: NumberStyle | undefined, unit = ''): (value: number) => string {
-  return value => formatNumber(value, style ?? 'compact', unit);
+/**
+ * An axis label short enough for an axis: compact unless the author chose a style.
+ *
+ * Compact writes a figure under 1,000 as a whole number, which is right for a bar's label and wrong for a tick: an axis
+ * from 0 to 2 in steps of 0.5 read "0, 1, 1, 2, 2" (MIG-367, a lineMarkers tile). A tick below 1,000 that is not whole
+ * keeps up to two decimals; the rest read as before.
+ */
+export function axisNumber(style: NumberStyle | undefined, unit = ''): (value: number) => string {
+  return value => style === undefined && Number.isFinite(value) && Math.abs(value) < 1000 && !Number.isInteger(value)
+    ? formatNumber(Number(value.toFixed(2)), 'plain', unit)
+    : formatNumber(value, style ?? 'compact', unit);
 }
 
 /**

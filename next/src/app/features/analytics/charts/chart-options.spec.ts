@@ -1,9 +1,10 @@
 import { ChartTable, TableDim } from './chart-table';
 import {
-  ANIMATE_BELOW, EOption, LARGE_FROM, OptionTheme, SAMPLE_FROM, boxStats, chartOption, density, flowOf,
+  ANIMATE_BELOW, EOption, LARGE_FROM, OptionTheme, SAMPLE_FROM, axisNumber, boxStats, chartOption, density, flowOf,
   formatNumber, niceCeiling, trendLine, treeOf, valueText,
 } from './chart-options';
-import { fitIssues } from './chart-fit';
+import { fitIssues, rowsDrawn } from './chart-fit';
+import { readsAsYears } from './chart-table';
 import { ECHART_KIND_IDS } from '../widget-kinds';
 import type { EChartKind } from '../analytics.service';
 import type { ChartSettings } from './chart-settings';
@@ -292,3 +293,41 @@ describe('formats', () => {
     expect(valueText(dim('name', []), 'north')).toBe('north');
   });
 });
+
+/** MIG-367: the rebuild's chart fixes, as data. */
+describe('the rebuild\'s chart fixes (MIG-367)', () => {
+  it('keeps a fractional tick on a small axis: 0, 0.5, 1, 1.5, 2 -- not 0, 1, 1, 2, 2', () => {
+    const tick = axisNumber(undefined);
+    expect([0, 0.5, 1, 1.5, 2].map(tick)).toEqual(['0', '0.5', '1', '1.5', '2']);
+    expect([0.1 + 0.2, 0.125, -2.5].map(tick)).toEqual(['0.3', '0.13', '-2.5']);
+    // Whole figures and big ones read as before; a chosen style is the author's.
+    expect([40, 1500, 2_000_000].map(tick)).toEqual(['40', '1.5K', '2M']);
+    expect(axisNumber('fixed0')(1.5)).toBe('2');
+  });
+
+  it('draws the lineMarkers value axis with those ticks', () => {
+    const o = option(oneDim([0.4, 1.2, 1.8, 0.9]), 'lineMarkers');
+    const formatter = ((o['yAxis'] as Record<string, unknown>)['axisLabel'] as { formatter: (v: number) => string }).formatter;
+    expect([0.5, 1.5].map(formatter)).toEqual(['0.5', '1.5']);
+  });
+
+  it('counts every row an ECharts kind draws, less a tail a top N drops', () => {
+    expect(rowsDrawn(twoDims(), 'lineSmooth')).toBe(4);
+    expect(rowsDrawn(oneDim(), 'barH')).toBe(4);
+    expect(rowsDrawn(oneDim(), 'barH', { topN: 2 })).toBe(4);
+    expect(rowsDrawn({ ...oneDim(), additive: false }, 'barH', { topN: 2 })).toBe(2);
+    expect(rowsDrawn(oneDim(), 'barH', { topN: 2, other: false })).toBe(2);
+    expect(rowsDrawn(numbers(1, 20), 'funnel')).toBe(12);
+  });
+
+  it('reads a column as years only when its name says so and every value is four digits', () => {
+    expect(readsAsYears('year', ['2002', '2003', null, ''])).toBe(true);
+    expect(readsAsYears('fiscal_year', ['2024'])).toBe(true);
+    expect(readsAsYears('Year of birth', ['1980'])).toBe(true);
+    expect(readsAsYears('orders', ['2002'])).toBe(false);
+    expect(readsAsYears('yearly_total', ['2002'])).toBe(false);
+    expect(readsAsYears('year', ['2002', '20.5'])).toBe(false);
+    expect(readsAsYears('year', [null])).toBe(false);
+  });
+});
+

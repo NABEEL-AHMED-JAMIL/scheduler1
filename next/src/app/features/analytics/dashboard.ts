@@ -23,10 +23,10 @@ import {
   QueryResult,
   RegisteredDataset,
   SavedAnalysis,
-  SavedQuery, TopN, WidgetVisualization, ClassicKind,
+  SavedQuery, TopN, WidgetVisualization, ClassicKind, EChartKind,
 } from './analytics.service';
-import { ChartTable, tableOf } from './charts/chart-table';
-import { fitIssues } from './charts/chart-fit';
+import { ChartTable, readsAsYears, tableOf } from './charts/chart-table';
+import { fitIssues, rowsDrawn } from './charts/chart-fit';
 import {
   ChartSettings, boardSettingsString, compactSettings, parseBoardSettings, parseSettings,
 } from './charts/chart-settings';
@@ -222,10 +222,32 @@ export function dateOnly(text: string): string {
   return match ? match[1] : text;
 }
 
+/** A BOOLEAN column's type name, as DuckDB gives it. */
+const BOOLEAN_TYPE = /^BOOL(EAN)?$/i;
+
+/**
+ * A true/false cell as a reader says it: Yes or No (MIG-367).
+ *
+ * DuckDB's CSV reader types a column of yes/no answers -- "Yes"/"No", "yes"/"no" -- as BOOLEAN, so a chart of
+ * attrition by overtime labelled its bars "true" and "false". Shown as Yes and No; anything else is left as it is. The
+ * value a click narrows on stays the raw one (markOperands), so a filter still asks for what the data holds.
+ */
+export function yesNo(raw: string): string {
+  const value = raw.trim().toLowerCase();
+  return value === 'true' ? 'Yes' : value === 'false' ? 'No' : raw;
+}
+
+/** Whether every present value of a column reads true or false: a saved query's way of being a BOOLEAN column. */
+function readsAsBooleans(values: (string | null)[]): boolean {
+  const present = values.filter((value): value is string => value !== null && value !== undefined && String(value).trim() !== '');
+  return present.length > 0 && present.every(value => /^(true|false)$/i.test(String(value).trim()));
+}
+
 /** One cell of an analysis result, rendered as what its column says it is. */
 function renderCell(column: AnalysisColumn | undefined, raw: string | null): string | null {
   if (raw === null || raw === undefined) return null;
   if (!column) return raw;
+  if (BOOLEAN_TYPE.test(column.type ?? '')) return yesNo(raw);
   if (DATE_ONLY_TYPE.test(column.type ?? '')) return dateOnly(raw);
   if (isNumericType(column.type)) return plainDecimal(raw);
   return raw;
@@ -929,10 +951,17 @@ function withChartTable(view: WidgetView, context: Parameters<typeof tableOf>[1]
  */
 export function queryView(result: QueryResult): WidgetView {
   const columns = result.columns ?? [];
-  const allRows = result.rows ?? [];
+  // A column of true/false answers reads Yes and No, here as on an analysis's BOOLEAN column (yesNo, MIG-367).
+  const raw = result.rows ?? [];
+  const booleans = columns.map((_, index) => readsAsBooleans(raw.map(row => row[index] ?? null)));
+  const allRows = booleans.some(Boolean)
+    ? raw.map(row => row.map((cell, index) => (booleans[index] && cell !== null && cell !== undefined ? yesNo(String(cell)) : cell)))
+    : raw;
   const readings = columns.map((name, index) => {
     let numbers = 0;
     let negative = 0;
+    // A year column is a label, not a figure (readsAsYears, MIG-367): it reads as having no numbers.
+    if (readsAsYears(name, allRows.map(row => row[index] ?? null))) return { name, index, numbers, negative };
     for (const row of allRows) {
       const value = asNumber(row[index]);
       if (value === null) continue;
@@ -1011,6 +1040,7 @@ export function queryView(result: QueryResult): WidgetView {
     // All true: this path has no roles to read. The server renders every value to text before a
     // query result leaves, so a column of digits here is as likely to be a figure as a label and
     // there is nothing to tell them apart with. That is the behaviour this path already had.
+    // (A year column is told apart where it matters -- the chart's split and the table's cells: readsAsYears.)
     measureColumn: columns.map(() => true),
     // A saved statement has no Top-N this screen knows about; whatever it discards it discards
     // in SQL, where nothing here can see it. The share charts are withheld anyway, by the
@@ -2551,6 +2581,25 @@ export class Dashboards implements OnInit, OnDestroy {
     return typeof caption === 'string' ? caption.trim() : '';
   }
 
+  /**
+   * Why a tile draws a table rather than the kind it was saved as, or '' (MIG-367).
+   *
+   * drawn() falls back to the table whenever the saved kind cannot draw this result, and said nothing: a saved query
+   * chosen as a ring, a pareto, a treemap or a stack came up as a table with no word why. A saved statement cannot say
+   * whether its figures add up -- `select avg(x)` and `select sum(x)` look the same -- so every part-of-a-whole kind is
+   * refused there, honestly; the tile now says so, and what would draw it.
+   */
+  fallbackNote(widget: DashboardWidget, view: WidgetView): string {
+    const asked = (widget.visualizationType ?? 'table') as WidgetVisualization;
+    if (asked === 'table' || !KINDS.some(kind => kind.id === asked)) return '';
+    const why = (view.issues[asked] ?? '').trim();
+    if (!why) return '';
+    const label = (kindInfo(asked)?.label ?? asked).toLowerCase();
+    const fix = /saved query does not say/.test(why)
+      ? ' Save it as an analysis that sums or counts to draw it this way.' : '';
+    return `Shown as a table, not as ${label}: ${this.lowerFirst(why).replace(/\.?$/, '.')}${fix}`;
+  }
+
   drawn(widget: DashboardWidget, view: WidgetView): WidgetVisualization {
     const asked = (widget.visualizationType ?? 'table') as WidgetVisualization;
     if (!KINDS.some(kind => kind.id === asked)) {
@@ -2567,7 +2616,7 @@ export class Dashboards implements OnInit, OnDestroy {
    * they are looking at a third of the data while they are looking at all of it. The opposite
    * mistake is worse, so this counts what the drawn kind actually renders.
    */
-  counted(view: WidgetView, kind: WidgetVisualization, limit = TILE_ROWS): string {
+  counted(view: WidgetView, kind: WidgetVisualization, limit = TILE_ROWS, settings: ChartSettings = {}): string {
     if (!view.rowCount) return 'No rows.';
     // A single figure renders the whole result and has no marks at all -- an analysis with no
     // dimension produces none. Counting marks there printed "0 of 1 rows shown" under a tile
@@ -2590,8 +2639,12 @@ export class Dashboards implements OnInit, OnDestroy {
         ? `${drawnGroups.toLocaleString()} of ${groups.toLocaleString()} groups shown`
         : `${groups.toLocaleString()} ${groups === 1 ? 'group' : 'groups'}`;
     }
+    // An ECharts kind draws the rows themselves, not the marks: the marks merge every row sharing a label into one, so a
+    // line of five cities over fourteen days counted fifteen of its seventy points (MIG-367). rowsDrawn says how many.
+    const echarts = kindInfo(kind)?.engine === 'echarts';
     const shown = kind === 'table' ? Math.min(view.rows.length, limit)
       : kind === 'kpi' ? Math.min(1, view.rowCount)
+      : echarts ? rowsDrawn(view.chart ?? tableOf(view, { additive: view.additive }), kind as EChartKind, settings)
       : view.marks.length;
     return shown < view.rowCount
       ? `${shown.toLocaleString()} of ${view.rowCount.toLocaleString()} rows shown`
