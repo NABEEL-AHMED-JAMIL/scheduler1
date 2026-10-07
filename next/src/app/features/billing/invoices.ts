@@ -7,6 +7,7 @@ import { Observable } from 'rxjs';
 import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { ONE_PANE_BELOW_1024 } from '../../shared/ui/one-pane';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, cardPaymentChip } from './billing.service';
@@ -25,6 +26,7 @@ import { WorkspacePicker } from './workspace-picker';
 @Component({
   selector: 'app-invoices',
   imports: [Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  styles: [ONE_PANE_BELOW_1024],
   templateUrl: './invoices.html',
 })
 export class Invoices implements OnInit {
@@ -48,6 +50,11 @@ export class Invoices implements OnInit {
   readonly preview = signal<string | null>(null);
   /** What the pane shows: the picked invoice, else the preview. */
   readonly shownNumber = computed(() => this.selectedNumber() ?? this.preview());
+  /**
+   * Review 2026-10-07 (M17): below 1024 px one pane at a time, as the task inbox: the list, or the invoice opened from it
+   * with "Back to list". An address naming an invoice opens it; the automatic pick (a bill that needs a look) does not.
+   */
+  readonly pane = signal<'list' | 'detail'>('list');
   readonly closing = signal(false);
   readonly closePeriod = signal(Invoices.lastMonth());
 
@@ -83,6 +90,7 @@ export class Invoices implements OnInit {
   readonly hasFilters = computed(() => !!this.search() || !!this.status());
 
   ngOnInit(): void {
+    if (this.route.snapshot.paramMap.get('number')) this.pane.set('detail');
     this.route.paramMap.subscribe(p => { const n = p.get('number'); if (n) this.selectedNumber.set(n); });
     this.workspaces.ready(() => this.load());
   }
@@ -105,7 +113,7 @@ export class Invoices implements OnInit {
         // address stays the list's until one is picked.
         if (!this.selectedNumber()) {
           const needsLook = rows.find(x => x.status === 'overdue') ?? rows.find(x => (x.pendingPayments ?? 0) > 0) ?? null;
-          if (needsLook) this.select(needsLook, true);
+          if (needsLook) this.select(needsLook, true, false);
           else this.preview.set(rows[0]?.number ?? null);
         }
       },
@@ -118,8 +126,9 @@ export class Invoices implements OnInit {
   }
   static lastMonth(): string { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return yearMonth(d); }
 
-  select(r: InvoiceRow, replace = false): void {
+  select(r: InvoiceRow, replace = false, open = true): void {
     this.selectedNumber.set(r.number);
+    if (open) this.pane.set('detail');
     this.router.navigate(['/billing/invoices', r.number], { replaceUrl: replace });
   }
   pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.preview.set(null); this.load(); }

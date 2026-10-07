@@ -13,6 +13,15 @@ import { RowSnap } from './row-snap';
 @Component({
   selector: 'app-table-shell',
   imports: [Icon, BlurLoader, LoadError, RowSnap],
+  styles: `
+    .table-toolbar-controls {
+      display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end;
+      gap: 0.5rem; min-width: 0;
+    }
+    /* The search box grows into the line's free room and shrinks before anything wraps; pages' own max-w-* caps
+       made it the first thing cut ("Search name, code, service or t"). */
+    .table-toolbar-controls ::ng-deep .search-field { flex: 1 1 15rem; min-width: 12rem; max-width: 24rem; }
+  `,
   template: `
     <div class="card overflow-hidden">
       <div class="table-toolbar flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-b border-subtle"
@@ -25,6 +34,10 @@ import { RowSnap } from './row-snap';
             </span>
           }
         </h2>
+        <!-- Review 2026-10-07 (M16): the controls are one group. When the heading and the group fit on one line they
+             share it; when not, the whole group drops below the heading and wraps inside itself, the search box
+             taking the room that is left -- never Columns alone on a second line, never a cut placeholder. -->
+        <div class="table-toolbar-controls">
         <ng-content select="[toolbar]" />
         @if (columns().length >= 5) {
           <!-- Owner, 2026-09-24: choose which columns to see. Read from the table's own headings, so every
@@ -54,6 +67,7 @@ import { RowSnap } from './row-snap';
             }
           </div>
         }
+        </div>
       </div>
 
       <!-- A second row for controls that come and go -- bulk selection above all. Putting them

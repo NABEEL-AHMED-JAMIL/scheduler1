@@ -7,6 +7,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { ONE_PANE_BELOW_1024 } from '../../../shared/ui/one-pane';
 import { Icon } from '../../../shared/ui/icon';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { StatusPill } from '../../../shared/ui/status-pill';
@@ -29,6 +30,7 @@ import { statusColor } from '../../../shared/charts/status-color';
   selector: 'app-connections',
   imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner,
     BarChart],
+  styles: [ONE_PANE_BELOW_1024],
   templateUrl: './connections.html',
 })
 export class Connections implements OnInit {
@@ -54,6 +56,11 @@ export class Connections implements OnInit {
   private readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
 
   readonly selectedId = signal<number | null>(null);
+  /**
+   * Review 2026-10-07 (M17): below 1024 px one pane at a time, as the task inbox: the list, or the connection opened
+   * from it with "Back to list". A link naming a connection (?connection=) opens it; the automatic pick does not.
+   */
+  readonly pane = signal<'list' | 'detail'>(this.route.snapshot.queryParamMap.get('connection') ? 'detail' : 'list');
   readonly selected = computed(() => this.connections().find(c => c.connectionId === this.selectedId()) ?? null);
 
   readonly filtered = computed(() => {
@@ -172,6 +179,7 @@ export class Connections implements OnInit {
   /** Mirrored to ?connection=, as Kafka does with ?profileId=, so a connection can be linked to. */
   select(c: ModelConnection): void {
     this.selectedId.set(c.connectionId);
+    this.pane.set('detail');
     this.router.navigate([], { relativeTo: this.route, queryParams: { connection: c.connectionId }, queryParamsHandling: 'merge', replaceUrl: true });
   }
   providerLabel(c: ModelConnection): string { return providerOf(c.provider).label; }

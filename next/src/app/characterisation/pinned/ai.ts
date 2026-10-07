@@ -159,6 +159,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Actions for Local Ollama",
+      "Back to list",
       "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
       "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
       "New connection",
@@ -215,6 +216,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Actions for Local Ollama",
+      "Back to list",
       "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
       "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
       "New connection",

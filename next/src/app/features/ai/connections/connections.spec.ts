@@ -74,6 +74,22 @@ describe('Model connections -- the selection lives in the address', () => {
   });
 });
 
+describe('Model connections -- one pane at a time below 1024 px (review 2026-10-07, M17)', () => {
+  it('opens on the list; picking a connection opens it, and Back to list goes back', () => {
+    const { screen } = screenAt(null);
+    expect(screen.selectedId()).toBe(1);                // the pane still has one to show from 1024 px
+    expect(screen.pane()).toBe('list');
+    screen.select(ROWS[1]);
+    expect(screen.pane()).toBe('detail');
+    screen.pane.set('list');
+    expect(screen.selectedId()).toBe(2);
+  });
+
+  it('opens on the connection a link names', () => {
+    expect(screenAt('2').screen.pane()).toBe('detail');
+  });
+});
+
 describe('Model connections -- what the selected connection has been doing', () => {
   it('reads the picked connection\'s activity and draws each day as succeeded and failed', () => {
     const { screen, asked } = screenAt(null);

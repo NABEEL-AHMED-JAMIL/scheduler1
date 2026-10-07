@@ -43,7 +43,7 @@
     }
   </div>
 
-  <div class="card lookup-split">
+  <div class="card lookup-split" [attr.data-pane]="pane()">
     <aside class="lookup-rail">
       <div class="lookup-rail-tools">
         <div class="search-field">
@@ -104,6 +104,9 @@
 
     <section class="lookup-detail" aria-live="polite">
       @if (shownNumber(); as n) {
+        <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="pane.set('list')" data-test="back-to-list">
+          <app-icon name="arrowLeft" />Back to list
+        </button>
         <app-invoice-pane [number]="n" (changed)="load()" />
       } @else {
         <div class="lookup-entries-empty lookup-detail-empty">

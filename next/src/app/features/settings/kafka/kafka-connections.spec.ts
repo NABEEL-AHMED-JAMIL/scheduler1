@@ -76,7 +76,7 @@ function screenFor(isPlatformAdmin: boolean, profiles: KafkaProfile[], tenants =
       },
       { provide: Dialog, useValue: {} },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
-      { provide: ActivatedRoute, useValue: { queryParamMap: of({ get: () => null }) } },
+      { provide: ActivatedRoute, useValue: { queryParamMap: of({ get: () => null }), snapshot: { queryParamMap: { get: () => null } } } },
       { provide: Router, useValue: { navigate: () => {} } },
     ],
   });

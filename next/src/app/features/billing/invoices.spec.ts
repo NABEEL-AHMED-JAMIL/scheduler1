@@ -26,7 +26,8 @@ function page(platformAdmin: boolean, number: string | null = null, rows: typeof
   TestBed.configureTestingModule({ providers: [
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: toast }, { provide: Dialog, useValue: { open: () => ({ closed: of(false) }) } },
     { provide: Router, useValue: router }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
-    { provide: ActivatedRoute, useValue: { paramMap: of(new Map(number ? [['number', number]] : [])) } },
+    { provide: ActivatedRoute, useValue: { paramMap: of(new Map(number ? [['number', number]] : [])),
+      snapshot: { paramMap: new Map(number ? [['number', number]] : []) } } },
     { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => (platformAdmin ? '2905' : null), { set: vi.fn() }), options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin } },
   ] });
   const component = TestBed.runInInjectionContext(() => new Invoices());
@@ -56,6 +57,15 @@ describe('Invoices', () => {
     // MIG-211: a line that starts with the slip starts with a capital, and a month reads as everywhere else.
     expect(component.docsLabel({ ...component.rows()[3], documentKinds: [], pendingPayments: 1 })).toBe('Slip pending');
     expect(component.period({ ...component.rows()[3], periodStart: '2026-09-01' })).toBe('September 2026');
+  });
+
+  it('below 1024 px opens on the list, and an invoice once it is picked or named in the address (review 2026-10-07, M17)', () => {
+    const { component } = page(false);
+    expect(component.selectedNumber()).toBe('INV-2026-08-0003');   // the bill that needs a look, for the pane from 1024 px
+    expect(component.pane()).toBe('list');
+    component.select(component.rows()[1]);
+    expect(component.pane()).toBe('detail');
+    expect(page(false, 'INV-2026-09-0007').component.pane()).toBe('detail');
   });
 
   it('selects the overdue bill first, or the one the address names, and writes the number to the address', () => {

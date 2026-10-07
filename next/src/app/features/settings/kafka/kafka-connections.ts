@@ -11,6 +11,7 @@ import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { ONE_PANE_BELOW_1024 } from '../../../shared/ui/one-pane';
 import { Icon } from '../../../shared/ui/icon';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { CopyButton } from '../../../shared/ui/copy-button';
@@ -149,6 +150,7 @@ export function healthTone(state: string | null | undefined): 'ok' | 'warn' | 'c
 @Component({
   selector: 'app-kafka-connections',
   imports: [MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
+  styles: [ONE_PANE_BELOW_1024],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -163,11 +165,14 @@ export class KafkaConnections implements OnInit {
    * Task Types links to, so arriving from there lands on that profile rather than on a banner.
    */
   readonly selectedId = signal<number | null>(null);
+  /** Review 2026-10-07 (M17): below 1024 px the list, or the profile opened from it ("Back to list"); a ?profileId= link opens it. */
+  readonly pane = signal<'list' | 'detail'>(this.route.snapshot.queryParamMap.get('profileId') ? 'detail' : 'list');
   readonly selected = computed(() =>
     this.profiles().find(p => p.kafkaConnectionProfileId === this.selectedId()) ?? null);
 
   select(profile: KafkaProfile): void {
     this.selectedId.set(profile.kafkaConnectionProfileId);
+    this.pane.set('detail');
     this.topicSearch.set('');
     this.topicPage.set(0);
     this.topicTests.set({});

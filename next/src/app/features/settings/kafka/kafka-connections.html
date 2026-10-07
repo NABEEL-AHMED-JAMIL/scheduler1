@@ -34,7 +34,7 @@
   }
 
   <!-- ── Master / detail ─────────────────────────────────────────────────────────────── -->
-  <div class="card lookup-split kafka-split">
+  <div class="card lookup-split kafka-split" [attr.data-pane]="pane()">
 
     <aside class="lookup-rail">
       <div class="lookup-rail-tools">
@@ -114,6 +114,9 @@
 
     <section class="lookup-detail" aria-live="polite">
       @if (selected(); as p) {
+        <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="pane.set('list')" data-test="back-to-list">
+          <app-icon name="arrowLeft" />Back to list
+        </button>
         <header class="lookup-detail-head">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
