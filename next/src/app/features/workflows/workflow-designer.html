@@ -14,6 +14,17 @@
 
   <app-managed-banner />
 
+  @if (noWorkspace()) {
+    <!-- A platform administrator's own sign-in has no workspace, and workflows are a workspace's: every call answered
+         "Pick a workspace" and the page showed an error, or another workspace's workflows under "This workspace"
+         (review 2026-10-07). -->
+    <div class="card p-10 flex flex-col items-center text-center gap-2" data-test="needs-workspace">
+      <app-icon name="layers" size="1.5rem" class="icon-muted" />
+      <p class="text-sm text-[color:var(--text-primary)]">Workflows belong to a workspace, and this sign-in has none.</p>
+      <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace from Work in a workspace to design its workflows or decide its tasks.</p>
+      <a routerLink="/administration/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
+    </div>
+  } @else {
   @if (error()) {
     <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}</p>
   }
@@ -422,13 +433,25 @@
           </footer>
         }
       } @else if (!loading()) {
-        <div class="inbox-empty">
+        <div class="inbox-empty" data-test="designer-empty">
           <app-icon name="layers" size="1.6rem" class="icon-muted block mx-auto mb-2" />
-          @if (canEdit()) { Create a workflow to start. } @else { No workflows in this workspace yet. }
+          @if (missingKey(); as key) {
+            <p class="text-sm text-[color:var(--text-primary)]" role="status" data-test="missing-workflow">There is no workflow “{{ key }}” in this workspace.</p>
+            <p class="mt-1">
+              @if (workflows().length) { Pick one from the list@if (canEdit()) {, or start a new one}. }
+              @else if (canEdit()) { This workspace has no workflows yet. }
+              @else { This workspace has no workflows yet. A workspace administrator makes them. }
+            </p>
+          } @else if (workflows().length) { Pick a workflow from the list. }
+          @else if (canEdit()) { Create a workflow to start. } @else { No workflows in this workspace yet. }
+          @if (canEdit()) {
+            <button type="button" class="btn btn-primary btn-sm mt-3" (click)="startNew()" data-test="empty-new-workflow"><app-icon name="plus" />New workflow</button>
+          }
         </div>
       }
     </section>
   </div>
+  }
 </div>
 
 <!-- Where a step goes in between two others: the connector, with an add button on it, or the menu once pressed. -->

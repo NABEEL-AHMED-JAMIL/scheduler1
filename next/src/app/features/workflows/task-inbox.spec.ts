@@ -28,7 +28,7 @@ const DETAIL = {
   ],
 } as unknown as TaskDetail;
 
-function screenWith(detail: TaskDetail = DETAIL) {
+function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [TASK] })),
     groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
@@ -49,7 +49,7 @@ function screenWith(detail: TaskDetail = DETAIL) {
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
       { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);
@@ -170,5 +170,18 @@ describe('P2 #31 and #36: the inbox at the edges', () => {
     expect(screen.aloneInWorkspace()).toBe(false);
     screen.colleagues.set([{ userId: 4537, fullName: 'Me', username: 'me@x.io' } as never]);
     expect(screen.aloneInWorkspace()).toBe(true);
+  });
+});
+
+/** Review 2026-10-07: a platform administrator's own sign-in has no workspace; the inbox said "could not be read". */
+describe('Task inbox -- a sign-in with no workspace', () => {
+  it('reads nothing and points to Work in a workspace', () => {
+    const { api, el, screen } = screenWith(DETAIL, null);
+    expect(api.mine).not.toHaveBeenCalled();
+    expect(screen.error()).toBe('');
+    expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
+    expect(el.querySelector('[data-test="tab-mine"]')).toBeNull();
+    screen.load();
+    expect(api.mine).not.toHaveBeenCalled();
   });
 });

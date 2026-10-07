@@ -62,7 +62,7 @@ function screen(link?: number) {
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
       { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(3), overdue: signal(1), mine: signal(3), groups: signal(0), done: signal(1), requests: signal(1) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);

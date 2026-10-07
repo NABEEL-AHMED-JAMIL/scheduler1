@@ -62,7 +62,7 @@ function screen(opts: { key?: string } = {}) {
       { provide: WorkflowsApi, useValue: api },
       { provide: AccessProfilesService, useValue: { list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })) } },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => true, builderLocked: () => false, canOpen: () => true, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => true, builderLocked: () => false, canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
   const fixture = TestBed.createComponent(WorkflowDesigner);

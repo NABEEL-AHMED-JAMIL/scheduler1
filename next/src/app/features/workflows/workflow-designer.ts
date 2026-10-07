@@ -58,6 +58,8 @@ export class WorkflowDesigner implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly current = signal<WorkflowDetail | null>(null);
+  /** A key a link named that this workspace has no workflow for: the detail pane says so instead of opening another. */
+  readonly missingKey = signal<string | null>(null);
 
   /** The chain being edited; `dirty` once it differs from what was loaded. */
   readonly steps = signal<DraftStep[]>([]);
@@ -101,7 +103,9 @@ export class WorkflowDesigner implements OnInit {
   readonly testSubject = signal('{\n  "amount": 1200\n}');
   readonly testStarted = signal<RequestRow | null>(null);
 
-  readonly canEdit = computed(() => this.auth.isTenantAdmin() && !this.auth.builderLocked());
+  /** A sign-in with no workspace of its own (a platform administrator's): workflows are a workspace's, so nothing is read. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+  readonly canEdit = computed(() => this.auth.isTenantAdmin() && !this.auth.builderLocked() && !this.noWorkspace());
   /** MIG-324: an empty list says what a workflow is and who makes one. */
   readonly emptyText = computed(() => this.canEdit()
     ? 'No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.'
@@ -166,6 +170,7 @@ export class WorkflowDesigner implements OnInit {
     .map(j => ({ value: String(j.jobId), label: j.jobName || `Schedule #${j.jobId}`, hint: `#${j.jobId}` })));
 
   ngOnInit(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     if (this.auth.isTenantAdmin()) {
       this.profiles.list().subscribe({
@@ -191,6 +196,9 @@ export class WorkflowDesigner implements OnInit {
         if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Workflows could not be read.'); return; }
         const rows = r.data ?? [];
         this.workflows.set(rows);
+        // A link to a workflow this workspace does not have -- another workspace's, a deleted one, a typo. Said plainly in
+        // the detail pane, beside the list, rather than a toast over an empty page; nothing else is opened in its place.
+        if (open && !rows.some(w => w.key === open)) { this.showMissing(open); return; }
         // With nothing named, the first row as the list draws it: Built in comes first.
         const key = open ?? this.current()?.key ?? (rows.find(isBuiltIn) ?? rows[0])?.key;
         if (key) this.open(key, true);
@@ -246,6 +254,7 @@ export class WorkflowDesigner implements OnInit {
     this.api.fetch(key).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS || !r.data) { if (!quiet) this.toast.error(r.message || 'That workflow could not be read.'); return; }
+        this.missingKey.set(null);
         this.current.set(r.data);
         this.loadVersion(r.data.versions[0]?.steps);
         // Nothing published yet: an administrator starts from one approval step rather than an empty page.
@@ -259,8 +268,22 @@ export class WorkflowDesigner implements OnInit {
         this.testStarted.set(null);
         this.router.navigate([], { relativeTo: this.route, queryParams: { key }, replaceUrl: true });
       },
-      error: () => { if (!quiet) this.toast.error('That workflow could not be read.'); },
+      error: (e: unknown) => {
+        if ((e as { status?: number })?.status === 404) { this.showMissing(key); return; }
+        if (!quiet) this.toast.error('That workflow could not be read. Try again.');
+      },
     });
+  }
+
+  /** No workflow by this key here: nothing is open, the link's key leaves the address, the pane says which key it was. */
+  private showMissing(key: string): void {
+    this.current.set(null);
+    this.steps.set([]);
+    this.selected.set(null);
+    this.dirty.set(false);
+    this.view.set('steps');
+    this.missingKey.set(key);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { key: null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   private loadVersion(json: string | undefined | null): void {
@@ -435,6 +458,7 @@ export class WorkflowDesigner implements OnInit {
     this.newKey.set('');
     this.newDescription.set('');
     this.newSubject.set('request');
+    this.missingKey.set(null);
     this.view.set('new');
   }
 

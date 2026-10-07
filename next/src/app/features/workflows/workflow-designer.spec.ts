@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
@@ -32,7 +32,7 @@ const WORKFLOW: WorkflowDetail = {
   ],
 };
 
-function screenWith(opts: { admin?: boolean; problems?: string[] } = {}) {
+function screenWith(opts: { admin?: boolean; problems?: string[]; tenantId?: number | null } = {}) {
   const admin = opts.admin ?? true;
   const api = {
     colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' }] })),
@@ -58,7 +58,8 @@ function screenWith(opts: { admin?: boolean; problems?: string[] } = {}) {
       { provide: AccessProfilesService, useValue: profiles },
       { provide: ToastService, useValue: toast },
       { provide: AuthService, useValue: {
-        isTenantAdmin: () => admin, builderLocked: () => false, canOpen: () => true, user: signal({ appUserId: 4537 }),
+        isTenantAdmin: () => admin, builderLocked: () => false, canOpen: () => true,
+        user: signal({ appUserId: 4537, tenantId: opts.tenantId === undefined ? 2924 : opts.tenantId }),
       } },
     ],
   });
@@ -176,5 +177,65 @@ describe('Workflow designer -- an empty list', () => {
     expect(screenWith({ admin: true }).screen.emptyText())
       .toBe('No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.');
     expect(screenWith({ admin: false }).screen.emptyText()).toBe('No workflows yet. A workspace administrator makes them.');
+  });
+});
+
+/** Review 2026-10-07: a link to a workflow this workspace does not have says so beside the list, not in a vague toast. */
+describe('Workflow designer -- a link to a workflow that is not here', () => {
+  it('names the key, opens nothing in its place, and offers New workflow to an administrator', () => {
+    const { api, toast, screen, fixture, el } = screenWith();
+    api.fetch.mockClear();
+    screen.loadList('no-such-workflow');
+    fixture.detectChanges();
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.current()).toBeNull();
+    expect(el.querySelector('[data-test="missing-workflow"]')!.textContent).toContain('There is no workflow “no-such-workflow” in this workspace.');
+    expect(el.querySelector('[data-test="designer-empty"]')!.textContent).toContain('Pick one from the list, or start a new one.');
+    expect(el.querySelector('[data-workflow="purchase"]')).not.toBeNull();
+    (el.querySelector('[data-test="empty-new-workflow"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.view()).toBe('new');
+    expect(screen.missingKey()).toBeNull();
+  });
+
+  it('tells a member the same without the New workflow button', () => {
+    const { screen, fixture, el } = screenWith({ admin: false });
+    screen.loadList('no-such-workflow');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="missing-workflow"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="designer-empty"]')!.textContent).toContain('Pick one from the list.');
+    expect(el.querySelector('[data-test="empty-new-workflow"]')).toBeNull();
+  });
+
+  it('treats a 404 on opening (deleted meanwhile) the same way, with no toast', () => {
+    const { api, toast, screen, fixture, el } = screenWith();
+    api.fetch.mockReturnValueOnce(throwError(() => ({ status: 404 })) as never);
+    screen.open('gone');
+    fixture.detectChanges();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.current()).toBeNull();
+    expect(el.querySelector('[data-test="missing-workflow"]')!.textContent).toContain('“gone”');
+  });
+
+  it('says to pick from the list when workflows exist and none is open', () => {
+    const { screen, fixture, el } = screenWith();
+    screen.current.set(null);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="designer-empty"]')!.textContent).toContain('Pick a workflow from the list.');
+  });
+});
+
+/** Review 2026-10-07: a platform administrator's own sign-in has no workspace; workflows are a workspace's. */
+describe('Workflow designer -- a sign-in with no workspace', () => {
+  it('reads nothing and points to Work in a workspace instead of an error', () => {
+    const { api, el, screen } = screenWith({ tenantId: null });
+    expect(api.list).not.toHaveBeenCalled();
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
+    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/administration/work-in-workspace');
+    expect(el.querySelector('[data-test="workflow-list"]')).toBeNull();
+    expect(screen.canEdit()).toBe(false);
+    expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();
   });
 });

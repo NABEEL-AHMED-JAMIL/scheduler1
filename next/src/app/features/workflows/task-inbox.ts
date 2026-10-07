@@ -241,7 +241,11 @@ export class TaskInbox implements OnInit {
     } }, { injector: this.injector });
   }
 
+  /** A sign-in with no workspace of its own (a platform administrator's): tasks are a workspace's, so nothing is read. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   ngOnInit(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     const params = this.route.snapshot.queryParamMap;
     const path = this.route.snapshot.routeConfig?.path ?? '';
     if (path.endsWith('requests')) {
@@ -260,6 +264,7 @@ export class TaskInbox implements OnInit {
    * lists keep their loaded pages instead (refreshKeeping).
    */
   load(): void {
+    if (this.noWorkspace()) return;
     this.now.set(Date.now());
     this.loading.set(true);
     this.error.set('');

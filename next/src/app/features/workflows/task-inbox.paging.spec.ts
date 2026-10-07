@@ -48,7 +48,7 @@ function screen(options: { mine?: (q: InboxQuery) => ReturnType<typeof page<Inbo
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
       { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(240), overdue: signal(0), mine: signal(240), groups: signal(0),
         done: signal(0), requests: signal(0) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);

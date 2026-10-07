@@ -18,6 +18,17 @@
     </div>
   </div>
 
+  @if (noWorkspace()) {
+    <!-- A platform administrator's own sign-in has no workspace, and workflows are a workspace's: every call answered
+         "Pick a workspace" and the page showed an error, or another workspace's workflows under "This workspace"
+         (review 2026-10-07). -->
+    <div class="card p-10 flex flex-col items-center text-center gap-2" data-test="needs-workspace">
+      <app-icon name="layers" size="1.5rem" class="icon-muted" />
+      <p class="text-sm text-[color:var(--text-primary)]">Workflows belong to a workspace, and this sign-in has none.</p>
+      <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace from Work in a workspace to design its workflows or decide its tasks.</p>
+      <a routerLink="/administration/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
+    </div>
+  } @else {
   <div class="tabs inbox-tabs" role="tablist" aria-label="Which tasks">
     <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'mine'" [class.tab-active]="tab() === 'mine'" (click)="pick('mine')" data-test="tab-mine">
       <app-icon name="inbox" />Waiting for me
@@ -260,6 +271,7 @@
       </section>
     }
   </div>
+  }
 </div>
 
 <!-- A heading's title: its trailing reference (#1016) never breaks across lines. -->
