@@ -21,8 +21,10 @@
    them stay put. */
 .dash-run-button { min-width: 8.75rem; justify-content: center; }
 /* A tile's "8 rows · ran 21:26:48" is right-aligned, so a change in its length moved its start: a
-   box of fixed width, the text at its right edge. */
-.dash-count { min-width: min(12rem, 100%); text-align: right; }
+   box of fixed width, laid out right to left so the words' start is their right edge (the words
+   themselves stay left to right, isolated in their own span). */
+.dash-count { min-width: min(12rem, 100%); direction: rtl; text-align: start; }
+.dash-count > span { unicode-bidi: isolate; }
 
 /* ---- a tile's menu, with its "Show as" grid --------------------------------------------------
    About 400px wide (the console's .cdk-menu caps menus at 22rem, so this says its own width), a

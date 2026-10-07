@@ -381,7 +381,7 @@
                     @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) {
                       <span class="dash-filter-note text-[11px] text-[color:var(--text-muted)] min-w-0 flex-1 truncate" [title]="note">{{ note }}</span>
                     } }
-                    <span class="dash-count text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span>
+                    <span class="dash-count text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')"><span dir="ltr">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span></span>
                   }
                 </div>
               </app-analytics-widget>
