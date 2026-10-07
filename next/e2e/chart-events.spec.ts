@@ -135,6 +135,8 @@ for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.j
       if ((narrowed = await sent)) break;
     }
     expect.soft(narrowed, `${kind}: a click on a mark narrowed the board`).toBe(true);
-    if (narrowed) await expect.soft(page.locator('.dash-filter-pill'), `${kind}: the facts line says so`).toHaveText(/1 filter on/);
+    // A mark of a two-dimension tile (a stack's x and series, a heatmap's cell, a sankey's link) stands for one value of
+    // each, and the board narrows on both (narrowTo: one EQ per operand): "2 filters on" there, "1 filter on" elsewhere.
+    if (narrowed) await expect.soft(page.locator('.dash-filter-pill'), `${kind}: the facts line says so`).toHaveText(/^\s*[12] filters? on\s*$/);
   }
 });
