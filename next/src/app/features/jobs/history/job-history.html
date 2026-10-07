@@ -154,6 +154,9 @@
               <div class="inbox-trigger">
                 <div class="detail-head mt-3">Inbox trigger</div>
                 <p class="text-sm">{{ triggerSentence(trigger()) }}</p>
+                @if (waitingSentence(trigger()); as waiting) {
+                  <p class="text-xs text-[color:var(--text-muted)] mt-0.5" data-test="inbox-waiting">{{ waiting }}</p>
+                }
                 @if (recentArrivals().length) {
                   <ul class="mt-1.5 space-y-1 text-xs" aria-label="Recent inbox files">
                     @for (a of recentArrivals(); track a.arrivalId) {
@@ -163,6 +166,10 @@
                         @if (a.outcome === 'Started' && a.jobQueueId) {
                           <a class="link-inline shrink-0 whitespace-nowrap"
                              [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId, 'logs']">run #{{ a.jobQueueId }}</a>
+                        } @else if (a.outcome === 'Waiting') {
+                          <!-- MIG-360: not dropped -- its turn comes when the run in flight ends. -->
+                          <span class="text-[color:var(--text-muted)] shrink-0 whitespace-nowrap" [title]="a.reason || ''"
+                                data-test="arrival-waiting">Waiting{{ a.place ? ' · #' + a.place + ' in line' : '' }}</span>
                         } @else {
                           <span class="text-warn-500 shrink-0" [title]="a.reason || ''">{{ a.outcome }}</span>
                         }
@@ -170,7 +177,7 @@
                           {{ a.dateCreated ? (a.dateCreated | serverTime:'recent') : '' }}
                         </span>
                       </li>
-                      @if (a.outcome !== 'Started' && a.reason) {
+                      @if (a.outcome === 'Skipped' && a.reason) {
                         <li class="pl-5 text-[11px] text-[color:var(--text-muted)] log-message">{{ a.reason }}</li>
                       }
                     }

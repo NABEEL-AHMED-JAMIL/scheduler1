@@ -21,7 +21,7 @@ import { dayLabel } from '../../../shared/ui/time-format';
 import { clockTime } from '../schedule-labels';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Observable, Subject, catchError, debounceTime, forkJoin, map, of, switchMap } from 'rxjs';
-import { InboxTrigger, patternProblem, triggerOf } from '../inbox/inbox-trigger';
+import { InboxTrigger, batchProblem, patternProblem, triggerOf } from '../inbox/inbox-trigger';
 import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
 import { AiModelPicks } from '../ai-models/ai-model-picks';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
@@ -243,6 +243,9 @@ export class JobEdit implements OnInit {
   readonly onArrival = signal(false);
   readonly filePattern = signal('');
   readonly patternError = computed(() => (this.onArrival() ? patternProblem(this.filePattern()) : ''));
+  /** MIG-360: how many files that waited for a run in flight the next run takes (1: each file its own run). */
+  readonly batchSize = signal<number | string>(1);
+  readonly batchError = computed(() => (this.onArrival() ? batchProblem(this.batchSize()) : ''));
   private readonly savedTrigger = signal<InboxTrigger | null>(null);
 
   /**
@@ -467,6 +470,7 @@ export class JobEdit implements OnInit {
         this.savedTrigger.set(trigger);
         this.onArrival.set(!!trigger?.configured && trigger.enabled !== false);
         this.filePattern.set(trigger?.filePattern ?? '');
+        this.batchSize.set(Number(trigger?.batchSize ?? 1));
       },
       error: () => {},
     });
@@ -481,13 +485,15 @@ export class JobEdit implements OnInit {
   }
 
   /** The trigger request the form asks for, or null when it asks for what is already saved. */
-  private triggerRequest(jobId: number): { jobId: number; enabled: boolean; filePattern: string } | null {
+  private triggerRequest(jobId: number): { jobId: number; enabled: boolean; filePattern: string; batchSize?: number } | null {
     const saved = this.savedTrigger();
     const savedOn = !!saved?.configured && saved.enabled !== false;
     const pattern = this.filePattern().trim();
+    const savedBatch = Number(saved?.batchSize ?? 1);
+    const batch = Number(this.batchSize());
     if (this.onArrival()) {
-      if (savedOn && (saved?.filePattern ?? '') === pattern) return null;
-      return { jobId, enabled: true, filePattern: pattern };
+      if (savedOn && (saved?.filePattern ?? '') === pattern && batch === savedBatch) return null;
+      return batch === savedBatch ? { jobId, enabled: true, filePattern: pattern } : { jobId, enabled: true, filePattern: pattern, batchSize: batch };
     }
     return savedOn ? { jobId, enabled: false, filePattern: saved?.filePattern ?? '' } : null;
   }
@@ -667,8 +673,8 @@ export class JobEdit implements OnInit {
       this.toast.error('Pick at least one day of the week.');
       return;
     }
-    if (this.patternError()) {
-      this.toast.error(this.patternError());
+    if (this.patternError() || this.batchError()) {
+      this.toast.error(this.patternError() || this.batchError());
       return;
     }
 

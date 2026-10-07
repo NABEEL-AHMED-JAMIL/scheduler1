@@ -28,7 +28,7 @@ import { clockTime } from '../schedule-labels';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
-import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence } from '../inbox/inbox-trigger';
+import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence, waitingSentence } from '../inbox/inbox-trigger';
 
 /**
  * How many runs one read brings: the newest window first, and older ones a window at a time on request.
@@ -254,6 +254,7 @@ export class JobHistory {
   readonly recentArrivals = computed(() => this.arrivals().slice(0, 5));
   readonly showInbox = computed(() => !!this.trigger()?.configured || this.arrivals().length > 0);
   readonly triggerSentence = triggerSentence;
+  readonly waitingSentence = waitingSentence;
 
   private loadTrigger(): void {
     if (!this.jobId()) { this.trigger.set(null); return; }

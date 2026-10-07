@@ -68,7 +68,7 @@
                    [checked]="onArrival()" (change)="onArrival.set($any($event.target).checked)" />
             <span class="min-w-0">
               <span class="choice-title">Also when a file arrives</span>
-              <span class="choice-text">Each file in the workspace inbox starts a run.</span>
+              <span class="choice-text">Each file in the workspace inbox starts a run; one that lands while a run is going waits its turn.</span>
             </span>
           </label>
         </div>
@@ -80,6 +80,12 @@
               <input id="filePattern" class="input mono" placeholder="*.csv"
                      [class.input-invalid]="!!patternError()"
                      [value]="filePattern()" (input)="filePattern.set($any($event.target).value)" />
+            </app-field>
+            <app-field label="Files per run" for="batchSize" [error]="batchError()"
+                       hint="1: each file its own run. More: files that waited for a run go together, up to this many, and the pipeline reads them all.">
+              <input id="batchSize" type="number" min="1" max="50" step="1" class="input w-24"
+                     [class.input-invalid]="!!batchError()"
+                     [value]="batchSize()" (input)="batchSize.set($any($event.target).value)" />
             </app-field>
           </div>
         }
