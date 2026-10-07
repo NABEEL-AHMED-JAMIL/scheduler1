@@ -67,6 +67,8 @@ async function openBoard(page: Page, name: string) {
  */
 async function kindsOf(page: Page, title: string) {
   await page.getByRole('button', { name: `Actions for ${title}` }).click();
+  // The menu first: counted before it is drawn, the toggle reads as absent.
+  await expect(page.locator('.dash-tile-menu .dash-kind').first()).toBeVisible();
   const misfits = page.locator('button.dash-misfits');
   if (await misfits.count() && await misfits.getAttribute('aria-checked') === 'false') await misfits.click();
   return page.locator('button.dash-kind');
