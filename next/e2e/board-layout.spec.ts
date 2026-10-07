@@ -71,7 +71,9 @@ async function watchShifts(page: Page): Promise<void> {
         const sources = entry.sources ?? [];
         w.__shifts.push({ value: entry.value,
           at: sources.map(s => element(s.node)?.className?.toString?.().slice(0, 60) ?? s.node?.nodeName ?? ''),
-          inChart: sources.length > 0 && sources.every(s => !!element(s.node)?.closest('app-widget-chart')) });
+          // In a chart, or gone: a chart redrawing an answer replaces its own marks, so by the time
+          // this runs a source may already be detached; the board's own boxes never are.
+          inChart: sources.length > 0 && sources.every(s => !s.node?.isConnected || !!element(s.node)?.closest('app-widget-chart')) });
       }
     }).observe({ type: 'layout-shift', buffered: true });
   });
