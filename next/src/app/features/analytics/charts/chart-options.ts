@@ -421,9 +421,12 @@ function lineKind(variant: 'smooth' | 'step' | 'markers' | 'stacked' | 'share'):
     const areaOpacity = s.line?.areaOpacity ?? (stacked ? 0.35 : 0);
     const refs = markLines(s);
     const shaped = table.dims.length >= 2 ? grid(table) : null;
+    const box = gridBox(s, lg, zoom);
+    // The highest point's pin stands 46px above it: room for it under the legend and the toolbox.
+    if (variant === 'markers') box['top'] = (box['top'] as number) + 30;
     const option: EOption = {
       legend: lg,
-      grid: gridBox(s, lg, zoom),
+      grid: box,
       tooltip: tooltip(s, 'axis', share ? '%' : unitOf(s)),
       xAxis: axisFrom({ type: 'category', data: xs, boundaryGap: false }, s.xAxis, false),
       yAxis: valueAxis,
@@ -654,9 +657,11 @@ function pie(variant: 'rose' | 'half'): Builder {
         itemStyle: { borderRadius: 4, borderWidth: 1 },
         avoidLabelOverlap: true,
         label: {
-          // The name is cut, never the share: cut by the label's width, "Home and garden 19%" lost its 19%.
-          ...labelOption(s, !lg, 'outside'), width: 170, overflow: 'truncate', ellipsis: '…',
-          formatter: (p: { name: string; percent: number }) => `${shortLabel(p.name, 18)} ${Math.round(p.percent)}%`,
+          // The share first, then the name, cut to the room ECharts finds between the ring and the
+          // edge (no fixed width: a set width overrides that, and a label ran off a narrow chart).
+          // Cut from the end, the name goes and the share stays; the tooltip has the whole of it.
+          ...labelOption(s, !lg, 'outside'), overflow: 'truncate', ellipsis: '…',
+          formatter: (p: { name: string; percent: number }) => `${Math.round(p.percent)}% ${shortLabel(p.name, 24)}`,
         },
         data: xs.map((name, i) => ({ name, value: values[i] })),
       }],
@@ -686,7 +691,7 @@ const nestedPie: Builder = (table, s, theme) => {
       { type: 'pie', radius: [0, `${s.pie?.inner ?? 34}%`], data: inner,
         // Named inside the slice only where the slice is wide enough to hold the name.
         label: { position: 'inner', fontSize: labelPx(s), width: 90, overflow: 'truncate', formatter: (p: { name: string; percent: number }) => (p.percent >= 9 ? p.name : '') }, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
-      { type: 'pie', radius: [`${(s.pie?.inner ?? 34) + 8}%`, `${s.pie?.outer ?? 72}%`], label: { show: s.labels?.show ?? outer.length <= 16, fontSize: labelPx(s), width: 120, overflow: 'truncate' }, data: outer, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
+      { type: 'pie', radius: [`${(s.pie?.inner ?? 34) + 8}%`, `${s.pie?.outer ?? 72}%`], label: { show: s.labels?.show ?? outer.length <= 16, fontSize: labelPx(s), overflow: 'truncate', ellipsis: '…' }, data: outer, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
     ],
   }, click => {
     const at = click.dataIndex;
