@@ -1,5 +1,5 @@
 import type { WidgetVisualization } from '../analytics.service';
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 import { CATEGORIES, KINDS, KindCategory, KindInfo } from '../widget-kinds';
 import { ChartTable, tableOf } from './chart-table';
 

@@ -3,6 +3,14 @@
    ("table", "hidden", "italic") would be read as utilities and grow every page's stylesheet. */
 @source not "./app/features/developer/content";
 @source not "../public/developer";
+/* Code review 2026-10-07: tests, their fixtures and the repository's scripts and docs are not the app; their class-like
+   words ("hidden", "table", "flex-1" in a spec's selector or a doc's prose) must not become utilities in every page's CSS. */
+@source not "./**/*.spec.ts";
+@source not "./app/characterisation";
+@source not "./app/shared/testing";
+@source not "../e2e";
+@source not "../docs";
+@source not "../scripts";
 
 /* ---------------------------------------------------------------------------
    Design tokens -- the Compass palette.

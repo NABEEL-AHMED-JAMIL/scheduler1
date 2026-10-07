@@ -1,4 +1,4 @@
-import type { Mark, WidgetView } from '../dashboard';
+import type { Mark, WidgetView } from '../widget-view';
 import type { Pick } from './chart-options';
 
 /**

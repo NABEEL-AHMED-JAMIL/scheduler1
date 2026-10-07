@@ -2,7 +2,7 @@ import { Component, inject } from '@angular/core';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { WidgetChart } from '../widget-chart';
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 import { KindPicker } from './kind-picker';
 import { ChartSettings } from './chart-settings';
 

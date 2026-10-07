@@ -8,7 +8,7 @@ import { ChartThemes } from '../../../shared/charts/echart/chart-themes';
 import { themeLabel, toHex, toRgb } from '../../../shared/charts/echart/echart-theme';
 import { ChartTokens } from '../../../shared/charts/echart/chart-tokens';
 import { WidgetChart } from '../widget-chart';
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 import { kindInfo } from '../widget-kinds';
 import { AxisSettings, ChartSettings, LabelColor, NumberStyle, SettingGroup, compactSettings, parseSettings, settingGroups } from './chart-settings';
 

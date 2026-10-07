@@ -3,7 +3,7 @@ import { fitIssues } from './chart-fit';
 import { ECHART_KIND_IDS, KINDS, KIND_IDS } from '../widget-kinds';
 import { KIND_ICONS } from './kind-icons';
 import type { EChartKind } from '../analytics.service';
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 
 /**
  * The fit rules of every ECharts kind: for each, a result it draws and the results it refuses,

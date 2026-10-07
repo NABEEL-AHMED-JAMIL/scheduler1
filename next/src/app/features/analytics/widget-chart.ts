@@ -23,7 +23,7 @@ import { ChartSettings } from './charts/chart-settings';
 import { naturalHeight, optionFor, pickerOf } from './charts/chart-options';
 import { markFor } from './charts/mark-pick';
 import { tableOf } from './charts/chart-table';
-import type { Mark, WidgetView } from './dashboard';
+import type { Mark, WidgetView } from './widget-view';
 
 /** How many rows a tile's table shows; the rest are one click away. */
 export const WIDGET_ROWS = 8;

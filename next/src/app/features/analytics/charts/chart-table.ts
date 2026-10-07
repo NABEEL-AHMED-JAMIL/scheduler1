@@ -1,4 +1,4 @@
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 import { SERVER_ZONE, instantOf } from '../../../core/instant';
 
 /**

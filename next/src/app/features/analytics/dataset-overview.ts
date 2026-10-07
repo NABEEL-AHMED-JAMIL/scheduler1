@@ -11,7 +11,7 @@ import { dayLabel, formatDuration } from '../../shared/ui/time-format';
 import { AnalyticsService, AnalysisRequest, DatasetOverview as OverviewData, DatasetProfile, OverviewChart } from './analytics.service';
 import { AnalyticsWidget, WidgetState } from './analytics-widget';
 import { WidgetChart } from './widget-chart';
-import { analysisView, WidgetView } from './dashboard';
+import { analysisView, WidgetView } from './widget-view';
 
 /** A chart on the overview, drawn: the server's chart plus the view the tile renders. */
 interface OverviewTile { chart: OverviewChart; view: WidgetView | null; kind: string; }

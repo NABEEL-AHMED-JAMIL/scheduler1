@@ -3,7 +3,7 @@ import { EOption, OptionTheme, Pick, chartOption, pickerOf } from './chart-optio
 import { markFor } from './mark-pick';
 import type { EChartKind } from '../analytics.service';
 import type { EChartClick } from '../../../shared/charts/echart/echart';
-import type { Mark, WidgetView } from '../dashboard';
+import type { Mark, WidgetView } from '../widget-view';
 
 /**
  * A click on an ECharts mark, from the event ECharts hands over to the Mark the board narrows on

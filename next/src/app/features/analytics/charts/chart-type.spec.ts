@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
 import type { EChartKind } from '../analytics.service';
-import { queryView, WidgetView } from '../dashboard';
+import { queryView, WidgetView } from '../widget-view';
 import { WidgetChart } from '../widget-chart';
 import { ChartTable, TableDim } from './chart-table';
 import { EOption, OptionTheme, chartOption } from './chart-options';

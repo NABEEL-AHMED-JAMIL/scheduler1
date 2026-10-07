@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 import { KIND_IDS } from '../widget-kinds';
 import type { ChartTable, TableDim } from './chart-table';
 import { kindMenu, matches, preferredKinds, suggestedKinds } from './kind-menu';

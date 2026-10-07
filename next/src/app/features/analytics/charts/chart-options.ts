@@ -1,5 +1,5 @@
 import type { EChartKind } from '../analytics.service';
-import type { WidgetView } from '../dashboard';
+import type { WidgetView } from '../widget-view';
 import { compactNumber, readableCell } from '../../../shared/charts/number-format';
 import { shortLabel } from '../../../shared/charts/short-label';
 import { dayLabel } from '../../../shared/ui/time-format';
