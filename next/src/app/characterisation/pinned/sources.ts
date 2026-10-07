@@ -30,7 +30,7 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Against",
       "Payload",
-      "{\"case_id\": \"WC-1001\", \"patient\": {\"mrn\": \"M-77\"}}"
+      "{\"record_id\": \"R-1001\", \"customer\": {\"id\": \"C-77\"}}"
     ],
     "links": [],
     "items": []

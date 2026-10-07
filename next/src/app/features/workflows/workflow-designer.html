@@ -261,7 +261,7 @@
                     @if (s.type === 'condition') {
                       <div>
                         <label class="label" for="st-field">Field of the request</label>
-                        <input id="st-field" class="input font-mono" placeholder="amount, or patient.age" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
+                        <input id="st-field" class="input font-mono" placeholder="amount, or customer.tier" [ngModel]="s.condition?.field" (ngModelChange)="setCondition('field', $event)" />
                       </div>
                       <div class="grid grid-cols-2 gap-3">
                         <div>

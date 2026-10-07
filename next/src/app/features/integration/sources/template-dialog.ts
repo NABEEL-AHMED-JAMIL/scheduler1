@@ -21,7 +21,7 @@ export interface TemplateGroup { key: string; label: string; hint: string; templ
 
 /**
  * The contracts a workspace may install (MIG-233): the generic ones first (record_intake, image_measurement_result),
- * then the examples for one domain (wound_intake, wound_result). Installing makes the template the workspace's own
+ * then any examples (group "example"; the product ships none). Installing makes the template the workspace's own
  * contract with v1 active; the service refuses a name the workspace already has. Closes with whether anything was
  * installed.
  */

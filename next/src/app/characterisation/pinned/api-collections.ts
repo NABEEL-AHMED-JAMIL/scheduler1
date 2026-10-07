@@ -46,10 +46,10 @@ export const PINNED: Record<string, unknown> = {
       "Folder",
       "Method",
       "Name *(required)",
-      "Patients API",
+      "Orders API",
       "URL *(required)",
       "What it returns, and for what",
-      "{{baseUrl}}/v1/patients"
+      "{{baseUrl}}/v1/orders"
     ],
     "links": [],
     "items": []

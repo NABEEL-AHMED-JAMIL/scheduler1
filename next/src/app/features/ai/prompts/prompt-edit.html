@@ -42,7 +42,7 @@
         <fieldset class="form-lock" [disabled]="locked()">
         <div class="form-grid">
           <app-field label="Name" for="pName" [required]="true" [control]="form.get('name')" [submitted]="submitted()">
-            <input id="pName" class="input" formControlName="name" placeholder="Summarise claim file" />
+            <input id="pName" class="input" formControlName="name" placeholder="Summarise a document" />
           </app-field>
           <app-field label="Description" for="pDesc" [control]="form.get('description')" [submitted]="submitted()">
             <input id="pDesc" class="input" formControlName="description" placeholder="What this prompt is for" />
@@ -68,13 +68,13 @@
         <app-field label="System instructions" for="pSystem" [control]="form.get('systemInstructions')" [submitted]="submitted()"
                    hint="Who the model is and how it should behave — the same for every run.">
           <textarea id="pSystem" class="input resize-y min-h-20" formControlName="systemInstructions"
-                    placeholder="You are a claims analyst for a US health network. Be terse. Never invent a claim number."></textarea>
+                    placeholder="You are an analyst. Be terse. Never invent a value the document does not hold."></textarea>
         </app-field>
 
         <app-field label="Message template" for="pTemplate" [required]="true" [control]="form.get('userTemplate')" [submitted]="submitted()"
                    hint="What is sent each run, with the variables filled in. Type {{ '{{' }}name{{ '}}' }} or click a variable to insert it.">
           <textarea #templateBox id="pTemplate" class="input resize-y min-h-32 mono" formControlName="userTemplate"
-                    placeholder="Claim {{ '{{' }}claim_id{{ '}}' }}. Summarise the attached file in four keys: diagnosis, procedures, total_billed, flags.&#10;&#10;{{ '{{' }}document_text{{ '}}' }}"></textarea>
+                    placeholder="Record {{ '{{' }}record_id{{ '}}' }}. Summarise the attached file in four keys: summary, items, total, flags.&#10;&#10;{{ '{{' }}document_text{{ '}}' }}"></textarea>
           <div class="flex flex-wrap items-center gap-1 mt-1.5">
             <span class="text-xs text-[color:var(--text-muted)]">Insert:</span>
             @for (name of declaredNames(); track name) {
@@ -102,7 +102,7 @@
                 <tbody>
                   @for (g of variables.controls; track g; let i = $index) {
                     <tr [formGroupName]="i">
-                      <td><input class="input mono min-w-28" formControlName="name" placeholder="claim_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()"
+                      <td><input class="input mono min-w-28" formControlName="name" placeholder="record_id" [attr.aria-label]="'Variable ' + (i + 1) + ' name'" (input)="onVariableChanged()"
                                  [class.input-invalid]="(submitted() || g.get('name')!.touched) && g.get('name')!.invalid"
                                  [attr.aria-invalid]="(submitted() || g.get('name')!.touched) && g.get('name')!.invalid ? 'true' : null"
                                  [attr.aria-describedby]="submitted() && variables.invalid ? 'pVarsError' : null" /></td>
@@ -170,7 +170,7 @@
           <app-field label="Output schema" for="pSchema" [control]="form.get('outputSchema')" [submitted]="submitted()"
                      hint='A JSON object with "required": [keys] (or "properties"). Blank accepts any JSON object.'>
             <textarea id="pSchema" class="input resize-y min-h-20 mono" formControlName="outputSchema"
-                      placeholder='{ "required": ["diagnosis", "procedures", "total_billed", "flags"] }'></textarea>
+                      placeholder='{ "required": ["summary", "items", "total", "flags"] }'></textarea>
           </app-field>
         }
         <div class="form-grid">

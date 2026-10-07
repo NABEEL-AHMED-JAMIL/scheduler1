@@ -28,7 +28,7 @@ import { BillingApi } from './billing.service';
       } @else {
       <form [formGroup]="form" class="form-stack" (ngSubmit)="save()">
         <app-field label="Legal name" for="baName" [required]="true" [control]="form.get('legalName')" [submitted]="submitted()">
-          <input id="baName" class="input" formControlName="legalName" placeholder="MedAxis Care Network Ltd" />
+          <input id="baName" class="input" formControlName="legalName" placeholder="Example Company Ltd" />
         </app-field>
         <app-field label="Address" for="baAddress" [control]="form.get('address')" [submitted]="submitted()">
           <textarea id="baAddress" class="input" rows="3" formControlName="address" placeholder="Street, city, country"></textarea>

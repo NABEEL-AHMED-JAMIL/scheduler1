@@ -42,7 +42,7 @@ export interface TaskReferenceDialogData {
                    [control]="form.get('name')" [submitted]="submitted()"
                    hint="What a task's dropdown shows. Unique in its workspace.">
           <input id="refName" class="input" formControlName="name" maxlength="255"
-                 [placeholder]="isHomePage ? 'Claims portal' : 'Nightly loads'" />
+                 [placeholder]="isHomePage ? 'Customer portal' : 'Nightly loads'" />
         </app-field>
 
         <app-field [label]="isHomePage ? 'Address' : 'Value'" for="refValue" [required]="isHomePage"
@@ -51,7 +51,7 @@ export interface TaskReferenceDialogData {
                    [errorMessages]="{ url: 'Enter an address that starts with http:// or https://.' }">
           <input id="refValue" class="input" [class.mono]="isHomePage" formControlName="value"
                  [type]="isHomePage ? 'url' : 'text'"
-                 [placeholder]="isHomePage ? 'https://claims.example.com' : ''" />
+                 [placeholder]="isHomePage ? 'https://portal.example.com' : ''" />
         </app-field>
 
         <app-field label="Description" for="refDescription"

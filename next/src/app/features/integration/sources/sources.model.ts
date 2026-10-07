@@ -20,7 +20,7 @@ export const FORMATS = ['CSV', 'JSON', 'JSONL', 'PARQUET'] as const;
 export const SSL_MODES = ['REQUIRE', 'PREFER', 'DISABLE'] as const;
 export const DIRECTIONS = ['IN', 'OUT'] as const;
 /** Free text on the service; the levels the data policies are written for. */
-export const SENSITIVITIES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'] as const;
+export const SENSITIVITIES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as const;
 
 const KIND_LABELS: Record<string, string> = { API: 'API', FILE: 'File', BUCKET: 'Bucket folder', DATABASE: 'Database' };
 const KIND_ICONS: Record<string, string> = { API: 'plug', FILE: 'file', BUCKET: 'folder', DATABASE: 'database' };
@@ -144,7 +144,7 @@ export interface ContractRow {
   activeVersion?: number | null;
   /** MIG-243: the level the service reads it as -- public, internal or sensitive. */
   sensitivity?: string | null;
-  /** MIG-243: the word it was given (PHI, CONFIDENTIAL...), kept beside the level; null when none was. */
+  /** MIG-243: the word it was given (CONFIDENTIAL, RESTRICTED...), kept beside the level; null when none was. */
   sensitivityLabel?: string | null;
   /** A shared system contract (result_manifest): read and validated against by everyone, changed by no one. */
   system: boolean;

@@ -21,7 +21,7 @@
         </div>
         <div class="form-grid">
           <app-field label="Name" for="apiName" [required]="true">
-            <input id="apiName" class="input" [value]="e.name" placeholder="Patients API" (input)="patch({ name: $any($event.target).value })" />
+            <input id="apiName" class="input" [value]="e.name" placeholder="Orders API" (input)="patch({ name: $any($event.target).value })" />
           </app-field>
           <app-field label="Folder" for="apiFolder">
             <select id="apiFolder" class="input" [value]="e.folderId ?? ''" (change)="patch({ folderId: $any($event.target).value ? +$any($event.target).value : null })">

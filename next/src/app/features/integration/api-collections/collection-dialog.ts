@@ -37,7 +37,7 @@ type AuthBlocks = Record<string, Record<string, string>>;
         }
         <div class="form-grid">
           <app-field label="Name" for="acName" [required]="true">
-            <input id="acName" class="input" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="Healthcare APIs" />
+            <input id="acName" class="input" [value]="name()" (input)="name.set($any($event.target).value)" placeholder="Orders APIs" />
           </app-field>
           <app-field label="Sensitivity" for="acSensitivity" hint="The data policy for this level applies to what its APIs return.">
             <select id="acSensitivity" class="input" [value]="sensitivity()" (change)="sensitivity.set($any($event.target).value)">

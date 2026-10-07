@@ -141,7 +141,7 @@ export class ContractPanel {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
 
-  readonly payloadPlaceholder = '{"case_id": "WC-1001", "patient": {"mrn": "M-77"}}';
+  readonly payloadPlaceholder = '{"record_id": "R-1001", "customer": {"id": "C-77"}}';
   readonly contract = signal<ContractRow>(this.data.contract);
   readonly versions = signal<ContractVersionRow[]>([]);
   readonly selected = signal<number | null>(null);

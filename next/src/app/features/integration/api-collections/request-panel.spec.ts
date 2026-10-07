@@ -168,7 +168,7 @@ describe('RequestPanel -- the panel', () => {
     screen.patch({ bodyType: 'MULTIPART' });
     fixture.detectChanges();
     expect(el.textContent).toContain('a file from one of this workspace\'s storage connections');
-    expect((el.querySelector('#apiBody') as HTMLTextAreaElement).placeholder).toContain('"file": {"bucket": "claims"');
+    expect((el.querySelector('#apiBody') as HTMLTextAreaElement).placeholder).toContain('"file": {"bucket": "intake"');
     screen.patch({ bodyType: 'BINARY' });
     fixture.detectChanges();
     expect(el.textContent).toContain('One file from this workspace\'s storage, sent as the whole body');

@@ -26,7 +26,7 @@ export interface CollectionRow {
   sourceFormat?: string | null;
   /** MIG-243: the level the service reads it as -- public, internal or sensitive (internal when nothing was given). */
   sensitivity?: string | null;
-  /** MIG-243: the word it was given (PHI, CONFIDENTIAL...), kept beside the level; null when none was. */
+  /** MIG-243: the word it was given (CONFIDENTIAL, RESTRICTED...), kept beside the level; null when none was. */
   sensitivityLabel?: string | null;
   currentVersion?: number | null;
   status?: string | null;
@@ -189,7 +189,7 @@ export const PAGING_LABELS: Record<string, string> = {
   NONE: 'None', PAGE: 'Page number', CURSOR: 'Cursor', LINK: 'Link header', NEXT_URL: 'Next URL in the answer', OFFSET: 'Offset',
 };
 /** Free text on the service (32 characters); these are the levels the data policies are written for. */
-export const SENSITIVITIES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'] as const;
+export const SENSITIVITIES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as const;
 
 const AUTH_LABELS: Record<string, string> = {
   INHERIT: 'From the collection', NONE: 'None', BEARER: 'Bearer token', BASIC: 'Basic', APIKEY: 'API key', OAUTH2: 'OAuth2 client credentials',
@@ -198,7 +198,7 @@ const BODY_LABELS: Record<string, string> = {
   NONE: 'None', JSON: 'JSON', TEXT: 'Text', XML: 'XML', FORM_URLENCODED: 'Form (URL-encoded)', MULTIPART: 'Multipart', BINARY: 'Binary', GRAPHQL: 'GraphQL',
 };
 const SOURCE_LABELS: Record<string, string> = { MANUAL: 'Made here', POSTMAN: 'Postman', BRUNO: 'Bruno', OPENAPI: 'OpenAPI' };
-const SENSITIVITY_LABELS: Record<string, string> = { PUBLIC: 'Public', INTERNAL: 'Internal', CONFIDENTIAL: 'Confidential', PHI: 'PHI' };
+const SENSITIVITY_LABELS: Record<string, string> = { PUBLIC: 'Public', INTERNAL: 'Internal', CONFIDENTIAL: 'Confidential', RESTRICTED: 'Restricted', PHI: 'PHI' };
 
 export const authLabel = (mode: string | null | undefined) => AUTH_LABELS[String(mode ?? '')] ?? String(mode ?? '—');
 export const bodyLabel = (type: string | null | undefined) => BODY_LABELS[String(type ?? '')] ?? String(type ?? '—');
