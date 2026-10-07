@@ -25,7 +25,8 @@
 /* A tile's "8 rows · ran 21:26:48" is right-aligned, so a change in its length moved its start: a
    box of fixed width, laid out right to left so the words' start is their right edge (the words
    themselves stay left to right, isolated in their own span). */
-.dash-count { min-width: min(12rem, 100%); direction: rtl; text-align: start; }
+/* Figures of one width (tabular), so "ran 22:15:16" and "ran 22:15:17" are one length too. */
+.dash-count { min-width: min(12rem, 100%); direction: rtl; text-align: start; font-variant-numeric: tabular-nums; }
 .dash-count > span { unicode-bidi: isolate; }
 
 /* ---- a tile's menu, with its "Show as" grid --------------------------------------------------
