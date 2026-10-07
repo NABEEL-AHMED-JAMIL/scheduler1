@@ -60,11 +60,15 @@ async function openBoard(page: Page, name: string) {
 }
 
 /**
- * The chart kinds of one tile: they live in its menu, under "Show as", one item per kind with
- * the kind id in data-kind. Opens the menu and hands back the items.
+ * The chart kinds of one tile: they live in its menu, under "All charts", one item per kind with
+ * the kind id in data-kind (the suggestions above them are .dash-suggested). Opens the menu,
+ * unfolds the categories in which nothing fits, and hands back the items. A kind that cannot draw
+ * the result is aria-disabled -- focusable, so its reason can be read -- not disabled.
  */
 async function kindsOf(page: Page, title: string) {
   await page.getByRole('button', { name: `Actions for ${title}` }).click();
+  const misfits = page.locator('button.dash-misfits');
+  if (await misfits.count() && await misfits.getAttribute('aria-checked') === 'false') await misfits.click();
   return page.locator('button.dash-kind');
 }
 
@@ -138,14 +142,16 @@ test('the picker offers every kind, and disables the ones this result cannot hon
     const items = await kindsOf(page, 'Total revenue');
     const kinds = await items.evaluateAll(buttons => buttons.map(button => ({
       value: (button as HTMLButtonElement).dataset['kind']!,
-      disabled: (button as HTMLButtonElement).disabled,
+      disabled: button.getAttribute('aria-disabled') === 'true',
     })));
 
     // Against the list the picker is built from, not a number written here. This said
     // "Fourteen: the original four, seven chart kinds, and three summaries" and was already wrong
     // by two -- shareStacked and pivot had been added and the sentence was not -- so the spec
     // failed on whatever change happened to run next and read as that change's regression.
-    expect(kinds.map(kind => kind.value)).toEqual(KIND_IDS);
+    // Sorted: the menu lists what fits first in each category (2026-10-06), so its order is the
+    // result's, not the catalogue's. Every kind, once.
+    expect(kinds.map(kind => kind.value).sort()).toEqual([...KIND_IDS].sort());
     const enabled = kinds.filter(kind => !kind.disabled).map(kind => kind.value);
     // One row, one column, no dimension: a single figure, a table, and a gauge (one figure against
     // a target, ECharts, 2026-10-06) -- and nothing else honestly.
@@ -176,10 +182,11 @@ test('a dimension-ordered series offers a line; a rank-ordered one refuses with 
     await expect(page.getByText('Revenue by month', { exact: true })).toBeVisible();
     await page.waitForTimeout(6000);
 
-    // The DOM property: the menu disables the button itself, and says why in its title.
+    // aria-disabled, not the DOM property: a kind that does not fit stays focusable so its reason
+    // can be read, and says why in its title.
     const kinds = await kindsOf(page, 'Revenue by month');
-    await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveJSProperty('disabled', false);
-    await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveJSProperty('disabled', true);
+    await expect(kinds.and(page.locator('[data-kind="line"]'))).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveAttribute('aria-disabled', 'true');
     await expect(kinds.and(page.locator('[data-kind="stacked"]')))
       .toHaveAttribute('title', /second dimension/);
   });
@@ -191,9 +198,9 @@ test('a two-dimension cross-tab is the one that may be stacked', async ({ page }
   await page.waitForTimeout(6000);
 
   const kinds = await kindsOf(page, 'Revenue by category and region');
-  await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveJSProperty('disabled', false);
+  await expect(kinds.and(page.locator('[data-kind="stacked"]'))).not.toHaveAttribute('aria-disabled', 'true');
   // Sorted biggest-first, so a line through them would draw the sort.
-  await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveJSProperty('disabled', true);
+  await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveAttribute('aria-disabled', 'true');
 });
 
 /**

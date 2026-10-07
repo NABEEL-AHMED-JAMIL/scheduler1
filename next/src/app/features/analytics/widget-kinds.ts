@@ -31,10 +31,33 @@ export type KindCategory =
 export interface KindInfo {
   id: WidgetVisualization;
   label: string;
+  /** A word or two under the kind's glyph in the tile menu's grid, where the label does not fit. */
+  short: string;
   category: KindCategory;
   engine: 'svg' | 'echarts';
   needs: string;
 }
+
+/**
+ * The label under a kind's glyph in a tile's "Show as" grid, about 90px wide. Each is a word of
+ * its label where one will do, so the accessible name (which starts with it) and the words on
+ * screen agree. Distinct, so two tiles never read the same.
+ */
+const SHORT: Record<WidgetVisualization, string> = {
+  kpi: 'Figure', table: 'Table', pivot: 'Cross-tab', comparison: 'Two figures',
+  ranked: 'Ranked', rankedShare: 'Ranked share', bar: 'Bars', stacked: 'Stacked', shareStacked: 'Share stack',
+  groupedBar: 'Side by side', barH: 'Horizontal', waterfall: 'Waterfall', pareto: 'Pareto', barLine: 'Bars + line',
+  polarBar: 'Polar', pictorialBar: 'Pictorial',
+  line: 'Line', area: 'Area', cumulative: 'Running total', lineSmooth: 'Smooth', lineStep: 'Stepped',
+  lineMarkers: 'Min, max', areaStacked: 'Stacked area', areaShare: '100% area',
+  donut: 'Donut', rose: 'Rose', halfDonut: 'Half donut', nestedPie: 'Nested pie',
+  scatter: 'Scatter', scatterTrend: 'Trend line', bubble: 'Bubbles', effectScatter: 'Top five',
+  histogram: 'Histogram', boxplot: 'Box plot', density: 'Density',
+  treemap: 'Treemap', sunburst: 'Sunburst', tree: 'Tree',
+  sankey: 'Sankey', chord: 'Chord', heatmap: 'Heatmap', calendar: 'Calendar',
+  funnel: 'Funnel', gauge: 'Gauge', radar: 'Radar', parallel: 'Parallel', themeRiver: 'River', candlestick: 'Candles',
+  dimensionSummary: 'Groups', trendSummary: 'Trend', distributionSummary: 'Spread',
+};
 
 /** The categories in picker order. */
 export const CATEGORIES: KindCategory[] = [
@@ -43,9 +66,9 @@ export const CATEGORIES: KindCategory[] = [
 ];
 
 const svg = (id: WidgetVisualization, label: string, category: KindCategory, needs: string): KindInfo =>
-  ({ id, label, category, engine: 'svg', needs });
+  ({ id, label, short: SHORT[id], category, engine: 'svg', needs });
 const ec = (id: WidgetVisualization, label: string, category: KindCategory, needs: string): KindInfo =>
-  ({ id, label, category, engine: 'echarts', needs });
+  ({ id, label, short: SHORT[id], category, engine: 'echarts', needs });
 
 const ONE_DIM = 'A text column and a number';
 const ORDERED = 'An ordered column (a date or a sequence) and a number';

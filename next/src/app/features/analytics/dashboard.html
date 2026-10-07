@@ -271,36 +271,86 @@
               <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
                                     [state]="stateOf(run)" [busy]="updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
-                  <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"><app-icon name="dots" size="1em" /></button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"
+                          (cdkMenuOpened)="kindMenuOpened()"><app-icon name="dots" size="1em" /></button>
                   <ng-template #tileMenu>
                     <!-- "Show as" is a section of this menu rather than a submenu: a CDK submenu opens on
-                         hover and a click on its trigger then closed it again. Every kind is listed in
-                         the picker's order; one this result cannot honestly be drawn as stays in the
-                         list, inert, with the reason under it. -->
-                    <div cdkMenu class="card shadow-xl py-1 w-72 max-h-[70vh] overflow-y-auto text-sm">
+                         hover and a click on its trigger then closed it again. A grid of glyphs rather than
+                         a list of 51 lines (owner, 2026-10-06): the kinds that suit this result first, then
+                         every kind by category, those that cannot draw it dimmed at the end of theirs with
+                         the reason in the tooltip and the description -- never as a second line. The search,
+                         the suggestions and the actions stay put; only "All charts" scrolls. Arrow keys move
+                         across the grid (kindMenuKey), Enter applies, Escape closes, typing searches. -->
+                    <div cdkMenu class="card shadow-xl text-sm dash-tile-menu" [class.has-kinds]="!!shown">
+                      <div class="dash-menu-panel" tabindex="-1" (keydown)="kindMenuKey($event)">
                       @if (shown; as view) {
-                        <button cdkMenuItem class="menu-item dash-choose" (cdkMenuItemTriggered)="openKindPicker(widget, view)"><app-icon name="chart" />Choose a chart, with a preview…</button>
-                        <button cdkMenuItem class="menu-item dash-settings" (cdkMenuItemTriggered)="openChartSettings(widget, view)"><app-icon name="settings" />Chart settings…</button>
-                        <div class="my-1 border-t border-subtle"></div>
-                        <p class="px-3 pt-1.5 pb-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-muted)]" [id]="'kinds-' + widget.analyticsDashboardWidgetId">Show as</p>
-                        <div cdkMenuGroup [attr.aria-labelledby]="'kinds-' + widget.analyticsDashboardWidgetId">
-                          @for (kind of kinds; track kind.id; let at = $index) {
-                            @if (startsCategory(at)) { <p class="px-3 pt-2 pb-0.5 text-[11px] text-[color:var(--text-muted)]" aria-hidden="true">{{ kind.category }}</p> }
-                            <button cdkMenuItemRadio class="menu-item items-start dash-kind" [attr.data-kind]="kind.id"
-                                    [cdkMenuItemChecked]="kind.id === drawn(widget, view)" [cdkMenuItemDisabled]="!!view.issues[kind.id]" [disabled]="!!view.issues[kind.id]"
-                                    [title]="view.issues[kind.id] || kind.label" (cdkMenuItemTriggered)="setVisualization(widget, kind.id)">
-                              <app-icon name="check" size="0.9em" class="mt-0.5 shrink-0" [class.invisible]="kind.id !== drawn(widget, view)" />
-                              <span class="min-w-0">
-                                <span class="block">{{ kind.label }}</span>
-                                @if (view.issues[kind.id]) { <span class="block text-[11px] leading-snug text-[color:var(--text-muted)] whitespace-normal">{{ view.issues[kind.id] }}</span> }
-                              </span>
+                        @let menu = kindMenuOf(widget, view);
+                        @let wid = widget.analyticsDashboardWidgetId;
+                        <div class="dash-menu-head">
+                          <button cdkMenuItem class="menu-item dash-choose" (cdkMenuItemTriggered)="openKindPicker(widget, view)"><app-icon name="chart" />Choose a chart, with a preview…</button>
+                          <button cdkMenuItem class="menu-item dash-settings" (cdkMenuItemTriggered)="openChartSettings(widget, view)"><app-icon name="settings" />Chart settings…</button>
+                          <div class="my-1 border-t border-subtle"></div>
+                          <div class="px-2 pb-1">
+                            <div class="search-field">
+                              <app-icon name="search" size="0.9em" />
+                              <input type="search" class="input input-sm dash-kind-search" placeholder="Search charts" aria-label="Search chart types by name or category"
+                                     autocomplete="off" [value]="kindQuery()" (input)="kindQuery.set($any($event.target).value)" />
+                            </div>
+                          </div>
+                          @if (menu.suggested.length) {
+                            <p class="dash-kinds-heading" [id]="'kinds-s-' + wid">Suggested for this data</p>
+                            <div cdkMenuGroup class="dash-kind-grid is-suggested" data-cols="3" [attr.aria-labelledby]="'kinds-s-' + wid">
+                              @for (tile of menu.suggested; track tile.kind.id) {
+                                <button cdkMenuItemRadio class="dash-tile dash-suggested" [attr.data-kind]="tile.kind.id" [class.is-on]="tile.current"
+                                        [cdkMenuItemChecked]="tile.current" [attr.aria-label]="tile.kind.short + (tile.current ? ', current' : '')"
+                                        [title]="tile.kind.label" (cdkMenuItemTriggered)="setVisualization(widget, tile.kind.id)">
+                                  <svg viewBox="0 0 24 24" class="dash-tile-glyph" aria-hidden="true"><path [attr.d]="kindIcon(tile.kind.id)" /></svg>
+                                  <span class="dash-tile-label">{{ tile.kind.short }}</span>
+                                  @if (tile.current) { <app-icon name="check" size="0.75em" class="dash-tile-tick" aria-hidden="true" /> }
+                                </button>
+                              }
+                            </div>
+                          }
+                        </div>
+                        <div class="dash-menu-scroll">
+                          <p class="dash-kinds-heading" [id]="'kinds-' + wid">{{ kindQuery().trim() ? 'Charts matching "' + kindQuery().trim() + '"' : 'All charts' }}</p>
+                          @for (group of menu.groups; track group.category; let g = $index) {
+                            <p class="dash-kinds-category" [id]="'kinds-' + wid + '-' + g">{{ group.category }}</p>
+                            <div cdkMenuGroup class="dash-kind-grid" data-cols="4" [attr.aria-labelledby]="'kinds-' + wid + '-' + g">
+                              @for (tile of group.tiles; track tile.kind.id) {
+                                <button cdkMenuItemRadio class="dash-tile dash-kind" [attr.data-kind]="tile.kind.id" [class.is-on]="tile.current" [class.is-off]="!!tile.why"
+                                        [cdkMenuItemChecked]="tile.current" [cdkMenuItemDisabled]="!!tile.why"
+                                        [attr.aria-label]="tile.kind.short + (tile.current ? ', current' : '') + (tile.why ? ', doesn\'t fit' : '')"
+                                        [attr.aria-describedby]="tile.why ? 'why-' + wid + '-' + tile.kind.id : null"
+                                        [title]="tile.why || tile.kind.label" (cdkMenuItemTriggered)="setVisualization(widget, tile.kind.id)">
+                                  <svg viewBox="0 0 24 24" class="dash-tile-glyph" aria-hidden="true"><path [attr.d]="kindIcon(tile.kind.id)" /></svg>
+                                  <span class="dash-tile-label">{{ tile.kind.short }}</span>
+                                  @if (tile.current) { <app-icon name="check" size="0.75em" class="dash-tile-tick" aria-hidden="true" /> }
+                                  @if (tile.why) { <span class="sr-only" [id]="'why-' + wid + '-' + tile.kind.id">Needs {{ lowerFirst(tile.kind.needs) }}. {{ tile.why }}</span> }
+                                </button>
+                              }
+                            </div>
+                          }
+                          @if (!menu.matched) {
+                            <p class="px-1 py-3 text-xs text-[color:var(--text-muted)]">No chart is called "{{ kindQuery().trim() }}".</p>
+                          }
+                          @if (menu.misfitGroups && !kindQuery().trim()) {
+                            <!-- Not a cdkMenuItem: choosing one closes the menu, and this only unfolds a part of it. -->
+                            <button type="button" role="menuitemcheckbox" class="dash-misfits" tabindex="-1" [attr.aria-checked]="kindShowMisfits()"
+                                    (click)="kindShowMisfits.set(!kindShowMisfits())">
+                              <app-icon [name]="kindShowMisfits() ? 'chevronUp' : 'chevronDown'" size="0.9em" />
+                              {{ kindShowMisfits() ? 'Hide' : 'Show' }} charts that don't fit ({{ menu.misfitGroups }} {{ menu.misfitGroups === 1 ? 'group' : 'groups' }})
                             </button>
                           }
                         </div>
-                        <div class="my-1 border-t border-subtle"></div>
-                        @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
                       }
-                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
+                      <div class="dash-menu-foot" [class.has-kinds]="!!shown">
+                        @if (shown; as view) {
+                          @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
+                        }
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
+                      </div>
+                      </div>
                     </div>
                   </ng-template>
                 </ng-container>

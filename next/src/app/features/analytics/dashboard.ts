@@ -1,4 +1,4 @@
-import { Component, DestroyRef, LOCALE_ID, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subscription, from, mergeMap } from 'rxjs';
@@ -36,7 +36,9 @@ import { KindPickerData, KindPickerPanel } from './charts/kind-picker-panel';
 import { ThemePicker } from '../../shared/charts/echart/theme-picker';
 import { themeLabel } from '../../shared/charts/echart/echart-theme';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
-import { CATEGORIES, kindInfo } from './widget-kinds';
+import { kindInfo } from './widget-kinds';
+import { KindMenu, kindMenu } from './charts/kind-menu';
+import { KIND_ICONS } from './charts/kind-icons';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -1175,9 +1177,9 @@ function fileName(path: string | null | undefined): string {
   selector: 'app-dashboards',
   imports: [Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker],
   templateUrl: './dashboard.html',
+  styleUrl: './dashboard.css',
 })
 export class Dashboards implements OnInit, OnDestroy {
-  styleUrl: './dashboard.css',
 
   private readonly analytics = inject(AnalyticsService);
   /** Server times, read and written as the rest of the console does. */
@@ -1192,8 +1194,6 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly kinds = KINDS;
-  readonly categories = CATEGORIES;
   readonly heightMin = WIDGET_HEIGHT_MIN;
   readonly heightMax = WIDGET_HEIGHT_MAX;
   readonly searchFrom = SEARCH_FROM;
@@ -2166,9 +2166,127 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly boardTheme = computed(() => parseBoardSettings(this.board()?.dashboardConfig).theme ?? null);
   readonly boardThemeLabel = computed(() => themeLabel(this.boardTheme()));
 
-  /** Whether a kind starts a new category in the menu's list, so it gets a heading. */
-  startsCategory(index: number): boolean {
-    return index === 0 || this.kinds[index].category !== this.kinds[index - 1].category;
+  // ---- the tile menu's "Show as" grid ------------------------------------------------------
+
+  /** What the open tile menu's search box holds. One menu is open at a time, so one is enough. */
+  readonly kindQuery = signal('');
+  /** Whether the open menu shows the categories in which nothing fits this result. */
+  readonly kindShowMisfits = signal(false);
+  private readonly injector = inject(Injector);
+
+  /** The menu for one tile's result: suggestions, then every kind by category (charts/kind-menu.ts). */
+  kindMenuOf(widget: DashboardWidget, view: WidgetView): KindMenu {
+    return kindMenu(view, this.drawn(widget, view), this.kindQuery(), this.kindShowMisfits());
+  }
+
+  kindIcon(id: string): string {
+    return KIND_ICONS[id as WidgetVisualization] ?? '';
+  }
+
+  lowerFirst(text: string): string {
+    return text.charAt(0).toLowerCase() + text.slice(1);
+  }
+
+  /**
+   * A tile menu opened: an empty search, the folded groups folded, and -- when it was opened with
+   * the pointer, which leaves the focus on the trigger outside the overlay -- the focus on the
+   * panel, so that typing goes to the search at once.
+   */
+  kindMenuOpened(): void {
+    this.kindQuery.set('');
+    this.kindShowMisfits.set(false);
+    afterNextRender(() => {
+      const panel = document.querySelector<HTMLElement>('.dash-menu-panel');
+      if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+    }, { injector: this.injector });
+  }
+
+  /**
+   * The keyboard inside a tile menu. The CDK menu moves up and down a list; the kinds are a grid,
+   * with a search box among them, so this takes the arrows, Home and End before the menu sees
+   * them. Escape and Tab still reach the menu, which closes; Enter and Space reach the item under
+   * the focus, which applies it.
+   *
+   *   - a printable key anywhere but the search box goes to the search box;
+   *   - in the search box, every key stays there, except Down/Enter/Tab (to the first tile) and
+   *     Up/Shift+Tab (to the item above);
+   *   - on a tile, Left/Right step through the tiles in reading order, Up/Down move a row by
+   *     position (the suggestions are three across, the rest four), Home/End go to the ends;
+   *     past the first row Up goes to the search box, past the last Down to the actions below;
+   *   - on any other item, Up/Down step through the panel's stops in order.
+   */
+  kindMenuKey(event: KeyboardEvent): void {
+    const panel = event.currentTarget as HTMLElement;
+    const target = event.target as HTMLElement;
+    const search = panel.querySelector<HTMLInputElement>('.dash-kind-search');
+    if (event.key === 'Escape') return;
+    // Everything rendered is on offer: a folded group is not rendered at all, rather than hidden.
+    const stops = [...panel.querySelectorAll<HTMLElement>('.menu-item, .dash-kind-search, .dash-tile, .dash-misfits')];
+    const tiles = stops.filter(el => el.classList.contains('dash-tile'));
+    const go = (el: HTMLElement | undefined) => {
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.scrollIntoView?.({ block: 'nearest' });
+    };
+    const done = () => { event.preventDefault(); event.stopPropagation(); };
+    const after = (el: HTMLElement) => stops[stops.indexOf(el) + 1];
+    const before = (el: HTMLElement) => stops[stops.indexOf(el) - 1];
+
+    if (search && target === search) {
+      if (event.key === 'ArrowDown' || event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
+        go(tiles[0] ?? after(search)); done();
+      } else if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
+        go(before(search)); done();
+      } else {
+        // Typing stays in the box: the menu's typeahead would otherwise move the focus to an item.
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (search && event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      search.focus({ preventScroll: true });
+      this.kindQuery.set(this.kindQuery() + event.key);
+      done();
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tile = target.closest<HTMLElement>('.dash-tile');
+    if (!tile || !tiles.includes(tile)) {
+      // The panel itself (opened with the pointer), an action, or the toggle: a list.
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') return;
+      const at = stops.indexOf(target);
+      go(event.key === 'Home' ? stops[0] : event.key === 'End' ? stops[stops.length - 1]
+        : at < 0 ? stops[0]
+        : event.key === 'ArrowDown' ? stops[(at + 1) % stops.length] : stops[(at - 1 + stops.length) % stops.length]);
+      done();
+      return;
+    }
+    const index = tiles.indexOf(tile);
+    if (event.key === 'ArrowRight') go(tiles[index + 1] ?? tile);
+    else if (event.key === 'ArrowLeft') go(tiles[index - 1] ?? tile);
+    else if (event.key === 'Home') go(tiles[0]);
+    else if (event.key === 'End') go(tiles[tiles.length - 1]);
+    else {
+      // Rows from each grid's own column count (data-cols, the same number its CSS lays out), not
+      // from where the tiles are on screen: the part of "All charts" scrolled out of sight is still
+      // laid out above or below, and a position read off it would jump into the suggestions.
+      const rows: { cells: HTMLElement[]; cols: number }[] = [];
+      for (const grid of panel.querySelectorAll<HTMLElement>('.dash-kind-grid')) {
+        const cells = [...grid.querySelectorAll<HTMLElement>('.dash-tile')].filter(el => tiles.includes(el));
+        const cols = Math.max(1, Number(grid.dataset['cols']) || 1);
+        for (let i = 0; i < cells.length; i += cols) rows.push({ cells: cells.slice(i, i + cols), cols });
+      }
+      const r = rows.findIndex(row => row.cells.includes(tile));
+      const next = rows[r + (event.key === 'ArrowDown' ? 1 : -1)];
+      if (r < 0 || !next) {
+        go(event.key === 'ArrowDown' ? after(tiles[tiles.length - 1]) : before(tiles[0]));
+      } else {
+        // The same place across the row, as a fraction of it: three across above four still lines up.
+        const across = (rows[r].cells.indexOf(tile) + 0.5) / rows[r].cols;
+        go(next.cells[Math.min(next.cells.length - 1, Math.floor(across * next.cols))]);
+      }
+    }
+    done();
   }
 
   /**

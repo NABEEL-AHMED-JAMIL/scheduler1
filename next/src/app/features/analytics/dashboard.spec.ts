@@ -2376,46 +2376,157 @@ describe('a table tile shows five rows and offers the rest', () => {
 });
 
 /**
- * The chart kind used to be a <select> at the foot of every tile. It lives in the tile's menu
- * now, under "Show as", listing every kind in the picker's order with the ones this result refuses
- * inert and saying why -- and choosing one still runs nothing.
+ * The chart kind used to be a <select> at the foot of every tile, then a list of every kind in the
+ * tile's menu. It is a grid there now (owner, 2026-10-06): a search, up to six kinds suggested for
+ * this result with the current one first, then every kind by category, those that cannot draw it
+ * dimmed at the end of theirs with the reason in the tooltip and the description -- and choosing one
+ * still runs nothing.
  */
 describe('choosing how a tile is drawn, from its menu', () => {
   function overlay(): HTMLElement { return document.querySelector('.cdk-overlay-container') as HTMLElement; }
 
-  function openKinds() {
-    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+  function openKinds(kind = 'table') {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: kind })] });
     rendered.finishAnalysis();
     rendered.text();
     const el = rendered.fixture.nativeElement as HTMLElement;
     expect(el.querySelector('select.widget-kind')).toBeNull();
     el.querySelector<HTMLButtonElement>('button[aria-label="Actions for Revenue by region"]')!.click();
     rendered.fixture.detectChanges();
-    expect(overlay().textContent).toContain('Show as');
-    const kinds = [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-kind')];
-    return { ...rendered, kinds };
+    const kinds = () => [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-kind')];
+    const suggested = () => [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-suggested')];
+    const misfits = () => overlay().querySelector<HTMLButtonElement>('button.dash-misfits');
+    const search = () => overlay().querySelector<HTMLInputElement>('input.dash-kind-search')!;
+    const key = (target: HTMLElement, name: string, extra: KeyboardEventInit = {}) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...extra }));
+      rendered.fixture.detectChanges();
+    };
+    return { ...rendered, kinds, suggested, misfits, search, key };
   }
 
-  it('lists every kind, ticks the drawn one, and leaves the refused ones inert with the reason', () => {
-    const { kinds } = openKinds();
-    expect(kinds.map(item => item.dataset['kind'])).toEqual(KIND_IDS);
-    const table = kinds.find(item => item.dataset['kind'] === 'table')!;
+  it('offers every kind once, the ones that fit first in each category, after "Show charts that don\'t fit"', () => {
+    const { kinds, misfits, fixture } = openKinds();
+    const before = kinds().map(item => item.dataset['kind']);
+    // Folded: only categories with something that fits are drawn until the toggle is pressed.
+    expect(before.length).toBeLessThan(KIND_IDS.length);
+    expect(misfits()!.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(misfits()!.getAttribute('aria-checked')).toBe('false');
+    misfits()!.click();
+    fixture.detectChanges();
+    const all = kinds();
+    expect(all.map(item => item.dataset['kind']).sort()).toEqual([...KIND_IDS].sort());
+    // Within a category the dimmed ones come after every one that fits.
+    for (const grid of overlay().querySelectorAll('.dash-menu-scroll .dash-kind-grid')) {
+      const off = [...grid.querySelectorAll('.dash-kind')].map(item => item.getAttribute('aria-disabled') === 'true');
+      expect(off).toEqual([...off].sort((a, b) => Number(a) - Number(b)));
+    }
+    expect(misfits()!.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('ticks the drawn one, and leaves the refused ones inert with the reason in a tooltip and a description, not a second line', () => {
+    const { kinds, misfits, fixture } = openKinds();
+    misfits()!.click();
+    fixture.detectChanges();
+    const table = kinds().find(item => item.dataset['kind'] === 'table')!;
     expect(table.getAttribute('role')).toBe('menuitemradio');
     expect(table.getAttribute('aria-checked')).toBe('true');
+    expect(table.getAttribute('aria-label')).toBe('Table, current');
     // Two rows is not a single figure: refused, and the reason is on the item itself.
-    const kpi = kinds.find(item => item.dataset['kind'] === 'kpi')!;
-    expect(kpi.disabled).toBe(true);
-    expect(kpi.title.length).toBeGreaterThan(0);
-    expect(kpi.textContent).toContain(kpi.title);
+    const kpi = kinds().find(item => item.dataset['kind'] === 'kpi')!;
+    expect(kpi.getAttribute('aria-disabled')).toBe('true');
+    expect(kpi.classList).toContain('is-off');
+    expect(kpi.title).toMatch(/single figure needs one row/i);
+    expect(kpi.getAttribute('aria-label')).toBe("Figure, doesn't fit");
+    const described = overlay().querySelector('#' + kpi.getAttribute('aria-describedby'))!;
+    expect(described.textContent).toContain(kpi.title);
+    expect(described.textContent).toMatch(/^\s*Needs one row with one number\./);
+    // On screen, the glyph and the short name: the reason is not a visible second line.
+    expect(kpi.querySelector('.dash-tile-label')!.textContent!.trim()).toBe('Figure');
+    expect(described.classList).toContain('sr-only');
+  });
+
+  it('suggests up to six kinds that fit, the current one first and marked', () => {
+    const { suggested } = openKinds('ranked');
+    const ids = suggested().map(item => item.dataset['kind']);
+    expect(ids.length).toBeGreaterThan(1);
+    expect(ids.length).toBeLessThanOrEqual(6);
+    expect(ids[0]).toBe('ranked');
+    expect(suggested()[0].getAttribute('aria-label')).toBe('Ranked, current');
+    expect(suggested()[0].classList).toContain('is-on');
+    expect(suggested().every(item => item.getAttribute('aria-disabled') !== 'true')).toBe(true);
+    // Not the .dash-kind hook: "every kind once" stays true with the suggestions on screen too.
+    expect(suggested().some(item => item.classList.contains('dash-kind'))).toBe(false);
+  });
+
+  it('narrows to the kinds whose name or category matches the search, folded ones included', () => {
+    const { kinds, search, fixture } = openKinds();
+    search().value = 'pie';
+    search().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(kinds().map(item => item.dataset['kind']).sort()).toEqual(['donut', 'halfDonut', 'nestedPie', 'rose']);
+    search().value = 'hierarchy';
+    search().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    // Hierarchy has nothing that fits two rows of one column, and a search still finds it.
+    expect(kinds().map(item => item.dataset['kind'])).toEqual(['treemap', 'sunburst', 'tree']);
+    search().value = 'zzz';
+    search().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(kinds()).toHaveLength(0);
+    expect(overlay().textContent).toContain('No chart is called "zzz"');
+  });
+
+  it('sends typing to the search box from anywhere in the menu', () => {
+    const { board, search, key } = openKinds();
+    const choose = overlay().querySelector<HTMLButtonElement>('.dash-choose')!;
+    choose.focus();
+    key(choose, 'b');
+    expect(document.activeElement).toBe(search());
+    expect(board.kindQuery()).toBe('b');
+    key(search(), 'a');      // typed in the box itself: left to the box, not the menu's typeahead
+    expect(document.activeElement).toBe(search());
+  });
+
+  it('moves across the grid with the arrows, a row by position with up and down', () => {
+    const { suggested, kinds, search, key } = openKinds();
+    key(search(), 'ArrowDown');
+    expect(document.activeElement).toBe(suggested()[0]);
+    key(suggested()[0], 'ArrowRight');
+    expect(document.activeElement).toBe(suggested()[1]);
+    key(suggested()[1], 'ArrowLeft');
+    expect(document.activeElement).toBe(suggested()[0]);
+    key(suggested()[0], 'ArrowUp');
+    expect(document.activeElement).toBe(search());
+    // Down from the first row of the suggestions lands in the row below, by position.
+    key(search(), 'ArrowDown');
+    const rowsBelow = suggested().length > 3 ? suggested()[3] : kinds()[0];
+    key(suggested()[0], 'ArrowDown');
+    expect(document.activeElement).toBe(rowsBelow);
+    key(document.activeElement as HTMLElement, 'End');
+    expect(document.activeElement).toBe(kinds()[kinds().length - 1]);
+    key(document.activeElement as HTMLElement, 'Home');
+    expect(document.activeElement).toBe(suggested()[0]);
   });
 
   it('saves the kind picked and redraws the result in hand, running nothing', () => {
     const { kinds, saveWidget, analyze, fixture } = openKinds();
-    kinds.find(item => item.dataset['kind'] === 'ranked')!.click();
+    kinds().find(item => item.dataset['kind'] === 'ranked')!.click();
     fixture.detectChanges();
     expect(saveWidget).toHaveBeenCalledWith(expect.objectContaining({ visualizationType: 'ranked' }));
     expect(analyze).toHaveBeenCalledTimes(1);
     expect((fixture.nativeElement as HTMLElement).querySelector('app-ranked-bar')).not.toBeNull();
+    // Chosen, the menu closes.
+    expect(overlay().querySelector('.dash-tile-menu')).toBeNull();
+  });
+
+  it('does nothing for a kind that does not fit', () => {
+    const { kinds, misfits, saveWidget, fixture } = openKinds();
+    misfits()!.click();
+    fixture.detectChanges();
+    kinds().find(item => item.dataset['kind'] === 'kpi')!.click();
+    fixture.detectChanges();
+    expect(saveWidget).not.toHaveBeenCalled();
+    expect(overlay().querySelector('.dash-tile-menu')).not.toBeNull();
   });
 });
 
