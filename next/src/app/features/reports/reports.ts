@@ -97,6 +97,9 @@ interface FailureRow {
   seconds: number;
 }
 
+/** The pages that open aiPrompt.json, where the model-call figures come from (Identity's PageKey). */
+const AI_USAGE_PAGES = ['ai-prompts', 'jobs', 'objects'] as const;
+
 /** One prompt's model calls over the range, from aiPrompt.json/usage. */
 interface AiUsageRow {
   promptId: number | null;
@@ -960,6 +963,14 @@ export class Reports implements OnInit {
   loadAiUsage(): void {
     const asked = { start: this.startDate(), end: this.endDate() };
     this.loadAiCost();
+    // aiPrompt.json is the Prompts, Schedules and Browse files pages' (Identity's PageKey). A reader of Run analytics
+    // alone -- the Reviewer and Viewer profiles -- was refused it on every open (review 2026-10-07): no section then.
+    if (!AI_USAGE_PAGES.some(page => this.auth.canOpen(page))) {
+      this.aiUsage.set([]);
+      this.aiUsageError.set('');
+      this.aiUsageLoading.set(false);
+      return;
+    }
     this.aiUsageLoading.set(true);
     this.aiUsageError.set('');
     this.http.get<ApiResponse<AiUsageRow[]>>(`${API_BASE}/aiPrompt.json/usage`, { params: { from: asked.start, to: asked.end } }).subscribe({

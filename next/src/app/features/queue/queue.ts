@@ -353,6 +353,9 @@ export class Queue implements OnInit {
   }
 
   private loadJobNames(): void {
+    // The names come from the Schedules page's list (sourceJob.json, page jobs). A reader holding Queue alone -- the
+    // Reviewer profile -- was refused it on every open, a 403 in the console (review 2026-10-07); their rows keep numbers.
+    if (!this.auth.canOpen('jobs')) return;
     this.http.get<ApiResponse<{ jobId: number; jobName?: string }[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;

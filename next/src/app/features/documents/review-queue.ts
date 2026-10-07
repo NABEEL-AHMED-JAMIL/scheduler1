@@ -31,7 +31,7 @@ import { ConfidenceBar } from './confidence-bar';
         <div>
           <h1 class="page-title">Review queue</h1>
           <p class="page-subtitle">
-            Documents Document Intelligence did not approve on its own, oldest first. Open one to check the values it was
+            Documents that Document Intelligence did not approve on its own, oldest first. Open one to check the values it was
             not sure about, correct them, and approve or reject it.
           </p>
         </div>

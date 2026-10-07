@@ -121,10 +121,10 @@
                   @for (i of g.items; track i.meter) {
                     <tr [class.is-changed]="changedAgainstBase(c).includes(i.label ?? i.meter)">
                       <td><div>{{ i.label ?? i.meter }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ i.meter }}</div></td>
-                      <td class="text-right tabular text-sm whitespace-nowrap">{{ i.tiers?.length ? 'Tiered' : price(i, c.currency) }}
+                      <td class="text-right tabular whitespace-nowrap">{{ i.tiers?.length ? 'Tiered' : price(i, c.currency) }}
                         <!-- The Tiers column is lg-only; below it the bands sit under the price, as Cost & usage prints them. -->
                         @if (i.tiers?.length) { <div class="lg:hidden text-[11px] text-[color:var(--text-muted)] whitespace-normal">@for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> }</div> }</td>
-                      <td class="text-right tabular text-sm hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
+                      <td class="text-right tabular hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
                       <td class="hidden lg:table-cell text-xs">
                         @for (t of tierText(i, c.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">Flat</span> }
                       </td>

@@ -195,7 +195,8 @@
     </app-table-shell>
 
     <div class="grid gap-4 lg:grid-cols-2">
-      <app-table-shell heading="Versions" [scrollRows]="false" [loading]="loading() && !detail()" [isEmpty]="!versions().length"
+      <!-- Scrolls in its own box: forty saves made the page three screens long (review 2026-10-07). -->
+      <app-table-shell heading="Versions" [loading]="loading() && !detail()" [isEmpty]="!versions().length"
                        emptyMessage="No versions yet." emptyIcon="history">
         <table class="table-modern">
           <thead><tr><th>Version</th><th>Saved</th></tr></thead>

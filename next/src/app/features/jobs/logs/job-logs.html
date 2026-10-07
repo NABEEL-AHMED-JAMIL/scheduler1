@@ -78,8 +78,11 @@
         <!-- The pipeline's AI steps for this run: what each prompt answered, what it cost. -->
         @if (aiSteps().length) {
           <div class="detail-panel mt-3">
-            <div class="detail-head">AI steps</div>
-            <ul class="side-panel-list text-xs">
+            <div class="detail-head">AI steps <span class="text-[color:var(--text-muted)]">({{ aiSteps().length }})</span></div>
+            <!-- Its own scroll box: a run of forty images drew forty answers in full and pushed the steps and the log
+                 twelve thousand pixels down (review 2026-10-07). -->
+            <ul class="side-panel-list text-xs max-h-[32rem] overflow-y-auto overscroll-contain" data-test="ai-steps" tabindex="0"
+                aria-label="AI steps of this run">
               @for (s of aiSteps(); track s.run.runId) {
                 <li>
                   <div class="min-w-0">

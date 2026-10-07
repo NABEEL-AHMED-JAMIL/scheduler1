@@ -27,7 +27,7 @@
       </div>
       <input class="input mono w-40 max-w-full" aria-label="Folder" placeholder="reports/"
              [value]="folder()" (change)="setFolder($any($event.target).value)" />
-      <div class="search-field w-56 max-w-full">
+      <div class="search-field w-72 max-w-full">
         <app-icon name="search" size="0.95em" />
         <input class="input" placeholder="Find by name, type or pipeline" aria-label="Find a report"
                [value]="query()" (input)="query.set($any($event.target).value); pager.goTo(1, filtered().length)" />

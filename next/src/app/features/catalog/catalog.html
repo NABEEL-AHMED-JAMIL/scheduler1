@@ -16,7 +16,7 @@
   }
 
   <app-table-shell heading="Assets" columnsKey="data-catalog" [loading]="loading()" [error]="error()" [isEmpty]="!shown().length"
-                   [shown]="shown().length" [total]="total()" [scrollRows]="false" emptyIcon="database" (retry)="load()"
+                   [shown]="shown().length" [total]="total()" emptyIcon="database" (retry)="load()"
                    [emptyMessage]="search() || flag() || kind() || withDeleted() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
     <ng-container toolbar>
       <app-segmented [value]="kind()" (valueChange)="setKind($event)" [options]="kinds" ariaLabel="Kind of asset" />

@@ -273,15 +273,19 @@ describe('shell navigation', () => {
       expect(el.querySelector('[data-nav-menu="__user"] a[href="/docs"]')).not.toBeNull();
     });
 
-    // MIG-246: eleven menus fit beside the wordmark from 2xl; between xl and 2xl (a 1280-1535px laptop) the
-    // header keeps the "E" mark alone and the menus sit tighter, so the page never scrolls sideways.
-    it('keeps the header on one line between xl and 2xl: the mark without its wordmark, tighter menus', async () => {
+    // MIG-246: eleven menus fit beside the wordmark from 2xl; below it the header keeps the "E" mark alone and the
+    // menus sit tighter, so the page never scrolls sideways. Review 2026-10-07: the menu shows from 1180px rather than
+    // xl, so the owner's 1187px window has it on the bar instead of behind the menu button.
+    it('keeps the header on one line from 1180px to 2xl: the mark without its wordmark, tighter menus', async () => {
       const { el } = await rendered();
       const wordmark = el.querySelector<HTMLElement>('header app-brand-mark span')!;
-      expect(wordmark.className).toContain('xl:hidden');
+      expect(wordmark.className).toContain('min-[1180px]:hidden');
       expect(wordmark.className).toContain('2xl:block');
+      expect(el.querySelector<HTMLElement>('header nav')!.className).toContain('min-[1180px]:flex');
+      expect(el.querySelector<HTMLElement>('header button[aria-label="Menu"]')!.className).toContain('min-[1180px]:hidden');
       const trigger = el.querySelector<HTMLElement>('header nav [data-nav-menu="Pipelines"] > button')!;
-      expect(trigger.className).toContain('px-2');
+      expect(trigger.className).toContain('px-1');
+      expect(trigger.className).toContain('xl:px-2');
       expect(trigger.className).toContain('2xl:px-2.5');
     });
 
@@ -290,7 +294,7 @@ describe('shell navigation', () => {
       const name = el.querySelector<HTMLElement>('[data-nav-menu="__user"] > button span.truncate');
       expect(name).not.toBeNull();
       expect(name!.className).toContain('max-w-36');
-      expect(name!.className).toContain('xl:hidden');
+      expect(name!.className).toContain('min-[1180px]:hidden');
       expect(name!.className).toContain('2xl:block');
       expect(name!.hasAttribute('title')).toBe(true);
     });

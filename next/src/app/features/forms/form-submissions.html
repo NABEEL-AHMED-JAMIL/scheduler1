@@ -89,7 +89,7 @@
                 }
               </td>
               @if (hasApproval()) {
-                <td class="text-sm" data-stage>{{ s.workflowStage || '—' }}</td>
+                <td data-stage>{{ s.workflowStage || '—' }}</td>
                 <td class="whitespace-nowrap" [attr.data-approval]="s.workflowStatus">
                   @if (s.workflowStatus) {
                     <span class="pill" [class]="'pill-' + approvalTone(s.workflowStatus)"

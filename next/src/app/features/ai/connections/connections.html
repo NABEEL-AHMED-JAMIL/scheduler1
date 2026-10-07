@@ -216,9 +216,10 @@
                         @for (r of a.recent; track r.runId) {
                           <tr>
                             <td class="text-xs whitespace-nowrap">{{ r.at | serverTime: 'dateTime' }}</td>
+                            <!-- One line, cut with the whole name as its title: wrapped, a long name made each row four lines (review 2026-10-07). -->
                             <td class="min-w-0">
                               @if (r.promptId) {
-                                <a class="link-inline" [routerLink]="['/ai/prompts', r.promptId, 'edit']">{{ r.promptName || 'Prompt ' + r.promptId }}</a>
+                                <a class="link-inline block truncate max-w-64" [title]="r.promptName || 'Prompt ' + r.promptId" [routerLink]="['/ai/prompts', r.promptId, 'edit']">{{ r.promptName || 'Prompt ' + r.promptId }}</a>
                               } @else { <span class="text-[color:var(--text-secondary)]">{{ kindLabel(r.kind) }}</span> }
                               @if (r.error) { <div class="text-xs text-crit-500 truncate max-w-[28rem]" [title]="r.error">{{ r.error }}</div> }
                             </td>

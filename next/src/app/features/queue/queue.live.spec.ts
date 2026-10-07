@@ -128,10 +128,13 @@ describe('Queue rows lead somewhere', () => {
     expect(hrefs).toContain('/pipelines/schedules/2838/executions');
   });
 
-  it('shows plain text to someone whose profile has Queue but not Jobs', () => {
+  // Review 2026-10-07: the job names come from the Schedules page's list, which the service refuses a Queue-only reader
+  // (a 403 on every open); their rows are named by number, as they always were once that refusal landed.
+  it('shows plain text to someone whose profile has Queue but not Jobs, the job by its number', () => {
     const el = render(false);
     expect(el.querySelectorAll('table a').length).toBe(0);
-    expect(el.textContent).toContain('Nightly ledger check');
+    expect(el.textContent).toContain('Job #2838');
+    expect(el.textContent).not.toContain('Nightly ledger check');
   });
 
   it('names the job in the busiest-jobs chart', () => {

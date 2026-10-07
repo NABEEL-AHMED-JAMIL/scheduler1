@@ -34,7 +34,7 @@
 
   <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
     @for (tile of [
-      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on here', icon: 'layers', tone: 'info' },
+      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' switched on', icon: 'layers', tone: 'info' },
       { label: 'Unavailable', value: taskTiles().unavailable, foot: taskTiles().unavailable ? 'the platform cannot run yet' : 'every task can run', icon: 'alert', tone: taskTiles().unavailable ? 'warn' : 'muted' },
       { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active', icon: 'send', tone: 'info' },
       { label: 'No topic', value: summary().untopped, foot: summary().untopped ? 'assign one to use them' : 'every pipeline has one', icon: 'alert', tone: summary().untopped ? 'warn' : 'muted' }

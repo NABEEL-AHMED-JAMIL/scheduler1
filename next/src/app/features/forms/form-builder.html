@@ -436,7 +436,7 @@
               <td><span class="pill" [class]="'pill-' + tone(f.status)">{{ f.status }}</span></td>
               <td class="hidden xl:table-cell text-right tabular">{{ f.fieldCount }}</td>
               @if (isAdmin()) {
-                <td class="text-sm">
+                <td>
                   @if (f.startsJob) { {{ f.jobName || 'Job #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                 </td>
                 <td class="text-right tabular">{{ f.submissions ?? 0 }}</td>

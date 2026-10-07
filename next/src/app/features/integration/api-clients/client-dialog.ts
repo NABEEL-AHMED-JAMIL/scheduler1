@@ -70,7 +70,7 @@ export function sameFrames(text: string, origins: string[] | null | undefined): 
           <input id="clientName" class="input" maxlength="120" [value]="name()" (input)="name.set($any($event.target).value)"
                  cdkFocusInitial />
         </app-field>
-        <app-field label="Last day (optional)" for="clientExpires" hint="The client stops working at the end of that day.">
+        <app-field label="Expires (optional)" for="clientExpires" hint="The client stops working at the end of that day.">
           <input id="clientExpires" type="date" class="input" [value]="expires()" (input)="expires.set($any($event.target).value)" />
         </app-field>
       </div>

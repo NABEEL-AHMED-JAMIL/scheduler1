@@ -21,13 +21,14 @@ const DATA: RunData = {
 };
 const failure = (id: number, task: string, message: string) => ({ jobQueueId: id, jobId: 1, job: 'job', task, status: 'Failed', message, when: '2026-08-01 10:00:00', seconds: 3 });
 
-function page(http: { get?: (url: string) => Observable<unknown>; post?: (url: string) => Observable<unknown> } = {}) {
+function page(http: { get?: (url: string) => Observable<unknown>; post?: (url: string) => Observable<unknown> } = {},
+    canOpen: (page: string) => boolean = () => true) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     provideRouter([]),
     { provide: HttpClient, useValue: { get: vi.fn(http.get ?? (() => of({ status: 'ERROR', message: '' }))), post: vi.fn(http.post ?? (() => of({ status: 'ERROR', message: '' }))) } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-    { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+    { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false, canOpen } },
     { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
   ] });
   const fixture = TestBed.createComponent(Reports);
@@ -96,6 +97,17 @@ describe('Reports, rendered', () => {
     fixture.detectChanges();
     expect(text()).toContain('Model calls');
     expect(text()).toContain('Usage is unavailable.');
+  });
+
+  it('does not ask for model calls without a page that opens them, and draws no section (review 2026-10-07)', () => {
+    const asked: string[] = [];
+    const { reports, fixture, text } = page({ get: (url: string) => { asked.push(url); return of({ status: 'ERROR', message: 'refused' }); } },
+      key => key === 'reports');
+    reports.loadAiUsage();
+    fixture.detectChanges();
+    expect(asked.some(url => url.includes('aiPrompt.json/usage'))).toBe(false);
+    expect(reports.aiUsageError()).toBe('');
+    expect(text()).not.toContain('Model calls');
   });
 
   it('drops a failure-detail answer for a range the page has left', () => {

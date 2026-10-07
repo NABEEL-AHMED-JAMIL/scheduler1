@@ -1602,22 +1602,6 @@ html.dark {
      column is full width again. A viewport breakpoint would have to guess which. An element
      cannot query itself, so the column owns the container and the split reads it. */
   .dataset-column { container-type: inline-size; }
-  /*
-   * Profile cards, in a container query rather than a viewport one.
-   *
-   * The reason is the 260px storage rail: it makes the WINDOW a bad proxy for how wide this
-   * column actually is. lg:grid-cols-2 was not merely inconsistent here, it was inverted -- at
-   * 1023px the rail stacks and this column is full width, giving ONE card across; at 1024px the
-   * rail takes its 260px back and it gives TWO. Fewest columns at the widest space.
-   *
-   * This paragraph used to sit on .dataset-split, which laid the Data tab's rows beside a
-   * read-only schema rail. The rail is gone -- it listed each column and its type, which is the
-   * first two cells of every Compact row -- so the rule went with it and its reasoning moved here.
-   */
-  .profile-grid { @apply grid gap-3; }
-  @container (min-width: 700px) {
-    .profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
 
   /* Form rhythm, defined once.
 
@@ -1782,12 +1766,6 @@ html.dark {
   .data-text-more-icon { @apply no-underline text-[color:var(--text-muted)] hover:text-[color:var(--accent-text)]; }
   /* The whole value in the panel: its own line breaks kept, and a 20,000-character token wrapped. */
   .data-text-full { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-  /* A heading that does not sort, set exactly like a table-modern <th> -- for a header built
-     outside a <thead> (a grid list's header row) or a label beside .th-sort buttons. */
-  .th-static {
-    @apply text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap
-           text-[color:var(--text-muted)];
-  }
 }
 
 /*
@@ -1987,7 +1965,9 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 /* The topics table fits the pane: fixed layout, the name column takes what is left and clips, the narrow columns
    keep their width, and the actions column never leaves the screen (it was cut off at 1024 and 768). */
 .kafka-table-wrap { overflow-x: auto; }
-.kafka-table { table-layout: fixed; width: 100%; }
+/* A floor under the fixed columns: on a tablet the auto-width name column was left 0px wide, so the topic's name
+   vanished and its header sat on top of "Read by" (review 2026-10-07). Narrower, the box scrolls sideways. */
+.kafka-table { table-layout: fixed; width: 100%; min-width: 52rem; }
 .kafka-table th:first-child, .kafka-table td.kafka-cell-name { width: auto; }
 .kafka-table .kafka-cell-name { min-width: 0; }
 .kafka-cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }

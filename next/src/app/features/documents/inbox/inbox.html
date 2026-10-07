@@ -142,8 +142,9 @@
   }
 
   @if (configured() || files().length) {
+    <!-- The fifty newest scroll in their own box with the header pinned; they made the page five screens long (review 2026-10-07). -->
     <app-table-shell heading="Arrivals" columnsKey="inbox-arrivals" [loading]="filesLoading()" [error]="filesError()"
-                     [isEmpty]="!files().length" [shown]="files().length" [scrollRows]="false"
+                     [isEmpty]="!files().length" [shown]="files().length"
                      emptyMessage="No file has arrived yet. Upload one above, or send one through the API."
                      emptyIcon="inbox" (retry)="loadFiles()">
       <ng-container toolbar>

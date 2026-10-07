@@ -62,7 +62,7 @@
           <th>Limit</th>
           <th class="text-right">Calls this month</th>
           <th>Last used</th>
-          <th>Last day</th>
+          <th>Expires</th>
           <th class="text-right">State</th>
           <th class="w-12"><span class="sr-only">Actions</span></th>
         </tr>
@@ -79,13 +79,13 @@
                 @for (s of c.scopes; track s) { <span class="pill pill-neutral mono">{{ s }}</span> }
               </div>
             </td>
-            <td class="text-sm text-[color:var(--text-secondary)]" data-client-allowed>
+            <td class="text-[color:var(--text-secondary)]" data-client-allowed>
               {{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}
               @if (c.frameAncestors?.length) {
                 <div class="text-xs text-[color:var(--text-muted)] mt-0.5" data-client-embeds>Run views embed on {{ c.frameAncestors!.join(', ') }}</div>
               }
             </td>
-            <td class="text-sm text-[color:var(--text-secondary)] whitespace-nowrap" data-client-limit>
+            <td class="text-[color:var(--text-secondary)] whitespace-nowrap" data-client-limit>
               {{ limitOf(c) }}
               @if (c.ratePerMinute == null && c.burst == null) { <div class="text-xs text-[color:var(--text-muted)]">the workspace's most</div> }
               @if (c.limit?.capped) { <div class="text-xs text-[color:var(--color-warn-600)]">capped by the workspace's limit</div> }
@@ -149,9 +149,9 @@
       <tbody>
         @for (r of routes(); track r.routeId) {
           <tr [class.opacity-70]="!r.active">
-            <td class="mono text-sm">{{ r.eventType }}</td>
+            <td class="mono">{{ r.eventType }}</td>
             <td>{{ targetOf(r) }}</td>
-            <td class="text-sm text-[color:var(--text-secondary)]">{{ r.contractName || (r.contractId ? 'Contract ' + r.contractId : '—') }}</td>
+            <td class="text-[color:var(--text-secondary)]">{{ r.contractName || (r.contractId ? 'Contract ' + r.contractId : '—') }}</td>
             <td class="text-right"><span [class]="r.active ? 'pill pill-ok' : 'pill pill-neutral'">{{ r.active ? 'Active' : 'Inactive' }}</span></td>
             <td class="text-right whitespace-nowrap">
               @if (auth.canBuild()) {
@@ -203,7 +203,7 @@
         @for (w of webhooks(); track w.id) {
           <tr [class.opacity-70]="!w.active">
             <td class="max-w-96">
-              <div class="mono text-sm truncate" [title]="w.url">{{ w.url }}</div>
+              <div class="mono truncate" [title]="w.url">{{ w.url }}</div>
               <div class="text-xs text-[color:var(--text-muted)] truncate">
                 {{ w.createdBy ? 'Added by ' + w.createdBy : '' }}
                 @if (w.pausedReason) { <span [title]="w.pausedReason"> · {{ w.pausedReason }}</span> }

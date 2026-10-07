@@ -9,13 +9,15 @@
       </a>
 
       <!-- Primary navigation -->
-      <nav class="hidden xl:flex items-center gap-0.5 flex-1">
+      <!-- From 1180px, not xl (1280): the owner's 1187px window had the whole menu behind the ☰ (review 2026-10-07).
+           Up to xl the items sit tighter (px-1); from xl as before. -->
+      <nav class="hidden min-[1180px]:flex items-center gap-0.5 flex-1">
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path"
                routerLinkActive="!text-accent !bg-accent-soft"
                [routerLinkActiveOptions]="{ exact: item.path === '/' }"
-               class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
+               class="px-1 xl:px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
                       text-[color:var(--text-secondary)]
                       hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]">
               {{ item.label }}
@@ -25,7 +27,7 @@
               <button type="button" (click)="toggleMenu(item.label)"
                       [attr.aria-expanded]="openMenu() === item.label"
                       [attr.aria-controls]="menuId(item.label)"
-                      class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
+                      class="px-1 xl:px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
                              hover:bg-[color:var(--surface-sunken)]"
@@ -62,7 +64,7 @@
         }
       </nav>
 
-      <div class="flex-1 xl:hidden"></div>
+      <div class="flex-1 min-[1180px]:hidden"></div>
 
       <!-- Right side -->
       <div class="flex items-center gap-1 shrink-0">
@@ -89,7 +91,7 @@
             <!-- Between xl and 2xl the full nav and a name do not both fit, so only the avatar shows;
                  the name is in the panel's header. The cap stops a long name or an email
                  fallback pushing the page wider than the screen. -->
-            <span class="text-sm font-medium hidden sm:block xl:hidden 2xl:block max-w-36 truncate"
+            <span class="text-sm font-medium hidden sm:block min-[1180px]:hidden 2xl:block max-w-36 truncate"
                   [title]="auth.displayName()">{{ auth.displayName() }}</span>
           </button>
           @if (openMenu() === '__user') {
@@ -129,7 +131,7 @@
           }
         </div>
 
-        <button type="button" class="btn btn-ghost btn-icon xl:hidden" (click)="toggleMobile()"
+        <button type="button" class="btn btn-ghost btn-icon min-[1180px]:hidden" (click)="toggleMobile()"
                 aria-label="Menu" [attr.aria-expanded]="mobileOpen()">
           <app-icon [name]="mobileOpen() ? 'close' : 'menu'" size="1.15em" />
         </button>
@@ -153,7 +155,7 @@
     }
 
     @if (mobileOpen()) {
-      <nav class="mobile-nav xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">
+      <nav class="mobile-nav min-[1180px]:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path" (click)="mobileOpen.set(false)"
