@@ -69,3 +69,12 @@ export async function openTaskOf(request: APIRequestContext, s: Session, workflo
   }, { timeout: 30_000, message: `an open task of workflow ${workflowKey}` }).toBe(true);
   return task!;
 }
+
+/** Cancels the requester's still-running requests of one of the spec's workflows (a test that stopped half-way). */
+export async function cancelRunning(request: APIRequestContext, requester: Session, workflowKey: string): Promise<void> {
+  const mine: { id: number; workflow: string; state: string }[] = (await getJson(request, requester, '/taskInbox.json/requests?limit=50')).data ?? [];
+  for (const r of mine.filter(x => x.workflow === workflowKey && x.state === 'Running')) {
+    await bestEffort(`cancel request ${r.id}`, () => request.post(`${api}/taskInbox.json/cancel`, {
+      headers: { ...authOf(requester), 'Idempotency-Key': `e2e-cancel-${r.id}` }, params: { id: r.id, reason: 'e2e clean-up' } }));
+  }
+}

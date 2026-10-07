@@ -1,6 +1,6 @@
 import { test, expect, Browser, Page } from '@playwright/test';
 import { hasToken, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
-import { inactivateWorkflow } from './support/forms';
+import { cancelRunning, inactivateWorkflow } from './support/forms';
 
 /**
  * Workflows (MIG-276), live, in Riverside Health: the administrator (role admin) designs a workflow in the designer --
@@ -51,7 +51,10 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
   });
 
   test.afterAll(async ({ request }) => {
-    if (admin) await inactivateWorkflow(request, await sessionFor(request, 'admin'), KEY);
+    if (!admin) return;
+    const s = await sessionFor(request, 'admin');
+    await cancelRunning(request, s, KEY);
+    await inactivateWorkflow(request, s, KEY);
   });
 
   test('the administrator designs and publishes a workflow, then starts two requests', async ({ browser }) => {
@@ -104,9 +107,13 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     // The first request: approve.
     await row('a').click();
     await expect(detail).toContainText('1200');
-    await expect(detail).toContainText(`${step}: waiting for`);
+    // The task names its step and that it waits for the reader ("Pending … With you", "Waiting for you").
+    await expect(detail).toContainText(step);
+    await expect(detail).toContainText(/Waiting for you|With you/);
     await detail.getByRole('button', { name: 'Approve', exact: true }).click();
-    await expect(detail).toContainText('approved by you');
+    // A decision moves the inbox on to the next task, as a mail client does: the approved one leaves My tasks.
+    await expect(page.locator('[data-test="tab-mine"]')).toBeVisible();
+    await expect(row('a')).toHaveCount(0);
 
     // The second: a rejection with no reason is refused here, then sent with one.
     await page.locator('[data-test="tab-mine"]').click();
@@ -116,7 +123,14 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await expect(page.getByText('Say why you are rejecting this: a reason is required.')).toBeVisible();
     await detail.getByLabel('Comment').fill('Over the quarter\'s budget');
     await detail.getByRole('button', { name: 'Reject', exact: true }).click();
-    await expect(detail).toContainText('rejected by you');
+    await expect(row('b')).toHaveCount(0);
+
+    // Both decisions, as Done shows them.
+    await page.locator('[data-test="tab-done"]').click();
+    await row('a').click();
+    await expect(detail).toContainText(/approved by you/i);
+    await row('b').click();
+    await expect(detail).toContainText(/rejected by you/i);
     await expect(detail).toContainText('Over the quarter\'s budget');
 
     // The designer is not the reviewer's page.
@@ -129,7 +143,8 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await page.goto(`/workflows/requests?id=${approved}`);
     const request = page.locator('[data-test="request-detail"]');
     await expect(request).toContainText('Approved');
-    await expect(request).toContainText(`${step}: approved by ${person}`);
+    await expect(request).toContainText(step);
+    await expect(request).toContainText(new RegExp(`approved by ${person}`, 'i'));
     await expect(request).toContainText('Request approved');
 
     await page.goto(`/workflows/requests?id=${rejected}`);

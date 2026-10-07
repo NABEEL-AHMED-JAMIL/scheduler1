@@ -1,5 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
-import { hasToken, NEEDS, tokenFor } from './support/session';
+import { hasToken, NEEDS, sessionFor, tokenFor } from './support/session';
+import { lendPages } from './support/workspace';
+import { hasFixtures, riverside } from './support/fixtures';
 import { join } from 'path';
 
 /**
@@ -112,19 +114,25 @@ test.describe('MIG-254: Administration › Data policies', () => {
   });
 
   test('a member holding Prompts reads it and changes nothing; one without it is refused', async ({ browser, request }, info) => {
-    test.skip(!hasToken('user'), NEEDS.user);
-    // The reviewer's profile does not hold Prompts; the console's gate reads the session's pages, so a profile that grants it is
-    // simulated by adding the key. ai-service answers the read for any member either way.
-    const reader = await pageAs(browser, await sessionOf(request, tokenFor('user')!, ['ai-prompts']));
-    await reader.goto('/administration/data-policies');
-    await expect(reader.locator('[data-read-only]')).toContainText('Only a workspace administrator can change the data policy.');
-    await expect(reader.locator('[data-level="internal"]')).toContainText('Keep run files');
-    await expect(reader.locator('[data-level] select, [data-level] input')).toHaveCount(0);
-    await expect(reader.getByRole('button', { name: 'Save policy' })).toHaveCount(0);
-    await shot(reader, info, 'data-policies-member');
-    await reader.context().close();
+    test.skip(!hasToken('user') || !hasFixtures(), NEEDS.user);
+    // The reviewer's profile does not hold Prompts: the page is lent to them for this test (the gateway checks it on the
+    // read as well as the console), and their exceptions are put back exactly as they were before the refusal is checked.
+    const admin = await sessionFor(request, 'admin');
+    const giveBack = await lendPages(request, admin, riverside().reviewer, ['ai-prompts']);
+    try {
+      const reader = await pageAs(browser, await sessionOf(request, tokenFor('user', { newSignIn: true })!));
+      await reader.goto('/administration/data-policies');
+      await expect(reader.locator('[data-read-only]')).toContainText('Only a workspace administrator can change the data policy.');
+      await expect(reader.locator('[data-level="internal"]')).toContainText('Keep run files');
+      await expect(reader.locator('[data-level] select, [data-level] input')).toHaveCount(0);
+      await expect(reader.getByRole('button', { name: 'Save policy' })).toHaveCount(0);
+      await shot(reader, info, 'data-policies-member');
+      await reader.context().close();
+    } finally {
+      await giveBack(request);
+    }
 
-    const refused = await pageAs(browser, await sessionOf(request, tokenFor('user')!));
+    const refused = await pageAs(browser, await sessionOf(request, tokenFor('user', { newSignIn: true })!));
     await refused.goto('/administration/data-policies');
     await expect(refused).toHaveURL(/\/unauthorized\?page=ai-prompts/);
     await refused.context().close();

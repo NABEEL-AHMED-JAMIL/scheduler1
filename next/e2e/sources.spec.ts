@@ -16,7 +16,7 @@ import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
  * source reads the suite's own e2e/sources/E2E-customers.csv in Riverside Health's bucket (support/fixtures.ts),
  * uploaded once and kept for the next run. Sign-in through support/session.ts (role admin).
  * Everything it makes is named "E2E …". The source and the database connection are deleted when the describe ends; the
- * contract it proposes and the wound_result template it installs (once) stay, as the service deletes neither.
+ * contract it proposes and the wound_intake template it installs (once) stay, as the service deletes neither.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
 const STORAGE = () => process.env['E2E_SOURCE_STORAGE'] ?? riverside().storageAlias;
@@ -164,15 +164,15 @@ test.describe('Sources', () => {
     await expect(contracts).toContainText('result_manifest');
     await expect(contracts).toContainText('System · read-only');
 
-    // ---- install: wound_result, unless this workspace already has it (the spec may have run before)
+    // ---- install: wound_intake, unless this workspace already has it (the spec may have run before); validated below
     await page.getByRole('button', { name: 'Install template' }).click();
     const templates = page.locator('app-template-dialog');
-    await expect(templates).toContainText('wound_intake');
-    const install = templates.getByRole('button', { name: 'Install wound_result' });
+    await expect(templates).toContainText('wound_result');
+    const install = templates.getByRole('button', { name: 'Install wound_intake' });
     if (await install.count()) await install.click();
-    await expect(templates.locator('li', { hasText: 'wound_result' })).toContainText('Installed', { timeout: 20_000 });
+    await expect(templates.locator('li', { hasText: 'wound_intake' })).toContainText('Installed', { timeout: 20_000 });
     await templates.getByRole('button', { name: 'Close' }).click();
-    await expect(contracts).toContainText('wound_result');
+    await expect(contracts).toContainText('wound_intake');
 
     // ---- propose from a sample, mark a field required, save v1
     await page.getByRole('button', { name: 'New from sample' }).click();

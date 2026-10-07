@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { deleteTopic } from './support/workspace';
 
 /**
  * Topics and pipelines, end to end, as a tenant administrator: a topic is added under the workspace's
@@ -50,7 +51,7 @@ test.describe('topics and pipelines', () => {
     if (!session) return;
     if (taskId) await request.put(`${api}/sourceTask.json/deleteSourceTask`, { headers, data: { taskDetailId: taskId } });
     if (pipelineKey) await request.delete(`${api}/pipeline.json/delete?pipelineKey=${pipelineKey}`, { headers });
-    if (topicId) await request.delete(`${api}/setting.json/deleteSourceTaskType?sourceTaskTypeId=${topicId}`, { headers });
+    if (topicId) await deleteTopic(request, session, topicId);
   });
 
   test('a topic is added under the profile, a pipeline on the topic, a task through both', async ({ browser, request }) => {

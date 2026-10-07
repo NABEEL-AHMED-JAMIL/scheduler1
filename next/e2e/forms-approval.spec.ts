@@ -1,7 +1,7 @@
 import { test, expect, Browser, Page } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
 import { getJson } from './support/workspace';
-import { archiveForm, inactivateWorkflow, makeForm, makeWorkflow, openTaskOf, submitForm } from './support/forms';
+import { archiveForm, cancelRunning, inactivateWorkflow, makeForm, makeWorkflow, openTaskOf, submitForm } from './support/forms';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
@@ -53,6 +53,7 @@ test.describe('Forms: approval and dataset (live)', () => {
   test.afterAll(async ({ request }) => {
     if (!s) return;
     if (form) await archiveForm(request, s, form);
+    await cancelRunning(request, s, WORKFLOW_KEY);
     await inactivateWorkflow(request, s, WORKFLOW_KEY);
   });
 

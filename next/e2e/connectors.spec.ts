@@ -67,6 +67,8 @@ test.describe.serial('Connector Hub', () => {
     const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     const name = NAME;
     await page.goto('/integration/connectors');
+    // The connect panel takes the gallery the page has loaded: opened before it lands, it offers nothing to choose.
+    await expect(page.locator('[data-connector="postgres"]')).toBeVisible();
     await page.locator('[data-new-connection]').click();
     await page.locator('[data-choose="postgres"]').click();
     await page.locator('#cName').fill(name);

@@ -121,7 +121,7 @@ test.describe('Task Registry', () => {
     const page = await pageAs(browser, s);
     await page.goto('/configuration/task-registry');
     await page.getByRole('button', { name: `Open ${CHECK_NAME}` }).click();
-    await page.getByRole('dialog', { name: CHECK_NAME }).getByRole('button', { name: 'Edit pipeline' }).click();
+    await page.getByRole('dialog', { name: CHECK_NAME }).getByRole('button', { name: /^Edit (pipeline|registry task)$/ }).click();
     const dialog = page.locator('app-pipeline-dialog');
     await expect(dialog.locator('#pipelineId')).toHaveValue(CHECK_ID);
     const sent = page.waitForRequest(r => r.url().includes('/pipeline.json/save') && r.method() === 'POST');

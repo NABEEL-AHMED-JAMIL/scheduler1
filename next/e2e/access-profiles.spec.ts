@@ -32,13 +32,17 @@ test.describe('access profiles', () => {
   let memberRow: Record<string, any>;
   let before: PersonAccess | undefined;
   let createdProfileId: number | null = null;
+  /** Everyone's profile before the test: nobody else in the workspace may end on another one. */
+  const profilesBefore = new Map<number, number | null>();
 
   test.beforeAll(async ({ request }) => {
     adminSession = await sessionFor(request, 'admin');
     const self = await memberNow(request);
     member = { username: self.username };
     const users = await request.get(`${api}/appUser.json/listUsers`, { headers: authOf(adminSession) });
-    memberRow = (await users.json()).data.find((u: any) => u.appUserId === self.appUserId);
+    const everyone = (await users.json()).data as Record<string, any>[];
+    memberRow = everyone.find((u: any) => u.appUserId === self.appUserId)!;
+    for (const u of everyone) profilesBefore.set(u.appUserId, u.pageAccessProfileId ?? null);
     expect(memberRow, `${member.username} is in the admin's workspace`).toBeTruthy();
     // What the person holds besides their profile, so it can be put back; then none, so the test sees the profile alone.
     const people = await (await request.get(`${api}/pageAccess.json/listPeople`, { headers: authOf(adminSession) })).json();
@@ -63,6 +67,14 @@ test.describe('access profiles', () => {
     const after = (await (await request.get(`${api}/pageAccess.json/listPeople`, { headers })).json()).data
       .find((p: PersonAccess) => p.appUserId === id);
     expect([...after.allowedExceptions].sort(), 'the member\'s exceptions are back').toEqual([...(before?.allowedExceptions ?? [])].sort());
+    // A safety net: anyone else whose profile moved (a wrong row clicked) goes back on theirs.
+    const now = ((await (await request.get(`${api}/appUser.json/listUsers`, { headers })).json()).data ?? []) as Record<string, any>[];
+    for (const u of now) {
+      const was = profilesBefore.get(u.appUserId);
+      if (u.appUserId === id || was === undefined || (u.pageAccessProfileId ?? null) === was) continue;
+      await request.put(`${api}/pageAccess.json/assignProfile`, { headers,
+        params: was ? { appUserId: u.appUserId, pageAccessProfileId: was } : { appUserId: u.appUserId } });
+    }
     if (createdProfileId) {
       await request.delete(`${api}/pageAccess.json/deleteProfile?pageAccessProfileId=${createdProfileId}`, { headers });
     }
@@ -92,7 +104,9 @@ test.describe('access profiles', () => {
 
     // --- the admin, in the browser: put the person on it from the user dialog
     await adminPage.goto('/administration/users');
-    const row = adminPage.locator('tr', { hasText: member.username }).first();
+    // The row whose username is exactly the member's: "viewer@…" is also the tail of "reviewer@…".
+    const row = adminPage.locator('tr').filter({ has: adminPage.locator(`span[title="${member.username}"]`) });
+    await expect(row).toHaveCount(1);
     await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Actions' }).click();
     await adminPage.getByRole('menuitem', { name: /Edit/ }).click();

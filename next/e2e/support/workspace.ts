@@ -157,10 +157,11 @@ interface PersonAccess { appUserId: number; allowedExceptions: string[]; withhel
 /**
  * Lends a person pages on top of their profile, as their administrator ticking the boxes would, and answers how to put
  * them back: the exceptions they had before, exactly. For a spec whose steps need a page the rebuilt person's profile
- * does not hold (a reviewer filling in a form); the profile itself is never touched.
+ * does not hold (a reviewer filling in a form); the profile itself is never touched. The answer takes the request
+ * context of wherever it is called (a beforeAll's cannot be used in afterAll).
  */
 export async function lendPages(request: APIRequestContext, admin: Session, appUserId: number, pages: string[]):
-  Promise<() => Promise<void>> {
+  Promise<(request: APIRequestContext) => Promise<void>> {
   const headers = authOf(admin);
   const people = (await getJson(request, admin, '/pageAccess.json/listPeople')).data ?? [];
   const before: PersonAccess | undefined = people.find((p: PersonAccess) => p.appUserId === appUserId);
@@ -168,7 +169,7 @@ export async function lendPages(request: APIRequestContext, admin: Session, appU
   for (const pageKey of pages) {
     await request.put(`${api}/pageAccess.json/setPageAccess`, { headers, params: { appUserId, pageKey, allowed: true } });
   }
-  return async () => {
+  return async (request: APIRequestContext) => {
     await request.delete(`${api}/pageAccess.json/clearPageAccess?appUserId=${appUserId}`, { headers });
     for (const pageKey of before!.allowedExceptions) {
       await request.put(`${api}/pageAccess.json/setPageAccess`, { headers, params: { appUserId, pageKey, allowed: true } });
@@ -233,4 +234,22 @@ export async function removeMade(request: APIRequestContext, s: Session,
   for (const pipelineKey of made.pipelines ?? []) {
     await bestEffort(`delete pipeline ${pipelineKey}`, () => request.delete(`${api}/pipeline.json/delete?pipelineKey=${pipelineKey}`, { headers }));
   }
+}
+
+/**
+ * Deletes a topic the spec made, once nothing publishes on it any more: Core refuses while a pipeline still names it,
+ * and a pipeline deleted a moment ago can still count, so the delete is asked again for a few seconds.
+ */
+export async function deleteTopic(request: APIRequestContext, s: Session, sourceTaskTypeId: number): Promise<void> {
+  await bestEffort(`delete topic ${sourceTaskTypeId}`, async () => {
+    let last = '';
+    for (let i = 0; i < 10; i++) {
+      const r = await body(await request.delete(`${api}/setting.json/deleteSourceTaskType?sourceTaskTypeId=${sourceTaskTypeId}`,
+        { headers: authOf(s) }));
+      if (r.status === 'SUCCESS') return;
+      last = r.message;
+      await new Promise(done => setTimeout(done, 1500));
+    }
+    throw new Error(last);
+  });
 }

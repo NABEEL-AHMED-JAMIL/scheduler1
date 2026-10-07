@@ -3,7 +3,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor, sessionOf } from './support/session';
-import { bestEffort, deleteObject, removeMade } from './support/workspace';
+import { bestEffort, deleteObject, deleteTopic, removeMade } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
@@ -83,8 +83,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     await removeMade(request, s, { jobs, tasks, pipelines });
     const topic = ((await getJson(request, s, `/setting.json/topics?q=${encodeURIComponent(TOPIC)}&limit=5`)).data ?? [])
       .find((t: any) => t.serviceName === TOPIC);
-    if (topic) await bestEffort(`delete topic ${topic.sourceTaskTypeId}`, () =>
-      request.delete(`${api}/setting.json/deleteSourceTaskType?sourceTaskTypeId=${topic.sourceTaskTypeId}`, { headers }));
+    if (topic) await deleteTopic(request, s, topic.sourceTaskTypeId);
     if (made.file) await bestEffort(`delete ${made.file.key}`, () => deleteObject(request, s, made.file!.bucket, made.file!.key));
     const storage = ((await getJson(request, s, '/storageConnection.json/fetchAllConnections')).data ?? []).find((c: any) => c.alias === ALIAS);
     if (storage) await bestEffort(`delete storage connection ${storage.storageConnectionId}`, () =>

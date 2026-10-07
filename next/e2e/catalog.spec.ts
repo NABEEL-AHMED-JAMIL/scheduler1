@@ -1,5 +1,6 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
 import { hasToken, NEEDS, sessionFor, tokenFor } from './support/session';
+import { archiveForm, makeForm, submitForm } from './support/forms';
 import { ensureObject, getJson, outputsOf, postJson } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
 import { join } from 'path';
@@ -9,15 +10,16 @@ import { join } from 'path';
  * fields, an asset's panel with columns, tags and lineage -- at a wide screen and a tablet; and the prompt editor's
  * file picker naming its variable plainly (no {{ }} in its heading).
  *
- * The sensitive asset is the suite's own: e2e/catalog/E2E-customers.csv in the workspace's bucket (emails and test card
+ * The sensitive asset is the suite's own: e2e/catalog/E2E-card-holders.csv in the workspace's bucket (emails and test card
  * numbers), uploaded once and kept for the next run, and scanned through the API when the catalog has not classified it
  * yet. The lineage is the rebuilt readmission schedule's (support/fixtures.ts): the statistics file its run uploads,
- * the file it read, and the schedule itself. Nothing else is created or changed.
+ * the file it read, and the schedule itself. Ask your data is asked about a form the spec makes ("E2E orders <stamp>",
+ * six answers), archived when the test ends. Nothing else is created or changed.
  *
  * Sign-in: support/session.ts (role admin); E2E_SHOTS optional.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const CUSTOMERS_KEY = 'e2e/catalog/E2E-customers.csv';
+const CUSTOMERS_KEY = 'e2e/catalog/E2E-card-holders.csv';
 const CUSTOMERS = ['customer_id,name,email,city,amount,card_number',
   'C-001,Ada Example,ada@example.com,Nairobi,1250.50,4111111111111111',
   'C-002,Bo Example,bo@example.com,Lagos,310.00,5500005555555559',
@@ -62,7 +64,7 @@ test.describe('Data Catalog', () => {
     // The catalog takes the file up from storage's events; classify it when it has not been scanned yet.
     let asset: { assetId: number; sensitivity: string } | undefined;
     await expect.poll(async () => {
-      asset = ((await getJson(request, s, '/analyticsCatalog.json/list?q=E2E-customers')).data ?? [])
+      asset = ((await getJson(request, s, '/analyticsCatalog.json/list?q=E2E-card-holders')).data ?? [])
         .find((a: { path: string; connection: string }) => a.path === CUSTOMERS_KEY && a.connection === bucket);
       return !!asset;
     }, { timeout: 60_000, message: `the catalog lists ${CUSTOMERS_KEY}` }).toBe(true);
@@ -90,8 +92,8 @@ test.describe('Data Catalog', () => {
       await page.goto('/data/catalog');
       await page.getByRole('heading', { name: 'Data Catalog' }).waitFor();
       await expect(page.getByText('With sensitive fields')).toBeVisible();
-      await page.locator('#catalogSearch').fill('E2E-customers');
-      const row = page.locator('tr[data-asset]').filter({ hasText: 'E2E-customers.csv' });
+      await page.locator('#catalogSearch').fill('E2E-card-holders');
+      const row = page.locator('tr[data-asset]').filter({ hasText: CUSTOMERS_KEY });
       await expect(row).toBeVisible();
       await expect(row).toContainText('Restricted');
       await expect(row).toContainText('card number');
@@ -133,25 +135,40 @@ test.describe('Data Catalog', () => {
       // The local model can take minutes to load when Ollama swaps models. The same question is asked through the API
       // first, which loads it; the page's own question then answers in seconds. Well inside a token's fifteen minutes.
       test.setTimeout(480_000);
-      const question = 'Which city has the largest total amount in E2E-customers.csv?';
+      // Ask your data queries the workspace's datasets (forms, pipeline results), not loose files: the spec makes a form
+      // of its own with a city and an amount, sends six answers, asks about them, and archives the form afterwards.
       const token = tokenFor('admin')!;
-      const warm = await request.post(`${api}/askData.json/ask`, { headers: { Authorization: `Bearer ${token}` },
-        data: { question }, timeout: 300_000, failOnStatusCode: false });
-      expect(warm.status(), 'the warm-up question was answered').toBeLessThan(500);
-      const page = await pageAs(browser, await sessionOf(request, token));
-      await page.goto('/data/ask');
-      await page.locator('[data-test="question"]').fill(question);
-      await page.locator('[data-test="ask"]').click();
-      const answer = page.locator('[data-test="query-answer"]');
-      await expect(answer).toBeVisible({ timeout: 150_000 });
-      await expect(answer.locator('[data-test="query-sql"]')).toContainText('GROUP BY');
-      await expect(answer.locator('[data-test="query-rows"]')).toContainText('Nairobi');
-      await shot(page, info, 'ask-query-answer');
-      await answer.locator('[data-test="open-analytics"]').click();
-      await expect(page).toHaveURL(/\/data\/analytics\?/);
-      await expect(page.locator('app-sql-editor')).toContainText('GROUP BY', { timeout: 30_000 });
-      await shot(page, info, 'ask-query-in-analytics');
-      await page.context().close();
+      const s = await sessionOf(request, token);
+      const admin = await sessionFor(request, 'admin');
+      const name = `E2E orders ${Date.now().toString(36)}`;
+      const form = await makeForm(request, admin, name, [{ key: 'city', label: 'City', type: 'text', required: true },
+        { key: 'amount', label: 'Amount', type: 'number', required: true }]);
+      try {
+        for (const [city, amount] of [['Nairobi', 1250.5], ['Lagos', 310], ['Nairobi', 980.25], ['Accra', 120], ['Lagos', 75.4], ['Nairobi', 2200]] as const) {
+          await submitForm(request, admin, form, { city, amount });
+        }
+        const top = 'Nairobi';
+        const question = `In the form "${name}", which city has the largest total amount?`;
+        const warm = await request.post(`${api}/askData.json/ask`, { headers: { Authorization: `Bearer ${token}` },
+          data: { question }, timeout: 300_000, failOnStatusCode: false });
+        expect(warm.status(), 'the warm-up question was answered').toBeLessThan(500);
+        const page = await pageAs(browser, s);
+        await page.goto('/data/ask');
+        await page.locator('[data-test="question"]').fill(question);
+        await page.locator('[data-test="ask"]').click();
+        const answer = page.locator('[data-test="query-answer"]');
+        await expect(answer).toBeVisible({ timeout: 150_000 });
+        await expect(answer.locator('[data-test="query-sql"]')).toContainText('GROUP BY');
+        await expect(answer.locator('[data-test="query-rows"]')).toContainText(top);
+        await shot(page, info, 'ask-query-answer');
+        await answer.locator('[data-test="open-analytics"]').click();
+        await expect(page).toHaveURL(/\/data\/analytics\?/);
+        await expect(page.locator('app-sql-editor')).toContainText('GROUP BY', { timeout: 30_000 });
+        await shot(page, info, 'ask-query-in-analytics');
+        await page.context().close();
+      } finally {
+        await archiveForm(request, admin, form);
+      }
     });
 });
 

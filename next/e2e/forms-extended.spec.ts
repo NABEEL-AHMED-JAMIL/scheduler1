@@ -25,7 +25,7 @@ test.describe('Forms: lookup, rules, table, file, signature (live)', () => {
   let admin: Session;
   let form = Number(process.env['E2E_EXTENDED_FORM'] ?? 0);
   const made: number[] = [];
-  let giveBack: (() => Promise<void>) | null = null;
+  let giveBack: ((request: APIRequestContext) => Promise<void>) | null = null;
 
   test.beforeAll(async ({ request }) => {
     admin = await sessionFor(request, 'admin');
@@ -50,7 +50,7 @@ test.describe('Forms: lookup, rules, table, file, signature (live)', () => {
   });
 
   test.afterAll(async ({ request }) => {
-    if (giveBack) await giveBack();
+    if (giveBack) await giveBack(request);
     for (const id of made) await archiveForm(request, admin, id);
   });
 
