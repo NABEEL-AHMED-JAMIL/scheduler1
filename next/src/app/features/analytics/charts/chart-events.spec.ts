@@ -71,7 +71,7 @@ describe('a click on each ECharts kind picks the rows it was drawn from', () => 
   it('a line and an area report a click on their path, not only on their points', () => {
     for (const kind of ['lineSmooth', 'areaStacked', 'density'] as EChartKind[]) {
       const t = kind === 'lineSmooth' ? regions() : regionByCategory();
-      expect(series(build(t, kind)).every(one => one['triggerLineEvent'] === true)).toBe(true);
+      expect(series(build(t, kind)).every(one => one['triggerEvent'] === true)).toBe(true);
     }
     expect(pick(regionByCategory(), 'density', { componentType: 'series', seriesType: 'line', seriesIndex: 1 })).toEqual(['south', undefined]);
   });

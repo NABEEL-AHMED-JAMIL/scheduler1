@@ -240,7 +240,12 @@ export class EChart {
       chart.dispatchAction({ type: 'hideTip' });
       chart.dispatchAction({ type: 'downplay' });
       if (!option || !Object.keys(option).length) { chart.clear(); return; }
-      chart.setOption(option, { notMerge: true, lazyUpdate: true });
+      // Synchronously, never lazyUpdate. A lazy setOption replaces the model at once and builds
+      // its data on the next frame; a mouseout in between (the pointer leaving a mark of the old
+      // kind) reached a series with no data yet and threw "Cannot read properties of undefined
+      // (reading 'getRawIndex')" from inside ECharts' event dispatch -- the hover error seen when
+      // switching charts (owner, 2026-10-06). Drawing at once leaves no such window.
+      chart.setOption(option, { notMerge: true });
     } catch (error) {
       // Logged, and said on the tile in words: a chart that throws must not take the board down.
       console.error('A chart could not be drawn', error);

@@ -17,7 +17,8 @@ class FakeChart {
   calls: string[] = [];
   disposed = false;
   on(event: string, handler: Handler) { this.handlers.set(event, [...(this.handlers.get(event) ?? []), handler]); this.calls.push(`on:${event}`); }
-  setOption() { this.assertAlive(); this.calls.push('setOption'); }
+  setOptionArgs: unknown[] = [];
+  setOption(_option: unknown, opts: unknown) { this.assertAlive(); this.calls.push('setOption'); this.setOptionArgs.push(opts); }
   setTheme(key: string) { this.assertAlive(); this.calls.push(`setTheme:${key}`); }
   dispatchAction(action: { type: string }) { this.assertAlive(); this.calls.push(`action:${action.type}`); }
   clear() { this.assertAlive(); this.calls.push('clear'); }
@@ -134,6 +135,19 @@ describe('app-echart', () => {
     expect(made[0].calls.filter(call => call === 'on:click').length).toBe(1);
     made[0].fire('click', { dataIndex: 0 });
     expect(host.clicks.length).toBe(1);
+  });
+
+  it('draws a new option at once, never lazily: a mouseout in a lazy update\'s gap threw inside ECharts', async () => {
+    // "Cannot read properties of undefined (reading 'getRawIndex')", from ECharts' mouseout
+    // dispatch, when the pointer left a mark while a switched kind's data was not built yet.
+    const { fixture, host } = await render();
+    host.option.set({ series: [{ type: 'candlestick' }] });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(made[0].setOptionArgs.length).toBe(2);
+    for (const opts of made[0].setOptionArgs) {
+      expect(opts).toEqual({ notMerge: true });
+    }
   });
 
   it('drops the old kind\'s tooltip and highlight before the new option lands', async () => {

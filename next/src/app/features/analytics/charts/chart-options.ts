@@ -423,9 +423,9 @@ function lineKind(variant: 'smooth' | 'step' | 'markers' | 'stacked' | 'share'):
       yAxis: valueAxis,
       dataZoom: dataZoom(zoom, 'x', n, n),
       series: drawn.map((one, i) => ({
-        // The line and its fill report a click with their series (triggerLineEvent); the point is
+        // The line and its fill report a click with their series (triggerEvent); the point is
         // read off the axis under the pointer (app-echart), so a stacked area narrows to both.
-        type: 'line', name: one.name, data: one.data, triggerLineEvent: true,
+        type: 'line', name: one.name, data: one.data, triggerEvent: true,
         smooth: step ? false : smooth ? 0.35 : false,
         step: step ? 'middle' : false,
         connectNulls: false,
@@ -847,8 +847,8 @@ const densityKind: Builder = (table, s) => {
     xAxis: axisFrom({ type: 'value', scale: true, name: primary(table)?.name, nameLocation: 'middle', nameGap: 26 }, s.xAxis, true),
     yAxis: { type: 'value', axisLabel: { show: false }, splitLine: { show: false } },
     series: groups.map(group => ({
-      // The curve and its fill report a click (triggerLineEvent): a density draws no points to click.
-      type: 'line', name: group.name, data: density(group.values), smooth: 0.3, showSymbol: false, triggerLineEvent: true,
+      // The curve and its fill report a click (triggerEvent): a density draws no points to click.
+      type: 'line', name: group.name, data: density(group.values), smooth: 0.3, showSymbol: false, triggerEvent: true,
       lineStyle: { width: s.line?.width ?? 2 }, areaStyle: { opacity: s.line?.areaOpacity ?? 0.2 },
     })),
   }, click => (table.dims.length === 2 ? pickOf(table, { 0: groups[click.seriesIndex ?? -1]?.raw }) : null));
