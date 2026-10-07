@@ -106,14 +106,20 @@ describe('app-echart', () => {
     fixture.detectChanges();
     await fixture.whenStable();
     made[0].zrHandlers.forEach(handler => handler({ target: {}, event: 'native', offsetX: 310, offsetY: 40 }));
+    await Promise.resolve();
     expect(host.clicks).toEqual([{ componentType: 'series', seriesType: 'line', seriesIndex: 0, dataIndex: 3 }]);
-    // On empty canvas, or a click ECharts already reported, nothing more.
+    // On empty canvas nothing; and a click ECharts reported itself -- even after zrender's -- once.
     made[0].zrHandlers.forEach(handler => handler({ target: null, event: 'other', offsetX: 10, offsetY: 10 }));
+    made[0].zrHandlers.forEach(handler => handler({ target: {}, event: 'claimed', offsetX: 210, offsetY: 40 }));
+    made[0].fire('click', { componentType: 'series', seriesType: 'line', seriesIndex: 0, dataIndex: 2, event: { event: 'claimed' } });
+    await Promise.resolve();
+    expect(host.clicks.length).toBe(2);
     host.option.set({ series: [{ type: 'pie' }] });
     fixture.detectChanges();
     await fixture.whenStable();
     made[0].zrHandlers.forEach(handler => handler({ target: {}, event: 'x', offsetX: 10, offsetY: 10 }));
-    expect(host.clicks.length).toBe(1);
+    await Promise.resolve();
+    expect(host.clicks.length).toBe(2);
   });
 
   it('keeps that one handler through a kind switch: a setOption, never a re-bind', async () => {

@@ -185,10 +185,15 @@ export class EChart {
       // A line or an area is ONE path, and ECharts reports no click on it -- only on its point
       // markers, which a long or smooth line does not draw. A click on the path that ECharts did
       // not claim is read as the category under the pointer.
+      // Read after the dispatch: zrender runs its handlers and ECharts' in no promised order, and a
+      // click ECharts did report (a point, a series path) must not be emitted a second time.
       chart.getZr().on('click', event => {
-        if (this.chart !== chart || !event.target || event.event === claimed) return;
-        const line = lineClick(chart, this.option(), event.offsetX, event.offsetY);
-        if (line) this.clicked.emit(line);
+        if (this.chart !== chart || !event.target) return;
+        queueMicrotask(() => {
+          if (this.chart !== chart || event.event === claimed) return;
+          const line = lineClick(chart, this.option(), event.offsetX, event.offsetY);
+          if (line) this.clicked.emit(line);
+        });
       });
     } catch (error) {
       console.error('A chart could not be drawn', error);

@@ -68,6 +68,14 @@ describe('a click on each ECharts kind picks the rows it was drawn from', () => 
     expect(pick(regions(), 'polarBar', { componentType: 'series', seriesIndex: 0, dataIndex: 0 })).toEqual(['north']);
   });
 
+  it('a line and an area report a click on their path, not only on their points', () => {
+    for (const kind of ['lineSmooth', 'areaStacked', 'density'] as EChartKind[]) {
+      const t = kind === 'lineSmooth' ? regions() : regionByCategory();
+      expect(series(build(t, kind)).every(one => one['triggerLineEvent'] === true)).toBe(true);
+    }
+    expect(pick(regionByCategory(), 'density', { componentType: 'series', seriesType: 'line', seriesIndex: 1 })).toEqual(['south', undefined]);
+  });
+
   it('a stacked series names its second dimension; a point on it names both', () => {
     expect(pick(regionByCategory(), 'areaStacked', { componentType: 'series', seriesIndex: 1, dataIndex: 0 })).toEqual(['north', 'b']);
     expect(pick(regionByCategory(), 'barH', { componentType: 'series', seriesIndex: 0, dataIndex: 0 })).toEqual(['south', 'a']);

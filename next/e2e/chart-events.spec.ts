@@ -12,8 +12,9 @@ import { analyticsFixtures, ORDERS, PREFIX } from './support/analytics-fixtures'
  * returns, are not here. The board and its analyses are made the first time they are missing and
  * kept, like every other "E2E" fixture.
  *
- * Each tile: find the marks by moving over the chart where ECharts shows the pointer cursor (it shows
- * it only over a mark that narrows), click it, and read the condition the board filter opened with.
+ * Each tile: find the spots where ECharts shows the pointer cursor (over a mark that narrows, and
+ * over a legend item or other text that does not), click them until one narrows, and read the
+ * condition the board filter opened with.
  * A narrowing re-runs the board with the filter on, so each kind opens the board afresh.
  *
  * @author Nabeel Ahmed
@@ -79,15 +80,18 @@ async function ensureBoard(request: APIRequestContext, s: Session, connection: s
 async function pointerSpots(page: Page, chart: Locator): Promise<{ x: number; y: number }[]> {
   const box = (await chart.boundingBox())!;
   const spots: { x: number; y: number }[] = [];
-  for (let gy = 1; gy < 20 && spots.length < 10; gy++) {
-    for (let gx = 1; gx < 28 && spots.length < 10; gx++) {
+  for (let gy = 1; gy < 20; gy++) {
+    for (let gx = 1; gx < 28; gx++) {
       const x = box.x + (box.width * gx) / 28, y = box.y + (box.height * gy) / 20;
       await page.mouse.move(x, y);
       const cursor = await chart.evaluate(el => getComputedStyle(el.querySelector('div > div') ?? el).cursor);
       if (cursor === 'pointer' && !spots.some(s => Math.abs(s.y - y) < 4 && Math.abs(s.x - x) < 30)) spots.push({ x, y });
     }
   }
-  return spots;
+  // Marks sit in the middle; the legend, the toolbox and a treemap's breadcrumb along the edges
+  // (a legend click hides a series, a breadcrumb click climbs out of a branch).
+  const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+  return spots.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)).slice(0, 10);
 }
 
 let boardId = 0;
@@ -107,7 +111,7 @@ for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.j
   for (const kind of group) {
     await page.goto(`/data/analytics/dashboards?board=${boardId}`);
     await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 400_000 });
-    const tile = page.locator('app-analytics-widget', { hasText: `Events — ${kind}` });
+    const tile = page.locator('app-analytics-widget', { has: page.getByText(`Events — ${kind}`, { exact: true }) });
     await tile.scrollIntoViewIfNeeded();
     const chart = tile.locator(`app-echart[data-kind="${kind}"][data-drawn]`);
     await chart.waitFor({ timeout: 10_000 }).catch(() => undefined);
