@@ -21,6 +21,8 @@ import { RowSnap } from './row-snap';
     /* The search box grows into the line's free room and shrinks before anything wraps; pages' own max-w-* caps
        made it the first thing cut ("Search name, code, service or t"). */
     .table-toolbar-controls ::ng-deep .search-field { flex: 1 1 15rem; min-width: 12rem; max-width: 24rem; }
+    /* Set when the controls would wrap beside the heading: the heading takes its own line and the controls the next. */
+    .table-toolbar.is-stacked > h2 { flex-basis: 100%; }
   `,
   template: `
     <div class="card overflow-hidden">
@@ -35,8 +37,9 @@ import { RowSnap } from './row-snap';
           }
         </h2>
         <!-- Review 2026-10-07 (M16): the controls are one group. When the heading and the group fit on one line they
-             share it; when not, the whole group drops below the heading and wraps inside itself, the search box
-             taking the room that is left -- never Columns alone on a second line, never a cut placeholder. -->
+             share it; when the group would wrap beside the heading, the heading takes a line of its own (is-stacked,
+             set by stackToolbar) and the group the next, the search box taking the room that is left -- never Columns
+             alone on a second line, never a cut placeholder. -->
         <div class="table-toolbar-controls">
         <ng-content select="[toolbar]" />
         @if (columns().length >= 5) {
@@ -156,17 +159,38 @@ export class TableShell implements AfterViewInit {
   protected readonly visibleCount = computed(() => this.columns().length - this.hiddenCount());
   private restoredKey = '';
   private observer?: MutationObserver;
+  private resized?: ResizeObserver;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.observer?.disconnect());
+    inject(DestroyRef).onDestroy(() => { this.observer?.disconnect(); this.resized?.disconnect(); });
   }
 
   ngAfterViewInit(): void {
     this.refreshColumns();
+    // M16: re-decided whenever the toolbar's width or its controls change (a filter that comes and goes).
+    const toolbar = this.host.querySelector<HTMLElement>('.table-toolbar');
+    if (toolbar && typeof ResizeObserver !== 'undefined') {
+      this.resized = new ResizeObserver(() => this.stackToolbar(toolbar));
+      this.resized.observe(toolbar);
+    }
     // Rows re-render (paging, filters, a reload), so the choice is re-applied whenever the table's children
     // change. Only childList: the display changes made here must not wake it again.
-    this.observer = new MutationObserver(() => this.refreshColumns());
+    this.observer = new MutationObserver(() => { this.refreshColumns(); if (toolbar) this.stackToolbar(toolbar); });
     this.observer.observe(this.host, { childList: true, subtree: true });
+  }
+
+  /**
+   * Review 2026-10-07 (M16): whether the controls wrap when they share the heading's line. Measured with the heading
+   * inline; when any control sits below the first, the heading takes its own line (is-stacked). Toggled within one
+   * callback, so the size the observer sees settles at once.
+   */
+  stackToolbar(toolbar: HTMLElement): void {
+    const group = toolbar.querySelector<HTMLElement>('.table-toolbar-controls');
+    if (!group) return;
+    toolbar.classList.remove('is-stacked');
+    const tops = Array.from(group.children).map(c => (c as HTMLElement).getBoundingClientRect())
+      .filter(r => r.width > 0).map(r => Math.round(r.top));
+    toolbar.classList.toggle('is-stacked', tops.some(top => top > tops[0] + 4));
   }
 
   protected isHidden(column: string): boolean {
