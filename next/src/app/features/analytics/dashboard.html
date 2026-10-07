@@ -120,7 +120,7 @@
               @if (boardFilterCount()) {
                 <!-- In the facts line, which is there anyway: a click on a mark that narrows the board
                      changes this line's words and nothing's position. -->
-                <span class="inline-flex items-center gap-1">
+                <span class="dash-filter-facts inline-flex items-center gap-1">
                   <button type="button" class="pill pill-brand dash-filter-pill" [attr.aria-expanded]="filterOpen()" (click)="filterOpen.set(!filterOpen())"
                           [title]="'Board filter: ' + boardFilterWords().join(' · ')">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</button>
                   <button type="button" class="btn btn-ghost btn-icon btn-xs dash-filter-clear" aria-label="Clear the board filter" title="Clear the board filter" [disabled]="running()" (click)="clearBoardFilter()"><app-icon name="close" size="0.85em" /></button>

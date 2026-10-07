@@ -15,8 +15,10 @@
 .dash-filter-clear { width: 1.375rem; height: 1.375rem; min-height: 0; padding: 0; }
 /* What a run is doing, in a box that keeps its width while the words change ("Running 3 of 12 ·
    ...", "Last run: ..."), so the filter pill after it does not move as the board re-runs. */
-.dash-run { display: block; width: 24rem; max-width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dash-run { display: block; width: 20rem; max-width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .dash-run > app-icon { margin-right: 0.25rem; vertical-align: -0.125em; }
+/* After the run's fixed box, the pill needs no dot: the box's own room separates them. */
+.dash-facts > .dash-filter-facts::before { content: none; }
 /* Run every widget and Stop take turns in one place: one width, so the theme and the menu beside
    them stay put. */
 .dash-run-button { min-width: 8.75rem; justify-content: center; }

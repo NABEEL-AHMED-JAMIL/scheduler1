@@ -1186,6 +1186,8 @@ const gauge: Builder = (table, s, theme, context) => {
   const unit = unitOf(s);
   const series: Obj[] = [{
     type: 'gauge', min, max, startAngle: 210, endAngle: -30, radius: '92%', center: ['50%', '58%'],
+    // Five figures round the arc, not ECharts' eleven: at tile size those ran into each other.
+    splitNumber: 4,
     progress: { show: true, width: 14, roundCap: true },
     axisLine: { lineStyle: { width: 14, color: [[1, theme.tokens.sunken]] }, roundCap: true },
     pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false },
