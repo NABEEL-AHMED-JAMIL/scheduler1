@@ -1308,6 +1308,8 @@ export class Dashboards implements OnInit, OnDestroy {
    * layout (another kind, its chart settings, Show all).
    */
   readonly heldHeights = signal<ReadonlyMap<number, number>>(new Map());
+  /** Each tile's width, held with its height (spanOf). */
+  private readonly heldSpans = signal<ReadonlyMap<number, WidgetSpan>>(new Map());
 
   heldHeight(widget: DashboardWidget): number | null {
     return this.heldHeights().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
@@ -1322,6 +1324,12 @@ export class Dashboards implements OnInit, OnDestroy {
       const height = tile.getBoundingClientRect().height;
       if (Number.isFinite(id) && height > 0 && !held.has(id)) held.set(id, height);
     });
+    const spans = new Map(this.heldSpans());
+    for (const widget of this.widgets()) {
+      const id = widget.analyticsDashboardWidgetId;
+      if (id !== undefined && !spans.has(id)) spans.set(id, this.spanOf(widget));
+    }
+    this.heldSpans.set(spans);
     this.heldHeights.set(held);
   }
 
@@ -1331,11 +1339,17 @@ export class Dashboards implements OnInit, OnDestroy {
     const held = new Map(this.heldHeights());
     held.delete(id);
     this.heldHeights.set(held);
+    const spans = new Map(this.heldSpans());
+    spans.delete(id);
+    this.heldSpans.set(spans);
   }
 
   /** The filter off and the board re-run: the tiles are back at their own sizes, so nothing is held. */
   protected readonly releaseHeights = effect(() => {
-    if (!this.running() && !this.boardFilterCount() && this.heldHeights().size) this.heldHeights.set(new Map());
+    if (!this.running() && !this.boardFilterCount() && (this.heldHeights().size || this.heldSpans().size)) {
+      this.heldHeights.set(new Map());
+      this.heldSpans.set(new Map());
+    }
   });
 
   /**
@@ -1878,6 +1892,7 @@ export class Dashboards implements OnInit, OnDestroy {
   private resetBoardState(): void {
     this.runs.set({});
     this.heldHeights.set(new Map());
+    this.heldSpans.set(new Map());
     this.expanded.set(new Set());
     this.addOpen.set(false);
     this.filterOpen.set(false);
@@ -2011,6 +2026,11 @@ export class Dashboards implements OnInit, OnDestroy {
    * one before, so a tile does not jump when its result lands.
    */
   spanOf(widget: DashboardWidget): WidgetSpan {
+    // Held while the board is narrowed, with the height: a narrowed answer a kind cannot draw (a
+    // rose of one row) falls back to a table, a table takes the whole row, and the tiles round it
+    // were reflowed into new rows (layout shift 0.11, 2026-10-06).
+    const held = this.heldSpans().get(widget.analyticsDashboardWidgetId ?? -1);
+    if (held !== undefined) return held;
     const view = this.runs()[widget.analyticsDashboardWidgetId!]?.view;
     const kind = view ? this.drawn(widget, view) : (widget.visualizationType ?? 'table');
     if (kind === 'kpi') return 3;
