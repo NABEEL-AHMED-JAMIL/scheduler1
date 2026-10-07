@@ -57,11 +57,14 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
 
   // Owner 2026-09-29: running an existing schedule is not building it -- Run now and Run with stay for the customer.
   it('a schedule\'s menu keeps what reads and runs, and loses what builds', async () => {
-    const v = await visit('/pipelines/schedules', 'TENANT_ADMIN', null, {}, MANAGED);
+    const v = await visit('/pipelines/schedules', 'TENANT_ADMIN', null, {
+      // A pipeline with an AI step: the AI-model run is offered only there (review 2026-10-07).
+      'GET /sourceJob.json/aiModelChoice': { status: 'SUCCESS', message: '1 AI step(s).', data: { steps: [{ stepKey: 'summary' }] } },
+    }, MANAGED);
     await click(v, /^Actions for /);
     const items = overlay().items.join(' | ');
     expect(v.main.querySelector('[data-managed-banner]')?.textContent).toContain('You can still run them.');
-    for (const kept of ['Run now', 'Run with', 'Edit', 'Executions', 'Ask about this job']) expect(items).toContain(kept);
+    for (const kept of ['Run now', 'Run with a different AI model…', 'Edit', 'Executions', 'Ask about this job']) expect(items).toContain(kept);
     for (const gone of ['Skip next run', 'Duplicate', 'Email notifications', 'Deactivate', 'Delete']) {
       expect(items, gone).not.toContain(gone);
     }

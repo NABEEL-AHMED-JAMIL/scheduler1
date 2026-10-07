@@ -184,6 +184,12 @@ export class Jobs implements OnInit {
   readonly statusFilter = signal('');
   readonly executionFilter = signal('');
   readonly busyJob = signal<number | null>(null);
+  /**
+   * Review 2026-10-07: whether each schedule's pipeline has an AI step, read (sourceJob.json/aiModelChoice) the first
+   * time its row menu opens. "Run with a different AI model…" is offered only where it is true: on a pipeline with no AI
+   * step the dialog had nothing to choose. Absent until read; a failed read leaves it absent, and the item hidden.
+   */
+  readonly aiSteps = signal<Record<number, boolean>>({});
   readonly expanded = signal<Set<number>>(new Set());
   readonly selected = signal<Set<number>>(new Set());
 
@@ -705,6 +711,24 @@ export class Jobs implements OnInit {
    * MIG-251: Run now with the model each AI step runs on chosen for this run only. Offered when Run now is; the dialog
    * lists the job's AI steps, or says it has none.
    */
+  hasAiSteps(job: SourceJob): boolean {
+    return this.aiSteps()[job.jobId] === true;
+  }
+
+  /** On opening a row's menu: whether its pipeline has an AI step, asked once per schedule. */
+  checkAiSteps(job: SourceJob): void {
+    if (job.jobId in this.aiSteps()) return;
+    this.http.get<ApiResponse<{ steps?: unknown[] }>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params: { jobId: String(job.jobId) } })
+      .subscribe({
+        next: r => {
+          if (r?.status !== API_SUCCESS) return;
+          const steps = Array.isArray(r.data?.steps) ? r.data!.steps!.length : 0;
+          this.aiSteps.update(known => ({ ...known, [job.jobId]: steps > 0 }));
+        },
+        error: () => {},
+      });
+  }
+
   runWith(job: SourceJob): void {
     if (!this.canRunNow(job) || this.busyJob() === job.jobId) return;
     const data: RunWithData = { jobId: job.jobId, jobName: job.jobName };

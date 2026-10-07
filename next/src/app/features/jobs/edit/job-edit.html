@@ -203,11 +203,11 @@
       </div>
 
       @if (aiSteps().length) {
-        <!-- MIG-251 on MIG-242: what the schedule's runs use; Run with… on the list chooses for one run. -->
+        <!-- MIG-251 on MIG-242: what the schedule's runs use; Run with a different AI model… on the list chooses for one run. -->
         <div class="form-section">
           <h2 class="form-section-title">AI models</h2>
           <p class="text-sm text-[color:var(--text-secondary)] mb-3">
-            The model each AI step runs on when this schedule runs it. Run with… on the schedules list chooses for a
+            The model each AI step runs on when this schedule runs it. Run with a different AI model… on the schedules list chooses for a
             single run instead.
           </p>
           <app-ai-model-picks [steps]="aiSteps()" [(picks)]="modelPicks" idPrefix="schedule-model" />

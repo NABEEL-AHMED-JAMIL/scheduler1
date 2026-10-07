@@ -236,7 +236,7 @@
                  painted over the selected row's tint; it takes the tint back here. -->
             <td class="text-right col-pin-right"
                 [class.bg-[var(--surface-sunken)]]="selected().has(job.jobId)">
-              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu" (cdkMenuOpened)="checkAiSteps(job)"
                       [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('job #' + job.jobId))">
                 <app-icon name="dots" size="1.05em" />
               </button>
@@ -246,9 +246,12 @@
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
-                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
+                  <!-- Only where the pipeline has an AI step: elsewhere there is no model to choose (review 2026-10-07). -->
+                  @if (hasAiSteps(job)) {
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)" data-test="run-with"
                           [title]="runBlockedReason(job) || 'Run now, choosing the model each AI step runs on'"
-                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with…</button>
+                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with a different AI model…</button>
+                  }
                   @if (!locked()) {
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
                           [title]="skipBlockedReason(job)"

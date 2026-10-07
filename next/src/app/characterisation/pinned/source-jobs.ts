@@ -463,7 +463,6 @@ export const PINNED: Record<string, unknown> = {
       "Email notifications 3",
       "Executions",
       "Run now",
-      "Run with…",
       "Skip next run"
     ],
     "columns": [],
@@ -474,7 +473,6 @@ export const PINNED: Record<string, unknown> = {
     ],
     "items": [
       "Run now",
-      "Run with…",
       "Skip next run",
       "Edit",
       "Executions",
@@ -496,7 +494,6 @@ export const PINNED: Record<string, unknown> = {
       "Email notifications 3",
       "Executions",
       "Run now",
-      "Run with…",
       "Skip next run"
     ],
     "columns": [],
@@ -507,7 +504,6 @@ export const PINNED: Record<string, unknown> = {
     ],
     "items": [
       "Run now",
-      "Run with…",
       "Skip next run",
       "Edit",
       "Executions",

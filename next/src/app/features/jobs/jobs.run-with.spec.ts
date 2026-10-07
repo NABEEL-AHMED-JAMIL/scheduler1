@@ -46,7 +46,7 @@ function jobs(answers: Record<string, unknown> = {}, dialogAnswer = true) {
 
 const JOB = { jobId: 2849, jobName: 'UI-CHECK registry chain job 0929', jobStatus: 'Active', jobRunningStatus: 'Completed', execution: 'Manual' } as any;
 
-describe('Schedules row: Run with…', () => {
+describe('Schedules row: Run with a different AI model…', () => {
   it('opens the Run with… dialog for the job', () => {
     const { screen, opened } = jobs({}, false);
     screen.runWith(JOB);
@@ -67,6 +67,26 @@ describe('Schedules row: Run with…', () => {
     screen.runWith({ ...JOB, jobStatus: 'Inactive' });
     screen.runWith({ ...JOB, jobRunningStatus: 'Running' });
     expect(opened).toHaveLength(0);
+  });
+});
+
+describe('Schedules row: offered only for a pipeline with an AI step (review 2026-10-07)', () => {
+  it('asks once, on the menu opening, whether the pipeline has an AI step', () => {
+    const { screen, gets } = jobs({ '/sourceJob.json/aiModelChoice': { status: 'SUCCESS', data: { steps: [{ stepKey: 'summary' }] } } });
+    expect(screen.hasAiSteps(JOB)).toBe(false);
+    screen.checkAiSteps(JOB);
+    screen.checkAiSteps(JOB);
+    expect(gets.filter(g => g.startsWith('/sourceJob.json/aiModelChoice'))).toEqual(['/sourceJob.json/aiModelChoice?jobId=2849']);
+    expect(screen.hasAiSteps(JOB)).toBe(true);
+  });
+
+  it('is not offered for a pipeline with no AI step, nor when the answer is a refusal', () => {
+    const none = jobs({ '/sourceJob.json/aiModelChoice': { status: 'SUCCESS', data: { steps: [] } } });
+    none.screen.checkAiSteps(JOB);
+    expect(none.screen.hasAiSteps(JOB)).toBe(false);
+    const refused = jobs({ '/sourceJob.json/aiModelChoice': { status: 'ERROR', message: 'No such job.' } });
+    refused.screen.checkAiSteps(JOB);
+    expect(refused.screen.hasAiSteps(JOB)).toBe(false);
   });
 });
 

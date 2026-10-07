@@ -106,12 +106,14 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
   // Owner 2026-09-29: running is not building (Run now / Run with stay); Queue, Kafka and Task Registry are build screens.
   test('a managed customer still runs a schedule; Queue, Kafka and Task Registry are read-only', async ({ browser }, info) => {
     const page = await pageAs(browser, MANAGED_ADMIN);
-    await fakeApi(page);
+    // A pipeline with an AI step, so the AI-model run is on the menu (it is offered only there, review 2026-10-07).
+    await fakeApi(page, { 'GET /sourceJob.json/aiModelChoice': { status: 'SUCCESS', message: '1 AI step(s).',
+      data: { steps: [{ stepKey: 'summary', options: [] }] } } });
     await page.goto('/pipelines/schedules');
     await expect(page.getByText('You can still run them.')).toBeVisible();
     await page.getByRole('button', { name: /^Actions for / }).first().click();
     await expect(page.getByRole('menuitem', { name: 'Run now' })).toBeVisible();
-    await expect(page.getByRole('menuitem', { name: /Run with/ })).toBeVisible();
+    await expect(page.getByRole('menuitem', { name: 'Run with a different AI model…' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Skip next run' })).toHaveCount(0);
     await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveCount(0);
     await shot(page, info, 'managed-schedule-menu');

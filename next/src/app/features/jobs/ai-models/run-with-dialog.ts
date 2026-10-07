@@ -14,7 +14,7 @@ export interface RunWithData {
 }
 
 /**
- * MIG-251: "Run with…" -- Run now, with the model each AI step runs on chosen for this run only
+ * MIG-251: "Run with a different AI model…" (was "Run with…") -- Run now, with the model each AI step runs on chosen for this run only
  * (sourceJob.json/runSourceJobWith, MIG-242's Core part). Each step starts from what it runs on today: the schedule's
  * setting, else its default. Core makes Run now's checks too, so a refusal is said here and the dialog stays open.
  *
@@ -26,7 +26,7 @@ export interface RunWithData {
   imports: [FormDialog, Icon, AiModelPicks],
   template: `
     <app-form-dialog
-        heading="Run with…"
+        heading="Run with a different AI model"
         [subtitle]="'Run ' + data.jobName + ' now, choosing the model each AI step runs on for this run only.'"
         confirmLabel="Run" busyLabel="Starting…"
         [cancelLabel]="steps().length ? 'Cancel' : 'Close'"

@@ -14,7 +14,8 @@ import { getJson, jobNamed, keptRun, runsOf } from './support/workspace';
  *  - NO_FILES: an older Completed run of the same job that recorded no outputs (from before MIG-236).
  *  - LEGACY: "UI-REVIEW Clean customers (manual, notify on completion)" and its latest run the worker ran (legacy).
  *  - INBOX: "UI-CHECK step engine job 0928", started by a file arriving in the inbox, and the run that arrival made.
- *  - Run with… from the Schedules row lists the job's AI steps and their models, or says it has none; it is closed.
+ *  - Run with a different AI model… from the Schedules row lists the job's AI steps and their models; it is offered only
+ *    for a pipeline with an AI step.
  *
  * Each can still be pinned (E2E_ENGINE_RUN, E2E_NO_FILES_RUN, E2E_LEGACY_RUN, E2E_INBOX_RUN, E2E_FILES_RUN). Sign-in
  * through support/session.ts: E2E_TENANT_ADMIN_TOKEN (4537 of 2924), or E2E_TENANT_ADMIN(_PASSWORD).
@@ -187,31 +188,33 @@ test.describe('Executions', () => {
     await page.context().close();
   });
 
-  test('Run with… lists the job\'s AI steps and models, or says it has none', async ({ browser, request }) => {
+  test('Run with a different AI model… lists the job\'s AI steps and models, and is offered only where there are some', async ({ browser, request }) => {
     // What the dialog should list, asked directly: Chromium does not always keep a cross-origin answer's body.
     const body = await (await request.get(`${api}/sourceJob.json/aiModelChoice?jobId=${ENGINE.job}`,
       { headers: authOf(s) })).json();
     expect(body.status, body.message).toBe('SUCCESS');
+    const hasAi = (body.data?.steps ?? []).length > 0;
     const page = await pageAs(browser, s);
     await page.goto('/pipelines/schedules');
     await page.getByLabel('Search jobs').fill(String(ENGINE.job));
     await page.getByRole('button', { name: new RegExp(`^Actions for ${REGISTRY_JOB}`) }).click();
     const menu = page.getByRole('menu');
-    // Every row action is where it was, with Run with… after Run now.
-    await expect(menu.getByRole('menuitem')).toHaveText([/Run now/, /Run with…/, /Skip next run/, /Edit/, /Executions/,
-      /Ask about this job/, /Duplicate/, /Email notifications/, /Deactivate|Activate/, /Delete/]);
-    await menu.getByRole('menuitem', { name: 'Run with…' }).click();
-    const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('heading', { name: 'Run with…' })).toBeVisible();
-    if ((body.data?.steps ?? []).length) {
-      await expect(dialog.locator('.ai-model-pick')).toHaveCount(body.data.steps.length);
-      await expect(dialog.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
-      await dialog.getByRole('button', { name: 'Cancel' }).click();
-    } else {
-      await expect(dialog).toContainText('no AI steps');
-      await expect(dialog.getByRole('button', { name: 'Run', exact: true })).toHaveCount(0);
-      await dialog.getByRole('button', { name: 'Close' }).click();
+    // Every row action is where it was; the AI-model run sits after Run now, and only for a pipeline with an AI step
+    // (review 2026-10-07).
+    await expect(menu.getByRole('menuitem')).toHaveText([/Run now/, ...(hasAi ? [/Run with a different AI model…/] : []),
+      /Skip next run/, /Edit/, /Executions/, /Ask about this job/, /Duplicate/, /Email notifications/, /Deactivate|Activate/, /Delete/]);
+    if (!hasAi) {
+      await expect(menu.getByRole('menuitem', { name: /Run with/ })).toHaveCount(0);
+      await page.keyboard.press('Escape');
+      await page.context().close();
+      return;
     }
+    await menu.getByRole('menuitem', { name: 'Run with a different AI model…' }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: 'Run with a different AI model' })).toBeVisible();
+    await expect(dialog.locator('.ai-model-pick')).toHaveCount(body.data.steps.length);
+    await expect(dialog.getByRole('button', { name: 'Run', exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
     await page.context().close();
   });
