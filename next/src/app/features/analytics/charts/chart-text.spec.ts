@@ -99,7 +99,8 @@ describe('chart text colours', () => {
     expect(labelInk(null, false, { labels: { color: '#ff0000' } }, THEME.tokens)).toBe('#ff0000');
     expect(labelInk('#fde68a', true, {}, THEME.tokens)).toBe('#000000');
     const big = series(build(n(4), 'barH', { labels: { show: true, size: 'large' } }))[0];
-    expect(label(big)['fontSize']).toBe(13);
+    // Large is the type scale's title step (shared/charts/chart-type.ts): 14px, was 13 before 2026-10-06.
+    expect(label(big)['fontSize']).toBe(14);
   });
 });
 

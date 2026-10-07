@@ -43,7 +43,9 @@ export interface RankedItem {
                     (click)="picked.emit(row)">
               <span class="flex items-center gap-2 text-[11px] leading-none">
                 <span class="truncate text-[color:var(--text-secondary)]">{{ row.short }}</span>
-                <span class="ml-auto tabular font-medium shrink-0">{{ row.display || row.value }}</span>
+                <!-- The name is an axis label (11px), the figure a data label (12px): the type scale's
+                     steps, as the horizontal bars ECharts draws. -->
+                <span class="ml-auto tabular font-medium shrink-0 text-xs">{{ row.display || row.value }}</span>
                 @if (showPercent()) {
                   <span class="tabular text-[color:var(--text-muted)] w-8 text-right shrink-0">
                     {{ row.percent }}%

@@ -1,3 +1,4 @@
+import { CHART_TYPE } from '../chart-type';
 import THEME_FILE from './echart-themes.json';
 import { CHART_SLOTS } from '../status-color';
 
@@ -185,30 +186,32 @@ export function themeKey(themeId: string | null | undefined, mode: Mode): string
  * The ECharts theme object: a palette, and the console's chrome around it.
  *
  * Animations are short and eased out -- a tile redraws on every board filter, and a long tween
- * between two results reads as the data moving. Text is the console's 11 and 12px, never smaller.
+ * between two results reads as the data moving. Text is on the console's chart type scale
+ * (shared/charts/chart-type.ts): 11px for the chrome, 12px for what is said about a mark.
  */
 export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<string, unknown> {
+  const { caption: CAPTION, body: BODY } = CHART_TYPE;
   const axis = (splitLines: boolean) => ({
     axisLine: { show: true, lineStyle: { color: tokens.border } },
     axisTick: { show: false, lineStyle: { color: tokens.border } },
     // The secondary text colour, not the muted one: muted is held to the 4.5:1 floor for prose
     // at 12px on the card, and axis text at 11px on a dark card read faint beside it.
-    axisLabel: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
-    nameTextStyle: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
+    axisLabel: { color: tokens.textSecondary, fontSize: CAPTION, fontFamily: tokens.font },
+    nameTextStyle: { color: tokens.textSecondary, fontSize: CAPTION, fontFamily: tokens.font },
     splitLine: { show: splitLines, lineStyle: { color: tokens.border, type: 'dashed' } },
     splitArea: { show: false },
   });
   return {
     color: palette,
     backgroundColor: 'transparent',
-    textStyle: { fontFamily: tokens.font, color: tokens.textSecondary, fontSize: 12 },
+    textStyle: { fontFamily: tokens.font, color: tokens.textSecondary, fontSize: BODY },
     title: {
-      textStyle: { color: tokens.text, fontSize: 13, fontWeight: 600, fontFamily: tokens.font },
-      subtextStyle: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
+      textStyle: { color: tokens.text, fontSize: BODY, fontWeight: 600, fontFamily: tokens.font },
+      subtextStyle: { color: tokens.textSecondary, fontSize: CAPTION, fontFamily: tokens.font },
     },
     legend: {
-      textStyle: { color: tokens.textSecondary, fontSize: 11, fontFamily: tokens.font },
-      pageTextStyle: { color: tokens.textSecondary },
+      textStyle: { color: tokens.textSecondary, fontSize: CAPTION, fontFamily: tokens.font },
+      pageTextStyle: { color: tokens.textSecondary, fontSize: CAPTION },
       pageIconColor: tokens.textSecondary,
       pageIconInactiveColor: tokens.border,
       inactiveColor: tokens.border,
@@ -218,14 +221,14 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
       borderColor: tokens.border,
       borderWidth: 1,
       padding: [6, 10],
-      textStyle: { color: tokens.text, fontSize: 12, fontFamily: tokens.font },
+      textStyle: { color: tokens.text, fontSize: BODY, fontFamily: tokens.font },
       // A long category name wraps inside the tooltip rather than running it off the chart.
       extraCssText: 'max-width: min(360px, 90vw); white-space: normal; overflow-wrap: anywhere; box-shadow: 0 4px 12px var(--shadow-color);',
       axisPointer: {
         lineStyle: { color: tokens.muted },
         crossStyle: { color: tokens.muted },
         shadowStyle: { color: tokens.sunken, opacity: 0.6 },
-        label: { backgroundColor: tokens.sunken, color: tokens.text, fontFamily: tokens.font },
+        label: { backgroundColor: tokens.sunken, color: tokens.text, fontFamily: tokens.font, fontSize: CAPTION },
       },
     },
     categoryAxis: axis(false),
@@ -235,7 +238,7 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     grid: { borderColor: tokens.border },
     polar: {},
     radar: {
-      axisName: { color: tokens.textSecondary, fontSize: 11 },
+      axisName: { color: tokens.textSecondary, fontSize: CAPTION },
       axisLine: { lineStyle: { color: tokens.border } },
       splitLine: { lineStyle: { color: tokens.border } },
       splitArea: { show: false },
@@ -243,7 +246,7 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     dataZoom: {
       borderColor: tokens.border,
       fillerColor: tokens.sunken,
-      textStyle: { color: tokens.textSecondary, fontSize: 11 },
+      textStyle: { color: tokens.textSecondary, fontSize: CAPTION },
       handleStyle: { color: tokens.surface, borderColor: tokens.muted },
       moveHandleStyle: { color: tokens.border },
       dataBackground: { lineStyle: { color: tokens.muted }, areaStyle: { color: tokens.sunken } },
@@ -252,7 +255,7 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     },
     visualMap: {
       inRange: { color: [tokens.sunken, tokens.heat] },
-      textStyle: { color: tokens.textSecondary, fontSize: 11 },
+      textStyle: { color: tokens.textSecondary, fontSize: CAPTION },
     },
     toolbox: {
       iconStyle: { borderColor: tokens.muted },
@@ -261,9 +264,9 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     calendar: {
       itemStyle: { color: tokens.surface, borderColor: tokens.border },
       splitLine: { lineStyle: { color: tokens.muted } },
-      dayLabel: { color: tokens.textSecondary, fontSize: 10 },
-      monthLabel: { color: tokens.textSecondary, fontSize: 11 },
-      yearLabel: { color: tokens.textSecondary, fontSize: 12 },
+      dayLabel: { color: tokens.textSecondary, fontSize: CAPTION },
+      monthLabel: { color: tokens.textSecondary, fontSize: CAPTION },
+      yearLabel: { color: tokens.textSecondary, fontSize: CAPTION },
     },
     candlestick: {
       itemStyle: { color: tokens.up, color0: tokens.down, borderColor: tokens.up, borderColor0: tokens.down },
@@ -271,12 +274,12 @@ export function buildTheme(tokens: ChartTokenSet, palette: string[]): Record<str
     // Labels beside a mark are text on the card: the card's text colour, and no halo. ECharts 6
     // draws a dark outline round them by default, which read as smudged bold type in both modes.
     ...Object.fromEntries(['pie', 'tree', 'sankey', 'chord'].map(type =>
-      [type, { label: { color: tokens.textSecondary, textBorderWidth: 0 }, labelLine: { lineStyle: { color: tokens.border } } }])),
-    ...Object.fromEntries(['bar', 'line', 'scatter', 'pictorialBar'].map(type => [type, { label: { textBorderWidth: 0 } }])),
-    markLine: { label: { color: tokens.textSecondary, fontSize: 11, textBorderWidth: 0 }, lineStyle: { color: tokens.muted } },
+      [type, { label: { color: tokens.textSecondary, fontSize: BODY, textBorderWidth: 0 }, labelLine: { lineStyle: { color: tokens.border } } }])),
+    ...Object.fromEntries(['bar', 'line', 'scatter', 'pictorialBar'].map(type => [type, { label: { fontSize: BODY, textBorderWidth: 0 } }])),
+    markLine: { label: { color: tokens.textSecondary, fontSize: CAPTION, textBorderWidth: 0 }, lineStyle: { color: tokens.muted } },
     // A pin is filled in its series' colour; the builder sets the ink per series (inkOn).
-    markPoint: { label: { fontSize: 11, textBorderWidth: 0 } },
-    gauge: { axisLabel: { color: tokens.textSecondary }, title: { color: tokens.textSecondary }, detail: { color: tokens.text } },
+    markPoint: { label: { fontSize: CAPTION, textBorderWidth: 0 } },
+    gauge: { axisLabel: { color: tokens.textSecondary, fontSize: CAPTION }, title: { color: tokens.textSecondary, fontSize: CAPTION }, detail: { color: tokens.text } },
     animationDuration: 280,
     animationDurationUpdate: 220,
     animationEasing: 'cubicOut',

@@ -1,3 +1,4 @@
+import { CHART_TYPE } from '../../../shared/charts/chart-type';
 import type { WidgetVisualization } from '../analytics.service';
 import { kindInfo } from '../widget-kinds';
 
@@ -22,8 +23,12 @@ export type Side = 'top' | 'bottom' | 'left' | 'right';
 /** 'auto' (contrast with the mark), 'theme' (the theme's text colours), or a #rrggbb. */
 export type LabelColor = 'auto' | 'theme' | `#${string}`;
 export type LabelSize = 'small' | 'normal' | 'large';
-/** The px a label size draws at. Never under the console's 10px floor for chart text. */
-export const LABEL_PX: Record<LabelSize, number> = { small: 10, normal: 11, large: 13 };
+/**
+ * The px a label size draws at: the chart type scale's three steps (shared/charts/chart-type.ts),
+ * so a label is never under the 11px floor for chart text nor larger than the tile's title. Was
+ * 10/11/13, and Small went under the floor.
+ */
+export const LABEL_PX: Record<LabelSize, number> = { small: CHART_TYPE.caption, normal: CHART_TYPE.body, large: CHART_TYPE.title };
 
 export interface AxisSettings {
   name?: string;

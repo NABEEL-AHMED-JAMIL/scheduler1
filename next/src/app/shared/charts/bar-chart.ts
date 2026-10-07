@@ -191,7 +191,8 @@ export function axisTicks(max: number, whole = true): number[] {
                   [class.cursor-pointer]="clickable() && !bar.inert"
                   (click)="barClicked.emit(bar)">
             @if (showValues()) {
-              <span class="text-[11px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.display }}</span>
+              <!-- A figure on a mark: the type scale's 12px, as ECharts' data labels. -->
+              <span class="bar-value text-xs tabular leading-none text-[color:var(--text-muted)]">{{ bar.display }}</span>
             }
             <!--
               --chart-0, not bg-brand-500. The accent ramp is monochrome and its 500 step is a

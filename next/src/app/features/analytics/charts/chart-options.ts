@@ -10,6 +10,11 @@ import {
 } from './chart-table';
 import { CATEGORY_LIMIT, gaugeFigures } from './chart-fit';
 import { AxisSettings, ChartSettings, LABEL_PX, NumberStyle } from './chart-settings';
+import { CHART_TYPE, figurePx } from '../../../shared/charts/chart-type';
+
+const CAPTION = CHART_TYPE.caption;
+/** A label's size by the settings, 'normal' (12px) unless a kind's labels are dense and start smaller. */
+const labelPx = (s: ChartSettings, unset: 'small' | 'normal' = 'normal'): number => LABEL_PX[s.labels?.size ?? unset];
 
 /**
  * Results to ECharts options: one pure function per kind, and one entry point.
@@ -284,7 +289,7 @@ function labelOption(settings: ChartSettings, defaultShow: boolean, defaultPosit
   return {
     show: settings.labels?.show ?? defaultShow,
     position,
-    fontSize: LABEL_PX[settings.labels?.size ?? 'normal'],
+    fontSize: labelPx(settings),
     formatter: (params: { value: unknown }) => {
       const raw = Array.isArray(params.value) ? params.value[params.value.length - 1] : params.value;
       return typeof raw === 'number' ? formatNumber(raw, settings.labels?.format ?? 'compact', unit) : String(raw ?? '');
@@ -440,7 +445,7 @@ function lineKind(variant: 'smooth' | 'step' | 'markers' | 'stacked' | 'share'):
           markPoint: {
             symbolSize: 34,
             data: [{ type: 'max', name: 'Highest' }, { type: 'min', name: 'Lowest' }],
-            label: { formatter: (p: { value: number }) => formatNumber(p.value, 'compact'), fontSize: 11 },
+            label: { formatter: (p: { value: number }) => formatNumber(p.value, 'compact'), fontSize: CAPTION },
           },
           markLine: {
             silent: true, symbol: 'none', lineStyle: { type: 'dashed', width: 1 },
@@ -590,7 +595,7 @@ const polarBar: Builder = (table0, s) => {
     tooltip: tooltip(s, 'item', unitOf(s)),
     polar: { radius: ['12%', '78%'] },
     angleAxis: { type: 'value', startAngle: 90, splitNumber: 4, axisLabel: { formatter: axisNumber('compact') }, splitLine: { show: false } },
-    radiusAxis: { type: 'category', data: xs, axisLabel: { interval: 0, fontSize: 11 }, z: 10 },
+    radiusAxis: { type: 'category', data: xs, axisLabel: { interval: 0, fontSize: CAPTION }, z: 10 },
     series: [{
       type: 'bar', coordinateSystem: 'polar', name: primary(table)?.name ?? '', data: figures(table),
       colorBy: 'data', roundCap: (s.bar?.radius ?? 1) > 0, label: labelOption(s, false, 'middle'),
@@ -677,8 +682,8 @@ const nestedPie: Builder = (table, s, theme) => {
     series: [
       { type: 'pie', radius: [0, `${s.pie?.inner ?? 34}%`], data: inner,
         // Named inside the slice only where the slice is wide enough to hold the name.
-        label: { position: 'inner', fontSize: LABEL_PX[s.labels?.size ?? 'normal'], width: 90, overflow: 'truncate', formatter: (p: { name: string; percent: number }) => (p.percent >= 9 ? p.name : '') }, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
-      { type: 'pie', radius: [`${(s.pie?.inner ?? 34) + 8}%`, `${s.pie?.outer ?? 72}%`], label: { show: s.labels?.show ?? outer.length <= 16, fontSize: LABEL_PX[s.labels?.size ?? 'normal'], width: 120, overflow: 'truncate' }, data: outer, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
+        label: { position: 'inner', fontSize: labelPx(s), width: 90, overflow: 'truncate', formatter: (p: { name: string; percent: number }) => (p.percent >= 9 ? p.name : '') }, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
+      { type: 'pie', radius: [`${(s.pie?.inner ?? 34) + 8}%`, `${s.pie?.outer ?? 72}%`], label: { show: s.labels?.show ?? outer.length <= 16, fontSize: labelPx(s), width: 120, overflow: 'truncate' }, data: outer, itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 } },
     ],
   }, click => {
     const at = click.dataIndex;
@@ -917,9 +922,9 @@ const treemap: Builder = (table0, s, theme, context) => {
       // A click narrows the board where it can; zooming into a branch is then the breadcrumb's job.
       type: 'treemap', name: primary(table)?.name ?? '', data: nodes, roam: false, nodeClick: context.clickable ? false : 'zoomToNode',
       top: s.title?.text ? 40 : 4, left: 4, right: 4, bottom: table.dims.length > 1 ? 26 : 4,
-      breadcrumb: { show: table.dims.length > 1, height: 18, itemStyle: { textStyle: { fontSize: 11 } } },
-      label: { show: s.labels?.show ?? true, fontSize: LABEL_PX[s.labels?.size ?? 'normal'], overflow: 'truncate', ellipsis: '…', textBorderWidth: 0, formatter: (p: { name: string; value: number }) => `${p.name}\n${formatNumber(p.value, s.labels?.format ?? 'compact')}` },
-      upperLabel: { show: table.dims.length > 1, height: 18, fontSize: LABEL_PX[s.labels?.size ?? 'normal'], overflow: 'truncate', textBorderWidth: 0 },
+      breadcrumb: { show: table.dims.length > 1, height: 18, itemStyle: { textStyle: { fontSize: CAPTION } } },
+      label: { show: s.labels?.show ?? true, fontSize: labelPx(s), overflow: 'truncate', ellipsis: '…', textBorderWidth: 0, formatter: (p: { name: string; value: number }) => `${p.name}\n${formatNumber(p.value, s.labels?.format ?? 'compact')}` },
+      upperLabel: { show: table.dims.length > 1, height: labelPx(s) + 7, fontSize: labelPx(s), overflow: 'truncate', ellipsis: '…', textBorderWidth: 0 },
       // Gaps in the card's colour: ECharts paints them white, a grid of white lines on a dark card.
       itemStyle: { borderWidth: 1, gapWidth: 1, borderColor: theme.tokens.surface },
       levels: [
@@ -943,7 +948,7 @@ const sunburst: Builder = (table, s, theme, context) => {
       type: 'sunburst', data: nodes, radius: [`${s.pie?.inner ?? 12}%`, `${s.pie?.outer ?? 92}%`], sort: undefined,
       nodeClick: context.clickable ? false : 'rootToNode',
       itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 },
-      label: { show: s.labels?.show ?? true, fontSize: LABEL_PX[s.labels?.size ?? 'normal'], minAngle: 8, rotate: 'radial', overflow: 'truncate', textBorderWidth: 0 },
+      label: { show: s.labels?.show ?? true, fontSize: labelPx(s), minAngle: 8, rotate: 'radial', overflow: 'truncate', textBorderWidth: 0 },
       emphasis: { focus: 'ancestor' },
     }],
   }, treePicker(table));
@@ -957,7 +962,7 @@ const tree: Builder = (table, s) => {
   series: [{
     type: 'tree', data: [{ name: primary(table)?.name ?? 'All', children: treeOf(table) }],
     top: 8, bottom: 8, left: 80, right: 140, symbolSize: 7, initialTreeDepth: leaves > 24 ? 1 : -1,
-    label: { position: 'left', verticalAlign: 'middle', align: 'right', fontSize: 11 },
+    label: { position: 'left', verticalAlign: 'middle', align: 'right', fontSize: labelPx(s, 'small'), width: 72, overflow: 'truncate', ellipsis: '…' },
     leaves: { label: { position: 'right', align: 'left', formatter: (p: { name: string; value: number }) => `${p.name}  ${formatNumber(p.value, 'compact')}` } },
     expandAndCollapse: true, animationDuration: 280,
   }],
@@ -1006,7 +1011,7 @@ const sankey: Builder = (table, s) => {
       type: 'sankey', data: flow.nodes, links: flow.links, nodeAlign: 'justify', nodeGap: 8, nodeWidth: 12,
       top: s.title?.text ? 44 : 8, bottom: 8, left: 8, right: 90,
       emphasis: { focus: 'adjacency' }, lineStyle: { color: 'gradient', opacity: 0.35, curveness: 0.5 },
-      label: { fontSize: LABEL_PX[s.labels?.size ?? 'normal'], width: 84, overflow: 'truncate', ellipsis: '…' },
+      label: { fontSize: labelPx(s), width: 84, overflow: 'truncate', ellipsis: '…' },
     }],
   }, click => {
     const item = click.data as { name?: string; source?: string; target?: string } | undefined;
@@ -1038,7 +1043,7 @@ const chord: Builder = (table, s) => {
     tooltip: { trigger: 'item', confine: true, valueFormatter: (v: number) => formatNumber(v, s.tooltip?.format, unitOf(s)) },
     series: [{
       type: 'chord', data: names.map(name => ({ name })), links: [...links.values()], radius: ['70%', '78%'],
-      padAngle: 2, minAngle: 2, label: { show: s.labels?.show ?? names.length <= 24, fontSize: 11 },
+      padAngle: 2, minAngle: 2, label: { show: s.labels?.show ?? names.length <= 24, fontSize: labelPx(s, 'small'), width: 90, overflow: 'truncate', ellipsis: '…' },
       lineStyle: { color: 'source', opacity: 0.4 }, emphasis: { focus: 'adjacency' },
     }],
   }, click => {
@@ -1112,9 +1117,9 @@ const calendar: Builder = (table, s, _theme, context) => {
     // The year sits left of the weekday initials, with room for both; the toolbox gets the top row.
     calendar: years.map((year, i) => ({
       range: year, top: top + i * band, left: years.length > 1 ? 58 : 36, right: 12, cellSize: ['auto', cell], orient: 'horizontal',
-      yearLabel: { show: years.length > 1, position: 'left', margin: 30 },
-      dayLabel: { firstDay: 1, nameMap: ['S', 'M', 'T', 'W', 'T', 'F', 'S'], margin: 6 },
-      monthLabel: { margin: 4 },
+      yearLabel: { show: years.length > 1, position: 'left', margin: 30, fontSize: CAPTION },
+      dayLabel: { firstDay: 1, nameMap: ['S', 'M', 'T', 'W', 'T', 'F', 'S'], margin: 6, fontSize: CAPTION },
+      monthLabel: { margin: 4, fontSize: CAPTION },
     })),
     series: years.map((year, i) => ({
       type: 'heatmap', coordinateSystem: 'calendar', calendarIndex: i,
@@ -1165,7 +1170,7 @@ export function niceCeiling(value: number): number {
   return 10 * magnitude;
 }
 
-const gauge: Builder = (table, s, theme) => {
+const gauge: Builder = (table, s, theme, context) => {
   const { value, target: inRow } = gaugeFigures(table);
   const target = s.refLines?.target ?? inRow;
   const max = s.yAxis?.max ?? niceCeiling(Math.max(value, target ?? 0) * 1.1);
@@ -1176,10 +1181,11 @@ const gauge: Builder = (table, s, theme) => {
     progress: { show: true, width: 14, roundCap: true },
     axisLine: { lineStyle: { width: 14, color: [[1, theme.tokens.sunken]] }, roundCap: true },
     pointer: { show: false }, axisTick: { show: false }, splitLine: { show: false },
-    axisLabel: { distance: 18, fontSize: 11, color: theme.tokens.textSecondary, formatter: axisNumber('compact', unit) },
-    anchor: { show: false }, title: { show: true, offsetCenter: [0, '26%'], fontSize: 11, color: theme.tokens.textSecondary },
+    axisLabel: { distance: 18, fontSize: CAPTION, color: theme.tokens.textSecondary, formatter: axisNumber('compact', unit) },
+    anchor: { show: false }, title: { show: true, offsetCenter: [0, '26%'], fontSize: CAPTION, color: theme.tokens.textSecondary, width: 160, overflow: 'truncate', ellipsis: '…' },
     detail: {
-      valueAnimation: true, offsetCenter: [0, '-4%'], fontSize: 18, fontWeight: 600, color: theme.tokens.text,
+      // The reading is the answer, like a single figure: it grows with the tile, up to a cap.
+      valueAnimation: true, offsetCenter: [0, '-4%'], fontSize: figurePx(context.height), fontWeight: 600, color: theme.tokens.text,
       formatter: (v: number) => formatNumber(v, s.labels?.format ?? 'compact', unit),
     },
     data: [{ value, name: target !== null && target !== undefined ? `of ${formatNumber(target, 'auto', unit)} target` : primary(table)?.name ?? '' }],
@@ -1216,7 +1222,7 @@ const radar: Builder = (table, s) => {
   return withPicker({
     legend: lg,
     tooltip: { trigger: 'item', confine: true, valueFormatter: (v: number) => formatNumber(v, s.tooltip?.format, unitOf(s)) },
-    radar: { indicator: indicators, radius: '66%', center: ['50%', lg && (s.legend?.position ?? 'top') === 'top' ? '56%' : '50%'], splitNumber: 4, axisName: { fontSize: 11 } },
+    radar: { indicator: indicators, radius: '66%', center: ['50%', lg && (s.legend?.position ?? 'top') === 'top' ? '56%' : '50%'], splitNumber: 4, axisName: { fontSize: CAPTION, width: 90, overflow: 'truncate', ellipsis: '…' } },
     series: [{
       type: 'radar', symbolSize: 4, lineStyle: { width: s.line?.width ?? 2 }, areaStyle: { opacity: s.line?.areaOpacity ?? 0.12 },
       data: series,
@@ -1240,7 +1246,7 @@ const parallel: Builder = (table, s) => {
       formatter: (p: { value: (string | number)[] }) => (p.value ?? [])
         .map((v, i) => `${names[i]}: ${typeof v === 'number' ? formatNumber(v, s.tooltip?.format) : v}`).join('<br>'),
     },
-    parallel: { left: 40, right: 60, top: s.title?.text ? 56 : 36, bottom: 24, parallelAxisDefault: { nameTextStyle: { fontSize: 11 }, axisLabel: { fontSize: 11 } } },
+    parallel: { left: 40, right: 60, top: s.title?.text ? 56 : 36, bottom: 24, parallelAxisDefault: { nameTextStyle: { fontSize: CAPTION, width: 90, overflow: 'truncate', ellipsis: '…' }, axisLabel: { fontSize: CAPTION } } },
     parallelAxis: axes,
     series: [{
       type: 'parallel', lineStyle: { width: 1, opacity: table.length > 500 ? 0.15 : 0.45 }, data,
@@ -1274,7 +1280,7 @@ const themeRiver: Builder = (table, s) => {
         return [head, ...params.map(p => `${p.marker}${p.value[2]}: ${formatNumber(p.value[1], s.tooltip?.format, unitOf(s))}`)].join('<br>');
       },
     },
-    singleAxis: { type: 'time', top: lg ? 44 : 16, bottom: 30, left: 24, right: 24, axisLabel: { fontSize: 11 }, splitLine: { show: true, lineStyle: { type: 'dashed' } } },
+    singleAxis: { type: 'time', top: lg ? 44 : 16, bottom: 30, left: 24, right: 24, axisLabel: { fontSize: CAPTION }, splitLine: { show: true, lineStyle: { type: 'dashed' } } },
     series: [{ type: 'themeRiver', data, label: { show: false }, emphasis: { focus: 'series' } }],
   }, click => {
     const layer = (click.value as [number, number, string] | undefined)?.[2] ?? click.name;
@@ -1361,6 +1367,7 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
     out['title'] = { text: settings.title.text ?? '', subtext: settings.title.subtext ?? '', left: 'left', top: 0, itemGap: 4 };
   }
   inkLabels(out, theme, settings);
+  sizeText(out, settings);
   // The pointer says a mark is a button only where a click on it does something.
   for (const one of (out['series'] as Obj[] | undefined) ?? []) {
     if (!one['silent']) one['cursor'] = context.clickable ? 'pointer' : 'default';
@@ -1388,6 +1395,72 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
   }
   const picker = PICKERS.get(option);
   return picker ? withPicker(out, picker) : out;
+}
+
+const asList = (value: unknown): Obj[] =>
+  (Array.isArray(value) ? value : value && typeof value === 'object' ? [value] : []).filter(item => item && typeof item === 'object') as Obj[];
+
+/** The object at `key` on `owner`, made when it is missing, so a size can be written on it. */
+function textAt(owner: Obj, key: string): Obj {
+  const found = owner[key];
+  if (found && typeof found === 'object' && !Array.isArray(found)) return found as Obj;
+  const made: Obj = {};
+  owner[key] = made;
+  return made;
+}
+
+/**
+ * Every piece of text in an option on the chart type scale (shared/charts/chart-type.ts), stated,
+ * so nothing is left at an ECharts default: 12px for what is said about a mark (by the settings'
+ * label size), 11px for the chrome around it -- axes, legends, reference lines, pins, breadcrumbs,
+ * calendars -- and a gauge's reading sized to the drawing. Rich-text styles take their label's
+ * size unless they name their own. Then every size is held to the scale's ends: never under 11px,
+ * never over the 14px of the tile's title, except the reading.
+ *
+ * A size a builder chose is kept (within the ends); only the missing ones are filled.
+ */
+function sizeText(option: EOption, s: ChartSettings): void {
+  const data = labelPx(s);
+  const size = (text: Obj, px: number, figure = false) => {
+    const own = typeof text['fontSize'] === 'number' ? text['fontSize'] as number : px;
+    text['fontSize'] = figure ? own : Math.min(CHART_TYPE.title, Math.max(CAPTION, own));
+    for (const style of Object.values((text['rich'] as Obj | undefined) ?? {})) {
+      if (style && typeof style === 'object') {
+        const rich = style as Obj;
+        rich['fontSize'] = Math.min(CHART_TYPE.title, Math.max(CAPTION, typeof rich['fontSize'] === 'number' ? rich['fontSize'] as number : text['fontSize'] as number));
+      }
+    }
+  };
+  for (const key of ['xAxis', 'yAxis', 'radiusAxis', 'angleAxis', 'singleAxis', 'parallelAxis']) {
+    for (const axis of asList(option[key])) { size(textAt(axis, 'axisLabel'), CAPTION); size(textAt(axis, 'nameTextStyle'), CAPTION); }
+  }
+  for (const parallel of asList(option['parallel'])) {
+    const base = textAt(parallel, 'parallelAxisDefault');
+    size(textAt(base, 'axisLabel'), CAPTION); size(textAt(base, 'nameTextStyle'), CAPTION);
+  }
+  for (const radar of asList(option['radar'])) size(textAt(radar, 'axisName'), CAPTION);
+  for (const legend of asList(option['legend'])) { size(textAt(legend, 'textStyle'), CAPTION); size(textAt(legend, 'pageTextStyle'), CAPTION); }
+  for (const tip of asList(option['tooltip'])) size(textAt(tip, 'textStyle'), CHART_TYPE.body);
+  for (const title of asList(option['title'])) { size(textAt(title, 'textStyle'), CHART_TYPE.body); size(textAt(title, 'subtextStyle'), CAPTION); }
+  for (const calendar of asList(option['calendar'])) for (const key of ['dayLabel', 'monthLabel', 'yearLabel']) size(textAt(calendar, key), CAPTION);
+  for (const key of ['visualMap', 'dataZoom']) for (const one of asList(option[key])) size(textAt(one, 'textStyle'), CAPTION);
+  for (const one of asList(option['series'])) {
+    const type = String(one['type'] ?? '');
+    size(textAt(one, 'label'), data);
+    for (const key of ['upperLabel', 'edgeLabel']) if (one[key]) size(one[key] as Obj, data);
+    if (one['leaves']) for (const leaf of asList(one['leaves'])) if (leaf['label']) size(leaf['label'] as Obj, data);
+    for (const level of asList(one['levels'])) for (const key of ['label', 'upperLabel']) if (level[key]) size(level[key] as Obj, data);
+    const emphasis = one['emphasis'] as Obj | undefined;
+    if (emphasis?.['label']) size(emphasis['label'] as Obj, data);
+    for (const key of ['markLine', 'markPoint', 'markArea']) if (one[key]) size(textAt(one[key] as Obj, 'label'), CAPTION);
+    const crumb = one['breadcrumb'] as Obj | undefined;
+    if (crumb) size(textAt(textAt(crumb, 'itemStyle'), 'textStyle'), CAPTION);
+    if (type === 'gauge') {
+      size(textAt(one, 'axisLabel'), CAPTION);
+      size(textAt(one, 'title'), CAPTION);
+      size(textAt(one, 'detail'), figurePx(undefined), true);
+    }
+  }
 }
 
 const INSIDE = new Set(['inside', 'inner', 'insideTop', 'insideBottom', 'insideLeft', 'insideRight',

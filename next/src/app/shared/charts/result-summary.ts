@@ -46,7 +46,7 @@ interface Fact { label: string; value: string; note?: string; }
             <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate">
               {{ fact.label }}
             </dt>
-            <dd class="text-base font-semibold tabular truncate" [title]="cap(fact.value)">
+            <dd class="text-sm font-semibold tabular truncate" [title]="cap(fact.value)">
               {{ fact.value }}
             </dd>
             @if (fact.note) {
