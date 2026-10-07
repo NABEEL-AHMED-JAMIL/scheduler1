@@ -135,6 +135,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "API limits",
       "Access",
+      "Billing time zone",
       "Cards",
       "Copy claude-demo-75a611b4",
       "Copy default",

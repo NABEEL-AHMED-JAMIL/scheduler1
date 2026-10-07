@@ -14,7 +14,8 @@ info:
     - Times: RFC 3339 in UTC.
     - Rate limits per client and per workspace: RateLimit-* headers on every answer, 429 with Retry-After
       (`/problems/rate-limited`). A workspace may have a monthly quota of calls: Quota-* headers, a Quota-Warning from 80%,
-      and past it 429 `/problems/quota-exceeded` until the month (UTC) ends.
+      and past it 429 `/problems/quota-exceeded` until the month ends -- the bill's month, a calendar month in the
+      workspace's billing time zone (America/Chicago unless set).
     - Every call that passes the checks is billed as `api.calls` (per 1,000, on the workspace's rate card); the token
       endpoint and signed links are not. Webhook deliveries that arrive are billed as `webhook.deliveries`.
     - Embeddable run view: POST /v1/runs/{runId}/view-links answers a 15-minute link to a read-only page of the run that a
@@ -941,7 +942,8 @@ components:
       description: |
         Past a limit. `/problems/rate-limited`: the client's rate limit, or its workspace's limit over all its clients;
         try again after Retry-After seconds (when a token is back). `/problems/quota-exceeded`: the workspace has used its
-        monthly quota of calls; Retry-After is the seconds until the month (UTC) ends. Nothing was done and nothing billed.
+        monthly quota of calls; Retry-After is the seconds until the month (the bill's, in the workspace's billing time zone)
+        ends. Nothing was done and nothing billed.
       headers:
         Retry-After: { $ref: '#/components/headers/Retry-After' }
         RateLimit-Limit: { $ref: '#/components/headers/RateLimit-Limit' }
@@ -964,8 +966,8 @@ components:
       description: "That bucket's rate: calls a minute, the window, its burst and whose it is, e.g. 600;w=60;burst=100;scope=client."
       schema: { type: string, example: "600;w=60;burst=100;scope=client" }
     Quota-Limit: { description: "The workspace's monthly quota of calls, when it has one.", schema: { type: integer } }
-    Quota-Remaining: { description: "Calls left in the quota this month (UTC).", schema: { type: integer, minimum: 0 } }
-    Quota-Reset: { description: "Seconds until the month (UTC) ends and the quota starts again.", schema: { type: integer } }
+    Quota-Remaining: { description: "Calls left in the quota this month (the bill's month, in the workspace's billing time zone).", schema: { type: integer, minimum: 0 } }
+    Quota-Reset: { description: "Seconds until the month (the bill's, in the workspace's billing time zone) ends and the quota starts again.", schema: { type: integer } }
     Quota-Warning: { description: "From 80% of the quota used, e.g. \"85% of this month's 10000 API calls are used.\"", schema: { type: string } }
   # MIG-336: the problem types (decision 4) every service answers, for the developer portal and the docs. Each is
   # `/problems/<kind>`; a kind not listed is the status's own (e.g. 404 not-found). `operations` names where only some
@@ -992,7 +994,7 @@ components:
     unsupported-media-type: { status: 415, title: Unsupported Media Type, description: "The body is not the content type the operation takes (JSON, multipart/form-data, or a form for the token)." }
     validation: { status: 422, title: Unprocessable Content, description: "The input contract (or the request's own rules) refused it; `errors[]` names each field by its path (`record.amount`) and why, never echoing a value." }
     rate-limited: { status: 429, title: Too Many Requests, description: "Past the client's rate limit, or its workspace's over all its clients. Wait Retry-After seconds." }
-    quota-exceeded: { status: 429, title: Too Many Requests, description: "The workspace has used its monthly quota of calls. Retry-After is the seconds until the month (UTC) ends." }
+    quota-exceeded: { status: 429, title: Too Many Requests, description: "The workspace has used its monthly quota of calls. Retry-After is the seconds until the month (the bill's, in the workspace's billing time zone) ends." }
     bad-gateway: { status: 502, title: Bad Gateway, description: "The service behind the call could not be reached, or dropped the connection before answering. Try again in a moment, with the same Idempotency-Key for a write." }
     unavailable: { status: 503, title: Service Unavailable, description: "Something the answer needs cannot be reached just now (the limits store, an input contract). Try again after Retry-After." }
     timeout: { status: 504, title: Gateway Timeout, description: "The service behind the call did not answer in time: 30 seconds, 120 for uploading a file (POST /files) and a file's content. A write may still have been made: repeat it with the same Idempotency-Key, which answers what was done or does it once. Once a download has started it is never cut while it keeps flowing; one silent for 30 seconds is ended." }

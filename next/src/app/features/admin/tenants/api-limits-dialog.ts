@@ -20,8 +20,8 @@ export function boundValue(text: string): number | null {
 
 /**
  * MIG-337: a workspace's bounds for the customer API, the platform administrator's (Administration › Tenants › API limits):
- * the most any one client may have, the ceiling over all its clients together, and an optional monthly quota of calls (a
- * calendar month in UTC, the bill's). Empty is the platform's default. They hold from the workspace's next call; past the
+ * the most any one client may have, the ceiling over all its clients together, and an optional monthly quota of calls (the
+ * bill's month: a calendar month in the workspace's billing time zone, H9). Empty is the platform's default. They hold from the workspace's next call; past the
  * quota the API answers 429 quota-exceeded until the month ends.
  */
 @Component({
@@ -51,7 +51,7 @@ export function boundValue(text: string): number | null {
                    [placeholder]="'' + l.defaults.workspaceBurst" />
           </app-field>
           <app-field label="Monthly quota, API calls" for="limMonthly"
-              hint="A calendar month in UTC, as the bill's. Empty: no quota. From 80% the answers warn; past it, 429 until the month ends.">
+              [hint]="quotaHint(l)">
             <input id="limMonthly" class="input" inputmode="numeric" [value]="monthly()" (input)="monthly.set($any($event.target).value)"
                    placeholder="No quota" />
           </app-field>
@@ -86,6 +86,11 @@ export class ApiLimitsDialog {
   readonly valid = computed(() => [this.clientRate(), this.clientBurst(), this.workspaceRate(), this.workspaceBurst(), this.monthly()]
     .every(v => boundValue(v) !== null));
   readonly ready = computed(() => !!this.loaded() && this.valid() && !this.saving());
+
+  /** H9: the quota's month is the bill's -- a calendar month in the workspace's billing time zone, which Identity names. */
+  quotaHint(l: ApiLimitsRow): string {
+    return `The bill's month, in ${l.monthTimeZone || "the workspace's billing time zone"}. Empty: no quota. From 80% the answers warn; past it, 429 until the month ends.`;
+  }
 
   constructor() {
     this.api.limits(this.data.tenantId).subscribe({

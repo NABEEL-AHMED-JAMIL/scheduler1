@@ -14,9 +14,9 @@ import { API_SUCCESS } from '../../core/api/api.config';
  * Cost & usage reads the meter's priced rollup and shows it as the invoice will: the same
  * lines, the same total, with the deletes called out and a forecast that says it is a guess.
  */
-function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DAYS) {
+function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DAYS, calendar: object = {}) {
   const api = {
-    usageByMeter: vi.fn((_q: UsageQuery) => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' } } })),
+    usageByMeter: vi.fn((_q: UsageQuery) => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 2, name: 'Standard, churn free', currency: 'USD', tenantSpecific: false, effectiveFrom: '2026-09-01' }, ...calendar } })),
     usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: days } })),
     subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },
@@ -133,6 +133,32 @@ describe('Billing', () => {
       expect(component.forecast()).toBeCloseTo(component.total() + perDay * (component.daysInMonth() - 19), 6);
       component.shiftMonth(-1);
       expect(component.forecast()).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  // H9: the days are the workspace's billing days, in its zone -- not the browser's. At 00:30 in the browser on 7 October
+  // a Chicago workspace is still on the 6th: yesterday is the 5th, and an evening's run on the 6th is the 6th's.
+  it('counts today, yesterday and the days elapsed in the workspace\'s billing time zone, and says which', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-07T00:30:00'));
+    try {
+      const october = [{ day: '2026-10-05', amount: '2.0', byService: { Seats: '2.0' } }, { day: '2026-10-06', amount: '10.13', byService: { 'Model calls': '10.13' } }];
+      const { component } = page(false, LINES, october, { timeZone: 'America/Chicago', today: '2026-10-06', currentMonth: '2026-10' });
+      expect(component.timeZone()).toBe('America/Chicago');
+      expect(component.isCurrentMonth()).toBe(true);
+      expect(component.daysElapsed()).toBe(6);
+      expect(component.yesterday()).toBe(2);
+      expect(component.forecast()).not.toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('opens on the workspace\'s own month when its zone is still in the last one', () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date('2026-11-01T01:00:00'));
+    try {
+      const { component, api } = page(false, LINES, DAYS, { timeZone: 'Pacific/Honolulu', today: '2026-10-31', currentMonth: '2026-10' });
+      expect(component.month()).toBe('2026-10-01');
+      expect(api.usageByMeter.mock.calls.some(([q]) => q.from === '2026-10-01' && q.to === '2026-10-31')).toBe(true);
+      expect(component.isCurrentMonth()).toBe(true);
+      expect(component.daysElapsed()).toBe(31);
     } finally { vi.useRealTimers(); }
   });
 

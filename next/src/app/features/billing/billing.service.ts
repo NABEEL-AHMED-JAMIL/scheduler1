@@ -12,6 +12,8 @@ export interface InvoiceRow {
   periodStart: string; periodEnd: string; status: 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'void'; currency: string;
   subtotal: number; taxRatePercent: number; tax: number; total: number; balance: number; note?: string;
   issuedAt?: string; dueAt?: string; paidAt?: string; voidedAt?: string; rateCardVersion?: number; rateCardName?: string; dateCreated?: string;
+  /** H9: the billing time zone the period's days were counted in, and the period as the PDF states it ("1–31 Oct 2026, America/Chicago"). */
+  timeZone?: string | null; periodLabel?: string | null;
   /** The kinds of document the invoice has (invoice, payment_slip, receipt, credit_note) and slips awaiting verification. */
   documentKinds?: string[]; pendingPayments?: number;
   /**
@@ -99,6 +101,18 @@ export interface PricedWith {
   fallback?: { version: number; name: string; effectiveFrom: string } | null;
 }
 export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
+/**
+ * H9: the billing calendar a usage answer was counted in -- the workspace's billing time zone, today there, the month under
+ * way there, and the instants the range covers. Days are the workspace's, never the browser's or UTC's.
+ */
+export interface UsageCalendar { timeZone?: string | null; endTimeZone?: string; today?: string; currentMonth?: string; periodStart?: string; periodEnd?: string; }
+/** H9: a workspace's billing time zone, as Billing keeps it (Administration › Tenants). */
+export interface BillingTimeZone {
+  tenantId: number; month: string; zone: string; monthStart: string; monthEnd: string; today: string; defaultZone: string;
+  nextMonth: string; nextMonthZone: string; changeTakesEffect: string;
+  scheduled: { effectiveMonth: string; zone: string }[];
+  history: { id: number; effectiveMonth: string; zone: string; reason: string | null; setBy: number | null; setAt: string | null }[];
+}
 export interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
 /** One priced line of a run: what its tokens were priced as (a model's own item, or the meter's). */
 export interface RunLine { meter: string; label: string; quantity: number; unit: string; per: number; unit_price: number; amount: number; }
@@ -175,11 +189,22 @@ export class BillingApi {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
   }
   summary(tenantId?: string | null): Observable<ApiResponse<BillingSummary>> { return this.http.get<ApiResponse<BillingSummary>>(`${this.base}/summary`, { params: this.tenantParam(tenantId) }); }
-  usageByMeter(q: UsageQuery): Observable<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>> {
-    return this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${this.base}/usage`, { params: this.usageParams(q, 'meter') });
+  usageByMeter(q: UsageQuery): Observable<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith } & UsageCalendar>> {
+    return this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith } & UsageCalendar>>(`${this.base}/usage`, { params: this.usageParams(q, 'meter') });
   }
-  usageByDay(q: UsageQuery): Observable<ApiResponse<{ rows: DayRow[] }>> {
-    return this.http.get<ApiResponse<{ rows: DayRow[] }>>(`${this.base}/usage`, { params: this.usageParams(q, 'day') });
+  usageByDay(q: UsageQuery): Observable<ApiResponse<{ rows: DayRow[] } & UsageCalendar>> {
+    return this.http.get<ApiResponse<{ rows: DayRow[] } & UsageCalendar>>(`${this.base}/usage`, { params: this.usageParams(q, 'day') });
+  }
+  /** H9: a workspace's billing time zone, its months and every change recorded (a workspace administrator reads their own). */
+  timeZone(tenantId?: string | number | null): Observable<ApiResponse<BillingTimeZone>> {
+    return this.http.get<ApiResponse<BillingTimeZone>>(`${this.base}/timeZone`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) });
+  }
+  /** H9: the IANA zones a platform administrator may pick. */
+  timeZones(): Observable<ApiResponse<string[]>> { return this.http.get<ApiResponse<string[]>>(`${this.base}/timeZones`); }
+  /** H9: sets a workspace's billing time zone from the first month it may take effect (the platform administrator). */
+  setTimeZone(tenantId: number, zone: string, reason: string): Observable<ApiResponse<{ zone: string; effectiveMonth: string; previousZone: string }>> {
+    return this.http.post<ApiResponse<{ zone: string; effectiveMonth: string; previousZone: string }>>(`${this.base}/timeZone`, null,
+      { params: { tenantId: String(tenantId), zone, reason } });
   }
   subjects(q: UsageQuery, meter: string, limit: number): Observable<ApiResponse<{ rows: SubjectRow[] }>> {
     return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });

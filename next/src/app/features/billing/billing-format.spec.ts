@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BYTES_PER_GB, addMoney, formatTotals, daysOverdue, formatBytes, formatMoney, formatMoneyRound, formatQuantity, formatUnitPrice, localIsoDate, moneyDigits, monthShort, pluralUnit, priceDigits, workspaceLabels, yearMonth } from './billing-format';
+import { BYTES_PER_GB, addMoney, formatTotals, daysOverdue, formatBytes, formatMoney, formatMoneyRound, formatQuantity, formatUnitPrice, localIsoDate, moneyDigits, monthShort, pluralUnit, priceDigits, shiftDay, workspaceLabels, yearMonth } from './billing-format';
 
 /** The one way billing figures read, on every billing screen. */
 describe('billing-format', () => {
@@ -120,5 +120,13 @@ describe('workspaceLabels', () => {
     const labels = workspaceLabels([{ tenantId: 1, tenantName: 'Default' }, { tenantId: 2, tenantName: ' default ' }]);
     expect(labels.get(1)).toBe('Default (#1)');
     expect(labels.get(2)).toBe('default (#2)');
+  });
+
+  it('moves a billing day by whole days across month and year ends, whatever the browser\'s zone (H9)', () => {
+    expect(shiftDay('2026-10-06', -1)).toBe('2026-10-05');
+    expect(shiftDay('2026-11-01', -1)).toBe('2026-10-31');
+    expect(shiftDay('2027-01-01', -1)).toBe('2026-12-31');
+    expect(shiftDay('2026-03-08', 1)).toBe('2026-03-09');
+    expect(shiftDay('2026-10-06T23:30:00Z', -1)).toBe('2026-10-06T23:30:00Z');
   });
 });

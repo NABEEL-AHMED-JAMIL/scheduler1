@@ -117,6 +117,17 @@ export function monthShort(month: string): string {
   return match ? formatDate(`${match[1]}-${match[2]}-01`, 'MMM yyyy', 'en-US') : String(month ?? '');
 }
 
+/**
+ * A calendar day (yyyy-MM-dd) moved by whole days -- a billing day as Billing names it in the workspace's zone (H9), which
+ * is a date, not an instant: no zone is involved, so none can shift it. Anything that is not such a day comes back as is.
+ */
+export function shiftDay(day: string, by: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day ?? '');
+  if (!match) return day;
+  const d = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + by));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
 /** The viewer's own calendar day as yyyy-MM-dd. toISOString() is UTC, and in the evening already says tomorrow. */
 export function localIsoDate(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;

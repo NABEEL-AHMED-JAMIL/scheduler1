@@ -10,7 +10,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { BillingApi, DayRow, MeterLine, PricedWith, RunRow, SERVICES, SubjectRow, UsageQuery } from './billing.service';
-import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, pluralUnit } from './billing-format';
+import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, pluralUnit, shiftDay } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
@@ -52,7 +52,16 @@ export class Billing implements OnInit {
   private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
   /** "September 2026". It went through toLocaleDateString, so it followed the browser's language, not the console's. */
   readonly monthLabel = computed(() => this.clock.transform(this.month(), 'month') ?? '');
-  readonly isCurrentMonth = computed(() => this.month() === firstOfMonth(new Date()));
+  /**
+   * H9: the workspace's billing calendar, as Billing answered it -- its zone, today there and the month under way there. The
+   * days on this page are those, never the browser's or UTC's: an evening's run in Chicago is that evening's usage.
+   */
+  readonly timeZone = signal<string | null>(null);
+  readonly today = signal<string | null>(null);
+  private readonly billingMonth = signal<string | null>(null);
+  /** The month first shown is the browser's guess; the workspace's own month (its zone) replaces it once, on the first answer. */
+  private followBillingMonth = true;
+  readonly isCurrentMonth = computed(() => this.month().slice(0, 7) === (this.billingMonth() ?? firstOfMonth(new Date()).slice(0, 7)));
 
   readonly loading = signal(false);
   readonly error = signal('');
@@ -88,9 +97,10 @@ export class Billing implements OnInit {
   readonly total = computed(() => this.lines().reduce((n, l) => n + l.amount, 0));
   readonly daysElapsed = computed(() => {
     const first = new Date(this.month() + 'T00:00:00');
-    const today = new Date();
     if (!this.isCurrentMonth()) return daysInMonth(first);
-    return Math.max(1, today.getDate());
+    // Today in the workspace's zone (yyyy-MM-dd from Billing); the browser's day only until Billing has answered.
+    const today = this.today();
+    return Math.max(1, today ? Number(today.split('-')[2]) : new Date().getDate());
   });
   readonly daysInMonth = computed(() => daysInMonth(new Date(this.month() + 'T00:00:00')));
   /** The sum of a day's amount by date, so a day with no usage counts as zero, not as absent. */
@@ -103,22 +113,21 @@ export class Billing implements OnInit {
    */
   readonly forecast = computed(() => {
     if (!this.isCurrentMonth() || !this.days().length) return null;
-    const today = new Date();
+    const today = this.todayInWorkspace();
     let spent = 0, counted = 0;
     for (let back = 1; back <= FORECAST_WINDOW_DAYS; back++) {
-      const d = new Date(today); d.setDate(today.getDate() - back);
-      if (this.isoDay(d) < this.month()) break;            // the window does not reach into last month
-      spent += this.amountOn(this.isoDay(d)); counted++;
+      const day = shiftDay(today, -back);
+      if (day < this.month()) break;                        // the window does not reach into last month
+      spent += this.amountOn(day); counted++;
     }
     if (!counted) return null;
     const perDay = spent / counted;
     return this.total() + perDay * Math.max(0, this.daysInMonth() - this.daysElapsed());
   });
-  /** What yesterday cost -- the date, not the last row but one. */
-  readonly yesterday = computed(() => {
-    const d = new Date(); d.setDate(d.getDate() - 1);
-    return this.amountOn(this.isoDay(d));
-  });
+  /** What yesterday cost -- the date, not the last row but one: the day before today in the workspace's zone (H9). */
+  readonly yesterday = computed(() => this.amountOn(shiftDay(this.todayInWorkspace(), -1)));
+  /** Today as the workspace's bill names it; the browser's day only until Billing has answered. */
+  private todayInWorkspace(): string { return this.today() ?? this.isoDay(new Date()); }
   /** Bytes deleted this month; the meter carries bytes, the screen says KB/MB/GB. */
   readonly deletedBytes = computed(() => this.lines().find(l => l.meter === 'storage.bytes.deleted')?.quantity ?? 0);
   readonly deleteOps = computed(() => this.lines().find(l => l.meter === 'storage.ops.delete')?.quantity ?? 0);
@@ -174,8 +183,9 @@ export class Billing implements OnInit {
     this.workspaces.ready(() => this.load());
   }
 
-  pickTenant(id: string): void { this.workspaces.tenantId.set(id); this.load(); }
+  pickTenant(id: string): void { this.workspaces.tenantId.set(id); this.followBillingMonth = true; this.load(); }
   shiftMonth(delta: number): void {
+    this.followBillingMonth = false;
     const d = new Date(this.month() + 'T00:00:00');
     d.setMonth(d.getMonth() + delta);
     this.month.set(firstOfMonth(d));
@@ -202,6 +212,16 @@ export class Billing implements OnInit {
     this.api.usageByMeter(this.query()).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
+        // H9: the workspace's billing calendar. On the first answer, show the workspace's own month (its zone may already
+        // be in the next, or still in the last, while the browser's is not).
+        this.timeZone.set(r.data?.timeZone ?? null);
+        this.today.set(r.data?.today ?? null);
+        this.billingMonth.set(r.data?.currentMonth ?? null);
+        const own = r.data?.currentMonth;
+        if (this.followBillingMonth) {
+          this.followBillingMonth = false;
+          if (own && own !== this.month().slice(0, 7)) { this.month.set(`${own}-01`); this.load(); return; }
+        }
         this.rateCard.set(r.data?.rateCard ?? null);
         if (r.data?.rateCard) this.currency.set(r.data.rateCard.currency || 'USD');
         this.lines.set((r.data?.rows ?? []).map(l => ({

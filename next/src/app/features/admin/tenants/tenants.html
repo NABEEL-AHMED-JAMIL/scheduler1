@@ -181,6 +181,9 @@
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="apiLimits(tenant)">
                       <app-icon name="zap" />API limits
                     </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="billingZone(tenant)" data-billing-zone-open>
+                      <app-icon name="clock" />Billing time zone
+                    </button>
                     @if (canMakeSandbox(tenant)) {
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="createSandbox(tenant)" data-create-sandbox>
                         <app-icon name="terminal" />Create sandbox
@@ -306,6 +309,9 @@
             </button>
             <button type="button" class="btn btn-ghost btn-sm" (click)="apiLimits(tenant)" title="Rate limits and the monthly quota of its API clients">
               <app-icon name="zap" />API limits
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="billingZone(tenant)" title="The days and months its usage is billed in">
+              <app-icon name="clock" />Billing time zone
             </button>
             @if (canMakeSandbox(tenant)) {
               <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="createSandbox(tenant)"

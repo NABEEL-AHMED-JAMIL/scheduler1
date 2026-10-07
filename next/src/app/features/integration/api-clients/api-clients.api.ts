@@ -43,8 +43,10 @@ export interface ApiLimitsRow {
   defaults: ApiLimitBounds;
   /** Whether the platform administrator set any bound (otherwise the defaults hold). */
   custom: boolean;
-  /** "2026-10": the bill's month, in UTC. */
+  /** "2026-10": the bill's month, in the workspace's billing time zone (H9). */
   month: string | null;
+  /** H9: the zone that month is counted in -- the workspace's billing time zone (America/Chicago unless set). */
+  monthTimeZone?: string | null;
   monthEndsAt: string | null;
   callsThisMonth: number | null;
   quotaUsedPercent: number | null;

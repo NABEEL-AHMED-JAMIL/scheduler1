@@ -82,7 +82,7 @@
         <div><span class="eyebrow">Billed to</span><div class="text-sm">{{ i.account.legalName || i.tenantName }}</div>
           @if (i.account.address) { <div class="text-xs text-[color:var(--text-secondary)] whitespace-pre-line">{{ i.account.address }}</div> }
           @if (i.account.taxId) { <div class="text-xs text-[color:var(--text-muted)]">Tax ID {{ i.account.taxId }}</div> }</div>
-        <div><span class="eyebrow">Period</span><div class="text-sm tabular">{{ i.periodStart | serverTime: 'day' }} – {{ i.periodEnd | serverTime: 'date' }}</div>
+        <div><span class="eyebrow">Period</span><div class="text-sm tabular" data-invoice-period>{{ i.periodStart | serverTime: 'day' }} – {{ i.periodEnd | serverTime: 'date' }}@if (i.timeZone) {<span title="The days of this period are counted in this billing time zone">, {{ i.timeZone }}</span>}</div>
           @if (i.issuedAt) { <div class="text-xs text-[color:var(--text-secondary)]">Issued {{ i.issuedAt | serverTime: 'date' }}</div> }
           @if (i.dueAt && i.kind === 'invoice') { <div class="text-xs" [class.text-crit-500]="i.status === 'overdue'" [class.text-[color:var(--text-secondary)]]="i.status !== 'overdue'">Due {{ i.dueAt | serverTime: 'date' }} (net {{ i.account.paymentTermsDays }})</div> }</div>
         <div><span class="eyebrow">Total</span><div class="text-sm tabular font-semibold" [class.text-crit-500]="i.total < 0">{{ money(i.total) }}</div>

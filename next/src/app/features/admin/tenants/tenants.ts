@@ -21,6 +21,7 @@ import { Pagination } from '../../../shared/ui/pagination';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { TenantDialog } from './tenant-dialog';
 import { ApiLimitsDialog, ApiLimitsDialogData } from './api-limits-dialog';
+import { BillingZoneDialog, BillingZoneDialogData } from './billing-zone-dialog';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagementMode } from '../../../core/auth/auth.models';
 
@@ -266,6 +267,12 @@ export class Tenants implements OnInit {
   apiLimits(tenant: Tenant): void {
     const data: ApiLimitsDialogData = { tenantId: tenant.tenantId, tenantName: tenant.tenantName };
     this.dialog.open<boolean>(ApiLimitsDialog, { data, hasBackdrop: true });
+  }
+
+  /** H9: the workspace's billing time zone -- the days and months its usage is billed in; a change starts with a month. */
+  billingZone(tenant: Tenant): void {
+    const data: BillingZoneDialogData = { tenantId: tenant.tenantId, tenantName: tenant.tenantName };
+    this.dialog.open<boolean>(BillingZoneDialog, { data, hasBackdrop: true });
   }
 
   /** MIG-336: "of Northwind" under a sandbox's pill: the workspace it is the sandbox of, by name when it is listed. */

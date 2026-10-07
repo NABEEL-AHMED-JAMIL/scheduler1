@@ -40,6 +40,7 @@
       } @else { Priced with the rate card in effect · {{ currency() }} }
       · day {{ daysElapsed() }} of {{ daysInMonth() }}
       @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
+      @if (timeZone(); as zone) { · <span data-billing-zone title="Days and months on this page and on the invoice are counted in this workspace's billing time zone">days in {{ zone }}</span> }
     </p>
 
     @if (unpricedLines().length) {

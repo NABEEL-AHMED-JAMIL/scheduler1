@@ -37,6 +37,9 @@ describe('MIG-337: a workspace\'s API limits (Administration › Tenants)', () =
     expect(d.workspaceRate()).toBe('240');
     expect(d.monthly()).toBe('1000');
     expect(fixture.nativeElement.textContent).toContain('850 calls');
+    // H9: the quota's month is the bill's, in the workspace's billing time zone, which Identity names.
+    expect(fixture.nativeElement.textContent).toContain("The bill's month, in the workspace's billing time zone.");
+    expect(d.quotaHint({ ...api.limits.mock.results[0].value, monthTimeZone: 'America/Chicago' } as never)).toContain('in America/Chicago.');
     d.clientRate.set('120');
     d.monthly.set('');
     d.save();
