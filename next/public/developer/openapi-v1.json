@@ -2472,10 +2472,20 @@
         "title": "Too Many Requests",
         "description": "The workspace has used its monthly quota of calls. Retry-After is the seconds until the month (UTC) ends."
       },
+      "bad-gateway": {
+        "status": 502,
+        "title": "Bad Gateway",
+        "description": "The service behind the call could not be reached, or dropped the connection before answering. Try again in a moment, with the same Idempotency-Key for a write."
+      },
       "unavailable": {
         "status": 503,
         "title": "Service Unavailable",
         "description": "Something the answer needs cannot be reached just now (the limits store, an input contract). Try again after Retry-After."
+      },
+      "timeout": {
+        "status": 504,
+        "title": "Gateway Timeout",
+        "description": "The service behind the call did not answer in time: 30 seconds, 120 for uploading a file (POST /files) and a file's content. A write may still have been made: repeat it with the same Idempotency-Key, which answers what was done or does it once. Once a download has started it is never cut while it keeps flowing; one silent for 30 seconds is ended."
       }
     },
     "schemas": {
