@@ -324,6 +324,16 @@ export class PromptEdit implements OnInit {
     });
   }
 
+  /** The run's pill: answered, held for review (MIG-349: the answer never fit the schema), or failed. */
+  runPill(status: PromptRun['status']): string {
+    return status === 'ok' ? 'pill-ok' : status === 'review' ? 'pill-warn' : 'pill-crit';
+  }
+
+  /** What the try's pill says. */
+  runLabel(status: PromptRun['status']): string {
+    return status === 'ok' ? 'Answered' : status === 'review' ? 'Held for review' : 'Failed';
+  }
+
   prettyOutput(run: PromptRun): string {
     if (!run.output) return '';
     if (this.outputMode() !== 'json') return run.output;

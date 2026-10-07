@@ -76,7 +76,7 @@ export class Prompts implements OnInit {
       active: list.filter(p => p.status === 'Active').length,
       json: list.filter(p => p.outputMode === 'json').length,
       runs: list.reduce((n, p) => n + (p.runCount ?? 0), 0),
-      failing: list.filter(p => p.lastRunStatus === 'failed').length,
+      failing: list.filter(p => p.lastRunStatus === 'failed' || p.lastRunStatus === 'review').length,
     };
   });
 

@@ -150,7 +150,7 @@
 
         <div class="form-grid">
           <app-field label="Output" for="pOutput" [control]="form.get('outputMode')" [submitted]="submitted()"
-                     [hint]="outputMode() === 'json' ? 'The answer must be a JSON object; the keys below are asked for out loud and checked, with one repair round.' : 'Free text, used as-is.'">
+                     [hint]="outputMode() === 'json' ? 'The answer must be a JSON object. The schema below is sent to the model and every answer is checked against it, with one repair round; one that still does not fit is held for review, never used.' : 'Free text, used as-is.'">
             <select id="pOutput" class="input" formControlName="outputMode">
               <option value="text">Text</option>
               <option value="json">JSON object</option>
@@ -168,9 +168,9 @@
         </div>
         @if (outputMode() === 'json') {
           <app-field label="Output schema" for="pSchema" [control]="form.get('outputSchema')" [submitted]="submitted()"
-                     hint='A JSON object with "required": [keys] (or "properties"). Blank accepts any JSON object.'>
+                     hint='JSON Schema. Give each key a "type"; list allowed values in "enum" and no other value is accepted. "properties" without "required" requires them all. Blank accepts any JSON object.'>
             <textarea id="pSchema" class="input resize-y min-h-20 mono" formControlName="outputSchema"
-                      placeholder='{ "required": ["summary", "items", "total", "flags"] }'></textarea>
+                      placeholder='{ "properties": { "status": { "type": "string", "enum": ["open", "closed"] }, "summary": { "type": "string" } } }'></textarea>
           </app-field>
         }
         <div class="form-grid">
@@ -215,7 +215,7 @@
         @if (lastRun(); as run) {
           <div class="mt-4">
             <div class="flex items-center gap-2 flex-wrap text-xs">
-              <span class="pill" [class]="'pill ' + (run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ run.status === 'ok' ? 'Answered' : 'Failed' }}</span>
+              <span class="pill" [class]="'pill ' + runPill(run.status)">{{ runLabel(run.status) }}</span>
               @if (run.latencyMs != null) { <span>{{ (run.latencyMs / 1000) | number: '1.1-1' }} s</span> }
               @if (run.tokensIn != null) { <span class="text-[color:var(--text-muted)]">{{ run.tokensIn | number }} in · {{ run.tokensOut | number }} out</span> }
               @if ((run.attempts ?? 1) > 1) { <span class="text-[color:var(--text-muted)]">{{ run.attempts }} attempts</span> }
@@ -226,6 +226,12 @@
             }
             @if (run.status === 'ok') {
               <pre class="prompt-out mt-2">{{ prettyOutput(run) }}</pre>
+            } @else if (run.status === 'review') {
+              <p class="text-sm text-warn-500 mt-2">{{ run.error }}</p>
+              @if (run.output) {
+                <p class="text-xs text-[color:var(--text-muted)] mt-2">The answer that was held (not used):</p>
+                <pre class="prompt-out mt-1" aria-label="The answer that was held">{{ prettyOutput(run) }}</pre>
+              }
             } @else {
               <p class="text-sm text-crit-500 mt-2">{{ run.error }}</p>
             }
@@ -242,10 +248,10 @@
             @for (r of runs(); track r.runId) {
               <li>
                 <div class="min-w-0">
-                  <span class="pill" [class]="'pill ' + (r.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ r.status }}</span>
+                  <span class="pill" [class]="'pill ' + runPill(r.status)">{{ r.status === 'review' ? runLabel(r.status) : r.status }}</span>
                   <span class="ml-1">{{ r.kind === 'try' ? 'try' : 'step' }} · v{{ r.promptVersion }}</span>
                   <span class="text-[color:var(--text-muted)]"> · {{ r.dateCreated | serverTime: 'recent' }}</span>
-                  @if (r.error) { <div class="text-crit-500 truncate" [title]="r.error">{{ r.error }}</div> }
+                  @if (r.error) { <div class="truncate" [class]="r.status === 'review' ? 'text-warn-500' : 'text-crit-500'" [title]="r.error">{{ r.error }}</div> }
                 </div>
                 <span class="text-[color:var(--text-muted)] whitespace-nowrap">
                   @if (r.latencyMs != null) { {{ (r.latencyMs / 1000) | number: '1.1-1' }} s }
