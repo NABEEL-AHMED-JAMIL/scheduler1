@@ -20,7 +20,7 @@ import { Component, input } from '@angular/core';
       <div class="size-7 rounded-md grid place-items-center text-sm font-bold bg-[var(--btn-primary-bg)] text-[color:var(--btn-primary-fg)]">E</div>
       <span class="font-semibold text-sm tracking-tight whitespace-nowrap"
             [class.hidden]="hideOnMobile()" [class.sm:block]="hideOnMobile()"
-            [class]="hideBesideNav() ? 'min-[1180px]:hidden 2xl:block' : ''">ETL Console</span>
+            [class]="hideBesideNav() ? 'nav:hidden 2xl:block' : ''">ETL Console</span>
     }
   `,
 })

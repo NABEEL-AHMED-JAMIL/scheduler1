@@ -10,7 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { JobEventsService } from '../../core/socket/job-events.service';
 import { AuthService } from '../../core/auth/auth.service';
 
-function dashboardFor() {
+function dashboardFor(admin = true) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
@@ -20,7 +20,7 @@ function dashboardFor() {
       { provide: Router, useValue: { navigate: () => {} } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
       { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
-      { provide: AuthService, useValue: { canOpen: () => true } },
+      { provide: AuthService, useValue: { canOpen: () => true, isTenantAdmin: () => admin } },
     ],
   });
   return TestBed.runInInjectionContext(() => new Dashboard());
@@ -86,7 +86,7 @@ describe('drilling into an hour from the breakdown', () => {
         { provide: Router, useValue: { navigate: (path: unknown[]) => { navigated.push(path); } } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
         { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
-        { provide: AuthService, useValue: { canOpen: () => true } },
+        { provide: AuthService, useValue: { canOpen: () => true, isTenantAdmin: () => true } },
       ],
     });
     return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), navigated };
@@ -126,6 +126,12 @@ describe('whose numbers the dashboard shows', () => {
     expect(dashboard.scopeLabel()).toBe('all workspaces');
   });
 
+  it('says a tenant user\'s numbers are their own schedules, not the workspace\'s (review 2026-10-07)', () => {
+    const dashboard = dashboardFor(false);
+    dashboard.jobStatus.set([{ name: 'All', value: 0, tenantId: 2960, allWorkspaces: false }]);
+    expect(dashboard.scopeLabel()).toBe('the schedules you made or are assigned');
+  });
+
   it('says nothing extra for one workspace, whose own numbers need no label', () => {
     const dashboard = dashboardFor();
     dashboard.jobStatus.set([{ name: 'All', value: 12, tenantId: 1004, allWorkspaces: false }]);
@@ -158,7 +164,7 @@ describe('a refused dashboard load', () => {
         { provide: Router, useValue: { navigate: () => {} } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
         { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
-        { provide: AuthService, useValue: { canOpen: () => true } },
+        { provide: AuthService, useValue: { canOpen: () => true, isTenantAdmin: () => true } },
       ],
     });
     const dashboard = TestBed.runInInjectionContext(() => new Dashboard());
@@ -248,7 +254,7 @@ describe('drill-down counts for someone without the Jobs page', () => {
         { provide: Router, useValue: { navigate: (path: unknown[]) => { navigated.push(path); } } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
         { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
-        { provide: AuthService, useValue: { canOpen: (page: string) => page === 'jobs' ? canOpenJobs : true } },
+        { provide: AuthService, useValue: { canOpen: (page: string) => page === 'jobs' ? canOpenJobs : true, isTenantAdmin: () => true } },
       ],
     });
     return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), navigated };

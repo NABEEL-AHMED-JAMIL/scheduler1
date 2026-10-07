@@ -164,8 +164,14 @@ export class Dashboard implements OnInit {
    * Whose numbers these are, when they are not simply the reader's own workspace: a platform
    * administrator's totals add up every workspace, and the server says so on each one (MIG-46).
    */
+  /**
+   * Whose schedules the figures count. A platform administrator's add up every workspace; a tenant user's are only the
+   * schedules they made or are assigned (Core's JobOwnership) -- a Viewer opening a workspace of nine schedules read
+   * "Total jobs 0" with nothing saying why (review 2026-10-07).
+   */
   readonly scopeLabel = computed(() =>
-    this.jobStatus().some(d => d.allWorkspaces) ? 'all workspaces' : null);
+    this.jobStatus().some(d => d.allWorkspaces) ? 'all workspaces'
+      : this.auth.isTenantAdmin() ? null : 'the schedules you made or are assigned');
 
   /** The real statuses, with the "All" total removed so it can't appear as a slice. */
   readonly statusCategories = computed(() =>

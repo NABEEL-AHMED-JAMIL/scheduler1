@@ -37,7 +37,7 @@ function dashboard(answers: Answers = {}, query: Record<string, string> = {}, ev
       { provide: Router, useValue: { navigate: (commands: unknown[], extras: unknown) => { navigations.push({ commands, extras }); } } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
       { provide: JobEventsService, useValue: { events, connected } },
-      { provide: AuthService, useValue: { canOpen: () => true } },
+      { provide: AuthService, useValue: { canOpen: () => true, isTenantAdmin: () => true } },
     ],
   });
   return { dashboard: TestBed.runInInjectionContext(() => new Dashboard()), calls, breakdownDates, ranges, navigations };

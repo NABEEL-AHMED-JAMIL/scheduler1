@@ -279,10 +279,10 @@ describe('shell navigation', () => {
     it('keeps the header on one line from 1180px to 2xl: the mark without its wordmark, tighter menus', async () => {
       const { el } = await rendered();
       const wordmark = el.querySelector<HTMLElement>('header app-brand-mark span')!;
-      expect(wordmark.className).toContain('min-[1180px]:hidden');
+      expect(wordmark.className).toContain('nav:hidden');
       expect(wordmark.className).toContain('2xl:block');
-      expect(el.querySelector<HTMLElement>('header nav')!.className).toContain('min-[1180px]:flex');
-      expect(el.querySelector<HTMLElement>('header button[aria-label="Menu"]')!.className).toContain('min-[1180px]:hidden');
+      expect(el.querySelector<HTMLElement>('header nav')!.className).toContain('nav:flex');
+      expect(el.querySelector<HTMLElement>('header button[aria-label="Menu"]')!.className).toContain('nav:hidden');
       const trigger = el.querySelector<HTMLElement>('header nav [data-nav-menu="Pipelines"] > button')!;
       expect(trigger.className).toContain('px-1');
       expect(trigger.className).toContain('xl:px-2');
@@ -294,7 +294,7 @@ describe('shell navigation', () => {
       const name = el.querySelector<HTMLElement>('[data-nav-menu="__user"] > button span.truncate');
       expect(name).not.toBeNull();
       expect(name!.className).toContain('max-w-36');
-      expect(name!.className).toContain('min-[1180px]:hidden');
+      expect(name!.className).toContain('nav:hidden');
       expect(name!.className).toContain('2xl:block');
       expect(name!.hasAttribute('title')).toBe(true);
     });

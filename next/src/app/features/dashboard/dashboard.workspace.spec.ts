@@ -45,7 +45,7 @@ async function render(role: Role, hour: JobBreakdown[] = HOUR) {
       { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
       { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
-      { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => role === 'PLATFORM_ADMIN', canBuild: () => false } },
+      { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isTenantAdmin: () => role !== 'TENANT_USER', canBuild: () => false } },
     ],
   });
   // The drill-down is what is under test; the billing card and the charts have their own specs

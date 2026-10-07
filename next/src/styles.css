@@ -38,6 +38,10 @@
    colour carries meaning that weight cannot.
    --------------------------------------------------------------------------- */
 @theme {
+  /* The width from which the shell's whole menu is on the bar (nav:), between lg and xl: the owner's 1187px window
+     had it behind the menu button at xl (review 2026-10-07). A named breakpoint, not min-[1180px]: Tailwind writes
+     arbitrary ones before sm/md/lg, so sm:block outranked them. */
+  --breakpoint-nav: 73.75rem;
   --color-ink-50:  #f9fafb;
   --color-ink-100: #f3f4f6;
   --color-ink-200: #e5e7eb;
