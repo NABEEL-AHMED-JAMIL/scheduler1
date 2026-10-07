@@ -2480,7 +2480,10 @@ describe('choosing how a tile is drawn, from its menu', () => {
     const { board, search, key } = openKinds();
     const choose = overlay().querySelector<HTMLButtonElement>('.dash-choose')!;
     choose.focus();
-    key(choose, 'b');
+    // In the box at once, before any change detection: the next key a fast typist presses lands
+    // in a box that already holds the first.
+    choose.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+    expect(search().value).toBe('b');
     expect(document.activeElement).toBe(search());
     expect(board.kindQuery()).toBe('b');
     key(search(), 'a');      // typed in the box itself: left to the box, not the menu's typeahead

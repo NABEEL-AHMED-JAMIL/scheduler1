@@ -2244,8 +2244,12 @@ export class Dashboards implements OnInit, OnDestroy {
       return;
     }
     if (search && event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      // Written into the box at once, not left to the next change detection: a fast typist's
+      // second key would otherwise land in a box still empty and replace the first.
+      search.value = this.kindQuery() + event.key;
       search.focus({ preventScroll: true });
-      this.kindQuery.set(this.kindQuery() + event.key);
+      search.setSelectionRange(search.value.length, search.value.length);
+      this.kindQuery.set(search.value);
       done();
       return;
     }

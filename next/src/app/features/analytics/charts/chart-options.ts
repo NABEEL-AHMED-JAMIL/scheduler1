@@ -1,6 +1,7 @@
 import type { EChartKind } from '../analytics.service';
 import type { WidgetView } from '../dashboard';
 import { compactNumber, readableCell } from '../../../shared/charts/number-format';
+import { shortLabel } from '../../../shared/charts/short-label';
 import { dayLabel } from '../../../shared/ui/time-format';
 import { instantOf } from '../../../core/instant';
 import { ChartTokenSet, blend, inkOn } from '../../../shared/charts/echart/echart-theme';
@@ -443,7 +444,8 @@ function lineKind(variant: 'smooth' | 'step' | 'markers' | 'stacked' | 'share'):
         label: labelOption(s, false, 'top', unitOf(s)),
         ...(variant === 'markers' ? {
           markPoint: {
-            symbolSize: 34,
+            // Big enough to hold a compact figure at 11px ("609K", "1.2M"): at 34 the text ran out of the pin.
+            symbolSize: 46,
             data: [{ type: 'max', name: 'Highest' }, { type: 'min', name: 'Lowest' }],
             label: { formatter: (p: { value: number }) => formatNumber(p.value, 'compact'), fontSize: CAPTION },
           },
@@ -652,8 +654,9 @@ function pie(variant: 'rose' | 'half'): Builder {
         itemStyle: { borderRadius: 4, borderWidth: 1 },
         avoidLabelOverlap: true,
         label: {
-          ...labelOption(s, !lg, 'outside'), width: 120, overflow: 'truncate', ellipsis: '…',
-          formatter: (p: { name: string; percent: number }) => `${p.name} ${Math.round(p.percent)}%`,
+          // The name is cut, never the share: cut by the label's width, "Home and garden 19%" lost its 19%.
+          ...labelOption(s, !lg, 'outside'), width: 170, overflow: 'truncate', ellipsis: '…',
+          formatter: (p: { name: string; percent: number }) => `${shortLabel(p.name, 18)} ${Math.round(p.percent)}%`,
         },
         data: xs.map((name, i) => ({ name, value: values[i] })),
       }],
@@ -921,8 +924,8 @@ const treemap: Builder = (table0, s, theme, context) => {
     series: [{
       // A click narrows the board where it can; zooming into a branch is then the breadcrumb's job.
       type: 'treemap', name: primary(table)?.name ?? '', data: nodes, roam: false, nodeClick: context.clickable ? false : 'zoomToNode',
-      top: s.title?.text ? 40 : 4, left: 4, right: 4, bottom: table.dims.length > 1 ? 26 : 4,
-      breadcrumb: { show: table.dims.length > 1, height: 18, itemStyle: { textStyle: { fontSize: CAPTION } } },
+      top: s.title?.text ? 40 : 4, left: 4, right: 4, bottom: table.dims.length > 1 ? 30 : 4,
+      breadcrumb: { show: table.dims.length > 1, height: 18, bottom: 0, itemStyle: { textStyle: { fontSize: CAPTION } } },
       label: { show: s.labels?.show ?? true, fontSize: labelPx(s), overflow: 'truncate', ellipsis: '…', textBorderWidth: 0, formatter: (p: { name: string; value: number }) => `${p.name}\n${formatNumber(p.value, s.labels?.format ?? 'compact')}` },
       upperLabel: { show: table.dims.length > 1, height: labelPx(s) + 7, fontSize: labelPx(s), overflow: 'truncate', ellipsis: '…', textBorderWidth: 0 },
       // Gaps in the card's colour: ECharts paints them white, a grid of white lines on a dark card.
