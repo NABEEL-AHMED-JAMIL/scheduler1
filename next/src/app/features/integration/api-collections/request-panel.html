@@ -116,18 +116,32 @@
               </app-field>
               <app-field label="Paging" for="apiPaging">
                 <select id="apiPaging" class="input" [value]="e.pagingType" (change)="patch({ pagingType: $any($event.target).value })">
-                  @for (p of pagingTypes; track p) { <option [value]="p" [selected]="p === e.pagingType">{{ p === 'NONE' ? 'None' : p === 'PAGE' ? 'Page number' : p === 'CURSOR' ? 'Cursor' : 'Link header' }}</option> }
+                  @for (p of pagingTypes; track p) { <option [value]="p" [selected]="p === e.pagingType">{{ pagingLabels[p] }}</option> }
                 </select>
               </app-field>
             </div>
             @if (e.pagingType !== 'NONE') {
-              <div class="form-grid">
-                @if (e.pagingType !== 'LINK') {
-                  <app-field label="Page parameter" for="apiPageParam">
-                    <input id="apiPageParam" class="input mono" [value]="e.pagingParam" [placeholder]="e.pagingType === 'PAGE' ? 'page' : 'cursor'" (input)="patch({ pagingParam: $any($event.target).value })" />
+              @let t = e.pagingType;
+              <p class="field-note text-[color:var(--text-muted)]" data-test="paging-note">
+                @switch (t) {
+                  @case ('PAGE') { Asks page 1, 2, 3… in a query parameter, and stops on an empty or short page. }
+                  @case ('CURSOR') { Sends the cursor the last answer gave, and stops when there is none. }
+                  @case ('LINK') { Follows the Link header's rel="next", and stops when there is none. }
+                  @case ('NEXT_URL') { Follows the next page's full URL from the answer — a JSONPath in the body, or a header — and stops when there is none. }
+                  @case ('OFFSET') { Moves a skip parameter by the items received, and stops at the total, or on an empty or short page. }
+                }
+                A next URL stays on the first request's host unless Other hosts names another.
+              </p>
+              <div class="form-grid" data-test="paging-fields">
+                @if (t === 'PAGE' || t === 'CURSOR' || t === 'OFFSET') {
+                  <app-field [label]="t === 'OFFSET' ? 'Offset parameter' : t === 'CURSOR' ? 'Cursor parameter' : 'Page parameter'" for="apiPageParam">
+                    <input id="apiPageParam" class="input mono" [value]="e.pagingParam" [placeholder]="t === 'PAGE' ? 'page' : t === 'OFFSET' ? 'offset' : 'cursor'" (input)="patch({ pagingParam: $any($event.target).value })" />
                   </app-field>
                 }
-                @if (e.pagingType === 'PAGE') {
+                @if (t === 'PAGE' || t === 'OFFSET') {
+                  <app-field [label]="t === 'OFFSET' ? 'First offset' : 'First page'" for="apiPageStart">
+                    <input id="apiPageStart" class="input" type="number" min="0" [value]="e.pagingStart" [placeholder]="t === 'OFFSET' ? '0' : '1'" (input)="patch({ pagingStart: num($event) })" />
+                  </app-field>
                   <app-field label="Size parameter" for="apiSizeParam">
                     <input id="apiSizeParam" class="input mono" [value]="e.pagingSizeParam" placeholder="limit" (input)="patch({ pagingSizeParam: $any($event.target).value })" />
                   </app-field>
@@ -135,9 +149,25 @@
                     <input id="apiPageSize" class="input" type="number" min="1" [value]="e.pagingSize" placeholder="50" (input)="patch({ pagingSize: num($event) })" />
                   </app-field>
                 }
-                @if (e.pagingType === 'CURSOR') {
-                  <app-field label="Next cursor at" for="apiNextPath">
-                    <input id="apiNextPath" class="input mono" [value]="e.pagingNextPath" placeholder="$.next_cursor" (input)="patch({ pagingNextPath: $any($event.target).value })" />
+                @if (t === 'OFFSET') {
+                  <app-field label="Total at" for="apiTotalPath" hint="Optional. Where the answer says how many items there are; paging stops there.">
+                    <input id="apiTotalPath" class="input mono" [value]="e.pagingTotalPath" placeholder="$.meta.results.total" (input)="patch({ pagingTotalPath: $any($event.target).value })" />
+                  </app-field>
+                }
+                @if (t === 'CURSOR' || t === 'NEXT_URL') {
+                  <app-field [label]="t === 'CURSOR' ? 'Next cursor at' : 'Next URL at'" for="apiNextPath"
+                             [hint]="t === 'NEXT_URL' ? 'A JSONPath; filters work. Blank: the header below.' : ''">
+                    <input id="apiNextPath" class="input mono" [value]="e.pagingNextPath" [placeholder]="t === 'CURSOR' ? '$.next_cursor' : '$.link[?(@.relation==&quot;next&quot;)].url'" (input)="patch({ pagingNextPath: $any($event.target).value })" />
+                  </app-field>
+                }
+                @if (t === 'NEXT_URL') {
+                  <app-field label="Next URL header" for="apiNextHeader" hint="Blank: the Link header's rel=&quot;next&quot;.">
+                    <input id="apiNextHeader" class="input mono" [value]="e.pagingNextHeader" placeholder="Link" (input)="patch({ pagingNextHeader: $any($event.target).value })" />
+                  </app-field>
+                }
+                @if (t === 'LINK' || t === 'NEXT_URL') {
+                  <app-field label="Other hosts" for="apiAllowedHosts" hint="Optional, comma-separated host names. Sent there without this API's credentials.">
+                    <input id="apiAllowedHosts" class="input mono" [value]="e.pagingAllowedHosts" placeholder="api2.example.org" (input)="patch({ pagingAllowedHosts: $any($event.target).value })" />
                   </app-field>
                 }
                 <app-field label="Items at" for="apiItemsPath">
@@ -147,6 +177,9 @@
                   <input id="apiMaxPages" class="input" type="number" min="1" [value]="e.pagingMaxPages" placeholder="10" (input)="patch({ pagingMaxPages: num($event) })" />
                 </app-field>
               </div>
+              @if (pagingProblem(e); as problem) {
+                <p class="field-note text-crit-500" role="alert" data-test="paging-problem">{{ problem }}</p>
+              }
             }
             <div class="flex flex-col gap-2 text-sm">
               <label class="flex items-center gap-2"><input type="checkbox" class="checkbox" [checked]="e.aiCallable" (change)="patch({ aiCallable: $any($event.target).checked, aiWriteAllowed: $any($event.target).checked && e.aiWriteAllowed })" />The AI Assistant may call it</label>

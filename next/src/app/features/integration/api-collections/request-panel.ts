@@ -6,8 +6,8 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import {
-  AUTH_MODES, BODY_TYPES, CollectionRow, EnvironmentRow, FolderRow, METHODS, PAGING_TYPES, PairRow, RequestEdit, RunResult,
-  authLabel, authSettingsFor, blankRequest, bodyLabel, effectiveAuthMode, referenceName, requestEditOf, requestSaveOf,
+  AUTH_MODES, BODY_TYPES, CollectionRow, EnvironmentRow, FolderRow, METHODS, PAGING_LABELS, PAGING_TYPES, PairRow, RequestEdit, RunResult,
+  authLabel, authSettingsFor, blankRequest, bodyLabel, effectiveAuthMode, pagingProblem, referenceName, requestEditOf, requestSaveOf,
 } from './api-collections.model';
 import { ApiCollectionsApi } from './api-collections.service';
 import { PairsEditor } from './pairs-editor';
@@ -54,6 +54,9 @@ export class RequestPanel {
   readonly bodyTypes = BODY_TYPES;
   readonly authModes = AUTH_MODES;
   readonly pagingTypes = PAGING_TYPES;
+  readonly pagingLabels = PAGING_LABELS;
+  /** What is wrong with the paging as it stands, said under its fields before Save is pressed. */
+  readonly pagingProblem = pagingProblem;
   readonly folders = folderOptions(this.data.folders);
   readonly tabs: { id: Tab; label: string }[] = [
     { id: 'params', label: 'Params' }, { id: 'headers', label: 'Headers' }, { id: 'auth', label: 'Auth' },

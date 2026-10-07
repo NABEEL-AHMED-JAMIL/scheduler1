@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import {
   PairRow, VariableEdit, authSettingsFor, blankRequest, brunoFiles, effectiveAuthMode, fromPairs, literalSecrets,
-  parseJsonField, reportRows, requestSaveOf, sensitivityWord, toPairs, variableEdits, variableSaves,
+  parseJsonField, reportRows, requestEditOf, requestSaveOf, sensitivityWord, toPairs, variableEdits, variableSaves,
 } from './api-collections.model';
 
 /**
@@ -227,3 +227,62 @@ describe('sensitivityWord (MIG-243)', () => {
     expect(sensitivityWord({ sensitivity: 'internal' } as never)).toBeNull();
   });
 });
+
+/** MIG-363, the console half: NEXT_URL and OFFSET paging, as integration-service's Paging reads them (f537e92). */
+describe('API Collections -- paging modes', () => {
+  const base = () => { const e = blankRequest(11); e.name = 'x'; e.urlTemplate = 'https://api.example.test'; return e; };
+  const pagination = (e: ReturnType<typeof blankRequest>) => (requestSaveOf(e) as { body: Record<string, unknown> }).body['pagination'];
+  const problem = (e: ReturnType<typeof blankRequest>) => (requestSaveOf(e) as { error?: string }).error;
+
+  it("sends a next URL's path, header and other hosts, and nothing a page-number mode left behind", () => {
+    const e = base();
+    e.pagingType = 'NEXT_URL';
+    e.pagingNextPath = "$.link[?(@.relation=='next')].url";
+    e.pagingNextHeader = 'Link';
+    e.pagingAllowedHosts = ' R4.SmartHealthIT.org , api2.example.org ';
+    e.pagingParam = 'page'; e.pagingSize = '50'; e.pagingTotalPath = '$.total';
+    e.pagingItemsPath = '$.entry'; e.pagingMaxPages = '5';
+    expect(pagination(e)).toEqual({ type: 'NEXT_URL', nextPath: "$.link[?(@.relation=='next')].url", nextHeader: 'Link',
+      allowedHosts: ['r4.smarthealthit.org', 'api2.example.org'], itemsPath: '$.entry', maxPages: 5 });
+  });
+
+  it("sends an offset's parameter, start, size and total as numbers where they are numbers", () => {
+    const e = base();
+    e.pagingType = 'OFFSET';
+    e.pagingParam = 'skip'; e.pagingStart = '0'; e.pagingSizeParam = 'limit'; e.pagingSize = '100';
+    e.pagingTotalPath = '$.meta.results.total'; e.pagingItemsPath = '$.results'; e.pagingAllowedHosts = 'ignored.example.org';
+    expect(pagination(e)).toEqual({ type: 'OFFSET', param: 'skip', start: 0, sizeParam: 'limit', size: 100,
+      totalPath: '$.meta.results.total', itemsPath: '$.results' });
+  });
+
+  it('reads a saved NEXT_URL and OFFSET back into the editor, extras kept', () => {
+    const detail = { requestId: 5, collectionId: 11, name: 'FHIR', method: 'GET', urlTemplate: 'https://x.test', timeoutMs: 30000,
+      pagination: { type: 'next_url', nextPath: '$.next', nextHeader: 'X-Next', allowedHosts: ['a.test', 'b.test'], maxPages: 3, future: true } };
+    const e = requestEditOf(detail as never);
+    expect(e.pagingType).toBe('NEXT_URL');
+    expect([e.pagingNextPath, e.pagingNextHeader, e.pagingAllowedHosts, e.pagingMaxPages]).toEqual(['$.next', 'X-Next', 'a.test, b.test', '3']);
+    expect(e.pagingExtra).toEqual({ future: true });
+    const offset = requestEditOf({ ...detail, pagination: { type: 'OFFSET', start: 10, totalPath: '$.total' } } as never);
+    expect([offset.pagingType, offset.pagingStart, offset.pagingTotalPath]).toEqual(['OFFSET', '10', '$.total']);
+  });
+
+  it('refuses what the runner would misread, in words', () => {
+    let e = base(); e.pagingType = 'OFFSET'; e.pagingSizeParam = 'limit';
+    expect(problem(e)).toBe('Give the page size the size parameter sends.');
+    e = base(); e.pagingType = 'OFFSET'; e.pagingStart = '-1';
+    expect(problem(e)).toBe('The first offset is a whole number, 0 or more.');
+    e = base(); e.pagingType = 'OFFSET'; e.pagingTotalPath = 'meta.total';
+    expect(problem(e)).toBe("Total at is a JSONPath from the answer's root, starting with $ (e.g. $.items).");
+    e = base(); e.pagingType = 'NEXT_URL'; e.pagingNextPath = 'next';
+    expect(problem(e)).toBe("Next URL at is a JSONPath from the answer's root, starting with $ (e.g. $.items).");
+    e = base(); e.pagingType = 'NEXT_URL'; e.pagingAllowedHosts = 'https://b.test/x';
+    expect(problem(e)).toBe('Other hosts are host names alone, without https:// or a path: https://b.test/x.');
+    e = base(); e.pagingType = 'NEXT_URL'; e.pagingNextHeader = 'X Next';
+    expect(problem(e)).toBe("The next URL's header is a header name, e.g. Link.");
+    e = base(); e.pagingType = 'PAGE'; e.pagingMaxPages = '0';
+    expect(problem(e)).toBe('Most pages is a whole number, 1 or more.');
+    e = base(); e.pagingType = 'OFFSET';
+    expect(problem(e)).toBeUndefined();
+  });
+});
+

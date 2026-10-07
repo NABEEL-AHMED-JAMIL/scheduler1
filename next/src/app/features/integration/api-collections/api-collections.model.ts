@@ -183,7 +183,11 @@ export interface Saved { id: number; collectionId: number; version?: number | nu
 export const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
 export const BODY_TYPES = ['NONE', 'JSON', 'TEXT', 'XML', 'FORM_URLENCODED', 'MULTIPART', 'BINARY', 'GRAPHQL'] as const;
 export const AUTH_MODES = ['INHERIT', 'NONE', 'BEARER', 'BASIC', 'APIKEY', 'OAUTH2'] as const;
-export const PAGING_TYPES = ['NONE', 'PAGE', 'CURSOR', 'LINK'] as const;
+/** The runner's paging modes (integration-service's Paging.Type); NEXT_URL and OFFSET since f537e92. */
+export const PAGING_TYPES = ['NONE', 'PAGE', 'CURSOR', 'LINK', 'NEXT_URL', 'OFFSET'] as const;
+export const PAGING_LABELS: Record<string, string> = {
+  NONE: 'None', PAGE: 'Page number', CURSOR: 'Cursor', LINK: 'Link header', NEXT_URL: 'Next URL in the answer', OFFSET: 'Offset',
+};
 /** Free text on the service (32 characters); these are the levels the data policies are written for. */
 export const SENSITIVITIES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'PHI'] as const;
 
@@ -309,7 +313,15 @@ export interface RequestEdit {
   pagingNextPath: string;
   pagingItemsPath: string;
   pagingMaxPages: string;
-  /** Paging settings the editor has no control for (start, nextHeader…), kept as they were. */
+  /** PAGE, OFFSET: the first page's number or offset (the runner's defaults: 1 and 0). */
+  pagingStart: string;
+  /** CURSOR, NEXT_URL: a header holding the next cursor or URL ("Link" is read as rel="next"). */
+  pagingNextHeader: string;
+  /** OFFSET: where the answer says how many items there are in all, e.g. $.meta.results.total. */
+  pagingTotalPath: string;
+  /** LINK, NEXT_URL: other hosts a next URL may go to, comma-separated; blank keeps paging on the first request's host. */
+  pagingAllowedHosts: string;
+  /** Paging settings the editor has no control for, kept as they were. */
   pagingExtra: Record<string, unknown>;
   aiCallable: boolean;
   aiWriteAllowed: boolean;
@@ -324,6 +336,7 @@ export function blankRequest(collectionId: number, folderId: number | null = nul
     paramsSchema: '', extractRules: '', assertRules: '', timeoutSeconds: '30',
     retryAttempts: '', retryBackoffMs: '', retryExtra: {},
     pagingType: 'NONE', pagingParam: '', pagingSizeParam: '', pagingSize: '', pagingNextPath: '', pagingItemsPath: '', pagingMaxPages: '',
+    pagingStart: '', pagingNextHeader: '', pagingTotalPath: '', pagingAllowedHosts: '',
     pagingExtra: {}, aiCallable: false, aiWriteAllowed: false, enabled: true, sortOrder: 0,
   };
 }
@@ -346,11 +359,52 @@ export function requestEditOf(d: RequestDetail): RequestEdit {
     pagingType: (PAGING_TYPES as readonly string[]).includes(pagingType) ? pagingType : 'NONE',
     pagingParam: take(paging, 'param'), pagingSizeParam: take(paging, 'sizeParam'), pagingSize: take(paging, 'size'),
     pagingNextPath: take(paging, 'nextPath'), pagingItemsPath: take(paging, 'itemsPath'), pagingMaxPages: take(paging, 'maxPages'),
+    pagingStart: take(paging, 'start'), pagingNextHeader: take(paging, 'nextHeader'), pagingTotalPath: take(paging, 'totalPath'),
+    pagingAllowedHosts: hostsOf(paging),
     pagingExtra: paging, aiCallable: !!d.aiCallable, aiWriteAllowed: !!d.aiWriteAllowed, enabled: d.enabled !== false, sortOrder: d.sortOrder ?? 0,
   };
 }
 
 const whole = (s: string): number | null => { const n = Number(s.trim()); return s.trim() && Number.isFinite(n) ? n : null; };
+
+/** allowedHosts as the editor shows it, taken out of the extras: a list joined by commas. */
+function hostsOf(paging: Record<string, unknown>): string {
+  const hosts = paging['allowedHosts'];
+  delete paging['allowedHosts'];
+  return Array.isArray(hosts) ? hosts.map(h => text(h).trim()).filter(Boolean).join(', ') : text(hosts);
+}
+
+/** A host name as allowedHosts takes it: no scheme, path or port. */
+const HOST = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/i;
+
+/**
+ * What is wrong with a request's paging, before the service is asked, or ''. The runner reads each mode's own
+ * settings (integration-service's Paging): a path is a JSONPath from the answer's root, a count is a whole number, a
+ * size parameter needs the size it sends, and another host is named bare.
+ */
+export function pagingProblem(e: RequestEdit): string {
+  const type = e.pagingType || 'NONE';
+  if (type === 'NONE') return '';
+  const isWhole = (v: string, least: number) => { const n = whole(v); return n !== null && Number.isInteger(n) && n >= least; };
+  if (e.pagingMaxPages.trim() && !isWhole(e.pagingMaxPages, 1)) return 'Most pages is a whole number, 1 or more.';
+  for (const [value, label] of [[e.pagingItemsPath, 'Items at'], [e.pagingNextPath, type === 'CURSOR' ? 'Next cursor at' : 'Next URL at'],
+    [e.pagingTotalPath, 'Total at']] as const) {
+    if (value.trim() && !value.trim().startsWith('$')) return `${label} is a JSONPath from the answer's root, starting with $ (e.g. $.items).`;
+  }
+  if (type === 'PAGE' || type === 'OFFSET') {
+    if (e.pagingStart.trim() && !isWhole(e.pagingStart, 0)) return `The first ${type === 'OFFSET' ? 'offset' : 'page'} is a whole number, 0 or more.`;
+    if (e.pagingSize.trim() && !isWhole(e.pagingSize, 1)) return 'The page size is a whole number, 1 or more.';
+    if (e.pagingSizeParam.trim() && !e.pagingSize.trim()) return 'Give the page size the size parameter sends.';
+  }
+  if (type === 'LINK' || type === 'NEXT_URL') {
+    const bad = e.pagingAllowedHosts.split(',').map(h => h.trim()).filter(h => h && !HOST.test(h));
+    if (bad.length) return `Other hosts are host names alone, without https:// or a path: ${bad.join(', ')}.`;
+  }
+  if (type === 'NEXT_URL' && e.pagingNextHeader.trim() && !/^[A-Za-z0-9-]+$/.test(e.pagingNextHeader.trim())) {
+    return 'The next URL\'s header is a header name, e.g. Link.';
+  }
+  return '';
+}
 
 /** The editor's request as /request/save takes it, or what to fix first. */
 export function requestSaveOf(e: RequestEdit): { body: Record<string, unknown> } | { error: string } {
@@ -373,6 +427,8 @@ export function requestSaveOf(e: RequestEdit): { body: Record<string, unknown> }
   const attempts = whole(e.retryAttempts), backoff = whole(e.retryBackoffMs);
   if (attempts !== null) retry['maxAttempts'] = attempts;
   if (backoff !== null) retry['backoffMs'] = backoff;
+  const paging = pagingProblem(e);
+  if (paging) return { error: paging };
   let pagination: Record<string, unknown> | null = null;
   if (e.pagingType && e.pagingType !== 'NONE') {
     pagination = { type: e.pagingType, ...e.pagingExtra };
@@ -380,8 +436,17 @@ export function requestSaveOf(e: RequestEdit): { body: Record<string, unknown> }
       if (!value.trim()) return;
       pagination![key] = numeric ? (whole(value) ?? value.trim()) : value.trim();
     };
-    put('param', e.pagingParam); put('sizeParam', e.pagingSizeParam); put('size', e.pagingSize, true);
-    put('nextPath', e.pagingNextPath); put('itemsPath', e.pagingItemsPath); put('maxPages', e.pagingMaxPages, true);
+    // Each mode sends the settings it reads; what another mode left in the editor stays out.
+    const type = e.pagingType;
+    if (type !== 'LINK' && type !== 'NEXT_URL') put('param', e.pagingParam);
+    if (type === 'PAGE' || type === 'OFFSET') { put('start', e.pagingStart, true); put('sizeParam', e.pagingSizeParam); put('size', e.pagingSize, true); }
+    if (type === 'CURSOR' || type === 'NEXT_URL') { put('nextPath', e.pagingNextPath); put('nextHeader', e.pagingNextHeader); }
+    if (type === 'OFFSET') put('totalPath', e.pagingTotalPath);
+    if (type === 'LINK' || type === 'NEXT_URL') {
+      const hosts = e.pagingAllowedHosts.split(',').map(h => h.trim().toLowerCase()).filter(Boolean);
+      if (hosts.length) pagination['allowedHosts'] = hosts;
+    }
+    put('itemsPath', e.pagingItemsPath); put('maxPages', e.pagingMaxPages, true);
   }
   return {
     body: {

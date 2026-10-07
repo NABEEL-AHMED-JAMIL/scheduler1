@@ -185,3 +185,51 @@ describe('RequestPanel -- the panel', () => {
     expect((el.querySelector('fieldset') as HTMLFieldSetElement).disabled).toBe(true);
   });
 });
+
+/** The console half of MIG-363: the runner's NEXT_URL and OFFSET paging modes (integration-service f537e92) in the editor. */
+describe('RequestPanel -- paging modes', () => {
+  function settings() {
+    panelWith({ canManage: true });
+    const fixture = TestBed.createComponent(RequestPanel);
+    fixture.detectChanges();
+    const screen = fixture.componentInstance;
+    screen.tab.set('settings');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const ids = () => Array.from(el.querySelectorAll('[data-test="paging-fields"] input')).map(i => i.id);
+    return { fixture, screen, el, ids };
+  }
+
+  it('offers every mode the runner has, in words', () => {
+    const { el } = settings();
+    expect(Array.from(el.querySelectorAll<HTMLOptionElement>('#apiPaging option')).map(o => o.textContent!.trim()))
+      .toEqual(['None', 'Page number', 'Cursor', 'Link header', 'Next URL in the answer', 'Offset']);
+  });
+
+  it('asks a next URL\'s path or header, and other hosts', () => {
+    const { fixture, screen, el, ids } = settings();
+    screen.patch({ pagingType: 'NEXT_URL' });
+    fixture.detectChanges();
+    expect(ids()).toEqual(['apiNextPath', 'apiNextHeader', 'apiAllowedHosts', 'apiItemsPath', 'apiMaxPages']);
+    expect(el.querySelector('[data-test="paging-note"]')!.textContent).toContain('next page\'s full URL');
+    expect((el.querySelector('#apiNextPath') as HTMLInputElement).placeholder).toBe('$.link[?(@.relation=="next")].url');
+  });
+
+  it('asks an offset\'s parameter, start, size and total', () => {
+    const { fixture, screen, ids } = settings();
+    screen.patch({ pagingType: 'OFFSET' });
+    fixture.detectChanges();
+    expect(ids()).toEqual(['apiPageParam', 'apiPageStart', 'apiSizeParam', 'apiPageSize', 'apiTotalPath', 'apiItemsPath', 'apiMaxPages']);
+  });
+
+  it('says what is wrong under the fields before Save is pressed', () => {
+    const { fixture, screen, el } = settings();
+    screen.patch({ pagingType: 'NEXT_URL', pagingAllowedHosts: 'https://api2.example.org/v1' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="paging-problem"]')!.textContent)
+      .toContain('Other hosts are host names alone, without https:// or a path: https://api2.example.org/v1.');
+    screen.patch({ pagingAllowedHosts: 'api2.example.org' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="paging-problem"]')).toBeNull();
+  });
+});
