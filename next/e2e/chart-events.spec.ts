@@ -84,12 +84,12 @@ async function ensureBoards(request: APIRequestContext, s: Session, connection: 
  * Points where ECharts shows the pointer, at most ten. Not every one is a mark that narrows -- a
  * legend item toggles its series, a calendar's month name is text -- so each is tried in turn.
  */
-async function pointerSpots(page: Page, chart: Locator): Promise<{ x: number; y: number }[]> {
+async function pointerSpots(page: Page, chart: Locator, cols = 28, rows = 20, limit = 10, outerFirst = false): Promise<{ x: number; y: number }[]> {
   const box = (await chart.boundingBox())!;
   const spots: { x: number; y: number }[] = [];
-  for (let gy = 1; gy < 20; gy++) {
-    for (let gx = 1; gx < 28; gx++) {
-      const x = box.x + (box.width * gx) / 28, y = box.y + (box.height * gy) / 20;
+  for (let gy = 1; gy < rows; gy++) {
+    for (let gx = 1; gx < cols; gx++) {
+      const x = box.x + (box.width * gx) / cols, y = box.y + (box.height * gy) / rows;
       await page.mouse.move(x, y);
       const cursor = await chart.evaluate(el => getComputedStyle(el.querySelector('div > div') ?? el).cursor);
       if (cursor === 'pointer' && !spots.some(s => Math.abs(s.y - y) < 4 && Math.abs(s.x - x) < 30)) spots.push({ x, y });
@@ -98,7 +98,10 @@ async function pointerSpots(page: Page, chart: Locator): Promise<{ x: number; y:
   // Marks sit in the middle; the legend, the toolbox and a treemap's breadcrumb along the edges
   // (a legend click hides a series, a breadcrumb click climbs out of a branch).
   const cx = box.x + box.width / 2, cy = box.y + box.height / 2;
-  return spots.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)).slice(0, 10);
+  // outerFirst: a tree's edges show the pointer too and narrow nothing; its leaves stand at the far end of the layout,
+  // right of everything else, below the toolbox in the top band.
+  if (outerFirst) return spots.filter(s => s.y > box.y + box.height * 0.15).sort((a, b) => b.x - a.x).slice(0, limit);
+  return spots.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)).slice(0, limit);
 }
 
 let boardOf: Record<string, number> = {};
@@ -128,11 +131,17 @@ for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.j
     // The click IS the apply: the board re-runs at once, its analyses carrying the clicked value
     // as an equality. Waited for on the wire.
     let narrowed = false;
-    for (const spot of spots) {
-      const sent = page.waitForRequest(r => r.url().includes('/analytics.json/analyze') && /"operator":"EQ"/.test(r.postData() ?? ''),
-        { timeout: 4_000 }).then(() => true, () => false);
-      await page.mouse.click(spot.x, spot.y);
-      if ((narrowed = await sent)) break;
+    // A tree's marks are 8 px dots the coarse grid can pass between, its edges show the pointer and narrow nothing, and a
+    // click on a branch unfolds it rather than narrowing: when nothing narrowed, look again on a finer grid, over
+    // whatever the clicks unfolded, from the far end of the layout (where its leaves are) inwards.
+    for (const round of [spots, null]) {
+      for (const spot of round ?? await pointerSpots(page, chart, 84, 40, 30, true)) {
+        const sent = page.waitForRequest(r => r.url().includes('/analytics.json/analyze') && /"operator":"EQ"/.test(r.postData() ?? ''),
+          { timeout: 4_000 }).then(() => true, () => false);
+        await page.mouse.click(spot.x, spot.y);
+        if ((narrowed = await sent)) break;
+      }
+      if (narrowed) break;
     }
     expect.soft(narrowed, `${kind}: a click on a mark narrowed the board`).toBe(true);
     // A mark of a two-dimension tile (a stack's x and series, a heatmap's cell, a sankey's link) stands for one value of
