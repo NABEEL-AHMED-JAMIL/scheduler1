@@ -376,3 +376,32 @@ describe('Build your own view export buttons', () => {
     expect(html).not.toMatch(/>\s*Submit\s*</);
   });
 });
+
+/** Owner, 2026-10-07: "Days active by task and outcome -- click on a count and it shows the wrong list." */
+describe('the drawer lists what the clicked number counts', () => {
+  const twoDays: RunData = {
+    task: ['ingest'], status: ['Completed'], owner: ['Ada'], day: ['2026-08-01', '2026-08-02'],
+    rows: [
+      [0, 0, 0, 0, 10, 'job', 1, 0, 1], [0, 0, 0, 0, 10, 'job', 2, 0, 1],
+      [0, 0, 0, 0, 10, 'job', 3, 0, 1], [0, 0, 0, 1, 10, 'job', 4, 0, 1],
+    ] as RunRow[],
+  };
+
+  it('says how many days a "Days active" cell is, beside the runs behind it', () => {
+    const pivot = pivotFor(twoDays);
+    pivot.setMeasure('distinct');
+    expect(pivot.pivot().matrix[0][0]).toBe(2);
+    pivot.drill(0, 0);
+    expect(pivot.drillDays()).toBe(2);
+    expect(pivot.drillRows().length).toBe(4);
+  });
+
+  it('opens only the matching rows from a column total while a row search is on', () => {
+    const pivot = pivotFor(manyTasks(40));
+    pivot.setRowSearch('task-3');
+    pivot.drillColumn(0);
+    // The total above it reads 355 (task-30 .. task-39); the list used to hold all 820 runs.
+    expect(pivot.drillRows().length).toBe(355);
+    expect(pivot.drillRows().length).toBe(pivot.pivot().colTotals[0]);
+  });
+});

@@ -427,9 +427,16 @@ export class ReportPivot {
   drillColumn(colIndex: number): void {
     const pivot = this.pivot();
     this.drillTitle.set(`All · ${pivot.colLabels[colIndex]}`);
-    this.drillRows.set(this.data().rows.filter(r => r[this.colDim().idx] === colIndex));
+    // The rows behind the total that was clicked: with a row search on, that total counts only the
+    // matching rows, so the list must too (it used to read every run in the range).
+    this.drillRows.set(pivot.cellRows.flatMap(cells => cells[colIndex]));
     this.focusDrill();
   }
+  /**
+   * "Days active" counts distinct days, but the drawer lists runs: a cell reading 3 opens 12 runs.
+   * The drawer says both, so the list matches the number that was clicked.
+   */
+  readonly drillDays = computed(() => new Set(this.drillRows().map(r => r[3])).size);
   /** Moves focus into the drawer, so a keyboard reader lands on what just opened. */
   private focusDrill(): void {
     afterNextRender(() => document.getElementById('drill-heading')?.focus(), { injector: this.injector });

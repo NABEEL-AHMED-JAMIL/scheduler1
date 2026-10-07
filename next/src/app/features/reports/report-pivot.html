@@ -257,6 +257,9 @@
        role="dialog" aria-modal="false" aria-labelledby="drill-heading" (keydown.escape)="closeDrill()">
     <div class="flex items-center gap-2.5 px-4 py-3 border-b border-subtle">
       <h2 id="drill-heading" tabindex="-1" class="text-sm font-semibold">{{ drillTitle() }}</h2>
+      @if (measure() === 'distinct') {
+        <span class="pill pill-neutral" data-test="drill-days">{{ drillDays() }} {{ drillDays() === 1 ? 'day active' : 'days active' }}</span>
+      }
       <span class="pill pill-neutral">{{ drillRows().length }} {{ drillRows().length === 1 ? 'run' : 'runs' }}</span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="closeDrill()">
         <app-icon name="close" />Close
