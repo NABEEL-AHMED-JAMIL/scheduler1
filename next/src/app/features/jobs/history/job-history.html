@@ -1,6 +1,9 @@
 <div class="page">
   <div>
-    <a routerLink="/pipelines/schedules" class="text-sm text-accent hover:underline">← Back to schedules</a>
+    <!-- From a schedule, the way back to the schedules; from the menu there is nowhere to go back to (review L3). -->
+    @if (jobId()) {
+      <a routerLink="/pipelines/schedules" class="text-sm text-accent hover:underline">← Back to schedules</a>
+    }
     <!-- The screen people watch while a job runs: it follows the job-status feed (Live), and
          the header Refresh, laid out as Run logs has it, stays for when the feed is down. -->
     <div class="flex items-start gap-3">
@@ -337,7 +340,7 @@
           <th>Message</th>
           <!-- Status and the Logs link share one cell pinned to the right edge, as Failed runs on
                Reports does, so a narrow screen scrolls the times away rather than the outcome. -->
-          <th class="text-right col-pin-right">Status</th>
+          <th class="text-right col-pin-right">Status · Logs</th>
         </tr>
       </thead>
       <tbody>

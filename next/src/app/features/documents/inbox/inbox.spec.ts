@@ -40,7 +40,7 @@ function stubApi(settings: InboxSettings = SETTINGS) {
   };
 }
 
-function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown; api?: ReturnType<typeof stubApi> } = {}) {
+function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown; api?: ReturnType<typeof stubApi>; tenantId?: number | null } = {}) {
   const api = opts.api ?? stubApi(opts.settings);
   const toast = { success: vi.fn(), error: vi.fn() };
   const opened: { component: unknown; data: unknown }[] = [];
@@ -58,7 +58,7 @@ function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith
       { provide: InboxApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537, tenantId: opts.tenantId === undefined ? 2924 : opts.tenantId }) } },
     ],
   });
   const screen = TestBed.runInInjectionContext(() => new Inbox());
@@ -76,6 +76,17 @@ describe('Inbox -- reading', () => {
     expect(api.files).toHaveBeenCalledWith(50);
     expect(screen.settings()?.alias).toBe('ui-review-s3');
     expect(screen.files().map(f => f.fileName)).toEqual(['live-customers.csv']);
+  });
+
+  it('reads nothing for a sign-in with no workspace (a platform administrator\'s own; review 2026-10-07, L6)', () => {
+    const { api, screen } = screenWith({ tenantId: null });
+    expect(screen.noWorkspace()).toBe(true);
+    expect(api.settings).not.toHaveBeenCalled();
+    expect(api.files).not.toHaveBeenCalled();
+    expect(api.users).not.toHaveBeenCalled();
+    expect(api.colleagues).not.toHaveBeenCalled();
+    screen.load();
+    expect(api.settings).not.toHaveBeenCalled();
   });
 
   it('names uploaders from the member list for an administrator', () => {

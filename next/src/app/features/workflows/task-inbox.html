@@ -42,7 +42,9 @@
   </div>
 
   @if (error()) {
-    <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}</p>
+    <!-- Review 2026-10-07 (M14): a list that could not be read offers to read it again where the reader is looking. -->
+    <p class="flex items-center gap-2 rounded-md px-3 py-2 text-sm bg-sunken text-warn-500" role="alert"><app-icon name="alert" size="0.95em" />{{ error() }}
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="load()" data-test="try-again"><app-icon name="refresh" />Try again</button></p>
   }
 
   <div class="inbox-split" [attr.data-pane]="pane()">

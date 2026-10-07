@@ -34,7 +34,7 @@ describe('Run history layout', () => {
 
   it('pins the Status and Logs cell to the right edge', async () => {
     const html = await read('history/job-history.html');
-    expect(classesOf(html, '>Status</th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '>Status · Logs</th>', 'th')).toContain('col-pin-right');
     expect(classesOf(html, '<app-status [label]="run.jobStatus"')).toContain('col-pin-right');
     // The Logs link shares the pinned cell, so the row's one action cannot scroll away either.
     const cell = html.slice(html.indexOf('<app-status [label]="run.jobStatus"'));

@@ -107,7 +107,7 @@ export const PINNED: Record<string, unknown> = {
         "Ended",
         "Duration",
         "Message",
-        "Status"
+        "Status · Logs"
       ]
     ],
     "fields": [
@@ -301,7 +301,7 @@ export const PINNED: Record<string, unknown> = {
         "Ended",
         "Duration",
         "Message",
-        "Status"
+        "Status · Logs"
       ]
     ],
     "fields": [
@@ -309,7 +309,6 @@ export const PINNED: Record<string, unknown> = {
       "Search runs"
     ],
     "links": [
-      "/pipelines/schedules",
       "/pipelines/schedules/2835/executions",
       "/pipelines/schedules/2835/runs/7381/logs",
       "/pipelines/schedules/2838/executions",

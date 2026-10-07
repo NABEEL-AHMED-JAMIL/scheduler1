@@ -18,6 +18,7 @@ import {
 import { InboxApi, InboxArrival } from './inbox.service';
 import { InboxSettingsDialog, InboxSettingsData } from './inbox-settings-dialog';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -48,7 +49,7 @@ const LIST_LIMIT = 50;
  */
 @Component({
   selector: 'app-inbox',
-  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton],
+  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton, NeedsWorkspace],
   templateUrl: './inbox.html',
 })
 export class Inbox implements OnInit {
@@ -88,7 +89,11 @@ export class Inbox implements OnInit {
   readonly shortSha = shortSha;
   readonly listLimit = LIST_LIMIT;
 
+  /** A sign-in with no workspace (a platform administrator's own): the inbox is a workspace's, so nothing is read (review L6). */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.load();
     // Names for an administrator, who may list the workspace's people whoever builds it (MIG-254); a member reads
     // the colleagues the task inbox offers (MIG-321). Either refused, the user numbers stand in for the names.
@@ -123,6 +128,7 @@ export class Inbox implements OnInit {
   }
 
   load(): void {
+    if (this.noWorkspace()) return;
     this.loading.set(true);
     this.error.set('');
     this.api.settings().subscribe({

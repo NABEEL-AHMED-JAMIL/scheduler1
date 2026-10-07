@@ -10,6 +10,7 @@ import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, cha
 import { AuthService } from '../../core/auth/auth.service';
 import { AskIndex } from './ask-index';
 import { RankedBar } from '../../shared/charts/ranked-bar';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
@@ -20,7 +21,7 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [RouterLink, Icon, RankedBar, AskIndex, ModelSetupBanner],
+  imports: [RouterLink, Icon, RankedBar, AskIndex, ModelSetupBanner, NeedsWorkspace],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {
@@ -30,6 +31,8 @@ export class AskData implements OnInit {
 
   /** MIG-281: a workspace administrator chooses what the search index holds. */
   readonly isAdmin = computed(() => this.auth.isTenantAdmin());
+  /** A sign-in with no workspace (a platform administrator's own): answers come from a workspace's data, so nothing is asked (review L6). */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
 
   readonly max = QUESTION_MAX;
   readonly question = signal('');
@@ -66,10 +69,12 @@ export class AskData implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.loadSuggestions();
   }
 
   loadSuggestions(): void {
+    if (this.noWorkspace()) return;
     this.suggestionsLoading.set(true);
     this.suggestionsError.set(null);
     this.api.suggestions().subscribe({

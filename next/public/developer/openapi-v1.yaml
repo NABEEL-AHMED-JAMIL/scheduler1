@@ -4,7 +4,7 @@ info:
   version: 1.0.0-draft
   summary: Start work, follow it, decide on it, and be told when something happens.
   description: |
-    The public contract for an organisation's own portals and systems (ADR-025). Generic: any pipeline, any form,
+    The public contract for an organisation's own portals and systems. Generic: any pipeline, any form,
     any event type. The console is the organisation's admin tool; this API is how their systems reach the platform.
 
     - Auth: OAuth 2.0 client credentials (POST /v1/oauth/token), per-organisation API clients with scopes.

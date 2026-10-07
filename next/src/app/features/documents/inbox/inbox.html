@@ -8,9 +8,11 @@
       </p>
     </div>
     <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
+      @if (!noWorkspace()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
+          <app-icon name="refresh" [class.spin]="loading()" />Refresh
+        </button>
+      }
       @if (canManage() && configured()) {
         <button type="button" class="btn btn-default btn-sm" (click)="openSettings()"><app-icon name="settings" />Inbox settings</button>
       }
@@ -18,7 +20,9 @@
   </div>
   <app-managed-banner what="inbox settings" />
 
-  @if (loading() && !settings()) {
+  @if (noWorkspace()) {
+    <app-needs-workspace what="The inbox is" todo="upload files to its inbox" icon="inbox" />
+  } @else if (loading() && !settings()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the inbox…</div>
   } @else if (error()) {
     <div class="card p-0">
