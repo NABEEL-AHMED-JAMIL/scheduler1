@@ -56,9 +56,9 @@ test.describe.serial('Connector Hub', () => {
     const s = await sessionFor(request, 'admin');
     const made = ((await getJson(request, s, '/connectorHub.json/connection/list')).data ?? [])
       .filter((c: { name: string }) => c.name === NAME);
-    for (const c of made as { connectionId: number }[]) {
-      await bestEffort(`delete connection ${c.connectionId}`, () => request.delete(`${api}/connectorHub.json/connection/delete`,
-        { headers: { Authorization: `Bearer ${s.token}` }, params: { connectionId: c.connectionId } }));
+    for (const c of made as { id: number }[]) {
+      await bestEffort(`delete connection ${c.id}`, () => request.delete(`${api}/connectorHub.json/connection/delete`,
+        { headers: { Authorization: `Bearer ${s.token}` }, params: { connectionId: c.id } }));
     }
   });
 

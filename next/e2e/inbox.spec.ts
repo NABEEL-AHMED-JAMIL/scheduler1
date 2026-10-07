@@ -55,9 +55,10 @@ test.describe('Inbox (live storage-service)', () => {
   test.afterAll(async ({ request }) => {
     if (!uploaded.length) return;
     const s = await sessionFor(request, 'admin');
-    const arrivals: { fileName: string; bucket: string; key: string }[] = (await getJson(request, s, '/storage.json/inbox/files?limit=50')).data ?? [];
+    // The arrivals list is a log: it keeps naming a file after the file itself is deleted.
+    const arrivals: { fileName: string; alias: string; key: string }[] = (await getJson(request, s, '/storage.json/inbox/files?limit=50')).data ?? [];
     for (const arrival of arrivals.filter(a => uploaded.includes(a.fileName))) {
-      await bestEffort(`delete ${arrival.key}`, () => deleteObject(request, s, arrival.bucket, arrival.key));
+      await bestEffort(`delete ${arrival.key}`, () => deleteObject(request, s, arrival.alias, arrival.key));
     }
   });
 
