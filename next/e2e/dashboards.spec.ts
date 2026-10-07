@@ -70,7 +70,11 @@ async function kindsOf(page: Page, title: string) {
   // The menu first: counted before it is drawn, the toggle reads as absent.
   await expect(page.locator('.dash-tile-menu .dash-kind').first()).toBeVisible();
   const misfits = page.locator('button.dash-misfits');
-  if (await misfits.count() && await misfits.getAttribute('aria-checked') === 'false') await misfits.click();
+  if (await misfits.count() && await misfits.getAttribute('aria-checked') === 'false') {
+    await misfits.click();
+    // Unfolded only once the menu has drawn it: read straight after the click, the list was the folded one (2026-10-07).
+    await expect(misfits).toHaveAttribute('aria-checked', 'true');
+  }
   return page.locator('button.dash-kind');
 }
 
