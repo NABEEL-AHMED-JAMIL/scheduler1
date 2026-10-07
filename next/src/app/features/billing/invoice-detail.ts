@@ -1,7 +1,7 @@
 import { DestroyRef, Component, LOCALE_ID, OnDestroy, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -14,7 +14,7 @@ import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
 import { DOC_VIEW_TITLE_ID, DocumentViewDialog } from './document-view-dialog';
-import { BillingApi, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
+import { BillingApi, cardPaymentChip, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -91,6 +91,21 @@ export class InvoicePane implements OnDestroy {
   /** The precision the Amount column shares, so a line under a cent does not sit in another format beside the rest. */
   readonly lineDigits = computed(() => moneyDigits((this.invoice()?.lines ?? []).map(l => l.amount)));
   readonly pdfDocument = computed(() => this.invoice()?.documents.find(d => d.kind === 'invoice' || d.kind === 'credit_note') ?? null);
+  /** MIG-359: card payment through Stripe's hosted page -- offered on an issued, unpaid invoice when the platform has it set up. */
+  readonly canPayByCard = computed(() => this.isOpen() && !!this.invoice()?.cardPayable);
+  readonly cardChip = computed(() => { const i = this.invoice(); return i ? cardPaymentChip(i) : null; });
+  /** When the card payment that settled it arrived: "Paid by card on …". */
+  readonly paidByCardAt = computed(() => {
+    const i = this.invoice();
+    if (!i || i.status !== 'paid' || i.paidVia !== 'card') return null;
+    const card = [...i.payments].reverse().find(p => p.method === 'card' && p.status === 'verified' && !!p.provider);
+    return card?.receivedAt ?? card?.verifiedAt ?? i.paidAt ?? null;
+  });
+  /** Back from Stripe's page (?payment=success|cancelled): the invoice is read again until Stripe's word has arrived. */
+  private readonly route = inject(ActivatedRoute, { optional: true });
+  private checkoutReturn: string | null = this.route?.snapshot?.queryParamMap?.get('payment') ?? null;
+  private checkoutPolls = 0;
+  private destroyed = false;
 
   readonly history = computed<HistoryEntry[]>(() => {
     const i = this.invoice();
@@ -99,6 +114,12 @@ export class InvoicePane implements OnDestroy {
     if (i.dateCreated) out.push({ at: i.dateCreated, text: `Draft ${i.number} built from the meter${i.createdByName ? ' by ' + i.createdByName : ''}`, tone: 'muted' });
     if (i.issuedAt) out.push({ at: i.issuedAt, text: `${i.kind === 'credit_note' ? 'Credit note' : 'Invoice'} issued for ${this.money(i.total)}${i.dueAt ? ', due ' + this.serverTime.transform(i.dueAt, 'date') : ''}`, tone: 'ok' });
     for (const p of i.payments) {
+      // MIG-359: a card payment through Stripe is the provider's word, not a slip somebody verified.
+      if (p.method === 'card' && p.provider) {
+        out.push({ at: p.dateCreated, text: p.status === 'verified' ? `Paid ${this.money(Number(p.amount))} by card through Stripe · receipt ${p.receiptNumber}`
+          : `Card payment of ${this.money(Number(p.amount))} declined${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
+        continue;
+      }
       out.push({ at: p.dateCreated, text: `Payment of ${this.money(Number(p.amount))} ${p.method === 'credit_note' ? 'credited (' + p.reference + ')' : 'submitted' + (p.submittedBy ? ' by ' + p.submittedBy : '') + (p.reference ? ' · ' + p.reference : '')}`, tone: 'muted' });
       if (p.verifiedAt && p.method !== 'credit_note') out.push({ at: p.verifiedAt, text: p.status === 'verified' ? `Verified${p.verifiedBy ? ' by ' + p.verifiedBy : ''} · receipt ${p.receiptNumber}` : `Rejected${p.verifiedBy ? ' by ' + p.verifiedBy : ''}${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
     }
@@ -113,7 +134,7 @@ export class InvoicePane implements OnDestroy {
     effect(() => { const n = this.number(); if (n) untracked(() => { this.reset(); this.load(); this.loadQr(n); }); });
   }
 
-  ngOnDestroy(): void { this.revokeQr(); }
+  ngOnDestroy(): void { this.destroyed = true; this.revokeQr(); }
 
   private reset(): void {
     // The previous invoice goes with its number: left in place, its Issue / Void / Record
@@ -140,6 +161,7 @@ export class InvoicePane implements OnDestroy {
           documents: d.documents ?? [], payments: d.payments ?? [],
           lines: (d.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), amount: Number(l.amount) })) });
         if (!this.payAmount()) this.payAmount.set(String(Number(d.balance).toFixed(2)));
+        this.afterCheckout(d);
         if ((d.lines ?? []).some(l => !!l.breakdown)) this.loadClientNames(d.tenantId);
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the invoice.'); },
@@ -242,6 +264,45 @@ export class InvoicePane implements OnDestroy {
         error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The payment could not be verified.'); },
       });
     });
+  }
+
+  // ---- card payment (MIG-359): Stripe's hosted page; no card data passes through the console or Billing ----
+  /** Opens Stripe's checkout for the balance: the open one reused, else a new one. */
+  payNow(): void {
+    const i = this.invoice(); if (!i) return;
+    this.busy.set('card');
+    this.api.payLink(i.invoiceId).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS || !r.data?.url) { this.busy.set(''); this.toast.error(r.message || 'The card payment page could not be opened.'); return; }
+        this.leaveFor(r.data.url);
+      },
+      error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The card payment page could not be opened.'); },
+    });
+  }
+  /** The platform administrator's way to hand a workspace its pay link. */
+  copyPayLink(): void {
+    const i = this.invoice(); if (!i) return;
+    this.api.payLink(i.invoiceId).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS || !r.data?.url) { this.toast.error(r.message || 'The pay link could not be made.'); return; }
+        copyText(r.data.url).then(() => this.toast.success('Pay link copied. It opens Stripe\'s card page for ' + this.money(Number(r.data!.amount)) + '.'));
+        this.refresh();
+      },
+      error: err => this.toast.error(err?.error?.message || 'The pay link could not be made.'),
+    });
+  }
+  /** Stripe's page replaces the console's; it sends the payer back to this invoice. A seam for the tests. */
+  leaveFor(url: string): void { window.location.assign(url); }
+
+  private afterCheckout(d: Detail): void {
+    const back = this.checkoutReturn;
+    if (!back || d.number !== this.number()) return;
+    if (back === 'cancelled') { this.checkoutReturn = null; this.toast.info('Card payment cancelled; nothing was charged.'); return; }
+    if (d.status === 'paid') { this.checkoutReturn = null; this.toast.success(`${d.number} is paid by card. The receipt is under Documents.`); this.changed.emit(); return; }
+    if (this.checkoutPolls === 0) this.toast.info('Payment sent to Stripe; waiting for its confirmation…');
+    if (this.checkoutPolls++ < 10) { setTimeout(() => { if (!this.destroyed) this.load(); }, 3000); return; }
+    this.checkoutReturn = null;
+    this.toast.info(d.paymentError ? 'The card payment failed: ' + d.paymentError : 'Stripe has not confirmed the payment yet; it shows here once it does.');
   }
 
   // ---- platform actions ----

@@ -12,6 +12,7 @@
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="pill" [class]="'pill ' + statusTone[i.status]">{{ statusLabel[i.status] }}@if (i.status === 'overdue') { · {{ overdueDays() }} d }@if (isOpen()) { · {{ money(i.balance) }} open }</span>
+          @if (cardChip(); as c) { <span class="pill" [class]="'pill ' + c.tone" [title]="c.title" data-card-chip>{{ c.label }}</span> }
           @if (i.kind === 'credit_note') { <span class="pill pill-neutral">Credit note</span> }
           @if (isPlatformAdmin()) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ i.tenantName }}</span> }
           @if (pending().length) { <span class="pill pill-warn">{{ pending().length }} slip{{ pending().length === 1 ? '' : 's' }} to verify</span> }
@@ -23,13 +24,16 @@
           <span class="text-xs text-[color:var(--text-muted)]">
             {{ i.periodStart | serverTime: 'month' }}
             @if (i.referencesNumber) { · against <a class="link-inline mono" [routerLink]="['/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
-            @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'date' }} }@if (i.dueAt && i.kind === 'invoice') { · due {{ i.dueAt | serverTime: 'date' }} }
+            @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'date' }} }@if (i.dueAt && i.kind === 'invoice' && i.status !== 'paid') { · due {{ i.dueAt | serverTime: 'date' }} }
+            @if (paidByCardAt(); as at) { · <span data-paid-by-card>Paid by card on {{ at | serverTime: 'date' }}</span> }
           </span>
         </div>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         @if (isPlatformAdmin() && i.status === 'draft') {
           <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue'"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
+        } @else if (canPayByCard() && !isPlatformAdmin()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="payNow()" [disabled]="busy() === 'card'" title="Pay by card on Stripe's secure page" data-pay-now><app-icon name="external" [busy]="busy() === 'card'" />Pay now</button>
         } @else if (isOpen()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record payment' : 'Upload payment slip' }}</button>
         } @else if (pdfDocument()) {
@@ -41,6 +45,9 @@
             @if (pdfDocument()) {
               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="pdf()"><app-icon name="eye" />View PDF</button>
               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="downloadPdf()"><app-icon name="download" />Download PDF</button>
+            }
+            @if (canPayByCard() && isPlatformAdmin()) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copyPayLink()"><app-icon name="link" />Copy card pay link</button>
             }
             @if (isOpen()) {
               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record a payment' : 'Upload a payment slip' }}</button>
@@ -59,6 +66,15 @@
         </ng-template>
       </div>
     </header>
+
+    @if (isOpen() && i.paymentError) {
+      <!-- MIG-359: the last card attempt failed; the invoice stays open until a payment arrives. -->
+      <div class="step-notice step-notice-warn mx-5 mt-3" role="alert" data-card-declined>
+        <app-icon name="alert" class="icon-warn shrink-0 mt-0.5" />
+        <div><b>The last card payment failed</b>@if (i.paymentErrorAt) { ({{ i.paymentErrorAt | serverTime: 'recent' }}) }: {{ i.paymentError }}
+          @if (canPayByCard() && !isPlatformAdmin()) { Try another card with <i>Pay now</i>, or upload a payment slip. }</div>
+      </div>
+    }
 
     <!-- Who is billed, for what, and the QR code of the number: the same facts the PDF prints. -->
     <div class="bill-facts">
@@ -191,7 +207,7 @@
       <section class="lookup-entries flex-none">
         <div class="lookup-entries-head">
           <h3 class="section-title">Payments <span class="text-[color:var(--text-muted)] font-normal">({{ i.payments.length }})</span></h3>
-          @if (!isPlatformAdmin()) { <span class="text-xs text-[color:var(--text-muted)]">A payment counts once the platform verifies the slip; a receipt is issued then</span> }
+          @if (!isPlatformAdmin()) { <span class="text-xs text-[color:var(--text-muted)]">{{ canPayByCard() ? 'A card payment counts as soon as Stripe confirms it; a slip once the platform verifies it' : 'A payment counts once the platform verifies the slip; a receipt is issued then' }}</span> }
         </div>
         @if (!i.payments.length) {
           <div class="lookup-entries-empty"><p>None yet.</p></div>
@@ -202,13 +218,13 @@
               @for (p of i.payments; track p.paymentId) {
                 <tr>
                   <td class="tabular text-xs">{{ p.dateCreated | serverTime: 'day' }}</td>
-                  <td>{{ methodLabel(p.method) }}</td>
+                  <td>{{ methodLabel(p.method) }}@if (p.provider === 'stripe') { <span class="text-xs text-[color:var(--text-muted)]"> · Stripe</span> }</td>
                   <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
                   <td class="text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ p.submittedBy || 'System' }}</td>
                   <td class="text-right tabular">{{ money(p.amount) }}</td>
                   <td class="text-right whitespace-nowrap">
                     @if (p.status === 'verified') { <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'Applied' : 'Verified' }}</span> }
-                    @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">Rejected</span> }
+                    @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">{{ p.method === 'card' && p.provider ? 'Declined' : 'Rejected' }}</span> }
                     @else if (isPlatformAdmin()) {
                       <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
                       <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>

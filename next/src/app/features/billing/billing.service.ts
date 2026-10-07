@@ -14,6 +14,12 @@ export interface InvoiceRow {
   issuedAt?: string; dueAt?: string; paidAt?: string; voidedAt?: string; rateCardVersion?: number; rateCardName?: string; dateCreated?: string;
   /** The kinds of document the invoice has (invoice, payment_slip, receipt, credit_note) and slips awaiting verification. */
   documentKinds?: string[]; pendingPayments?: number;
+  /**
+   * MIG-359, paying by card (Stripe, test mode first): whether Pay now is offered, the open hosted checkout, the last card
+   * decline (until a payment arrives) and 'card' once a card payment settled it.
+   */
+  cardPayable?: boolean; payLinkOpen?: boolean; payLinkUrl?: string | null; payLinkExpiresAt?: string | null;
+  paymentError?: string | null; paymentErrorAt?: string | null; paidVia?: string | null;
 }
 export interface InvoiceLine {
   invoiceLineId: number; sort: number; meter?: string; description: string; quantity: number; unit?: string; per: number;
@@ -53,6 +59,17 @@ export interface RateCardDraft {
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
   receiptNumber?: string; submittedBy?: string; verifiedBy?: string; verifiedAt?: string; receivedAt?: string; dateCreated: string; hasSlip: boolean;
+  /** MIG-359: a card payment's provider and ids -- never card data, which Billing never sees. */
+  currency?: string | null; provider?: string | null; providerPaymentId?: string | null; providerChargeId?: string | null;
+  providerSessionId?: string | null; refundedAmount?: number | null;
+}
+/** billing.json/payments: the latest payments, a workspace's or (the platform's) every workspace's (MIG-359). */
+export interface PaymentListRow extends PaymentRow {
+  tenantId: number; tenantName?: string | null; invoiceId: number; invoiceNumber: string;
+}
+/** billing.json/invoice/payLink: the provider's hosted checkout for the invoice's balance. */
+export interface PayLink {
+  invoiceId: number; number: string; url: string; sessionId: string; expiresAt: string; amount: number; currency: string; provider: string; testMode: boolean;
 }
 export interface DocumentRow {
   documentId: number; kind: 'invoice' | 'credit_note' | 'receipt' | 'statement' | 'payment_slip'; number?: string; fileName: string;
@@ -146,6 +163,10 @@ export class BillingApi {
   verifyPayment(paymentId: number, accept: boolean, note: string): Observable<ApiResponse<PaymentRow>> {
     return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/verify`, null, { params: { paymentId: String(paymentId), accept: String(accept), note } });
   }
+  /** MIG-359: the invoice's card pay link -- the open checkout reused, else a new one. */
+  payLink(invoiceId: number): Observable<ApiResponse<PayLink>> { return this.http.post<ApiResponse<PayLink>>(`${this.base}/invoice/payLink`, null, { params: { invoiceId: String(invoiceId) } }); }
+  /** MIG-359: the latest payments -- slips, cards (paid and declined), credit notes applied. */
+  payments(tenantId?: string | null): Observable<ApiResponse<PaymentListRow[]>> { return this.http.get<ApiResponse<PaymentListRow[]>>(`${this.base}/payments`, { params: this.tenantParam(tenantId) }); }
   documents(tenantId?: string | null): Observable<ApiResponse<DocumentRow[]>> { return this.http.get<ApiResponse<DocumentRow[]>>(`${this.base}/documents`, { params: this.tenantParam(tenantId) }); }
   /** The invoice number as a QR code (PNG); the PDF carries the same one. */
   qrBlob(number: string, size = 160): Observable<Blob> { return this.http.get(`${this.base}/invoice/qr`, { params: { number, size: String(size) }, responseType: 'blob' }); }
@@ -215,6 +236,20 @@ export const MODEL_PRICED_METERS = ['ai.tokens.in', 'ai.tokens.out'];
 export function modelOfMeter(meter: string): string | null {
   const at = meter.indexOf('@');
   return at > 0 && MODEL_PRICED_METERS.includes(meter.slice(0, at)) ? meter.slice(at + 1) : null;
+}
+
+/**
+ * MIG-359: the card payment chip beside an invoice's status -- Paid by card, a card that was declined, or a pay link
+ * that is open -- or null when card payment says nothing about the invoice.
+ */
+export function cardPaymentChip(i: Pick<InvoiceRow, 'status' | 'paidVia' | 'paymentError' | 'payLinkOpen' | 'cardPayable'>):
+  { label: string; tone: string; title: string } | null {
+  if (i.status === 'paid' && i.paidVia === 'card') return { label: 'Paid by card', tone: 'pill-ok', title: 'Paid online by card through Stripe' };
+  const open = i.status === 'issued' || i.status === 'partially_paid' || i.status === 'overdue';
+  if (!open) return null;
+  if (i.paymentError) return { label: 'Card declined', tone: 'pill-crit', title: i.paymentError };
+  if (i.payLinkOpen) return { label: 'Pay link open', tone: 'pill-neutral', title: 'A Stripe checkout is open for this invoice' };
+  return null;
 }
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {

@@ -27,8 +27,8 @@ const TENANTS = [
   { tenantId: 2905, tenantName: 'MedAxis Care Network' }, { tenantId: 2901, tenantName: 'CareBridge Health Services' }, { tenantId: 3107, tenantName: 'MedAxis Care Network' },
 ];
 
-function page(data: object = DATA) {
-  const api = { analytics: vi.fn(() => of({ status: API_SUCCESS, data })) };
+function page(data: object = DATA, payments: object[] = []) {
+  const api = { analytics: vi.fn(() => of({ status: API_SUCCESS, data })), payments: vi.fn(() => of({ status: API_SUCCESS, data: payments })) };
   const tenants = signal(TENANTS);
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [BillingAnalyticsPage], providers: [provideRouter([]),
@@ -65,7 +65,7 @@ describe('BillingAnalyticsPage', () => {
   it('keeps each table inside a scroller of its own, so a phone never scrolls the page sideways', () => {
     const { el } = page();
     const tables = [...el.querySelectorAll('table')];
-    expect(tables.length).toBe(2);
+    expect(tables.length).toBe(3);   // by workspace, usage and churn, payments (MIG-359)
     for (const t of tables) expect(t.parentElement!.classList).toContain('overflow-x-auto');
     // A grid item will not shrink below its content unless told to; the scroller inside it then never scrolls.
     for (const card of el.querySelectorAll('.card')) if (card.parentElement!.classList.contains('grid')) expect(card.classList).toContain('min-w-0');
@@ -95,7 +95,7 @@ describe('BillingAnalyticsPage', () => {
   });
 
   it('offers Try again when the read fails, and it reads again', () => {
-    const api = { analytics: vi.fn(() => of({ status: 'FAILED', message: 'The meter did not answer.' })) };
+    const api = { analytics: vi.fn(() => of({ status: 'FAILED', message: 'The meter did not answer.' })), payments: vi.fn(() => of({ status: API_SUCCESS, data: [] })) };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ imports: [BillingAnalyticsPage], providers: [provideRouter([]),
       { provide: BillingApi, useValue: api },
@@ -109,5 +109,19 @@ describe('BillingAnalyticsPage', () => {
     expect(retry).toBeTruthy();
     retry!.click();
     expect(api.analytics).toHaveBeenCalledTimes(2);
+  });
+
+  it('MIG-359: the platform sees every workspace\'s payments, cards through Stripe among them, declined ones said so', () => {
+    const { component, fixture, el } = page(DATA, [
+      { paymentId: 2, tenantId: 2905, tenantName: 'MedAxis Care Network', invoiceId: 7, invoiceNumber: 'INV-2026-10-0002', amount: '12.00', method: 'card',
+        status: 'rejected', note: 'Your card was declined.', provider: 'stripe', providerPaymentId: 'pi_test_2', dateCreated: '2026-10-06T21:41:00', hasSlip: false },
+      { paymentId: 1, tenantId: 2901, tenantName: 'CareBridge Health Services', invoiceId: 6, invoiceNumber: 'INV-2026-10-0001', amount: '9.67', method: 'card',
+        status: 'verified', receiptNumber: 'RCP-2026-10-0001', provider: 'stripe', providerPaymentId: 'pi_test_1', dateCreated: '2026-10-06T21:40:00', hasSlip: false },
+    ]);
+    fixture.detectChanges();
+    expect(component.cardPayments()).toHaveLength(2);
+    const rows = [...el.querySelectorAll('[data-payments] tbody tr')].map(r => r.textContent!.replace(/\s+/g, ' ').trim());
+    for (const said of ['INV-2026-10-0002', 'Card · Stripe', 'pi_test_2', 'Declined']) expect(rows[0]).toContain(said);
+    for (const said of ['CareBridge Health Services', '$9.67', 'Paid']) expect(rows[1]).toContain(said);
   });
 });

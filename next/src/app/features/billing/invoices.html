@@ -89,6 +89,7 @@
                     @else if ((r.pendingPayments ?? 0) > 0) { · <em>slip to verify</em> }
                     @else if (r.status === 'draft') { · running }
                     @else if (r.status === 'partially_paid') { · {{ money(r.balance, r.currency) }} open }
+                    @if (cardNote(r); as c) { · <em data-card-note>{{ c }}</em> }
                     @if (isPlatformAdmin()) { · {{ r.tenantName }} }
                   </span>
                   @if (docsLabel(r)) { <span class="lookup-rail-sub">{{ docsLabel(r) }}</span> }

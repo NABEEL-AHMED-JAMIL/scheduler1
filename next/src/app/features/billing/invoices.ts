@@ -9,7 +9,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
-import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, cardPaymentChip } from './billing.service';
 import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingAccountDialog } from './billing-account-dialog';
@@ -130,6 +130,8 @@ export class Invoices implements OnInit {
   /** The billing period as the invoice itself heads it, "September 2026" (MIG-295). */
   period(r: InvoiceRow): string { return this.clock.transform(r.periodStart, 'month') ?? r.periodStart; }
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
+  /** MIG-359: "paid by card", "card declined" or "pay link open" in the rail, from the same chip the pane shows. */
+  cardNote(r: InvoiceRow): string | null { return cardPaymentChip(r)?.label.toLowerCase() ?? null; }
   /** The rail's dot: what the row's state means for the reader. */
   tone(r: InvoiceRow): string {
     return r.status === 'overdue' ? 'crit' : (r.pendingPayments ?? 0) > 0 ? 'warn' : r.status === 'paid' ? 'ok' : r.status === 'draft' || r.status === 'void' ? 'muted' : 'warn';

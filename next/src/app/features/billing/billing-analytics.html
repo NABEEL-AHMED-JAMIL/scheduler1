@@ -69,5 +69,32 @@
       </table>
       </div>
     </div>
+    <div class="card p-4 mt-4" data-payments>
+      <div class="flex items-baseline justify-between gap-2 flex-wrap">
+        <h2 class="font-semibold text-sm">Payments</h2>
+        <span class="text-xs text-[color:var(--text-muted)]">{{ cardPayments().length }} by card through Stripe · latest {{ payments().length }}</span>
+      </div>
+      <p class="text-xs text-[color:var(--text-muted)] mb-2">Every workspace, newest first: cards paid on Stripe's page (and declined), slips, credit notes applied. Card data never reaches the platform.</p>
+      @if (paymentsError()) { <p class="text-xs text-crit-500">{{ paymentsError() }}</p> }
+      <div class="overflow-x-auto">
+      <table class="table-modern">
+        <thead><tr><th>Date</th><th>Workspace</th><th>Invoice</th><th>Method</th><th class="hidden lg:table-cell">Stripe payment</th><th class="text-right">Amount</th><th class="text-right">State</th></tr></thead>
+        <tbody>
+          @for (p of payments().slice(0, 50); track p.paymentId) {
+            <tr>
+              <td class="tabular text-xs whitespace-nowrap">{{ p.dateCreated | serverTime: 'day' }}</td>
+              <td>{{ labels().get(p.tenantId) ?? p.tenantName ?? ('Workspace ' + p.tenantId) }}</td>
+              <td><a class="link-inline mono text-xs" [routerLink]="['/billing/invoices', p.invoiceNumber]">{{ p.invoiceNumber }}</a></td>
+              <td>{{ methodLabel(p.method) }}@if (p.provider === 'stripe') { <span class="text-xs text-[color:var(--text-muted)]"> · Stripe</span> }</td>
+              <td class="mono text-xs hidden lg:table-cell" [title]="p.providerChargeId || ''">{{ p.providerPaymentId || '—' }}</td>
+              <td class="text-right tabular">{{ money2(p.amount) }}</td>
+              <td class="text-right"><span class="pill" [class]="'pill ' + paymentState(p).tone" [title]="p.note || ''">{{ paymentState(p).label }}</span></td>
+            </tr>
+          }
+          @if (!payments().length) { <tr><td colspan="7" class="text-center text-[color:var(--text-muted)] py-4">No payment yet.</td></tr> }
+        </tbody>
+      </table>
+      </div>
+    </div>
   }
 </div>

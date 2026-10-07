@@ -8,13 +8,14 @@ import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { chartColor } from '../../shared/charts/status-color';
 import { WorkspacePicker } from './workspace-picker';
-import { BillingApi, BillingAnalytics as Analytics, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { BillingApi, BillingAnalytics as Analytics, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentListRow, paymentMethodLabel } from './billing.service';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { formatBytes, formatMoney, formatMoneyRound, monthShort, workspaceLabels } from './billing-format';
 
 /** The platform's view: invoiced, collected, open and overdue across every workspace, and who churns data. */
 @Component({
   selector: 'app-billing-analytics',
-  imports: [Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented],
+  imports: [Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented, ServerTimePipe],
   templateUrl: './billing-analytics.html',
 })
 export class BillingAnalyticsPage implements OnInit {
@@ -27,6 +28,11 @@ export class BillingAnalyticsPage implements OnInit {
   readonly data = signal<Analytics | null>(null);
   readonly statusLabel = INVOICE_STATUS_LABEL;
   readonly statusTone = INVOICE_STATUS_TONE;
+  /** MIG-359: the latest payments in every workspace -- cards through Stripe (paid and declined), slips, credit notes applied. */
+  readonly payments = signal<PaymentListRow[]>([]);
+  readonly paymentsError = signal('');
+  readonly methodLabel = paymentMethodLabel;
+  readonly cardPayments = computed(() => this.payments().filter(p => p.provider === 'stripe'));
 
   readonly bars = computed<Bar[]>(() => (this.data()?.months ?? []).map(m => ({
     name: monthShort(m.month), value: Math.round(Number(m.invoiced ?? 0) * 100) / 100,
@@ -74,10 +80,23 @@ export class BillingAnalyticsPage implements OnInit {
 
   ngOnInit(): void { this.workspaces.ready(() => this.load()); }
   setMonths(n: number): void { this.months.set(n); this.load(); }
+  loadPayments(): void {
+    this.paymentsError.set('');
+    this.api.payments(null).subscribe({
+      next: r => { if (r.status !== API_SUCCESS) { this.paymentsError.set(r.message); return; } this.payments.set((r.data ?? []).map(p => ({ ...p, amount: Number(p.amount) }))); },
+      error: err => this.paymentsError.set(err?.error?.message || 'Could not read the payments.'),
+    });
+  }
+  paymentState(p: PaymentListRow): { label: string; tone: string } {
+    if (p.status === 'verified') return { label: p.method === 'credit_note' ? 'Applied' : 'Paid', tone: 'pill-ok' };
+    if (p.status === 'rejected') return { label: p.method === 'card' && p.provider ? 'Declined' : 'Rejected', tone: 'pill-crit' };
+    return { label: 'To verify', tone: 'pill-warn' };
+  }
   load(): void {
     this.loading.set(true); this.error.set('');
     const to = new Date(); const from = new Date(to.getFullYear(), to.getMonth() - (this.months() - 1), 1);
     const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    this.loadPayments();
     this.api.analytics(iso(from), iso(to)).subscribe({
       next: r => { this.loading.set(false); if (r.status !== API_SUCCESS) { this.error.set(r.message); return; } this.data.set(r.data ?? null); },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read billing analytics.'); },

@@ -33,7 +33,8 @@ class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) p
 function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [] })) }) {
   // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
-  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))) };
+  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))),
+    payLink: vi.fn(() => of({ status: API_SUCCESS, data: { invoiceId: 7, number: 'INV-2026-08-0006', url: 'https://checkout.stripe.com/c/pay/cs_test_1', sessionId: 'cs_test_1', amount: 202.75, currency: 'USD', provider: 'stripe', testMode: true } })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
@@ -203,5 +204,55 @@ describe('InvoicePane with an answer that is not a whole invoice', () => {
     expect(component.invoice()?.documents).toEqual([]);
     expect(component.invoice()?.payments).toEqual([]);
     expect(component.pdfDocument()).toBeNull();
+  });
+
+  // ---- MIG-359: paying by card through Stripe's hosted page ----
+  const el = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
+
+  it('MIG-359: a workspace admin pays an open invoice by card on Stripe\'s page: Pay now opens the link Billing hands out', () => {
+    const { component, api, fixture } = page(false, { ...DETAIL, cardPayable: true });
+    const leave = vi.spyOn(component, 'leaveFor').mockImplementation(() => {});
+    fixture.detectChanges();
+    const button = el(fixture).querySelector('[data-pay-now]') as HTMLButtonElement;
+    expect(button?.textContent?.trim()).toBe('Pay now');
+    button.click();
+    expect(api.payLink).toHaveBeenCalledWith(7);
+    expect(leave).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_test_1');
+  });
+
+  it('MIG-359: no Pay now where card payment is not set up, nor for the platform administrator, who copies the link instead', () => {
+    const off = page(false, { ...DETAIL, cardPayable: false });
+    off.fixture.detectChanges();
+    expect(el(off.fixture).querySelector('[data-pay-now]')).toBeNull();
+    const platform = page(true, { ...DETAIL, cardPayable: true });
+    platform.fixture.detectChanges();
+    expect(el(platform.fixture).querySelector('[data-pay-now]')).toBeNull();
+    expect(platform.component.canPayByCard()).toBe(true);
+  });
+
+  it('MIG-359: a paid-by-card invoice says so, with the day, and offers no payment', () => {
+    const paid = { ...DETAIL, status: 'paid', balance: '0', paidVia: 'card', paidAt: '2026-10-06T21:40:00', cardPayable: false,
+      payments: [{ paymentId: 9, amount: '402.75', method: 'card', reference: 'pi_test_1', status: 'verified', receiptNumber: 'RCP-2026-10-0001',
+        receivedAt: '2026-10-06T21:40:00', verifiedAt: '2026-10-06T21:40:00', dateCreated: '2026-10-06T21:40:00', hasSlip: false, provider: 'stripe', providerPaymentId: 'pi_test_1' }] };
+    const { component, fixture } = page(false, paid);
+    fixture.detectChanges();
+    expect(el(fixture).querySelector('[data-card-chip]')?.textContent?.trim()).toBe('Paid by card');
+    expect(el(fixture).querySelector('[data-paid-by-card]')?.textContent?.trim()).toMatch(/^Paid by card on /);
+    expect(el(fixture).querySelector('[data-pay-now]')).toBeNull();
+    expect(component.history().map(h => h.text)).toContain('Paid $402.75 by card through Stripe · receipt RCP-2026-10-0001');
+  });
+
+  it('MIG-359: a declined card leaves the invoice open with the reason, and Pay now to try another card', () => {
+    const declined = { ...DETAIL, status: 'issued', balance: '402.75', cardPayable: true, paymentError: 'Your card was declined. (card_declined: generic_decline)',
+      paymentErrorAt: '2026-10-06T21:41:00',
+      payments: [{ paymentId: 9, amount: '402.75', method: 'card', reference: 'pi_test_2', status: 'rejected', note: 'Your card was declined. (card_declined: generic_decline)',
+        verifiedAt: '2026-10-06T21:41:00', dateCreated: '2026-10-06T21:41:00', hasSlip: false, provider: 'stripe' }] };
+    const { component, fixture } = page(false, declined);
+    fixture.detectChanges();
+    expect(el(fixture).querySelector('[data-card-chip]')?.textContent?.trim()).toBe('Card declined');
+    expect(el(fixture).querySelector('[data-card-declined]')?.textContent).toContain('Your card was declined.');
+    expect(el(fixture).querySelector('[data-pay-now]')).not.toBeNull();
+    expect(component.paid()).toBe(0);
+    expect(component.history().map(h => h.text)).toContain('Card payment of $402.75 declined · Your card was declined. (card_declined: generic_decline)');
   });
 });
