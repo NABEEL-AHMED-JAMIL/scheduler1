@@ -5,27 +5,27 @@ import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor, sessionOf, 
  * Access profiles, end to end: a tenant administrator makes a profile and puts a person on it, and that
  * person's console shrinks to match -- menu, direct URL, and the API behind it.
  *
- * Needs two people in one workspace (support/session.ts): a TENANT_ADMIN (E2E_TENANT_ADMIN_TOKEN, 4537 of 2924) and
- * a TENANT_USER of the same workspace (E2E_TENANT_USER_TOKEN, Alex, 4597), or both by password.
+ * Needs two people in one workspace (support/session.ts): Riverside Health's administrator (role admin) and its
+ * viewer (role viewer, a TENANT_USER whom no other spec signs in as), or both by password.
  *
  * Leaves the workspace as it found it: the person goes back on the profile they had WITH THE EXCEPTIONS THEY HAD
- * (Alex carries five that other specs rely on -- they are cleared for the test, which asserts the profile's pages
- * alone, and put back afterwards), and the profile made here is deleted.
+ * (any are cleared for the test, which asserts the profile's pages alone, and put back afterwards), and the profile
+ * made here is deleted. The "Request access" it sends leaves a notification for the administrator.
  */
 
 const PROFILE = `E2E Reviewer ${Date.now().toString(36)}`;
 
 /** The member signed in afresh: a new password sign-in, or the token's session re-read (its pages are the server's). */
 async function memberNow(request: APIRequestContext): Promise<Session> {
-  const token = tokenFor('user', { newSignIn: true });
+  const token = tokenFor('viewer', { newSignIn: true });
   if (token) return sessionOf(request, token);
-  return signInWithPassword(request, process.env['E2E_TENANT_USER']!, process.env['E2E_TENANT_USER_PASSWORD']!);
+  return signInWithPassword(request, process.env['E2E_TENANT_VIEWER']!, process.env['E2E_TENANT_VIEWER_PASSWORD']!);
 }
 
 interface PersonAccess { appUserId: number; username: string; allowedExceptions: string[]; withheldExceptions: string[] }
 
 test.describe('access profiles', () => {
-  test.skip(!canSignIn('admin') || !canSignIn('user'), `${NEEDS.admin}; ${NEEDS.user}`);
+  test.skip(!canSignIn('admin') || !canSignIn('viewer'), `${NEEDS.admin}; ${NEEDS.viewer}`);
 
   let adminSession: Session;
   let member: { username: string };

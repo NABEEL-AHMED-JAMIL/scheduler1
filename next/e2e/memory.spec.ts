@@ -2,13 +2,13 @@ import { test, expect, Browser, CDPSession, Page } from '@playwright/test';
 import { hasToken, NEEDS, Session, sessionFor } from './support/session';
 
 /**
- * MIG-214, the console's half: cycle the main screens as workspace 2924's administrator (4537) and check that what a
+ * MIG-214, the console's half: cycle the main screens as Riverside Health's administrator and check that what a
  * screen leaves behind after it is gone does not pile up. After each cycle the browser collects garbage (DevTools
  * HeapProfiler.collectGarbage) and reads its own counters (Performance.getMetrics): the JS heap, the live DOM nodes and
  * the event listeners. The first cycle warms the caches; the last is compared with it.
  *
- * Opt-in (it takes a few minutes and reads every screen): E2E_MEMORY=1 plus E2E_TENANT_ADMIN_TOKEN
- * (etl-platform/scripts/mint-test-token.sh 4537 900). Read-only: it opens screens and saves nothing.
+ * Opt-in (it takes a few minutes and reads every screen): E2E_MEMORY=1, signed in through support/session.ts (role
+ * admin). Read-only: it opens screens and saves nothing.
  */
 const CYCLES = Number(process.env['E2E_MEMORY_CYCLES'] ?? 5);
 

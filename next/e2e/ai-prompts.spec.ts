@@ -10,7 +10,7 @@ import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './su
  *
  * Needs:
  *   a TENANT_ADMIN whose workspace has a default Kafka profile and a topic (support/session.ts:
- *   E2E_TENANT_ADMIN_TOKEN, 4537 of 2924, or E2E_TENANT_ADMIN(_PASSWORD)); every row it makes is named "E2E ..."
+ *   role admin, Riverside Health's administrator); every row it makes is named "E2E ..."
  *   a local Ollama the server can reach (host.docker.internal:11434) with E2E_OLLAMA_MODEL
  *   (default gemma3:1b) pulled -- the Try it and the run make real calls
  */

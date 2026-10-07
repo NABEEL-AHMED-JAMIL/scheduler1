@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/session';
+import { hasFixtures, riverside } from './support/fixtures';
 
 /**
  * Cost & usage, end to end: a tenant administrator uploads a file of a known size and deletes it, and
@@ -8,7 +9,7 @@ import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/ses
  *
  * Needs a running metering service (etl_meter) behind the console, and a TENANT_ADMIN with a bucket of their own
  * (support/session.ts: E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD)); E2E_BUCKET names that bucket's alias
- * (default: ui-review-s3 or worker-store when the workspace has one, else the first listed). The file it uploads is
+ * (default: the rebuilt workspace's own, support/fixtures.ts, else the first listed). The file it uploads is
  * deleted again by the test -- that delete is what is being measured.
  */
 
@@ -28,7 +29,8 @@ test.describe('cost & usage', () => {
     // The workspace's test bucket when it has one: the first alias in the list is whatever sorts
     // first, and after a configuration test that is a connection made to fail on purpose.
     const listed: string[] = (buckets.data ?? []).map((b: { bucket: string }) => b.bucket);
-    const bucket = process.env['E2E_BUCKET'] ?? ['ui-review-s3', 'worker-store'].find(b => listed.includes(b)) ?? listed[0];
+    const own = hasFixtures() ? riverside().storageAlias : undefined;
+    const bucket = process.env['E2E_BUCKET'] ?? (own && listed.includes(own) ? own : listed[0]);
     expect(bucket, 'a bucket to work in').toBeTruthy();
 
     // A file of a known size, uploaded then deleted through the same API the browser uses.

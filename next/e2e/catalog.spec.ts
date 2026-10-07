@@ -1,16 +1,33 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
-import { hasToken, NEEDS, tokenFor } from './support/session';
+import { hasToken, NEEDS, sessionFor, tokenFor } from './support/session';
+import { ensureObject, getJson, outputsOf, postJson } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
 import { join } from 'path';
 
 /**
- * MIG-288: Data › Data Catalog against analytics-service for workspace 2924 -- the strip, the list with its sensitive
+ * MIG-288: Data › Data Catalog against analytics-service for Riverside Health -- the strip, the list with its sensitive
  * fields, an asset's panel with columns, tags and lineage -- at a wide screen and a tablet; and the prompt editor's
  * file picker naming its variable plainly (no {{ }} in its heading).
  *
- * Sign-in: E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh 4537 900); E2E_SHOTS optional.
- * Reads only: nothing is created or changed.
+ * The sensitive asset is the suite's own: e2e/catalog/E2E-customers.csv in the workspace's bucket (emails and test card
+ * numbers), uploaded once and kept for the next run, and scanned through the API when the catalog has not classified it
+ * yet. The lineage is the rebuilt readmission schedule's (support/fixtures.ts): the statistics file its run uploads,
+ * the file it read, and the schedule itself. Nothing else is created or changed.
+ *
+ * Sign-in: support/session.ts (role admin); E2E_SHOTS optional.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
+const CUSTOMERS_KEY = 'e2e/catalog/E2E-customers.csv';
+const CUSTOMERS = ['customer_id,name,email,city,amount,card_number',
+  'C-001,Ada Example,ada@example.com,Nairobi,1250.50,4111111111111111',
+  'C-002,Bo Example,bo@example.com,Lagos,310.00,5500005555555559',
+  'C-003,Cy Example,cy@example.com,Nairobi,980.25,340000000000009',
+  'C-004,Di Example,di@example.com,Accra,120.00,6011000000000004',
+  'C-005,Ed Example,ed@example.com,Lagos,75.40,4012888888881881',
+  'C-006,Fa Example,fa@example.com,Nairobi,2200.00,4222222222222'].join('\n') + '\n';
+/** The readmission run's uploaded statistics (the asset whose lineage is read) and the lineage's names. */
+let LINEAGE_FILE = '';
+let LINEAGE_NAMES: string[] = [];
 
 async function sessionOf(request: APIRequestContext, token: string): Promise<Record<string, unknown>> {
   const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
@@ -35,6 +52,37 @@ async function shot(page: Page, info: TestInfo, name: string): Promise<void> {
 
 test.describe('Data Catalog', () => {
   test.skip(!hasToken('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
+
+  test.beforeAll(async ({ request }) => {
+    test.setTimeout(120_000);
+    const s = await sessionFor(request, 'admin');
+    const bucket = riverside().storageAlias;
+    await ensureObject(request, s, bucket, CUSTOMERS_KEY, Buffer.from(CUSTOMERS));
+    // The catalog takes the file up from storage's events; classify it when it has not been scanned yet.
+    let asset: { assetId: number; sensitivity: string } | undefined;
+    await expect.poll(async () => {
+      asset = ((await getJson(request, s, '/analyticsCatalog.json/list?q=E2E-customers')).data ?? [])
+        .find((a: { path: string; connection: string }) => a.path === CUSTOMERS_KEY && a.connection === bucket);
+      return !!asset;
+    }, { timeout: 60_000, message: `the catalog lists ${CUSTOMERS_KEY}` }).toBe(true);
+    if (asset!.sensitivity !== 'Restricted') {
+      const scanned = await postJson(request, s, `/analyticsCatalog.json/scan?assetId=${asset!.assetId}`);
+      expect(scanned.data?.sensitivity, `the scan of ${CUSTOMERS_KEY}`).toBe('Restricted');
+    }
+    // The lineage: the readmission run's upload, as the catalog links it.
+    const run = pipeline('readmission').run!.jobQueueId;
+    const upload = (await outputsOf(request, s, run)).find(o => o.kind === 'bucket')!;
+    expect(upload, `run ${run} uploaded a file`).toBeTruthy();
+    LINEAGE_FILE = upload.name;
+    const listed = ((await getJson(request, s, `/analyticsCatalog.json/list?q=${encodeURIComponent(upload.name)}`)).data ?? [])
+      .find((a: { path: string }) => a.path === upload.key);
+    expect(listed, `the catalog lists ${upload.bucket}/${upload.key}`).toBeTruthy();
+    const graph = (await getJson(request, s, `/analyticsCatalog.json/lineage?assetId=${listed.assetId}&depth=2`)).data;
+    LINEAGE_NAMES = (graph?.nodes ?? []).filter((n: { kind: string }) => n.kind === 'file' || n.kind === 'pipeline')
+      .map((n: { name: string }) => n.name);
+    expect(LINEAGE_NAMES.length, 'the upload has a pipeline and an input upstream').toBeGreaterThanOrEqual(3);
+  });
 
   for (const [width, height, label] of [[1920, 1080, 'wide'], [1024, 768, 'tablet']] as const) {
     test(`the list, the strip and an asset's panel (${label})`, async ({ browser, request }, info) => {
@@ -42,8 +90,8 @@ test.describe('Data Catalog', () => {
       await page.goto('/data/catalog');
       await page.getByRole('heading', { name: 'Data Catalog' }).waitFor();
       await expect(page.getByText('With sensitive fields')).toBeVisible();
-      await page.locator('#catalogSearch').fill('MIG286-customers');
-      const row = page.locator('tr[data-asset]').filter({ hasText: 'MIG286-customers.csv' });
+      await page.locator('#catalogSearch').fill('E2E-customers');
+      const row = page.locator('tr[data-asset]').filter({ hasText: 'E2E-customers.csv' });
       await expect(row).toBeVisible();
       await expect(row).toContainText('Restricted');
       await expect(row).toContainText('card number');
@@ -58,12 +106,10 @@ test.describe('Data Catalog', () => {
       await shot(page, info, `catalog-panel-${label}`);
       await page.getByRole('button', { name: 'Close' }).click();
 
-      await page.locator('#catalogSearch').fill('MIG-287 clean customers');
-      await page.locator('tr[data-asset]').filter({ hasText: 'MIG-287 clean customers' }).first().click();
+      await page.locator('#catalogSearch').fill(LINEAGE_FILE);
+      await page.locator('tr[data-asset]').filter({ hasText: LINEAGE_FILE }).first().click();
       const lineage = page.locator('[data-lineage]');
-      await expect(lineage).toContainText('live-customers.csv');
-      await expect(lineage).toContainText('UI-CHECK registry chain job 0929');
-      await expect(lineage).toContainText('MIG-287 customer health');
+      for (const name of LINEAGE_NAMES) await expect(lineage).toContainText(name);
       await shot(page, info, `catalog-lineage-${label}`);
       await page.context().close();
     });
@@ -87,7 +133,7 @@ test.describe('Data Catalog', () => {
       // The local model can take minutes to load when Ollama swaps models. The same question is asked through the API
       // first, which loads it; the page's own question then answers in seconds. Well inside a token's fifteen minutes.
       test.setTimeout(480_000);
-      const question = 'Which city has the largest total amount among UI-REVIEW customers?';
+      const question = 'Which city has the largest total amount in E2E-customers.csv?';
       const token = tokenFor('admin')!;
       const warm = await request.post(`${api}/askData.json/ask`, { headers: { Authorization: `Bearer ${token}` },
         data: { question }, timeout: 300_000, failOnStatusCode: false });

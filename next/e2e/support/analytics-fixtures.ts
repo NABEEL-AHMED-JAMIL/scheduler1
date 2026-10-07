@@ -1,5 +1,6 @@
 import { APIRequestContext, expect } from '@playwright/test';
 import { api, authOf, Session } from './session';
+import { hasFixtures, riverside } from './fixtures';
 
 /**
  * The Analytics Studio's fixtures, made by the suite instead of pinned (MIG-330).
@@ -7,15 +8,17 @@ import { api, authOf, Session } from './session';
  * The analytics, dashboards, data-grid, keyboard, accessibility and appearance specs used to read two objects in the
  * platform administrator's MinIO bucket (worker-store) and twenty-five dashboards that a Java seeder had written as
  * that administrator. A tenant's session can see none of it. So the suite now makes its own, in the signed-in
- * person's workspace (2924 on the token path), the first time they are missing, and reuses them by name afterwards:
+ * person's workspace (Riverside Health on the token path), the first time they are missing, and reuses them by name
+ * afterwards:
  *
  *   <bucket>/analytics-benchmark/sales-10mb.csv   150,000 rows, the shape BenchmarkDataGeneratorIT documents
  *   <bucket>/analytics-samples/orders.csv         250,000 rows, the shape SampleDataGeneratorIT documents
  *   ten dashboards named "E2E ..."                the five benchmark reports and five of the orders catalogue
  *
- * The bucket is the workspace's object-storage connection (E2E_CONNECTION, else ui-review-s3 or worker-store, else
- * the first S3/MinIO one). Every value is a function of the row number, so a figure a spec asserts is computed here,
- * by different code from the engine that is being checked. Nothing is ever deleted: the rows are left for the owner.
+ * The bucket is the workspace's object-storage connection (E2E_CONNECTION, else the rebuilt workspace's own from
+ * support/fixtures.ts, else the first S3/MinIO one). Every value is a function of the row number, so a figure a spec
+ * asserts is computed here, by different code from the engine that is being checked. Nothing is ever deleted: the files
+ * and boards are kept for the next run (in Riverside, boards 1466-1475 and analytics-benchmark/, analytics-samples/).
  */
 
 // ----------------------------------------------------------------------------------------------- the two datasets
@@ -224,7 +227,8 @@ async function connectionOf(request: APIRequestContext, s: Session): Promise<str
   if (named) return named;
   const buckets: { bucket: string; provider?: string }[] = (await json(await request.get(`${api}/storage.json/buckets`, { headers: authOf(s) }))).data ?? [];
   const aliases = buckets.map(b => b.bucket);
-  const chosen = ['ui-review-s3', 'worker-store'].find(a => aliases.includes(a))
+  const own = hasFixtures() ? riverside().storageAlias : undefined;
+  const chosen = (own && aliases.includes(own) ? own : undefined)
     ?? buckets.find(b => /^(S3|MINIO)$/i.test(b.provider ?? ''))?.bucket;
   expect(chosen, 'the workspace has an object-storage connection for the analytics fixtures').toBeTruthy();
   return chosen!;

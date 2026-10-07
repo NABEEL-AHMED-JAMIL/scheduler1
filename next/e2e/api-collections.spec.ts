@@ -10,13 +10,10 @@ import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
  * requests that set them may carry them.
  *
  * Needs integration-service behind :9098 and a console at E2E_BASE_URL (default :4400) that has MIG-247.
- * Sign-in, either:
- *   E2E_TENANT_ADMIN_TOKEN                          a TENANT_ADMIN access token (e.g. from
- *                                                   etl-platform/scripts/mint-test-token.sh 4537 900), or
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD    a TENANT_ADMIN's credentials
+ * Sign-in through support/session.ts (role admin: Riverside Health's administrator).
  * The test makes one real outbound call (E2E_ECHO_URL, default https://httpbin.org, which echoes the request:
- * its Authorization header must come back masked). Everything it makes is named "UI-CHECK e2e …" and deleted
- * at the end through the API.
+ * its Authorization header must come back masked). Everything it makes is named "E2E …" and deleted at the end through
+ * the API; the rebuilt API collection is never opened.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
 const ECHO = process.env['E2E_ECHO_URL'] ?? 'https://httpbin.org';

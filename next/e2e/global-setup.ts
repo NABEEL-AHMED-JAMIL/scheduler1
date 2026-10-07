@@ -14,9 +14,9 @@ import { sessionOf, tokenFor } from './support/session';
  * fails because a machine has no stack running teaches people to ignore it; one that says why it
  * skipped teaches them how to run it.
  *
- * <b>With no password, a minted token does the same job</b> (MIG-330): E2E_TENANT_ADMIN_TOKEN, the
- * TENANT_ADMIN of workspace 2924 that final-regression.sh passes in, is written into the same
- * state.json. Specs importing `test` from support/session.ts re-seed it per test from a fresh token,
+ * <b>With no password, a minted token does the same job</b> (MIG-330): E2E_TENANT_ADMIN_TOKEN, or
+ * with E2E_MINT=1 one minted for the TENANT_ADMIN of Riverside Health (the rebuilt workspace,
+ * support/fixtures.ts), is written into the same state.json. Specs importing `test` from support/session.ts re-seed it per test from a fresh token,
  * because a token lives fifteen minutes and a full run is longer.
  */
 async function globalSetup(config: FullConfig) {
@@ -29,15 +29,16 @@ async function globalSetup(config: FullConfig) {
   const blank = { cookies: [], origins: [] };
   const statePath = 'e2e/.auth/state.json';
 
-  // No password but a minted token (final-regression.sh): the token's session, written fresh every run.
-  if (!password && process.env['E2E_TENANT_ADMIN_TOKEN']) {
-    const token = tokenFor('admin')!;
+  // No password but a token -- handed in (final-regression.sh), or minted with E2E_MINT=1 for the rebuilt workspace's
+  // administrator (support/session.ts): the token's session, written fresh every run.
+  const token = !password && (process.env['E2E_TENANT_ADMIN_TOKEN'] || process.env['E2E_MINT'] === '1') ? tokenFor('admin') : undefined;
+  if (token) {
     const context = await requests.newContext();
     try {
       const session = await sessionOf(context, token);
       writeFileSync(statePath, JSON.stringify({ cookies: [], origins: [{ origin: new URL(base).origin,
         localStorage: [{ name: 'etl_auth_user', value: JSON.stringify(session.data) }] }] }));
-      console.log(`\n[e2e] Signed in from E2E_TENANT_ADMIN_TOKEN (appUserId ${session.appUserId}).\n`);
+      console.log(`\n[e2e] Signed in from a token (appUserId ${session.appUserId}).\n`);
     } finally {
       await context.dispose();
     }

@@ -1,15 +1,17 @@
 import { test, expect } from '@playwright/test';
-import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/session';
+import { api, authOf, canMintPeople, canSignIn, NEEDS, pageAs, Session, sessionAsPerson, sessionFor } from './support/session';
+import { hasFixtures, meridian, openData } from './support/fixtures';
 
 /**
  * Invoices and Billing documents as rail + pane: the address names a bill, the pane shows it
  * with the QR code of its number, and the document list reads a PDF in place.
  *
  * Sign-in through support/session.ts:
- *   admin     a TENANT_ADMIN whose workspace has an issued invoice (E2E_TENANT_ADMIN_TOKEN, 4537 of 2924)
- *   platform  a TEST platform administrator (E2E_PLATFORM_ADMIN_TOKEN) -- never the owner's own account
- * Issuing a bill is the platform administrator's, so until a test platform administrator exists and has issued one to
- * the workspace, the first test skips for want of one; it reads only.
+ *   admin     a TENANT_ADMIN whose workspace has an issued invoice: Riverside Health's administrator when Riverside has
+ *             one, else the first rebuilt workspace's administrator that has (Meridian's October bill is issued and
+ *             paid; support/fixtures.ts), minted for this read-only test
+ *   platform  the TEST platform administrator -- never the owner's own account
+ * Issuing a bill is the platform administrator's; the test reads only, and skips when no rebuilt workspace has one.
  */
 
 
@@ -17,11 +19,18 @@ test.describe('invoices as rail and pane', () => {
   test.skip(!canSignIn('admin'), NEEDS.admin);
 
   test('the address names the bill, the pane carries its QR code, and a document reads in place', async ({ browser, request }) => {
-    const session = await sessionFor(request, 'admin');
-    const auth = authOf(session);
-    const list = await (await request.get(`${api}/billing.json/invoices`, { headers: auth })).json();
-    const issued = (list.data as { number: string; status: string; documentKinds: string[] }[]).find(i => i.status !== 'draft' && i.documentKinds?.includes('invoice'));
-    test.skip(!issued, `No issued invoice for workspace ${session.tenantId} yet: issuing one ${NEEDS.platform}.`);
+    type Bill = { number: string; status: string; documentKinds: string[] };
+    const issuedOf = async (s: Session): Promise<Bill | undefined> =>
+      ((await (await request.get(`${api}/billing.json/invoices`, { headers: authOf(s) })).json()).data as Bill[] ?? [])
+        .find(i => i.status !== 'draft' && i.documentKinds?.includes('invoice'));
+    let session = await sessionFor(request, 'admin');
+    let issued = await issuedOf(session);
+    for (const other of hasFixtures() && canMintPeople() ? [meridian().admin, openData().admin] : []) {
+      if (issued) break;
+      session = await sessionAsPerson(request, other);
+      issued = await issuedOf(session);
+    }
+    test.skip(!issued, 'No rebuilt workspace has an issued invoice yet: issuing one is the platform administrator\'s.');
 
     const page = await pageAs(browser, session);
     await page.goto('/billing/invoices');

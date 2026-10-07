@@ -10,7 +10,7 @@ import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './su
  * boxes ask the server for what was typed, and the task's topic comes after its connection.
  *
  * Needs a TENANT_ADMIN whose workspace has a Kafka profile marked default (support/session.ts:
- * E2E_TENANT_ADMIN_TOKEN, 4537 of 2924, or E2E_TENANT_ADMIN(_PASSWORD)). Everything it makes is named "E2E ..."
+ * role admin, Riverside Health's administrator). Everything it makes is named "E2E ..."
  * and is cleaned up in reverse -- task, pipeline, topic -- through the API.
  */
 

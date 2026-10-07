@@ -1,43 +1,54 @@
 import { test, expect, APIRequestContext, Page } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
-import { pipelineById } from './support/workspace';
+import { bestEffort, Pipeline, pipelineById } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, pipeline, pipelinesOf, riverside } from './support/fixtures';
 
 /**
- * MIG-250: Configuration › Task Registry end to end, as a workspace administrator of workspace 2924: the list shows
- * every kind (Read, Process, Output and a Legacy row per pipeline), a task's side panel, an administrator's switch
- * off and back to its default (restored in afterAll whatever happens), and a Legacy row opening the existing pipeline
- * dialog. The shared legacy pipeline REF_CSV_CHECK_V1 (used by 15 jobs) is only viewed; the save test saves
- * the spec's own "UI-CHECK legacy pipeline" (created once, left in place for the owner to clear).
+ * MIG-250: Configuration › Task Registry end to end, as Riverside Health's administrator: the list shows every kind
+ * (Read, Process, Output and a Legacy row per pipeline), a task's side panel, an administrator's switch off and back to
+ * its default (restored in afterAll whatever happens), and a Legacy row opening the existing pipeline dialog. The rebuilt
+ * pipelines (support/fixtures.ts) are only viewed -- the readmission one's dialog is opened and cancelled; the save test
+ * saves the spec's own "E2E legacy pipeline <stamp>", made for the run on the workspace's topic and deleted afterwards.
  *
- * Needs Core behind :9098 and a console at E2E_BASE_URL with MIG-250 (e.g. `ng serve --port 4418`). Sign-in:
- *   support/session.ts: E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh 4537 900), or a password
+ * Needs Core behind :9098 and a console at E2E_BASE_URL with MIG-250. Sign-in: support/session.ts (role admin).
  */
 const SWITCHED = 'aggregate';
-const CHECK_ID = 'UI_CHECK_LEGACY_0929';
+const STAMP = Date.now().toString(36).toUpperCase();
+const CHECK_ID = `E2E_LEGACY_${STAMP}`;
+const CHECK_NAME = `E2E legacy pipeline ${STAMP}`;
 
 
 const headers = (s: Session) => authOf(s);
-/** The workspace's pipelines this spec names, by id (MIG-330: they were pinned by key, 100167/100175/100177). */
-const SHARED_ID = 'REF_CSV_CHECK_V1';
-const LISTED = [SHARED_ID, 'UI_CHECK_STEPS_0928', 'UI_CHECK_REGISTRY_0929'];
+/** The rebuilt pipelines this spec lists (three of Riverside's), and the one whose dialog it opens (readmission). */
+let LISTED: string[] = [];
+let SHARED: Pipeline;
 const KEY: Record<string, number> = {};
 let TOPIC = 0;
+/** The spec's own legacy pipeline, made for this run. */
+let CHECK_KEY = 0;
 const row = (page: Page, id: string) => page.locator(`tr[data-row="${id}"]`);
 
 test.describe('Task Registry', () => {
   test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
 
   let s: Session;
   test.beforeAll(async ({ request }) => {
     s = await sessionFor(request, 'admin');
+    LISTED = pipelinesOf('riverside').slice(0, 3).map(([, p]) => p.pipelineId);
     for (const id of LISTED) KEY[id] = (await pipelineById(request, s, id)).pipelineKey;
-    // The topic the legacy pipelines publish on: the shared one's, which every legacy pipeline here shares.
-    TOPIC = (await pipelineById(request, s, SHARED_ID)).sourceTaskTypeId;
+    SHARED = await pipelineById(request, s, pipeline('readmission').pipelineId);
+    KEY[SHARED.pipelineId] = SHARED.pipelineKey;
+    // The topic the rebuilt pipelines publish on.
+    TOPIC = riverside().topicId;
   });
 
   test.afterAll(async ({ request }) => {
+    if (!s) return;
     // Never leave a task switched: back to its default, whatever the test did.
-    if (s) await request.post(`${api}/pipeline.json/steps/tasks/enabled`, { headers: headers(s), data: { code: SWITCHED, enabled: null } });
+    await request.post(`${api}/pipeline.json/steps/tasks/enabled`, { headers: headers(s), data: { code: SWITCHED, enabled: null } });
+    if (CHECK_KEY) await bestEffort(`delete pipeline ${CHECK_ID}`, () =>
+      request.delete(`${api}/pipeline.json/delete?pipelineKey=${CHECK_KEY}`, { headers: headers(s) }));
   });
 
   test('lists every kind, and each pipeline as a Legacy task', async ({ browser }) => {
@@ -48,7 +59,7 @@ test.describe('Task Registry', () => {
       await expect(page.locator(`tbody [data-kind="${kind}"]`).first()).toBeVisible();
     }
     for (const id of LISTED) await expect(row(page, `legacy:${KEY[id]}`)).toContainText('Legacy');
-    await expect(row(page, `legacy:${KEY[SHARED_ID]}`)).toContainText(SHARED_ID);
+    await expect(row(page, `legacy:${SHARED.pipelineKey}`)).toContainText(SHARED.pipelineId);
     await expect(row(page, 'write_database')).toContainText('Unavailable');
     await page.getByLabel('Kind').selectOption('Legacy');
     await expect(page.locator('tbody tr[data-row]').first()).toHaveAttribute('data-row', /^legacy:/);
@@ -91,15 +102,15 @@ test.describe('Task Registry', () => {
   test('a Legacy row opens the existing pipeline dialog (viewed only)', async ({ browser }) => {
     const page = await pageAs(browser, s);
     await page.goto('/configuration/task-registry');
-    await page.getByRole('button', { name: 'Open Reference: CSV check and summarise' }).click();
-    const panel = page.getByRole('dialog', { name: 'Reference: CSV check and summarise' });
-    await expect(panel).toContainText('REF_CSV_CHECK_V1');
+    await page.getByRole('button', { name: `Open ${SHARED.pipelineName}` }).click();
+    const panel = page.getByRole('dialog', { name: SHARED.pipelineName });
+    await expect(panel).toContainText(SHARED.pipelineId);
     await expect(panel.locator('.pipeline-fields li').first()).toBeVisible();
     await expect(panel.getByRole('switch')).toHaveCount(0);
     await panel.getByRole('button', { name: 'Edit registry task' }).click();
     const dialog = page.locator('app-pipeline-dialog');
     await expect(dialog.getByRole('heading', { name: 'Edit registry task' })).toBeVisible();
-    await expect(dialog.locator('#pipelineId')).toHaveValue('REF_CSV_CHECK_V1');
+    await expect(dialog.locator('#pipelineId')).toHaveValue(SHARED.pipelineId);
     await dialog.getByRole('button', { name: 'Cancel' }).click();
     await expect(dialog).toHaveCount(0);
   });
@@ -109,14 +120,14 @@ test.describe('Task Registry', () => {
     const before = await fieldsOf(request, s, key);
     const page = await pageAs(browser, s);
     await page.goto('/configuration/task-registry');
-    await page.getByRole('button', { name: 'Open UI-CHECK legacy pipeline' }).click();
-    await page.getByRole('dialog', { name: 'UI-CHECK legacy pipeline' }).getByRole('button', { name: 'Edit pipeline' }).click();
+    await page.getByRole('button', { name: `Open ${CHECK_NAME}` }).click();
+    await page.getByRole('dialog', { name: CHECK_NAME }).getByRole('button', { name: 'Edit pipeline' }).click();
     const dialog = page.locator('app-pipeline-dialog');
     await expect(dialog.locator('#pipelineId')).toHaveValue(CHECK_ID);
     const sent = page.waitForRequest(r => r.url().includes('/pipeline.json/save') && r.method() === 'POST');
     await dialog.getByRole('button', { name: 'Save changes' }).click();
     const body = JSON.parse((await sent).postData() ?? '{}');
-    expect(body).toMatchObject({ pipelineKey: key, pipelineId: CHECK_ID, pipelineName: 'UI-CHECK legacy pipeline', sourceTaskTypeId: TOPIC, status: 'Active' });
+    expect(body).toMatchObject({ pipelineKey: key, pipelineId: CHECK_ID, pipelineName: CHECK_NAME, sourceTaskTypeId: TOPIC, status: 'Active' });
     expect(body.fields.map((f: { tagKey: string; position: number }) => `${f.position}:${f.tagKey}`)).toEqual(before.map(f => `${f.position}:${f.tagKey}`));
     await expect(dialog).toHaveCount(0);
     // Saved untouched: the stored fields are what they were.
@@ -133,14 +144,14 @@ async function fieldsOf(request: APIRequestContext, s: Session, key: number): Pr
   return body.data;
 }
 
-/** The spec's own legacy pipeline: found by its id, or created once (and left for the owner to clear). */
+/** The spec's own legacy pipeline: found by its id, or created (and deleted in afterAll). */
 async function checkPipeline(request: APIRequestContext, s: Session): Promise<number> {
   const list = await (await request.get(`${api}/pipeline.json/list?page=1&limit=1000&q=${CHECK_ID}`, { headers: headers(s) })).json();
   const found = (list.data?.rows ?? []).find((p: { pipelineId: string }) => p.pipelineId === CHECK_ID);
-  if (found) return found.pipelineKey;
+  if (found) return (CHECK_KEY = found.pipelineKey);
   const saved = await (await request.post(`${api}/pipeline.json/save`, { headers: headers(s), data: {
-    pipelineId: CHECK_ID, pipelineName: 'UI-CHECK legacy pipeline', sourceTaskTypeId: TOPIC, status: 'Active',
-    description: 'MIG-250 e2e: a legacy dialog saved from the Task Registry. Safe to delete.',
+    pipelineId: CHECK_ID, pipelineName: CHECK_NAME, sourceTaskTypeId: TOPIC, status: 'Active',
+    description: 'MIG-250 e2e: a legacy dialog saved from the Task Registry. Deleted by the spec.',
     fields: [
       { tagKey: 'inputKey', label: 'Input CSV', fieldType: 'text', required: true, position: 0 },
       { tagKey: 'format', label: 'Shape', fieldType: 'select', required: false, defaultValue: 'records', fieldOptions: 'records=JSON array\nlines=JSON Lines', position: 1 },

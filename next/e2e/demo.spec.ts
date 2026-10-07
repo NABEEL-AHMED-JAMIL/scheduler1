@@ -3,20 +3,25 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { api, authOf, claimsOf, pageAs, Session, sessionOf } from './support/session';
+import { forbiddenIds } from './support/fixtures';
 
 /**
  * The sales demo's two paths (MIG-319), headless, against the demo workspaces that etl-platform/demo/setup.py builds:
  *
- *   A  Northwind Group (2946, SELF), its admin 4602: an invoice whose total does not add up is uploaded to Document
+ *   A  Northwind Group (SELF), its admin: an invoice whose total does not add up is uploaded to Document
  *      Intelligence, read by the local model, and stopped in review with the rule that failed.
- *   C  Harbor Health (2947, MANAGED), its admin 4603: a follow-up visit with a wound photo is submitted through the
+ *   C  Harbor Health (MANAGED), its admin: a follow-up visit with a wound photo is submitted through the
  *      form; the run measures it and waits for review, which Executions and the run's review panel show. The
  *      customer's build screens carry the managed banner (story D in one look).
  *
  * The ids come from etl-platform/.state/demo/ids.json (setup.py writes it). Tokens are minted with
- * etl-platform/scripts/mint-test-token.sh for 4602 and 4603 only; never printed, never for 1000. Each test leaves what a
- * rehearsal leaves (a document, a submission and its run): etl-platform/demo/reset.py clears them for the next one.
+ * etl-platform/scripts/mint-test-token.sh for those two admins only; never printed, never for the owner. Each test
+ * leaves what a rehearsal leaves (a document, a submission and its run): etl-platform/demo/reset.py clears them.
  * Opt-in: E2E_DEMO=1 (they upload and run the local models, minutes not seconds).
+ *
+ * <b>Not runnable on the rebuilt platform.</b> The 2026-10-06 wipe removed both workspaces and ids.json; the rebuild
+ * (rebuild.json, support/fixtures.ts) made Riverside, Meridian and Open Data Lab instead, with no wound form and with
+ * Meridian's invoices as demo data the suite must not add to. Until setup.py's workspaces exist again, this skips.
  */
 const PLATFORM = resolve(__dirname, '../../../etl-platform');
 const IDS = resolve(PLATFORM, '.state/demo/ids.json');
@@ -26,7 +31,7 @@ const ready = process.env['E2E_DEMO'] === '1' && existsSync(IDS) && existsSync(M
 const ids = ready ? JSON.parse(readFileSync(IDS, 'utf8')) : {};
 
 function mint(appUserId: number): string {
-  if (appUserId === 1000) throw new Error('the demo smoke never acts as 1000, the owner\'s platform administrator');
+  if (forbiddenIds().includes(appUserId)) throw new Error(`the demo smoke never acts as ${appUserId}, the owner's or api-check's`);
   const token = execFileSync('bash', [MINT, String(appUserId), '900'], {
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, MINT_CALLER: 'playwright demo smoke' },
   }).trim();
@@ -45,7 +50,8 @@ function freshCopy(path: string): Buffer {
 }
 
 test.describe('Sales demo paths (MIG-319)', () => {
-  test.skip(!ready, 'needs E2E_DEMO=1 and etl-platform/.state/demo/ids.json (python3 etl-platform/demo/setup.py)');
+  test.skip(!ready, 'needs E2E_DEMO=1 and etl-platform/.state/demo/ids.json (python3 etl-platform/demo/setup.py): the'
+    + ' MIG-319 demo workspaces were wiped on 2026-10-06 and the rebuild does not recreate them');
 
   test('A: an invoice that does not add up stops in review with the failed check', async ({ browser, request }) => {
     test.setTimeout(10 * 60_000);

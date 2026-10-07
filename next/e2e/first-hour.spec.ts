@@ -1,44 +1,36 @@
 import { test, expect, APIRequestContext, Page } from '@playwright/test';
-import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { api, authOf, claimsOf, pageAs, Session, sessionOf } from './support/session';
+import { join } from 'node:path';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor, sessionOf } from './support/session';
+import { bestEffort, deleteObject, removeMade } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
  * MIG-324: a new organisation's first hour, as its first administrator, through the console only and timed:
  * storage, the inbox and a file, a topic, the registry task, the pipeline and its steps, a schedule, Run now, the run
  * completed, and its output on the run's page. Every stage is a screen a new administrator uses; the API is only read,
- * to find what an earlier run of this spec already made and to wait for the run.
+ * to find what the run made and to wait for it -- and, when the test is over, to remove it again.
  *
- * Who: the QA Team workspace's administrator (appUserId 4600, workspace 2945), the owner's fresh organisation --
- * E2E_FIRST_HOUR_TOKEN, or minted by etl-platform/scripts/mint-test-token.sh for E2E_FIRST_HOUR_ADMIN_ID (default
- * 4600) when that script is on this machine. Never the owner's platform administrator (1000).
+ * Who: Riverside Health's administrator (support/session.ts, role admin), or E2E_FIRST_HOUR_TOKEN for another
+ * workspace's. The rebuilt workspace is not empty, so the dashboard's first-run guide is checked only when the workspace
+ * has never completed a run; everything else is made fresh, named "E2E first-hour <stamp>", and deleted in afterAll --
+ * the schedule, the pipeline, the registry task, the topic, the storage connection and the uploaded file. When the
+ * workspace's inbox is off the walk turns it on, on its own storage connection (and that is left on: the inbox has no
+ * way back to "not set up"); Riverside's inbox is on already, on its own bucket, and is only used.
  *
- * Safe to rerun: each object is found by its "E2E first-hour" name and made only when missing; nothing is deleted.
- * Each run uploads the sample file again and points the pipeline's Read step at the new arrival's key, so the run
- * proves the whole path. The storage is LocalStack's bucket qa-team-2945 (etl-platform fixtures/localstack-buckets.tsv),
- * with keys LocalStack does not check; E2E_FIRST_HOUR_S3_ENDPOINT moves it.
- *
- * Prints the time of each stage and the total ("first-hour: ..."), which the MIG-324 card records.
+ * The storage is LocalStack's bucket of the workspace (support/fixtures.ts), with keys LocalStack does not check;
+ * E2E_FIRST_HOUR_BUCKET and E2E_FIRST_HOUR_S3_ENDPOINT move it. Prints the time of each stage and the total
+ * ("first-hour: ..."), which the MIG-324 card records.
  */
-const OWNER_ID = 1000;
-const ADMIN_ID = Number(process.env['E2E_FIRST_HOUR_ADMIN_ID'] ?? 4600);
-const MINT = process.env['E2E_MINT_SCRIPT'] ?? resolve(__dirname, '../../../etl-platform/scripts/mint-test-token.sh');
-
-/**
- * E2E_FIRST_HOUR_SET names a second set of the same objects ("E2E first-hour b ..."), for a walk that has to make
- * every one of them again -- the path a new workspace takes -- in a workspace where the first set already exists.
- */
-const SET = (process.env['E2E_FIRST_HOUR_SET'] ?? '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-const NAME = SET ? `E2E first-hour ${SET}` : 'E2E first-hour';
+const STAMP = Date.now().toString(36);
+const NAME = `E2E first-hour ${STAMP}`;
 const STORAGE = `${NAME} storage`;
-const ALIAS = SET ? `e2e-first-hour-${SET}-s3` : 'e2e-first-hour-s3';
-const BUCKET = process.env['E2E_FIRST_HOUR_BUCKET'] ?? 'qa-team-2945';
+const ALIAS = `e2e-first-hour-${STAMP}-s3`;
 const ENDPOINT = process.env['E2E_FIRST_HOUR_S3_ENDPOINT'] ?? 'http://host.docker.internal:4566';
 const TOPIC = `${NAME} topic`;
-const KAFKA_TOPIC = SET ? `e2e-first-hour-${SET}` : 'e2e-first-hour';
-const REGISTRY_ID = SET ? `E2E_FIRST_HOUR_${SET.toUpperCase()}` : 'E2E_FIRST_HOUR';
+const KAFKA_TOPIC = `e2e-first-hour-${STAMP}`;
+const REGISTRY_ID = `E2E_FIRST_HOUR_${STAMP.toUpperCase()}`;
 const REGISTRY_NAME = `${NAME} orders`;
 const PIPELINE = `${NAME} orders task`;
 const SCHEDULE = `${NAME} orders schedule`;
@@ -46,19 +38,13 @@ const FILE = 'e2e-first-hour-orders.csv';
 const ROWS = ['order_id,customer,amount,status', 'A-1001,Northwind,120.50,paid', 'A-1002,Contoso,75.00,open',
   'A-1003,Fabrikam,310.25,paid', 'A-1004,Northwind,42.10,refunded'];
 
-function token(): string | null {
-  const given = process.env['E2E_FIRST_HOUR_TOKEN'];
-  const minted = !given && existsSync(MINT) && ADMIN_ID !== OWNER_ID
-    ? execFileSync('bash', [MINT, String(ADMIN_ID), '900'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000,
-        env: { ...process.env, MINT_CALLER: 'playwright e2e (first-hour)' } }).trim()
-    : null;
-  const t = given || minted;
-  if (!t) return null;
-  if (Number(claimsOf(t).appUserId) === OWNER_ID) throw new Error('the first-hour walk never acts as the owner\'s platform administrator');
-  return t;
-}
+const canRun = !!process.env['E2E_FIRST_HOUR_TOKEN'] || (canSignIn('admin') && hasFixtures());
 
-const canRun = !!process.env['E2E_FIRST_HOUR_TOKEN'] || existsSync(MINT);
+/** The walk's administrator: the given token's, else Riverside's. */
+async function admin(request: APIRequestContext): Promise<Session> {
+  const given = process.env['E2E_FIRST_HOUR_TOKEN'];
+  return given ? sessionOf(request, given) : sessionFor(request, 'admin');
+}
 
 /** Types into a searchable box and picks the row whose label contains `label`. */
 async function pick(page: Page, boxId: string, typed: string, label: string): Promise<void> {
@@ -79,11 +65,35 @@ async function rowAction(page: Page, rowText: string, item: string): Promise<voi
 }
 
 test.describe('a new organisation\'s first hour (MIG-324)', () => {
-  test.skip(!canRun, 'needs E2E_FIRST_HOUR_TOKEN, or etl-platform/scripts/mint-test-token.sh to mint one for 4600');
+  test.skip(!canRun, `${NEEDS.admin}; ${NEEDS_FIXTURES}`);
   test.setTimeout(8 * 60_000);
 
+  /** The file the walk uploaded; everything else it made is found by its stamped name in afterAll. */
+  const made: { file?: { bucket: string; key: string } } = {};
+
+  test.afterAll(async ({ request }) => {
+    const s = await admin(request);
+    const headers = authOf(s);
+    const jobs = ((await getJson(request, s, '/sourceJob.json/listSourceJob?page=1&limit=1000')).data ?? [])
+      .filter((j: any) => j.jobName === SCHEDULE).map((j: any) => j.jobId);
+    const tasks = ((await (await request.post(`${api}/sourceTask.json/listSourceTask?page=1&limit=1000`, { headers, data: {} })).json()).data ?? [])
+      .filter((t: any) => t.taskName === PIPELINE).map((t: any) => t.taskDetailId);
+    const pipelines = ((await getJson(request, s, `/pipeline.json/list?page=1&limit=1000&q=${REGISTRY_ID}`)).data?.rows ?? [])
+      .filter((p: any) => p.pipelineId === REGISTRY_ID).map((p: any) => p.pipelineKey);
+    await removeMade(request, s, { jobs, tasks, pipelines });
+    const topic = ((await getJson(request, s, `/setting.json/topics?q=${encodeURIComponent(TOPIC)}&limit=5`)).data ?? [])
+      .find((t: any) => t.serviceName === TOPIC);
+    if (topic) await bestEffort(`delete topic ${topic.sourceTaskTypeId}`, () =>
+      request.delete(`${api}/setting.json/deleteSourceTaskType?sourceTaskTypeId=${topic.sourceTaskTypeId}`, { headers }));
+    if (made.file) await bestEffort(`delete ${made.file.key}`, () => deleteObject(request, s, made.file!.bucket, made.file!.key));
+    const storage = ((await getJson(request, s, '/storageConnection.json/fetchAllConnections')).data ?? []).find((c: any) => c.alias === ALIAS);
+    if (storage) await bestEffort(`delete storage connection ${storage.storageConnectionId}`, () =>
+      request.delete(`${api}/storageConnection.json/deleteConnection`, { headers, params: { storageConnectionId: String(storage.storageConnectionId) } }));
+  });
+
   test('from an empty workspace to a first completed run and its output, in the console', async ({ browser, request }) => {
-    const s = await sessionOf(request, token()!);
+    const BUCKET = process.env['E2E_FIRST_HOUR_BUCKET'] ?? riverside().bucket;
+    const s = await admin(request);
     expect(s.data['userRole'], 'the first administrator of a workspace').toBe('TENANT_ADMIN');
     const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
     const times: [string, number][] = [];
@@ -149,6 +159,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     await expect(page.locator(`[title="${arrival.key}"]`)).toBeVisible();
     const key = (await page.locator(`[title="${arrival.key}"]`).innerText()).trim();
     expect(key).toBe(arrival.key);
+    made.file = { bucket: arrival.alias ?? arrival.bucket, key: arrival.key };
     lap('inbox and a file');
 
     // ── 3. A topic, on the platform's Kafka connection ────────────────────────────────────────────────────────────
@@ -213,7 +224,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await page.getByRole('option', { name: /^Read CSV/ }).click();
       const read = page.getByRole('dialog', { name: /^Step 1/ });
       await read.locator('#stepKey').fill('orders');
-      await read.locator('#cfg-bucket').fill(arrival.alias);
+      await read.locator('#cfg-bucket').fill(arrival.alias ?? arrival.bucket);
       await read.locator('#cfg-key').fill(key);
       await read.locator('#cfg-format').selectOption('csv');
       await read.getByRole('button', { name: 'Apply' }).click();
@@ -231,7 +242,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
       await stepsTab.click();
       await page.getByRole('button', { name: 'Edit step orders' }).click();
       const read = page.getByRole('dialog', { name: /^Step 1/ });
-      await read.locator('#cfg-bucket').fill(arrival.alias);
+      await read.locator('#cfg-bucket').fill(arrival.alias ?? arrival.bucket);
       await read.locator('#cfg-key').fill(key);
       await read.getByRole('button', { name: 'Apply' }).click();
       await page.getByRole('button', { name: 'Save', exact: true }).click();

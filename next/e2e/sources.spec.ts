@@ -1,5 +1,7 @@
 import { test, expect, Browser, Page, Response } from '@playwright/test';
 import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
+import { bestEffort, ensureObject, getJson } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
  * MIG-248: Sources end to end, as a workspace administrator -- create a FILE source on the workspace's own storage
@@ -10,18 +12,16 @@ import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
  * Beside every step, the business rule: a database password never comes back. Every response from the API gateway
  * is read, and none may hold the password this spec typed -- only the request that set it may carry it.
  *
- * Needs integration-service behind :9098, workspace 2924's storage connection ui-review-s3 holding
- * sources-live-check/live-customers.csv, and a console at E2E_BASE_URL (default :4400) that has MIG-248.
- * Sign-in, either:
- *   E2E_TENANT_ADMIN_TOKEN                          a TENANT_ADMIN access token (e.g. from
- *                                                   etl-platform/scripts/mint-test-token.sh 4537 900), or
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD    a TENANT_ADMIN's credentials
- * Everything it makes is named "UI-CHECK e2e …" (the template it installs keeps the template's name) and is left
- * in place: the workspace's owner clears test data.
+ * Needs integration-service behind :9098 and a console at E2E_BASE_URL (default :4400) that has MIG-248. The file
+ * source reads the suite's own e2e/sources/E2E-customers.csv in Riverside Health's bucket (support/fixtures.ts),
+ * uploaded once and kept for the next run. Sign-in through support/session.ts (role admin).
+ * Everything it makes is named "E2E …". The source and the database connection are deleted when the describe ends; the
+ * contract it proposes and the wound_result template it installs (once) stay, as the service deletes neither.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const STORAGE = process.env['E2E_SOURCE_STORAGE'] ?? 'ui-review-s3';
-const CSV_PATH = process.env['E2E_SOURCE_PATH'] ?? 'sources-live-check/live-customers.csv';
+const STORAGE = () => process.env['E2E_SOURCE_STORAGE'] ?? riverside().storageAlias;
+const CSV_PATH = process.env['E2E_SOURCE_PATH'] ?? 'e2e/sources/E2E-customers.csv';
+const CSV = 'customer_id,name,balance,active\n101,Ada Lovelace,1250.50,true\n102,Alan Turing,-42.00,false\n103,Grace Hopper,0,true\n';
 
 const STAMP = Date.now().toString(36);
 const SOURCE = `E2E source ${STAMP}`;
@@ -54,9 +54,26 @@ function watchForPassword(page: Page): { leaks: string[]; scanned: () => number 
 
 test.describe('Sources', () => {
   test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await sessionFor(request, 'admin'); });
+  test.beforeAll(async ({ request }) => {
+    s = await sessionFor(request, 'admin');
+    if (!process.env['E2E_SOURCE_PATH']) await ensureObject(request, s, STORAGE(), CSV_PATH, Buffer.from(CSV));
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (!s) return;
+    const headers = { Authorization: `Bearer ${s.token}` };
+    const sources = (await getJson(request, s, `/dataSource.json/list?page=1&limit=100&search=${encodeURIComponent(SOURCE)}`)).data ?? [];
+    for (const row of (sources as { id: number; name: string }[]).filter(r => r.name === SOURCE)) {
+      await bestEffort(`delete source ${row.id}`, () => request.delete(`${api}/dataSource.json/delete`, { headers, params: { sourceId: row.id } }));
+    }
+    const connections = (await getJson(request, s, '/dataSource.json/connection/list')).data ?? [];
+    for (const row of (connections as { id: number; name: string }[]).filter(r => r.name === CONNECTION)) {
+      await bestEffort(`delete connection ${row.id}`, () => request.delete(`${api}/dataSource.json/connection/delete`, { headers, params: { connectionId: row.id } }));
+    }
+  });
 
   test('a file source: create → test → preview → schema', async ({ browser }) => {
     test.setTimeout(120_000);
@@ -69,7 +86,7 @@ test.describe('Sources', () => {
     await expect(panel.getByRole('heading', { name: 'New source' })).toBeVisible();
     await panel.locator('#srcName').fill(SOURCE);
     await panel.getByRole('button', { name: 'File', exact: true }).click();
-    await panel.locator('#srcStorage').selectOption(STORAGE);
+    await panel.locator('#srcStorage').selectOption(STORAGE());
     await panel.locator('#srcPath').fill(CSV_PATH);
     await panel.locator('#srcFormat').selectOption('CSV');
 

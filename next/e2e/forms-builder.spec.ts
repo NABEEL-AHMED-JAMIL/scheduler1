@@ -1,10 +1,12 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 import { canSignIn, NEEDS, pageAs as signedIn, sessionFor } from './support/session';
+import { archiveForm, formIdNamed } from './support/forms';
 
 /**
- * MIG-280, live: the administrator (4537) builds a form in the new builder -- two fields from the palette, a rule in
- * Logic -- publishes it, fills it in and sends it, and finds the submission on Submissions with its strip. It CREATES a
- * form ("E2E builder <time>") and one submission, and leaves them. Sign-in: E2E_TENANT_ADMIN_TOKEN.
+ * MIG-280, live: Riverside Health's administrator builds a form in the new builder -- two fields from the palette, a
+ * rule in Logic -- publishes it, fills it in and sends it, and finds the submission on Submissions with its strip. It
+ * CREATES a form ("E2E builder <time>") and one submission; the form is archived afterwards (forms are never deleted),
+ * and the submission stays with it. Sign-in: support/session.ts (role admin).
  */
 const NAME = `E2E builder ${new Date().toISOString().slice(5, 19).replace(/[-:T]/g, '')}`;
 
@@ -14,6 +16,12 @@ async function pageAs(browser: Browser, request: APIRequestContext): Promise<Pag
 
 test.describe('Forms: build, publish, fill, submit (live)', () => {
   test.skip(!canSignIn('admin'), NEEDS.admin);
+
+  test.afterAll(async ({ request }) => {
+    const s = await sessionFor(request, 'admin');
+    const id = await formIdNamed(request, s, NAME);
+    if (id) await archiveForm(request, s, id);
+  });
 
   test('a form built from the palette is published, filled in and shows on Submissions', async ({ browser, request }) => {
     const page = await pageAs(browser, request);

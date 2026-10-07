@@ -8,9 +8,12 @@ import { LIVE, LIVE_IDS } from '../src/app/characterisation/fixtures.live';
  *
  * The platform's only administrator is the owner's account, which these tests never act as: every platform-admin
  * and MANAGED scene runs on an unsigned session whose every API call is answered here (page.route), so nothing
- * leaves the browser. One live smoke runs as a SELF workspace's administrator (E2E_TENANT_ADMIN_TOKEN, minted with
- * etl-platform/scripts/mint-test-token.sh 4537) and shows the console exactly as before: no banner.
+ * leaves the browser; its workspaces and people are made-up ids (FAKE) that no live row has. One live smoke runs as a
+ * SELF workspace's administrator (support/session.ts, role admin: Riverside Health's) and shows the console exactly as
+ * before: no banner.
  */
+/** The faked scenes' ids: answered by page.route, never sent anywhere. */
+const FAKE = { tenant: 9001, otherTenant: 9002, admin: 9101 } as const;
 const REFUSAL = 'This workspace is managed by our team, so this cannot be changed here. Contact your account team to request the change.';
 
 function token(claims: Record<string, unknown>): string {
@@ -25,9 +28,9 @@ function session(claims: Record<string, unknown>, extra: Record<string, unknown>
 }
 
 const PLATFORM = session({ userRole: 'PLATFORM_ADMIN' });
-const MANAGED_ADMIN = session({ userRole: 'TENANT_ADMIN', tenantId: 2924, mgmt: 'MANAGED' }, { appUserId: 4537, fullName: 'Casey Admin' });
-const SELF_ADMIN = session({ userRole: 'TENANT_ADMIN', tenantId: 2924, mgmt: 'SELF' }, { appUserId: 4537, fullName: 'Casey Admin' });
-const STAFF_SESSION = session({ userRole: 'TENANT_ADMIN', tenantId: 2924, mgmt: 'MANAGED', msvc: true },
+const MANAGED_ADMIN = session({ userRole: 'TENANT_ADMIN', tenantId: FAKE.tenant, mgmt: 'MANAGED' }, { appUserId: FAKE.admin, fullName: 'Casey Admin' });
+const SELF_ADMIN = session({ userRole: 'TENANT_ADMIN', tenantId: FAKE.tenant, mgmt: 'SELF' }, { appUserId: FAKE.admin, fullName: 'Casey Admin' });
+const STAFF_SESSION = session({ userRole: 'TENANT_ADMIN', tenantId: FAKE.tenant, mgmt: 'MANAGED', msvc: true },
   { managedService: true, managementMode: 'MANAGED', refreshToken: 'r-managed' });
 
 interface Seen { method: string; path: string; body: unknown; auth: string | null }
@@ -134,8 +137,8 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
   test('Administration offers our team\'s activity, and it lists what they did', async ({ browser }) => {
     const page = await pageAs(browser, MANAGED_ADMIN);
     const seen = await fakeApi(page, { 'GET /managedService.json/actions': { status: 'SUCCESS', message: '', paging: { nextBeforeId: null },
-      data: [{ id: 42, tenantId: 2924, appUserId: 5001, fullName: 'Sam Staff', username: 'staff@example.com', service: 'process',
-        method: 'POST', path: '/sourceTask.json/updateSourceTask', target: 'sourceTaskId=1854', builderAction: true, createdAt: '2026-09-28 10:05:00' }] } });
+      data: [{ id: 42, tenantId: FAKE.tenant, appUserId: 5001, fullName: 'Sam Staff', username: 'staff@example.com', service: 'process',
+        method: 'POST', path: '/sourceTask.json/updateSourceTask', target: 'sourceTaskId=9301', builderAction: true, createdAt: '2026-09-28 10:05:00' }] } });
     await page.goto('/dashboard');
     await page.getByRole('button', { name: 'Administration' }).click();
     await page.getByRole('link', { name: /Our team's activity/ }).click();
@@ -159,8 +162,8 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
 
 test.describe('MIG-254: a platform administrator (faked; the owner\'s account is never used)', () => {
   const TENANTS = { status: 'SUCCESS', message: '', data: [
-    { tenantId: 2924, tenantName: 'Claude Demo', tenantCode: 'DEMO', status: 'Active', managementMode: 'SELF', userCount: 3 },
-    { tenantId: 3001, tenantName: 'Workspace B', tenantCode: 'WSB', status: 'Active', managementMode: 'MANAGED', userCount: 1 }] };
+    { tenantId: FAKE.tenant, tenantName: 'Claude Demo', tenantCode: 'DEMO', status: 'Active', managementMode: 'SELF', userCount: 3 },
+    { tenantId: FAKE.otherTenant, tenantName: 'Workspace B', tenantCode: 'WSB', status: 'Active', managementMode: 'MANAGED', userCount: 1 }] };
 
   test('Tenants: a Mode column, and switching asks first and says who is signed out', async ({ browser }, info) => {
     const page = await pageAs(browser, PLATFORM);
@@ -175,7 +178,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await shot(page, info, 'tenants-mode-confirm');
     await dialog.getByRole('button', { name: 'Switch and sign out' }).click();
     await expect(page.getByText('Tenant "Claude Demo" is now MANAGED.', { exact: false })).toBeVisible();
-    expect(seen.find(s => s.method === 'PUT')?.body).toEqual({ tenantId: 2924, managementMode: 'MANAGED' });
+    expect(seen.find(s => s.method === 'PUT')?.body).toEqual({ tenantId: FAKE.tenant, managementMode: 'MANAGED' });
     await page.close();
   });
 
@@ -185,7 +188,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
       'GET /tenant.json/listTenants': TENANTS,
       'GET /appUser.json/listUsers': { status: 'SUCCESS', message: '', data: [
         { appUserId: 5001, username: 'staff@example.com', fullName: 'Sam Staff', userRole: 'PLATFORM_ADMIN', status: 'Active', tenantId: null }] },
-      'GET /managedService.json/listGrants': { status: 'SUCCESS', message: '', data: [{ grantId: 11, tenantId: 3001, tenantName: 'Workspace B',
+      'GET /managedService.json/listGrants': { status: 'SUCCESS', message: '', data: [{ grantId: 11, tenantId: FAKE.otherTenant, tenantName: 'Workspace B',
         managementMode: 'MANAGED', appUserId: 5001, fullName: 'Sam Staff', username: 'staff@example.com', grantedAt: '2026-09-28 10:00:00', revokedAt: null }] },
       'POST /managedService.json/grant': { status: 'SUCCESS', message: 'Granted.' },
       'POST /managedService.json/revoke': { status: 'SUCCESS', message: 'Revoked. The staff member signs in again.' },
@@ -199,19 +202,19 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await shot(page, info, 'managed-service-grant');
     await grant.getByRole('button', { name: 'Grant', exact: true }).click();
     await expect(page.getByText('Granted.')).toBeVisible();
-    expect(seen.find(s => s.path === '/managedService.json/grant')?.body).toEqual({ tenantId: 2924, appUserId: 5001 });
+    expect(seen.find(s => s.path === '/managedService.json/grant')?.body).toEqual({ tenantId: FAKE.tenant, appUserId: 5001 });
     await page.getByRole('button', { name: 'Revoke Sam Staff in Workspace B' }).click();
     const confirm = page.getByRole('dialog');
     await expect(confirm.getByText(/signed out everywhere/)).toBeVisible();
     await confirm.getByRole('button', { name: 'Revoke and sign out' }).click();
     await expect(page.getByText('Revoked. The staff member signs in again.')).toBeVisible();
-    expect(seen.find(s => s.path === '/managedService.json/revoke')?.body).toEqual({ tenantId: 3001, appUserId: 5001 });
+    expect(seen.find(s => s.path === '/managedService.json/revoke')?.body).toEqual({ tenantId: FAKE.otherTenant, appUserId: 5001 });
     await page.close();
   });
 
   test('Staff activity pages back', async ({ browser }) => {
     const page = await pageAs(browser, PLATFORM);
-    const row = (id: number) => ({ id, tenantId: 3001, tenantName: 'Workspace B', appUserId: 5001, fullName: 'Sam Staff', service: 'process',
+    const row = (id: number) => ({ id, tenantId: FAKE.otherTenant, tenantName: 'Workspace B', appUserId: 5001, fullName: 'Sam Staff', service: 'process',
       method: 'POST', path: `/sourceTask.json/change${id}`, builderAction: true, createdAt: '2026-09-28 10:05:00' });
     const seen = await fakeApi(page, { 'GET /managedService.json/actions': (s: Seen) => ({ status: 200, body: s.path.includes('beforeId')
       ? { status: 'SUCCESS', message: '', data: [row(40)], paging: { nextBeforeId: null } }
@@ -229,7 +232,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
   test('Work in a workspace: a managed session with its banner, and Exit back to the platform session', async ({ browser }, info) => {
     const page = await pageAs(browser, PLATFORM);
     const seen = await fakeApi(page, {
-      'GET /managedService.json/myWorkspaces': { status: 'SUCCESS', message: '', data: [{ grantId: 11, tenantId: 2924, tenantName: 'Claude Demo',
+      'GET /managedService.json/myWorkspaces': { status: 'SUCCESS', message: '', data: [{ grantId: 11, tenantId: FAKE.tenant, tenantName: 'Claude Demo',
         managementMode: 'MANAGED', appUserId: 5001, grantedAt: '2026-09-28 10:00:00' }] },
       'POST /managedService.json/openSession': { status: 'SUCCESS', message: 'Managed-service session opened.', data: STAFF_SESSION },
     });
@@ -257,7 +260,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
 test.describe('MIG-254: live smoke, a SELF workspace', () => {
   test.skip(!hasToken('admin'), NEEDS.admin);
 
-  test('4537 (SELF) sees no banner and builds as before', async ({ browser }) => {
+  test('a SELF workspace\'s administrator sees no banner and builds as before', async ({ browser }) => {
     const live = tokenFor('admin')!;
     const claims = JSON.parse(Buffer.from(live.split('.')[1], 'base64url').toString('utf8'));
     const page = await pageAs(browser, { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,

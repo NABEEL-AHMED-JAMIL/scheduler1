@@ -3,16 +3,16 @@ import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 
 /**
- * MIG-254: Administration › Data policies, against ai-service's live policy (MIG-243) for workspace 2924.
+ * MIG-254: Administration › Data policies, against ai-service's live policy (MIG-243) for Riverside Health.
  *
- * The administrator (4537) edits Internal's retention to 7 days and saves; a reload shows it saved. The policy the
+ * The administrator (role admin) edits Internal's retention to 7 days and saves; a reload shows it saved. The policy the
  * workspace had before the run is read first and put back afterwards, level by level. ai-service has no way to delete a
  * saved level, so a level that was an unsaved default is put back by SAVING its default values: the workspace's
  * effective policy is unchanged, but that level then reads "saved" (with the default's values).
  *
- * Needs ai-service behind :9098 and a console at E2E_BASE_URL with MIG-254 (`ng serve --port 4423`). Sign-in:
- *   E2E_TENANT_ADMIN_TOKEN   a TENANT_ADMIN access token of 2924 (etl-platform/scripts/mint-test-token.sh 4537 900)
- *   E2E_TENANT_USER_TOKEN    optional: a TENANT_USER token of 2924 (mint-test-token.sh 4597 900)
+ * Needs ai-service behind :9098 and a console at E2E_BASE_URL with MIG-254. Sign-in through support/session.ts:
+ *   admin                    Riverside's administrator
+ *   user                     optional: Riverside's reviewer, a TENANT_USER whose profile does not hold Prompts
  *   E2E_SHOTS                optional: a folder the screenshots are also written to
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
@@ -113,7 +113,7 @@ test.describe('MIG-254: Administration › Data policies', () => {
 
   test('a member holding Prompts reads it and changes nothing; one without it is refused', async ({ browser, request }, info) => {
     test.skip(!hasToken('user'), NEEDS.user);
-    // 4597's profile does not hold Prompts; the console's gate reads the session's pages, so a profile that grants it is
+    // The reviewer's profile does not hold Prompts; the console's gate reads the session's pages, so a profile that grants it is
     // simulated by adding the key. ai-service answers the read for any member either way.
     const reader = await pageAs(browser, await sessionOf(request, tokenFor('user')!, ['ai-prompts']));
     await reader.goto('/administration/data-policies');

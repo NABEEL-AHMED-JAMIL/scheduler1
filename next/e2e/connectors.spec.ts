@@ -1,19 +1,25 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
-import { hasToken, NEEDS, tokenFor } from './support/session';
+import { hasToken, NEEDS, sessionFor, tokenFor } from './support/session';
+import { bestEffort, getJson } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 import { join } from 'path';
 
 /**
- * MIG-292: Integration › Connector Hub against integration-service for workspace 2924 -- the gallery and the connections
- * with their sync health at a wide screen and two tablets, light and dark; and the connect flow on the demo's stand-in
- * customer database (etl-platform's demo_source_db, PostgreSQL): a wrong password shows its cause and its fix, the right
- * one goes on to tables, sync mode and schedule, and the new connection syncs.
+ * MIG-292: Integration › Connector Hub against integration-service for Riverside Health -- the connect flow on the
+ * demo's stand-in customer database (etl-platform's demo_source_db, PostgreSQL): a wrong password shows its cause and its
+ * fix, the right one goes on to tables, sync mode and schedule, and the new connection syncs; then the gallery and the
+ * connections with their sync health at a wide screen and two tablets, light and dark, showing that connection.
  *
- * Sign-in: E2E_TENANT_ADMIN_TOKEN (etl-platform/scripts/mint-test-token.sh 4537 900). The connect flow also needs
- * E2E_DEMO_DB_PASSWORD (demo_reader's, from etl-platform/secrets/demo_source_db.env); E2E_SHOTS optional.
- * Leaves the connection it makes ("E2E Connector Hub <stamp>") in place.
+ * The rebuilt workspaces have no Connector Hub connection, so the spec makes its own ("E2E Connector Hub <stamp>",
+ * syncing public.customers into the workspace's bucket) and deletes it when the describe ends; without
+ * E2E_DEMO_DB_PASSWORD (demo_reader's, from etl-platform/secrets/demo_source_db.env) nothing can be made and every test
+ * skips, saying so. Sign-in: support/session.ts (role admin); E2E_SHOTS optional.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
 const demoPassword = process.env['E2E_DEMO_DB_PASSWORD'];
+const NAME = `E2E Connector Hub ${Date.now()}`;
+const NO_PASSWORD = 'needs E2E_DEMO_DB_PASSWORD (demo_reader\'s, etl-platform/secrets/demo_source_db.env): the connection'
+  + ' these screens show is made by the connect test';
 
 async function sessionOf(request: APIRequestContext, token: string): Promise<Record<string, unknown>> {
   const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
@@ -41,50 +47,30 @@ async function noSidewaysScroll(page: Page): Promise<void> {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'no page-wide horizontal scroll').toBe(true);
 }
 
-test.describe('Connector Hub', () => {
+test.describe.serial('Connector Hub', () => {
   test.skip(!hasToken('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
+  test.skip(!demoPassword, NO_PASSWORD);
 
-  for (const [width, height, label, scheme] of [[1920, 1080, 'wide', 'light'], [2560, 1440, 'wide-2560-dark', 'dark'],
-    [1024, 768, 'tablet', 'light'], [768, 1024, 'tablet-portrait-dark', 'dark']] as const) {
-    test(`the gallery, the connections and a connection (${label})`, async ({ browser, request }, info) => {
-      const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!), width, height, scheme);
-      await page.goto('/integration/connectors');
-      await page.getByRole('heading', { name: 'Connector Hub' }).waitFor();
-      await expect(page.locator('[data-connector="postgres"]')).toContainText('Connected');
-      await expect(page.locator('[data-connector="mysql"]')).toContainText('Not yet');
-      await expect(page.locator('[data-connector="hubspot"]')).toContainText('On request');
-      const row = page.locator('tr[data-connection]').filter({ hasText: 'Shop DB (demo)' });
-      await expect(row).toBeVisible();
-      await expect(row).toContainText('PostgreSQL');
-      await noSidewaysScroll(page);
-      if (scheme === 'dark') expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
-      await shot(page, info, `connectors-${label}`);
-
-      await page.getByRole('button', { name: 'Databases' }).click();
-      await expect(page.locator('[data-connector="files"]')).toHaveCount(0);
-      await page.getByRole('button', { name: /^All/ }).click();
-
-      await row.getByRole('button', { name: 'Shop DB (demo)' }).click();
-      const panel = page.locator('[data-connection-panel]');
-      await expect(panel).toBeVisible();
-      await expect(panel.locator('[data-health]')).toContainText('Lag');
-      await expect(panel.locator('tr[data-stream="public.orders"]')).toBeVisible();
-      await expect(panel.locator('[data-runs]')).toContainText('Succeeded');
-      await shot(page, info, `connection-${label}`);
-      await page.context().close();
-    });
-  }
+  test.afterAll(async ({ request }) => {
+    const s = await sessionFor(request, 'admin');
+    const made = ((await getJson(request, s, '/connectorHub.json/connection/list')).data ?? [])
+      .filter((c: { name: string }) => c.name === NAME);
+    for (const c of made as { connectionId: number }[]) {
+      await bestEffort(`delete connection ${c.connectionId}`, () => request.delete(`${api}/connectorHub.json/connection/delete`,
+        { headers: { Authorization: `Bearer ${s.token}` }, params: { connectionId: c.connectionId } }));
+    }
+  });
 
   test('connecting the demo database: a wrong password says why and what to do, the right one syncs', async ({ browser, request }, info) => {
-    test.skip(!demoPassword, 'needs E2E_DEMO_DB_PASSWORD');
     test.setTimeout(180_000);
     const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
-    const name = `E2E Connector Hub ${Date.now()}`;
+    const name = NAME;
     await page.goto('/integration/connectors');
     await page.locator('[data-new-connection]').click();
     await page.locator('[data-choose="postgres"]').click();
     await page.locator('#cName').fill(name);
-    await page.locator('#cTarget').selectOption('ui-review-s3');
+    await page.locator('#cTarget').selectOption(riverside().storageAlias);
     await page.locator('[data-field="host"]').fill('demo-source-db');
     await page.locator('[data-field="port"]').fill('5432');
     await page.locator('[data-field="database"]').fill('shop');
@@ -126,4 +112,35 @@ test.describe('Connector Hub', () => {
     await shot(page, info, 'connect-synced');
     await page.context().close();
   });
+  for (const [width, height, label, scheme] of [[1920, 1080, 'wide', 'light'], [2560, 1440, 'wide-2560-dark', 'dark'],
+    [1024, 768, 'tablet', 'light'], [768, 1024, 'tablet-portrait-dark', 'dark']] as const) {
+    test(`the gallery, the connections and a connection (${label})`, async ({ browser, request }, info) => {
+      const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!), width, height, scheme);
+      await page.goto('/integration/connectors');
+      await page.getByRole('heading', { name: 'Connector Hub' }).waitFor();
+      await expect(page.locator('[data-connector="postgres"]')).toContainText('Connected');
+      await expect(page.locator('[data-connector="mysql"]')).toContainText('Not yet');
+      await expect(page.locator('[data-connector="hubspot"]')).toContainText('On request');
+      const row = page.locator('tr[data-connection]').filter({ hasText: NAME });
+      await expect(row).toBeVisible();
+      await expect(row).toContainText('PostgreSQL');
+      await noSidewaysScroll(page);
+      if (scheme === 'dark') expect(await page.evaluate(() => document.documentElement.classList.contains('dark'))).toBe(true);
+      await shot(page, info, `connectors-${label}`);
+
+      await page.getByRole('button', { name: 'Databases' }).click();
+      await expect(page.locator('[data-connector="files"]')).toHaveCount(0);
+      await page.getByRole('button', { name: /^All/ }).click();
+
+      await row.getByRole('button', { name: NAME }).click();
+      const panel = page.locator('[data-connection-panel]');
+      await expect(panel).toBeVisible();
+      await expect(panel.locator('[data-health]')).toContainText('Lag');
+      await expect(panel.locator('tr[data-stream="public.customers"]')).toBeVisible();
+      await expect(panel.locator('[data-runs]')).toContainText('Succeeded');
+      await shot(page, info, `connection-${label}`);
+      await page.context().close();
+    });
+  }
+
 });

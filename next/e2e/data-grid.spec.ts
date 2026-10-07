@@ -3,9 +3,9 @@ import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
 import { analyticsFixtures } from './support/analytics-fixtures';
 
 /**
- * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
- * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
- * alias nobody has fails every spec at the first select, which looks nothing like what it is.
+ * The alias of the storage connection that holds the fixtures: E2E_CONNECTION, else what
+ * analyticsFixtures() picks (the rebuilt workspace's own bucket, support/fixtures.ts). An alias
+ * nobody has fails every spec at the first select, which looks nothing like what it is.
  */
 let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
 

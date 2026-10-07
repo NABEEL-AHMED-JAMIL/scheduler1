@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/session';
+import { APIRequestContext } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
 
 /**
  * Rate cards, end to end: the platform administrator saves a new version of the calculation through the
@@ -7,13 +8,39 @@ import { api, authOf, canSignIn, NEEDS, pageAs, sessionFor } from './support/ses
  * fresh draft is priced with the new one. A tenant administrator never sees the page.
  *
  * Needs a running metering service (etl_meter) behind the console. Sign-in through support/session.ts:
- *   platform  a TEST platform administrator (E2E_PLATFORM_ADMIN_TOKEN) -- never the owner's own account; the version
- *             it saves (named "e2e <stamp>: images at 0.02") is left in place
- *   admin     a TENANT_ADMIN, for the negative case (E2E_TENANT_ADMIN_TOKEN, 4537 of 2924)
+ *   platform  the TEST platform administrator (rebuild.json's platformAdmin) -- never the owner's own account
+ *   admin     a TENANT_ADMIN, for the negative case (Riverside Health's administrator)
+ *
+ * Rate cards are never deleted, and the version this saves ("E2E <stamp>: images at ...") is the platform's DEFAULT
+ * from the 1st of next month. So afterwards the card that was next month's default before the test (the demo's
+ * "Standard 2026") is saved again, unchanged, as a newer version from that same day: next month bills as it would have,
+ * and the two versions stay in the history.
  */
+
+interface Card { version: number; name: string; currency: string; effective_from: string;
+  items: { meter: string; unit: string; per: number; unit_price: number; included_quantity?: number; tiers?: unknown[] }[] }
+
+/** Saves `base` again as the default from `day`: what puts next month back after the test's version. */
+async function restoreDefault(request: APIRequestContext, s: Session, base: Card, day: string): Promise<void> {
+  const r = await (await request.put(`${api}/billing.json/rateCard`, { headers: authOf(s), data: {
+    name: base.name, tenant_id: null, effective_from: day, currency: base.currency, based_on_version: base.version,
+    note: `Put back by the e2e suite after its rate-card check (v${base.version}'s items, unchanged)`,
+    items: base.items.map(i => ({ meter: i.meter, unit: i.unit, per: i.per, unit_price: i.unit_price,
+      included_quantity: i.included_quantity ?? 0, tiers: i.tiers ?? [] })),
+  } })).json();
+  if (r.status !== 'SUCCESS') console.log(`[e2e] could not put rate card v${base.version} back from ${day}: ${r.message}`);
+}
 
 
 test.describe('rate cards', () => {
+  /** Next month's default before the test, the day it starts, and the name of the version the test saves. */
+  let undo: { s: Session; base: Card; day: string; name: string } | null = null;
+
+  test.afterAll(async ({ request }) => {
+    if (!undo) return;
+    const cards: Card[] = (await (await request.get(`${api}/billing.json/rateCards`, { headers: authOf(undo.s) })).json()).data?.cards ?? [];
+    if (cards.some(c => c.name === undo!.name)) await restoreDefault(request, undo.s, undo.base, undo.day);
+  });
 
   test('a new version is saved from the editor, listed, and prices only the bills that come after', async ({ browser, request }) => {
     test.skip(!canSignIn('platform'), NEEDS.platform);
@@ -34,6 +61,11 @@ test.describe('rate cards', () => {
     const included = Number(baseImages?.included_quantity) === 10 ? '11' : '10';
     const stamp = Date.now().toString(36);
     const name = `E2E ${stamp}: images at ${price}`;
+    const first = new Date(); first.setDate(1); first.setMonth(first.getMonth() + 1);
+    const day = first.toISOString().slice(0, 10);
+    const nextBase: Card = (await (await request.get(`${api}/billing.json/rateCard?day=${day}`, { headers: auth })).json()).data;
+    expect(nextBase?.items?.length, `the default card in effect on ${day}`).toBeGreaterThan(0);
+    undo = { s: session, base: nextBase, day, name };
 
     const page = await pageAs(browser, session);
     await page.goto('/billing/rates');

@@ -1,42 +1,45 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 import { canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
-import { getJson, jobNamed } from './support/workspace';
+import { getJson } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, pipeline, RebuiltPipeline } from './support/fixtures';
 
 /**
- * Wave 5 by Friday (owner 2026-09-29): Forms (lite) and the result review (MIG-237) as workspace 2924's administrator
- * (4537), and the menu without the deferred modules (Data Catalog, Connector Hub). Read-only: it submits
- * nothing, decides no review and saves no form.
+ * Wave 5: Forms (lite) and the result review (MIG-237) as Riverside Health's administrator, and the menu with every
+ * Wave 5 module. Read-only: it submits nothing, decides no review and saves no form.
  *
- * Live data it reads, found by name (MIG-330: the job was pinned as 2853): the Active form "Wound follow-up (synthetic,
- * demo)", linked to the job "Wound intake job (synthetic, MIG-255)", the wound assessment, and that job's newest run
- * whose review is still pending (found at start through the API; a form submission or an inbox batch makes one).
- * Sign-in through support/session.ts: E2E_TENANT_ADMIN_TOKEN (4537 of 2924), or E2E_TENANT_ADMIN(_PASSWORD).
+ * Live data it reads (support/fixtures.ts, the rebuilt platform's): the clinical-trial finder's Active form and its
+ * fields, and the newest Completed run of a rebuilt schedule whose review is still pending (the partner-lab sign-off the
+ * rebuild left open for the owner, or another found through the API) -- only looked at, never decided.
+ * Sign-in through support/session.ts (role admin).
  */
-const FORM = 'Wound follow-up (synthetic, demo)';
-const WOUND_JOB_NAME = 'Wound intake job (synthetic, MIG-255)';
-let WOUND_JOB = 0;
+let REVIEW_JOB = 0;
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
   return signedIn(browser, s, { viewport: { width, height: 900 } });
 }
 
-/** The wound job's newest run (of its latest ten) whose review is still pending, or 0. */
+/** A run of a rebuilt schedule whose review is still pending: the one the rebuild left open first, else the newest. */
 async function pendingReview(request: APIRequestContext, s: Session): Promise<number> {
-  const runs = await getJson(request, s, `/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=${WOUND_JOB}`);
-  for (const run of (runs?.data?.jobQueues ?? []).slice(0, 10)) {
-    if (run.jobStatus !== 'Completed') continue;
-    const review = await getJson(request, s, `/sourceJob.json/review?jobQueueId=${run.jobQueueId}`);
-    if (review?.data?.reviewStatus === 'PENDING') return run.jobQueueId;
+  const labs = pipeline('labs') as RebuiltPipeline & { openSignoff?: { run: number } };
+  const candidates = [labs.openSignoff?.run ?? 0];
+  const waiting = (await getJson(request, s, '/sourceJob.json/review/waiting')).data?.runs ?? [];
+  candidates.push(...waiting.map((r: { jobQueueId: number }) => r.jobQueueId));
+  for (const run of candidates.filter(Boolean).slice(0, 10)) {
+    const review = await getJson(request, s, `/sourceJob.json/review?jobQueueId=${run}`);
+    if (review?.data?.reviewStatus === 'PENDING' && review.data.runStatus === 'Completed') {
+      REVIEW_JOB = review.data.jobId;
+      return run;
+    }
   }
   return 0;
 }
 
 test.describe('Forms (lite), the result review, and the Friday menu (live)', () => {
   test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
   let s: Session;
   test.beforeAll(async ({ request }) => {
     s = await sessionFor(request, 'admin');
-    WOUND_JOB = (await jobNamed(request, s, WOUND_JOB_NAME)).jobId;
   });
 
   test('the menu offers every Wave 5 module: forms, the Task inbox, Data Catalog and Connector Hub', async ({ browser }) => {
@@ -57,18 +60,19 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     await expect(menu.getByText('Coming soon', { exact: true })).toHaveCount(0);
   });
 
-  test('All forms lists the wound form, and its fill-in page asks for its five fields', async ({ browser, request }) => {
+  test('All forms lists the trial finder\'s form, and its fill-in page asks for its fields', async ({ browser, request }) => {
+    const formId = pipeline('trials').formId!;
+    const form = (await getJson(request, s, `/form.json/fetch?formId=${formId}`)).data;
+    expect(form?.status, `form ${formId} is Active`).toBe('Active');
     const page = await pageAs(browser, s);
     await page.goto('/forms/builder');
     await expect(page.getByRole('heading', { level: 1, name: 'Forms' })).toBeVisible();
-    const row = page.locator('tr[data-form]', { hasText: FORM });
+    const row = page.locator(`tr[data-form="${formId}"]`);
     await expect(row).toBeVisible();
-    const formId = await row.getAttribute('data-form');
-    // The fields are the form's current version's, read from the service: the form is live and is edited (its photo
-    // field went from "Photo in the inbox" to an upload, "Wound photo", on 2026-10-06 in the middle of a run).
-    const fields: { label: string }[] = (await getJson(request, s, `/form.json/fetch?formId=${formId}`)).data?.fields ?? [];
-    expect(fields.map(f => f.label).slice(0, 4)).toEqual(['Case id', 'Patient id', 'Visit date', 'Wound site']);
-    expect(fields).toHaveLength(5);
+    await expect(row).toContainText(form.name);
+    // The fields are the form's current version's, read from the service: the form is live and may be edited.
+    const fields: { label: string }[] = form.fields ?? [];
+    expect(fields.length, `form ${formId} asks something`).toBeGreaterThan(0);
     await page.goto(`/forms/${formId}/fill`);
     for (const { label } of fields) {
       await expect(page.getByText(label, { exact: false }).first()).toBeVisible();
@@ -76,11 +80,11 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     await expect(page.getByRole('button', { name: /send|submit/i })).toBeVisible();
   });
 
-  test('a wound run waiting for review shows who must review, and Approve / Reject', async ({ browser, request }) => {
+  test('a run waiting for review shows who must review, and Approve / Reject', async ({ browser, request }) => {
     const run = await pendingReview(request, s);
-    test.skip(!run, `"${WOUND_JOB_NAME}" has no completed run pending review: send the wound form once, then run this spec.`);
+    test.skip(!run, 'No rebuilt schedule has a completed run pending review (the rebuild left the partner-lab sign-off open).');
     const page = await pageAs(browser, s);
-    await page.goto(`/pipelines/schedules/${WOUND_JOB}/runs/${run}/logs`);
+    await page.goto(`/pipelines/schedules/${REVIEW_JOB}/runs/${run}/logs`);
     const review = page.locator('[data-review]');
     await expect(review).toBeVisible();
     await expect(review.getByRole('heading', { name: 'Result review' })).toBeVisible();
