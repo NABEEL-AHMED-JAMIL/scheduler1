@@ -271,7 +271,8 @@
             @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
               @let run = runs()[widget.analyticsDashboardWidgetId!];
               @let shown = shownView(run);
-              <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
+              <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [attr.data-widget]="widget.analyticsDashboardWidgetId"
+                                    [style.height.px]="heldHeight(widget)" [class.is-held]="heldHeight(widget) !== null" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
                                     [state]="stateOf(run)" [busy]="updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
                   <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"

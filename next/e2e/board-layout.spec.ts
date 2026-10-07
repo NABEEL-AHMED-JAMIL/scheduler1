@@ -8,7 +8,8 @@ import { analyticsFixtures, ORDERS, PREFIX } from './support/analytics-fixtures'
  *
  * Measured the way the browser scores it -- every layout-shift entry, including the ones within
  * half a second of the click that Cumulative Layout Shift forgives, because a board that jumps
- * on a click is what was reported -- at the two widths the owner reviews at, 1187 and 1920.
+ * on a click is what was reported -- at the two widths the owner reviews at, 1187 and 1920. A
+ * narrowed board holds each tile at its height (heldHeights in dashboard.ts) until it is cleared.
  *
  * The board is "E2E board layout": four tiles over the orders file, two drawn as SVG (ranked bars,
  * bars in order) and two by ECharts (horizontal bars, a donut-like rose), made the first time it
@@ -62,16 +63,32 @@ test.beforeAll(async ({ request }) => {
 /** Every layout shift from now on, whatever caused it. */
 async function watchShifts(page: Page): Promise<void> {
   await page.addInitScript(() => {
-    const w = window as unknown as { __shifts: { value: number; at: string[] }[] };
+    const w = window as unknown as { __shifts: { value: number; at: string[]; inChart: boolean }[] };
     w.__shifts = [];
+    const element = (node: Node | undefined) => (node?.nodeType === 3 ? node.parentElement : node as Element | undefined) ?? null;
     new PerformanceObserver(list => {
       for (const entry of list.getEntries() as unknown as { value: number; sources?: { node?: Node }[] }[]) {
-        w.__shifts.push({ value: entry.value, at: (entry.sources ?? []).map(s => (s.node as Element | undefined)?.className?.toString?.().slice(0, 60) ?? s.node?.nodeName ?? '') });
+        const sources = entry.sources ?? [];
+        w.__shifts.push({ value: entry.value,
+          at: sources.map(s => element(s.node)?.className?.toString?.().slice(0, 60) ?? s.node?.nodeName ?? ''),
+          inChart: sources.length > 0 && sources.every(s => !!element(s.node)?.closest('app-widget-chart')) });
       }
     }).observe({ type: 'layout-shift', buffered: true });
   });
 }
-const shifts = (page: Page) => page.evaluate(() => (window as unknown as { __shifts: { value: number; at: string[] }[] }).__shifts.splice(0));
+/**
+ * The shifts since the last call, of the board itself: tiles, their heads and feet, the facts line.
+ * A shift whose every source is inside a chart is the chart drawing a different answer -- the SVG
+ * kinds lay their bars out in HTML, so one bar where there were six is "moved" bars -- and is
+ * returned apart, to be reported rather than failed on (the ECharts kinds draw on a canvas, which
+ * the browser never scores).
+ */
+async function shifts(page: Page): Promise<{ value: number; at: string[] }[]> {
+  const all = await page.evaluate(() => (window as unknown as { __shifts: { value: number; at: string[]; inChart: boolean }[] }).__shifts.splice(0));
+  const inCharts = all.filter(s => s.inChart);
+  if (inCharts.length) test.info().annotations.push({ type: 'chart redraw', description: `${inCharts.length} shifts inside charts, ${inCharts.reduce((n, s) => n + s.value, 0).toFixed(4)}` });
+  return all.filter(s => !s.inChart).map(({ value, at }) => ({ value, at }));
+}
 
 async function openBoard(page: Page): Promise<void> {
   await page.goto(`/data/analytics/dashboards?board=${board}`);

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
 import { Subscription, from, mergeMap } from 'rxjs';
@@ -1292,8 +1292,51 @@ export class Dashboards implements OnInit, OnDestroy {
    * exists to prevent. It reuses runAll() rather than growing a second queue.
    */
   applyBoardFilter(): void {
+    this.holdTileHeights();
     this.runAll();
   }
+
+  // ---- tile heights held while the board is narrowed -----------------------------------------
+
+  /**
+   * Each tile's height, in px, held while a board filter re-runs and stays on. Without it a click
+   * on a mark moved the board: the narrowed results are shorter (six horizontal bars become one,
+   * a ranked list of ten becomes one row) and every tile below a shorter row moved up -- and back
+   * down on Clear. Held, a narrowed tile keeps its size and its chart sits in the same box (a
+   * longer result scrolls inside it). Let go once the filter is off and the board has re-run, when
+   * the tiles are back at the sizes that were held; and per tile when its reader changes its
+   * layout (another kind, its chart settings, Show all).
+   */
+  readonly heldHeights = signal<ReadonlyMap<number, number>>(new Map());
+
+  heldHeight(widget: DashboardWidget): number | null {
+    return this.heldHeights().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
+  }
+
+  /** Reads each tile's height off the page and holds it; a height already held is kept. */
+  private holdTileHeights(): void {
+    if (typeof document === 'undefined') return;
+    const held = new Map(this.heldHeights());
+    document.querySelectorAll<HTMLElement>('app-analytics-widget[data-widget]').forEach(tile => {
+      const id = Number(tile.dataset['widget']);
+      const height = tile.getBoundingClientRect().height;
+      if (Number.isFinite(id) && height > 0 && !held.has(id)) held.set(id, height);
+    });
+    this.heldHeights.set(held);
+  }
+
+  private letGoOf(widget: DashboardWidget): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (id === undefined || !this.heldHeights().has(id)) return;
+    const held = new Map(this.heldHeights());
+    held.delete(id);
+    this.heldHeights.set(held);
+  }
+
+  /** The filter off and the board re-run: the tiles are back at their own sizes, so nothing is held. */
+  protected readonly releaseHeights = effect(() => {
+    if (!this.running() && !this.boardFilterCount() && this.heldHeights().size) this.heldHeights.set(new Map());
+  });
 
   /**
    * What this tile has to say about the board filter, or '' when there is nothing to say.
@@ -1393,11 +1436,13 @@ export class Dashboards implements OnInit, OnDestroy {
     // above the board on a click pushed every tile down mid-click. The facts line says "1 filter
     // on" -- a button that opens the editor -- with a Clear beside it, and each tile's foot says
     // what narrowed it; all three sit in lines that are already there.
+    this.holdTileHeights();
     this.runAll();
   }
 
   /** Takes the board filter off and runs the board again: the undo of a click on a mark. */
   clearBoardFilter(): void {
+    this.holdTileHeights();
     this.boardFilter.set(emptyFilterGroup());
     this.runAll();
   }
@@ -1832,6 +1877,7 @@ export class Dashboards implements OnInit, OnDestroy {
   /** What belongs to one open board and must not follow the reader to the next. */
   private resetBoardState(): void {
     this.runs.set({});
+    this.heldHeights.set(new Map());
     this.expanded.set(new Set());
     this.addOpen.set(false);
     this.filterOpen.set(false);
@@ -2010,6 +2056,7 @@ export class Dashboards implements OnInit, OnDestroy {
   toggleRows(widget: DashboardWidget): void {
     const id = widget.analyticsDashboardWidgetId;
     if (id === undefined) return;
+    this.letGoOf(widget);
     this.expanded.update(open => {
       const next = new Set(open);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -2125,6 +2172,7 @@ export class Dashboards implements OnInit, OnDestroy {
     const id = widget.analyticsDashboardWidgetId;
     if (!id || kind === widget.visualizationType) return;
     this.widgetError.set('');
+    this.letGoOf(widget);
     // Chosen from the tile's menu, whose tick follows the saved kind: a refusal changes nothing
     // on the widget, so the tick stays where it was without being put back by hand.
     this.analytics.saveWidget({ ...widget, visualizationType: kind }).subscribe({
@@ -2341,6 +2389,7 @@ export class Dashboards implements OnInit, OnDestroy {
   private saveChartSettings(widget: DashboardWidget, settings: ChartSettings): void {
     const id = widget.analyticsDashboardWidgetId;
     if (!id) return;
+    this.letGoOf(widget);
     const widgetConfig = widgetConfigString({ ...widgetConfigOf(widget), chart: settings });
     if (widgetConfig === (widget.widgetConfig ?? null)) return;
     this.widgetError.set('');

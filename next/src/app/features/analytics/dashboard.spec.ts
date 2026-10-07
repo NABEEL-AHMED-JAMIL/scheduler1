@@ -2032,6 +2032,38 @@ describe('narrowing the board by clicking a mark', () => {
     expect(harness.board.shownView(harness.board.runs()[id])).toBeNull();
   });
 
+  it('holds every tile at its height while the board is narrowed, and lets go once it is cleared and re-run', () => {
+    // A click on a mark re-ran the board, the narrowed results were shorter, and every tile below a
+    // shorter row moved up (layout shift 0.12 at 1187, 2026-10-06) -- and back down on Clear.
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    rendered.finishAnalysis();
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    const tile = el.querySelector<HTMLElement>('app-analytics-widget[data-widget]')!;
+    const measured = vi.spyOn(tile, 'getBoundingClientRect').mockReturnValue({ height: 312.5 } as DOMRect);
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+
+    rendered.board.narrowTo(widgetOn(), view.marks[0]);
+    rendered.text();
+    expect(tile.style.height).toBe('312.5px');
+    expect(tile.classList).toContain('is-held');
+    rendered.finishAnalysis();
+    rendered.text();
+    TestBed.tick();
+    // Narrowed and settled: still held, so a shorter result does not pull the board up.
+    expect(tile.style.height).toBe('312.5px');
+
+    rendered.board.clearBoardFilter();
+    rendered.text();
+    expect(tile.style.height).toBe('312.5px');
+    rendered.finishAnalysis();
+    TestBed.tick();
+    rendered.text();
+    expect(tile.style.height).toBe('');
+    expect(tile.classList).not.toContain('is-held');
+    measured.mockRestore();
+  });
+
   it('ignores a click while the board is running', () => {
     // runAll() abandons the run in flight. A second click during a ten-widget pass would throw
     // away nine answers to ask a question the reader has not finished asking.
