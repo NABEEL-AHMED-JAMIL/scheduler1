@@ -73,3 +73,27 @@ describe('ranked bar value labels', () => {
     expect(chart.rows()[0].display).toBeUndefined();
   });
 });
+
+/**
+ * A bar that narrows the board looks like it can be clicked: a pointer over it, and none over a
+ * bar that cannot (an inert roll-up, or a chart nobody may click). A <button> keeps the arrow by
+ * default, so the clickable bars read as decoration.
+ */
+describe('ranked bar cursor', () => {
+  function rendered(clickable: boolean): HTMLButtonElement[] {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(RankedBar);
+    fixture.componentRef.setInput('data', [{ name: 'a', value: 3 }, { name: 'b', value: 2, inert: true }]);
+    fixture.componentRef.setInput('clickable', clickable);
+    fixture.detectChanges();
+    return [...(fixture.nativeElement as HTMLElement).querySelectorAll('button')];
+  }
+
+  it('shows a pointer only over a bar a click narrows', () => {
+    const [live, inert] = rendered(true);
+    expect(live.classList).toContain('cursor-pointer');
+    expect(inert.classList).not.toContain('cursor-pointer');
+    expect(rendered(false).some(button => button.classList.contains('cursor-pointer'))).toBe(false);
+  });
+});

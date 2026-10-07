@@ -36,6 +36,7 @@ export interface RankedItem {
         @for (row of rows(); track row.name) {
           <li>
             <button type="button" class="w-full text-left group block"
+                    [class.cursor-pointer]="clickable() && !row.inert"
                     [class.cursor-default]="!clickable() || row.inert"
                     [disabled]="!clickable() || !!row.inert"
                     [title]="row.title + ': ' + (row.display || row.value)"

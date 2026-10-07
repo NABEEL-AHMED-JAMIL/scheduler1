@@ -188,6 +188,7 @@ export function axisTicks(max: number, whole = true): number[] {
                   [title]="axis() ? '' : bar.hint"
                   [class.relative]="axis()"
                   [class.pointer-events-none]="axis() && !clickable()"
+                  [class.cursor-pointer]="clickable() && !bar.inert"
                   (click)="barClicked.emit(bar)">
             @if (showValues()) {
               <span class="text-[11px] tabular leading-none text-[color:var(--text-muted)]">{{ bar.display }}</span>
