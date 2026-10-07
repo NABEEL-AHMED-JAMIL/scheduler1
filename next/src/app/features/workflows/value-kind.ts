@@ -5,7 +5,8 @@ import { shortTime } from './history';
  * How a request's value reads in the Task inbox (owner, 2026-10-06: "I don't like the design for inbox"). Decided by the
  * value's shape and never by its field's name, so a workflow nobody has seen yet reads as well as the ones we know:
  * a list of records is a small table, a short list is chips, a yes/no is Yes or No, a file name is a file chip, a long
- * text wraps, and an id or a technical key is set quietly so it does not read as the request's data.
+ * text wraps, an id or a technical key is set quietly so it does not read as the request's data, and a page of this
+ * console ("/pipelines/schedules/2908/runs/8071/logs", MIG-361: the run a review task is about) opens it.
  */
 export type ValueView =
   | { kind: 'text'; text: string }
@@ -14,7 +15,8 @@ export type ValueView =
   | { kind: 'id'; text: string }
   | { kind: 'chips'; items: string[] }
   | { kind: 'table'; columns: string[]; rows: string[][] }
-  | { kind: 'file'; name: string; image: boolean; href: string | null };
+  | { kind: 'file'; name: string; image: boolean; href: string | null }
+  | { kind: 'page'; path: string; query: Record<string, string> };
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg|bmp|tiff?|heic|avif)$/i;
 const DOCUMENT = /\.(pdf|docx?|xlsx?|pptx?|csv|tsv|txt|rtf|odt|ods|json|xml|zip|eml|msg|md|parquet)$/i;
@@ -33,6 +35,8 @@ export function valueKind(value: unknown): ValueView {
   const text = String(value ?? '').trim();
   const parsed = jsonOf(text);
   if (parsed !== undefined) return valueKind(parsed);
+  const page = pageOf(text);
+  if (page) return page;
   const file = fileOf(text);
   if (file) return file;
   if (/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(text) && instantOf(text)) return { kind: 'text', text: shortTime(text) };
@@ -78,6 +82,18 @@ function cell(value: unknown): string {
   if (Array.isArray(value)) return value.map(cell).join(', ');
   if (typeof value === 'object') return Object.entries(value as Record<string, unknown>).map(([k, v]) => `${labelOf(k)}: ${cell(v)}`).join(', ');
   return String(value);
+}
+
+/**
+ * A page of this console: a path from its root, two segments or more, nothing but path characters (and a query) -- never
+ * a web address, which is the file chip's, and never something with a scheme or "//" that could leave the console.
+ */
+function pageOf(text: string): ValueView | null {
+  if (text.length > 300 || !/^\/[a-z][a-z0-9-]*(\/[A-Za-z0-9._~-]+)+(\?[A-Za-z0-9._~=&%-]*)?$/.test(text)) return null;
+  const [path, search] = text.split('?');
+  const query: Record<string, string> = {};
+  new URLSearchParams(search ?? '').forEach((v, k) => (query[k] = v));
+  return { kind: 'page', path, query };
 }
 
 /** A list or a record sent as text -- '[{"mg":500}]' -- is read as what it is. */

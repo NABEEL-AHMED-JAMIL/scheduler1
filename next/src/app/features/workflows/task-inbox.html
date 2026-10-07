@@ -291,6 +291,9 @@
         <dd>
           @switch (f.view.kind) {
             @case ('id') { <span class="inbox-id">{{ f.view.text }}</span> }
+            @case ('page') {
+              <a class="link-inline inline-flex items-center gap-1" [routerLink]="f.view.path" [queryParams]="f.view.query" data-test="field-page"><app-icon name="external" size="0.9em" />Open</a>
+            }
             @case ('long') { <span class="inbox-long">{{ f.view.text }}</span> }
             @case ('chips') { <span class="inbox-chips">@for (c of f.view.items; track $index) { <span class="pill pill-neutral">{{ c }}</span> }</span> }
             @case ('file') {
