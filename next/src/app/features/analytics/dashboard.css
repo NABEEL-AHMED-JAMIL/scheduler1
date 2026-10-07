@@ -1,0 +1,16 @@
+/*
+ * The board's own rules. Here rather than in styles.css so they load with the board's lazy chunk
+ * and the initial stylesheet every page downloads does not carry them.
+ */
+
+/* A board whose height changes with a result (a narrowed tile has fewer rows) must not gain and lose
+   the page scrollbar: with classic scrollbars that changed the width of every tile and resized every
+   chart on the board. The gutter is kept on the board page only. ::ng-deep because the rule is about
+   the document, not this component: unscoped, it matches only while a board is on screen. */
+::ng-deep html:has(.dash-grid) { scrollbar-gutter: stable; }
+
+/* The line already has room for the "1 filter on" pill and its Clear, so a click on a mark that
+   narrows the board changes these words and moves nothing below them. */
+.dash-facts { min-height: 1.5rem; }
+.dash-filter-clear { width: 1.375rem; height: 1.375rem; min-height: 0; padding: 0; }
+

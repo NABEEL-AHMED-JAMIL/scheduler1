@@ -1177,6 +1177,7 @@ function fileName(path: string | null | undefined): string {
   templateUrl: './dashboard.html',
 })
 export class Dashboards implements OnInit, OnDestroy {
+  styleUrl: './dashboard.css',
 
   private readonly analytics = inject(AnalyticsService);
   /** Server times, read and written as the rest of the console does. */
