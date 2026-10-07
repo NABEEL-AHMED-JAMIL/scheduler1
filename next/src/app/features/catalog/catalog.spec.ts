@@ -57,12 +57,14 @@ function api(detail?: Partial<AssetDetail>) {
   };
 }
 
-function page(flag?: string) {
+function page(flag?: string, admin?: boolean) {
   const fake = api();
   const dialog = { open: vi.fn() };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: CatalogApi, useValue: fake }, { provide: Dialog, useValue: dialog }],
+    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: CatalogApi, useValue: fake }, { provide: Dialog, useValue: dialog },
+      ...(admin === undefined ? [] : [{ provide: AuthService, useValue: { isTenantAdmin: () => admin, isPlatformAdmin: () => false,
+        user: () => ({ appUserId: admin ? 4640 : 4641, tenantId: 2960 }) } }])],
   });
   const fixture = TestBed.createComponent(Catalog);
   if (flag) fixture.componentRef.setInput('flag', flag);
@@ -88,7 +90,7 @@ function panel(detail?: Partial<AssetDetail>) {
 describe('Data Catalog', () => {
   it('lists the assets with their owner, freshness, sensitive fields, sensitivity and quality, and counts them in the strip', () => {
     const { el, fake } = page();
-    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: undefined, withDeleted: false, page: 0, size: 50 });
+    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: undefined, withDeleted: false, withSystem: false, page: 0, size: 50 });
     expect(el.querySelector('h2')?.textContent).toContain('(2 of 244)');
     const rows = Array.from(el.querySelectorAll('tr[data-asset]'));
     expect(rows.map(r => r.getAttribute('data-asset'))).toEqual(['1346', '1010']);
@@ -105,11 +107,28 @@ describe('Data Catalog', () => {
 
   it('narrows by kind on the server and by flag through the address, from the first page', () => {
     const { screen, fake } = page('sensitive');
-    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: 'sensitive', withDeleted: false, page: 0, size: 50 });
+    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: 'sensitive', withDeleted: false, withSystem: false, page: 0, size: 50 });
     screen.goTo(3);
     expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
     screen.setKind('dataset');
-    expect(fake.list).toHaveBeenLastCalledWith({ q: undefined, kind: 'dataset', flag: 'sensitive', withDeleted: false, page: 0, size: 50 });
+    expect(fake.list).toHaveBeenLastCalledWith({ q: undefined, kind: 'dataset', flag: 'sensitive', withDeleted: false, withSystem: false, page: 0, size: 50 });
+  });
+
+  it('leaves the platform\'s own files out unless an administrator shows them (review 2026-10-07, M13)', () => {
+    const member = page(undefined, false);
+    expect(member.el.querySelector('[data-system-files]')).toBeNull();
+
+    const { el, fake, fixture } = page(undefined, true);
+    fake.summary.mockReturnValue(of({ status: 'SUCCESS', message: '', data: { ...SUMMARY, systemAssets: 26 } }));
+    fixture.componentInstance.loadSummary();
+    fixture.detectChanges();
+    const toggle = el.querySelector<HTMLInputElement>('[data-system-files]')!;
+    expect(toggle.closest('label')!.textContent).toContain('Show system files (26)');
+    expect(fake.summary).toHaveBeenLastCalledWith(false);
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ withSystem: true, page: 0 }));
+    expect(fake.summary).toHaveBeenLastCalledWith(true);
   });
 
   it('pages on the server and cancels a search still in flight when a newer one starts', () => {

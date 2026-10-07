@@ -2,6 +2,7 @@ import { Component, DestroyRef, OnInit, computed, effect, inject, input, signal,
 import { Subscription } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
 import { Router } from '@angular/router';
+import { AuthService } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
@@ -33,6 +34,7 @@ type KindFilter = '' | 'dataset' | 'file' | 'document_type';
 })
 export class Catalog implements OnInit {
   private readonly api = inject(CatalogApi);
+  private readonly auth = inject(AuthService);
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
 
@@ -49,6 +51,9 @@ export class Catalog implements OnInit {
   readonly flag = signal('');
   readonly search = signal('');
   readonly withDeleted = signal(false);
+  /** Review 2026-10-07 (M13): the platform's own files (OCR pages and intermediates), for an administrator who asks. */
+  readonly withSystem = signal(false);
+  readonly canSeeSystem = computed(() => this.auth.isTenantAdmin() || this.auth.isPlatformAdmin());
   /** The page shown, from 1 as the pager counts; the server counts from 0. */
   readonly page = signal(1);
   readonly size = signal(PAGE_SIZES[0]);
@@ -112,7 +117,7 @@ export class Catalog implements OnInit {
   }
 
   loadSummary(): void {
-    this.api.summary().subscribe({ next: res => this.summary.set(res.status === API_SUCCESS ? res.data ?? null : null) });
+    this.api.summary(this.withSystem()).subscribe({ next: res => this.summary.set(res.status === API_SUCCESS ? res.data ?? null : null) });
   }
 
   load(): void {
@@ -120,7 +125,7 @@ export class Catalog implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.inFlight = this.api.list({ q: this.search().trim() || undefined, kind: this.kind() || undefined, flag: this.flag() || undefined,
-      withDeleted: this.withDeleted(), page: this.page() - 1, size: this.size() }).subscribe({
+      withDeleted: this.withDeleted(), withSystem: this.withSystem(), page: this.page() - 1, size: this.size() }).subscribe({
       next: res => {
         this.loading.set(false);
         if (res.status !== API_SUCCESS) {
@@ -163,6 +168,12 @@ export class Catalog implements OnInit {
     this.withDeleted.set(on);
     this.page.set(1);
     this.load();
+  }
+
+  showSystem(on: boolean): void {
+    this.withSystem.set(on);
+    this.page.set(1);
+    this.refresh();
   }
 
   goTo(page: number): void {

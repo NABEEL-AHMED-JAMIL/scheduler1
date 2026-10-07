@@ -221,7 +221,8 @@
                 <td class="text-xs whitespace-nowrap">{{ userKind(u.userType) }}</td>
                 <td class="max-w-56"><app-data-text [value]="u.userName || u.userRef" label="Used by" /></td>
                 <td class="max-w-56"><app-data-text [value]="u.requestName || '—'" label="API" /></td>
-                <td class="text-right text-xs whitespace-nowrap">v{{ u.pinnedVersion ?? '—' }}@if (u.behind) { <span class="text-warn-600">· behind</span> }</td>
+                <!-- A step-engine pipeline's step that pins no version runs the API as it is now (review M12). -->
+                <td class="text-right text-xs whitespace-nowrap">@if (u.pinnedVersion == null) { Latest } @else { v{{ u.pinnedVersion }} }@if (u.behind) { <span class="text-warn-600">· behind</span> }</td>
               </tr>
             }
           </tbody>

@@ -39,6 +39,8 @@ export interface CatalogAsset {
   deletedAt: string | null;
   stale: boolean;
   noOwner: boolean;
+  /** A platform-internal file (an OCR page image or intermediate), shown only when an administrator asks (review M13). */
+  system?: boolean;
   /** In the list: the tags across its columns. */
   tags?: string[];
 }
@@ -88,6 +90,8 @@ export interface CatalogSummary {
   datasets: number;
   files: number;
   staleDays: number;
+  /** For an administrator: how many of the platform's own files the catalog leaves out unless asked (review M13). */
+  systemAssets?: number;
 }
 
 export interface LineageNode { ref: string; kind: string; name: string | null; }

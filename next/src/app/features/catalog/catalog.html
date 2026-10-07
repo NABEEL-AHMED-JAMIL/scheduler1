@@ -17,7 +17,7 @@
 
   <app-table-shell heading="Assets" columnsKey="data-catalog" [loading]="loading()" [error]="error()" [isEmpty]="!shown().length"
                    [shown]="shown().length" [total]="total()" emptyIcon="database" (retry)="load()"
-                   [emptyMessage]="search() || flag() || kind() || withDeleted() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
+                   [emptyMessage]="search() || flag() || kind() || withDeleted() || withSystem() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
     <ng-container toolbar>
       <app-segmented [value]="kind()" (valueChange)="setKind($event)" [options]="kinds" ariaLabel="Kind of asset" />
       <label class="sr-only" for="catalogFlag">Show</label>
@@ -30,6 +30,12 @@
       <label class="flex items-center gap-1 text-xs">
         <input type="checkbox" [checked]="withDeleted()" (change)="showDeleted($any($event.target).checked)" /> Deleted too
       </label>
+      @if (canSeeSystem()) {
+        <label class="flex items-center gap-1 text-xs" title="OCR page images and other files the platform keeps for itself">
+          <input type="checkbox" [checked]="withSystem()" (change)="showSystem($any($event.target).checked)" data-system-files />
+          Show system files@if (summary()?.systemAssets) { ({{ summary()?.systemAssets }}) }
+        </label>
+      }
     </ng-container>
     <table class="table-modern">
       <thead>
@@ -43,6 +49,7 @@
               <!-- Below 1280px the type rides on this line and its column goes: seven columns did not fit 1024 (UI review U4). -->
               <div class="text-xs text-[color:var(--text-muted)] truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="where(a)"><span class="xl:hidden">{{ kindText(a.kind) }} · </span>{{ where(a) }}</div>
               @if (a.status === 'Deleted') { <span class="pill pill-crit xl:hidden">Deleted</span> }
+              @if (a.system) { <span class="pill pill-neutral" title="A file the platform keeps for itself, such as an OCR page image">System file</span> }
             </td>
             <td class="whitespace-nowrap hidden xl:table-cell">{{ kindText(a.kind) }}
               @if (a.status === 'Deleted') { <span class="pill pill-crit">Deleted</span> }</td>
