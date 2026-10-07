@@ -2003,10 +2003,33 @@ describe('narrowing the board by clicking a mark', () => {
     // The key is the pair joined by a NUL, which is the one separator a bucket key cannot hold.
     expect(harness.board.boardFilterOn())
       .toBe(ANALYSIS.connectionAlias + '\u0000' + ANALYSIS.datasetPath);
-    // Opened, so the reader ends up looking at a filter they can read, edit and clear -- rather
-    // than at numbers that moved for a reason with no trace on the screen.
-    expect(harness.board.filterOpen()).toBe(true);
+    // The editor stays closed (owner 2026-10-06: opening it on a click pushed the board down); the
+    // facts line says a filter is on, and its pill opens the editor.
+    expect(harness.board.filterOpen()).toBe(false);
     expect(harness.analyzes.length).toBeGreaterThan(before);
+  });
+
+  it('keeps each tile\'s result on screen while a narrowed board re-runs, so nothing jumps', () => {
+    // Owner, 2026-10-06, "the panel dances": a click re-ran every tile, and each one dropped its
+    // chart for a short skeleton and grew back. The tile now draws what it had, marked busy.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.openDashboard(BOARD);
+    harness.finishAnalysis();
+    const id = widgetOn().analyticsDashboardWidgetId!;
+    const settled = harness.board.runs()[id];
+    expect(settled.view).not.toBeNull();
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+
+    harness.board.narrowTo(widgetOn(), view.marks[0]);
+
+    const rerun = harness.board.runs()[id];
+    expect(rerun.state === 'queued' || rerun.state === 'running').toBe(true);
+    expect(harness.board.shownView(rerun)).toBe(settled.view);
+    expect(harness.board.updating(rerun)).toBe(true);
+    expect(harness.board.stateOf(rerun)).toBe('ready');
+    // The new answer replaces it; a stop drops it rather than leave the old figure under a filter.
+    harness.board.stopRun();
+    expect(harness.board.shownView(harness.board.runs()[id])).toBeNull();
   });
 
   it('ignores a click while the board is running', () => {

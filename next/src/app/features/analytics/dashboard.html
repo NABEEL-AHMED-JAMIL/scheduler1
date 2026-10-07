@@ -115,7 +115,15 @@
                 <span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span>
                 <span>{{ lastRunText() }}</span>
               }
-              @if (boardFilterCount()) { <span><span class="pill pill-brand">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</span></span> }
+              @if (boardFilterCount()) {
+                <!-- In the facts line, which is there anyway: a click on a mark that narrows the board
+                     changes this line's words and nothing's position. -->
+                <span class="inline-flex items-center gap-1">
+                  <button type="button" class="pill pill-brand dash-filter-pill" [attr.aria-expanded]="filterOpen()" (click)="filterOpen.set(!filterOpen())"
+                          [title]="'Board filter: ' + boardFilterWords().join(' · ')">{{ boardFilterCount() }} filter{{ boardFilterCount() === 1 ? '' : 's' }} on</button>
+                  <button type="button" class="btn btn-ghost btn-icon btn-xs dash-filter-clear" aria-label="Clear the board filter" title="Clear the board filter" [disabled]="running()" (click)="clearBoardFilter()"><app-icon name="close" size="0.85em" /></button>
+                </span>
+              }
             </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
@@ -259,8 +267,9 @@
           <div class="dash-grid">
             @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
               @let run = runs()[widget.analyticsDashboardWidgetId!];
+              @let shown = shownView(run);
               <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
-                                    [state]="stateOf(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                                    [state]="stateOf(run)" [busy]="updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
                   <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"><app-icon name="dots" size="1em" /></button>
                   <ng-template #tileMenu>
@@ -269,7 +278,7 @@
                          the picker's order; one this result cannot honestly be drawn as stays in the
                          list, inert, with the reason under it. -->
                     <div cdkMenu class="card shadow-xl py-1 w-72 max-h-[70vh] overflow-y-auto text-sm">
-                      @if (run?.view; as view) {
+                      @if (shown; as view) {
                         <button cdkMenuItem class="menu-item dash-choose" (cdkMenuItemTriggered)="openKindPicker(widget, view)"><app-icon name="chart" />Choose a chart, with a preview…</button>
                         <button cdkMenuItem class="menu-item dash-settings" (cdkMenuItemTriggered)="openChartSettings(widget, view)"><app-icon name="settings" />Chart settings…</button>
                         <div class="my-1 border-t border-subtle"></div>
@@ -296,8 +305,7 @@
                   </ng-template>
                 </ng-container>
 
-                @if (run?.view; as view) {
-                  @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) { <p class="field-note text-[color:var(--text-muted)] truncate" [title]="note">{{ note }}</p> } }
+                @if (shown; as view) {
                   @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
                   <div [class.dash-rows-open]="isExpanded(widget)">
                     <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)"
@@ -307,13 +315,19 @@
                 }
 
                 <div foot class="widget-foot">
-                  @if (run?.view; as view) {
+                  @if (shown; as view) {
                     @let kind = drawn(widget, view);
                     @if (hiddenRowTotal(view, kind); as total) {
                       <button type="button" class="btn btn-ghost btn-xs dash-show-all" [attr.aria-expanded]="isExpanded(widget)" (click)="toggleRows(widget)">
                         {{ isExpanded(widget) ? 'Show fewer' : 'Show all ' + total }}
                       </button>
                     }
+                    <!-- The board filter's line on a tile lives here, in the foot's one line, rather than above
+                         the chart: appearing on a click it pushed every chart down a line (owner,
+                         2026-10-06, "the panel dances"). Cut to the line; the whole of it is the title. -->
+                    @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) {
+                      <span class="dash-filter-note text-[11px] text-[color:var(--text-muted)] min-w-0 flex-1 truncate" [title]="note">{{ note }}</span>
+                    } }
                     <span class="text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span>
                   }
                 </div>

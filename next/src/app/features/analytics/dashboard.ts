@@ -1047,6 +1047,14 @@ export interface WidgetRun {
   view: WidgetView | null;
   /** Minted here so the run can be stopped; the server keys its registry on (tenant, user, id). */
   queryId: string;
+  /**
+   * The result on screen before this run, kept while the tile waits and runs (owner, 2026-10-06:
+   * "the panel dances"). A click that narrowed the board re-ran every tile, and each one dropped
+   * its chart for a three-line skeleton and then grew back -- four layouts in two seconds. The
+   * tile now keeps drawing what it had, marked busy, until the new answer replaces it. Dropped
+   * on a stop or a failure, where the old figure would no longer be what the tile says.
+   */
+  previous?: WidgetView | null;
 }
 
 /** What a saved analysis's one JSON column holds. Written by the Canvas, read here. */
@@ -1351,9 +1359,9 @@ export class Dashboards implements OnInit, OnDestroy {
    * keystroke; one deliberate click is one apply, which is the same cost as pressing the button
    * next to it.
    *
-   * It fills the bar rather than filtering behind it, and opens the bar to show it did: the reader
-   * ends up looking at an ordinary board filter they can read, edit, extend or clear, instead of a
-   * hidden narrowing whose only trace is that the numbers moved. Every tile on another dataset
+   * It fills the bar rather than filtering behind it, and says so in the facts line, which opens
+   * the bar: the reader ends up with an ordinary board filter they can read, edit, extend or
+   * clear, instead of a hidden narrowing whose only trace is that the numbers moved. Every tile on another dataset
    * then says on its face that it was NOT narrowed, which is the same promise the bar already
    * makes.
    *
@@ -1380,7 +1388,16 @@ export class Dashboards implements OnInit, OnDestroy {
         value: operand.value ?? '',
       })),
     });
-    this.filterOpen.set(true);
+    // The editor is NOT opened here (owner, 2026-10-06, "the panel dances"): a card appearing
+    // above the board on a click pushed every tile down mid-click. The facts line says "1 filter
+    // on" -- a button that opens the editor -- with a Clear beside it, and each tile's foot says
+    // what narrowed it; all three sit in lines that are already there.
+    this.runAll();
+  }
+
+  /** Takes the board filter off and runs the board again: the undo of a click on a mark. */
+  clearBoardFilter(): void {
+    this.boardFilter.set(emptyFilterGroup());
     this.runAll();
   }
 
@@ -1546,6 +1563,8 @@ export class Dashboards implements OnInit, OnDestroy {
   /** A run's state as the shared tile chrome names it; a result with no rows is 'empty'. */
   stateOf(run: WidgetRun | undefined): TileState {
     if (!run) return 'idle';
+    // Re-running over a result it has: the result stays, busy (see WidgetRun.previous).
+    if (this.updating(run)) return run.previous!.rowCount ? 'ready' : 'empty';
     if (run.state === 'done') return run.view && !run.view.rowCount ? 'empty' : 'ready';
     return run.state;
   }
@@ -2656,7 +2675,22 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   private mark(id: number, run: WidgetRun): void {
-    this.runs.update(runs => ({ ...runs, [id]: run }));
+    this.runs.update(runs => {
+      const old = runs[id];
+      const waiting = run.state === 'queued' || run.state === 'running';
+      const previous = waiting && !run.view ? (old?.view ?? old?.previous ?? null) : null;
+      return { ...runs, [id]: previous ? { ...run, previous } : run };
+    });
+  }
+
+  /** What a tile draws: the run's result, or -- while it re-runs -- the one it had. */
+  shownView(run: WidgetRun | undefined): WidgetView | null {
+    return run?.view ?? run?.previous ?? null;
+  }
+
+  /** Whether a tile is re-running over a result it still shows. */
+  updating(run: WidgetRun | undefined): boolean {
+    return !!run && !run.view && !!run.previous && (run.state === 'queued' || run.state === 'running');
   }
 
   // ---- small renderings -------------------------------------------------------------------

@@ -6,16 +6,16 @@ import { analyticsFixtures, ORDERS, PREFIX } from './support/analytics-fixtures'
  * A click on a mark of every ECharts kind narrows the board, as a click on an SVG bar does
  * (owner, 2026-10-06: "events for echarts not working").
  *
- * One board, "E2E chart events", one tile per kind, every tile an ANALYSIS over the orders file:
+ * A board per kind, "E2E chart events — <kind>", one tile each, an ANALYSIS over the orders file:
  * a saved query's tile cannot be narrowed at all (that endpoint takes SQL and nothing else), which
  * is why the bars-and-a-line and the candlestick, which need two or four measures only a query
- * returns, are not here. The board and its analyses are made the first time they are missing and
+ * returns, are not here. The boards and their analyses are made the first time they are missing and
  * kept, like every other "E2E" fixture.
  *
  * Each tile: find the spots where ECharts shows the pointer cursor (over a mark that narrows, and
  * over a legend item or other text that does not), click them until one narrows, and read the
  * condition the board filter opened with.
- * A narrowing re-runs the board with the filter on, so each kind opens the board afresh.
+ * A narrowing re-runs the board with the filter on; each kind's board is opened afresh.
  *
  * @author Nabeel Ahmed
  */
@@ -56,21 +56,28 @@ async function post(request: APIRequestContext, s: Session, path: string, data: 
 }
 
 /** The board, made once: an analysis per source, a tile per kind. */
-async function ensureBoard(request: APIRequestContext, s: Session, connection: string): Promise<number> {
-  const boards = (await (await request.get(`${api}/analyticsWorkspace.json/fetchAllDashboards`, { headers: authOf(s) })).json()).data ?? [];
-  const found = boards.find((b: { dashboardName: string }) => b.dashboardName === BOARD)?.analyticsDashboardId;
-  if (found) return found;
-  const id = (await post(request, s, 'saveDashboard', { dashboardName: BOARD, dashboardDescription: 'A tile per ECharts kind, to click (made by the e2e suite)' })).analyticsDashboardId;
+/**
+ * A board per kind, one tile each, made once: a click narrows and re-runs one analysis rather
+ * than thirty (the governor is four queries for the whole application).
+ */
+async function ensureBoards(request: APIRequestContext, s: Session, connection: string): Promise<Record<string, number>> {
+  const boards: { dashboardName: string; analyticsDashboardId: number }[] =
+    (await (await request.get(`${api}/analyticsWorkspace.json/fetchAllDashboards`, { headers: authOf(s) })).json()).data ?? [];
   const analyses: Record<string, number> = {};
-  for (const [name, config] of Object.entries(SOURCES)) {
-    analyses[name] = (await post(request, s, 'saveAnalysis', { analysisName: `${PREFIX}events — ${name}`, connectionAlias: connection,
-      datasetPath: ORDERS.path, analysisConfig: JSON.stringify(config) })).analyticsAnalysisId;
+  const analysisOf = async (source: string): Promise<number> => analyses[source] ??= (await post(request, s, 'saveAnalysis', {
+    analysisName: `${PREFIX}events — ${source}`, connectionAlias: connection, datasetPath: ORDERS.path,
+    analysisConfig: JSON.stringify(SOURCES[source]) })).analyticsAnalysisId;
+  const ids: Record<string, number> = {};
+  for (const [kind, source] of KINDS) {
+    const name = `${BOARD} — ${kind}`;
+    const found = boards.find(b => b.dashboardName === name)?.analyticsDashboardId;
+    if (found) { ids[kind] = found; continue; }
+    const id = (await post(request, s, 'saveDashboard', { dashboardName: name, dashboardDescription: 'One ECharts tile, to click (made by the e2e suite)' })).analyticsDashboardId;
+    await post(request, s, 'saveWidget', { analyticsDashboardId: id, analyticsAnalysisId: await analysisOf(source), widgetTitle: `Events — ${kind}`,
+      visualizationType: kind, displayOrder: 0 });
+    ids[kind] = id;
   }
-  for (const [order, [kind, source]] of KINDS.entries()) {
-    await post(request, s, 'saveWidget', { analyticsDashboardId: id, analyticsAnalysisId: analyses[source], widgetTitle: `Events — ${kind}`,
-      visualizationType: kind, displayOrder: order });
-  }
-  return id;
+  return ids;
 }
 
 /**
@@ -94,22 +101,21 @@ async function pointerSpots(page: Page, chart: Locator): Promise<{ x: number; y:
   return spots.sort((a, b) => Math.hypot(a.x - cx, a.y - cy) - Math.hypot(b.x - cx, b.y - cy)).slice(0, 10);
 }
 
-let boardId = 0;
+let boardOf: Record<string, number> = {};
 test.beforeAll(async ({ request }) => {
   test.setTimeout(600_000);
   const session = await defaultSession(request);
   const { connection } = await analyticsFixtures(request, session);
-  boardId = await ensureBoard(request, session, connection);
+  boardOf = await ensureBoards(request, session, connection);
 });
 
-// Six kinds a test: each kind opens the board afresh (no filter carried over), and a test is one
-// token's fifteen minutes.
+// Six kinds a test, each on its own board: a test is one token's fifteen minutes.
 const GROUPS = Array.from({ length: Math.ceil(KINDS.length / 6) }, (_, i) => KINDS.slice(i * 6, i * 6 + 6).map(([kind]) => kind));
 
 for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.join(', ')}`, async ({ page }) => {
   test.setTimeout(900_000);
   for (const kind of group) {
-    await page.goto(`/data/analytics/dashboards?board=${boardId}`);
+    await page.goto(`/data/analytics/dashboards?board=${boardOf[kind]}`);
     await expect(page.locator('.dash-facts', { hasText: 'Last run' })).toBeVisible({ timeout: 400_000 });
     const tile = page.locator('app-analytics-widget', { has: page.getByText(`Events — ${kind}`, { exact: true }) });
     await tile.scrollIntoViewIfNeeded();
@@ -129,6 +135,6 @@ for (const group of GROUPS) test(`a click on a mark narrows the board: ${group.j
       if ((narrowed = await sent)) break;
     }
     expect.soft(narrowed, `${kind}: a click on a mark narrowed the board`).toBe(true);
-    if (narrowed) await expect.soft(page.locator('app-filter-builder').getByLabel('Value for condition 1')).not.toHaveValue('');
+    if (narrowed) await expect.soft(page.locator('.dash-filter-pill'), `${kind}: the facts line says so`).toHaveText(/1 filter on/);
   }
 });

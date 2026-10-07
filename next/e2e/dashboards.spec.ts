@@ -338,8 +338,11 @@ test('clicking a bar narrows the board, and the rolled-up bar is not a button',
 
     await bars.first().click();
 
-    // The bar opened and carries the clicked value as an ordinary, editable condition -- not a
-    // hidden narrowing whose only trace is that the numbers moved.
+    // The facts line says a filter is on (owner 2026-10-06: the bar no longer opens on a click, which
+    // pushed the board down mid-click), and its pill opens the bar: the clicked value is an
+    // ordinary, editable condition -- not a hidden narrowing whose only trace is that the numbers moved.
+    await expect(page.locator('.dash-filter-pill')).toHaveText(/1 filter on/);
+    await page.locator('.dash-filter-pill').click();
     const builder = page.locator('app-filter-builder');
     await expect(builder).toBeVisible();
     await expect(builder.getByLabel('Column for condition 1')).toHaveValue('sub_category');
