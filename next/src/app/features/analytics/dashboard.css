@@ -13,6 +13,16 @@
    narrows the board changes these words and moves nothing below them. */
 .dash-facts { min-height: 1.5rem; }
 .dash-filter-clear { width: 1.375rem; height: 1.375rem; min-height: 0; padding: 0; }
+/* What a run is doing, in a box that keeps its width while the words change ("Running 3 of 12 ·
+   ...", "Last run: ..."), so the filter pill after it does not move as the board re-runs. */
+.dash-run { display: block; width: 24rem; max-width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.dash-run > app-icon { margin-right: 0.25rem; vertical-align: -0.125em; }
+/* Run every widget and Stop take turns in one place: one width, so the theme and the menu beside
+   them stay put. */
+.dash-run-button { min-width: 8.75rem; justify-content: center; }
+/* A tile's "8 rows · ran 21:26:48" is right-aligned, so a change in its length moved its start: a
+   box of fixed width, the text at its right edge. */
+.dash-count { min-width: min(12rem, 100%); text-align: right; }
 
 /* ---- a tile's menu, with its "Show as" grid --------------------------------------------------
    About 400px wide (the console's .cdk-menu caps menus at 22rem, so this says its own width), a

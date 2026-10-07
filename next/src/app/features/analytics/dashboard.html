@@ -110,10 +110,12 @@
               <span>{{ widgets().length }} widget{{ widgets().length === 1 ? '' : 's' }}</span>
               @if (boardFiles().length) { <span>{{ boardFiles().length }} file{{ boardFiles().length === 1 ? '' : 's' }}</span> }
               @if (open.createdByName) { <span>{{ open.createdByName }}</span> }
-              @if (running()) { <span class="inline-flex items-center gap-1"><app-icon name="refresh" size="0.9em" class="spin" />{{ progress() }}</span> }
+              <!-- One box of its own width for the run's words, whatever they say: "Running 3 of 12 · ..."
+                   and "Last run: ..." differ in length, and everything after a box that changes width
+                   moves -- the filter pill jumped on every tile the board re-ran (layout shift, 2026-10-06). -->
+              @if (running()) { <span class="dash-run" [title]="progress()"><app-icon name="refresh" size="0.9em" class="spin" />{{ progress() }}</span> }
               @else if (lastRun()) {
-                <span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span>
-                <span>{{ lastRunText() }}</span>
+                <span class="dash-run" [title]="'Last run: ' + lastRun() + ' · ' + lastRunText()"><span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span> · {{ lastRunText() }}</span>
               }
               @if (boardFilterCount()) {
                 <!-- In the facts line, which is there anyway: a click on a mark that narrows the board
@@ -128,9 +130,10 @@
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
             @if (running()) {
-              <button type="button" class="btn btn-default btn-sm" (click)="stopRun()"><app-icon name="stop" />Stop</button>
+              <button type="button" class="btn btn-default btn-sm dash-run-button" (click)="stopRun()"><app-icon name="stop" />Stop</button>
             } @else if (widgets().length) {
-              <button type="button" class="btn btn-primary btn-sm" (click)="runAll()"><app-icon name="refresh" />Run every widget</button>
+              <!-- Run and Stop are one width, so swapping them moves nothing beside them. -->
+              <button type="button" class="btn btn-primary btn-sm dash-run-button" (click)="runAll()"><app-icon name="refresh" />Run every widget</button>
             }
             <!-- The theme every tile draws in. Stored on the board; choosing one runs nothing. -->
             <button type="button" class="btn btn-ghost btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
@@ -378,7 +381,7 @@
                     @if (boardFilterCount()) { @if (boardFilterNote(widget); as note) {
                       <span class="dash-filter-note text-[11px] text-[color:var(--text-muted)] min-w-0 flex-1 truncate" [title]="note">{{ note }}</span>
                     } }
-                    <span class="text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span>
+                    <span class="dash-count text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">{{ counted(view, kind, rowLimit(widget)) }} · ran {{ clock(view.ranAt) }}</span>
                   }
                 </div>
               </app-analytics-widget>

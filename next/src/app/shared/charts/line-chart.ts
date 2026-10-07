@@ -84,7 +84,9 @@ export function pointLabel(text: string): string {
         }
       </svg>
       @if (hovered(); as point) {
-        <div class="line-readout" [style.left.%]="(point.x / width) * 100" [class.flip]="point.x > width * 0.6" role="status">
+        <!-- Moved with a transform, not with left: a box that moves by layout is a layout shift, and a
+             board scored one on every point the pointer crossed (2026-10-06). -->
+        <div class="line-readout" [style.transform]="readoutAt(point.x)" role="status">
           <span class="block text-[color:var(--text-secondary)]">{{ point.when }}</span>
           <span class="block font-medium tabular">{{ point.shown }}</span>
         </div>
@@ -98,11 +100,10 @@ export function pointLabel(text: string): string {
     }
   `,
   styles: [`
-    .line-readout { position: absolute; top: 0; transform: translateX(8px); pointer-events: none; z-index: 1;
+    .line-readout { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 1;
       max-width: min(18rem, 60%); padding: 0.25rem 0.5rem; font-size: 12px; line-height: 1.35;
       background: var(--surface-raised); color: var(--text-primary); border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md); box-shadow: 0 4px 12px var(--shadow-color); overflow-wrap: anywhere; }
-    .line-readout.flip { transform: translateX(calc(-100% - 8px)); }
   `],
 })
 export class LineChart {
@@ -163,8 +164,18 @@ export class LineChart {
     return mark ? { ...mark, when: capTitle(pointLabel(mark.label)) } : null;
   });
 
+  /** The chart's drawn width in px, read at the last pointer move: where a point is, in px. */
+  private readonly drawnWidth = signal(0);
+
+  /** The readout beside the point, or before it past 60% of the width so it stays on the card. */
+  protected readoutAt(x: number): string {
+    const px = (x / WIDTH) * this.drawnWidth();
+    return x > WIDTH * 0.6 ? `translateX(calc(${px}px - 100% - 8px))` : `translateX(${px + 8}px)`;
+  }
+
   hover(event: MouseEvent): void {
     const box = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    this.drawnWidth.set(box.width);
     const n = this.marks().length;
     if (!box.width || !n) return;
     const x = ((event.clientX - box.left) / box.width) * WIDTH;
