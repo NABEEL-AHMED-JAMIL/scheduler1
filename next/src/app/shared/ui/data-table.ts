@@ -170,7 +170,9 @@ export class TableShell implements AfterViewInit {
     // M16: re-decided whenever the toolbar's width or its controls change (a filter that comes and goes).
     const toolbar = this.host.querySelector<HTMLElement>('.table-toolbar');
     if (toolbar && typeof ResizeObserver !== 'undefined') {
-      this.resized = new ResizeObserver(() => this.stackToolbar(toolbar));
+      // In the next frame, not inside the observer's own delivery: stacking changes the toolbar's height, which the
+      // observer would otherwise report again in the same frame ("ResizeObserver loop completed ...").
+      this.resized = new ResizeObserver(() => requestAnimationFrame(() => this.stackToolbar(toolbar)));
       this.resized.observe(toolbar);
     }
     // Rows re-render (paging, filters, a reload), so the choice is re-applied whenever the table's children
@@ -190,7 +192,7 @@ export class TableShell implements AfterViewInit {
     toolbar.classList.remove('is-stacked');
     const tops = Array.from(group.children).map(c => (c as HTMLElement).getBoundingClientRect())
       .filter(r => r.width > 0).map(r => Math.round(r.top));
-    toolbar.classList.toggle('is-stacked', tops.some(top => top > tops[0] + 4));
+    if (tops.some(top => top > tops[0] + 4)) toolbar.classList.add('is-stacked');
   }
 
   protected isHidden(column: string): boolean {
