@@ -37,6 +37,10 @@
 .dash-tile-menu { padding: 0.25rem 0; }
 .dash-tile-menu.has-kinds { width: 25rem; max-width: calc(100vw - 2rem); }
 .dash-menu-panel { display: flex; flex-direction: column; max-height: min(72vh, 42rem); min-height: 0; outline: none; }
+/* With the kinds, one height from the moment it opens: unfolding "Show charts that don't fit" or
+   typing a search changes what scrolls, never the menu's size -- a menu that grew past the room
+   below its trigger was pushed up over the board's heading. */
+.dash-tile-menu.has-kinds .dash-menu-panel { height: min(72vh, 42rem); }
 .dash-menu-head { flex: none; }
 .dash-menu-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 0.5rem 0.5rem;
   border-top: 1px solid var(--border-subtle); margin-top: 0.375rem; }

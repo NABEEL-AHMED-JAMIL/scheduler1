@@ -898,7 +898,9 @@ function paintTree(nodes: TreeNode[], palette: string[], s: ChartSettings, token
     const ink = labelInk(fill, true, s, tokens);
     node.itemStyle = { ...(node.itemStyle ?? {}), color: fill };
     node.label = { color: ink };
-    node.upperLabel = { color: ink };
+    // A branch's name sits in its header strip, which is drawn in the gap colour -- the card --
+    // not in the branch's fill: ink for the fill was dark-on-dark in a dark theme (midnight).
+    node.upperLabel = { color: node.children?.length ? labelInk(null, false, s, tokens) : ink };
     if (node.children) paintTree(node.children, palette, s, tokens, fill);
   });
 }
