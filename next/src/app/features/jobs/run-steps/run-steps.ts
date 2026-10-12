@@ -1,5 +1,6 @@
 import { toneClass } from '../../../shared/ui/tone';
 import { RunReview } from './run-review';
+import { RunMap } from './run-map';
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
@@ -22,7 +23,7 @@ import {
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { AttemptDetail, RetryFrom, attemptSentence, stepLabel } from '../retry/run-retry';
 
-type StepView = 'timeline' | 'console';
+type StepView = 'timeline' | 'console' | 'map';
 
 /** Run statuses after which nothing about the run's steps changes again. */
 const TERMINAL = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
@@ -40,7 +41,7 @@ const TERMINAL = ['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'];
  */
 @Component({
   selector: 'app-run-steps',
-  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RunReview],
+  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RunReview, RunMap],
   templateUrl: './run-steps.html',
   // Its cards (the review, the steps) stand apart as the page's own cards do; a legacy run draws nothing and takes no room.
   host: { class: 'flex flex-col gap-5 empty:hidden' },
@@ -76,6 +77,8 @@ export class RunSteps {
   readonly views: SegmentOption<StepView>[] = [
     { id: 'timeline', label: 'Timeline', icon: 'clock' },
     { id: 'console', label: 'Console', icon: 'terminal' },
+    // AI workflow review: the run's steps as a plan map -- time and rows per step, the failed or slowest one marked.
+    { id: 'map', label: 'Map', icon: 'layers' },
   ];
 
   /** The step the Console shows; the failed one, else the running one, else the first, until someone picks. */

@@ -41,6 +41,9 @@
     }
 
     @switch (view()) {
+      @case ('map') {
+        <app-run-map [timeline]="t" />
+      }
       @case ('timeline') {
         <ol class="log-timeline">
           @for (s of t.steps; track s.index) {
