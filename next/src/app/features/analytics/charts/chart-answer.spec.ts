@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { KIND_IDS } from '../widget-kinds';
 import { widgetConfigOf } from '../widget-view';
 import {
-  ANSWER_KINDS, ChartAnswer, answerSettings, answerView, fitKind, pinRequest, suggestCharts, suggestionAnswer, tableAnswer,
+  ANSWER_KINDS, ChartAnswer, answerSettings, answerView, chartRows, fitKind, pinRequest, suggestCharts, suggestionAnswer, tableAnswer,
 } from './chart-answer';
 
 /**
@@ -86,6 +86,32 @@ describe('chart answer -- the fit rules have the last word', () => {
       rowCount: 4,
     }, { kind: 'lineSmooth', additive: true });
     expect(fitKind(answerView(monthly), 'lineSmooth')).toMatchObject({ kind: 'lineSmooth', fellBack: false });
+  });
+});
+
+describe('chart answer -- rows with two columns of names (revenue by category per month)', () => {
+  // As qwen3:8b answered it live: category first, month second, newest month first.
+  const monthly = answer({
+    sql: 'SELECT "category", date_trunc(\'month\', CAST("order_date" AS DATE)) AS month, SUM("amount") AS total_revenue FROM dataset GROUP BY 1, 2 ORDER BY 2 DESC',
+    columns: ['category', 'month', 'total_revenue'],
+    rows: [['Sports', '2025-12-01', '273031.99'], ['Books', '2025-12-01', '35604.25'], ['Sports', '2025-11-01', '279117.07'], ['Books', '2025-11-01', '37047.28']],
+    rowCount: 4,
+  }, { kind: 'line', additive: true });
+
+  it('puts the date first and in its own order, the figures untouched', () => {
+    const { columns, rows } = chartRows(monthly.columns, monthly.rows);
+    expect(columns).toEqual(['month', 'category', 'total_revenue']);
+    expect(rows).toEqual([['2025-11-01', 'Sports', '279117.07'], ['2025-11-01', 'Books', '37047.28'],
+      ['2025-12-01', 'Sports', '273031.99'], ['2025-12-01', 'Books', '35604.25']]);
+    expect(chartRows(['region', 'n'], [['North', '3']])).toEqual({ columns: ['region', 'n'], rows: [['North', '3']] });
+  });
+
+  it('never draws a one-series kind over two columns of names: a line becomes a line per group', () => {
+    const view = answerView(monthly);
+    expect(view.issues.line).toContain('two columns of names ("month" and "category")');
+    const fitted = fitKind(view, 'line');
+    expect(fitted).toMatchObject({ kind: 'lineSmooth', fellBack: true });
+    expect(fitted.reason).toContain('Shown as smooth line instead');
   });
 });
 

@@ -56,10 +56,55 @@ export interface Fitted {
 /** The kinds the server's chart answer may name: the picker's, in its order (ai-service AskChart.KINDS pins the same list). */
 export const ANSWER_KINDS: readonly string[] = KINDS.map(kind => kind.id);
 
-/** The rows as a view: the same reading a saved query's tile makes, with the answer's additivity where it knows. */
+/** The kinds the console's own SVG components draw as ONE series of one column of names. */
+const ONE_SERIES: ReadonlySet<string> = new Set(['kpi', 'line', 'area', 'cumulative', 'bar', 'ranked', 'rankedShare', 'donut',
+  'comparison', 'dimensionSummary', 'trendSummary', 'histogram']);
+
+/** For a one-series kind asked of rows with two columns of names: the kinds that draw the same thing per group. */
+const PER_GROUP: Record<string, WidgetVisualization[]> = {
+  line: ['lineSmooth'], cumulative: ['lineSmooth'], trendSummary: ['lineSmooth'], area: ['areaStacked', 'lineSmooth'],
+  bar: ['barH', 'heatmap'], ranked: ['barH', 'heatmap'], rankedShare: ['barH', 'heatmap'], donut: ['nestedPie', 'sunburst', 'treemap'],
+};
+
+const DATE_TEXT = /^\d{4}-\d{2}(-\d{2})?([ T]\d{2}:\d{2}.*)?$/;
+const NUMBER_TEXT = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
+
+/**
+ * The rows as a chart reads them, the figures untouched: where the names come in two columns and the date is not the
+ * first, the date column is put first (a line runs along it, one per group); and rows ordered newest-first are put in
+ * the date's own order, so a line does not run backwards. The query and its table keep the order they came in.
+ */
+export function chartRows(columns: string[], rows: (string | null)[][]): { columns: string[]; rows: (string | null)[][] } {
+  const filled = (i: number) => rows.map(r => r[i]).filter((v): v is string => v !== null && v !== undefined && v !== '');
+  const isDate = (i: number) => { const v = filled(i); return v.length > 0 && v.every(x => DATE_TEXT.test(x)); };
+  const isNumber = (i: number) => { const v = filled(i); return v.length > 0 && v.every(x => NUMBER_TEXT.test(x.trim())); };
+  const names = columns.map((_, i) => i).filter(i => !isNumber(i) || isDate(i));
+  const date = names.find(isDate);
+  if (date === undefined) return { columns, rows };
+  const order = [date, ...columns.map((_, i) => i).filter(i => i !== date)];
+  const moved = rows.map(r => order.map(i => r[i] ?? null));
+  const sorted = moved.map((r, i) => ({ r, i })).sort((a, b) =>
+    String(a.r[0] ?? '').localeCompare(String(b.r[0] ?? '')) || a.i - b.i).map(x => x.r);
+  return { columns: order.map(i => columns[i]), rows: sorted };
+}
+
+/**
+ * The rows as a view: the same reading a saved query's tile makes, with the answer's additivity where it knows -- and,
+ * where the rows have two columns of names, the console's one-series kinds marked as not drawing them (they would add
+ * every group into one line or one bar per name, which is a different question).
+ */
 export function answerView(answer: ChartAnswer): WidgetView {
-  return queryView({ columns: answer.columns, rows: answer.rows, rowCount: answer.rowCount, truncated: answer.truncated },
-    answer.chart?.additive ?? null);
+  const { columns, rows } = chartRows(answer.columns, answer.rows);
+  const view = queryView({ columns, rows, rowCount: answer.rowCount, truncated: answer.truncated }, answer.chart?.additive ?? null);
+  const dims = view.chart?.dims ?? [];
+  if (dims.length < 2) return view;
+  const issues = { ...view.issues };
+  const named = dims.slice(0, 2).map(d => `"${d.name}"`).join(' and ');
+  for (const kind of ONE_SERIES) {
+    const id = kind as WidgetVisualization;
+    if (!issues[id]) issues[id] = `This draws one series, and these rows have two columns of names (${named}).`;
+  }
+  return { ...view, issues };
 }
 
 const article = (label: string) => (/^[aeiou]/i.test(label) ? 'An' : 'A');
@@ -72,7 +117,8 @@ export function fitKind(view: WidgetView, asked: string | null | undefined): Fit
   const wanted = asked && kindInfo(asked) ? asked as WidgetVisualization : null;
   const why = wanted ? (view.issues[wanted] ?? '') : 'unknown';
   if (wanted && !why) return { kind: wanted, asked: wanted, fellBack: false, reason: '' };
-  const best = suggestedKinds(view, '', 1)[0] ?? 'table';
+  const twins = (wanted && PER_GROUP[wanted]) || [];
+  const best = twins.find(k => !view.issues[k]) ?? suggestedKinds(view, '', 1)[0] ?? 'table';
   const bestLabel = kindInfo(best)?.label ?? 'Table';
   const askedLabel = wanted ? kindInfo(wanted)!.label : asked ? `"${asked}"` : '';
   const reason = !asked ? `Shown as ${bestLabel.toLowerCase()}, which suits these rows.`
