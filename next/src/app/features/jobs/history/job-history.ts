@@ -31,6 +31,11 @@ import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
 import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence, waitingSentence } from '../inbox/inbox-trigger';
+import {
+  DocumentApproval, DocumentTrigger, approvalWord, approvalsOf, runsStartedByDocument, startedChip,
+  triggerOf as documentTriggerOf, triggerSentence as documentTriggerSentence, waitingSentence as documentWaitingSentence,
+} from '../documents/document-trigger';
+import { DocumentsApi } from '../../documents/documents.service';
 
 /**
  * How many runs one read brings: the newest window first, and older ones a window at a time on request.
@@ -38,6 +43,8 @@ import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, t
  * again on each status push.
  */
 const HISTORY_WINDOW = 500;
+/** MIG-364: the approved documents read with the runs -- enough to name the documents behind the runs on screen. */
+const APPROVALS_WINDOW = '200';
 /** Runs Executions shows when it is opened without a job: the newest of the last day. */
 export const RECENT_WINDOW = 200;
 
@@ -259,7 +266,61 @@ export class JobHistory {
   readonly triggerSentence = triggerSentence;
   readonly waitingSentence = waitingSentence;
 
+  /**
+   * MIG-364: the job's document trigger -- the second Event start, a document of one type being approved -- and what the
+   * approved documents did to it. A run a document started links to the document's review screen.
+   */
+  readonly documentTrigger = signal<DocumentTrigger | null>(null);
+  readonly approvals = signal<DocumentApproval[]>([]);
+  /** The workspace's document types by id, for the trigger's sentence; read only for a job that has the trigger. */
+  readonly documentTypeNames = signal<ReadonlyMap<number, string> | null>(null);
+  private readonly documentsApi = inject(DocumentsApi);
+  /** The documents each run started, by run id, oldest first: its Started cell links to the first. */
+  readonly startedByDocument = computed(() => runsStartedByDocument(this.approvals()));
+  readonly recentApprovals = computed(() => this.approvals().slice(0, 5));
+  readonly showDocuments = computed(() => !!this.documentTrigger()?.configured || this.approvals().length > 0);
+  readonly documentTriggerSentence = documentTriggerSentence;
+  readonly documentWaitingSentence = documentWaitingSentence;
+  readonly startedChip = startedChip;
+  readonly approvalWord = approvalWord;
+
+  private loadDocumentTrigger(): void {
+    if (!this.jobId()) { this.documentTrigger.set(null); return; }
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentTrigger`, { params: { jobId: this.jobId() } }).subscribe({
+      next: response => {
+        const trigger = response.status === API_SUCCESS ? documentTriggerOf(response.data) : null;
+        this.documentTrigger.set(trigger);
+        if (trigger?.configured && this.documentTypeNames() === null) this.loadDocumentTypeNames();
+      },
+      error: () => this.documentTrigger.set(null),
+    });
+  }
+
+  /** Once, and only to name the type: without the list the sentence names it by its id. */
+  private loadDocumentTypeNames(): void {
+    this.documentTypeNames.set(new Map());
+    this.documentsApi.types().subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !Array.isArray(response.data)) return;
+        this.documentTypeNames.set(new Map(response.data.map(t => [Number(t.documentTypeId), t.name])));
+      },
+      error: () => {},
+    });
+  }
+
+  /** Re-read with the runs: an approved document that starts a run is how a new row arrives on this screen. */
+  private loadApprovals(): void {
+    if (!this.jobId()) { this.approvals.set([]); return; }
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentApprovals`,
+      { params: { jobId: this.jobId(), limit: APPROVALS_WINDOW } }).subscribe({
+      next: response => { if (response.status === API_SUCCESS) this.approvals.set(approvalsOf(response.data)); },
+      // The runs are the point of the screen; losing the documents must not break it.
+      error: () => {},
+    });
+  }
+
   private loadTrigger(): void {
+    this.loadDocumentTrigger();
     if (!this.jobId()) { this.trigger.set(null); return; }
     this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxTrigger`, { params: { jobId: this.jobId() } }).subscribe({
       next: response => this.trigger.set(response.status === API_SUCCESS ? triggerOf(response.data) : null),
@@ -445,6 +506,7 @@ export class JobHistory {
     if (this.jobId()) drillParams['jobId'] = this.jobId();
 
     this.loadArrivals();
+    this.loadApprovals();
 
     const request = this.isDrillDown()
       ? this.http.get<ApiResponse<any>>(

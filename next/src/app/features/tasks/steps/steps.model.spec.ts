@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   Definition, StepTaskEntry, addStep, canonical, coerce, inputColumns, isMapSchema, mapValueKind, outputColumns, refusalOf, definitionJson, fieldsOf, isLegacyDefinition, moveStep, nextKey, problemsByStep,
   removeStep, replaceStep, runFinished, sampleRowsOf, schemaSupported, seedConfig, taskEntry, taskOptions, toYaml, updateSettings,
-  withSample, parseSampleRows, usesWebhook,
+  withSample, parseSampleRows, usesWebhook, usesDocumentType,
 } from './steps.model';
 
 /**
@@ -373,6 +373,16 @@ describe('steps model -- Test with sample', () => {
     expect(parseSampleRows('[{"a": {"b": 1}}]').error).toBe('Row 1, a: a value is text, a number, true/false or null.');
     expect(parseSampleRows('[{').error).toMatch(/^Not JSON/);
     expect(parseSampleRows('[]').error).toBe('At least one row.');
+  });
+});
+
+describe('fieldsOf -- MIG-364', () => {
+  it('reads an integer with the document-type hint as a document type choice, and knows a task that names one', () => {
+    const schema = { type: 'object', properties: { documentTypeId: { type: 'integer', format: 'document-type', title: 'Document type' } } };
+    expect(fieldsOf(schema)[0].kind).toBe('document-type');
+    expect(usesDocumentType(schema)).toBe(true);
+    expect(usesDocumentType({ type: 'object', properties: { source: schema } })).toBe(true);
+    expect(usesDocumentType({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
   });
 });
 

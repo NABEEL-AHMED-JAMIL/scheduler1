@@ -4,7 +4,8 @@ import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
-import { DefinitionView, LinkedJob, BucketChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice } from './steps.model';
+import { DocumentsApi } from '../../documents/documents.service';
+import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -17,6 +18,7 @@ export type DefinitionFormat = 'json' | 'yaml';
 @Injectable({ providedIn: 'root' })
 export class StepsApi {
   private readonly http = inject(HttpClient);
+  private readonly documents = inject(DocumentsApi);
 
   definition(pipelineKey: number): Observable<ApiResponse<DefinitionView>> {
     return this.http.get<ApiResponse<DefinitionView>>(`${API_BASE}/pipeline.json/steps/definition`, { params: { pipelineKey } });
@@ -88,6 +90,15 @@ export class StepsApi {
         const why = !w.active ? ' (paused)' : !takes ? ` (does not take ${STEP_WEBHOOK_EVENT})` : '';
         return { id: Number(w.id), label: `#${w.id} ${w.url}${why}`, ready };
       })));
+  }
+
+  /** MIG-364: the workspace's document types (Document Intelligence's own list), by name, for a step that names one. */
+  documentTypes(): Observable<DocumentTypeChoice[]> {
+    return this.documents.types().pipe(
+      map(r => (Array.isArray(r.data) ? r.data : []).filter(t => t.documentTypeId != null).map(t => ({
+        id: Number(t.documentTypeId),
+        label: t.status && t.status !== 'Active' ? `${t.name} (inactive)` : t.name,
+      }))));
   }
 
   prompts(): Observable<PromptChoice[]> {

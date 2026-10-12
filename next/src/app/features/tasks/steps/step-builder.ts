@@ -18,7 +18,7 @@ import {
   Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
-  withSample, withSwitchedLine, BucketChoice, PromptChoice, usesWebhook, WebhookChoice,
+  withSample, withSwitchedLine, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, DocumentTypeChoice, usesDocumentType,
 } from './steps.model';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
@@ -261,6 +261,9 @@ export class StepBuilder {
   /** MIG-346: the workspace's webhooks, read the first time a step that names one is opened. */
   private readonly webhookChoices = signal<WebhookChoice[] | null>(null);
 
+  /** MIG-364: the workspace's document types, read the first time a step that names one is opened. */
+  private readonly documentTypeChoices = signal<DocumentTypeChoice[] | null>(null);
+
   open(index: number): void {
     const step = this.draft().steps[index];
     if (!step) return;
@@ -290,6 +293,14 @@ export class StepBuilder {
       });
       return;
     }
+    if (this.documentTypeChoices() === null && usesDocumentType(schema)) {
+      // Likewise: without the list a saved type still shows by its id.
+      this.api.documentTypes().subscribe({
+        next: types => { this.documentTypeChoices.set(types); this.open(index); },
+        error: () => { this.documentTypeChoices.set([]); this.open(index); },
+      });
+      return;
+    }
     this.openPanel(index);
   }
 
@@ -304,6 +315,7 @@ export class StepBuilder {
       prompts: this.promptChoices() ?? [],
       buckets: this.bucketChoices() ?? [],
       webhooks: this.webhookChoices() ?? [],
+      documentTypes: this.documentTypeChoices() ?? [],
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.

@@ -186,6 +186,44 @@
               </div>
             }
 
+            @if (showDocuments()) {
+              <!-- MIG-364: the second Event start -- a document of one type being approved. -->
+              <div class="document-trigger">
+                <div class="detail-head mt-3">Document trigger</div>
+                <p class="text-sm">{{ documentTriggerSentence(documentTrigger(), documentTypeNames()) }}</p>
+                @if (documentWaitingSentence(documentTrigger()); as waiting) {
+                  <p class="text-xs text-[color:var(--text-muted)] mt-0.5" data-test="documents-waiting">{{ waiting }}</p>
+                }
+                @if (recentApprovals().length) {
+                  <ul class="mt-1.5 space-y-1 text-xs" aria-label="Recently approved documents">
+                    @for (a of recentApprovals(); track a.extractionId + '-' + (a.typeVersion ?? '') + '-' + (a.dateCreated ?? '')) {
+                      <li class="flex items-baseline gap-1.5 min-w-0">
+                        <app-icon name="file" size="0.85em" class="icon-muted shrink-0" />
+                        <a class="link-inline mono truncate min-w-0" [routerLink]="['/documents/review', a.extractionId]"
+                           [title]="'Document #' + a.extractionId + ', ' + approvalWord(a.approval)">Document #{{ a.extractionId }}</a>
+                        @if (a.outcome === 'Started' && a.jobQueueId) {
+                          <a class="link-inline shrink-0 whitespace-nowrap"
+                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId, 'logs']">run #{{ a.jobQueueId }}</a>
+                        } @else if (a.outcome === 'Waiting') {
+                          <!-- Not dropped: its turn comes when the run in flight ends. -->
+                          <span class="text-[color:var(--text-muted)] shrink-0 whitespace-nowrap" [title]="a.reason || ''"
+                                data-test="approval-waiting">Waiting{{ a.place ? ' · #' + a.place + ' in line' : '' }}</span>
+                        } @else {
+                          <span class="text-warn-500 shrink-0" [title]="a.reason || ''">{{ a.outcome }}</span>
+                        }
+                        <span class="text-[color:var(--text-muted)] whitespace-nowrap ml-auto shrink-0">
+                          {{ a.dateCreated ? (a.dateCreated | serverTime:'recent') : '' }}
+                        </span>
+                      </li>
+                      @if (a.outcome === 'Skipped' && a.reason) {
+                        <li class="pl-5 text-[11px] text-[color:var(--text-muted)] log-message">{{ a.reason }}</li>
+                      }
+                    }
+                  </ul>
+                }
+              </div>
+            }
+
             <div class="detail-head mt-3">Email notifications</div>
             <p class="text-sm">{{ notifySentence(job) }}</p>
             <div class="flex flex-wrap gap-1.5 mt-1.5">
@@ -390,6 +428,14 @@
                   <app-icon name="inbox" size="0.9em" class="shrink-0" />
                   <span class="truncate max-w-48">{{ arrival.fileName }}</span>
                 </div>
+              }
+              <!-- MIG-364: a run an approved document started links to the document's review screen (a batch: its first). -->
+              @if (startedByDocument().get(run.jobQueueId); as documents) {
+                <a class="flex items-center gap-1 mt-0.5 text-[11px] link-inline w-fit" data-test="started-by-document"
+                   [routerLink]="['/documents/review', documents[0].extractionId]" [title]="startedChip(documents).title">
+                  <app-icon name="file" size="0.9em" class="shrink-0" />
+                  <span class="truncate max-w-48">{{ startedChip(documents).text }}</span>
+                </a>
               }
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">

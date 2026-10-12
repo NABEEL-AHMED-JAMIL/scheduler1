@@ -22,6 +22,11 @@ import { clockTime } from '../schedule-labels';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Observable, Subject, catchError, debounceTime, forkJoin, map, of, switchMap } from 'rxjs';
 import { InboxTrigger, batchProblem, patternProblem, triggerOf } from '../inbox/inbox-trigger';
+import {
+  DocumentTrigger, batchProblem as documentBatchProblem, triggerOf as documentTriggerOf,
+} from '../documents/document-trigger';
+import { DocumentsApi } from '../../documents/documents.service';
+import { DocumentType } from '../../documents/documents.model';
 import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
 import { AiModelPicks } from '../ai-models/ai-model-picks';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
@@ -249,6 +254,61 @@ export class JobEdit implements OnInit {
   private readonly savedTrigger = signal<InboxTrigger | null>(null);
 
   /**
+   * MIG-364: the second Event start -- run when a document of one type is approved, by a reviewer or automatically.
+   * Kept apart from the job as the inbox trigger is (sourceJob.json/documentTrigger), saved after the job and only when
+   * it changed; off keeps the type, saved as a trigger that is off.
+   */
+  readonly onApproval = signal(false);
+  readonly documentTypeId = signal<number | null>(null);
+  /** How many approved documents that waited for a run in flight the next run takes (1: each document its own run). */
+  readonly documentBatch = signal<number | string>(1);
+  readonly documentTypeError = computed(() => (this.onApproval() && this.documentTypeId() === null
+    ? 'Choose the document type whose approved documents start this job.' : ''));
+  readonly documentBatchError = computed(() => (this.onApproval() ? documentBatchProblem(this.documentBatch()) : ''));
+  private readonly savedDocumentTrigger = signal<DocumentTrigger | null>(null);
+  /** The workspace's document types (Document Intelligence), read the first time the document start is shown; null until then. */
+  readonly documentTypes = signal<DocumentType[] | null>(null);
+  private readonly documentsApi = inject(DocumentsApi);
+  /** The choices: the workspace's types by name, and a saved type the list no longer has, by its id. */
+  readonly documentTypeOptions = computed(() => {
+    const options = (this.documentTypes() ?? []).map(t => ({
+      id: Number(t.documentTypeId),
+      label: t.status && t.status !== 'Active' ? `${t.name} (inactive)` : t.name,
+    }));
+    const chosen = this.documentTypeId();
+    if (chosen !== null && this.documentTypes() !== null && !options.some(o => o.id === chosen)) {
+      options.push({ id: chosen, label: `Document type ${chosen} (not in this workspace)` });
+    }
+    return options;
+  });
+  /** The chosen type's name, for the summary beside the form. */
+  readonly documentTypeLabel = computed(() => {
+    const chosen = this.documentTypeId();
+    if (chosen === null) return '';
+    return this.documentTypes()?.find(t => Number(t.documentTypeId) === chosen)?.name ?? `document type ${chosen}`;
+  });
+
+  setOnApproval(on: boolean): void {
+    this.onApproval.set(on);
+    if (on) this.loadDocumentTypes();
+  }
+
+  pickDocumentType(value: string): void {
+    this.documentTypeId.set(value === '' ? null : Number(value));
+  }
+
+  /** Once: a list that cannot be read leaves the choice empty, and a saved type still shows by its id. */
+  private loadDocumentTypes(): void {
+    if (this.documentTypes() !== null || this.documentTypesAsked) return;
+    this.documentTypesAsked = true;
+    this.documentsApi.types().subscribe({
+      next: response => this.documentTypes.set(response.status === API_SUCCESS && Array.isArray(response.data) ? response.data : []),
+      error: () => this.documentTypes.set([]),
+    });
+  }
+  private documentTypesAsked = false;
+
+  /**
    * MIG-251 on MIG-242: the model each AI step runs on when this schedule runs it (sourceJob.json/aiModelChoice). Only
    * for a saved job whose pipeline has AI steps; the section is not drawn otherwise.
    */
@@ -474,6 +534,17 @@ export class JobEdit implements OnInit {
       },
       error: () => {},
     });
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentTrigger`, { params }).subscribe({
+      next: response => {
+        const trigger = response.status === API_SUCCESS ? documentTriggerOf(response.data) : null;
+        this.savedDocumentTrigger.set(trigger);
+        this.onApproval.set(!!trigger?.configured && trigger.enabled !== false);
+        this.documentTypeId.set(trigger?.documentTypeId === null || trigger?.documentTypeId === undefined ? null : Number(trigger.documentTypeId));
+        this.documentBatch.set(Number(trigger?.batchSize ?? 1));
+        if (trigger?.configured) this.loadDocumentTypes();
+      },
+      error: () => {},
+    });
     this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params }).subscribe({
       next: response => {
         const steps = response.status === API_SUCCESS ? stepsOf(response.data) : [];
@@ -498,13 +569,33 @@ export class JobEdit implements OnInit {
     return savedOn ? { jobId, enabled: false, filePattern: saved?.filePattern ?? '' } : null;
   }
 
+  /** MIG-364: the document trigger request the form asks for, or null when it asks for what is already saved. */
+  private documentRequest(jobId: number): { jobId: number; enabled: boolean; documentTypeId?: number; batchSize?: number } | null {
+    const saved = this.savedDocumentTrigger();
+    const savedOn = !!saved?.configured && saved.enabled !== false;
+    const savedType = saved?.documentTypeId === null || saved?.documentTypeId === undefined ? null : Number(saved.documentTypeId);
+    const type = this.documentTypeId();
+    const savedBatch = Number(saved?.batchSize ?? 1);
+    const batch = Number(this.documentBatch());
+    if (this.onApproval()) {
+      if (savedOn && savedType === type && batch === savedBatch) return null;
+      const body = { jobId, enabled: true, documentTypeId: type ?? undefined };
+      return batch === savedBatch ? body : { ...body, batchSize: batch };
+    }
+    // Off keeps the type: Core keeps the saved one when none is sent, and this sends the one it has.
+    return savedOn ? (savedType === null ? { jobId, enabled: false } : { jobId, enabled: false, documentTypeId: savedType }) : null;
+  }
+
   /**
    * The trigger and the models, saved once the job is: each answers '' or why it was refused. A new job's id is the one
    * its creation answered with ("Job save with jobId 2901."), as Duplicate reads it.
    */
   private saveExtras(jobId: number | null): Observable<string[]> {
     if (jobId === null || !Number.isFinite(jobId)) {
-      return of(this.triggerRequest(0) ? ['the job\'s id did not come back, so its inbox trigger was not set.'] : []);
+      return of([
+        ...(this.triggerRequest(0) ? ['the job\'s id did not come back, so its inbox trigger was not set.'] : []),
+        ...(this.documentRequest(0) ? ['the job\'s id did not come back, so its document trigger was not set.'] : []),
+      ]);
     }
     const asks: Observable<string>[] = [];
     const reason = (fallback: string) => (response: ApiResponse) =>
@@ -514,6 +605,12 @@ export class JobEdit implements OnInit {
       asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/inboxTrigger/save`, trigger).pipe(
         map(reason('the inbox trigger was not saved.')),
         catchError(err => of(err?.error?.message || 'the inbox trigger was not saved.'))));
+    }
+    const documents = this.documentRequest(jobId);
+    if (documents) {
+      asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/documentTrigger/save`, documents).pipe(
+        map(reason('the document trigger was not saved.')),
+        catchError(err => of(err?.error?.message || 'the document trigger was not saved.'))));
     }
     if (this.isEdit() && this.aiSteps().length && picksChanged(this.aiSteps(), this.modelPicks())) {
       asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/aiModelChoice/save`, choiceBody(jobId, this.modelPicks())).pipe(
@@ -675,6 +772,11 @@ export class JobEdit implements OnInit {
     }
     if (this.patternError() || this.batchError()) {
       this.toast.error(this.patternError() || this.batchError());
+      return;
+    }
+    if (this.documentTypeError() || this.documentBatchError()) {
+      this.toast.error(this.documentTypeError() || this.documentBatchError());
+      this.host?.nativeElement.querySelector<HTMLElement>(this.documentTypeError() ? '#documentTypeId' : '#documentBatch')?.focus();
       return;
     }
 

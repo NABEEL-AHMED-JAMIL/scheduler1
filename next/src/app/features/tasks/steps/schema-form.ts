@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  BucketChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -15,6 +15,8 @@ interface MapRow { key: string; value: unknown; }
  * list of objects, rows with Add and Remove), a map (rows of name and value) -- and a raw-JSON box for a setting the
  * schema says in a way a form cannot. Nested objects and each group row are this same form, one level down; a schema
  * with no properties and an additionalProperties schema is drawn as a map.
+ *
+ * A document-type setting (MIG-364) is a choice of the workspace's document types, stored as the type's id.
  *
  * The registry's other widget hints -- api-request, api-environment, data-contract, db-connection, bucket, pipeline,
  * user -- are text boxes for now (TODO(MIG-249): their pickers).
@@ -124,6 +126,20 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('document-type') {
+            <!-- MIG-364: one of the workspace's document types, stored as its id; empty is the documents that started the run. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || documentTypeHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a document type…' : 'The documents that started the run' }}</option>
+                @for (t of documentTypes(); track t.id) { <option [value]="'' + t.id" [selected]="textOf(f) === '' + t.id">{{ t.label }}</option> }
+                @if (textOf(f) && !documentTypeListed(f)) {
+                  <option [value]="textOf(f)" selected>Document type {{ textOf(f) }} (not in this workspace)</option>
+                }
+              </select>
+            </app-field>
+          }
           @case ('column') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || (columns().length ? 'A column of the rows this step reads: pick one, or type it.' : '')">
@@ -181,7 +197,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -205,7 +221,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -267,6 +283,10 @@ export class SchemaForm {
   readonly webhooks = input<WebhookChoice[]>([]);
   /** MIG-321: the workspace's buckets, what a bucket setting offers. */
   readonly buckets = input<BucketChoice[]>([]);
+  /** MIG-364: the workspace's document types, what a document-type setting offers. */
+  readonly documentTypes = input<DocumentTypeChoice[]>([]);
+  /** MIG-364: what a document-type setting says when its schema says nothing. */
+  readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document Intelligence).';
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 
@@ -298,6 +318,10 @@ export class SchemaForm {
 
   webhookListed(f: FieldSpec): boolean {
     return this.webhooks().some(w => '' + w.id === this.textOf(f));
+  }
+
+  documentTypeListed(f: FieldSpec): boolean {
+    return this.documentTypes().some(t => '' + t.id === this.textOf(f));
   }
 
   promptListed(f: FieldSpec): boolean {

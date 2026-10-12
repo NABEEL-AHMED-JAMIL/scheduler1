@@ -81,8 +81,10 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob",
       "GET /sourceJob.json/inboxArrivals?jobId=2833",
+      "GET /sourceJob.json/documentApprovals?jobId=2833&limit=200",
       "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2833&limit=500",
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
+      "GET /sourceJob.json/documentTrigger?jobId=2833",
       "GET /sourceJob.json/inboxTrigger?jobId=2833"
     ],
     "headings": [
@@ -156,6 +158,7 @@ export const PINNED: Record<string, unknown> = {
       "A run fails",
       "A run is skipped",
       "Active: runs as soon as it is saved",
+      "Also when a document is approvedEach approved document of a type starts a run; one approved while a run is going waits its turn.",
       "Also when a file arrivesEach file in the workspace inbox starts a run; one that lands while a run is going waits its turn.",
       "Attempts",
       "Ends",
@@ -236,6 +239,7 @@ export const PINNED: Record<string, unknown> = {
       "POST /sourceTask.json/listSourceTask?limit=1000 {}",
       "GET /sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=2833",
       "GET /sourceJob.json/inboxTrigger?jobId=2833",
+      "GET /sourceJob.json/documentTrigger?jobId=2833",
       "GET /sourceJob.json/aiModelChoice?jobId=2833"
     ],
     "headings": [
@@ -258,6 +262,7 @@ export const PINNED: Record<string, unknown> = {
       "A run fails",
       "A run is skipped",
       "Active: runs as soon as it is saved",
+      "Also when a document is approvedEach approved document of a type starts a run; one approved while a run is going waits its turn.",
       "Also when a file arrivesEach file in the workspace inbox starts a run; one that lands while a run is going waits its turn.",
       "Attempts",
       "Nightly orders export",

@@ -287,3 +287,60 @@ describe('SchemaForm -- a prompt setting', () => {
     expect(select.value).toBe('99');
   });
 });
+
+/**
+ * MIG-364: the Read documents step names a document type: a choice of the workspace's types, stored as its id. Optional,
+ * so empty is the documents whose approval started the run.
+ */
+describe('SchemaForm -- a document-type setting', () => {
+  const TYPE_SCHEMA: JsonSchema = { type: 'object',
+    properties: { documentTypeId: { type: 'integer', format: 'document-type', title: 'Document type' } } };
+
+  function typeForm(types: { id: number; label: string }[], value: Record<string, unknown> | null, schema: JsonSchema = TYPE_SCHEMA) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', schema);
+    fixture.componentRef.setInput('value', value);
+    fixture.componentRef.setInput('documentTypes', types);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-documentTypeId')!;
+    return { select, fixture, changes };
+  }
+
+  it('offers the types by name, empty as the documents that started the run, and stores the id as a number', () => {
+    const { select, fixture, changes } = typeForm([{ id: 1007, label: 'Intake form' }, { id: 1008, label: 'Referral letter' }], { documentTypeId: 1008 });
+    expect(select.tagName).toBe('SELECT');
+    expect(Array.from(select.options).map(o => o.textContent!.trim()))
+      .toEqual(['The documents that started the run', 'Intake form', 'Referral letter']);
+    expect(select.value).toBe('1008');
+    select.value = '1007';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(changes.at(-1)).toEqual({ documentTypeId: 1007 });
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    expect(changes.at(-1)).toEqual({});
+  });
+
+  it('asks for a choice when the type is required', () => {
+    const { select } = typeForm([{ id: 1007, label: 'Intake form' }], null,
+      { ...TYPE_SCHEMA, required: ['documentTypeId'] });
+    expect(select.options[0].textContent!.trim()).toBe('Choose a document type…');
+  });
+
+  it('keeps a saved type the workspace no longer has, by its id', () => {
+    const { select } = typeForm([{ id: 1007, label: 'Intake form' }], { documentTypeId: 1099 });
+    expect(Array.from(select.options).map(o => o.textContent!.trim())).toContain('Document type 1099 (not in this workspace)');
+    expect(select.value).toBe('1099');
+  });
+
+  it('reaches a document-type setting inside a group', () => {
+    const { fixture } = typeForm([{ id: 1007, label: 'Intake form' }], { source: { documentTypeId: 1007 } },
+      { type: 'object', properties: { source: TYPE_SCHEMA } });
+    const nested = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-source-documentTypeId')!;
+    expect(nested.value).toBe('1007');
+  });
+});
