@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { KIND_IDS } from '../widget-kinds';
 import { widgetConfigOf } from '../widget-view';
 import {
-  ANSWER_KINDS, ChartAnswer, answerSettings, answerView, chartRows, fitKind, pinRequest, suggestCharts, suggestionAnswer, tableAnswer,
+  ANSWER_KINDS, ChartAnswer, answerSettings, answerView, chartRows, chartSql, fitKind, pinRequest, suggestCharts, suggestionAnswer, tableAnswer,
 } from './chart-answer';
 
 /**
@@ -103,7 +103,13 @@ describe('chart answer -- rows with two columns of names (revenue by category pe
     expect(columns).toEqual(['month', 'category', 'total_revenue']);
     expect(rows).toEqual([['2025-11-01', 'Sports', '279117.07'], ['2025-11-01', 'Books', '37047.28'],
       ['2025-12-01', 'Sports', '273031.99'], ['2025-12-01', 'Books', '35604.25']]);
-    expect(chartRows(['region', 'n'], [['North', '3']])).toEqual({ columns: ['region', 'n'], rows: [['North', '3']] });
+    expect(chartRows(['region', 'n'], [['North', '3']])).toEqual({ columns: ['region', 'n'], rows: [['North', '3']], names: ['region'], changed: false });
+  });
+
+  it('pins the statement wrapped to return the rows the chart drew, the figures the same query\'s', () => {
+    expect(chartSql(monthly)).toBe('SELECT "month", "category", "total_revenue"\nFROM (\n' + monthly.sql + '\n) AS answer\nORDER BY "month", "category"');
+    expect(pinRequest(monthly, 'lineSmooth', {}, 'Revenue', { id: 1 }).queryText).toContain(') AS answer');
+    expect(chartSql(answer())).toBe(answer().sql);
   });
 
   it('never draws a one-series kind over two columns of names: a line becomes a line per group', () => {
@@ -117,9 +123,7 @@ describe('chart answer -- rows with two columns of names (revenue by category pe
 
 describe('chart answer -- settings and the pin', () => {
   it('turns the model\'s settings into the panel\'s', () => {
-    expect(answerSettings(answer().chart)).toEqual({
-      title: { text: 'Readmission rate by age band' }, xAxis: { name: 'Age band' }, yAxis: { name: 'Rate' }, sort: 'desc',
-    });
+    expect(answerSettings(answer().chart)).toEqual({ xAxis: { name: 'Age band' }, yAxis: { name: 'Rate' }, sort: 'desc' });
     expect(answerSettings(answer({}, { stack: 'percent', topN: 10, sort: 'none' }).chart)).toMatchObject({ bar: { stack: 'percent' }, topN: 10 });
     expect(answerSettings(null)).toEqual({});
   });
@@ -161,7 +165,10 @@ describe('Visualise -- suggestions from the shape, no AI', () => {
     const suggestions = suggestCharts(ENCOUNTERS);
     expect(suggestions.length).toBe(4);
     expect(suggestions.map(s => s.id)).toEqual(['trend', 'count', 'total', 'series']);
-    expect(suggestions[0]).toMatchObject({ kind: 'line', title: 'stay days by month' });
+    expect(suggestions[0]).toMatchObject({ kind: 'line', title: 'Total stay days by month' });
+    expect(suggestions[2]).toMatchObject({ title: 'Total stay days by age band' });
+    expect(suggestCharts([{ name: 'gender', type: 'VARCHAR' }, { name: 'age', type: 'BIGINT' }])[1])
+      .toMatchObject({ title: 'Average age by gender', kind: 'bar' });
     expect(suggestions[0].sql).toContain(`date_trunc('month', CAST("admitted_at" AS DATE))`);
     expect(suggestions[1].sql).toBe('SELECT "age_band", count(*) AS n FROM dataset GROUP BY 1 ORDER BY n DESC LIMIT 50');
     for (const s of suggestions) {

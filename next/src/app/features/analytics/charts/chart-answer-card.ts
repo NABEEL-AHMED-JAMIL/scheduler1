@@ -30,9 +30,9 @@ import { PinChartData, PinChartPanel } from './pin-chart-panel';
   template: `
     <section class="card p-4 flex flex-col gap-3 min-w-0" data-test="chart-answer" [attr.data-kind]="kind()" aria-label="Chart">
       <div class="flex flex-wrap items-start justify-between gap-2">
-        <div class="min-w-0 flex-1">
+        <div class="min-w-64 flex-1">
           <p class="font-semibold text-sm break-words" data-test="chart-title">{{ title() }}</p>
-          @if (caption()) { <p class="text-xs text-[color:var(--text-secondary)] break-words mt-0.5" data-test="chart-caption">{{ caption() }}</p> }
+          @if (showCaption() && caption()) { <p class="text-xs text-[color:var(--text-secondary)] break-words mt-0.5" data-test="chart-caption">{{ caption() }}</p> }
         </div>
         <div class="flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Chart actions">
           <button type="button" class="btn btn-default btn-sm" data-test="change-chart" [cdkMenuTriggerFor]="kinds">
@@ -87,6 +87,8 @@ export class ChartAnswerCard {
   readonly canPin = input(true);
   readonly pinBlocked = input('Your access does not let you change dashboards.');
   readonly height = input(320);
+  /** Off where the caption is already the answer's sentence above the card (Ask your data). */
+  readonly showCaption = input(true);
   readonly pinnedTo = output<PinnedChart>();
 
   readonly view = computed(() => answerView(this.answer()));

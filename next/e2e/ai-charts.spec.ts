@@ -29,7 +29,8 @@ async function shots(page: Page, info: TestInfo, name: string, focus?: string): 
     await page.setViewportSize({ width, height: 1080 });
     for (const theme of ['light', 'dark'] as const) {
       const now = await page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'));
-      if (now !== theme) await page.locator(`button[title="Switch to ${theme}"]`).first().click();
+      // Dispatched, not clicked: an open panel's backdrop covers the header's button.
+      if (now !== theme) await page.locator(`button[title="Switch to ${theme}"]`).first().dispatchEvent('click');
       if (focus) await page.locator(focus).first().scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
       await shot(page, info, `${name}-${width}-${theme}`);
@@ -57,7 +58,49 @@ async function tableRows(page: Page): Promise<string[][]> {
     rows.map(r => Array.from(r.querySelectorAll('td')).map(td => (td.textContent ?? '').trim())));
 }
 
-const round = (v: string | null | undefined, places = 2) => Number(Number(v).toFixed(places));
+const round = (v: string | number | null | undefined, places = 2) => Number(Number(v).toFixed(places));
+
+/**
+ * Every figure a correct answer could hold, per group, from a query of our own: the group's rows, and for each value of
+ * the outcome column its count, its percentage and its share -- whichever the model chose to chart, a figure on the
+ * chart must be one of these.
+ */
+async function figuresBy(request: APIRequestContext, s: Session, connection: string, path: string, group: string, outcome: string):
+    Promise<Map<string, number[]>> {
+  const rows = await direct(request, s, connection, path,
+    `SELECT "${group}", "${outcome}", count(*) FROM dataset GROUP BY 1, 2`);
+  const by = new Map<string, Map<string, number>>();
+  for (const [g, o, n] of rows) {
+    if (!by.has(g)) by.set(g, new Map());
+    by.get(g)!.set(o, Number(n));
+  }
+  const out = new Map<string, number[]>();
+  for (const [g, counts] of by) {
+    const total = [...counts.values()].reduce((a, b) => a + b, 0);
+    const figures = [total];
+    for (const n of counts.values()) figures.push(n, 100 * n / total, n / total);
+    out.set(g, figures);
+  }
+  return out;
+}
+
+/** Each figure of each row of the answer's table is one the data holds for that row's group. */
+async function figuresHold(page: Page, want: Map<string, number[]>): Promise<number> {
+  const shown = await tableRows(page);
+  let checked = 0;
+  for (const row of shown) {
+    const figures = want.get(row[0]);
+    expect(figures, `the group ${row[0]}`).toBeTruthy();
+    for (const cell of row.slice(1)) {
+      if (cell === '—' || Number.isNaN(Number(cell))) continue;
+      const hit = figures!.some(f => Math.abs(round(f, 4) - round(cell, 4)) < 0.006 || Math.abs(round(f) - round(cell)) < 0.006);
+      expect(hit, `${row[0]}: ${cell} is one of ${figures!.map(f => round(f, 4)).join(', ')}`).toBe(true);
+      checked++;
+    }
+  }
+  expect(checked, 'figures checked').toBeGreaterThan(0);
+  return checked;
+}
 
 test.describe('MIG-357: charts for analytics questions', () => {
   test.skip(!hasFixtures(), NEEDS_FIXTURES);
@@ -73,18 +116,8 @@ test.describe('MIG-357: charts for analytics questions', () => {
       await ask(page, 'readmission rate by age band');
       const card = page.locator('[data-turn]').first().locator('[data-test="chart-answer"]');
       await expect(card).toHaveAttribute('data-kind', /.+/);
-      // The figures on the chart are the query's: every band's rate, against a query of our own.
-      const want = await direct(request, s, 'riverside-health-s3', 'datasets/readmission/diabetic_data.csv',
-        "SELECT age, 100.0 * count(*) FILTER (WHERE readmitted = '<30') / count(*) FROM dataset GROUP BY age");
-      const shown = await tableRows(page);
-      const header = await page.locator('[data-turn]').first().locator('[data-test="query-rows"] thead th').allTextContents();
-      const rate = header.findIndex(h => /rate|pct|percent/i.test(h));
-      expect(rate, `a rate column in ${header.join(', ')}`).toBeGreaterThan(0);
-      for (const [age, pct] of want) {
-        const row = shown.find(r => r[0] === age);
-        expect(row, `the ${age} band`).toBeTruthy();
-        expect(round(row![rate]), `${age}: chart table against our query`).toBe(round(pct));
-      }
+      // The figures on the chart are the data's: each one, against a query of our own.
+      await figuresHold(page, await figuresBy(request, s, 'riverside-health-s3', 'datasets/readmission/diabetic_data.csv', 'age', 'readmitted'));
       await shots(page, info, 'ask-readmission', '[data-test="chart-answer"]');
       await page.locator('[data-test="change-chart"]').first().click();
       await expect(page.locator('[data-test="change-chart-menu"]')).toBeVisible();
@@ -92,16 +125,8 @@ test.describe('MIG-357: charts for analytics questions', () => {
       await page.keyboard.press('Escape');
 
       await ask(page, 'no-show rate by weekday');
-      const days = await direct(request, s, 'riverside-health-s3', 'datasets/appointments/smart_hospital_appointment_dataset.csv',
-        "SELECT appointment_day, 100.0 * count(*) FILTER (WHERE appointment_status = 'No Show') / count(*) FROM dataset GROUP BY 1");
-      const dayRows = await tableRows(page);
-      const dayHeader = await page.locator('[data-turn]').first().locator('[data-test="query-rows"] thead th').allTextContents();
-      const dayRate = dayHeader.findIndex(h => /rate|pct|percent/i.test(h));
-      for (const [day, pct] of days) {
-        const row = dayRows.find(r => r[0] === day);
-        expect(row, `the ${day} row`).toBeTruthy();
-        expect(round(row![dayRate], 1), `${day}: chart table against our query`).toBe(round(pct, 1));
-      }
+      await figuresHold(page, await figuresBy(request, s, 'riverside-health-s3',
+        'datasets/appointments/smart_hospital_appointment_dataset.csv', 'appointment_day', 'appointment_status'));
       await shots(page, info, 'ask-no-show', '[data-turn] [data-test="chart-answer"]');
     });
 

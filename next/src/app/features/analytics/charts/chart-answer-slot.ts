@@ -20,6 +20,7 @@ export class ChartAnswerSlot {
   readonly answer = input.required<ChartAnswer>();
   readonly canPin = input(true);
   readonly height = input(320);
+  readonly showCaption = input(true);
   readonly ready = signal(false);
 
   private card: ComponentRef<ChartAnswerCard> | null = null;
@@ -35,7 +36,7 @@ export class ChartAnswerSlot {
     });
     effect(() => {
       // Read every input here, so a new answer (or a change of rights) reaches the card.
-      this.answer(); this.canPin(); this.height();
+      this.answer(); this.canPin(); this.height(); this.showCaption();
       this.pass();
     });
   }
@@ -45,5 +46,6 @@ export class ChartAnswerSlot {
     this.card.setInput('answer', this.answer());
     this.card.setInput('canPin', this.canPin());
     this.card.setInput('height', this.height());
+    this.card.setInput('showCaption', this.showCaption());
   }
 }

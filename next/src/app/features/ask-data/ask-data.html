@@ -96,7 +96,7 @@
                   @if (q.rows.length) {
                     <div class="min-w-0" data-test="query-chart">
                       <!-- MIG-357: the dashboards' chart engine, loaded with the first chart answer and not before. -->
-                      <app-chart-answer-slot [answer]="chartAnswerOf(q)" [canPin]="canPin()" />
+                      <app-chart-answer-slot [answer]="chartAnswerOf(q)" [canPin]="canPin()" [showCaption]="false" />
                     </div>
                   }
                   @if (q.rows.length) {

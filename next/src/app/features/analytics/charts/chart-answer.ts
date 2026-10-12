@@ -74,18 +74,20 @@ const NUMBER_TEXT = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
  * first, the date column is put first (a line runs along it, one per group); and rows ordered newest-first are put in
  * the date's own order, so a line does not run backwards. The query and its table keep the order they came in.
  */
-export function chartRows(columns: string[], rows: (string | null)[][]): { columns: string[]; rows: (string | null)[][] } {
+export function chartRows(columns: string[], rows: (string | null)[][]):
+    { columns: string[]; rows: (string | null)[][]; names: string[]; changed: boolean } {
   const filled = (i: number) => rows.map(r => r[i]).filter((v): v is string => v !== null && v !== undefined && v !== '');
   const isDate = (i: number) => { const v = filled(i); return v.length > 0 && v.every(x => DATE_TEXT.test(x)); };
   const isNumber = (i: number) => { const v = filled(i); return v.length > 0 && v.every(x => NUMBER_TEXT.test(x.trim())); };
-  const names = columns.map((_, i) => i).filter(i => !isNumber(i) || isDate(i));
-  const date = names.find(isDate);
-  if (date === undefined) return { columns, rows };
+  const nameAt = columns.map((_, i) => i).filter(i => !isNumber(i) || isDate(i));
+  const date = nameAt.find(isDate);
+  if (date === undefined) return { columns, rows, names: nameAt.map(i => columns[i]), changed: false };
   const order = [date, ...columns.map((_, i) => i).filter(i => i !== date)];
   const moved = rows.map(r => order.map(i => r[i] ?? null));
-  const sorted = moved.map((r, i) => ({ r, i })).sort((a, b) =>
-    String(a.r[0] ?? '').localeCompare(String(b.r[0] ?? '')) || a.i - b.i).map(x => x.r);
-  return { columns: order.map(i => columns[i]), rows: sorted };
+  const sorted = moved.map((r, i) => ({ r, i })).sort((x, y) =>
+    String(x.r[0] ?? '').localeCompare(String(y.r[0] ?? '')) || x.i - y.i).map(x => x.r);
+  const changed = date !== order[0] || order.some((at, i) => at !== i) || sorted.some((r, i) => r !== moved[i]);
+  return { columns: order.map(i => columns[i]), rows: sorted, names: [date, ...nameAt.filter(i => i !== date)].map(i => columns[i]), changed };
 }
 
 /**
@@ -131,14 +133,28 @@ export function fitKind(view: WidgetView, asked: string | null | undefined): Fit
 /** The chart's settings as the panel stores them, from the answer's: title, axis names, stacking, sort, top N. */
 export function answerSettings(chart: AnswerChart | null | undefined): ChartSettings {
   if (!chart) return {};
+  // No title: the card (and a pinned tile) shows the answer's title above the chart, and ECharts would draw it again inside.
   const settings: ChartSettings = {};
-  if (chart.title?.trim()) settings.title = { text: chart.title.trim().slice(0, 120) };
   if (chart.xAxis?.trim()) settings.xAxis = { name: chart.xAxis.trim().slice(0, 60) };
   if (chart.yAxis?.trim()) settings.yAxis = { name: chart.yAxis.trim().slice(0, 60) };
   if (chart.stack === 'stack' || chart.stack === 'percent') settings.bar = { stack: chart.stack };
   if (chart.sort === 'asc' || chart.sort === 'desc') settings.sort = chart.sort;
   if (chart.topN && chart.topN > 0 && chart.topN <= 500) settings.topN = Math.floor(chart.topN);
   return settings;
+}
+
+const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
+
+/**
+ * The statement a pinned tile runs: the answer's own, or -- where the chart reads its rows date first and in the date's
+ * order (chartRows) -- the answer's wrapped to return them that way, so the board's tile draws what the answer drew.
+ * The figures are the same query's; only the columns' order and the rows' order differ.
+ */
+export function chartSql(answer: ChartAnswer): string {
+  const drawn = chartRows(answer.columns, answer.rows);
+  if (!drawn.changed) return answer.sql;
+  const inner = answer.sql.trim().replace(/;\s*$/, '');
+  return `SELECT ${drawn.columns.map(quoteName).join(', ')}\nFROM (\n${inner}\n) AS answer\nORDER BY ${drawn.names.map(quoteName).join(', ')}`;
 }
 
 /** What analyticsWorkspace.json/pinChart takes (MIG-357). */
@@ -166,7 +182,7 @@ export function pinRequest(answer: ChartAnswer, kind: string, settings: ChartSet
     widgetTitle: title.trim().slice(0, 255),
     connectionAlias: answer.dataset.connection,
     datasetPath: answer.dataset.path,
-    queryText: answer.sql,
+    queryText: chartSql(answer),
     visualizationType: kind,
     widgetConfig: widgetConfigString(config),
   };
@@ -189,6 +205,9 @@ const DATE = /^(DATE|TIMESTAMP.*|TIMESTAMPTZ)$/i;
 const TEXT = /^(VARCHAR.*|TEXT|STRING|CHAR.*|BOOLEAN|BOOL|ENUM.*)$/i;
 /** A column that names a person or a record rather than a group: never grouped by in a suggestion. */
 const IDENTIFYING = /(^|_|\b)(id|uuid|name|first|last|surname|email|phone|mobile|ssn|mrn|address|street|zip|postcode|dob|birth|note|notes|comment|description|text)(_|\b|$)/i;
+/** A figure that adds up across rows (an amount, a quantity): totalled; any other (an age, a rating, a score) is averaged. */
+const SUMMABLE = /(amount|total|cost|fee|bill|price|revenue|sales|profit|spend|charge|payment|qty|quantity|units|volume|count|orders|visits|minutes|hours|days)/i;
+
 /** The most rows a Visualise suggestion asks for: a chart reads 50 bars, not 5,000 (the engine bounds it again). */
 export const SUGGESTION_ROWS = 50;
 
@@ -211,16 +230,19 @@ export function suggestCharts(columns: readonly ShapeColumn[], max = 4): Suggest
   const group = groups[0];
   if (date) {
     const month = `date_trunc('month', CAST(${quote(date.name)} AS DATE))`;
-    add({ id: 'trend', title: figure ? `${words(figure.name)} by month` : `Rows by month`, kind: 'line',
-      sql: `SELECT ${month} AS month, ${figure ? `sum(${quote(figure.name)})` : 'count(*)'} AS ${figure ? 'total' : 'n'} FROM dataset `
+    const sums = !!figure && SUMMABLE.test(figure.name);
+    add({ id: 'trend', title: figure ? `${sums ? 'Total' : 'Average'} ${words(figure.name)} by month` : `Rows by month`, kind: 'line',
+      sql: `SELECT ${month} AS month, ${figure ? `${sums ? 'sum' : 'avg'}(${quote(figure.name)})` : 'count(*)'} AS ${figure ? (sums ? 'total' : 'average') : 'n'} FROM dataset `
         + `WHERE ${quote(date.name)} IS NOT NULL GROUP BY 1 ORDER BY 1 LIMIT ${SUGGESTION_ROWS * 4}` });
   }
   if (group) {
     add({ id: 'count', title: `Rows by ${words(group.name)}`, kind: 'ranked',
       sql: `SELECT ${quote(group.name)}, count(*) AS n FROM dataset GROUP BY 1 ORDER BY n DESC LIMIT ${SUGGESTION_ROWS}` });
     if (figure) {
-      add({ id: 'total', title: `${words(figure.name)} by ${words(group.name)}`, kind: 'ranked',
-        sql: `SELECT ${quote(group.name)}, sum(${quote(figure.name)}) AS total FROM dataset GROUP BY 1 ORDER BY total DESC LIMIT ${SUGGESTION_ROWS}` });
+      const adds = SUMMABLE.test(figure.name);
+      add({ id: 'total', title: `${adds ? 'Total' : 'Average'} ${words(figure.name)} by ${words(group.name)}`, kind: adds ? 'ranked' : 'bar',
+        sql: `SELECT ${quote(group.name)}, ${adds ? 'sum' : 'avg'}(${quote(figure.name)}) AS ${adds ? 'total' : 'average'} FROM dataset `
+          + `GROUP BY 1 ORDER BY 2 DESC LIMIT ${SUGGESTION_ROWS}` });
     }
     if (date && groups.length) {
       const month = `date_trunc('month', CAST(${quote(date.name)} AS DATE))`;
@@ -251,7 +273,7 @@ export function suggestCharts(columns: readonly ShapeColumn[], max = 4): Suggest
 /** A suggestion's rows as a chart answer -- its chart marked as the shape's, not a model's. */
 export function suggestionAnswer(s: Suggestion, dataset: ChartAnswer['dataset'],
     result: { columns: string[]; rows: (string | null)[][]; rowCount: number; truncated: boolean }): ChartAnswer {
-  const counts = /\b(count|sum)\(/i.test(s.sql);
+  const counts = /\b(count|sum)\(/i.test(s.sql) && !/\bavg\(/i.test(s.sql);
   return {
     sql: s.sql, dataset, columns: result.columns, rows: result.rows, rowCount: result.rowCount, truncated: result.truncated,
     chart: { kind: s.kind, title: s.title, caption: `${s.title} in ${dataset.name}.`, additive: counts ? true : null, source: 'shape' },
