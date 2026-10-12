@@ -95,7 +95,7 @@ describe('MIG-252: AI › AI Assistant and Tool Registry', () => {
 
   it('conversation 1000, confirmed and run, with its tool calls', async () => {
     const v = await visit('/ai/assistant?c=1000', 'TENANT_ADMIN', null, ANSWERS);
-    const opened = await click(v, 'Show tool calls');
+    const opened = await click(v, 'Tool calls');
     pin(FILE, 'conversation 1000, confirmed and run, with its tool calls',
       { ...v.surface, ...surfaceOf(v.main), opened, thread: threadOf(v) }, PINNED);
   });

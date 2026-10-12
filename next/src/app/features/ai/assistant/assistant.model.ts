@@ -75,7 +75,8 @@ export interface AssistantMessage {
   runStatus: string | null;
   card: ConfirmCard | null;
   links: AssistantLink[];
-  artifact: PipelineDraft | null;
+  /** A drafted pipeline (before the review) or, since it, a designed flow (kind pipeline-flow, flow.model.ts). */
+  artifact: PipelineDraft | import('./flow.model').PipelineFlowArtifact | null;
   dateCreated?: string;
 }
 
@@ -83,7 +84,32 @@ export interface AssistantMessage {
 export interface AssistantAnswer {
   conversation: Conversation;
   messages: AssistantMessage[];
-  run?: { toolRunId: number | null; status: string } | null;
+  run?: { toolRunId: number | null; status: string; phase?: string | null } | null;
+  /** An async answer's: the seq of the newest message when the run started; progress is done once the answer follows it. */
+  afterSeq?: number;
+}
+
+/** aiPrompt.json/assistant/progress: a run while it works. */
+export interface RunProgress {
+  run: {
+    toolRunId: number;
+    status: string;
+    phase?: string | null;
+    toolMode?: 'native' | 'protocol' | string | null;
+    model?: string | null;
+    rounds: number;
+    toolCallCount: number;
+    maxToolCalls: number;
+    tokensIn: number;
+    tokensOut: number;
+    tokenBudget: number;
+    timeBudgetMs: number;
+    elapsedMs?: number | null;
+    cancelRequested?: boolean;
+    error?: string | null;
+  };
+  calls: ToolCall[];
+  done: boolean;
 }
 
 export interface ToolCall {

@@ -9,6 +9,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { PipelineDraftHandoff } from '../../tasks/steps/draft-handoff';
 import { AssistantApi } from './assistant.api';
+import { JobEvent, JobEventsService } from '../../../core/socket/job-events.service';
 import { AssistantMessage, ToolDef } from './assistant.model';
 import { Assistant } from './assistant';
 
@@ -24,26 +25,36 @@ const tool = (t: Partial<ToolDef>): ToolDef => ({ name: 'get_jobs', title: 'Jobs
 interface Setup {
   query?: Record<string, string>;
   admin?: boolean;
-  send?: () => Observable<any>;
+  send?: (text: string) => Observable<any>;
   decide?: () => Observable<any>;
+  progress?: () => Observable<any>;
 }
 
 function screenWith(setup: Setup = {}) {
+  // The thread as the server has it: an async send appends the question at once and the answer when its run is done.
+  const thread: AssistantMessage[] = [
+    m({ messageId: 1000, seq: 1, role: 'user', content: 'Run the job' }),
+    m({ messageId: 1002, seq: 3, toolRunId: 1004, runStatus: 'awaiting_confirmation', card: { ...CARD } }),
+  ];
   const api = {
     conversations: vi.fn(() => of({ status: 'SUCCESS', data: [CONV] })),
-    conversation: vi.fn(() => of({ status: 'SUCCESS', data: { conversation: CONV, messages: [
-      m({ messageId: 1000, seq: 1, role: 'user', content: 'Run the job' }),
-      m({ messageId: 1002, seq: 3, toolRunId: 1004, runStatus: 'awaiting_confirmation', card: { ...CARD } }),
-    ] } })),
-    send: vi.fn(setup.send ?? (() => of({ status: 'SUCCESS', data: { conversation: CONV, messages: [
-      m({ messageId: 2000, seq: 6, role: 'user', content: 'Which jobs?' }),
-      m({ messageId: 2001, seq: 7, content: 'Two jobs.', toolRunId: 1010, runStatus: 'answered' }),
-    ], run: { toolRunId: 1010, status: 'answered' } } }))),
-    decide: vi.fn(setup.decide ?? (() => of({ status: 'SUCCESS', data: { conversation: CONV, messages: [
-      m({ messageId: 1003, seq: 4, role: 'tool-summary', content: 'You confirmed: Run a pipeline job (jobId=2848).' }),
-      m({ messageId: 1004, seq: 5, toolRunId: 1004, runStatus: 'answered', content: 'Queued.',
-        links: [{ kind: 'execution', jobId: 2848, jobName: 'UI-CHECK', jobQueueId: 7404, status: 'Completed' }] }),
-    ] } }))),
+    conversation: vi.fn(() => of({ status: 'SUCCESS', data: { conversation: CONV, messages: [...thread] } })),
+    sendAsync: vi.fn(setup.send ?? ((text: string) => {
+      const asked = m({ messageId: 2000, seq: 6, role: 'user', content: text });
+      thread.push(asked, m({ messageId: 2001, seq: 7, content: 'Two jobs.', toolRunId: 1010, runStatus: 'answered' }));
+      return of({ status: 'SUCCESS', data: { conversation: CONV, messages: [asked], run: { toolRunId: 1010, status: 'running' }, afterSeq: 6 } });
+    })),
+    progress: vi.fn(setup.progress ?? (() => of({ status: 'SUCCESS', data: { run: { toolRunId: 1010, status: 'answered', model: 'qwen3:8b',
+      toolMode: 'native', rounds: 2, toolCallCount: 1, maxToolCalls: 8, tokensIn: 5000, tokensOut: 100, tokenBudget: 32000, timeBudgetMs: 180000,
+      elapsedMs: 4200 }, calls: [{ callId: 1, toolRunId: 1010, seq: 1, toolName: 'get_jobs', toolKind: 'read', arguments: '{}', outcome: 'allowed' }],
+      done: true } }))),
+    cancel: vi.fn(() => of({ status: 'SUCCESS', message: 'Stopping.' })),
+    decideAsync: vi.fn(setup.decide ?? (() => {
+      thread.push(m({ messageId: 1003, seq: 4, role: 'tool-summary', content: 'You confirmed: Run a pipeline job (jobId=2848).' }),
+        m({ messageId: 1004, seq: 5, toolRunId: 1004, runStatus: 'answered', content: 'Queued.',
+          links: [{ kind: 'execution', jobId: 2848, jobName: 'UI-CHECK', jobQueueId: 7404, status: 'Completed' }] }));
+      return of({ status: 'SUCCESS', data: { conversation: CONV, messages: [], run: { toolRunId: 1004, status: 'running' }, afterSeq: 3 } });
+    })),
     trace: vi.fn(() => of({ status: 'SUCCESS', data: { run: { toolRunId: 1004, status: 'answered' }, calls: [] } })),
     tools: vi.fn(() => of({ status: 'SUCCESS', data: [tool({}), tool({ name: 'run_pipeline', kind: 'write', requiresConfirmation: true }),
       tool({ name: 'transform_data', available: false, unavailableReason: 'No endpoint.' })] })),
@@ -75,6 +86,7 @@ function screenWith(setup: Setup = {}) {
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: (k: string) => setup.query?.[k] ?? null } } } },
       { provide: Dialog, useValue: { open: vi.fn(() => ({ closed: of(true) })) } },
       { provide: ToastService, useValue: toast },
+      { provide: JobEventsService, useValue: { events: new Subject<JobEvent>().asObservable(), connected: signal(true) } },
       { provide: AuthService, useValue: { isManagedSession: () => false, canManageAgents: () => admin, isTenantAdmin: () => admin, displayName: () => 'Test Admin',
         role: () => (admin ? 'TENANT_ADMIN' : 'TENANT_USER'), user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
@@ -93,14 +105,39 @@ describe('AI Assistant -- a conversation', () => {
     expect(screen.conversations().length).toBe(1);
   });
 
-  it('sends a question into the open conversation, with the workspace default model', () => {
+  it('sends a question, follows its run, and takes the answer from the conversation when the run is done', () => {
     const { screen, api } = screenWith({ query: { c: '1000' } });
     screen.draft.set('  Which jobs?  ');
     screen.send();
-    expect(api.send).toHaveBeenCalledWith('Which jobs?', 1000, null);
+    expect(api.sendAsync).toHaveBeenCalledWith('Which jobs?', 1000, null);
+    expect(api.progress).toHaveBeenCalledWith(1010, 1000, 6);
     expect(screen.draft()).toBe('');
     expect(screen.messages().map(x => x.messageId)).toEqual([1000, 1002, 2000, 2001]);
     expect(screen.working()).toBeNull();
+    expect(screen.modelStatus().model).toBe('qwen3:8b');
+    expect(screen.modelStatus().facts).toContain('native tool calling');
+    expect(api.trace).toHaveBeenCalledWith(1010);
+  });
+
+  it('shows the run\'s phase and calls while it works, then stops on Stop', () => {
+    vi.useFakeTimers();
+    const working = { status: 'SUCCESS', data: { run: { toolRunId: 1010, status: 'running', phase: 'Running get_jobs', rounds: 1, toolCallCount: 1,
+      maxToolCalls: 8, tokensIn: 10, tokensOut: 1, tokenBudget: 32000, timeBudgetMs: 180000 },
+      calls: [{ callId: 1, toolRunId: 1010, seq: 1, toolName: 'get_jobs', toolKind: 'read', arguments: '{}', outcome: 'allowed' }], done: false } };
+    const progress = vi.fn(() => of(working));
+    const { screen, api } = screenWith({ progress });
+    screen.draft.set('Which jobs?');
+    screen.send();
+    expect(screen.working()).toBe('send');
+    expect(screen.live()?.run.phase).toBe('Running get_jobs');
+    expect(screen.liveCalls().map(c => c.toolName)).toEqual(['get_jobs']);
+    expect(screen.traceView().live).toBe(true);
+    vi.advanceTimersByTime(1000);
+    expect(progress).toHaveBeenCalledTimes(2);
+    screen.stop();
+    expect(api.cancel).toHaveBeenCalledWith(1010);
+    expect(screen.stopping()).toBe(true);
+    vi.useRealTimers();
   });
 
   it('sends the connection an administrator picked', () => {
@@ -109,25 +146,18 @@ describe('AI Assistant -- a conversation', () => {
     screen.connectionId.set(1049);
     screen.draft.set('Hi');
     screen.send();
-    expect(api.send).toHaveBeenCalledWith('Hi', null, 1049);
+    expect(api.sendAsync).toHaveBeenCalledWith('Hi', null, 1049);
     expect(screen.conversation()?.conversationId).toBe(1000);
   });
 
-  it('opens the new run\'s tool calls as the answer arrives', () => {
-    const { screen, api } = screenWith();
-    screen.draft.set('Which jobs?');
-    screen.send();
-    expect(api.trace).toHaveBeenCalledWith(1010);
-    expect(screen.openTraces().has(1010)).toBe(true);
-  });
-
-  it('shows a refusal the server recorded, from the envelope\'s data', () => {
+  it('shows a refusal the server recorded, from the envelope\'s data, and offers Retry', () => {
     const { screen } = screenWith({ send: () => of({ status: 'ERROR', message: 'That model is not allowed.', data: { conversation: CONV,
       messages: [m({ messageId: 3000, seq: 1, role: 'user', content: 'Hi' }), m({ messageId: 3001, seq: 2, runStatus: 'refused', content: 'That model is not allowed.' })] } }) });
     screen.draft.set('Hi');
     screen.send();
     expect(screen.messages().at(-1)?.runStatus).toBe('refused');
     expect(screen.error()).toBe('');
+    expect(screen.retryable()).toBe('Hi');
   });
 
   it('keeps the question when the request itself fails', () => {
@@ -139,29 +169,30 @@ describe('AI Assistant -- a conversation', () => {
     expect(screen.working()).toBeNull();
   });
 
-  it('stops waiting without cancelling anything on the server', () => {
+  it('stops waiting when the answer has not named its run yet', () => {
     const pending = new Subject<any>();
-    const { screen } = screenWith({ send: () => pending });
+    const { screen, api } = screenWith({ send: () => pending });
     screen.draft.set('Slow one');
     screen.send();
     expect(screen.working()).toBe('send');
     expect(screen.waitingFor()).toBe('Slow one');
-    screen.stopWaiting();
+    screen.stop();
     expect(screen.working()).toBeNull();
     expect(pending.observed).toBe(false);
     expect(screen.stopped()).toBe(true);
+    expect(api.cancel).not.toHaveBeenCalled();
   });
 
   it('does not send while it is waiting, or an empty message', () => {
     const { screen, api } = screenWith({ send: () => NEVER });
     screen.draft.set('   ');
     screen.send();
-    expect(api.send).not.toHaveBeenCalled();
+    expect(api.sendAsync).not.toHaveBeenCalled();
     screen.draft.set('One');
     screen.send();
     screen.draft.set('Two');
     screen.send();
-    expect(api.send).toHaveBeenCalledTimes(1);
+    expect(api.sendAsync).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -170,11 +201,11 @@ describe('AI Assistant -- confirm, then run', () => {
     const { screen, api } = screenWith({ query: { c: '1000' } });
     const asking = screen.messages().find(x => x.card)!;
     screen.decide(asking, true);
-    expect(api.decide).toHaveBeenCalledWith('act-1', true);
-    expect(screen.messages().find(x => x.messageId === 1002)?.card?.state).toBe('confirmed');
+    expect(api.decideAsync).toHaveBeenCalledWith('act-1', true);
     const result = screen.messages().at(-1)!;
     expect(result.links[0]).toMatchObject({ kind: 'execution', jobQueueId: 7404 });
     // The run moved on: its calls are read afresh, not the ones read while it waited.
+    expect(api.progress).toHaveBeenCalledWith(1004, 1000, 3);
     expect(api.trace).toHaveBeenCalledWith(1004);
   });
 
@@ -182,7 +213,7 @@ describe('AI Assistant -- confirm, then run', () => {
     const { screen, api } = screenWith({ query: { c: '1000' }, decide: () => of({ status: 'SUCCESS', data: { conversation: CONV,
       messages: [m({ messageId: 1003, seq: 4, role: 'tool-summary', content: 'You declined.' })] } }) });
     screen.decide(screen.messages().find(x => x.card)!, false);
-    expect(api.decide).toHaveBeenCalledWith('act-1', false);
+    expect(api.decideAsync).toHaveBeenCalledWith('act-1', false);
     expect(screen.messages().find(x => x.messageId === 1002)?.card?.state).toBe('declined');
   });
 
@@ -192,6 +223,35 @@ describe('AI Assistant -- confirm, then run', () => {
     screen.decide(screen.messages().find(x => x.card)!, true);
     expect(toast.error).toHaveBeenCalledWith('That confirmation expired.');
     expect(api.conversation).toHaveBeenCalledWith(1000);
+  });
+});
+
+describe('AI Assistant -- a designed flow', () => {
+  const flow = (name: string, steps: string[]) => ({ kind: 'pipeline-flow', name, trigger: { type: 'manual' }, valid: true, saved: false, problems: [],
+    flow: { nodes: [{ id: 'trigger-node', kind: 'trigger', label: 'Run on demand' }, ...steps.map(s => ({ id: s, kind: 'process', label: s, task: 'select' }))],
+      edges: [] }, definition: { version: 1, steps: steps.map(s => ({ key: s, task: 'select' })) } });
+
+  it('draws the conversation\'s newest flow, and a picked one on asking', () => {
+    const { screen } = screenWith();
+    screen.messages.set([
+      m({ messageId: 10, seq: 2, content: 'Drawn.', artifact: flow('First', ['a']) as never }),
+      m({ messageId: 11, seq: 4, content: 'Changed.', artifact: flow('Second', ['a', 'b']) as never }),
+    ]);
+    expect(screen.flow()?.name).toBe('Second');
+    expect(screen.flowMessageId()).toBe(11);
+    screen.tab.set('trace');
+    screen.showFlow(10);
+    expect(screen.flow()?.name).toBe('First');
+    expect(screen.tab()).toBe('flow');
+  });
+
+  it('offers healthcare designs and generic asks as suggestions', () => {
+    const { screen } = screenWith();
+    const all = screen.suggestions.flatMap(g => g.prompts);
+    expect(all.some(p => p.includes('lab results'))).toBe(true);
+    expect(all.some(p => p.includes('orders.csv'))).toBe(true);
+    screen.useSuggestion(all[0]);
+    expect(screen.draft()).toBe(all[0]);
   });
 });
 
