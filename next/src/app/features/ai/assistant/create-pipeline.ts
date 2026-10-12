@@ -28,6 +28,12 @@ type StepState = 'todo' | 'doing' | 'done' | 'failed';
 
 export const CREATE_STEPS = ['Pipeline', 'Steps', 'Pipeline task', 'Schedule', 'Trigger'] as const;
 
+/**
+ * Core asks every pipeline for at least one field (what its task form collects): a designed pipeline gets one optional
+ * note, which its steps never need -- they read their own source.
+ */
+export const PIPELINE_FIELDS = [{ tagKey: 'note', label: 'Note', fieldType: 'text', required: false, position: 0 }];
+
 /** The job Core is asked for: manual, a schedule (every hour/day/week/month at a time), or manual with an inbox trigger. */
 export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrigger, today: string): Record<string, unknown> {
   const payload: Record<string, unknown> = {
@@ -172,7 +178,7 @@ export class CreatePipeline implements OnInit {
       // 1. The pipeline: refused when the id is taken (the person picks another).
       await this.step('Pipeline', async () => {
         const saved = await this.post('/pipeline.json/save', { pipelineId: pid, pipelineName: name, sourceTaskTypeId: topic, status: 'Active',
-          description: (this.data.flow.description || `Designed with the AI Assistant: ${name}.`).slice(0, 500), fields: [] });
+          description: (this.data.flow.description || `Designed with the AI Assistant: ${name}.`).slice(0, 500), fields: PIPELINE_FIELDS });
         return saved.message || `${pid} saved.`;
       });
       const pipelineKey = await this.pipelineKeyOf(pid);
