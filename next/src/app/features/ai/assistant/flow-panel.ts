@@ -149,7 +149,7 @@ export class FlowPanel {
    */
   readonly direction = linkedSignal<PipelineFlowArtifact | null, 'LR' | 'TB'>({
     source: this.flow,
-    computation: (f, previous) => previous?.value ?? ((f?.flow.nodes.length ?? 0) > 5 ? 'TB' : 'LR'),
+    computation: (f, previous) => previous?.value ?? ((f?.flow.nodes.length ?? 0) > 4 ? 'TB' : 'LR'),
   });
 
   /** Settings the person filled, by step key; kept across a redraw for the steps the edit kept. */

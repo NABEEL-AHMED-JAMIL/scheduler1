@@ -107,7 +107,7 @@ export function byTask(t: StepTimeline, basis: MapBasis): { task: string; count:
       </div>
       <div class="rm-grid">
         <div class="rm-canvas rounded-lg border border-subtle overflow-hidden">
-          <app-flow-graph [nodes]="m.nodes" [edges]="m.edges" [selected]="selected()" direction="LR" [minFit]="0.55" ariaLabel="Run plan map"
+          <app-flow-graph [nodes]="m.nodes" [edges]="m.edges" [selected]="selected()" direction="LR" [minFit]="0.75" ariaLabel="Run plan map"
                           (select)="selected.set($event)" />
         </div>
         <section class="rounded-lg border border-subtle px-3 py-2.5 flex flex-col gap-2 min-w-0" aria-label="Overview">

@@ -211,7 +211,12 @@ export class Assistant implements OnInit {
     const id = this.traceRunId();
     if (live && (id == null || id === live.run.toolRunId)) return { run: live.run, calls: live.calls, live: !live.done };
     const state = id != null ? this.traces()[id] : null;
-    if (state?.trace) return { run: { ...state.trace.run } as TraceRun, calls: state.trace.calls, live: false };
+    if (state?.trace) {
+      const r = state.trace.run as ToolTrace['run'] & { dateFinished?: string | null; elapsedMs?: number | null };
+      // A finished run's time: from when it was made to when it finished (both the platform's wall-clock).
+      const elapsedMs = r.elapsedMs ?? (r.dateCreated && r.dateFinished ? Math.max(0, Date.parse(r.dateFinished) - Date.parse(r.dateCreated)) : null);
+      return { run: { ...r, elapsedMs } as TraceRun, calls: state.trace.calls, live: false };
+    }
     return { run: null, calls: [], live: false };
   });
   readonly traceRuns = computed(() => {
