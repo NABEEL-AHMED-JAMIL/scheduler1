@@ -97,7 +97,17 @@
       </div>
 
       <div class="space-y-4">
-        @if (me.mustChangePassword) {
+        @if (me.mustChangePassword && auth.user()?.passwordExpired) {
+          <div class="card p-4 flex items-start gap-2.5 border-[color:var(--accent-mark)]" data-test="password-expired">
+            <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
+            <p class="text-sm">
+              <strong>Your password has expired.</strong>
+              <span class="text-[color:var(--text-secondary)]">
+                It is older than your workspace allows. Choose a new one below to carry on.
+              </span>
+            </p>
+          </div>
+        } @else if (me.mustChangePassword) {
           <div class="card p-4 flex items-start gap-2.5 border-[color:var(--accent-mark)]">
             <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
             <p class="text-sm">
@@ -195,11 +205,15 @@
                      [value]="currentPassword()"
                      (input)="currentPassword.set($any($event.target).value)" />
             </app-field>
-            <app-field label="New password" for="newPassword" hint="At least 8 characters.">
-              <input id="newPassword" type="password" class="input" autocomplete="new-password"
-                     [value]="newPassword()"
-                     (input)="newPassword.set($any($event.target).value)" />
-            </app-field>
+            <div>
+              <app-field label="New password" for="newPassword">
+                <input id="newPassword" type="password" class="input" autocomplete="new-password"
+                       [value]="newPassword()"
+                       (input)="newPassword.set($any($event.target).value)" />
+              </app-field>
+              <!-- MIG-353: the workspace's rules, ticked as they are met; the server names any it refuses. -->
+              <app-password-rules [rules]="rules()" [password]="newPassword()" />
+            </div>
           </div>
 
           @if (passwordError()) {

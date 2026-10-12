@@ -36,6 +36,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/landing/landing').then(m => m.Landing),
   },
   {
+    // MIG-353 part 5: where a company's identity provider returns a person (the redirect URI its administrator registers).
+    // Public on purpose: the code and the state in the address are the proof, and Identity checks both.
+    path: 'sso/callback',
+    title: 'Signing in',
+    loadComponent: () => import('./features/login/sso-callback').then(m => m.SsoCallback),
+  },
+  {
     // Public: whoever is asking for a workspace has no account yet, which is the ask.
     path: 'request-workspace',
     title: 'Request a workspace',
@@ -650,6 +657,16 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-353: Administration › Security -- the workspace's sign-in rules (password, lockout, idle sign-out, two-factor),
+        // single sign-on and the sign-in history. Role-gated like Users: every call behind it is TENANT_ADMIN, and a platform
+        // administrator also sets the platform's defaults here.
+        path: 'administration/security',
+        title: 'Security',
+        loadComponent: () => import('./features/admin/security/workspace-security').then(m => m.WorkspaceSecurity),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'administration/tenants',
         title: 'Tenants',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
@@ -714,6 +731,12 @@ export const routes: Routes = [
         path: 'profile',
         title: 'Your profile',
         loadComponent: () => import('./features/profile/profile').then(m => m.Profile),
+      },
+      {
+        // MIG-353: My account › Security -- the person's own password, two-factor login, sessions and sign-in history.
+        path: 'account/security',
+        title: 'Security',
+        loadComponent: () => import('./features/account/account-security').then(m => m.AccountSecurity),
       },
       {
         path: 'notifications',

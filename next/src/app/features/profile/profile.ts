@@ -23,6 +23,8 @@ import { formatDuration } from '../../shared/ui/time-format';
 import { instantMs } from '../../core/instant';
 import { Field } from '../../shared/ui/field';
 import { StatTile } from '../../shared/ui/stat-tile';
+import { AccountSecurityApi, PasswordRules } from '../account/account-security.api';
+import { PasswordRulesHint } from '../account/password-rules';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
 export interface ActivityRun {
@@ -72,7 +74,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [PhoneInput, Icon, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile],
+  imports: [PhoneInput, Icon, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {
@@ -81,6 +83,7 @@ export class Profile implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly storage = inject(StorageService);
   readonly auth = inject(AuthService);
+  private readonly security = inject(AccountSecurityApi);
 
   readonly profile = signal<UserProfile | null>(null);
   readonly loading = signal(true);
@@ -238,6 +241,12 @@ export class Profile implements OnInit {
 
   ngOnInit(): void {
     this.load();
+    if (!this.auth.isManagedSession()) {
+      this.security.myRules().subscribe({
+        next: r => { if (r.status === API_SUCCESS && r.data) this.rules.set(r.data); },
+        error: () => { /* the server still holds the rules */ },
+      });
+    }
     this.http.get<ApiResponse<UserActivity>>(`${API_BASE}/sourceJob.json/myActivity`).subscribe({
       next: r => {
         this.activityLoading.set(false);
@@ -279,9 +288,11 @@ export class Profile implements OnInit {
   readonly newPassword = signal('');
   readonly savingPassword = signal(false);
   readonly passwordError = signal('');
+  /** MIG-353: the workspace's password rules, beside the new password. */
+  readonly rules = signal<PasswordRules | null>(null);
 
   canChangePassword(): boolean {
-    return !!this.currentPassword() && this.newPassword().length >= 8;
+    return !!this.currentPassword() && this.newPassword().length >= (this.rules()?.passwordMinLength ?? 8);
   }
 
   /**

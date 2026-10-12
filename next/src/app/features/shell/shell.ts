@@ -1,4 +1,4 @@
-import { Component, HostListener, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, ViewContainerRef, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
@@ -79,6 +79,14 @@ export class Shell {
   readonly currentUrl = signal(this.router.url);
 
   constructor() {
+    // MIG-353: idle sign-out -- the warning a minute before, and the sign-out. Its own lazy chunk, fetched after the
+    // shell's first paint; a dynamic import rather than @defer, which would pull the defer runtime into the initial bundle.
+    const host = inject(ViewContainerRef);
+    let destroyed = false;
+    afterNextRender(() => {
+      void import('../../core/auth/idle-guard').then(m => { if (!destroyed && !host.length) host.createComponent(m.IdleGuard); });
+    });
+    inject(DestroyRef).onDestroy(() => { destroyed = true; host.clear(); });
     this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
       if (event instanceof NavigationEnd) {
         this.currentUrl.set(event.urlAfterRedirects);
@@ -267,6 +275,9 @@ export class Shell {
           hint: 'Who can sign in, and as what' },
         { label: 'Access profiles', path: '/administration/access-profiles', icon: 'shield', adminOnly: true,
           hint: 'Which pages your tenant users can open.' },
+        // MIG-353: password rules, lockout, idle sign-out, two-factor, single sign-on and the sign-in history.
+        { label: 'Security', path: '/administration/security', icon: 'key', adminOnly: true,
+          hint: 'Sign-in rules, single sign-on and sign-in history' },
         // MIG-254: members may read it too (the route rides the Prompts key), but it is administration: they reach it
         // from the AI Assistant's Context panel, not from this menu.
         { label: 'Data policies', path: '/administration/data-policies', icon: 'lock', adminOnly: true,

@@ -23,6 +23,12 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/sso/callback",
+      "title": "Signing in",
+      "guards": [],
+      "lazy": true
+    },
+    {
       "path": "/request-workspace",
       "title": "Request a workspace",
       "guards": [],
@@ -638,6 +644,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/security",
+      "title": "Security",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/administration/tenants",
       "title": "Tenants",
       "minRole": "PLATFORM_ADMIN",
@@ -703,6 +718,12 @@ export const PINNED: Record<string, unknown> = {
     {
       "path": "/profile",
       "title": "Your profile",
+      "guards": [],
+      "lazy": true
+    },
+    {
+      "path": "/account/security",
+      "title": "Security",
       "guards": [],
       "lazy": true
     },

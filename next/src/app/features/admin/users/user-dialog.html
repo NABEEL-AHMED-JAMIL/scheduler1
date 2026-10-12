@@ -66,6 +66,9 @@
              autocomplete="new-password"
              [placeholder]="isEdit() ? '' : 'leave blank to send a one-time password'" />
     </app-field>
+    @if (typedPassword()) {
+      <app-password-rules [rules]="passwordRules()" [password]="typedPassword()" />
+    }
 
     <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"
                [control]="form.get('userRole')" [submitted]="submitted()">

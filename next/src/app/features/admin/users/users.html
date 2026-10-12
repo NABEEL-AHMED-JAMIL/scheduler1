@@ -246,6 +246,17 @@
                         [disabled]="busy() === user.appUserId" title="Send a new one-time password">
                   <app-icon name="key" />Reset
                 </button>
+                @if (lockedUntil(user)) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="unlock(user)" [disabled]="busy() === user.appUserId">
+                    <app-icon name="lock" />Unlock
+                  </button>
+                }
+                @if (mfaOn(user)) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="resetMfa(user)" [disabled]="busy() === user.appUserId"
+                          title="Reset their two-factor login">
+                    <app-icon name="shield" />2FA
+                  </button>
+                }
                 <button type="button" class="btn btn-ghost btn-sm"
                         [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
                         [disabled]="isSelf(user) || busy() === user.appUserId"
@@ -452,7 +463,16 @@
               }
             </td>
 
-            <td class="text-right"><app-status [label]="user.status" [quiet]="true" /></td>
+            <td class="text-right">
+              <div class="inline-flex flex-col items-end gap-1">
+                <app-status [label]="user.status" [quiet]="true" />
+                <!-- MIG-353: a lock in force (the workspace's lockout) and two-factor login, at a glance. -->
+                @if (lockedUntil(user)) {
+                  <span class="pill pill-crit" data-test="user-locked" [title]="'Locked until ' + (lockedUntil(user) | serverTime: 'dateTime')">Locked</span>
+                }
+                @if (mfaOn(user)) { <span class="pill pill-ok" title="Signs in with a code from an authenticator app">2FA</span> }
+              </div>
+            </td>
 
             <td class="text-right">
               <!-- No menu at all on a row this administrator cannot act on. Every item in it
@@ -481,6 +501,16 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
                     <app-icon name="key" />Reset password
                   </button>
+                  @if (lockedUntil(user)) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="unlock(user)" data-test="user-unlock">
+                      <app-icon name="lock" />Unlock
+                    </button>
+                  }
+                  @if (mfaOn(user)) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetMfa(user)" data-test="user-reset-mfa">
+                      <app-icon name="shield" />Reset two-factor login
+                    </button>
+                  }
                   <div class="my-1 border-t border-subtle"></div>
                   <button cdkMenuItem class="menu-item"
                           [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"

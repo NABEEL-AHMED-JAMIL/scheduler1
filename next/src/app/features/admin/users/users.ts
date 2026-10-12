@@ -27,6 +27,7 @@ import { ResetPasswordDialog } from './reset-password-dialog';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { AccountSecurityApi, PersonStanding } from '../../account/account-security.api';
 
 /** What one user owns and how their runs have gone, from dashboard.json/userStatistics. */
 export interface UserStatistic {
@@ -87,6 +88,7 @@ export class Users implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly profilesApi = inject(AccessProfilesService);
   private readonly dialog = inject(Dialog);
+  private readonly security = inject(AccountSecurityApi);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
@@ -239,6 +241,7 @@ export class Users implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.loadStats();
+    this.loadStanding();
     this.http.get<ApiResponse<AppUser[]>>(`${API_BASE}/appUser.json/listUsers`).subscribe({
       next: response => {
         this.loading.set(false);
@@ -397,11 +400,62 @@ export class Users implements OnInit {
     });
   }
 
+  // ---- MIG-353: each person's sign-in standing -- a lock, two-factor -- and an administrator's unlock and reset ----
+
+  /** {appUserId: {lockedUntil, failedSignIns, mfaEnabled, ...}} from tenant.json/security/people. */
+  readonly standing = signal<Record<string, PersonStanding>>({});
+
+  private loadStanding(): void {
+    this.security.people().subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.standing.set(r.data ?? {}); },
+      error: () => { /* the list stands without it */ },
+    });
+  }
+
+  lockedUntil(user: AppUser): string | null {
+    return this.standing()[String(user.appUserId)]?.lockedUntil ?? null;
+  }
+
+  mfaOn(user: AppUser): boolean {
+    return !!this.standing()[String(user.appUserId)]?.mfaEnabled;
+  }
+
+  unlock(user: AppUser): void {
+    this.busy.set(user.appUserId);
+    this.security.unlock(user.appUserId).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status === API_SUCCESS) { this.toast.success(r.message); this.loadStanding(); } else this.toast.error(r.message);
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'Could not unlock the account.'); },
+    });
+  }
+
+  async resetMfa(user: AppUser): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Reset two-factor login for ${user.fullName || user.username}?`,
+      body: 'Their authenticator app and recovery codes stop working and they are signed out everywhere. If the workspace requires '
+        + 'two-factor login they set it up again at their next sign-in. Do this only when you are sure it is them asking.',
+      confirmLabel: 'Reset two-factor login',
+      danger: true,
+    });
+    if (!ok) return;
+    this.busy.set(user.appUserId);
+    this.security.resetMfa(user.appUserId).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status === API_SUCCESS) { this.toast.success(r.message); this.loadStanding(); } else this.toast.error(r.message);
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'Could not reset two-factor login.'); },
+    });
+  }
+
   resetPassword(user: AppUser): void {
-    // The length rule lives in the dialog now, on the field, so a short password never closes it.
+    // The length rule lives in the dialog now, on the field, so a short password never closes it. MIG-353: with the
+    // person's workspace's rules beside it.
     this.dialog.open<string>(ResetPasswordDialog, {
       hasBackdrop: true,
-      data: { name: user.fullName || user.username },
+      data: { name: user.fullName || user.username, tenantId: user.tenantId ?? null },
     }).closed.subscribe(password => {
       if (!password) return;
       // The dialog is already gone by this point (it closes on submit, before this fires), so

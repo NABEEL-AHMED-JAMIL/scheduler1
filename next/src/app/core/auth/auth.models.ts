@@ -100,6 +100,14 @@ export interface AuthUser {
   managementMode?: ManagementMode | null;
   /** MIG-244: a staff member's managed-service session in a customer's workspace (the token's `msvc`). */
   managedService?: boolean | null;
+  /** MIG-353: the workspace's idle sign-out, in minutes; the console warns a minute before and signs out. */
+  idleMinutes?: number | null;
+  /** MIG-353: when the server ends this session unless it is used (an ISO instant); every refresh moves it. */
+  idleExpiresAt?: string | null;
+  /** MIG-353: the password is older than the workspace allows, so the change is owed (mustChangePassword). */
+  passwordExpired?: boolean | null;
+  /** MIG-353: how this session signed in: PASSWORD, MFA, RECOVERY_CODE or SSO. */
+  signInMethod?: string | null;
 }
 
 /** MIG-244: SELF, the customer's administrators build; MANAGED, our team does and the customer's people use. */

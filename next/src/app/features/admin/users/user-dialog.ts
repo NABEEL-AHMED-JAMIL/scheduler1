@@ -11,6 +11,8 @@ import { PhoneInput } from '../../../shared/ui/phone-input';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ROLE_META, UserRole } from '../../../core/auth/auth.models';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
+import { AccountSecurityApi, PasswordRules } from '../../account/account-security.api';
+import { PasswordRulesHint } from '../../account/password-rules';
 
 /**
  * The picker's options, taken from the table that already names every role rather than said a
@@ -29,7 +31,7 @@ const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
 
 @Component({
   selector: 'app-user-dialog',
-  imports: [ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox],
+  imports: [PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox],
   templateUrl: './user-dialog.html',
 })
 export class UserDialog {
@@ -167,7 +169,22 @@ export class UserDialog {
     // counter is dropped with the account).
   });
 
+  /** MIG-353: the target workspace's password rules, beside a typed password (a generated one owes a change instead). */
+  private readonly security = inject(AccountSecurityApi);
+  readonly passwordRules = signal<PasswordRules | null>(null);
+  readonly typedPassword = signal('');
+
+  private loadRules(tenantId: number | null): void {
+    this.security.rulesFor(tenantId).subscribe({
+      next: r => this.passwordRules.set(r.status === API_SUCCESS ? r.data ?? null : null),
+      error: () => this.passwordRules.set(null),
+    });
+  }
+
   constructor() {
+    this.form.get('password')!.valueChanges.subscribe((value: string | null) => this.typedPassword.set(value ?? ''));
+    this.loadRules(this.form.getRawValue().tenantId ?? null);
+    this.form.get('tenantId')!.valueChanges.subscribe((value: number | null) => this.loadRules(value ?? null));
     // The select is fed from ROLES, so the only values it can emit are the three role literals.
     this.form.get('userRole')!.valueChanges.subscribe((value: UserRole) => this.role.set(value));
     this.form.get('tenantId')!.valueChanges.subscribe((value: number | null) => this.tenant.set(value ?? null));

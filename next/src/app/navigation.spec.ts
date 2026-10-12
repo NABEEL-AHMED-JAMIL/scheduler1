@@ -367,6 +367,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const ADMINISTRATION = [
     'Administration › Users -> /administration/users',
     'Administration › Access profiles -> /administration/access-profiles',
+    // MIG-353: password rules, lockout, idle sign-out, two-factor, single sign-on, sign-in history.
+    'Administration › Security -> /administration/security',
     'Administration › Data policies -> /administration/data-policies',
   ];
 

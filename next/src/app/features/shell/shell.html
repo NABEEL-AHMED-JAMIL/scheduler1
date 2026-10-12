@@ -114,6 +114,11 @@
                    class="menu-item text-sm">
                   <app-icon name="user" size="0.95em" />Your profile
                 </a>
+                <!-- MIG-353: My account › Security -- password, two-factor, sessions and sign-in history. -->
+                <a routerLink="/account/security" (click)="openMenu.set(null)"
+                   class="menu-item text-sm">
+                  <app-icon name="lock" size="0.95em" />Security
+                </a>
               }
               <a routerLink="/notifications" (click)="openMenu.set(null)"
                  class="menu-item text-sm">

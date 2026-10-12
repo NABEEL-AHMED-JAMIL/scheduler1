@@ -21,6 +21,19 @@ export const PASSWORD_CHANGED_REASON = 'password-changed';
 /** What the login page says for it. */
 export const PASSWORD_CHANGED_NOTICE = 'Your password was changed. Please sign in with the new password.';
 
+/** MIG-353: the login page's `reason` for a session ended by the workspace's idle sign-out. */
+export const IDLE_REASON = 'idle';
+/**
+ * MIG-353: when this browser last saw its person act (epoch milliseconds), shared by every tab. The idle guard writes it;
+ * a refresh sends it, so the server moves the session's idle deadline from real activity, not from the refresh itself.
+ */
+export const LAST_ACTIVITY_KEY = 'etl_last_activity';
+
+/** Whether a refused refresh was the server's idle sign-out (its sentence names the inactivity). */
+export function isIdleRefusal(message: string | null | undefined): boolean {
+  return !!message && message.includes('inactivity');
+}
+
 /**
  * The role the server signed into the access token, or null when there is nothing readable.
  *
@@ -299,11 +312,15 @@ export class AuthService {
   login(username: string, password: string): Observable<ApiResponse<AuthUser>> {
     return this.http
       .post<ApiResponse<AuthUser>>(`${API_BASE}/auth.json/login`, { username, password })
-      .pipe(tap(response => {
-        if (response.status === API_SUCCESS && response.data) {
-          this.persist(response.data);
-        }
-      }));
+      .pipe(tap(response => this.signedIn(response)));
+  }
+
+  /**
+   * A sign-in's answer, from the password (login) or a later step (MIG-353: a two-factor code, single sign-on): kept only
+   * when it carries a session -- a two-factor challenge carries none.
+   */
+  signedIn(response: ApiResponse<AuthUser>): void {
+    if (response.status === API_SUCCESS && response.data?.accessToken) this.persist(response.data);
   }
 
   /**
@@ -313,8 +330,9 @@ export class AuthService {
    */
   refresh(): Observable<ApiResponse<AuthUser>> {
     const refreshToken = this.currentUser()?.refreshToken ?? '';
+    const lastActivityAt = Number(readStorage(LAST_ACTIVITY_KEY)) || null;
     return this.http
-      .post<ApiResponse<AuthUser>>(`${API_BASE}/auth.json/refresh`, { refreshToken })
+      .post<ApiResponse<AuthUser>>(`${API_BASE}/auth.json/refresh`, { refreshToken, lastActivityAt })
       .pipe(tap(response => {
         if (response.status === API_SUCCESS && response.data) {
           this.persist({ ...this.currentUser(), ...response.data } as AuthUser);
@@ -329,12 +347,12 @@ export class AuthService {
    * /auth.json/logout) -- forgetting them only in this tab left both working. Fire and forget: a server that cannot be
    * reached must not keep anyone signed in here. Other open tabs follow through the storage event (see below).
    */
-  logout(): void {
+  logout(reason?: string): void {
     this.revoke(this.currentUser());
     // A staff member signed out inside a managed session leaves both: the platform session held aside too.
     this.revoke(this.readHeldPlatformSession());
     this.clear();
-    void this.router.navigate(['/login']);
+    void this.router.navigate(['/login'], reason ? { queryParams: { reason } } : {});
   }
 
   private revoke(user: AuthUser | null): void {
