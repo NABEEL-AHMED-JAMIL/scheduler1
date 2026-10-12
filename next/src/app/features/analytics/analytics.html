@@ -378,6 +378,11 @@
                       [attr.aria-expanded]="filesOpen()" (click)="openFiles($event.currentTarget)">
                 <app-icon name="folder" /><span class="max-sm:sr-only">Files</span>
               </button>
+              <!-- MIG-357: suggested charts of this file, from its columns (the panel loads when pressed). -->
+              <button type="button" class="btn btn-default btn-sm" data-test="visualise" title="Suggested charts of this file"
+                      (click)="visualise()">
+                <app-icon name="chart" /><span class="max-sm:sr-only">Visualise</span>
+              </button>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="More for this file"
                       [cdkMenuTriggerFor]="fileMenu">
                 <app-icon name="dots" />

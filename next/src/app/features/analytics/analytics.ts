@@ -24,6 +24,7 @@ import { capTitle } from '../../shared/ui/long-text';
 import { shortLabel } from '../../shared/charts/short-label';
 import { WRAPPED_LINES } from './widget-table';
 import { WidgetView, queryView } from './widget-view';
+import { openVisualise } from './charts/visualise-open';
 import { DatasetRegistry } from './dataset-registry';
 import { WidgetChart } from './widget-chart';
 import { KINDS, kindInfo } from './widget-kinds';
@@ -658,6 +659,14 @@ export class Analytics implements OnInit {
   }
 
   openFiles(trigger?: EventTarget | null): void { this.openPanel('files', trigger); }
+
+  /** MIG-357: Visualise -- suggested charts of the open file from its shape, each a bounded query as the reader. */
+  visualise(): void {
+    const connection = this.connection();
+    const path = this.path();
+    if (!connection || !path) return;
+    void openVisualise(this.dialog, { name: path.split('/').filter(Boolean).pop() ?? path, connection, path });
+  }
 
   closeFiles(): void { if (this.filesOpen()) this.closePanel(); }
 
