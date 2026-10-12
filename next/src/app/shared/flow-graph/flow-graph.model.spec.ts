@@ -27,9 +27,34 @@ describe('layoutFlow', () => {
     expect(['x', 'y', 'z'].map(id => m.get(id)!.layer)).toEqual([1, 1, 1]);
     expect(m.get('sink')!.layer).toBe(2);
     const mid = (id: string) => m.get(id)!.y + m.get(id)!.h / 2;
-    expect(mid('src')).toBeCloseTo(mid('y'), 5);
-    expect(mid('sink')).toBeCloseTo(mid('y'), 5);
+    expect(mid('src')).toBeCloseTo(mid('sink'), 5);
     expect(m.get('x')!.y).toBeLessThan(m.get('y')!.y);
+    expect(m.get('y')!.y).toBeLessThan(m.get('z')!.y);
+    const fanned = byId(layoutFlow(nodes, edges.slice(0, 6)));
+    const fmid = (id: string) => fanned.get(id)!.y + fanned.get(id)!.h / 2;
+    expect(fmid('src')).toBeCloseTo(fmid('y'), 5);
+    expect(fmid('sink')).toBeCloseTo(fmid('y'), 5);
+  });
+
+  it('runs an edge that skips layers through a lane of its own, round the nodes in its way, not through them', () => {
+    const nodes = ['a', 'b', 'c', 'd'].map(id => node(id));
+    for (const direction of ['TB', 'LR'] as const) {
+      const l = layoutFlow(nodes, [...chain('a', 'b', 'c', 'd'), { from: 'a', to: 'd', label: 'joined' }], { direction });
+      const m = byId(l);
+      const skip = l.edges.find(e => e.from === 'a' && e.to === 'd')!;
+      const along = [...skip.path.matchAll(/L([\d.-]+),([\d.-]+)/g)].map(x => [Number(x[1]), Number(x[2])]);
+      expect(along).toHaveLength(2);
+      for (const [px, py] of along) {
+        for (const id of ['b', 'c']) {
+          const b = m.get(id)!;
+          const inside = direction === 'TB' ? px > b.x && px < b.x + b.w : py > b.y && py < b.y + b.h;
+          expect(inside, `${direction}: the a>d lane crosses ${id}`).toBe(false);
+        }
+      }
+      const d = m.get('d')!;
+      if (direction === 'TB') expect(skip.labelY).toBeGreaterThan(m.get('c')!.y + m.get('c')!.h);
+      expect(skip.path.endsWith(direction === 'TB' ? `${d.x + d.w / 2},${d.y}` : `${d.x},${d.y + d.h / 2}`)).toBe(true);
+    }
   });
 
   it('orders a layer by its predecessors to avoid crossings', () => {

@@ -298,7 +298,7 @@ describe('Workflow designer, the design -- the workflow', () => {
     expect(designer.steps().map(s => s.key)).toEqual(['admin', 'condition', 'tell', 'wait']);
     expect(designer.selected()).toBe(1);
     expect(el.querySelector('[data-test="add-menu"]')).toBeNull();
-    expect([...el.querySelectorAll('.fg-elabel text')].map(t => t.textContent)).toContain('yes');
+    expect([...el.querySelectorAll('.fg-elabel text')].map(t => t.textContent)).toContain('yes / no');
 
     (el.querySelector('[data-test="add-step"]') as HTMLButtonElement).click();
     render();

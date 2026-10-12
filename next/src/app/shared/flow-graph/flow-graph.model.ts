@@ -43,6 +43,8 @@ export const FLOW_NODE_WIDTH = 224;
 export const FLOW_NODE_BASE = 54;
 export const FLOW_ROW = { badges: 22, metric: 18, share: 10 } as const;
 export const FLOW_METRICS_PER_ROW = 2;
+/** The breadth of an edge's lane through a layer it skips, the gap beside one, and how many lanes a layout makes at most. */
+const LANE = 16, LANE_GAP = 14, MAX_LANES = 4000;
 
 /** Where each optional row of a node starts, and the node's total height. Shared with the renderer. */
 export function nodeRows(node: FlowNode, base = FLOW_NODE_BASE): { badgesY: number; metricsY: number; shareY: number; h: number } {
@@ -122,11 +124,38 @@ export function layoutFlow(nodes: FlowNode[], edges: FlowEdge[], opts: FlowLayou
     }
   }
   const layerCount = Math.max(...layer) + 1;
+
+  // An edge that skips layers runs through a lane of its own in each layer it passes (a dummy node, as Sugiyama does):
+  // ordered with the nodes, so it goes round them rather than straight through the ones in its way.
+  const lane = new Map<number, number[]>();
+  const layerOf = [...layer];
+  const predsX: number[][] = list.map(() => []);
+  const succsX: number[][] = list.map(() => []);
+  const link = (a: number, b: number) => { succsX[a].push(b); predsX[b].push(a); };
+  let dummies = 0;
+  kept.forEach((e, ei) => {
+    const v = index.get(e.from)!, w = index.get(e.to)!;
+    if (back.has(v + '>' + w)) return;
+    const span = layer[w] - layer[v];
+    if (span <= 1 || dummies + span - 1 > MAX_LANES) { link(v, w); return; }
+    const chain: number[] = [];
+    let prev = v;
+    for (let l = layer[v] + 1; l < layer[w]; l++) {
+      const d = layerOf.length;
+      layerOf.push(l); predsX.push([]); succsX.push([]);
+      link(prev, d); chain.push(d); prev = d;
+    }
+    link(prev, w);
+    dummies += chain.length;
+    lane.set(ei, chain);
+  });
+  const total = layerOf.length;
+  const isLane = (v: number) => v >= n;
   const layers: number[][] = Array.from({ length: layerCount }, () => []);
-  for (let v = 0; v < n; v++) layers[layer[v]].push(v);
+  for (let v = 0; v < total; v++) layers[layerOf[v]].push(v);
 
   // Barycentre ordering. Positions are centred (index minus half the layer), as the layers are drawn.
-  const pos = new Float64Array(n);
+  const pos = new Float64Array(total);
   const place = (l: number[]) => l.forEach((v, i) => (pos[v] = i - (l.length - 1) / 2));
   layers.forEach(place);
   const sweep = (order: number[], neighbours: number[][]) => {
@@ -143,29 +172,44 @@ export function layoutFlow(nodes: FlowNode[], edges: FlowEdge[], opts: FlowLayou
   };
   const down = layers.map((_, i) => i).slice(1);
   const up = layers.map((_, i) => i).reverse().slice(1);
-  sweep(down, preds); sweep(up, succs); sweep(down, preds);
+  sweep(down, predsX); sweep(up, succsX); sweep(down, predsX);
 
-  // Coordinates.
+  // Coordinates. A lane is LANE wide across its layer, with a small gap beside it.
   const heights = list.map(v => nodeRows(v, base).h);
-  const x = new Float64Array(n), y = new Float64Array(n);
+  const x = new Float64Array(total), y = new Float64Array(total);
+  /** Each layer's start and depth along the flow (TB: its row's top and height; LR: its column's left and width). */
+  const bandAt = new Float64Array(layerCount), bandDepth = new Float64Array(layerCount);
+  const gapBeside = (a: number, b: number, gap: number) => (isLane(a) || isLane(b) ? LANE_GAP : gap);
+  const extentOf = (l: number[], size: (v: number) => number, gap: number) =>
+    l.reduce((a, v, i) => a + size(v) + (i ? gapBeside(l[i - 1], v, gap) : 0), 0);
   let width: number, height: number;
   if (dir === 'LR') {
-    const extent = layers.map(l => l.reduce((a, v) => a + heights[v], 0) + gapY * (l.length - 1));
+    const size = (v: number) => (isLane(v) ? LANE : heights[v]);
+    const extent = layers.map(l => extentOf(l, size, gapY));
     const tallest = Math.max(...extent);
     layers.forEach((l, li) => {
       let cy = FLOW_PAD + (tallest - extent[li]) / 2;
-      for (const v of l) { x[v] = FLOW_PAD + li * (nodeW + gapX); y[v] = cy; cy += heights[v] + gapY; }
+      bandAt[li] = FLOW_PAD + li * (nodeW + gapX); bandDepth[li] = nodeW;
+      l.forEach((v, i) => {
+        if (i) cy += gapBeside(l[i - 1], v, gapY);
+        x[v] = bandAt[li]; y[v] = cy; cy += size(v);
+      });
     });
     width = FLOW_PAD * 2 + layerCount * nodeW + (layerCount - 1) * gapX;
     height = FLOW_PAD * 2 + tallest;
   } else {
-    const extent = layers.map(l => l.length * nodeW + gapX * (l.length - 1));
+    const size = (v: number) => (isLane(v) ? LANE : nodeW);
+    const extent = layers.map(l => extentOf(l, size, gapX));
     const widest = Math.max(...extent);
     let cy = FLOW_PAD;
     layers.forEach((l, li) => {
-      const rowH = Math.max(...l.map(v => heights[v]));
+      const rowH = Math.max(0, ...l.filter(v => !isLane(v)).map(v => heights[v]));
+      bandAt[li] = cy; bandDepth[li] = rowH;
       let cx = FLOW_PAD + (widest - extent[li]) / 2;
-      for (const v of l) { x[v] = cx; y[v] = cy + (rowH - heights[v]) / 2; cx += nodeW + gapX; }
+      l.forEach((v, i) => {
+        if (i) cx += gapBeside(l[i - 1], v, gapX);
+        x[v] = cx; y[v] = isLane(v) ? cy : cy + (rowH - heights[v]) / 2; cx += size(v);
+      });
       cy += rowH + gapY;
     });
     width = FLOW_PAD * 2 + widest;
@@ -173,23 +217,34 @@ export function layoutFlow(nodes: FlowNode[], edges: FlowEdge[], opts: FlowLayou
   }
 
   const placed: PlacedFlowNode[] = list.map((node, v) => ({ ...node, x: r(x[v]), y: r(y[v]), w: nodeW, h: heights[v], layer: layer[v] }));
-  const placedEdges: PlacedFlowEdge[] = kept.map(e => {
-    const a = placed[index.get(e.from)!], b = placed[index.get(e.to)!];
-    let sx, sy, ex, ey, c1x, c1y, c2x, c2y;
-    if (dir === 'LR') {
-      sx = a.x + a.w; sy = a.y + a.h / 2; ex = b.x; ey = b.y + b.h / 2;
-      const d = Math.max(Math.abs(ex - sx) / 2, 32);
-      c1x = sx + d; c1y = sy; c2x = ex - d; c2y = ey;
-    } else {
-      sx = a.x + a.w / 2; sy = a.y + a.h; ex = b.x + b.w / 2; ey = b.y;
-      const d = Math.max(Math.abs(ey - sy) / 2, 32);
-      c1x = sx; c1y = sy + d; c2x = ex; c2y = ey - d;
-    }
+  /** A curve from one point to the next across the gap between two layers, leaving and arriving along the flow. */
+  const curve = (sx: number, sy: number, ex: number, ey: number) => {
+    let c1x, c1y, c2x, c2y;
+    if (dir === 'LR') { const d = Math.max(Math.abs(ex - sx) / 2, 32); c1x = sx + d; c1y = sy; c2x = ex - d; c2y = ey; }
+    else { const d = Math.max(Math.abs(ey - sy) / 2, 32); c1x = sx; c1y = sy + d; c2x = ex; c2y = ey - d; }
     // The curve's own midpoint (t = 0.5), not the chord's: a back edge bulges away from it.
-    const labelX = r((sx + 3 * c1x + 3 * c2x + ex) / 8);
-    const labelY = r((sy + 3 * c1y + 3 * c2y + ey) / 8);
-    const path = `M${r(sx)},${r(sy)} C${r(c1x)},${r(c1y)} ${r(c2x)},${r(c2y)} ${r(ex)},${r(ey)}`;
-    return { ...e, path, labelX, labelY };
+    return { d: `C${r(c1x)},${r(c1y)} ${r(c2x)},${r(c2y)} ${r(ex)},${r(ey)}`,
+      mx: r((sx + 3 * c1x + 3 * c2x + ex) / 8), my: r((sy + 3 * c1y + 3 * c2y + ey) / 8) };
+  };
+  const placedEdges: PlacedFlowEdge[] = kept.map((e, ei) => {
+    const a = placed[index.get(e.from)!], b = placed[index.get(e.to)!];
+    const [sx, sy] = dir === 'LR' ? [a.x + a.w, a.y + a.h / 2] : [a.x + a.w / 2, a.y + a.h];
+    const [ex, ey] = dir === 'LR' ? [b.x, b.y + b.h / 2] : [b.x + b.w / 2, b.y];
+    let path = `M${r(sx)},${r(sy)}`;
+    let px = sx, py = sy;
+    for (const d of lane.get(ei) ?? []) {
+      // Into the lane, along it across the layer, and out the far side.
+      const li = layerOf[d];
+      const [ix, iy, ox, oy] = dir === 'LR'
+        ? [bandAt[li], y[d] + LANE / 2, bandAt[li] + bandDepth[li], y[d] + LANE / 2]
+        : [x[d] + LANE / 2, bandAt[li], x[d] + LANE / 2, bandAt[li] + bandDepth[li]];
+      path += ' ' + curve(px, py, ix, iy).d + ` L${r(ox)},${r(oy)}`;
+      px = ox; py = oy;
+    }
+    // The label sits on the last stretch, next to the step the edge goes into.
+    const last = curve(px, py, ex, ey);
+    path += ' ' + last.d;
+    return { ...e, path, labelX: last.mx, labelY: last.my };
   });
   return { nodes: placed, edges: placedEdges, width: r(width), height: r(height) };
 }

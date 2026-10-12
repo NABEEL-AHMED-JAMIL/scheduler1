@@ -180,8 +180,10 @@ export function pipelineEdges(steps: readonly PipelineStepLike[], opts: Pipeline
       edges.push({ from, to: step.key, ...edge });
     };
     if (readsInput(step, entry)) {
-      const from = step.input && keys.has(step.input) ? step.input : previous;
-      if (from) push(from, { label: 'rows' });
+      // The step before needs no word; an input named from further back says it reads that step's rows.
+      const named = !!step.input && keys.has(step.input) && step.input !== previous;
+      const from = named ? step.input! : previous;
+      if (from) push(from, { label: named ? 'rows' : null });
       else if (opts.startId) push(opts.startId, { label: opts.startLabel ?? 'starts' });
     }
     for (const r of refs) push(r.key, { label: r.label });
@@ -434,6 +436,9 @@ export function workflowGraph(steps: readonly WorkflowStepLike[], opts: Workflow
     if (!to) return;
     if (to === WORKFLOW_END) ends = true;
     if (to === WORKFLOW_REJECTED) rejected = true;
+    // Two ways to the same place (a condition whose yes and no both end it) are one edge that says both.
+    const same = edges.find(e => e.from === from && e.to === to);
+    if (same) { same.label = [same.label, label].filter(Boolean).join(' / ') || null; same.tone = null; same.dashed = same.dashed && dashed; return; }
     edges.push({ from, to, label, tone, dashed });
   };
   if (steps.length) link(WORKFLOW_START, steps[0].key, null);

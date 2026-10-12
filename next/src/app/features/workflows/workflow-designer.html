@@ -177,19 +177,22 @@
                     <p class="text-xs text-[color:var(--text-muted)]">Step {{ selected()! + 1 }} of {{ steps().length }}</p>
                   </div>
                   @if (canEdit()) {
-                    <span class="flex items-center gap-1">
-                      <button type="button" class="btn-circle" [disabled]="selected() === 0" (click)="move(selected()!, -1)" [attr.aria-label]="'Move “' + stepName(s) + '” up'"
-                              title="Move up" data-test="move-up"><app-icon name="arrowUp" size="0.95em" /></button>
-                      <button type="button" class="btn-circle" [disabled]="selected() === steps().length - 1" (click)="move(selected()!, 1)"
-                              [attr.aria-label]="'Move “' + stepName(s) + '” down'" title="Move down" data-test="move-down"><app-icon name="arrowDown" size="0.95em" /></button>
-                      <button type="button" class="btn-circle" (click)="openAdd(selected()! + 1)" [attr.aria-label]="'Add a step after “' + stepName(s) + '”'"
-                              title="Add a step after this one" data-test="insert-step" [attr.data-at]="selected()! + 1"><app-icon name="plus" size="0.95em" /></button>
-                    </span>
                     <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
                   }
                   <button type="button" class="btn btn-ghost btn-icon designer-props-close" (click)="closeSheet()" aria-label="Close the step's properties" data-test="close-props"><app-icon name="close" /></button>
                 </div>
                 <div class="designer-props-body">
+                  @if (canEdit()) {
+                    <!-- Where the step sits in the run: move it, or add one after it (the canvas draws the order). -->
+                    <div class="flex flex-wrap items-center gap-1.5 mb-3" role="group" aria-label="Order" data-test="step-order">
+                      <button type="button" class="btn btn-default btn-xs" [disabled]="selected() === 0" (click)="move(selected()!, -1)"
+                              [attr.aria-label]="'Move “' + stepName(s) + '” up'" title="Move up" data-test="move-up"><app-icon name="arrowUp" />Up</button>
+                      <button type="button" class="btn btn-default btn-xs" [disabled]="selected() === steps().length - 1" (click)="move(selected()!, 1)"
+                              [attr.aria-label]="'Move “' + stepName(s) + '” down'" title="Move down" data-test="move-down"><app-icon name="arrowDown" />Down</button>
+                      <button type="button" class="btn btn-default btn-xs" (click)="openAdd(selected()! + 1)" [attr.aria-label]="'Add a step after “' + stepName(s) + '”'"
+                              title="Add a step after this one" data-test="insert-step" [attr.data-at]="selected()! + 1"><app-icon name="plus" />Add after</button>
+                    </div>
+                  }
                   @let found = problemsOf(selected()!);
                   @if (found.length) {
                     <div class="flex flex-col gap-1 mb-3" role="alert" data-test="step-problems">

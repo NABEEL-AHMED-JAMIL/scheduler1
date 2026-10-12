@@ -45,7 +45,7 @@ export function stepChange(step: Step, saved: readonly Step[] | null): StepChang
       </div>
     </div>
     <div class="sf-canvas rounded-lg border border-subtle overflow-hidden">
-      <app-flow-graph [nodes]="graph().nodes" [edges]="graph().edges" [selected]="selected()" [direction]="direction()" [minFit]="0.5"
+      <app-flow-graph [nodes]="graph().nodes" [edges]="graph().edges" [selected]="selected()" [direction]="direction()" [minFit]="0.8"
                       ariaLabel="Pipeline steps as a flow" (select)="pick($event)">
         <p empty class="text-sm text-[color:var(--text-muted)]">No steps. Add one from the Task Registry: a pipeline has at least one.</p>
       </app-flow-graph>

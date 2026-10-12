@@ -34,19 +34,19 @@ describe('pipeline edges', () => {
   it('follow the run: each step reads the one before it, the first from the start', () => {
     const steps = [step('read', 'read_file'), step('keep', 'filter'), step('save', 'save_file')];
     expect(pairs(pipelineEdges(steps, { tasks: TASKS, startId: FLOW_START, startLabel: 'payload' })))
-      .toEqual(['@start>read:payload', 'read>keep:rows', 'keep>save:rows']);
+      .toEqual(['@start>read:payload', 'read>keep', 'keep>save']);
   });
 
   it('draw a named input from the step it names, not the one before', () => {
     const steps = [step('read', 'read_file'), step('keep', 'filter'), step('all', 'save_file', { input: 'read' })];
-    expect(pairs(pipelineEdges(steps, { tasks: TASKS }))).toEqual(['read>keep:rows', 'read>all:rows']);
+    expect(pairs(pipelineEdges(steps, { tasks: TASKS }))).toEqual(['read>keep', 'read>all:rows']);
   });
 
   it('draw a join from both sides: its input and the step its "with" names (from the registry\'s format: step)', () => {
     const steps = [step('patients', 'read_file'), step('visits', 'read_database'), step('both', 'join', { config: { with: 'patients', on: ['id'] } })];
-    expect(pairs(pipelineEdges(steps, { tasks: TASKS }))).toEqual(['patients>visits:then (dashed)', 'visits>both:rows', 'patients>both:joined']);
+    expect(pairs(pipelineEdges(steps, { tasks: TASKS }))).toEqual(['patients>visits:then (dashed)', 'visits>both', 'patients>both:joined']);
     // Before the registry answers, the built-in join is still known.
-    expect(pairs(pipelineEdges(steps))).toEqual(['patients>visits:then (dashed)', 'visits>both:rows', 'patients>both:joined']);
+    expect(pairs(pipelineEdges(steps))).toEqual(['patients>visits:then (dashed)', 'visits>both', 'patients>both:joined']);
   });
 
   it('draw an append from each step it stacks, and no input edge: an append reads only those', () => {
@@ -61,7 +61,7 @@ describe('pipeline edges', () => {
     expect(stepRefs(report, TASKS.find(t => t.code === 'render_pdf')).map(r => [r.field, r.key, r.label]))
       .toEqual([['sections.input', 'read', 'rows of'], ['sections.input', 'later', 'rows of']]);
     const steps = [step('read', 'read_file'), step('keep', 'filter'), report, step('later', 'save_file')];
-    expect(pairs(pipelineEdges(steps, { tasks: TASKS }))).toEqual(['read>keep:rows', 'keep>report:rows', 'read>report:rows of', 'report>later:rows']);
+    expect(pairs(pipelineEdges(steps, { tasks: TASKS }))).toEqual(['read>keep', 'keep>report', 'read>report:rows of', 'report>later']);
   });
 
   it('keep a read in the middle in the run\'s order, dashed: it reads no rows', () => {
@@ -88,7 +88,7 @@ describe('a pipeline as a flow', () => {
     expect(g.nodes[1]).toMatchObject({ label: 'read', sub: 'read_file', icon: 'file', metrics: [{ label: 'path', value: 'in/claims.csv' }, { label: 'format', value: 'csv' }] });
     expect(g.nodes[2].label).toBe('Summarise');
     expect(g.nodes[3].pending).toBe(true);
-    expect(pairs(g.edges)).toEqual(['@start>read:payload', 'read>ask:rows', 'ask>save:rows', 'save>@review:results (dashed)']);
+    expect(pairs(g.edges)).toEqual(['@start>read:payload', 'read>ask', 'ask>save', 'save>@review:results (dashed)']);
   });
 
   it('draws 100 steps (the engine\'s cap) with a branch, laid out without overlap in good time', () => {
@@ -125,7 +125,7 @@ describe('the AI flow', () => {
       },
       definition: { steps: [step('left', 'read_file'), step('right', 'read_database'), step('both', 'join', { config: { with: 'left' } })] },
     }, TASKS);
-    expect(pairs(g.edges)).toEqual(['trigger>left:file', 'left>right:then (dashed)', 'right>both:rows', 'left>both:joined', 'both>review:results (dashed)']);
+    expect(pairs(g.edges)).toEqual(['trigger>left:file', 'left>right:then (dashed)', 'right>both', 'left>both:joined', 'both>review:results (dashed)']);
     expect(g.nodes.find(n => n.id === 'both')).toMatchObject({ tone: 'warn', badges: ['needs 1 setting'], icon: 'link' });
   });
 });
@@ -163,6 +163,10 @@ describe('a workflow as a flow', () => {
     expect(pairs(g.edges)).toEqual(['@start>a', 'b>@end']);
     expect(g.nodes.some(n => n.id === WORKFLOW_REJECTED)).toBe(false);
     expect(pairs(workflowGraph([]).edges)).toEqual(['@start>@end']);
+    // A condition whose two ways go to the same place is one edge saying both.
+    const both = workflowGraph([{ key: 'c', type: 'condition', whenTrue: 'end', whenFalse: 'end' }]);
+    expect(pairs(both.edges)).toEqual(['@start>c', 'c>@end:yes / no']);
+    expect(both.edges[1].tone).toBeNull();
   });
 });
 
