@@ -1,11 +1,13 @@
 import { localIsoDaysAgo } from '../../../shared/ui/local-day';
 import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Dialog } from '@angular/cdk/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription, auditTime, filter } from 'rxjs';
 
 import { Router, RouterLink } from '@angular/router';
 import { ReviewWaiting } from './review-waiting';
+import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { JobEventsService } from '../../../core/socket/job-events.service';
@@ -111,6 +113,7 @@ export class JobHistory {
   protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
   private readonly jobEvents = inject(JobEventsService);
 
   /** Shown as "Live" beside Refresh: while the feed is up, new runs arrive without a click. */
@@ -511,6 +514,19 @@ export class JobHistory {
   }
 
   /** The next window of older runs, below the ones on screen. */
+  /**
+   * MIG-345: a failed run's Retry -- the dialog offers "Retry from <step>" (the steps before it are reused, not run or
+   * billed again) and "Run again from the start", each with Core's word on whether it can. The list re-reads once the run
+   * is queued again.
+   */
+  retry(run: JobQueue): void {
+    if (run.jobStatus !== 'Failed') return;
+    const data: RetryDialogData = { jobQueueId: run.jobQueueId };
+    this.dialog.open<boolean>(RetryDialog, { data }).closed.subscribe(queued => {
+      if (queued) this.load({ silent: true });
+    });
+  }
+
   loadOlder(): void {
     const loaded = this.runs();
     if (!this.jobId() || !loaded.length || this.loadingOlder()) return;

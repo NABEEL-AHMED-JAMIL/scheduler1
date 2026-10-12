@@ -281,13 +281,17 @@
           "response": []
         },
         {
-          "name": "Run a failed run again, as a new run.",
+          "name": "Retry a failed run from the step that failed, or from the start.",
           "request": {
             "method": "POST",
             "header": [
               {
                 "key": "Idempotency-Key",
                 "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
               }
             ],
             "url": {
@@ -307,7 +311,16 @@
                 }
               ]
             },
-            "description": "Run a failed run again, as a new run.\n\noperationId: retryRun"
+            "description": "Retry a failed run from the step that failed, or from the start.\n\nRuns a failed run again as its next attempt (the same run id; `attempt` goes up by one). With no body, or `{\"from\": \"failed_step\"}`, it resumes from the first step of the latest attempt that did not complete: the steps before it are not run again -- their kept outputs are reused, and their work is not billed again -- and the step that failed and every step after it run, on the pipeline as it is now. `{\"from\": \"start\"}` runs every step again. A resume is refused (409, the problem's `type` says why) when the run is not failed (`run-not-failed`), another run of the pipeline is in flight (`run-in-flight`), the pipeline is inactive (`pipeline-inactive`) or its workspace paused (`workspace-paused`), the pipeline changed before the failed step (`pipeline-changed`: only the failed step and later steps may change; a step's name, retries, timeout and on-error may), a file a reused step read has changed since, judged by its sha256 (`input-changed`), a reused step's kept output has expired (`outputs-expired`: outputs are kept for the pipeline's retention, 24 hours unless set), or there is nothing to resume from (`not-resumable`: the run ran no steps, every step completed, or it has had 20 attempts). From the start, only the first four apply. Answered once the run is queued; follow it as any run, or by its `run.started` and `run.completed` or `run.failed` events, which carry the new `attempt` and `retry`.\n\noperationId: retryRun",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"failed_step\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
           },
           "response": []
         },

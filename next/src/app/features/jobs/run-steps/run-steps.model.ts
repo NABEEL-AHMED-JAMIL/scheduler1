@@ -1,3 +1,5 @@
+import { AttemptDetail } from '../retry/run-retry';
+
 /**
  * MIG-251: what Core's step engine (MIG-230) says about one run, as sourceJob.json/stepExecutions answers it, and the
  * few readings the Executions screens make of it.
@@ -39,6 +41,8 @@ export interface StepExecution {
   statusMessage?: string | null;
   error?: StepError | string | null;
   datasets?: StepDataset[];
+  /** MIG-345: a step a resumed attempt did not run again -- the attempt whose output it reused; null for a step that ran. */
+  reusedFromAttempt?: number | null;
   /** "step": the step's own lines (stepLogs); "run": a legacy run, whose lines are the run's audit log. */
   log: 'step' | 'run';
 }
@@ -73,6 +77,8 @@ export interface StepTimeline {
   pipelineDefinitionId?: number | null;
   steps: StepExecution[];
   aiSteps?: RunAiStep[];
+  /** MIG-345: the run's attempts someone asked for (a resume or a restart), oldest first. */
+  attemptDetails?: AttemptDetail[];
 }
 
 export interface StepLogLine {
@@ -172,4 +178,15 @@ export function attachmentName(disposition: string | null | undefined): string {
   const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition ?? '');
   if (!match) return '';
   try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+}
+
+/**
+ * MIG-345: the step a retry of this attempt would resume from -- the first that did not complete -- when the run failed
+ * on the latest attempt; null otherwise (Core decides whether it can, and says why not).
+ */
+export function failedStep(timeline: StepTimeline | null | undefined): StepExecution | null {
+  if (!timeline || timeline.runStatus !== 'Failed') return null;
+  const latest = Math.max(...(timeline.attempts?.length ? timeline.attempts : [timeline.attempt]));
+  if (timeline.attempt !== latest) return null;
+  return timeline.steps.find(step => step.status !== 'Completed') ?? null;
 }

@@ -434,6 +434,13 @@
                      Job column has always linked by run.jobId; this one did not.
                      Withheld entirely on the row where the run does not name its job, because a
                      Logs button that cannot say whose logs is worse than no button. -->
+                <!-- MIG-345: a failed run is retried as its next attempt, from its failed step or from the start. -->
+                @if (run.jobStatus === 'Failed') {
+                  <button type="button" class="btn btn-ghost btn-sm" data-test="run-retry"
+                          [attr.aria-label]="'Retry run #' + run.jobQueueId"
+                          title="Retry from the step that failed, or run again from the start"
+                          (click)="retry(run)"><app-icon name="play" />Retry</button>
+                }
                 @if (run.jobId) {
                   <a class="btn btn-ghost btn-sm"
                      [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>

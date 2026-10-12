@@ -1,6 +1,7 @@
 import { toneClass } from '../../../shared/ui/tone';
 import { RunReview } from './run-review';
-import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -16,8 +17,10 @@ import { StorageService } from '../../objects/storage.service';
 import { refusalOf } from '../../bulk/bulk-transfer';
 import {
   DATASET_FORMATS, DatasetFormat, RunAiStep, formatsFor, RunOutput, StepExecution, StepLogLine, StepTimeline, attachmentName,
-  engineTimeline, errorText, focusStep, outputsOf, recordsLabel, stepStillGoing,
+  engineTimeline, errorText, failedStep, focusStep, outputsOf, recordsLabel, stepStillGoing,
 } from './run-steps.model';
+import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
+import { AttemptDetail, RetryFrom, attemptSentence, stepLabel } from '../retry/run-retry';
 
 type StepView = 'timeline' | 'console';
 
@@ -51,10 +54,13 @@ export class RunSteps {
    * entries. A run whose steps have all settled is not read again.
    */
   readonly revision = input(0);
+  /** MIG-345: the run was queued again (a retry); the page re-reads the run. */
+  readonly retried = output<void>();
 
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
   private readonly storage = inject(StorageService);
+  private readonly dialog = inject(Dialog);
 
   /** Wave 4: what the shown attempt put out (runOutputs); null until read, 'error' when it could not be. */
   readonly outputs = signal<RunOutput[] | 'error' | null>(null);
@@ -90,6 +96,19 @@ export class RunSteps {
   readonly attemptOptions = computed<SegmentOption<string>[]>(() =>
     (this.timeline()?.attempts ?? []).map(n => ({ id: String(n), label: `Attempt ${n}` })));
   readonly shownAttempt = computed(() => String(this.timeline()?.attempt ?? ''));
+
+  /** MIG-345: the step a retry would resume from, when the run failed on its latest attempt. */
+  readonly retryStep = computed(() => failedStep(this.timeline()));
+  readonly retryLabel = computed(() => {
+    const step = this.retryStep();
+    return step ? `Retry from ${stepLabel(step.index, step.key)}` : '';
+  });
+  /** MIG-345: how the shown attempt came about, when someone asked for it (a resume or a restart). */
+  readonly attemptDetail = computed<AttemptDetail | null>(() => {
+    const t = this.timeline();
+    return t?.attemptDetails?.find(detail => detail.attempt === t.attempt) ?? null;
+  });
+  readonly attemptSentence = attemptSentence;
 
   readonly completedCount = computed(() => (this.timeline()?.steps ?? []).filter(s => s.status === 'Completed').length);
   readonly aiSteps = computed<RunAiStep[]>(() => this.timeline()?.aiSteps ?? []);
@@ -248,6 +267,26 @@ export class RunSteps {
     this.outputs.set(null);
     this.selectedKey.set(null);
     this.requestedAttempt.set(attempt);
+  }
+
+  /**
+   * MIG-345: "Retry from <step>" or "Run again from the start": the dialog reads what Core would do and asks. Once the
+   * run is queued again, its steps are read afresh (the new attempt) and the page re-reads the run.
+   */
+  retry(from: RetryFrom): void {
+    const t = this.timeline();
+    if (!t) return;
+    const data: RetryDialogData = { jobQueueId: t.jobQueueId, from };
+    this.dialog.open<boolean>(RetryDialog, { data }).closed.subscribe(queued => {
+      if (!queued) return;
+      this.settled = false;
+      this.logs.set(new Map());
+      this.outputs.set(null);
+      this.selectedKey.set(null);
+      this.requestedAttempt.set(null);
+      this.load(null);
+      this.retried.emit();
+    });
   }
 
   /** From a step's row: its lines in the Console. */

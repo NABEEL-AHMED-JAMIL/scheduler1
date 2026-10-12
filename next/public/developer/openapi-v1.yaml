@@ -210,19 +210,45 @@ paths:
     post:
       tags: [runs]
       operationId: retryRun
-      summary: Run a failed run again, as a new run.
+      summary: Retry a failed run from the step that failed, or from the start.
+      description: >
+        Runs a failed run again as its next attempt (the same run id; `attempt` goes up by one). With no body, or
+        `{"from": "failed_step"}`, it resumes from the first step of the latest attempt that did not complete: the steps
+        before it are not run again -- their kept outputs are reused, and their work is not billed again -- and the step
+        that failed and every step after it run, on the pipeline as it is now. `{"from": "start"}` runs every step again.
+        A resume is refused (409, the problem's `type` says why) when the run is not failed (`run-not-failed`), another run
+        of the pipeline is in flight (`run-in-flight`), the pipeline is inactive (`pipeline-inactive`) or its workspace
+        paused (`workspace-paused`), the pipeline changed before the failed step (`pipeline-changed`: only the failed step
+        and later steps may change; a step's name, retries, timeout and on-error may), a file a reused step read has
+        changed since, judged by its sha256 (`input-changed`), a reused step's kept output has expired (`outputs-expired`:
+        outputs are kept for the pipeline's retention, 24 hours unless set), or there is nothing to resume from
+        (`not-resumable`: the run ran no steps, every step completed, or it has had 20 attempts). From the start, only the
+        first four apply. Answered once the run is queued; follow it as any run, or by its `run.started` and
+        `run.completed` or `run.failed` events, which carry the new `attempt` and `retry`.
       security: [{ clientCredentials: [runs:write] }]
       parameters:
         - $ref: '#/components/parameters/RunId'
         - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RetryRequest' }
       responses:
         '202':
-          description: The new run.
+          description: The run, queued as its next attempt.
+          headers:
+            Location: { schema: { type: string }, description: "/v1/runs/{runId}" }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/Run' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '413': { $ref: '#/components/responses/TooLarge' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
         '429': { $ref: '#/components/responses/TooManyRequests' }
   /runs/{runId}/steps:
     get:
@@ -982,9 +1008,14 @@ components:
     conflict: { status: 409, title: Conflict, description: "The resource's state refuses it, e.g. a redelivery while the webhook is paused or a workspace's 21st webhook." }
     idempotency-conflict: { status: 409, title: Conflict, description: "This Idempotency-Key was already used with a different request (within 24 hours). Use a new key for new work." }
     idempotency-in-progress: { status: 409, title: Conflict, description: "A request with this Idempotency-Key is still being handled. Try again in a moment with the same key." }
-    run-in-flight: { status: 409, title: Conflict, description: "A run of this pipeline is still in flight; one runs at a time. Start the next once it has finished.", operations: [startRun] }
-    pipeline-inactive: { status: 409, title: Conflict, description: "The pipeline is not active.", operations: [startRun] }
-    workspace-paused: { status: 409, title: Conflict, description: "The workspace is suspended or inactive, so its runs are paused.", operations: [startRun] }
+    run-in-flight: { status: 409, title: Conflict, description: "A run of this pipeline is still in flight; one runs at a time. Start (or retry) the next once it has finished.", operations: [startRun, retryRun] }
+    pipeline-inactive: { status: 409, title: Conflict, description: "The pipeline is not active.", operations: [startRun, retryRun] }
+    workspace-paused: { status: 409, title: Conflict, description: "The workspace is suspended or inactive, so its runs are paused.", operations: [startRun, retryRun] }
+    run-not-failed: { status: 409, title: Conflict, description: "Only a failed run is retried; this one is queued, running, completed, skipped or interrupted.", operations: [retryRun] }
+    pipeline-changed: { status: 409, title: Conflict, description: "The pipeline changed before the step that failed (its source, or a step's key, task, input or settings), so the kept outputs no longer match it. Retry with from start.", operations: [retryRun] }
+    input-changed: { status: 409, title: Conflict, description: "A file a step before the failed one read has changed since (its sha256), or is gone; a resume would mix old and new data. Retry with from start.", operations: [retryRun] }
+    outputs-expired: { status: 409, title: Conflict, description: "A kept output of a step before the failed one has expired (outputs are kept for the pipeline's retention, 24 hours unless set). Retry with from start.", operations: [retryRun] }
+    not-resumable: { status: 409, title: Conflict, description: "There is no step to resume from (the run ran no steps, or every step completed), its inputs cannot be checked, or it has had 20 attempts. Retry with from start, or start a new run.", operations: [retryRun] }
     workspace-not-ready: { status: 409, title: Conflict, description: "The workspace has no inbox for API uploads yet; an administrator chooses one under Documents > Inbox.", operations: [uploadFile, startRun] }
     review-not-open: { status: 409, title: Conflict, description: "The run's review cannot take this decision: not completed, no customer review asked for, or already decided.", operations: [decideReview] }
     file-expired: { status: 410, title: Gone, description: "The file is past its expiry: still listed (expired true), no longer downloadable. Run the pipeline again for a new one.", operations: [downloadFile, readFileContent] }
@@ -1058,8 +1089,26 @@ components:
         startedAt: { type: [string, 'null'], format: date-time }
         endedAt: { type: [string, 'null'], format: date-time }
         message: { type: [string, 'null'], description: "The run's status line." }
-        attempt: { type: integer, description: "Which attempt the run is on, from 1." }
+        attempt: { type: integer, description: "Which attempt the run is on, from 1. A retry (POST /runs/{runId}/retry, or the console's) is the next attempt of the same run." }
         review: { $ref: '#/components/schemas/ReviewStatus' }
+        retry:
+          oneOf:
+            - { $ref: '#/components/schemas/RunRetry' }
+            - { type: 'null' }
+          description: "How the run's current attempt came about when someone retried it; null for a first attempt or one the pipeline's own retry policy made."
+    RunRetry:
+      type: object
+      required: [from, previousAttempt, reusedSteps, requestedThrough]
+      properties:
+        from: { type: string, enum: [failed_step, start], description: "failed_step: resumed from the step that failed; start: every step ran again." }
+        fromStep: { type: [string, 'null'], description: "The key of the step it resumed from; null from the start." }
+        previousAttempt: { type: integer, description: "The attempt that failed." }
+        reusedSteps: { type: integer, description: "How many steps before it were not run again (their kept outputs reused)." }
+        requestedThrough: { type: string, enum: [api, console] }
+    RetryRequest:
+      type: object
+      properties:
+        from: { type: string, enum: [failed_step, start], default: failed_step, description: "Where the next attempt starts." }
     RunPage:
       type: object
       required: [data, nextCursor]
@@ -1080,6 +1129,7 @@ components:
         endedAt: { type: [string, 'null'], format: date-time }
         durationMs: { type: [integer, 'null'] }
         message: { type: [string, 'null'] }
+        reusedFromAttempt: { type: [integer, 'null'], description: "A step a retry did not run again: the attempt whose output it reused (it has no times of its own). Null for a step that ran." }
     Manifest:
       type: object
       required: [runId, pipelineId, status, attempt, generatedAt, files, review]

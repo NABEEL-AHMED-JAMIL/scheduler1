@@ -15,6 +15,31 @@
       <app-segmented [(value)]="view" [options]="views" ariaLabel="Step view" />
     </div>
 
+    <!-- MIG-345: a run that failed on its latest attempt is retried as its next attempt: from the step that failed (the
+         steps before it are reused, not run or billed again), or from the start. Core says what each would do, or why not. -->
+    @if (retryStep(); as failed) {
+      <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle" data-test="run-retry">
+        <app-icon name="alert" class="text-crit-500 shrink-0" />
+        <span class="text-xs text-[color:var(--text-secondary)] mr-auto">
+          Failed at step {{ failed.index + 1 }} <span class="mono">&lt;{{ failed.key }}&gt;</span>.
+          Fix the cause, then retry: the steps before it are not run again.
+        </span>
+        <button type="button" class="btn btn-primary btn-sm" (click)="retry('failed_step')" data-test="retry-from-step">
+          <app-icon name="play" />{{ retryLabel() }}
+        </button>
+        <button type="button" class="btn btn-default btn-sm" (click)="retry('start')" data-test="retry-from-start">
+          <app-icon name="refresh" />Run again from the start
+        </button>
+      </div>
+    }
+    @if (attemptDetail(); as detail) {
+      <p class="flex items-start gap-1.5 px-4 py-2 border-b border-subtle text-xs text-[color:var(--text-secondary)]"
+         data-test="attempt-detail">
+        <app-icon name="history" size="0.9em" class="icon-muted mt-px shrink-0" />
+        <span>{{ attemptSentence(detail) }}@if (detail.requestedAt) {<span>, {{ detail.requestedAt | serverTime:'recentSec' }}</span>}.</span>
+      </p>
+    }
+
     @switch (view()) {
       @case ('timeline') {
         <ol class="log-timeline">
@@ -29,6 +54,12 @@
                   <span class="mono font-medium">{{ s.key }}</span>
                   <span class="pill pill-neutral mono">{{ s.task }}</span>
                   <app-status [label]="s.status" />
+                  @if (s.reusedFromAttempt) {
+                    <span class="pill pill-neutral" data-test="step-reused"
+                          [title]="'Not run again: its kept output from attempt ' + s.reusedFromAttempt + ' was reused'">
+                      <app-icon name="history" size="0.85em" />Reused from attempt {{ s.reusedFromAttempt }}
+                    </span>
+                  }
                   @if (s.log === 'step' && s.stepExecutionId !== null) {
                     <button type="button" class="btn btn-ghost btn-sm ml-auto"
                             [attr.aria-label]="'Show the log of step ' + s.key"
@@ -42,7 +73,7 @@
                 <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs tabular text-[color:var(--text-secondary)]">
                   <span title="Started">
                     <app-icon name="clock" size="0.85em" class="icon-muted" />
-                    {{ s.startedAt ? (s.startedAt | serverTime:'timeSec') : 'Not started' }}
+                    {{ s.startedAt ? (s.startedAt | serverTime:'timeSec') : s.reusedFromAttempt ? 'Not run again' : 'Not started' }}
                   </span>
                   <span title="How long the step took">{{ duration(s) }}</span>
                   <span title="Records in → out">{{ recordsLabel(s) }} records</span>

@@ -115,7 +115,7 @@
 
   <!-- MIG-251: a step-engine run's steps, Timeline and Console. A legacy run draws nothing here. -->
   @if (!missing()) {
-    <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" />
+    <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" (retried)="refresh()" />
   }
 
   @if (hasInsights()) {
