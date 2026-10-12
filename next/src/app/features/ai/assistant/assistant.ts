@@ -45,10 +45,10 @@ export type PanelTab = 'flow' | 'trace' | 'context';
  */
 export const SUGGESTIONS: { group: string; icon: string; prompts: string[] }[] = [
   { group: 'Design a pipeline', icon: 'layers', prompts: [
-    'When a lab results CSV lands in the inbox, validate it against the lab contract, flag abnormal values, ask the reviewer to approve, '
-      + 'then save a PDF and notify the doctor.',
-    'Pull patients and observations from FHIR daily, compute risk flags, summarise with AI, approve, dashboard.',
-    'Every night read orders.csv from storage, keep the paid orders, and save them as a CSV.',
+    'Design a pipeline: when a lab results CSV lands in the inbox, validate it against the lab contract, flag abnormal values, ask the '
+      + 'reviewer to approve, then save a PDF and notify the doctor.',
+    'Design a pipeline: pull patients and observations from FHIR daily, compute risk flags, summarise with AI, approve, dashboard.',
+    'Design a pipeline: every night read orders.csv from storage, keep the paid orders, and save them as a CSV.',
   ] },
   { group: 'Ask about runs', icon: 'zap', prompts: ['How did my last run go?', 'Which runs failed this week?', 'Which pipeline jobs do I have?'] },
   { group: 'Look things up', icon: 'database', prompts: ['List the data sources in this workspace.', 'What can a pipeline step point at here?'] },
