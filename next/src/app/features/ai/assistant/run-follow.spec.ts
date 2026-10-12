@@ -112,10 +112,11 @@ describe('RunFollow (the assistant run card)', () => {
     expect(el.querySelector('[data-state]')!.getAttribute('data-state')).toBe('Completed');
   });
 
-  it('a completed run whose results need a review says Waiting for review', () => {
+  it('a completed run whose results need a review says Waiting for review; a run paused at an approval says so', () => {
     expect(runState({ runStatus: 'Completed', reviewStatus: 'PENDING' })).toEqual({ label: 'Waiting for review', final: true });
     expect(runState({ runStatus: 'Running' })).toEqual({ label: 'Running', final: false });
     expect(runState(null, 'Queue')).toEqual({ label: 'Queue', final: false });
+    expect(runState({ runStatus: 'Running', waitingForApproval: true })).toEqual({ label: 'Waiting for approval', final: false });
   });
 });
 

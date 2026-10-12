@@ -19,9 +19,11 @@ import { RetryDialog, RetryDialogData } from '../../jobs/retry/retry-dialog';
 export const FOLLOW_BACKOFF_MS = [1500, 2500, 4000, 6000, 10000, 15000];
 
 /** What the card says a run is: the run's own status, and -- once it completed -- its review, when the results need one. */
-export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: string | null } | null, fallback?: string | null):
-  { label: string; final: boolean } {
+export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: string | null; waitingForApproval?: boolean } | null,
+  fallback?: string | null): { label: string; final: boolean } {
   const status = t?.runStatus ?? fallback ?? 'Queue';
+  // MIG-346: a run paused at an Approval step goes on once someone decides: still followed, said as what it waits for.
+  if (t?.waitingForApproval && !runFinished(status)) return { label: 'Waiting for approval', final: false };
   if (status === 'Completed' && t?.reviewStatus === 'PENDING') return { label: 'Waiting for review', final: true };
   if (status === 'Completed' && t?.reviewStatus === 'REJECTED') return { label: 'Rejected', final: true };
   return { label: status, final: runFinished(status) };
@@ -89,7 +91,7 @@ export class RunFollow implements OnInit {
   /** The status the link was stored with: shown until the first read answers. */
   readonly initialStatus = input<string | null | undefined>(null);
 
-  readonly timeline = signal<(Timeline & { reviewStatus?: string | null }) | null>(null);
+  readonly timeline = signal<(Timeline & { reviewStatus?: string | null; waitingForApproval?: boolean }) | null>(null);
   readonly error = signal('');
   readonly following = signal(false);
 
@@ -148,7 +150,7 @@ export class RunFollow implements OnInit {
     const id = this.jobQueueId();
     if (id == null) return;
     this.reading?.unsubscribe();
-    this.reading = this.http.get<ApiResponse<Timeline & { reviewStatus?: string | null }>>(`${API_BASE}/sourceJob.json/stepExecutions`,
+    this.reading = this.http.get<ApiResponse<Timeline & { reviewStatus?: string | null; waitingForApproval?: boolean }>>(`${API_BASE}/sourceJob.json/stepExecutions`,
       { params: { jobQueueId: id } }).subscribe({
       next: r => {
         if (r.status === API_SUCCESS && r.data) {
