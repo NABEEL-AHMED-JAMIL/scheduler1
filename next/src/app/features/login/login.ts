@@ -12,7 +12,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { MfaEnrolment } from '../account/account-security.api';
 import { MfaEnrolmentPanel } from '../account/mfa-enrolment';
 import { RecoveryCodes } from '../account/recovery-codes';
-import { SignInApi, SignInStep, SignedIn } from './sign-in.api';
+import { SignInApi, SignInStep, SignedIn, rememberFlow } from './sign-in.api';
 
 /** What the page says after the workspace's idle sign-out ended a session (MIG-353). Here, not in AuthService: the
  * initial bundle carries AuthService. */
@@ -232,6 +232,7 @@ export class Login implements OnInit {
     this.api().ssoStart(byKey ? { loginKey: this.ssoKey } : { email }).subscribe({
       next: r => {
         if (r.status === API_SUCCESS && r.data?.authorizationUrl) {
+          rememberFlow(r.data.flow);
           window.location.assign(r.data.authorizationUrl);
           return;
         }

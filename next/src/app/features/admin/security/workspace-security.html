@@ -106,13 +106,23 @@
               }
             </div>
             <p class="field-note text-[color:var(--text-muted)] mt-0.5">
-              People sign in with their company account (Microsoft Entra ID, Google Workspace, Okta or any OpenID Connect
-              provider). Their company's own two-factor login applies there.
+              People sign in with their company account — OpenID Connect (Microsoft Entra ID, Google Workspace, Okta) or SAML 2.0
+              (ADFS, Okta, Entra ID). Their company's own two-factor login applies there.
             </p>
           </div>
         </div>
 
         @if (sso(); as s) {
+          <div class="mt-4 flex flex-wrap items-center gap-4 text-sm" role="radiogroup" aria-label="Protocol" data-test="sso-protocol">
+            <label class="flex items-center gap-2">
+              <input type="radio" name="sso-protocol" [checked]="ssoDraft().protocol === 'OIDC'" (change)="setSso('protocol', 'OIDC')" />
+              OpenID Connect
+            </label>
+            <label class="flex items-center gap-2">
+              <input type="radio" name="sso-protocol" [checked]="ssoDraft().protocol === 'SAML'" (change)="setSso('protocol', 'SAML')" />
+              SAML 2.0
+            </label>
+          </div>
           <div class="grid gap-4 mt-4 lg:grid-cols-2">
             <div class="space-y-3 min-w-0">
               <div class="field">
@@ -120,22 +130,92 @@
                 <input id="sso-name" class="input" placeholder="Acme (Microsoft)" [value]="ssoDraft().displayName"
                        (input)="setSso('displayName', $any($event.target).value)" />
               </div>
-              <div class="field">
-                <label class="label" for="sso-issuer">Issuer</label>
-                <input id="sso-issuer" class="input mono" placeholder="https://login.microsoftonline.com/&lt;tenant id&gt;/v2.0"
-                       [value]="ssoDraft().issuer" (input)="setSso('issuer', $any($event.target).value)" />
-              </div>
-              <div class="field">
-                <label class="label" for="sso-client">Client (application) id</label>
-                <input id="sso-client" class="input mono" [value]="ssoDraft().clientId" (input)="setSso('clientId', $any($event.target).value)" />
-              </div>
-              <div class="field">
-                <label class="label" for="sso-secret">Client secret</label>
-                <input id="sso-secret" class="input mono" type="password" autocomplete="new-password"
-                       [placeholder]="s.clientSecretSet ? 'Saved — leave empty to keep it' : ''"
-                       [value]="ssoDraft().clientSecret" (input)="setSso('clientSecret', $any($event.target).value)" />
-                <p class="field-note text-[color:var(--text-muted)]">Stored encrypted and never shown again.</p>
-              </div>
+              @if (ssoDraft().protocol === 'OIDC') {
+                <div class="field">
+                  <label class="label" for="sso-issuer">Issuer</label>
+                  <input id="sso-issuer" class="input mono" placeholder="https://login.microsoftonline.com/&lt;tenant id&gt;/v2.0"
+                         [value]="ssoDraft().issuer" (input)="setSso('issuer', $any($event.target).value)" />
+                </div>
+                <div class="field">
+                  <label class="label" for="sso-client">Client (application) id</label>
+                  <input id="sso-client" class="input mono" [value]="ssoDraft().clientId" (input)="setSso('clientId', $any($event.target).value)" />
+                </div>
+                <div class="field">
+                  <label class="label" for="sso-secret">Client secret</label>
+                  <input id="sso-secret" class="input mono" type="password" autocomplete="new-password"
+                         [placeholder]="s.clientSecretSet ? 'Saved — leave empty to keep it' : ''"
+                         [value]="ssoDraft().clientSecret" (input)="setSso('clientSecret', $any($event.target).value)" />
+                  <p class="field-note text-[color:var(--text-muted)]">Stored encrypted and never shown again.</p>
+                </div>
+              } @else {
+                <div class="rounded-md border border-subtle p-3 space-y-2" data-test="saml-metadata">
+                  <div class="text-sm font-medium">Identity provider's metadata</div>
+                  <p class="field-note text-[color:var(--text-muted)]">Upload or paste it to fill the three fields below; check them, then save.</p>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <label class="btn btn-default btn-sm cursor-pointer">
+                      <app-icon name="upload" />Upload metadata
+                      <input type="file" class="sr-only" accept=".xml,application/xml,text/xml,application/samlmetadata+xml"
+                             (change)="metadataFile($event)" data-test="saml-metadata-file" />
+                    </label>
+                  </div>
+                  <label class="label" for="saml-metadata-xml">Or paste it</label>
+                  <textarea id="saml-metadata-xml" class="input mono text-xs" rows="3" placeholder="&lt;md:EntityDescriptor ..."
+                            [value]="metadataXml()" (input)="metadataXml.set($any($event.target).value)"></textarea>
+                  <button type="button" class="btn btn-default btn-sm" (click)="readMetadata(metadataXml())" [disabled]="samlBusy() || !metadataXml().trim()">
+                    <app-icon name="file" [busy]="samlBusy()" />Read pasted metadata
+                  </button>
+                </div>
+                <div class="field">
+                  <label class="label" for="saml-entity">Identity provider entity ID</label>
+                  <input id="saml-entity" class="input mono" placeholder="http://adfs.hospital.org/adfs/services/trust"
+                         [value]="ssoDraft().idpEntityId" (input)="setSso('idpEntityId', $any($event.target).value)" />
+                </div>
+                <div class="field">
+                  <label class="label" for="saml-sso-url">Single sign-on URL (HTTP-Redirect)</label>
+                  <input id="saml-sso-url" class="input mono" placeholder="https://adfs.hospital.org/adfs/ls/"
+                         [value]="ssoDraft().idpSsoUrl" (input)="setSso('idpSsoUrl', $any($event.target).value)" />
+                </div>
+                <div class="field">
+                  <label class="label" for="saml-certs">Signing certificate (PEM; up to three during a rollover)</label>
+                  <textarea id="saml-certs" class="input mono text-xs" rows="4" placeholder="-----BEGIN CERTIFICATE-----"
+                            [value]="ssoDraft().idpCertificates" (input)="setSso('idpCertificates', $any($event.target).value)"></textarea>
+                  @if (metadataCertificates() ?? s.certificates; as certs) {
+                    <ul class="mt-1 space-y-1 text-xs" data-test="saml-certificates">
+                      @for (c of certs; track c.sha256) {
+                        <li class="min-w-0">
+                          <span [class]="c.expired ? 'pill pill-crit' : 'pill pill-neutral'">{{ c.expired ? 'Expired' : 'Until' }} {{ c.notAfter | serverTime: 'date' }}</span>
+                          <span class="ml-1 break-all">{{ c.subject }}</span>
+                          <div class="mono text-[11px] text-[color:var(--text-muted)] break-all">SHA-256 {{ c.sha256 }}</div>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
+                <details class="text-sm">
+                  <summary class="cursor-pointer font-medium">Name ID and attributes</summary>
+                  <div class="mt-2 space-y-3">
+                    <div class="field">
+                      <label class="label" for="saml-nameid">Name ID format to ask for</label>
+                      <select id="saml-nameid" class="input" (change)="setSso('nameIdFormat', $any($event.target).value)">
+                        @for (f of nameIdFormats; track f.value) {
+                          <option [value]="f.value" [selected]="ssoDraft().nameIdFormat === f.value">{{ f.label }}</option>
+                        }
+                      </select>
+                    </div>
+                    <div class="field">
+                      <label class="label" for="saml-email-attr">Email attribute</label>
+                      <input id="saml-email-attr" class="input mono" placeholder="Automatic (emailaddress, mail, email, then the name ID)"
+                             [value]="ssoDraft().emailAttribute" (input)="setSso('emailAttribute', $any($event.target).value)" />
+                      <p class="field-note text-[color:var(--text-muted)]">An attribute name, or NameID to use the name ID.</p>
+                    </div>
+                    <div class="field">
+                      <label class="label" for="saml-name-attr">Name attribute</label>
+                      <input id="saml-name-attr" class="input mono" placeholder="Automatic (display name, or given name and surname)"
+                             [value]="ssoDraft().nameAttribute" (input)="setSso('nameAttribute', $any($event.target).value)" />
+                    </div>
+                  </div>
+                </details>
+              }
               <div class="field">
                 <label class="label" for="sso-domains">Email domains</label>
                 <input id="sso-domains" class="input" placeholder="example.com, example.co.uk" [value]="ssoDraft().allowedDomains"
@@ -175,12 +255,35 @@
                 On: people can sign in this way
               </label>
               <div class="rounded-md border border-subtle p-3 space-y-2 text-sm">
-                <div>
-                  <div class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Redirect URI to register with the provider</div>
-                  <div class="flex items-center gap-1 min-w-0"><code class="mono text-xs break-all">{{ s.redirectUri }}</code>
-                    <app-copy-button value="redirect URI" [copied]="copied() === 'redirect'" copiedLabel="Copied" (copy)="copy('redirect', s.redirectUri)" />
+                @if (ssoDraft().protocol === 'OIDC') {
+                  <div>
+                    <div class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Redirect URI to register with the provider</div>
+                    <div class="flex items-center gap-1 min-w-0"><code class="mono text-xs break-all">{{ s.redirectUri }}</code>
+                      <app-copy-button value="redirect URI" [copied]="copied() === 'redirect'" copiedLabel="Copied" (copy)="copy('redirect', s.redirectUri)" />
+                    </div>
                   </div>
-                </div>
+                } @else if (s.spEntityId) {
+                  <div data-test="saml-sp">
+                    <div class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Our entity ID (identifier, audience)</div>
+                    <div class="flex items-center gap-1 min-w-0"><code class="mono text-xs break-all">{{ s.spEntityId }}</code>
+                      <app-copy-button value="entity ID" [copied]="copied() === 'entity'" copiedLabel="Copied" (copy)="copy('entity', s.spEntityId)" />
+                    </div>
+                  </div>
+                  <div>
+                    <div class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Assertion consumer service (reply URL, HTTP-POST)</div>
+                    <div class="flex items-center gap-1 min-w-0"><code class="mono text-xs break-all">{{ s.acsUrl }}</code>
+                      <app-copy-button value="ACS URL" [copied]="copied() === 'acs'" copiedLabel="Copied" (copy)="copy('acs', s.acsUrl)" />
+                    </div>
+                  </div>
+                  <button type="button" class="btn btn-default btn-sm" (click)="downloadSpMetadata()" data-test="saml-download">
+                    <app-icon name="download" />Download our metadata
+                  </button>
+                  <p class="text-xs text-[color:var(--text-muted)]">Requests are not signed and assertions must not be encrypted; the provider
+                    signs the assertion or the response.</p>
+                } @else {
+                  <p class="text-xs text-[color:var(--text-muted)]" data-test="saml-sp-pending">Save once (it can stay off) to get our entity ID,
+                    reply URL and metadata to register with the provider.</p>
+                }
                 @if (s.loginUrl) {
                   <div>
                     <div class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">This workspace's sign-in link</div>
@@ -191,18 +294,36 @@
                 }
                 @if (s.updatedAt) { <p class="text-xs text-[color:var(--text-muted)]">Saved {{ s.updatedAt | serverTime: 'dateTime' }}</p> }
               </div>
-              <details class="text-sm">
-                <summary class="cursor-pointer font-medium">How to connect Microsoft Entra ID, Google or Okta</summary>
-                <div class="mt-2 space-y-2 text-[color:var(--text-secondary)]">
-                  <p><strong>Microsoft Entra ID:</strong> App registrations › New registration, a Web redirect URI (above). Issuer
-                    <code class="mono text-xs">https://login.microsoftonline.com/&lt;directory id&gt;/v2.0</code>; the Application (client) id;
-                    Certificates &amp; secrets › New client secret. Add the optional claim <code class="mono text-xs">email</code>.</p>
-                  <p><strong>Google Workspace:</strong> Google Cloud console › APIs &amp; Services › Credentials › OAuth client id (Web
-                    application), the redirect URI above. Issuer <code class="mono text-xs">https://accounts.google.com</code>.</p>
-                  <p><strong>Okta:</strong> Applications › Create App Integration › OIDC, Web Application, the redirect URI above as the
-                    sign-in redirect. Issuer <code class="mono text-xs">https://&lt;your-org&gt;.okta.com/oauth2/default</code>; assign the app to people.</p>
-                </div>
-              </details>
+              @if (ssoDraft().protocol === 'OIDC') {
+                <details class="text-sm">
+                  <summary class="cursor-pointer font-medium">How to connect Microsoft Entra ID, Google or Okta</summary>
+                  <div class="mt-2 space-y-2 text-[color:var(--text-secondary)]">
+                    <p><strong>Microsoft Entra ID:</strong> App registrations › New registration, a Web redirect URI (above). Issuer
+                      <code class="mono text-xs">https://login.microsoftonline.com/&lt;directory id&gt;/v2.0</code>; the Application (client) id;
+                      Certificates &amp; secrets › New client secret. Add the optional claim <code class="mono text-xs">email</code>.</p>
+                    <p><strong>Google Workspace:</strong> Google Cloud console › APIs &amp; Services › Credentials › OAuth client id (Web
+                      application), the redirect URI above. Issuer <code class="mono text-xs">https://accounts.google.com</code>.</p>
+                    <p><strong>Okta:</strong> Applications › Create App Integration › OIDC, Web Application, the redirect URI above as the
+                      sign-in redirect. Issuer <code class="mono text-xs">https://&lt;your-org&gt;.okta.com/oauth2/default</code>; assign the app to people.</p>
+                  </div>
+                </details>
+              } @else {
+                <details class="text-sm" data-test="saml-help">
+                  <summary class="cursor-pointer font-medium">How to connect ADFS, Okta or Microsoft Entra ID</summary>
+                  <div class="mt-2 space-y-2 text-[color:var(--text-secondary)]">
+                    <p><strong>ADFS:</strong> AD FS Management › Relying Party Trusts › Add (claims aware), import our metadata file (or enter the
+                      entity ID as identifier and the reply URL as a SAML 2.0 WebSSO endpoint). Claim rule: send LDAP attribute E-Mail-Addresses as
+                      E-Mail Address, and transform it to Name ID (Email). Then upload
+                      <code class="mono text-xs">https://&lt;adfs host&gt;/FederationMetadata/2007-06/FederationMetadata.xml</code> here.</p>
+                    <p><strong>Okta:</strong> Applications › Create App Integration › SAML 2.0. Single sign-on URL: the reply URL; Audience URI: the
+                      entity ID; Name ID format EmailAddress, Application username Email. Assign people, then upload the app's metadata
+                      (Sign On › SAML Signing Certificates › Actions › View IdP metadata).</p>
+                    <p><strong>Microsoft Entra ID:</strong> Enterprise applications › New application › Create your own (non-gallery) › Single
+                      sign-on › SAML. Basic SAML Configuration: Identifier = entity ID, Reply URL = reply URL (or upload our metadata file). Leave
+                      token encryption off. Download Federation Metadata XML and upload it here; assign users and groups.</p>
+                  </div>
+                </details>
+              }
             </div>
           </div>
           @if (ssoError()) {
@@ -215,9 +336,17 @@
             <button type="button" class="btn btn-primary btn-sm" (click)="saveSso()" [disabled]="ssoSaving()" data-test="sso-save">
               <app-icon name="save" [busy]="ssoSaving()" />Save single sign-on
             </button>
-            <button type="button" class="btn btn-default btn-sm" (click)="testSso()" [disabled]="!ssoDraft().issuer">
-              <app-icon name="plug" />Test the issuer
-            </button>
+            @if (ssoDraft().protocol === 'OIDC') {
+              <button type="button" class="btn btn-default btn-sm" (click)="testSso()" [disabled]="!ssoDraft().issuer">
+                <app-icon name="plug" />Test the issuer
+              </button>
+            } @else {
+              <button type="button" class="btn btn-default btn-sm" (click)="testSamlSignIn()" [disabled]="!s.configured || s.protocol !== 'SAML'"
+                      title="Signs in at your provider with the saved settings and shows what would happen; nobody is signed in here."
+                      data-test="saml-test">
+                <app-icon name="plug" />Test sign-in
+              </button>
+            }
             @if (s.configured) {
               <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" (click)="removeSso()"><app-icon name="trash" />Remove</button>
             }

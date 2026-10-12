@@ -22,6 +22,39 @@ export interface SsoProviderHint {
   sso: boolean;
   loginKey?: string;
   displayName?: string;
+  /** MIG-353 part 6: which protocol the workspace's provider speaks; the login page needs nothing different for either. */
+  protocol?: 'OIDC' | 'SAML';
+}
+
+/** Where to go next: the provider's sign-in page; SAML adds the flow secret this tab keeps until it comes back. */
+export interface SsoStarted {
+  authorizationUrl: string;
+  flow?: string;
+  protocol?: 'OIDC' | 'SAML';
+}
+
+/** MIG-353 part 6: an administrator's SAML test sign-in -- what would happen; nobody is signed in. */
+export interface SamlTestResult {
+  test: true;
+  email: string;
+  name?: string | null;
+  nameId?: string | null;
+  attributes?: string | null;
+  outcome: 'EXISTING' | 'JIT' | 'REFUSED';
+  explanation: string;
+}
+
+/** The tab's SAML flow secret (sessionStorage): only the tab that started a SAML sign-in can finish it. */
+export const SSO_FLOW_KEY = 'etl_sso_flow';
+
+/** Keeps (or forgets) this tab's SAML flow secret; storage refused only means the callback cannot finish. */
+export function rememberFlow(flow: string | undefined | null): void {
+  try {
+    if (flow) sessionStorage.setItem(SSO_FLOW_KEY, flow);
+    else sessionStorage.removeItem(SSO_FLOW_KEY);
+  } catch {
+    // Storage refused.
+  }
 }
 
 /**
@@ -52,8 +85,14 @@ export class SignInApi {
     return this.http.post<ApiResponse<SsoProviderHint>>(`${API_BASE}/auth.json/sso/discover`, body);
   }
 
-  ssoStart(body: { email?: string; loginKey?: string }): Observable<ApiResponse<{ authorizationUrl: string }>> {
-    return this.http.post<ApiResponse<{ authorizationUrl: string }>>(`${API_BASE}/auth.json/sso/start`, body);
+  ssoStart(body: { email?: string; loginKey?: string }): Observable<ApiResponse<SsoStarted>> {
+    return this.http.post<ApiResponse<SsoStarted>>(`${API_BASE}/auth.json/sso/start`, body);
+  }
+
+  /** MIG-353 part 6: the SAML handoff the consumer service sent the browser back with, and this tab's flow secret. */
+  samlFinish(handoff: string, flow: string): Observable<ApiResponse<SignedIn | SamlTestResult>> {
+    return this.http.post<ApiResponse<SignedIn | SamlTestResult>>(`${API_BASE}/auth.json/sso/saml/finish`, { handoff, flow })
+      .pipe(tap(r => this.auth.signedIn(r as ApiResponse<SignedIn>)));
   }
 
   ssoCallback(code: string, state: string): Observable<ApiResponse<SignedIn>> {

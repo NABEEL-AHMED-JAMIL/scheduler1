@@ -112,7 +112,8 @@ export const OUTCOME_LABEL: Record<string, string> = {
   MFA_DISABLED: 'Two-factor off', MFA_RESET: 'Two-factor reset', SIGNED_OUT: 'Signed out',
 };
 export const METHOD_LABEL: Record<string, string> = {
-  PASSWORD: 'Password', MFA: 'Password + code', RECOVERY_CODE: 'Recovery code', SSO: 'Single sign-on', ADMIN: 'Administrator',
+  PASSWORD: 'Password', MFA: 'Password + code', RECOVERY_CODE: 'Recovery code', SSO: 'Single sign-on', SAML: 'Single sign-on (SAML)',
+  ADMIN: 'Administrator',
   SESSION: 'Session',
 };
 

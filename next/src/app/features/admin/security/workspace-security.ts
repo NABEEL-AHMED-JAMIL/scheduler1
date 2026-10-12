@@ -13,6 +13,7 @@ import { AccountSecurityApi, SecurityPolicy, SecuritySettings } from '../../acco
 import { SignInHistory } from '../../account/sign-in-history';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { FlagChoice, RANGES, RulesDraft, draftOf, draftProblem, platformText, settingsOf } from './security-settings.model';
+import { SsoStarted, rememberFlow } from '../../login/sign-in.api';
 
 /** A workspace's single sign-on, as the server answers it (never the secret). */
 export interface SsoSettings {
@@ -30,9 +31,40 @@ export interface SsoSettings {
   loginKey?: string;
   loginUrl?: string;
   updatedAt?: string | null;
+  /** MIG-353 part 6: SAML 2.0 -- the provider's side as saved, and ours to register with it. */
+  protocol?: SsoProtocol;
+  spEntityId?: string;
+  acsUrl?: string;
+  spMetadataUrl?: string;
+  idpEntityId?: string | null;
+  idpSsoUrl?: string | null;
+  idpCertificates?: string | null;
+  certificates?: SamlCertificate[];
+  nameIdFormat?: string | null;
+  emailAttribute?: string | null;
+  nameAttribute?: string | null;
+}
+
+export type SsoProtocol = 'OIDC' | 'SAML';
+
+/** A provider's signing certificate, as the server describes it. */
+export interface SamlCertificate {
+  subject: string;
+  notAfter: string;
+  expired: boolean;
+  sha256: string;
+}
+
+/** What an identity provider's metadata says, read by the server for the form. */
+interface SamlMetadataRead {
+  idpEntityId: string;
+  idpSsoUrl: string;
+  idpCertificates: string;
+  certificates: SamlCertificate[];
 }
 
 interface SsoDraft {
+  protocol: SsoProtocol;
   displayName: string;
   issuer: string;
   clientId: string;
@@ -41,13 +73,31 @@ interface SsoDraft {
   userCreation: 'EXISTING' | 'JIT';
   defaultProfileId: string;
   enabled: boolean;
+  idpEntityId: string;
+  idpSsoUrl: string;
+  idpCertificates: string;
+  nameIdFormat: string;
+  emailAttribute: string;
+  nameAttribute: string;
 }
+
+/** The name ID formats an administrator may ask for; "unspecified" asks for none in particular. */
+export const NAME_ID_FORMATS: { value: string; label: string }[] = [
+  { value: 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified', label: 'Unspecified (the provider decides)' },
+  { value: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', label: 'Email address' },
+  { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent', label: 'Persistent' },
+  { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient', label: 'Transient' },
+];
 
 function ssoDraftOf(s: SsoSettings | null): SsoDraft {
   return {
+    protocol: s?.protocol ?? 'OIDC',
     displayName: s?.displayName ?? '', issuer: s?.issuer ?? '', clientId: s?.clientId ?? '', clientSecret: '',
     allowedDomains: (s?.allowedDomains ?? []).join(', '), userCreation: s?.userCreation ?? 'EXISTING',
     defaultProfileId: s?.defaultProfileId ? String(s.defaultProfileId) : '', enabled: !!s?.enabled,
+    idpEntityId: s?.idpEntityId ?? '', idpSsoUrl: s?.idpSsoUrl ?? '', idpCertificates: s?.idpCertificates ?? '',
+    nameIdFormat: s?.nameIdFormat ?? NAME_ID_FORMATS[0].value, emailAttribute: s?.emailAttribute ?? '',
+    nameAttribute: s?.nameAttribute ?? '',
   };
 }
 
@@ -111,6 +161,11 @@ export class WorkspaceSecurity implements OnInit {
   readonly ssoTest = signal('');
   readonly profiles = signal<AccessProfile[]>([]);
   readonly copied = signal('');
+  readonly nameIdFormats = NAME_ID_FORMATS;
+  /** SAML: the metadata an administrator pastes, and the certificates the last read found. */
+  readonly metadataXml = signal('');
+  readonly metadataCertificates = signal<SamlCertificate[] | null>(null);
+  readonly samlBusy = signal(false);
 
   ngOnInit(): void {
     if (this.isPlatformAdmin()) {
@@ -242,17 +297,23 @@ export class WorkspaceSecurity implements OnInit {
     const d = this.ssoDraft();
     this.ssoSaving.set(true);
     this.ssoError.set('');
-    this.http.post<ApiResponse<SsoSettings>>(`${API_BASE}/tenant.json/security/sso`, {
-      tenantId: this.tenantId(), displayName: d.displayName, issuer: d.issuer, clientId: d.clientId, clientSecret: d.clientSecret,
-      allowedDomains: d.allowedDomains, userCreation: d.userCreation,
-      defaultProfileId: d.userCreation === 'JIT' && d.defaultProfileId ? Number(d.defaultProfileId) : null, enabled: d.enabled,
-    }).subscribe({
+    const common = {
+      tenantId: this.tenantId(), protocol: d.protocol, displayName: d.displayName, allowedDomains: d.allowedDomains,
+      userCreation: d.userCreation, defaultProfileId: d.userCreation === 'JIT' && d.defaultProfileId ? Number(d.defaultProfileId) : null,
+      enabled: d.enabled,
+    };
+    const body = d.protocol === 'SAML'
+      ? { ...common, idpEntityId: d.idpEntityId, idpSsoUrl: d.idpSsoUrl, idpCertificates: d.idpCertificates, nameIdFormat: d.nameIdFormat,
+        emailAttribute: d.emailAttribute, nameAttribute: d.nameAttribute }
+      : { ...common, issuer: d.issuer, clientId: d.clientId, clientSecret: d.clientSecret };
+    this.http.post<ApiResponse<SsoSettings>>(`${API_BASE}/tenant.json/security/sso`, body).subscribe({
       next: r => {
         this.ssoSaving.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.ssoError.set(r.message); return; }
         this.toast.success(r.message);
         this.sso.set(r.data);
         this.ssoDraft.set(ssoDraftOf(r.data));
+        this.metadataCertificates.set(null);
       },
       error: err => { this.ssoSaving.set(false); this.ssoError.set(err?.error?.message || 'Single sign-on could not be saved.'); },
     });
@@ -275,7 +336,68 @@ export class WorkspaceSecurity implements OnInit {
     });
   }
 
-  copy(what: 'redirect' | 'link', value: string | undefined): void {
+  // ---- SAML 2.0 (MIG-353 part 6) ------------------------------------------------------------------------------
+
+  /** The provider's metadata (pasted or uploaded), read by the server into the form; nothing is saved until Save. */
+  readMetadata(xml: string): void {
+    if (!xml.trim()) { this.ssoError.set('Paste or upload the identity provider\'s metadata XML.'); return; }
+    this.samlBusy.set(true);
+    this.ssoError.set('');
+    this.http.post<ApiResponse<SamlMetadataRead>>(`${API_BASE}/tenant.json/security/sso/saml/metadata`, { xml }).subscribe({
+      next: r => {
+        this.samlBusy.set(false);
+        if (r.data) {
+          this.ssoDraft.update(d => ({ ...d, idpEntityId: r.data!.idpEntityId, idpSsoUrl: r.data!.idpSsoUrl,
+            idpCertificates: r.data!.idpCertificates }));
+          this.metadataCertificates.set(r.data.certificates ?? null);
+        }
+        if (r.status === API_SUCCESS) { this.ssoTest.set(r.message); this.metadataXml.set(''); } else this.ssoError.set(r.message);
+      },
+      error: err => { this.samlBusy.set(false); this.ssoError.set(err?.error?.message || 'The metadata could not be read.'); },
+    });
+  }
+
+  /** An uploaded metadata file: read here as text (at most 512 KB), then as pasted. */
+  metadataFile(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    if (file.size > 512 * 1024) { this.ssoError.set('That file is larger than 512 KB; metadata is much smaller.'); return; }
+    void file.text().then(text => this.readMetadata(text), () => this.ssoError.set('The file could not be read.'));
+  }
+
+  /** Our service-provider metadata, saved as a file for the identity provider's import. */
+  downloadSpMetadata(): void {
+    const url = this.sso()?.spMetadataUrl;
+    if (!url) return;
+    this.http.get(url, { responseType: 'text' }).subscribe({
+      next: xml => {
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([xml], { type: 'application/samlmetadata+xml' }));
+        link.download = 'etl-console-sp-metadata.xml';
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+      },
+      error: () => this.ssoError.set('Our metadata could not be read. Save the settings first.'),
+    });
+  }
+
+  /** A sign-in through the saved SAML settings (on or off) that ends on a page saying what would happen; nobody is signed in. */
+  testSamlSignIn(): void {
+    this.ssoError.set('');
+    this.ssoTest.set('');
+    this.http.post<ApiResponse<SsoStarted>>(`${API_BASE}/tenant.json/security/sso/saml/test`, { tenantId: this.tenantId() }).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS || !r.data?.authorizationUrl) { this.ssoError.set(r.message); return; }
+        rememberFlow(r.data.flow);
+        window.location.assign(r.data.authorizationUrl);
+      },
+      error: err => this.ssoError.set(err?.error?.message || 'The test sign-in could not start.'),
+    });
+  }
+
+  copy(what: 'redirect' | 'link' | 'entity' | 'acs', value: string | undefined | null): void {
     if (!value) return;
     void copyText(value).then(ok => {
       this.copied.set(ok ? what : '');
