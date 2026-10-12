@@ -5,6 +5,7 @@ import { Icon } from '../../shared/ui/icon';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AnalyticsService, RegisteredDataset } from './analytics.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { openVisualise } from './charts/visualise-open';
 
 /**
  * The dataset registry: naming a location once, and finding it again.
@@ -100,6 +101,12 @@ import { ToastService } from '../../shared/ui/toast.service';
               <span class="text-[11px] mono text-[color:var(--text-muted)] truncate max-w-72">
                 {{ item.connectionAlias }}/{{ item.datasetPath }}
               </span>
+              <button type="button" class="btn btn-default btn-xs shrink-0" data-test="visualise"
+                      [attr.aria-label]="'Visualise ' + item.datasetName" title="Suggested charts of this dataset"
+                      (click)="visualise(item)">
+                <app-icon name="chart" />
+                Visualise
+              </button>
               <button type="button" class="btn btn-ghost btn-icon btn-xs btn-intent-crit shrink-0"
                       title="Remove from the registry"
                       [attr.aria-label]="'Remove ' + item.datasetName + ' from the registry'"
@@ -114,6 +121,12 @@ import { ToastService } from '../../shared/ui/toast.service';
   `,
 })
 export class DatasetRegistry implements OnInit {
+
+  /** MIG-357: suggested charts of a registered dataset, from its shape (the panel is loaded when asked for). */
+  visualise(item: RegisteredDataset): void {
+    void openVisualise(this.dialog, { name: item.datasetName, connection: item.connectionAlias, path: item.datasetPath,
+      datasetId: item.analyticsDatasetId ?? null });
+  }
 
   private readonly analytics = inject(AnalyticsService);
   private readonly dialog = inject(Dialog);

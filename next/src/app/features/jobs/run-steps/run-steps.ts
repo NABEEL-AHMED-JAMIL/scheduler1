@@ -3,6 +3,7 @@ import { RunReview } from './run-review';
 import { RunMap } from './run-map';
 import { Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
+import { chartable, openVisualise } from '../../analytics/charts/visualise-open';
 import { HttpClient } from '@angular/common/http';
 import { Subscription } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -233,6 +234,21 @@ export class RunSteps {
         this.toast.error(await refusalOf(err) || `${name} could not be downloaded.`);
       },
     });
+  }
+
+  /** MIG-357: a table the run put out can be charted -- a kept file read as rows, an upload through Analytics. */
+  canVisualise(output: RunOutput): boolean {
+    return chartable(output.name, output.format);
+  }
+
+  /** MIG-357: suggested charts of a run's file (the panel and the chart engine load when asked for). */
+  visualise(output: RunOutput): void {
+    if (output.kind === 'bucket') {
+      if (!output.bucket || !output.key) return;
+      void openVisualise(this.dialog, { name: output.name, connection: output.bucket, path: output.key });
+    } else if (output.runDatasetId) {
+      void openVisualise(this.dialog, { name: output.name, runDatasetId: output.runDatasetId, rowCount: output.rowCount ?? null });
+    }
   }
 
   /** A bucket upload, from storage, exactly as the object browser downloads one. */

@@ -89,11 +89,14 @@
               @if (a.query; as q) {
                 <div class="flex flex-col gap-3" data-test="query-answer">
                   <p class="text-sm leading-relaxed" data-test="answer">{{ a.answer }}</p>
+                  @if (q.summary) {
+                    <p class="text-xs text-[color:var(--text-muted)]" data-test="answer-summary">From the rows: {{ q.summary }}</p>
+                  }
                   <div class="flex flex-col gap-3 2xl:grid 2xl:grid-cols-2 2xl:items-start">
-                  @if (chartItems(q).length) {
-                    <div class="card p-4" data-test="query-chart">
-                      <p class="text-xs text-[color:var(--text-muted)] mb-2">{{ q.chart!.value }} by {{ q.chart!.label }}</p>
-                      <app-ranked-bar [data]="chartItems(q)" [sorted]="false" [max]="12" [showPercent]="false" />
+                  @if (q.rows.length) {
+                    <div class="min-w-0" data-test="query-chart">
+                      <!-- MIG-357: the dashboards' chart engine, loaded with the first chart answer and not before. -->
+                      <app-chart-answer-slot [answer]="chartAnswerOf(q)" [canPin]="canPin()" />
                     </div>
                   }
                   @if (q.rows.length) {

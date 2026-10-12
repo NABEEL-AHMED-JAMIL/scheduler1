@@ -155,10 +155,15 @@ describe('RunSteps: the run\'s Files', () => {
 
   it('downloads an upload from storage, by its alias and key', () => {
     const { el, http } = mount();
-    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] button')!.click();
+    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] button:not([data-test="visualise"])')!.click();
     const req = http.expectOne(r => r.url.endsWith('/storage.json/downloadObject'));
     expect(req.request.params.get('bucket')).toBe('ui-review-s3');
     expect(req.request.params.get('key')).toBe('registry-live-check/customers-clean.json');
+  });
+
+  it('offers Visualise for a table the run put out (MIG-357)', () => {
+    const { el } = mount();
+    expect(el.querySelector('.exec-file[data-kind="bucket"] [data-test="visualise"]')).not.toBeNull();
   });
 
   it('says an expired file has expired, and offers no download', () => {

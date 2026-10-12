@@ -6,10 +6,10 @@ import { Subscription, TimeoutError } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, chartItems, csvOf, linkParts, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, chartAnswerOf, csvOf, linkParts, refusalText, searchedText, segments } from './ask-data.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { AskIndex } from './ask-index';
-import { RankedBar } from '../../shared/charts/ranked-bar';
+import { ChartAnswerSlot } from '../analytics/charts/chart-answer-slot';
 import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 
 /**
@@ -17,11 +17,11 @@ import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
  * workspace's model only from the documents and pipeline results the person can see, with numbered citations that open
  * each source. A workspace administrator also chooses what the workspace's search index holds (MIG-281, AskIndex).
  * The examples are built from what the workspace actually has; the session's questions stay on the page
- * (newest first) until it is left -- nothing is saved.
+ * (newest first) until it is left -- nothing is saved but a chart pinned to a dashboard (MIG-357).
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [RouterLink, Icon, RankedBar, AskIndex, ModelSetupBanner, NeedsWorkspace],
+  imports: [RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {
@@ -151,8 +151,13 @@ export class AskData implements OnInit {
     this.highlightTimer = setTimeout(() => this.highlighted.set(null), 1600);
   }
 
-  /** MIG-283: a query answer's chart, rows shown (the first 20) and the way to keep working on it. */
-  readonly chartItems = chartItems;
+  /**
+   * MIG-357: a query answer as the chart card draws it -- the model's kind (overruled by the fit rules when it cannot draw
+   * the rows), Change chart, Chart settings and Pin to dashboard.
+   */
+  readonly chartAnswerOf = chartAnswerOf;
+  /** Pinning puts a tile on a dashboard: whoever may open the dashboards (Saved Analyses or Analytics Studio). */
+  readonly canPin = computed(() => this.auth.canOpen('analytics-dashboards') || this.auth.canOpen('analytics'));
 
   shownRows(q: AskQuery): (string | null)[][] {
     return q.rows.slice(0, 20);

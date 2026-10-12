@@ -1759,7 +1759,7 @@ export class Dashboards implements OnInit, OnDestroy {
           return;
         }
         done({ state: 'done', error: '', queryId,
-          view: queryView(response.data) });
+          view: queryView(response.data, widgetConfigOf(widget).additive) });
       },
       error: err => {
         done({ state: 'failed', view: null, queryId,

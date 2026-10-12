@@ -2,6 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import type { PinChartRequest } from './charts/chart-answer';
+
+/** What pinChart answers: the board (made or chosen), the saved query and the widget. */
+export interface PinnedChart {
+  dashboard: { analyticsDashboardId: number; dashboardName: string; created: boolean };
+  analyticsQueryId: number;
+  widget: DashboardWidget;
+}
 
 export interface DatasetColumn {
   name: string;
@@ -1175,6 +1183,14 @@ export class AnalyticsService {
   }
 
   /** Takes one tile off a board. The analysis or query it showed is untouched. */
+  /**
+   * MIG-357: a chart answer kept as a tile -- its query saved and a widget on the board (or a new one), both or neither,
+   * in one transaction on the server (analyticsWorkspace.json/pinChart).
+   */
+  pinChart(request: PinChartRequest): Observable<ApiResponse<PinnedChart>> {
+    return this.http.post<ApiResponse<PinnedChart>>(`${this.workspace}/pinChart`, request);
+  }
+
   deleteWidget(analyticsDashboardWidgetId: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.workspace}/deleteWidget`, {
       params: { analyticsDashboardWidgetId: String(analyticsDashboardWidgetId) },

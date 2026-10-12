@@ -23,12 +23,14 @@ import { workspaceName } from '../../../shared/ui/workspace-name';
 import { PipelineDraftHandoff } from '../../tasks/steps/draft-handoff';
 import { ASSISTANT_TIMEOUT_MS, AssistantApi } from './assistant.api';
 import {
-  AssistantAnswer, AssistantLink, AssistantMessage, Conversation, PipelineDraft, RunProgress, ToolCall, ToolDef, ToolTrace, allowedTools,
-  askFirstNames, cardView, confirmLabel, contentBlocks, filesLink, mergeMessages, outcomeLook, runLink, toolState, traceOwners, withDecision,
+  AssistantAnswer, AssistantLink, AssistantMessage, ChartArtifact, Conversation, PipelineDraft, RunProgress, ToolCall, ToolDef, ToolTrace, allowedTools,
+  askFirstNames, cardView, chartAnswerOfArtifact, confirmLabel, contentBlocks, filesLink, isChart, mergeMessages, newestChart, outcomeLook, runLink,
+  toolState, traceOwners, withDecision,
 } from './assistant.model';
 import { DatasetPanel } from './dataset-panel';
 import { RunFollow } from './run-follow';
 import { FlowPanel } from './flow-panel';
+import { ChartAnswerSlot } from '../../analytics/charts/chart-answer-slot';
 import { TracePanel, TraceRun } from './trace-panel';
 import { PipelineFlowArtifact, flowVerdict, isFlow, newestFlow } from './flow.model';
 import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
@@ -37,7 +39,7 @@ import { sensitivityText } from '../../../shared/ui/sensitivity';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
-export type PanelTab = 'flow' | 'trace' | 'context';
+export type PanelTab = 'flow' | 'chart' | 'trace' | 'context';
 
 /**
  * What a person can ask first, by what they want. Healthcare shows up only here, as samples: everything the assistant
@@ -71,7 +73,7 @@ export const PROGRESS_MS = [1000, 2000] as const;
 @Component({
   selector: 'app-assistant',
   imports: [Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, ModelSetupBanner, RunFollow,
-    FlowPanel, TracePanel],
+    FlowPanel, TracePanel, ChartAnswerSlot],
   templateUrl: './assistant.html',
   // The page's own layout, kept with the page (lazy) rather than as new global utilities.
   styles: [`
@@ -205,6 +207,22 @@ export class Assistant implements OnInit {
   });
   readonly flowMessageId = computed(() => this.pickedFlow() ?? newestFlow(this.messages())?.messageId ?? null);
 
+  /** MIG-357: the message whose chart the Chart tab draws; null: the newest. */
+  readonly pickedChart = signal<number | null>(null);
+  /** The chart the Chart tab draws: the picked message's, else the conversation's newest. */
+  readonly chart = computed<ChartArtifact | null>(() => {
+    const picked = this.pickedChart();
+    if (picked != null) {
+      const a = this.messages().find(m => m.messageId === picked)?.artifact;
+      if (isChart(a)) return a;
+    }
+    return newestChart(this.messages())?.chart ?? null;
+  });
+  readonly chartMessageId = computed(() => this.pickedChart() ?? newestChart(this.messages())?.messageId ?? null);
+  readonly chartAnswer = computed(() => { const c = this.chart(); return c ? chartAnswerOfArtifact(c) : null; });
+  /** Pinning puts a tile on a dashboard: whoever may open the dashboards. */
+  readonly canPinCharts = computed(() => this.auth.canOpen('analytics-dashboards') || this.auth.canOpen('analytics'));
+
   /** What the Trace tab shows: the live run, or a finished run's trace as read. */
   readonly traceView = computed<{ run: TraceRun | null; calls: ToolCall[]; live: boolean }>(() => {
     const live = this.live();
@@ -316,6 +334,7 @@ export class Assistant implements OnInit {
     this.stopped.set(false);
     this.renaming.set(false);
     this.pickedFlow.set(null);
+    this.pickedChart.set(null);
     this.historyOpen.set(false);
     this.api.conversation(conversationId).subscribe({
       next: r => {
@@ -326,7 +345,7 @@ export class Assistant implements OnInit {
         this.remember(r.data.conversation.conversationId);
         const newest = this.traceRuns()[0];
         if (newest != null) this.showTrace(newest);
-        this.tab.set(this.flow() ? 'flow' : this.tab());
+        this.tab.set(this.flow() ? 'flow' : this.chart() ? 'chart' : this.tab());
       },
       error: err => { this.threadLoading.set(false); this.threadError.set(err?.error?.message || 'Could not open the conversation.'); },
     });
@@ -341,6 +360,7 @@ export class Assistant implements OnInit {
     this.traceRunId.set(null);
     this.live.set(null);
     this.pickedFlow.set(null);
+    this.pickedChart.set(null);
     this.error.set('');
     this.threadError.set('');
     this.stopped.set(false);
@@ -491,6 +511,7 @@ export class Assistant implements OnInit {
     const id = this.conversation()?.conversationId;
     if (id == null) { this.settle(); return; }
     const hadFlow = this.flowMessageId();
+    const hadChart = this.chartMessageId();
     this.api.conversation(id).subscribe({
       next: r => {
         this.settle();
@@ -499,7 +520,9 @@ export class Assistant implements OnInit {
           this.messages.set(mergeMessages([], r.data.messages ?? []));
           this.conversations.update(list => [r.data!.conversation, ...list.filter(c => c.conversationId !== id)]);
           this.pickedFlow.set(null);
+          this.pickedChart.set(null);
           if (this.flowMessageId() !== hadFlow && this.flow()) this.tab.set('flow');
+          else if (this.chartMessageId() !== hadChart && this.chart()) this.tab.set('chart');
         }
         this.showTrace(f.runId, true);
       },
@@ -643,6 +666,12 @@ export class Assistant implements OnInit {
     this.tab.set('flow');
   }
 
+  /** MIG-357: a message's chart, in the Chart tab. */
+  showChart(messageId: number): void {
+    this.pickedChart.set(messageId);
+    this.tab.set('chart');
+  }
+
   openDataset(link: AssistantLink): void {
     if (!link.datasetRef) return;
     this.dialog.open(DatasetPanel, sidePanelConfig({ datasetRef: link.datasetRef, tool: link.tool ?? '' }, 'wide'));
@@ -695,9 +724,10 @@ export class Assistant implements OnInit {
   size(bytes: number | null | undefined): string { return formatSize(bytes); }
   tip(text: string | null | undefined): string { return capTitle(text); }
   flowOf(m: AssistantMessage): PipelineFlowArtifact | null { return isFlow(m.artifact) ? m.artifact : null; }
+  chartOf(m: AssistantMessage): ChartArtifact | null { return isChart(m.artifact) ? m.artifact : null; }
   draftOf(m: AssistantMessage): PipelineDraft | null {
     const a = m.artifact as PipelineDraft | null;
-    return a && !isFlow(a) && typeof a.text === 'string' ? a : null;
+    return a && !isFlow(a) && !isChart(a) && typeof (a as PipelineDraft).text === 'string' ? a : null;
   }
   verdictOf(f: PipelineFlowArtifact) { return flowVerdict(f); }
   problemText(p: string | { message?: string; path?: string }): string {

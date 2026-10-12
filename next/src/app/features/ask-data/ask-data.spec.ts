@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, chartItems, csvOf, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, chartAnswerOf, csvOf, refusalText, searchedText, segments } from './ask-data.model';
 import { AskData } from './ask-data';
 import { AuthService } from '../../core/auth/auth.service';
 
@@ -40,7 +40,7 @@ function render(setup: Setup = {}) {
   TestBed.configureTestingModule({
     imports: [AskData],
     providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AskDataApi, useValue: api },
-      { provide: AuthService, useValue: { isTenantAdmin: () => false, user: () => ({ appUserId: 4641, tenantId: setup.tenantId === undefined ? 2960 : setup.tenantId }) } }],
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, canOpen: () => true, user: () => ({ appUserId: 4641, tenantId: setup.tenantId === undefined ? 2960 : setup.tenantId }) } }],
   });
   const fixture = TestBed.createComponent(AskData);
   fixture.detectChanges();
@@ -190,27 +190,48 @@ describe('Ask your data -- a question answered by a query (MIG-283)', () => {
     sql: 'SELECT city, sum(amount) AS total FROM dataset GROUP BY city ORDER BY total DESC\nLIMIT 200',
     dataset: { datasetId: 1002, name: 'Customers small', connection: 's3', path: 'customers.csv' },
     columns: ['city', 'total'], rows: [['Austin', '120.5'], ['Paris, FR', '80']], rowCount: 2, truncated: false,
-    chart: { type: 'bar' as const, label: 'city', value: 'total' },
+    chart: { kind: 'donut', title: 'Total by city', caption: 'The total amount for each city.', xAxis: 'City', yAxis: 'Total',
+      stack: 'none' as const, sort: 'desc' as const, topN: 0, additive: true, source: 'model' as const },
+    summary: '2 rows; the first: Austin, 120.5.',
   };
 
-  it('shows the sentence, the chart, the rows and the query it ran -- and hands the query to Analytics Studio', () => {
+  it('shows the sentence, the chart, the rows and the query it ran -- and hands the query to Analytics Studio', async () => {
     const { screen, fixture, q } = render({ ask: (question: string) => of({ status: 'SUCCESS', data: {
-      question, kind: 'query', answer: '2 rows; the first: Austin, 120.5.', notFound: false, sources: [], query: QUERY,
+      question, kind: 'query', answer: 'The total amount for each city.', notFound: false, sources: [], query: QUERY,
       model: 'gemma3:1b', connection: 'Local Ollama', runId: 9, latencyMs: 2100, searched: { datasets: 1 }, warnings: [] } }) });
     screen.ask('Total amount by city');
     fixture.detectChanges();
-    expect(q('[data-test="query-answer"] [data-test="answer"]')?.textContent).toContain('2 rows; the first: Austin, 120.5.');
-    expect(q('[data-test="query-chart"]')?.textContent).toContain('Austin');
+    await vi.waitFor(() => { fixture.detectChanges(); if (!q('[data-test="chart-answer"]')) throw new Error('the chart is still loading'); });
+    expect(q('[data-test="query-answer"] [data-test="answer"]')?.textContent).toContain('The total amount for each city.');
+    expect(q('[data-test="answer-summary"]')?.textContent).toContain('From the rows: 2 rows; the first: Austin, 120.5.');
+    // MIG-357: the chart card draws the model's kind (a ring: two cities whose totals add up) over the rows that ran.
+    expect(q('[data-test="query-chart"] [data-test="chart-answer"]')?.getAttribute('data-kind')).toBe('donut');
+    expect(q('[data-test="chart-title"]')?.textContent).toContain('Total by city');
+    expect(q('[data-test="chart-fallback"]')).toBeNull();
+    expect(q('[data-test="pin-chart"]')).not.toBeNull();
     expect(q('[data-test="query-rows"]')?.textContent).toContain('Paris, FR');
     expect(q('[data-test="query-sql"]')?.textContent).toContain('GROUP BY city');
     expect(q('[data-test="open-analytics"]')?.getAttribute('href')).toContain('sql=SELECT');
     expect(q('[data-test="meta"]')?.textContent).toContain('1 dataset');
   });
 
-  it('turns the rows into CSV and the chart into bars', () => {
+  it('turns the rows into CSV and the answer into the chart card\'s', () => {
     expect(csvOf(QUERY)).toBe('city,total\r\nAustin,120.5\r\n"Paris, FR",80\r\n');
-    expect(chartItems(QUERY)).toEqual([{ name: 'Austin', value: 120.5 }, { name: 'Paris, FR', value: 80 }]);
-    expect(chartItems({ ...QUERY, chart: null })).toEqual([]);
+    expect(chartAnswerOf(QUERY).chart?.kind).toBe('donut');
+    expect(chartAnswerOf(QUERY).summary).toBe('2 rows; the first: Austin, 120.5.');
+    // An older ai-service's bar hint is not a chart answer: the card picks from the shape.
+    expect(chartAnswerOf({ ...QUERY, chart: { type: 'bar', label: 'city', value: 'total' } as never }).chart).toBeNull();
+  });
+
+  it('falls back to a kind that fits when the model\'s cannot draw the rows, and says why', async () => {
+    const averages = { ...QUERY, chart: { ...QUERY.chart, kind: 'donut', additive: false } };
+    const { screen, fixture, q } = render({ ask: (question: string) => of({ status: 'SUCCESS', data: {
+      question, kind: 'query', answer: 'The average amount for each city.', notFound: false, sources: [], query: averages,
+      model: 'qwen3:8b', connection: 'Local Ollama', runId: 9, latencyMs: 2100, searched: { datasets: 1 }, warnings: [] } }) });
+    screen.ask('Average amount by city');
+    await vi.waitFor(() => { fixture.detectChanges(); if (!q('[data-test="chart-answer"]')) throw new Error('the chart is still loading'); });
+    expect(q('[data-test="chart-answer"]')?.getAttribute('data-kind')).not.toBe('donut');
+    expect(q('[data-test="chart-fallback"]')?.textContent).toContain('was asked for, but');
   });
 });
 

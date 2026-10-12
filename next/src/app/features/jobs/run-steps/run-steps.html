@@ -213,6 +213,12 @@
                 </div>
                 @if (o.kind === 'file') {
                   <div class="flex flex-wrap justify-end justify-self-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name + ' as'">
+                    @if (canVisualise(o)) {
+                      <button type="button" class="btn btn-default btn-xs" data-test="visualise" [disabled]="!!o.expired || !o.runDatasetId"
+                              [attr.aria-label]="'Visualise ' + o.name" title="Suggested charts of this file" (click)="visualise(o)">
+                        <app-icon name="chart" />Visualise
+                      </button>
+                    }
                     @for (f of formatsFor(o.name, o.format); track f.id) {
                       <button type="button" class="btn btn-default btn-xs" [attr.data-format]="f.id"
                               [disabled]="!!o.expired || !o.runDatasetId || busy() !== ''"
@@ -223,11 +229,19 @@
                     }
                   </div>
                 } @else {
+                  <div class="flex flex-wrap justify-end justify-self-end gap-1">
+                  @if (canVisualise(o)) {
+                    <button type="button" class="btn btn-default btn-xs" data-test="visualise" [disabled]="!o.bucket || !o.key"
+                            [attr.aria-label]="'Visualise ' + o.name" title="Suggested charts of this file" (click)="visualise(o)">
+                      <app-icon name="chart" />Visualise
+                    </button>
+                  }
                   <button type="button" class="btn btn-default btn-xs justify-self-end" [disabled]="!o.bucket || !o.key || busy() !== ''"
                           [attr.aria-label]="'Download ' + o.name + ' from ' + o.bucket"
                           (click)="downloadUpload(o)">
                     <app-icon name="download" />Download
                   </button>
+                  </div>
                 }
               </li>
             } @empty {

@@ -254,6 +254,15 @@
                       <span class="pill" [class]="'pill pill-' + v.tone">{{ v.label }}</span>
                       <span class="text-xs text-[color:var(--text-muted)] ml-auto flex items-center gap-1">{{ flowMessageId() === m.messageId ? 'Shown' : 'Show flow' }}<app-icon name="chevronRight" size="0.85em" /></span>
                     </button>
+                  } @else if (chartOf(m); as c) {
+                    <button type="button" class="rounded-lg border px-3 py-2 flex flex-wrap items-center gap-2 max-w-xl text-left hover:bg-sunken"
+                            [class]="chartMessageId() === m.messageId && tab() === 'chart' ? 'border-[color:var(--accent-mark)]' : 'border-subtle'"
+                            data-artifact="chart" (click)="showChart(m.messageId)">
+                      <app-icon name="chart" class="text-[color:var(--text-muted)]" />
+                      <span class="font-medium truncate min-w-0" [title]="tip(c.query.chart?.title || c.query.dataset.name)">{{ c.query.chart?.title || c.query.dataset.name }}</span>
+                      <span class="pill pill-neutral">{{ c.query.rows.length }} rows</span>
+                      <span class="text-xs text-[color:var(--text-muted)] ml-auto flex items-center gap-1">{{ chartMessageId() === m.messageId && tab() === 'chart' ? 'Shown' : 'Show chart' }}<app-icon name="chevronRight" size="0.85em" /></span>
+                    </button>
                   } @else if (draftOf(m); as a) {
                     <div class="rounded-lg border border-subtle px-3.5 py-3 flex flex-col gap-2 max-w-2xl" data-artifact="pipeline-draft">
                       <div class="flex flex-wrap items-center gap-2 min-w-0">
@@ -357,6 +366,11 @@
           <app-icon name="layers" />Flow
           @if (flow(); as f) { <span class="pill" [class]="'pill pill-' + verdictOf(f).tone">{{ f.definition.steps.length }}</span> }
         </button>
+        @if (chart()) {
+          <button type="button" role="tab" class="tab" data-tab="chart" [class.tab-active]="tab() === 'chart'" [attr.aria-selected]="tab() === 'chart'" (click)="tab.set('chart')">
+            <app-icon name="chart" />Chart
+          </button>
+        }
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'trace'" [attr.aria-selected]="tab() === 'trace'" (click)="tab.set('trace')">
           <app-icon name="plug" />Tool calls
           @if (traceView().live) { <span class="size-1.5 rounded-full bg-[color:var(--accent-mark)]" aria-label="live"></span> }
@@ -369,6 +383,14 @@
         @switch (tab()) {
           @case ('flow') {
             <app-flow-panel class="block h-full" [flow]="flow()" [canCreate]="canEditPipelines()" />
+          }
+          @case ('chart') {
+            <!-- MIG-357: the chart_data tool's answer, drawn with the dashboards' chart engine; loaded only when shown. -->
+            @if (chartAnswer(); as answer) {
+              <app-chart-answer-slot [answer]="answer" [canPin]="canPinCharts()" [height]="300" />
+            } @else {
+              <p class="text-sm text-[color:var(--text-muted)]">Ask about numbers in your datasets, and the chart appears here.</p>
+            }
           }
           @case ('trace') {
             <div class="flex flex-col gap-3">

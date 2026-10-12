@@ -1,3 +1,5 @@
+import type { AnswerChart, ChartAnswer } from '../analytics/charts/chart-answer';
+
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): what ai-service's /askData.json answers, and the pure
  * pieces of the page -- an answer cut into text and citations, and the words for a refusal.
@@ -81,8 +83,32 @@ export interface AskQuery {
   rows: (string | null)[][];
   rowCount: number;
   truncated: boolean;
-  /** A bar chart of one label column and one number column, when the rows make one. */
-  chart: { type: 'bar'; label: string; value: string } | null;
+  /**
+   * MIG-357: the chart the model chose for the rows -- a kind of the console's 51, its settings and a caption -- which the
+   * console's fit rules may overrule (charts/chart-answer.ts). Null from an older ai-service.
+   */
+  chart: AnswerChart | null;
+  /** What the rows hold, in a sentence made from the rows (never by the model). */
+  summary?: string | null;
+}
+
+const DRAWN = new WeakMap<AskQuery, ChartAnswer>();
+
+/**
+ * The query answer as the chart card draws it -- the same object for the same answer, so a template that asks again on
+ * every check hands the card the input it already has.
+ */
+export function chartAnswerOf(q: AskQuery): ChartAnswer {
+  const kept = DRAWN.get(q);
+  if (kept) return kept;
+  const made = chartAnswerFrom(q);
+  DRAWN.set(q, made);
+  return made;
+}
+
+function chartAnswerFrom(q: AskQuery): ChartAnswer {
+  return { sql: q.sql, dataset: q.dataset, columns: q.columns, rows: q.rows, rowCount: q.rowCount, truncated: q.truncated,
+    chart: q.chart && typeof q.chart === 'object' && 'kind' in q.chart ? q.chart : null, summary: q.summary ?? null };
 }
 
 export interface AskAnswer {
@@ -156,15 +182,6 @@ export function refusalText(status: number, message: string | null | undefined):
   if (status === 429) return 'Too many questions at once. Wait a moment and ask again.';
   if (status === 504 || status === 408) return 'The answer took too long. Try a shorter or more specific question.';
   return 'The question could not be answered. Try again.';
-}
-
-/** The query's chart as bars: its label column against its number column, in the order the query gave. */
-export function chartItems(q: AskQuery | null | undefined): { name: string; value: number }[] {
-  if (!q?.chart) return [];
-  const label = q.columns.indexOf(q.chart.label);
-  const value = q.columns.indexOf(q.chart.value);
-  if (label < 0 || value < 0) return [];
-  return q.rows.map(r => ({ name: r[label] ?? '—', value: Number(r[value]) })).filter(i => Number.isFinite(i.value));
 }
 
 /** The query's rows as CSV (RFC 4180 quoting), header first. */

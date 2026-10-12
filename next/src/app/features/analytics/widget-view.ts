@@ -66,6 +66,11 @@ export interface WidgetConfig {
    * Read through parseSettings, never trusted as stored.
    */
   chart?: ChartSettings;
+  /**
+   * MIG-357: whether the saved query's figures add up (a count or a sum), as the chart answer it was pinned from judged its
+   * statement. Absent: unknown, as for every saved query (queryView), so the part-of-a-whole kinds stay refused.
+   */
+  additive?: boolean;
 }
 
 /**
@@ -103,6 +108,7 @@ export function widgetConfigString(config: WidgetConfig): string | null {
   if (config.caption && config.caption.trim()) kept.caption = config.caption.trim();
   const chart = config.chart ? compactSettings(config.chart) : undefined;
   if (chart) kept.chart = chart;
+  if (typeof config.additive === 'boolean') kept.additive = config.additive;
   return Object.keys(kept).length ? JSON.stringify(kept) : null;
 }
 
@@ -912,7 +918,7 @@ export function withChartTable(view: WidgetView, context: Parameters<typeof tabl
  * it told issuesFor the figures were additive and then took the ring back out afterwards, so a
  * column of averages was still offered "share of the total" as ranked bars carrying percentages.
  */
-export function queryView(result: QueryResult): WidgetView {
+export function queryView(result: QueryResult, additive?: boolean | null): WidgetView {
   const columns = result.columns ?? [];
   // A column of true/false answers reads Yes and No, here as on an analysis's BOOLEAN column (yesNo, MIG-367).
   const raw = result.rows ?? [];
@@ -995,8 +1001,12 @@ export function queryView(result: QueryResult): WidgetView {
   // the running total were offered on the same false premise. Only the ring was taken back out,
   // one line below, which is why the hole was invisible -- the kind the comments talk about was
   // the one kind that was actually closed.
+  //
+  // MIG-357: unless the caller KNOWS -- a chart answer's query was read for its aggregates (a count or a sum adds up; an
+  // average, a rate or a division does not) and a widget pinned from one keeps that verdict (WidgetConfig.additive).
+  const known = additive === true || additive === false;
   const issues = issuesFor(
-    value && value.negative ? [] : marks, reason, 'unknown', 'this measure');
+    value && value.negative ? [] : marks, reason, known ? additive : 'unknown', 'this measure');
 
   return withChartTable({
     columns,
@@ -1018,12 +1028,12 @@ export function queryView(result: QueryResult): WidgetView {
     // A saved query does not say whether its figures add up, which is why every totalling kind is
     // refused above. The dimension summary withholds its top-share fact on the same grounds, and
     // reads this flag to do it -- so the two must agree, and this is the value issuesFor is given.
-    additive: false,
+    additive: additive === true,
     marks,
     notes,
     issues: issues as WidgetView['issues'],
     ranAt: Date.now(),
-  }, { additive: 'unknown', emptyReason: reason });
+  }, { additive: known ? additive : 'unknown', emptyReason: reason });
 }
 
 /**

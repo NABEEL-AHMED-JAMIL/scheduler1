@@ -22,6 +22,14 @@ export class AskDataApi {
     return this.http.post<ApiResponse<AskAnswer>>(`${BASE()}/ask`, { question }).pipe(timeout(ASK_TIMEOUT_MS));
   }
 
+  /**
+   * MIG-357: a question answered with a chart -- over the dataset named (Visualise's "Ask AI for a chart") or the one the
+   * question names: the query run as the person, its rows, and the kind and settings the model chose.
+   */
+  chart(body: { question: string; connection?: string; path?: string; name?: string; datasetId?: number | null }): Observable<ApiResponse<AskAnswer>> {
+    return this.http.post<ApiResponse<AskAnswer>>(`${BASE()}/chart`, body).pipe(timeout(ASK_TIMEOUT_MS));
+  }
+
   /** MIG-281: the workspace's search index (TENANT_ADMIN). */
   indexStatus(): Observable<ApiResponse<AskIndexStatus>> {
     return this.http.get<ApiResponse<AskIndexStatus>>(`${BASE()}/index`);

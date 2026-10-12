@@ -65,6 +65,48 @@ export interface PipelineDraft {
   saved?: boolean;
 }
 
+/**
+ * MIG-357: a chart the assistant's chart_data tool drew -- Ask your data's chart answer: the query that ran as the person,
+ * its rows, and the kind and settings the model chose (which the console's fit rules may overrule). The model saw none of
+ * the rows; the figures on the chart are the query's.
+ */
+export interface ChartArtifact {
+  kind: 'chart';
+  question?: string;
+  answer?: string;
+  query: {
+    sql: string;
+    dataset: { datasetId?: number | null; name: string; connection: string; path: string };
+    columns: string[];
+    rows: (string | null)[][];
+    rowCount: number;
+    truncated: boolean;
+    chart: import('../../analytics/charts/chart-answer').AnswerChart | null;
+    summary?: string | null;
+  };
+}
+
+export function isChart(artifact: unknown): artifact is ChartArtifact {
+  const a = artifact as ChartArtifact | null;
+  return !!a && typeof a === 'object' && a.kind === 'chart' && !!a.query && Array.isArray(a.query.columns) && Array.isArray(a.query.rows);
+}
+
+/** The newest chart in the conversation, and the message it is on. */
+export function newestChart(messages: readonly { messageId: number; artifact?: unknown }[]): { messageId: number; chart: ChartArtifact } | null {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const a = messages[i].artifact;
+    if (isChart(a)) return { messageId: messages[i].messageId, chart: a };
+  }
+  return null;
+}
+
+/** A chart artifact as the chart card draws it. */
+export function chartAnswerOfArtifact(a: ChartArtifact): import('../../analytics/charts/chart-answer').ChartAnswer {
+  const q = a.query;
+  return { sql: q.sql, dataset: q.dataset, columns: q.columns, rows: q.rows, rowCount: q.rowCount, truncated: q.truncated,
+    chart: q.chart ?? null, summary: q.summary ?? null };
+}
+
 export interface AssistantMessage {
   messageId: number;
   conversationId: number;
@@ -76,7 +118,7 @@ export interface AssistantMessage {
   card: ConfirmCard | null;
   links: AssistantLink[];
   /** A drafted pipeline (before the review) or, since it, a designed flow (kind pipeline-flow, flow.model.ts). */
-  artifact: PipelineDraft | import('./flow.model').PipelineFlowArtifact | null;
+  artifact: PipelineDraft | import('./flow.model').PipelineFlowArtifact | ChartArtifact | null;
   dateCreated?: string;
 }
 
