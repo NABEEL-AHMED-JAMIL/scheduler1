@@ -52,8 +52,8 @@ function writeNumber(key: string, value: number): void {
           <div class="min-w-0 flex-1">
             <h2 id="idle-title" class="text-sm font-semibold">Still there?</h2>
             <p id="idle-body" class="text-sm text-[color:var(--text-secondary)] mt-0.5">
-              You'll be signed out in <span class="tabular font-medium text-[color:var(--text-primary)]">{{ countdown() }}</span>
-              because the console has not been used for {{ idleMinutes() }} minutes.
+              You'll be signed out in <span class="tabular font-medium text-[color:var(--text-primary)]">{{ countdown() }}</span>:
+              your workspace signs people out after {{ idleMinutes() }} minutes without activity.
             </p>
             <div class="flex gap-2 mt-3">
               <button type="button" class="btn btn-primary btn-sm" (click)="stay()">Stay signed in</button>

@@ -348,6 +348,9 @@ export class AuthService {
    * reached must not keep anyone signed in here. Other open tabs follow through the storage event (see below).
    */
   logout(reason?: string): void {
+    // Already signed out (MIG-353): a request that failed after the sign-out must not navigate again -- that second
+    // navigation, without a reason, replaced the idle sign-out's "you were signed out because..." on the login page.
+    if (!reason && !this.currentUser() && !this.readHeldPlatformSession()) return;
     this.revoke(this.currentUser());
     // A staff member signed out inside a managed session leaves both: the platform session held aside too.
     this.revoke(this.readHeldPlatformSession());
