@@ -4,7 +4,7 @@ import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
-import { DefinitionView, LinkedJob, BucketChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult } from './steps.model';
+import { DefinitionView, LinkedJob, BucketChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -77,6 +77,17 @@ export class StepsApi {
   buckets(): Observable<BucketChoice[]> {
     return this.http.get<ApiResponse<{ bucket: string; label?: string }[]>>(`${API_BASE}/storage.json/buckets`).pipe(
       map(r => (r.data ?? []).filter(b => !!b.bucket).map(b => ({ alias: b.bucket, label: b.label || b.bucket }))));
+  }
+
+  /** MIG-346: the workspace's webhooks (integration-service), for a Send webhook step: ready ones take run.step.sent and are active. */
+  webhooks(): Observable<WebhookChoice[]> {
+    return this.http.get<ApiResponse<{ id: string; url: string; eventTypes?: string[]; active?: boolean }[]>>(`${API_BASE}/webhook.json/list`).pipe(
+      map(r => (r.data ?? []).filter(w => /^\d+$/.test(String(w.id))).map(w => {
+        const takes = (w.eventTypes ?? []).includes(STEP_WEBHOOK_EVENT);
+        const ready = !!w.active && takes;
+        const why = !w.active ? ' (paused)' : !takes ? ` (does not take ${STEP_WEBHOOK_EVENT})` : '';
+        return { id: Number(w.id), label: `#${w.id} ${w.url}${why}`, ready };
+      })));
   }
 
   prompts(): Observable<PromptChoice[]> {

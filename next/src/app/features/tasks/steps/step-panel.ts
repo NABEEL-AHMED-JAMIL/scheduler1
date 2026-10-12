@@ -5,7 +5,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
 import {
-  LIMITS, ON_ERRORS, BucketChoice, PromptChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
+  LIMITS, ON_ERRORS, BucketChoice, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
   validKey,
 } from './steps.model';
 
@@ -22,6 +22,8 @@ export interface StepPanelData {
   prompts?: PromptChoice[];
   /** MIG-321: the workspace's buckets, for a task whose settings name one. */
   buckets?: BucketChoice[];
+  /** MIG-346: the workspace's webhooks, for a task whose settings name one. */
+  webhooks?: WebhookChoice[];
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */

@@ -146,6 +146,34 @@ describe('RunSteps: a step-engine run', () => {
   });
 });
 
+describe('RunSteps: an Approval step (MIG-346)', () => {
+  const waiting = { ...ENGINE, runStatus: 'Running', waitingForApproval: true, steps: [
+    step(0, 'read', 'read_file'),
+    step(1, 'approve', 'approval', { status: 'Running', datasets: [], statusMessage: 'Waiting for approval: Send 120 results?',
+      approval: { approvalId: 1203, status: 'PENDING', waiting: true, title: 'Send 120 results?', reviewers: { kind: 'role', value: 'TENANT_ADMIN' },
+        expiresAt: '2026-10-15T20:00:00Z' } }),
+    step(2, 'send', 'send_webhook', { status: 'Queue', startedAt: null, datasets: [] }),
+  ] };
+
+  it('says a waiting run waits for approval, by whom and until when', () => {
+    const { el } = mount(waiting);
+    const row = el.querySelector<HTMLElement>('[data-step="approve"]')!;
+    expect(row.querySelector('[data-test="step-waiting-approval"]')?.textContent).toContain('Waiting for approval');
+    expect(row.querySelector('app-status')).toBeNull();
+    expect(row.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the workspace administrators in their Task inbox, until');
+  });
+
+  it('says who approved or rejected it, and what they said', () => {
+    const approved = { ...waiting, runStatus: 'Completed', waitingForApproval: false, steps: [waiting.steps[0],
+      { ...waiting.steps[1], status: 'Completed', approval: { approvalId: 1203, status: 'APPROVED', waiting: false,
+        decidedBy: 'Ana Ruiz (user 4641)', comment: 'totals match', decidedAt: '2026-10-12T20:00:00Z' } }, waiting.steps[2]] };
+    const { el } = mount(approved);
+    const row = el.querySelector<HTMLElement>('[data-step="approve"]')!;
+    expect(row.querySelector('[data-test="step-waiting-approval"]')).toBeNull();
+    expect(row.querySelector('[data-test="step-approval"]')?.textContent).toContain('Approved by Ana Ruiz (user 4641): totals match');
+  });
+});
+
 describe('RunSteps: a legacy run', () => {
   it('draws nothing, so the run\'s page stays as it is today', () => {
     const { el } = mount(LEGACY, '7383');

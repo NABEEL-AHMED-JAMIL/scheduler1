@@ -18,7 +18,7 @@ import {
   Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
-  withSample, withSwitchedLine, BucketChoice, PromptChoice,
+  withSample, withSwitchedLine, BucketChoice, PromptChoice, usesWebhook, WebhookChoice,
 } from './steps.model';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
@@ -258,6 +258,9 @@ export class StepBuilder {
   /** MIG-321: the workspace's buckets, read the first time a step that names one is opened. */
   private readonly bucketChoices = signal<BucketChoice[] | null>(null);
 
+  /** MIG-346: the workspace's webhooks, read the first time a step that names one is opened. */
+  private readonly webhookChoices = signal<WebhookChoice[] | null>(null);
+
   open(index: number): void {
     const step = this.draft().steps[index];
     if (!step) return;
@@ -279,6 +282,14 @@ export class StepBuilder {
       });
       return;
     }
+    if (this.webhookChoices() === null && usesWebhook(schema)) {
+      // Likewise: without the list a saved webhook still shows by its id.
+      this.api.webhooks().subscribe({
+        next: webhooks => { this.webhookChoices.set(webhooks); this.open(index); },
+        error: () => { this.webhookChoices.set([]); this.open(index); },
+      });
+      return;
+    }
     this.openPanel(index);
   }
 
@@ -292,6 +303,7 @@ export class StepBuilder {
       canManage: this.canManage() && step.task !== 'legacy',
       prompts: this.promptChoices() ?? [],
       buckets: this.bucketChoices() ?? [],
+      webhooks: this.webhookChoices() ?? [],
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.

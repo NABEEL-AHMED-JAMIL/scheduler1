@@ -53,7 +53,13 @@
                   <span class="step-index">{{ s.index + 1 }}</span>
                   <span class="mono font-medium">{{ s.key }}</span>
                   <span class="pill pill-neutral mono">{{ s.task }}</span>
-                  <app-status [label]="s.status" />
+                  @if (s.approval?.waiting && s.status === 'Running') {
+                    <span class="pill pill-warn" data-test="step-waiting-approval">
+                      <app-icon name="clock" size="0.85em" />Waiting for approval
+                    </span>
+                  } @else {
+                    <app-status [label]="s.status" />
+                  }
                   @if (s.reusedFromAttempt) {
                     <span class="pill pill-neutral" data-test="step-reused"
                           [title]="'Not run again: its kept output from attempt ' + s.reusedFromAttempt + ' was reused'">
@@ -81,6 +87,14 @@
                   @if (s.onError && s.onError !== 'fail') { <span>On error: {{ s.onError }}</span> }
                 </div>
 
+                <!-- MIG-346: an Approval step's request: who decides and by when, or who decided and what they said. -->
+                @if (s.approval; as a) {
+                  <p class="flex items-start gap-1.5 mt-1.5 text-xs text-[color:var(--text-secondary)]" data-test="step-approval">
+                    <app-icon [name]="a.waiting ? 'inbox' : a.status === 'APPROVED' ? 'checkCircle' : 'xCircle'" size="0.9em"
+                              class="mt-px shrink-0" [class.icon-muted]="a.waiting" />
+                    <span>{{ outcome(a) }}@if (a.waiting && a.expiresAt) {<span>, until {{ a.expiresAt | serverTime:'recentSec' }}</span>}@if (!a.waiting && a.decidedAt) {<span>, {{ a.decidedAt | serverTime:'recentSec' }}</span>}.</span>
+                  </p>
+                }
                 @if (errorText(s); as problem) {
                   <p class="flex items-start gap-1.5 mt-1.5 text-xs text-crit-500 log-message">
                     <app-icon name="xCircle" size="0.9em" class="mt-px shrink-0" />{{ problem }}

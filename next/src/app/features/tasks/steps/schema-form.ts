@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  BucketChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  BucketChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -109,6 +109,21 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('webhook') {
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || webhookHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a webhook…' : 'None' }}</option>
+                @for (w of webhooks(); track w.id) {
+                  <option [value]="'' + w.id" [selected]="textOf(f) === '' + w.id" [disabled]="!w.ready && textOf(f) !== '' + w.id">{{ w.label }}</option>
+                }
+                @if (textOf(f) && !webhookListed(f)) {
+                  <option [value]="textOf(f)" selected>Webhook {{ textOf(f) }} (not one of this workspace's webhooks)</option>
+                }
+              </select>
+            </app-field>
+          }
           @case ('column') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || (columns().length ? 'A column of the rows this step reads: pick one, or type it.' : '')">
@@ -166,7 +181,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -190,7 +205,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -246,6 +261,10 @@ export class SchemaForm {
   readonly steps = input<string[]>([]);
   /** MIG-245: the workspace's active prompts, what a prompt setting offers. */
   readonly prompts = input<PromptChoice[]>([]);
+  /** MIG-346: what a webhook setting says when its schema says nothing. */
+  readonly webhookHint = 'One of this workspace’s webhooks (Integration › API Clients).';
+  /** MIG-346: the workspace's webhooks, what a webhook setting offers (those that cannot take a step's delivery disabled). */
+  readonly webhooks = input<WebhookChoice[]>([]);
   /** MIG-321: the workspace's buckets, what a bucket setting offers. */
   readonly buckets = input<BucketChoice[]>([]);
   readonly disabled = input(false);
@@ -275,6 +294,10 @@ export class SchemaForm {
     const next = withValue(this.current(), name, value);
     this.current.set(next);
     this.valueChange.emit(next);
+  }
+
+  webhookListed(f: FieldSpec): boolean {
+    return this.webhooks().some(w => '' + w.id === this.textOf(f));
   }
 
   promptListed(f: FieldSpec): boolean {

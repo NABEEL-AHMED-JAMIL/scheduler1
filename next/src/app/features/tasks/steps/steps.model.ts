@@ -635,10 +635,19 @@ export function inputColumns(definition: Definition, index: number, tasks: StepT
 // ---------------------------------------------------------------------------------------------- a config form
 
 export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json'
-  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket';
+  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook';
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
 export interface PromptChoice { id: number; label: string; }
+
+/**
+ * MIG-346: a workspace webhook a Send webhook step may name: its id, its address as the choice shows it, and whether it can
+ * take a step's delivery now (active, and subscribed to run.step.sent).
+ */
+export interface WebhookChoice { id: number; label: string; ready: boolean; }
+
+/** MIG-346: the event type a webhook must take for a pipeline step to send to it. */
+export const STEP_WEBHOOK_EVENT = 'run.step.sent';
 
 /** MIG-321: a workspace bucket a step may name: its alias, and the connection's name as the choice shows it. */
 export interface BucketChoice { alias: string; label: string; }
@@ -649,7 +658,7 @@ export interface BucketChoice { alias: string; label: string; }
  * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
-  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression'] as const;
+  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression', 'webhook'] as const;
 const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {
@@ -696,7 +705,7 @@ function kindOf(schema: JsonSchema): FieldKind {
       if (schema.format === 'step') return 'step';
       if (schema.format === 'bucket') return 'bucket';
       return (schema.maxLength ?? 0) > 200 || LONG_TEXT_FORMATS.includes(schema.format ?? '') ? 'textarea' : 'text';
-    case 'integer': return schema.format === 'prompt' ? 'prompt' : 'integer';
+    case 'integer': return schema.format === 'prompt' ? 'prompt' : schema.format === 'webhook' ? 'webhook' : 'integer';
     case 'number': return 'number';
     case 'boolean': return 'boolean';
     case 'array': {
@@ -814,6 +823,11 @@ function usesFormat(schema: JsonSchema | null | undefined, format: string): bool
 /** MIG-245: whether a task's settings name a saved prompt anywhere (so its panel needs the prompts to choose from). */
 export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
   return usesFormat(schema, 'prompt');
+}
+
+/** MIG-346: whether a task's settings name a webhook anywhere (so its panel offers the workspace's webhooks). */
+export function usesWebhook(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'webhook');
 }
 
 /** MIG-321: whether a task's settings name a bucket anywhere (so its panel offers the workspace's buckets). */

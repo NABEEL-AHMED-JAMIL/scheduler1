@@ -43,6 +43,8 @@ export interface StepExecution {
   datasets?: StepDataset[];
   /** MIG-345: a step a resumed attempt did not run again -- the attempt whose output it reused; null for a step that ran. */
   reusedFromAttempt?: number | null;
+  /** MIG-346: an Approval step's request -- waiting, or how it was decided (times are UTC instants). */
+  approval?: StepApproval | null;
   /** "step": the step's own lines (stepLogs); "run": a legacy run, whose lines are the run's audit log. */
   log: 'step' | 'run';
 }
@@ -67,6 +69,40 @@ export interface RunAiStep {
   dateCreated?: string | null;
 }
 
+/** MIG-346: an Approval step's request: PENDING while the run waits; APPROVED, REJECTED, EXPIRED or CANCELLED once settled. */
+export interface StepApproval {
+  approvalId: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED' | string;
+  waiting: boolean;
+  title?: string | null;
+  reviewers?: { kind?: string | null; value?: string | null } | null;
+  requestedAt?: string | null;
+  expiresAt?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  comment?: string | null;
+}
+
+/** MIG-346: who an approval goes to, in words. */
+export function approvalReviewers(approval: StepApproval): string {
+  const who = approval.reviewers;
+  if (!who?.kind) return 'the workspace administrators';
+  if (who.kind === 'role') return who.value === 'TENANT_USER' ? 'the workspace users' : 'the workspace administrators';
+  return `group ${who.value}`;
+}
+
+/** MIG-346: an approval's outcome as a sentence ("Approved by Ana Ruiz (user 4641): totals match"). */
+export function approvalOutcome(approval: StepApproval): string {
+  const said = approval.comment ? `: ${approval.comment}` : '';
+  switch (approval.status) {
+    case 'APPROVED': return `Approved by ${approval.decidedBy ?? 'a reviewer'}${said}`;
+    case 'REJECTED': return `Rejected by ${approval.decidedBy ?? 'a reviewer'}${said}`;
+    case 'EXPIRED': return 'Nobody decided in time; the request expired';
+    case 'CANCELLED': return 'The run was closed before anyone decided';
+    default: return `Waiting for approval by ${approvalReviewers(approval)} in their Task inbox`;
+  }
+}
+
 export interface StepTimeline {
   jobQueueId: number;
   jobId: number;
@@ -79,6 +115,8 @@ export interface StepTimeline {
   aiSteps?: RunAiStep[];
   /** MIG-345: the run's attempts someone asked for (a resume or a restart), oldest first. */
   attemptDetails?: AttemptDetail[];
+  /** MIG-346: the run waits at an Approval step of this attempt. */
+  waitingForApproval?: boolean;
 }
 
 export interface StepLogLine {

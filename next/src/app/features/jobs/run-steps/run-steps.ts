@@ -17,7 +17,7 @@ import { StorageService } from '../../objects/storage.service';
 import { refusalOf } from '../../bulk/bulk-transfer';
 import {
   DATASET_FORMATS, DatasetFormat, RunAiStep, formatsFor, RunOutput, StepExecution, StepLogLine, StepTimeline, attachmentName,
-  engineTimeline, errorText, failedStep, focusStep, outputsOf, recordsLabel, stepStillGoing,
+  engineTimeline, errorText, failedStep, focusStep, outputsOf, recordsLabel, stepStillGoing, StepApproval, approvalOutcome,
 } from './run-steps.model';
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { AttemptDetail, RetryFrom, attemptSentence, stepLabel } from '../retry/run-retry';
@@ -109,6 +109,11 @@ export class RunSteps {
     return t?.attemptDetails?.find(detail => detail.attempt === t.attempt) ?? null;
   });
   readonly attemptSentence = attemptSentence;
+
+  /** MIG-346: an Approval step's request in words. */
+  outcome(approval: StepApproval): string {
+    return approvalOutcome(approval);
+  }
 
   readonly completedCount = computed(() => (this.timeline()?.steps ?? []).filter(s => s.status === 'Completed').length);
   readonly aiSteps = computed<RunAiStep[]>(() => this.timeline()?.aiSteps ?? []);
