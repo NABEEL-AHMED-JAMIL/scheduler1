@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
+import { Component, ComponentRef, ViewContainerRef, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { Router } from '@angular/router';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -22,8 +22,23 @@ import {
 } from './steps.model';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
+import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
+import type { StepFlow } from './step-flow';
 
 export type BuilderTab = 'steps' | 'settings' | 'yaml' | 'json';
+
+/** The Steps tab as a list of cards, or as a flow (the shared flow-graph, loaded only when shown). */
+export type StepsLayout = 'list' | 'flow';
+const LAYOUT_KEY = 'etl.view.pipeline-steps';
+
+/** The layout this viewer last chose (in this browser): the list until they pick the flow. */
+export function savedStepsLayout(): StepsLayout {
+  try { return localStorage.getItem(LAYOUT_KEY) === 'flow' ? 'flow' : 'list'; } catch { return 'list'; }
+}
+
+function saveStepsLayout(layout: StepsLayout): void {
+  try { localStorage.setItem(LAYOUT_KEY, layout); } catch { /* the choice is simply not remembered */ }
+}
 
 type Tone = 'ok' | 'warn' | 'crit';
 
@@ -43,7 +58,7 @@ type Tone = 'ok' | 'warn' | 'crit';
  */
 @Component({
   selector: 'app-step-builder',
-  imports: [Icon, Field, Combobox, ServerTimePipe, TaskSwitch, TaskStatePill],
+  imports: [Icon, Field, Combobox, ServerTimePipe, TaskSwitch, TaskStatePill, Segmented],
   templateUrl: './step-builder.html',
 })
 export class StepBuilder {
@@ -91,6 +106,18 @@ export class StepBuilder {
 
   readonly dragFrom = signal<number | null>(null);
   readonly dropAt = signal<number | null>(null);
+  /** List or Flow, remembered per viewer. */
+  readonly layout = signal<StepsLayout>(savedStepsLayout());
+  readonly layouts: SegmentOption<StepsLayout>[] = [{ id: 'list', label: 'List', icon: 'list' }, { id: 'flow', label: 'Flow', icon: 'layers' }];
+  /** The saved steps the Flow view marks unsaved ones against; none while the pipeline runs as its legacy step. */
+  readonly savedSteps = computed(() => (this.meta().stored && !this.meta().legacy ? this.meta().definition.steps : null));
+  /**
+   * Where the Flow view goes, and the view once its code has loaded. It is imported when first shown (a dynamic import,
+   * not @defer: the defer runtime would land in the console's first download), so the list never loads the graph.
+   */
+  private readonly flowHost = viewChild('flowHost', { read: ViewContainerRef });
+  readonly flowView = signal<ComponentRef<StepFlow> | null>(null);
+
   /** Add step's box: flipped between '' and null to clear it after a pick. */
   readonly addPick = signal<string | null>('');
 
@@ -133,6 +160,20 @@ export class StepBuilder {
         if (handed.format === 'json') { this.jsonText.set(handed.text); this.jsonTyped.set(true); }
         else { this.yamlText.set(handed.text); this.yamlTyped.set(true); }
       });
+    });
+    // The Flow view: loaded and placed when its slot appears, handed the draft as it changes.
+    effect(() => {
+      const host = this.flowHost();
+      untracked(() => (host ? void this.mountFlow(host) : this.flowView.set(null)));
+    });
+    effect(() => {
+      const view = this.flowView();
+      if (!view) return;
+      view.setInput('definition', this.draft());
+      view.setInput('saved', this.savedSteps());
+      view.setInput('tasks', this.tasks());
+      view.setInput('problems', this.grouped().steps);
+      view.setInput('selected', this.selected());
     });
     // Leaving a text tab applies what was typed to the draft; entering one shows the draft as that text.
     effect(() => {
@@ -241,6 +282,21 @@ export class StepBuilder {
     this.open(this.draft().steps.length - 1);
   }
 
+  setLayout(layout: StepsLayout): void {
+    this.layout.set(layout);
+    saveStepsLayout(layout);
+  }
+
+  private async mountFlow(host: ViewContainerRef): Promise<void> {
+    const { StepFlow } = await import('./step-flow');
+    // Back on the list (or the tab left) while it loaded: nothing to place.
+    if (this.flowHost() !== host) return;
+    host.clear();
+    const view = host.createComponent(StepFlow);
+    view.instance.open.subscribe(index => this.open(index));
+    this.flowView.set(view);
+  }
+
   move(index: number, delta: number): void {
     this.draft.update(d => moveStep(d, index, delta));
     this.shiftProblems();
@@ -319,7 +375,8 @@ export class StepBuilder {
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.
-    const config = { ...sidePanelConfig(data, 'wide'), restoreFocus: `.step-list > li:nth-child(${index + 1}) .step-open` };
+    const restoreFocus = this.layout() === 'flow' ? `[data-node][data-id="${step.key}"]` : `.step-list > li:nth-child(${index + 1}) .step-open`;
+    const config = { ...sidePanelConfig(data, 'wide'), restoreFocus };
     this.dialog.open<Step>(StepPanel, config).closed.subscribe(edited => {
       if (!edited) return;
       this.draft.update(d => replaceStep(d, index, edited));

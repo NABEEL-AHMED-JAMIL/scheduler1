@@ -1,67 +1,19 @@
 import { ChangeDetectionStrategy, Component, computed, input, signal } from '@angular/core';
 import { FlowGraph } from '../../../shared/flow-graph/flow-graph';
-import { FlowEdge, FlowNode, FlowNodeKind } from '../../../shared/flow-graph/flow-graph.model';
+import { FlowEdge, FlowNode } from '../../../shared/flow-graph/flow-graph.model';
+import { MapBasis, countText, durationText, runGraph } from '../../../shared/flow-graph/flow-adapters';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { StepExecution, StepTimeline } from './run-steps.model';
 
-export type MapBasis = 'time' | 'rows';
-
-/** A duration in the run's own words: ms under a second, then seconds, then minutes. */
-export function durationText(ms: number | null | undefined): string {
-  if (ms == null) return '—';
-  if (ms < 1000) return `${ms} ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
-  return `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`;
-}
-
-function count(n: number | null | undefined): string {
-  return n == null ? '—' : n.toLocaleString('en-US');
-}
-
-/** A step's kind on the map, from its task: where rows come from, what is done to them, where they go. */
-export function stepKind(task: string): FlowNodeKind {
-  if (task === 'legacy') return 'legacy';
-  if (task.startsWith('read_') || task === 'sample') return 'read';
-  if (task === 'ai_prompt' || task === 'measure_image') return 'ai';
-  if (['save_file', 'upload_bucket', 'render_pdf', 'send_notification', 'write_database', 'send_webhook'].includes(task)) return 'output';
-  if (task === 'approval') return 'review';
-  return 'process';
-}
+export type { MapBasis } from '../../../shared/flow-graph/flow-adapters';
+export { durationText, stepKind } from '../../../shared/flow-graph/flow-adapters';
 
 /**
- * A run's steps as a plan map (the "plan map" pattern from the design references): each step a node with its time and
- * rows in and out, a bar of its share of the run's time (or of the rows it wrote), the failed step marked and -- when
- * nothing failed -- the slowest one highlighted; edges carry the rows that passed. Pure, for the spec.
+ * A run's steps as a plan map: the shared run adapter (shared/flow-graph) over the timeline -- each step's time and rows,
+ * the failed or slowest step highlighted. Pure, for the spec.
  */
 export function runMap(t: StepTimeline, basis: MapBasis): { nodes: FlowNode[]; edges: FlowEdge[]; hot: StepExecution | null } {
-  const steps = t.steps;
-  const total = steps.reduce((sum, s) => sum + (basis === 'time' ? s.durationMs ?? 0 : s.recordsOut ?? 0), 0);
-  const failed = steps.find(s => s.status === 'Failed') ?? null;
-  const slowest = steps.filter(s => s.durationMs != null).sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))[0] ?? null;
-  const hot = failed ?? (steps.length > 1 ? slowest : null);
-  const nodes: FlowNode[] = steps.map(s => {
-    const share = total ? (basis === 'time' ? s.durationMs ?? 0 : s.recordsOut ?? 0) / total : null;
-    const badges: string[] = [];
-    if (s.status && s.status !== 'Completed') badges.push(s.status);
-    if (s === hot && !failed) badges.push('slowest');
-    if (s.reusedFromAttempt != null) badges.push(`reused from attempt ${s.reusedFromAttempt}`);
-    if ((s.tries ?? 1) > 1) badges.push(`${s.tries} tries`);
-    return {
-      id: s.key, label: s.key, sub: s.task, kind: stepKind(s.task),
-      tone: s.status === 'Failed' ? 'crit' : s.status === 'Running' ? 'info' : s.status === 'Completed' ? null : 'neutral',
-      badges,
-      metrics: [
-        { label: 'time', value: durationText(s.durationMs) },
-        { label: 'share', value: share == null ? '—' : `${Math.round(share * 1000) / 10}%` },
-        { label: 'rows in', value: count(s.recordsIn) },
-        { label: 'rows out', value: count(s.recordsOut) },
-      ],
-      share, hot: s === hot,
-    };
-  });
-  const edges: FlowEdge[] = steps.slice(1).map((s, i) => ({ from: steps[i].key, to: s.key,
-    label: steps[i].recordsOut != null ? `${count(steps[i].recordsOut)} rows` : null, tone: steps[i].status === 'Failed' ? 'crit' : null }));
-  return { nodes, edges, hot };
+  return runGraph(t.steps, basis);
 }
 
 /** The tasks ranked by what they cost the run (the reference's "Overview": node type, count, total). */
@@ -144,5 +96,5 @@ export class RunMap {
   readonly overview = computed(() => byTask(this.timeline(), this.basis()));
 
   time(ms: number | null | undefined): string { return durationText(ms); }
-  rows(n: number): string { return count(n); }
+  rows(n: number): string { return countText(n); }
 }

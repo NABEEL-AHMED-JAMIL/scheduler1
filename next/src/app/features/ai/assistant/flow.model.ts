@@ -1,4 +1,5 @@
-import { FlowEdge, FlowNode, FlowNodeKind, FlowTone } from '../../../shared/flow-graph/flow-graph.model';
+import { FlowEdge, FlowNode } from '../../../shared/flow-graph/flow-graph.model';
+import { PipelineTaskLike, aiFlowGraph } from '../../../shared/flow-graph/flow-adapters';
 
 /**
  * AI workflow review (2026-10-12): a pipeline the assistant designed, as ai-service's design_pipeline / edit_pipeline
@@ -66,26 +67,13 @@ export function isFlow(artifact: unknown): artifact is PipelineFlowArtifact {
     && !!(artifact as PipelineFlowArtifact).flow && Array.isArray((artifact as PipelineFlowArtifact).flow.nodes);
 }
 
-const KINDS: FlowNodeKind[] = ['trigger', 'read', 'process', 'ai', 'output', 'review', 'legacy', 'other'];
-
 /**
- * The flow as the graph draws it: a step with an error is crit, one with a setting to fill is warn, the trigger and
- * review gate keep their kind's look; each step's badges say what is wrong or missing, in a few words.
+ * The flow as the graph draws it: the shared AI-flow adapter (shared/flow-graph), so the step builder's Flow view, the
+ * Workflow designer, the run map and this panel draw one way. A step with an error is crit, one with a setting to fill
+ * is warn; edges between steps follow the engine's own rule, so a join or an append draws its other inputs.
  */
-export function graphOf(artifact: PipelineFlowArtifact): { nodes: FlowNode[]; edges: FlowEdge[] } {
-  const nodes: FlowNode[] = artifact.flow.nodes.map(n => {
-    const problems = n.problems ?? [];
-    const errors = problems.filter(p => p.kind === 'error');
-    const settings = problems.filter(p => p.kind === 'setting');
-    const tone: FlowTone | null = errors.length ? 'crit' : settings.length ? 'warn' : null;
-    const badges: string[] = [];
-    if (errors.length) badges.push(errors.length === 1 ? '1 error' : `${errors.length} errors`);
-    if (settings.length) badges.push(settings.length === 1 ? 'needs 1 setting' : `needs ${settings.length} settings`);
-    const kind = (KINDS as string[]).includes(n.kind) ? n.kind as FlowNodeKind : 'other';
-    return { id: n.id, label: n.label, sub: n.task ?? n.sub ?? null, kind, tone, badges };
-  });
-  const edges: FlowEdge[] = artifact.flow.edges.map(e => ({ from: e.from, to: e.to, label: e.label ?? null, dashed: !!e.dashed }));
-  return { nodes, edges };
+export function graphOf(artifact: PipelineFlowArtifact, tasks?: readonly PipelineTaskLike[] | null): { nodes: FlowNode[]; edges: FlowEdge[] } {
+  return aiFlowGraph(artifact, tasks);
 }
 
 /** One line on the flow: how many steps, and whether it can be created as it is. */

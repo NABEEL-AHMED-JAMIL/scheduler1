@@ -7,7 +7,8 @@ import { of } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Confirm } from '../../../shared/ui/confirm';
 import { StepsApi } from './steps.service';
-import { StepBuilder } from './step-builder';
+import { StepBuilder, savedStepsLayout } from './step-builder';
+import { useMemoryStorage } from '../../../shared/testing/memory-storage';
 import { StepPanel } from './step-panel';
 import { RunDrawer } from './run-drawer';
 import { SampleDialog } from './sample-dialog';
@@ -555,5 +556,67 @@ describe('StepBuilder -- the review setting', () => {
     fixture.detectChanges();
     expect(builder.draft().settings?.review).toEqual({ required: ['customer', 'internal'] });
     expect(el.textContent).toContain('The customer (through the API)');
+  });
+});
+
+/** 2026-10-12: the steps as a flow on the shared graph canvas, beside the list; the viewer's choice is remembered. */
+describe('StepBuilder -- List or Flow', () => {
+  useMemoryStorage();
+
+  const flowNodes = (el: HTMLElement) => Array.from(el.querySelectorAll('app-step-flow g[data-node]')).map(n => n.getAttribute('data-id'));
+  /** The Flow view's code loads on first use (a dynamic import): wait until it has drawn. */
+  const drawn = (fixture: { detectChanges(): void }, el: HTMLElement) =>
+    vi.waitFor(() => { fixture.detectChanges(); expect(el.querySelectorAll('app-step-flow g[data-node]').length).toBeGreaterThan(0); });
+
+  it('shows the list until the viewer picks Flow, then the flow, and remembers the choice for the next pipeline', async () => {
+    const first = build();
+    expect(first.builder.layout()).toBe('list');
+    expect(first.cards()).toEqual(['read', 'keep']);
+    first.click('Flow');
+    expect(first.cards()).toEqual([]);
+    await drawn(first.fixture, first.el);
+    expect(flowNodes(first.el)).toEqual(['@start', 'read', 'keep']);
+    expect(localStorage.getItem('etl.view.pipeline-steps')).toBe('flow');
+
+    const next = build();
+    expect(next.builder.layout()).toBe('flow');
+    next.click('List');
+    expect(next.cards()).toEqual(['read', 'keep']);
+    expect(localStorage.getItem('etl.view.pipeline-steps')).toBe('list');
+  });
+
+  it('falls back to the list when this browser keeps nothing', () => {
+    localStorage.setItem('etl.view.pipeline-steps', 'nonsense');
+    expect(savedStepsLayout()).toBe('list');
+    vi.stubGlobal('localStorage', { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } });
+    expect(savedStepsLayout()).toBe('list');
+    const { builder } = build();
+    builder.setLayout('flow');
+    expect(builder.layout()).toBe('flow');
+  });
+
+  it('opens the same side panel from a node, and marks a step not saved and a step with problems', async () => {
+    const { builder, fixture, el, opened, api } = build({ dialogAnswer: undefined });
+    builder.setLayout('flow');
+    builder.add('select');
+    api.validate.mockReturnValueOnce(of({ status: 'ERROR', message: 'Invalid.', data: { valid: false, problems: [{ path: 'steps[1].config.columns', message: 'needs one' }] } }) as never);
+    builder.validate();
+    fixture.detectChanges();
+    await drawn(fixture, el);
+    expect(flowNodes(el)).toEqual(['@start', 'read', 'keep', 'select']);
+    const node = (key: string) => el.querySelector(`app-step-flow g[data-id="${key}"]`)!;
+    expect(node('select').getAttribute('class')).toContain('pending');
+    expect(node('select').getAttribute('aria-label')).toContain('unsaved');
+    expect(node('keep').getAttribute('class')).toContain('t-crit');
+    expect(node('keep').getAttribute('aria-label')).toContain('1 problem');
+    expect(node('read').getAttribute('class')).not.toContain('pending');
+    const before = opened.length;
+    node('keep').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    fixture.detectChanges();
+    expect(opened.length).toBe(before + 1);
+    expect(opened.at(-1)!.component).toBe(StepPanel);
+    expect(opened.at(-1)!.data.step.key).toBe('keep');
+    node('@start').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(opened.length).toBe(before + 1);
   });
 });

@@ -17,12 +17,16 @@ export interface FlowNode {
   kind: FlowNodeKind;
   /** Overrides the kind's glyph; a name from FLOW_ICONS (the app-icon names this graph carries). */
   icon?: string | null;
+  /** Overrides the kind's accent: the tile's colours (a workflow step's type has its own). */
+  accent?: FlowTone | null;
   tone?: FlowTone | null;
   badges?: string[];
   metrics?: FlowMetric[];
   /** 0..1: a bar along the node's foot, e.g. its share of the run's time. */
   share?: number | null;
   hot?: boolean;
+  /** Not saved yet: the frame is dashed. */
+  pending?: boolean;
 }
 export interface FlowEdge { from: string; to: string; label?: string | null; tone?: FlowTone | null; dashed?: boolean; }
 
@@ -216,6 +220,12 @@ export const FLOW_ICONS: Record<string, string> = {
   eye: 'M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z',
   user: 'M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2M12 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
   check: 'M20 6 9 17l-5-5',
+  checkCircle: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM8.5 12.5l2.5 2.5 4.5-5',
+  xCircle: 'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20ZM15 9l-6 6M9 9l6 6',
+  list: 'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',
+  bell: 'M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 0 1-3.4 0',
+  sort: 'm8 9 4-4 4 4M8 15l4 4 4-4',
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11Z',
   history: 'M3 12a9 9 0 1 0 3-6.7L3 8m0-5v5h5M12 7v5l3 2',
   server: 'M20 2H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2ZM20 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2ZM6 6h.01M6 18h.01',
   cloud: 'M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10Z',
@@ -243,4 +253,26 @@ export const FLOW_KINDS: Record<FlowNodeKind, { icon: string; accent: FlowTone }
 export function flowIconPaths(name: string | null | undefined, kind: FlowNodeKind): string[] {
   const path = (name && FLOW_ICONS[name]) || FLOW_ICONS[(FLOW_KINDS[kind] ?? FLOW_KINDS.other).icon];
   return path.split(/(?<=[Zz])\s+(?=[Mm])/).map(p => p.trim()).filter(Boolean);
+}
+
+const sameList = <T>(a: readonly T[] | null | undefined, b: readonly T[] | null | undefined, same: (x: T, y: T) => boolean) => {
+  const x = a ?? [], y = b ?? [];
+  if (x.length !== y.length) return false;
+  for (let i = 0; i < x.length; i++) if (!same(x[i], y[i])) return false;
+  return true;
+};
+
+/**
+ * Whether two graphs draw the same: every field a node or an edge shows, in order. What lets the renderer skip a layout
+ * when a screen hands it a new array of the same graph (a signal ticked, nothing drawn changed).
+ */
+export function sameGraph(an: readonly FlowNode[], ae: readonly FlowEdge[], bn: readonly FlowNode[], be: readonly FlowEdge[]): boolean {
+  if (an === bn && ae === be) return true;
+  return sameList(an, bn, (a, b) => a === b || (a.id === b.id && a.label === b.label && (a.sub ?? null) === (b.sub ?? null) && a.kind === b.kind
+      && (a.icon ?? null) === (b.icon ?? null) && (a.accent ?? null) === (b.accent ?? null) && (a.tone ?? null) === (b.tone ?? null)
+      && (a.share ?? null) === (b.share ?? null) && !!a.hot === !!b.hot && !!a.pending === !!b.pending
+      && sameList(a.badges, b.badges, (x, y) => x === y)
+      && sameList(a.metrics, b.metrics, (x, y) => x.label === y.label && x.value === y.value)))
+    && sameList(ae, be, (a, b) => a === b || (a.from === b.from && a.to === b.to && (a.label ?? null) === (b.label ?? null)
+      && (a.tone ?? null) === (b.tone ?? null) && !!a.dashed === !!b.dashed));
 }

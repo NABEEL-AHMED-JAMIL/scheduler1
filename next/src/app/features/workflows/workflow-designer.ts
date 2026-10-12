@@ -10,6 +10,8 @@ import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Combobox, ComboboxOption } from '../../shared/ui/combobox';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { FlowGraph } from '../../shared/flow-graph/flow-graph';
+import { workflowGraph } from '../../shared/flow-graph/flow-adapters';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
@@ -24,8 +26,11 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
 }
 
 /**
- * The Workflow designer (MIG-276): an administrator lays out a workflow's steps as a chain of cards -- who approves,
- * what is checked, what runs -- edits one at a time in the panel beside it, and publishes the chain as the next version.
+ * The Workflow designer (MIG-276): an administrator lays out a workflow's steps -- who approves, what is checked, what
+ * runs -- edits one at a time in the panel beside it, and publishes them as the next version. The steps are drawn as a
+ * flow on the shared graph canvas (the AI Assistant's, 2026-10-12): each step a node with its type's icon and colour and
+ * who or what it is for, every way out of it an edge saying the outcome it follows -- approved, rejected, yes, no -- to
+ * the step it goes to or to the request's end. Zoom, fit, full screen and a minimap come with the canvas.
  * The server checks the steps (WorkflowSteps) and names each problem where it is; the designer puts it on its card.
  * Running requests keep the version they started with. A test run starts a request as the administrator and opens it.
  * Everyone else with the page reads the workflows but changes nothing.
@@ -37,7 +42,7 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
  */
 @Component({
   selector: 'app-workflow-designer',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner],
+  imports: [FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph],
   templateUrl: './workflow-designer.html',
   host: { '(document:keydown)': 'onKey($event)' },
 })
@@ -157,6 +162,25 @@ export class WorkflowDesigner implements OnInit {
   });
 
   readonly keys = computed(() => this.steps().map(s => s.key));
+
+  /** The steps as the graph draws them; laid out again only when what it shows changes. */
+  readonly graph = computed(() => {
+    const problems = this.problems();
+    return workflowGraph(this.steps(), {
+      summary: s => this.summary(s as DraftStep),
+      problems: i => problems.filter(p => problemStep(p) === i).length,
+      typeLabel: t => STEP_TYPES.find(x => x.type === t)?.label ?? t,
+    });
+  });
+
+  readonly selectedKey = computed(() => this.step()?.key ?? null);
+
+  /** What the Add a step menu says it does: where the new step goes. */
+  readonly addWhere = computed(() => {
+    const at = this.insertAt() ?? this.steps().length;
+    const after = this.steps()[at - 1];
+    return at >= this.steps().length ? 'Add a step at the end' : after ? `Add a step after “${this.stepName(after)}”` : 'Add a step first';
+  });
 
   /** Where a step may go next: any other step, or the end. */
   readonly targets = computed(() => this.steps().map(s => ({ key: s.key, label: s.name || s.key })));
@@ -296,6 +320,12 @@ export class WorkflowDesigner implements OnInit {
   }
 
   // ---- editing the chain ------------------------------------------------------------------------------------------
+
+  /** A node picked on the canvas: a step opens its properties; the start and the ends are not steps. */
+  pickNode(id: string | null): void {
+    const i = id ? this.steps().findIndex(s => s.key === id) : -1;
+    if (i >= 0) this.pick(i);
+  }
 
   /** A step picked on the canvas: its properties beside it, or sliding over below 1024 px. */
   pick(i: number): void {

@@ -17,7 +17,8 @@ import { splitTail } from './inbox-list';
  * The Workflow designer's design (owner, 2026-10-06: "redesign the page, check the issue"), on the Task inbox's layout:
  * a list with a pinned search and status filter and rows by name under sticky Built in and This workspace headers, the
  * workflow's header with real tabs, the publish bar pinned at the pane's foot and loud once something is unpublished,
- * steps with a type badge and move buttons that say which step they move, and an add button between every two steps.
+ * steps drawn as a flow (the shared graph canvas, 2026-10-12) in their type's colour, and move and add buttons on the
+ * picked step's properties that say which step they act on.
  * Below 1024 px is CSS (data-pane, data-sheet); what these pin is the state behind it.
  */
 const summary = (key: string, name: string, extra: Partial<WorkflowSummary> = {}): WorkflowSummary =>
@@ -228,7 +229,7 @@ describe('Workflow designer, the design -- the workflow', () => {
     expect(body().getAttribute('data-sheet')).toBe('closed');
     expect(panel().classList).not.toContain('is-open');
 
-    (el.querySelector('[data-step="tell"] .designer-step-main') as HTMLButtonElement).click();
+    el.querySelector('g[data-id="tell"]')!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     render();
     expect(designer.selected()).toBe(1);
     expect(body().getAttribute('data-sheet')).toBe('open');
@@ -248,53 +249,60 @@ describe('Workflow designer, the design -- the workflow', () => {
     expect(panel().querySelector('fieldset.form-lock')).not.toBeNull();
   });
 
-  it('marks each step with its type\'s badge and colour, and the picked one', () => {
+  it('draws each step in its type\'s icon and colour, every way out labelled, and marks the picked one', () => {
     const { el } = screen();
-    const badge = (key: string) => el.querySelector(`[data-step="${key}"] [data-test="step-type"]`)!;
-    expect(badge('admin').textContent!.trim()).toBe('Approval');
-    expect(badge('admin').classList).toContain('pill-ok');
-    expect(badge('tell').classList).toContain('pill-brand');
-    expect(badge('wait').classList).toContain('pill-neutral');
+    const node = (key: string) => el.querySelector(`g[data-node][data-id="${key}"]`)!;
+    expect(node('admin').querySelector('.p-ok')).not.toBeNull();
+    expect(node('tell').querySelector('.p-brand')).not.toBeNull();
+    expect(node('wait').querySelector('.p-neutral')).not.toBeNull();
     expect(new Set(STEP_TYPES.filter(t => ['approval', 'task', 'condition'].includes(t.type)).map(t => t.tone)).size).toBe(3);
-    expect(el.querySelector('[data-step="admin"]')!.classList).toContain('is-on');
-    expect(el.querySelector('[data-step="admin"] .designer-step-main')!.getAttribute('aria-pressed')).toBe('true');
+    expect(node('admin').getAttribute('aria-label')).toContain('A workspace admin approves, the administrators · due in 2 days');
+    expect([...el.querySelectorAll('.fg-elabel text')].map(t => t.textContent)).toEqual(['approved', 'rejected', 'after 1 d']);
+    expect(node('@start').getAttribute('aria-label')).toBe('Request starts');
+    expect(node('@rejected').getAttribute('aria-label')).toBe('Ends rejected');
+    expect(node('admin').getAttribute('class')).toContain('sel');
+    expect(node('admin').getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('moves a step with buttons that name it, none past either end', () => {
+  it('moves the picked step with buttons that name it, none past either end', () => {
     const { designer, el, render } = screen();
-    const up = (key: string) => el.querySelector(`[data-step="${key}"] [data-test="move-up"]`) as HTMLButtonElement;
-    const down = (key: string) => el.querySelector(`[data-step="${key}"] [data-test="move-down"]`) as HTMLButtonElement;
-    expect(up('admin').disabled).toBe(true);
-    expect(down('wait').disabled).toBe(true);
-    expect(up('tell').getAttribute('aria-label')).toBe('Move “tell” up');
-    expect(down('admin').getAttribute('aria-label')).toBe('Move “A workspace admin approves” down');
-    down('admin').click();
+    const up = () => el.querySelector('[data-test="step-panel"] [data-test="move-up"]') as HTMLButtonElement;
+    const down = () => el.querySelector('[data-test="step-panel"] [data-test="move-down"]') as HTMLButtonElement;
+    expect(up().disabled).toBe(true);
+    expect(down().getAttribute('aria-label')).toBe('Move “A workspace admin approves” down');
+    down().click();
     render();
     expect(designer.steps().map(s => s.key)).toEqual(['tell', 'admin', 'wait']);
     expect(designer.selected()).toBe(1);
     expect(designer.dirty()).toBe(true);
-    up('wait').click();
+    designer.pick(2);
+    render();
+    expect(down().disabled).toBe(true);
+    expect(up().getAttribute('aria-label')).toBe('Move “Cool off” up');
+    up().click();
     render();
     expect(designer.steps().map(s => s.key)).toEqual(['tell', 'wait', 'admin']);
   });
 
-  it('adds a step between any two, or at the end, from a menu in that place', () => {
+  it('adds a step after the picked one, or at the end, from a menu that says where', () => {
     const { designer, el, render } = screen();
-    const inserts = [...el.querySelectorAll('[data-test="insert-step"]')];
-    expect(inserts.map(b => b.getAttribute('data-at'))).toEqual(['1', '2']);
-    expect(inserts[0].getAttribute('aria-label')).toBe('Add a step after “A workspace admin approves”');
-    (inserts[0] as HTMLButtonElement).click();
+    const insert = el.querySelector('[data-test="step-panel"] [data-test="insert-step"]') as HTMLButtonElement;
+    expect(insert.getAttribute('data-at')).toBe('1');
+    expect(insert.getAttribute('aria-label')).toBe('Add a step after “A workspace admin approves”');
+    insert.click();
     render();
     const menu = el.querySelector('[data-test="add-menu"]')!;
-    expect(menu.previousElementSibling!.previousElementSibling!.getAttribute('data-step')).toBe('admin');
+    expect(menu.getAttribute('aria-label')).toBe('Add a step after “A workspace admin approves”');
     (menu.querySelector('[data-add="condition"]') as HTMLButtonElement).click();
     render();
     expect(designer.steps().map(s => s.key)).toEqual(['admin', 'condition', 'tell', 'wait']);
     expect(designer.selected()).toBe(1);
     expect(el.querySelector('[data-test="add-menu"]')).toBeNull();
+    expect([...el.querySelectorAll('.fg-elabel text')].map(t => t.textContent)).toContain('yes');
 
     (el.querySelector('[data-test="add-step"]') as HTMLButtonElement).click();
     render();
+    expect(el.querySelector('[data-test="add-menu"]')!.getAttribute('aria-label')).toBe('Add a step at the end');
     (el.querySelector('[data-test="add-menu"] [data-add="task"]') as HTMLButtonElement).click();
     expect(designer.steps().map(s => s.key)).toEqual(['admin', 'condition', 'tell', 'wait', 'task']);
   });

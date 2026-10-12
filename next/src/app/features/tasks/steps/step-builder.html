@@ -201,14 +201,25 @@
             <h2 class="text-sm font-semibold">Steps</h2>
             <p class="field-note text-[color:var(--text-muted)]">They run in this order, each on the output before it unless it reads another.</p>
           </div>
-          @if (canManage()) {
-            <div class="ml-auto w-full sm:w-72">
-              <app-combobox id="addStep" ariaLabel="Add step" placeholder="Add step from the Task Registry…" [allowClear]="false"
-                            [options]="taskOptions()" [selected]="addPick()" (selectedChange)="add($event)" />
-            </div>
-          }
+          <div class="ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <app-segmented [value]="layout()" (valueChange)="setLayout($event)" [options]="layouts" ariaLabel="Show the steps as" data-test="steps-layout" />
+            @if (canManage()) {
+              <div class="w-full sm:w-72">
+                <app-combobox id="addStep" ariaLabel="Add step" placeholder="Add step from the Task Registry…" [allowClear]="false"
+                              [options]="taskOptions()" [selected]="addPick()" (selectedChange)="add($event)" />
+              </div>
+            }
+          </div>
         </div>
 
+        @if (layout() === 'flow') {
+          <div data-test="step-flow">
+            <ng-container #flowHost />
+            @if (!flowView()) {
+              <div class="h-96 grid place-items-center text-sm text-[color:var(--text-muted)]" data-test="flow-loading">Drawing the flow…</div>
+            }
+          </div>
+        } @else {
         <ol class="step-list" aria-label="Steps, in order">
           @for (step of draft().steps; track $index; let i = $index; let last = $last) {
             <li class="step-card" [attr.data-step]="step.key"
@@ -257,6 +268,7 @@
             <li class="text-sm text-[color:var(--text-muted)] py-4 text-center">No steps. Add one from the Task Registry: a pipeline has at least one.</li>
           }
         </ol>
+        }
       </div>
     }
   }

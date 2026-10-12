@@ -1,11 +1,12 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
 import { Icon } from '../ui/icon';
 import {
-  FLOW_KINDS, FLOW_METRICS_PER_ROW, FLOW_ROW, FlowDirection, FlowEdge, FlowNode, FlowTone, fitText, flowIconPaths, layoutFlow, nodeRows,
+  FLOW_KINDS, FLOW_METRICS_PER_ROW, FLOW_NODE_WIDTH, FLOW_ROW, FlowDirection, FlowEdge, FlowNode, FlowTone, fitText, flowIconPaths, layoutFlow,
+  nodeRows, sameGraph,
 } from './flow-graph.model';
 
 interface View { x: number; y: number; k: number; }
-const ZOOM_MIN = 0.2, ZOOM_MAX = 3, STEP = 1.2, MINI_W = 140, MINI_H = 92;
+const ZOOM_MIN = 0.2, ZOOM_MAX = 3, STEP = 1.2, MINI_W = 140, MINI_H = 92, FAR_ZOOM = 0.45;
 const TONES: FlowTone[] = ['neutral', 'ok', 'warn', 'crit', 'info', 'brand'];
 const clamp = (k: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, k));
 const raf: (cb: () => void) => number = typeof requestAnimationFrame === 'function'
@@ -31,7 +32,7 @@ let seq = 0;
     @if (!vm().nodes.length) {
       <div class="fg-empty"><ng-content select="[empty]" /></div>
     } @else {
-      <svg class="fg-canvas" tabindex="0" role="group" [attr.aria-label]="ariaLabel() || null"
+      <svg class="fg-canvas" [class.fg-far]="far()" tabindex="0" role="group" [attr.aria-label]="ariaLabel() || null"
            (click)="onCanvasClick($event)" (keydown)="onKey($event)">
         <defs>
           @for (t of tones; track t) {
@@ -55,7 +56,7 @@ let seq = 0;
             }
           }
           @for (n of vm().nodes; track n.id) {
-            <g data-node [attr.data-id]="n.id" [attr.class]="'fg-node t-' + n.tone + (n.hot ? ' hot' : '') + (n.id === selected() ? ' sel' : '')"
+            <g data-node [attr.data-id]="n.id" [attr.class]="'fg-node t-' + n.tone + (n.hot ? ' hot' : '') + (n.pending ? ' pending' : '') + (n.id === selected() ? ' sel' : '')"
                [attr.transform]="'translate(' + n.x + ',' + n.y + ')'" tabindex="0" role="button"
                [attr.aria-label]="n.aria" [attr.aria-pressed]="n.id === selected()" (click)="pick(n.id, $event)">
               <title>{{ n.aria }}</title>
@@ -69,17 +70,23 @@ let seq = 0;
               </g>
               <text class="fg-label" x="50" [attr.y]="n.subText ? 28 : 32">{{ n.title }}</text>
               @if (n.subText) { <text class="fg-sub" x="50" y="44">{{ n.subText }}</text> }
-              @for (b of n.pills; track $index) {
-                <g [attr.class]="'p-' + n.tone" [attr.transform]="'translate(' + b.x + ',' + (n.rows.badgesY - 4) + ')'">
-                  <rect class="fg-pill-bg" [attr.width]="b.w" height="16" rx="8" />
-                  <text class="fg-pill-fg fg-badge" [attr.x]="b.w / 2" y="11.5" text-anchor="middle">{{ b.text }}</text>
+              @if (n.pills.length) {
+                <g class="fg-badges">
+                  @for (b of n.pills; track $index) {
+                    <g [attr.class]="'p-' + n.tone" [attr.transform]="'translate(' + b.x + ',' + (n.rows.badgesY - 4) + ')'">
+                      <rect class="fg-pill-bg" [attr.width]="b.w" height="16" rx="8" />
+                      <text class="fg-pill-fg fg-badge" [attr.x]="b.w / 2" y="11.5" text-anchor="middle">{{ b.text }}</text>
+                    </g>
+                  }
                 </g>
               }
               @if (n.cells.length) {
-                <line class="fg-sep" x1="12" [attr.x2]="n.w - 12" [attr.y1]="n.rows.metricsY - 2" [attr.y2]="n.rows.metricsY - 2" />
-                @for (c of n.cells; track $index) {
-                  <text [attr.x]="c.x" [attr.y]="c.y"><tspan class="fg-mlabel">{{ c.label }}</tspan><tspan class="fg-mvalue" dx="4">{{ c.value }}</tspan></text>
-                }
+                <g class="fg-metrics">
+                  <line class="fg-sep" x1="12" [attr.x2]="n.w - 12" [attr.y1]="n.rows.metricsY - 2" [attr.y2]="n.rows.metricsY - 2" />
+                  @for (c of n.cells; track $index) {
+                    <text [attr.x]="c.x" [attr.y]="c.y"><tspan class="fg-mlabel">{{ c.label }}</tspan><tspan class="fg-mvalue" dx="4">{{ c.value }}</tspan></text>
+                  }
+                </g>
               }
               @if (n.shareW !== null) {
                 <rect class="fg-track" x="12" [attr.y]="n.rows.shareY + 1" [attr.width]="n.w - 24" height="4" rx="2" />
@@ -152,6 +159,7 @@ let seq = 0;
     .fg-node.t-neutral .fg-frame { stroke: var(--border-strong); }
     .fg-node:hover .fg-frame { stroke-width: 1.75; }
     .fg-node.hot .fg-frame { stroke-width: 2.75; }
+    .fg-node.pending .fg-frame { stroke-dasharray: 5 3; }
     .fg-node.hot.t-neutral .fg-frame { stroke: var(--accent-mark); }
     .fg-ring { fill: none; stroke: transparent; stroke-width: 2; }
     .fg-node.sel .fg-ring { stroke: var(--accent-mark); }
@@ -176,6 +184,8 @@ let seq = 0;
       border-radius: var(--radius-md); cursor: crosshair; touch-action: none; box-shadow: 0 1px 3px var(--shadow-color); }
     .fg-minimap rect { fill: var(--fg-tone); opacity: 0.55; }
     .fg-minimap rect.t-neutral { fill: var(--border-strong); opacity: 1; }
+    /* Zoomed far out: the words cannot be read, so they are not drawn -- a 100-step flow stays smooth to pan. */
+    .fg-far .fg-sub, .fg-far .fg-elabel, .fg-far .fg-badges, .fg-far .fg-metrics { display: none; }
     .fg-minimap .fg-viewport { fill: var(--accent-soft); fill-opacity: 0.35; opacity: 1; stroke: var(--accent-mark); stroke-width: 1.25; }
   `,
 })
@@ -192,6 +202,8 @@ export class FlowGraph {
    * zoom out for the rest) rather than shrunk until nothing can be read. Default: fit everything.
    */
   readonly minFit = input(0.2);
+  /** A node's width; a workflow's steps say who and what in their sub line, and take more room. */
+  readonly nodeWidth = input(FLOW_NODE_WIDTH);
   readonly select = output<string | null>();
 
   protected readonly uid = `fg${++seq}`;
@@ -208,8 +220,19 @@ export class FlowGraph {
   protected readonly transform = computed(() => { const v = this.view(); return `translate(${v.x},${v.y}) scale(${v.k})`; });
   private readonly size = signal({ w: 0, h: 0 });
 
+  /**
+   * What is laid out: the inputs, kept as they were while a screen hands over the same graph again (a signal that ticks
+   * with nothing drawn changed -- a selection, a typed setting the nodes do not show) so the layout is not run again.
+   */
+  private readonly graph = computed(() => ({ nodes: this.nodes() ?? [], edges: this.edges() ?? [], direction: this.direction(), width: this.nodeWidth() }),
+    { equal: (a, b) => a.direction === b.direction && a.width === b.width && sameGraph(a.nodes, a.edges, b.nodes, b.edges) });
+
+  /** Zoomed out past reading: the sub lines, badges, metrics and edge labels are left out (CSS), the frames stay. */
+  protected readonly far = computed(() => this.view().k < FAR_ZOOM);
+
   protected readonly vm = computed(() => {
-    const l = layoutFlow(this.nodes() ?? [], this.edges() ?? [], { direction: this.direction() });
+    const g = this.graph();
+    const l = layoutFlow(g.nodes, g.edges, { direction: g.direction, nodeWidth: g.width });
     const nodes = l.nodes.map(n => {
       const tone: FlowTone = n.tone ?? 'neutral';
       const textW = n.w - 62;
@@ -233,10 +256,10 @@ export class FlowGraph {
           x: 12 + (i % FLOW_METRICS_PER_ROW) * cellW, y: rows.metricsY + Math.floor(i / FLOW_METRICS_PER_ROW) * FLOW_ROW.metric + 12,
         };
       });
-      const aria = [n.label, n.sub, ...badges].filter(Boolean).join(', ');
+      const aria = [n.label, n.sub, ...badges, ...(n.metrics ?? []).map(m => `${m.label} ${m.value}`)].filter(Boolean).join(', ');
       return {
         ...n, tone, rows, pills, cells, aria,
-        accent: (FLOW_KINDS[n.kind] ?? FLOW_KINDS.other).accent,
+        accent: n.accent ?? (FLOW_KINDS[n.kind] ?? FLOW_KINDS.other).accent,
         glyph: flowIconPaths(n.icon, n.kind),
         title: fitText(n.label, textW, 13),
         subText: n.sub ? fitText(n.sub, textW, 11, 0.62) : '',
@@ -247,7 +270,7 @@ export class FlowGraph {
       const text = e.label ? fitText(e.label, 168, 11, 0.58) : '';
       return { ...e, tone: (e.tone ?? 'neutral') as FlowTone, text, textW: Math.round(text.length * 6.1 + 14) };
     });
-    return { nodes, edges, width: l.width, height: l.height, key: this.direction() + '|' + l.nodes.map(n => n.id).sort().join('\n') };
+    return { nodes, edges, width: l.width, height: l.height, key: g.direction + '|' + l.nodes.map(n => n.id).sort().join('\n') };
   });
 
   protected readonly mini = computed(() => {

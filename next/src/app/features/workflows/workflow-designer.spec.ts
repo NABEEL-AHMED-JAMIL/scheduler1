@@ -97,15 +97,20 @@ describe('Workflow designer -- the step model', () => {
 });
 
 describe('Workflow designer -- the screen', () => {
-  it('opens the first workflow\'s current version as a chain, in words', () => {
-    const { api, el } = screenWith();
+  it('opens the first workflow\'s current version as a flow, in words, a condition\'s two ways drawn', () => {
+    const { api, el, screen, fixture } = screenWith();
     expect(api.fetch).toHaveBeenCalledWith('purchase');
-    const cards = Array.from(el.querySelectorAll('[data-step]')).map(c => c.textContent!.replace(/\s+/g, ' '));
-    expect(cards).toHaveLength(3);
-    expect(cards[0]).toContain('the requester\'s manager · due in 2 days · then the requester\'s manager');
-    expect(cards[1]).toContain('If amount is more than 1000');
-    expect(cards[1]).toContain('Yes → Finance approves · No → end');
-    expect(cards[2]).toContain('the administrators');
+    const nodes = Array.from(el.querySelectorAll('g[data-node]')).filter(n => !n.getAttribute('data-id')!.startsWith('@')).map(n => n.getAttribute('aria-label')!);
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0]).toContain('the requester\'s manager · due in 2 days · then the requester\'s manager');
+    expect(nodes[1]).toContain('If amount is more than 1000');
+    expect(nodes[2]).toContain('the administrators');
+    const graph = screen.graph();
+    const edge = (from: string, label: string) => graph.edges.find(e => e.from === from && e.label === label)?.to;
+    expect([edge('large', 'yes'), edge('large', 'no'), edge('manager', 'approved'), edge('manager', 'rejected')]).toEqual(['finance', '@end', 'large', '@rejected']);
+    screen.pick(1);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="step-branches"]')!.textContent).toContain('Yes → Finance approves · No → end');
     expect(el.querySelector('[data-test="publish"]')).not.toBeNull();
   });
 
@@ -136,16 +141,18 @@ describe('Workflow designer -- the screen', () => {
     fixture.detectChanges();
     expect(toast.error).toHaveBeenCalled();
     expect(screen.selected()).toBe(1);
-    expect(el.querySelector('[data-step="large"]')!.textContent).toContain('condition.field: which field.');
+    expect(el.querySelector('[data-test="step-problems"]')!.textContent).toContain('condition.field: which field.');
+    expect(el.querySelector('g[data-id="large"]')!.getAttribute('aria-label')).toContain('1 problem');
     expect(el.textContent).toContain('steps: something else.');
   });
 
   it('shows a member the chain and nothing that changes it', () => {
     const { profiles, el } = screenWith({ admin: false });
     expect(profiles.list).not.toHaveBeenCalled();
-    expect(el.querySelectorAll('[data-step]')).toHaveLength(3);
+    expect(el.querySelectorAll('g[data-node]:not([data-id^="@"])')).toHaveLength(3);
     expect(el.querySelector('[data-test="publish"]')).toBeNull();
     expect(el.querySelector('[data-test="add-step"]')).toBeNull();
+    expect(el.querySelector('[data-test="move-up"], [data-test="insert-step"], [data-test="remove-step"]')).toBeNull();
     expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();
     expect((el.querySelector('[data-test="step-panel"] fieldset') as HTMLFieldSetElement).disabled).toBe(true);
   });

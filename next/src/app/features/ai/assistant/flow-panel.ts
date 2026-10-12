@@ -165,7 +165,7 @@ export class FlowPanel {
 
   readonly graph = computed(() => {
     const f = this.flow();
-    return f ? graphOf(f) : { nodes: [], edges: [] };
+    return f ? graphOf(f, this.tasks()) : { nodes: [], edges: [] };
   });
   readonly verdict = computed(() => {
     const f = this.flow();

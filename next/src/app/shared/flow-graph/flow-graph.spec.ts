@@ -147,4 +147,39 @@ describe('<app-flow-graph>', () => {
     const track = el.querySelector('g[data-id="s2"] .fg-track')!;
     expect(Number(bar.getAttribute('width'))).toBe(Number(track.getAttribute('width')) / 2);
   });
+
+  it('lays out again only when what it draws changes: a new array of the same graph keeps the layout', () => {
+    const { host, fixture, el } = render(4);
+    const graph = fixture.debugElement.children[0].componentInstance as unknown as { vm: () => unknown };
+    const before = graph.vm();
+    host.nodes.set(steps(4));
+    host.edges.set(line(4));
+    host.selected.set('s1');
+    fixture.detectChanges();
+    expect(graph.vm()).toBe(before);
+    host.nodes.set(steps(4).map(n => (n.id === 's3' ? { ...n, label: 'Renamed' } : n)));
+    fixture.detectChanges();
+    expect(graph.vm()).not.toBe(before);
+    expect(el.querySelector('g[data-id="s3"] .fg-label')!.textContent).toBe('Renamed');
+  });
+
+  it('leaves the words out when zoomed too far out to read them, and puts them back on the way in', () => {
+    const { el, click } = render(3);
+    const canvas = () => el.querySelector('svg.fg-canvas')!;
+    expect(canvas().classList).not.toContain('fg-far');
+    for (let i = 0; i < 6; i++) click('[data-act="out"]');
+    expect(canvas().classList).toContain('fg-far');
+    expect(el.querySelectorAll('g[data-node]')).toHaveLength(3);
+    click('[data-act="reset"]');
+    expect(canvas().classList).not.toContain('fg-far');
+  });
+
+  it('draws an accent a node asks for over its kind\'s, and a node not saved yet dashed', () => {
+    const { host, fixture, el } = render(2);
+    host.nodes.set(steps(2).map(n => (n.id === 's1' ? { ...n, accent: 'crit' as const, pending: true } : n)));
+    fixture.detectChanges();
+    const node = el.querySelector('g[data-id="s1"]')!;
+    expect(node.getAttribute('class')).toContain('pending');
+    expect(node.querySelector('.p-crit')).not.toBeNull();
+  });
 });

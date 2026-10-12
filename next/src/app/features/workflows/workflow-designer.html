@@ -150,51 +150,20 @@
 
         @if (view() === 'steps') {
           <div class="designer-body" [attr.data-sheet]="sheet() ? 'open' : 'closed'">
-            <!-- The canvas: the chain of steps, centred, scrolling on its own. -->
+            <!-- The canvas: the steps as a flow on the shared graph (zoom, fit, full screen, minimap), branches drawn with their
+                 outcomes; Add a step floats over its top left. -->
             <section class="designer-canvas" aria-label="Steps" data-test="chain">
-              <div class="designer-flow">
-                <div class="designer-end"><app-icon name="send" size="0.9em" />Request starts</div>
-                @for (s of steps(); track s.key; let i = $index; let first = $first; let last = $last) {
-                  @if (first) {
-                    <div class="designer-link" aria-hidden="true"></div>
-                  } @else {
-                    <ng-container *ngTemplateOutlet="slot; context: { at: i, after: steps()[i - 1] }" />
-                  }
-                  <div class="card designer-step" [class.is-on]="selected() === i" [class.has-problem]="problemsOf(i).length" [attr.data-step]="s.key" [attr.data-type]="s.type">
-                    <div class="designer-step-top">
-                      <span [class]="'pill designer-type pill-' + typeOf(s.type).tone" data-test="step-type"><app-icon [name]="typeOf(s.type).icon" size="0.95em" />{{ typeOf(s.type).label }}</span>
-                      <span class="designer-step-no" aria-hidden="true">{{ i + 1 }}</span>
-                      @if (canEdit()) {
-                        <span class="designer-move">
-                          <button type="button" class="btn-circle" [disabled]="first" (click)="move(i, -1)" [attr.aria-label]="'Move “' + stepName(s) + '” up'" title="Move up" data-test="move-up"><app-icon name="arrowUp" size="0.95em" /></button>
-                          <button type="button" class="btn-circle" [disabled]="last" (click)="move(i, 1)" [attr.aria-label]="'Move “' + stepName(s) + '” down'" title="Move down" data-test="move-down"><app-icon name="arrowDown" size="0.95em" /></button>
-                        </span>
-                      }
-                    </div>
-                    <button type="button" class="designer-step-main" (click)="pick(i)" [attr.aria-pressed]="selected() === i" [attr.aria-label]="typeOf(s.type).label + ': ' + stepName(s) + ' — edit'">
-                      <span class="designer-step-name">{{ stepName(s) }}</span>
-                      <span class="designer-step-sub">{{ summary(s) }}</span>
-                      @if (s.type === 'condition') { <span class="designer-step-link">{{ branches(s) }}</span> }
-                      @else if (s.next) { <span class="designer-step-link">Then → {{ targetName(s.next) }}</span> }
-                      @if (s.type === 'approval' && s.onReject && s.onReject !== 'end') { <span class="designer-step-link">If rejected → {{ targetName(s.onReject) }}</span> }
-                    </button>
-                    @for (p of problemsOf(i); track p) {
-                      <p class="designer-problem"><app-icon name="alert" size="0.9em" />{{ p }}</p>
-                    }
-                  </div>
-                }
-                <div class="designer-link" aria-hidden="true"></div>
-                @if (canEdit()) {
-                  @if (adding() && insertAt() === steps().length) {
+              @if (canEdit()) {
+                <div class="designer-tools">
+                  @if (adding()) {
                     <ng-container *ngTemplateOutlet="addMenu" />
                   } @else {
-                    <button type="button" class="btn btn-default btn-sm self-center" (click)="openAdd(steps().length)" data-test="add-step">
-                      <app-icon name="plus" />Add a step</button>
+                    <button type="button" class="btn btn-default btn-sm" (click)="openAdd(steps().length)" data-test="add-step"><app-icon name="plus" />Add a step</button>
                   }
-                  <div class="designer-link" aria-hidden="true"></div>
-                }
-                <div class="designer-end"><app-icon name="checkCircle" size="0.9em" />Request ends</div>
-              </div>
+                </div>
+              }
+              <app-flow-graph [nodes]="graph().nodes" [edges]="graph().edges" [selected]="selectedKey()" direction="TB" [nodeWidth]="272" [minFit]="0.6"
+                              ariaLabel="The workflow's steps" (select)="pickNode($event)" />
             </section>
 
             <!-- The step's properties: beside the canvas, or sliding over it below 1024 px. -->
@@ -208,11 +177,32 @@
                     <p class="text-xs text-[color:var(--text-muted)]">Step {{ selected()! + 1 }} of {{ steps().length }}</p>
                   </div>
                   @if (canEdit()) {
+                    <span class="flex items-center gap-1">
+                      <button type="button" class="btn-circle" [disabled]="selected() === 0" (click)="move(selected()!, -1)" [attr.aria-label]="'Move “' + stepName(s) + '” up'"
+                              title="Move up" data-test="move-up"><app-icon name="arrowUp" size="0.95em" /></button>
+                      <button type="button" class="btn-circle" [disabled]="selected() === steps().length - 1" (click)="move(selected()!, 1)"
+                              [attr.aria-label]="'Move “' + stepName(s) + '” down'" title="Move down" data-test="move-down"><app-icon name="arrowDown" size="0.95em" /></button>
+                      <button type="button" class="btn-circle" (click)="openAdd(selected()! + 1)" [attr.aria-label]="'Add a step after “' + stepName(s) + '”'"
+                              title="Add a step after this one" data-test="insert-step" [attr.data-at]="selected()! + 1"><app-icon name="plus" size="0.95em" /></button>
+                    </span>
                     <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="remove(selected()!)" data-test="remove-step"><app-icon name="trash" />Remove</button>
                   }
                   <button type="button" class="btn btn-ghost btn-icon designer-props-close" (click)="closeSheet()" aria-label="Close the step's properties" data-test="close-props"><app-icon name="close" /></button>
                 </div>
                 <div class="designer-props-body">
+                  @let found = problemsOf(selected()!);
+                  @if (found.length) {
+                    <div class="flex flex-col gap-1 mb-3" role="alert" data-test="step-problems">
+                      @for (p of found; track p) { <p class="designer-problem"><app-icon name="alert" size="0.9em" />{{ p }}</p> }
+                    </div>
+                  }
+                  @if (s.type === 'condition') {
+                    <p class="text-xs text-[color:var(--text-secondary)] mb-3" data-test="step-branches">{{ branches(s) }}</p>
+                  } @else if (s.next || (s.type === 'approval' && s.onReject && s.onReject !== 'end')) {
+                    <p class="text-xs text-[color:var(--text-secondary)] mb-3" data-test="step-branches">
+                      @if (s.next) { Then → {{ targetName(s.next) }} }@if (s.type === 'approval' && s.onReject && s.onReject !== 'end') { @if (s.next) { · }If rejected → {{ targetName(s.onReject) }} }
+                    </p>
+                  }
                   <fieldset class="form-lock flex flex-col gap-3" [disabled]="!canEdit()">
                     <div>
                       <label class="label" for="st-name">Name</label>
@@ -454,27 +444,10 @@
   }
 </div>
 
-<!-- Where a step goes in between two others: the connector, with an add button on it, or the menu once pressed. -->
-<ng-template #slot let-at="at" let-after="after">
-  @if (canEdit()) {
-    @if (adding() && insertAt() === at) {
-      <div class="designer-link" aria-hidden="true"></div>
-      <ng-container *ngTemplateOutlet="addMenu" />
-      <div class="designer-link" aria-hidden="true"></div>
-    } @else {
-      <div class="designer-gap">
-        <button type="button" class="btn-circle designer-insert" (click)="openAdd(at)" [attr.aria-label]="'Add a step after “' + stepName(after) + '”'"
-                title="Add a step here" data-test="insert-step" [attr.data-at]="at"><app-icon name="plus" size="0.9em" /></button>
-      </div>
-    }
-  } @else {
-    <div class="designer-link" aria-hidden="true"></div>
-  }
-</ng-template>
-
 <!-- The step types to add, each with what it does. -->
 <ng-template #addMenu>
-  <div class="card designer-add" data-test="add-menu" role="group" aria-label="Add a step">
+  <div class="card designer-add" data-test="add-menu" role="group" [attr.aria-label]="addWhere()">
+    <p class="designer-add-where">{{ addWhere() }}</p>
     @for (t of types; track t.type) {
       <button type="button" class="designer-add-item" (click)="add(t.type)" [attr.data-add]="t.type">
         <span [class]="'designer-props-icon pill-' + t.tone"><app-icon [name]="t.icon" size="0.95em" /></span>
