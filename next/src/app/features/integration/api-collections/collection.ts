@@ -52,6 +52,9 @@ export class Collection implements OnChanges {
 
   /** From the route, :collectionId. */
   readonly collectionId = input<string>();
+  /** From the address, ?tab= (UX final I3): History, or the overview. */
+  readonly tab = input<string>();
+  readonly activeTab = computed<'overview' | 'history'>(() => this.tab() === 'history' ? 'history' : 'overview');
 
   readonly detail = signal<CollectionDetail | null>(null);
   readonly defaultAuth = signal<unknown>(null);

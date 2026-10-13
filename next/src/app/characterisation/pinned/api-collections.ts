@@ -66,14 +66,15 @@ export const PINNED: Record<string, unknown> = {
       "LIVE-CHECK 0928 httpbin",
       "APIs (2 of 2)",
       "Environments",
-      "Versions",
       "Used by"
     ],
     "buttons": [
       "Cards",
       "Columns",
       "Get status",
+      "History 3",
       "Metadata probe",
+      "Overview",
       "Refresh",
       "Table"
     ],
@@ -90,10 +91,6 @@ export const PINNED: Record<string, unknown> = {
       [
         "Environment",
         "Variables"
-      ],
-      [
-        "Version",
-        "Saved"
       ]
     ],
     "fields": [
@@ -102,7 +99,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/connections",
-      "/connections/api-collections"
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/api-collections/1000?tab=history"
     ]
   },
   "one collection, as a workspace administrator": {
@@ -118,7 +117,6 @@ export const PINNED: Record<string, unknown> = {
       "LIVE-CHECK 0928 httpbin",
       "APIs (2 of 2)",
       "Environments",
-      "Versions",
       "Used by"
     ],
     "buttons": [
@@ -130,8 +128,10 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Edit details",
       "Get status",
+      "History 3",
       "Metadata probe",
       "New environment",
+      "Overview",
       "Refresh",
       "Table"
     ],
@@ -150,10 +150,6 @@ export const PINNED: Record<string, unknown> = {
         "Environment",
         "Variables",
         "Actions"
-      ],
-      [
-        "Version",
-        "Saved"
       ]
     ],
     "fields": [
@@ -165,7 +161,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/connections",
-      "/connections/api-collections"
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/api-collections/1000?tab=history"
     ]
   },
   "the list, as a platform administrator": {
