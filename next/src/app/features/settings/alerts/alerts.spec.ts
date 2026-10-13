@@ -80,6 +80,7 @@ describe('Alerts', () => {
   it('says what a rule watches in a sentence', () => {
     expect(ruleSentence(rule({ threshold: 3, windowMinutes: 15 }))).toBe('3 or more runs of a pipeline fail within 15 minutes');
     expect(ruleSentence(rule({ kind: 'RUN_SLOW', factor: 2.5 }))).toContain('2.5x');
+    expect(ruleSentence(rule({ kind: 'RETENTION' }))).toContain('retention class pauses');
     expect(ruleSentence(rule({ kind: 'DISK_LOW', threshold: 10 }))).toBe('The disk has under 10% free');
     expect(minutes(1440)).toBe('a day');
     expect(minutes(120)).toBe('2 hours');

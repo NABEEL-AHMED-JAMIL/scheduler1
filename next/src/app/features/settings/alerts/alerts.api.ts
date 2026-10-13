@@ -183,6 +183,7 @@ export function ruleSentence(rule: AlertRule): string {
     case 'SCHEDULE_MISSED': return `A schedule's slot is skipped, missed or overdue within ${w}`;
     case 'RUN_SLOW': return `A run takes over ${rule.factor ?? 2}x its pipeline's usual (p95), checked over ${w}`;
     case 'REVIEW_WAITING': return `A review or approval waits longer than ${w}`;
+    case 'RETENTION': return 'A retention class pauses for confirmation, or a retention pass fails';
     case 'SERVICE_UNHEALTHY': return `A service is not up for ${rule.threshold} ${rule.threshold === 1 ? 'minute' : 'minutes'} in a row`;
     case 'SERVICE_RESTARTED': return `A service restarted within ${w}`;
     case 'MEMORY_HIGH': return `A service's heap after garbage collection reaches ${rule.threshold}%`;
