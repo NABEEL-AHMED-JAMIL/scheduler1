@@ -101,8 +101,11 @@ describe('Alerts', () => {
       { service: 'media', status: 'UP', series: { at: ['2026-10-13T13:00:00Z'], heapUsedMb: [900], requestsPerMin: [4], errorsPerMin: [0],
         meanMs: [12], cpuPct: [3], up: [true] } },
       { service: 'gateway', status: 'UP' },
-    ], 'heapUsedMb', ['#111'], '#222', '#333') as { series: { name: string; data: unknown[] }[] };
+    ], 'heapUsedMb', ['#111'], '#222', '#333', '2026-10-13T14:00:00Z') as { series: { name: string; data: unknown[]; showSymbol: boolean }[];
+      xAxis: { min: number; max: number } };
     expect(option.series.map(s => s.name)).toEqual(['media']);
+    expect(option.series[0].showSymbol).toBe(true);
+    expect(option.xAxis.max - option.xAxis.min).toBe(86_400_000);
     expect(option.series[0].data).toEqual([['2026-10-13T13:00:00Z', 900]]);
   });
 });

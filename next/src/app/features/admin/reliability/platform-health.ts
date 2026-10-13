@@ -30,18 +30,21 @@ export function statusWord(status: string | undefined): { word: string; tone: 'o
 }
 
 /** A service's 24 hours as one line per service, for the picked figure: an ECharts option. */
-export function healthOption(services: ServiceHealth[], metric: HealthMetric, palette: string[], text: string, border: string): Record<string, unknown> {
+export function healthOption(services: ServiceHealth[], metric: HealthMetric, palette: string[], text: string, border: string,
+  asOf?: string): Record<string, unknown> {
   const shown = services.filter(s => s.series && s.series.at.length);
+  // The axis is the last 24 hours whatever the samples hold: a first hour of samples is drawn at the right end, not spread.
+  const end = asOf ? Date.parse(asOf) : NaN;
   return {
     animation: false,
     color: palette,
     grid: { left: 8, right: 16, top: 36, bottom: 4, containLabel: true },
     legend: { type: 'scroll', top: 0, textStyle: { color: text, fontSize: 11 } },
     tooltip: { trigger: 'axis', valueFormatter: (v: number | null) => (v == null ? '—' : Number(v).toLocaleString('en-US')) },
-    xAxis: { type: 'time', axisLabel: { color: text, fontSize: 11, hideOverlap: true }, axisLine: { lineStyle: { color: border } } },
+    xAxis: { type: 'time', ...(Number.isNaN(end) ? {} : { min: end - 86_400_000, max: end }), axisLabel: { color: text, fontSize: 11, hideOverlap: true }, axisLine: { lineStyle: { color: border } } },
     yAxis: { type: 'value', min: 0, axisLabel: { color: text, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: 0.5 } } },
     series: shown.map(s => ({
-      name: s.service, type: 'line', showSymbol: false, smooth: false, connectNulls: false, lineStyle: { width: 1.5 },
+      name: s.service, type: 'line', showSymbol: s.series!.at.length < 4, symbolSize: 4, smooth: false, connectNulls: false, lineStyle: { width: 1.5 },
       data: s.series!.at.map((at, i) => [at, (s.series![metric] as (number | null)[])[i]]),
     })),
   };
@@ -173,7 +176,7 @@ export class PlatformHealthView implements OnInit, OnDestroy {
   readonly metricLabel = computed(() => METRIC_LABEL[this.metric()]);
   readonly option = computed(() => {
     const t = this.theme();
-    return healthOption(this.services(), this.metric(), t.palette, t.tokens.textSecondary, t.tokens.border);
+    return healthOption(this.services(), this.metric(), t.palette, t.tokens.textSecondary, t.tokens.border, this.health()?.asOf);
   });
   readonly summary = computed(() => {
     const all = this.services();
