@@ -1,4 +1,4 @@
-import { Injector, Injectable, effect, inject, signal, untracked } from '@angular/core';
+import { DestroyRef, Injector, Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
@@ -19,6 +19,8 @@ export class TaskCountService {
   private readonly auth = inject(AuthService);
   private readonly unread = inject(UnreadCountService);
   readonly injector = inject(Injector);
+  /** Set when the injector goes (a test's reset, the app's teardown): a count loaded after that is dropped. */
+  private destroyed = false;
 
   /** Open tasks in Mine and My groups (the Task inbox's own total). */
   readonly count = signal(0);
@@ -37,7 +39,8 @@ export class TaskCountService {
       this.auth.user();
       untracked(() => this.refresh());
     });
-    setInterval(() => this.refresh(), 120_000);
+    const timer = setInterval(() => this.refresh(), 120_000);
+    inject(DestroyRef).onDestroy(() => { this.destroyed = true; clearInterval(timer); });
     if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => { if (!document.hidden) this.refresh(); });
   }
 
@@ -47,7 +50,8 @@ export class TaskCountService {
     if (!user || !user.tenantId) { this.count.set(0); this.review.set(null); return; }
     // A tab in the background re-reads when it is looked at again (the bell moves then), not every two minutes.
     if (typeof document !== 'undefined' && document.hidden) return;
-    import('../review/review-sources').then(m => m.countReview(this), () => {});
+    // The review list is loaded on first use; by the time it arrives the injector may be gone (NG0205 otherwise).
+    import('../review/review-sources').then(m => { if (!this.destroyed) m.countReview(this); }, () => {});
     if (!this.auth.canOpen('task-inbox')) { this.count.set(0); return; }
     this.api.count().subscribe({
       next: r => {
