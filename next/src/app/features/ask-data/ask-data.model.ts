@@ -1,3 +1,5 @@
+import { readableCell } from '../../shared/charts/number-format';
+import { readsAsYears } from '../analytics/charts/chart-table';
 import type { AnswerChart, ChartAnswer } from '../analytics/charts/chart-answer';
 
 /**
@@ -191,4 +193,29 @@ export function csvOf(q: AskQuery): string {
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   return [q.columns.map(cell).join(','), ...q.rows.map(r => r.map(cell).join(','))].join('\r\n') + '\r\n';
+}
+
+const FIGURES = new WeakMap<AskQuery, boolean[]>();
+
+/**
+ * UX review 2026-10-12: which of an answer's columns hold figures -- every value a number, and not a column of years -- so
+ * the table rounds them to sensible places and right-aligns them (36.347245665183365 read as written, left-aligned). Kept
+ * per answer, so the template asks once.
+ */
+export function figureColumns(q: AskQuery): boolean[] {
+  const kept = FIGURES.get(q);
+  if (kept) return kept;
+  const made = q.columns.map((name, i) => {
+    const values = q.rows.map(row => row[i] ?? null);
+    const present = values.filter((v): v is string => v !== null && String(v).trim() !== '');
+    return present.length > 0 && present.every(v => /^-?\d+(\.\d+)?$/.test(String(v).trim())) && !readsAsYears(name, values);
+  });
+  FIGURES.set(q, made);
+  return made;
+}
+
+/** One cell as the answer's table shows it: a figure rounded as the dashboards' tables round it, anything else as it came. */
+export function answerCell(value: string | null, figure: boolean): string {
+  if (value === null || value === undefined) return '—';
+  return figure ? readableCell(String(value)) : String(value);
 }

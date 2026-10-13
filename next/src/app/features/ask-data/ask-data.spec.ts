@@ -40,7 +40,7 @@ function render(setup: Setup = {}) {
   TestBed.configureTestingModule({
     imports: [AskData],
     providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AskDataApi, useValue: api },
-      { provide: AuthService, useValue: { isTenantAdmin: () => false, canOpen: () => true, user: () => ({ appUserId: 4641, tenantId: setup.tenantId === undefined ? 2960 : setup.tenantId }) } }],
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, canOpen: () => true, canEditDashboards: () => true, user: () => ({ appUserId: 4641, tenantId: setup.tenantId === undefined ? 2960 : setup.tenantId }) } }],
   });
   const fixture = TestBed.createComponent(AskData);
   fixture.detectChanges();
@@ -203,7 +203,12 @@ describe('Ask your data -- a question answered by a query (MIG-283)', () => {
     fixture.detectChanges();
     await vi.waitFor(() => { fixture.detectChanges(); if (!q('[data-test="chart-answer"]')) throw new Error('the chart is still loading'); });
     expect(q('[data-test="query-answer"] [data-test="answer"]')?.textContent).toContain('The total amount for each city.');
-    expect(q('[data-test="answer-summary"]')?.textContent).toContain('From the rows: 2 rows; the first: Austin, 120.5.');
+    // UX review 2026-10-12: the rows' raw first line is folded under Details.
+    expect(q('[data-test="answer-details"]')?.hasAttribute('open')).toBe(false);
+    expect(q('[data-test="answer-details"] [data-test="answer-summary"]')?.textContent).toContain('From the rows: 2 rows; the first: Austin, 120.5.');
+    // The figures right-aligned, the names not.
+    expect(Array.from(fixture.nativeElement.querySelectorAll('[data-test="query-rows"] th')).map((th: any) => th.classList.contains('num')))
+      .toEqual([false, true]);
     // MIG-357: the chart card draws the model's kind (a ring: two cities whose totals add up) over the rows that ran.
     expect(q('[data-test="query-chart"] [data-test="chart-answer"]')?.getAttribute('data-kind')).toBe('donut');
     expect(q('[data-test="chart-title"]')?.textContent).toContain('Total by city');

@@ -91,9 +91,7 @@
               @if (a.query; as q) {
                 <div class="flex flex-col gap-3" data-test="query-answer">
                   <p class="text-sm leading-relaxed" data-test="answer">{{ a.answer }}</p>
-                  @if (q.summary) {
-                    <p class="text-xs text-[color:var(--text-muted)]" data-test="answer-summary">From the rows: {{ q.summary }}</p>
-                  }
+
                   <div class="flex flex-col gap-3 2xl:grid 2xl:grid-cols-2 2xl:items-start">
                   @if (q.rows.length) {
                     <div class="min-w-0" data-test="query-chart">
@@ -104,11 +102,16 @@
                   @if (q.rows.length) {
                     <div class="min-w-0 flex flex-col gap-2">
                     <div class="overflow-x-auto">
+                      <!-- UX review 2026-10-12: figures rounded as the dashboards' tables round them, right-aligned in tabular
+                           figures (header too); the cell's own value stays in its tooltip. -->
+                      @let figures = figureColumns(q);
                       <table class="table-modern" data-test="query-rows">
-                        <thead><tr>@for (c of q.columns; track $index) { <th>{{ c }}</th> }</tr></thead>
+                        <thead><tr>@for (c of q.columns; track $index) { <th [class.num]="figures[$index]">{{ c }}</th> }</tr></thead>
                         <tbody>
                           @for (r of shownRows(q); track $index) {
-                            <tr>@for (v of r; track $index) { <td class="text-xs">{{ v ?? '—' }}</td> }</tr>
+                            <tr>@for (v of r; track $index) {
+                              <td class="text-xs" [class.num]="figures[$index]" [attr.title]="figures[$index] && v !== null ? v : null">{{ answerCell(v, figures[$index]) }}</td>
+                            }</tr>
                           }
                         </tbody>
                       </table>
@@ -119,6 +122,13 @@
                     </div>
                   }
                   </div>
+                  @if (q.summary) {
+                    <!-- UX review 2026-10-12: the rows' raw first line is a detail, not the answer -- folded away. -->
+                    <details class="text-xs text-[color:var(--text-muted)]" data-test="answer-details">
+                      <summary class="cursor-pointer select-none w-fit">Details</summary>
+                      <p class="mt-1" data-test="answer-summary">From the rows: {{ q.summary }}</p>
+                    </details>
+                  }
                   <div class="flex flex-col gap-1">
                     <p class="text-xs font-medium">The query, run as you over "{{ q.dataset.name }}"</p>
                     <pre class="mono text-xs whitespace-pre-wrap break-words card p-4" data-test="query-sql">{{ q.sql }}</pre>
