@@ -214,6 +214,11 @@
     --text-inverse:    #ffffff;
     --accent-text:     var(--color-brand-600);
     --accent-soft:     var(--color-brand-50);
+    /* A selected list row (the AI Assistant's conversations, owner 2026-10-13): a soft tint of the
+       accent, with an --accent-mark-strong mark inside it. Not --accent-soft: here that is ink-100,
+       the very grey of a hovered row and of a neutral pill, so selected and hovered looked alike.
+       Dark lightens it less than a chip -- at the full --accent-soft the crit pill is 4.4:1. */
+    --row-selected-bg: color-mix(in oklab, var(--accent-mark) 9%, var(--surface-raised));
     /* The primary button is a near-black pill on a light ground, which is Compass's own
        treatment. It has to invert in dark -- see the html.dark block. */
     --btn-primary-bg:     var(--color-brand-500);
@@ -359,6 +364,7 @@
        is not a chip at all, just a slightly different black. A monochrome system marks a
        selected row on a dark ground by lifting it toward the light, not by darkening it. */
     --accent-soft:     color-mix(in oklab, var(--color-ink-50) 12%, var(--surface-raised));
+    --row-selected-bg: color-mix(in oklab, var(--accent-soft) 70%, var(--surface-raised));
     /*
      * Inverted, and it has to be. The accent is monochrome now, so a primary button in light is
      * a near-black pill -- and painting that same near-black on this theme's near-black page
@@ -1174,6 +1180,12 @@
   .md-h { @apply font-semibold; }
   .md-list { @apply pl-4 space-y-0.5 list-disc; }
   .md-list-ol { @apply list-decimal; }
+  /* A nested item (an indented "  - " under a lead-in item) steps in and takes the next marker. */
+  .md-list > li.md-depth-1 { margin-left: 1rem; list-style-type: circle; }
+  .md-list > li.md-depth-2 { margin-left: 2rem; list-style-type: square; }
+  .md-list > li.md-depth-3 { margin-left: 3rem; list-style-type: square; }
+  /* On the assistant's sunken answer bubble, inline code takes the card's surface, or it would vanish into the bubble. */
+  .ai-answer .md-inline-code { background: var(--surface-raised); }
   .md-hr { border-color: var(--border-subtle); @apply my-2.5 border-t; }
   .md-link { @apply text-accent underline underline-offset-2 hover:no-underline; }
   .md-inline-code {

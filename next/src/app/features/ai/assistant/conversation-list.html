@@ -98,7 +98,7 @@
                   {{ title(c) }}
                 </button>
               }
-              <time class="cl-time" [attr.datetime]="c.dateUpdated">{{ time(c) }}</time>
+              <time class="cl-time" [attr.datetime]="c.dateUpdated" [title]="c.dateUpdated | serverTime: 'dateTime'">{{ when(c, g.id) }}</time>
               <div class="cl-meta">
                 @if (c.pinned) { <span class="cl-pin-on inline-flex" title="Pinned"><ng-container [ngTemplateOutlet]="pinGlyph" /><span class="sr-only">Pinned</span></span> }
                 @if (b) {

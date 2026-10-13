@@ -5,13 +5,14 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AssistantApi } from './assistant.api';
 import { Conversation } from './assistant.model';
 import { ConversationApi } from './conversation.api';
 import {
   CHIPS, Chip, ConversationKind, ConversationRow, KIND_LABEL, ListGroup, badgeOf, browserStorage, groupRows, kindIcon, kindOf, matchesChip, mergeRecent,
-  readRail, relativeTime, titleOf, viewerZone, writeRail,
+  readRail, rowTime, titleOf, viewerZone, writeRail,
 } from './conversation.model';
 
 /** One page of the side list; Load more asks for the next. */
@@ -36,7 +37,7 @@ export const RAIL_ITEMS = 12;
  */
 @Component({
   selector: 'app-conversation-list',
-  imports: [Icon, RouterLink, NgTemplateOutlet, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [Icon, RouterLink, NgTemplateOutlet, CdkMenu, CdkMenuItem, CdkMenuTrigger, ServerTimePipe],
   templateUrl: './conversation-list.html',
   encapsulation: ViewEncapsulation.None,
   host: { class: 'cl-host', '[class.cl-rail]': 'rail()' },
@@ -48,33 +49,51 @@ export const RAIL_ITEMS = 12;
     @media (min-width: 1536px) {
       .ai-grid:has(> .ai-history .cl-host:not(.cl-rail)) { grid-template-columns: 18.5rem minmax(26rem, 0.95fr) minmax(30rem, 1.15fr); }
     }
-    .cl-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0.375rem 0.5rem; }
-    .cl-group { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); padding: 0.5rem 0.5rem 0.25rem;
+    .cl-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 0.25rem 0.5rem 0.5rem; }
+    .cl-group { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); padding: 0.625rem 0.5rem 0.25rem;
       font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
-    .cl-row { position: relative; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; column-gap: 0.5rem; row-gap: 0.2rem;
-      align-items: center; padding: 0.45rem 0.5rem; border-radius: var(--radius-lg); }
-    .cl-row:hover, .cl-row:focus-within { background: var(--surface-sunken); }
-    .cl-row.cl-active { background: var(--surface-sunken); box-shadow: inset 2px 0 0 var(--accent-mark); }
-    .cl-kind { grid-row: span 2; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: var(--radius-lg);
+    /*
+     * A row (owner 2026-10-13: "the click border does not look good"): 54 px, the kind's icon in a fixed 2 rem box, the
+     * title on one line with the time beside it, the status under the title. Three states, none of which moves the row:
+     * hover sinks it; the open conversation takes the accent's soft tint and a 3 px mark drawn inside the row, clear of
+     * the card's edge; keyboard focus alone draws a ring (:focus-visible -- a mouse click draws none).
+     */
+    .cl-row { position: relative; display: grid; grid-template-columns: 2rem minmax(0, 1fr) auto; grid-template-rows: 1.25rem 1.125rem;
+      column-gap: 0.625rem; row-gap: 0.125rem; align-items: center; min-height: 3.375rem; padding: 0.4375rem 0.625rem 0.4375rem 0.75rem;
+      border-radius: var(--radius-lg); }
+    .cl-row::before { content: ''; position: absolute; left: 0.25rem; top: 0.75rem; bottom: 0.75rem; width: 3px; border-radius: var(--radius-full);
+      background: transparent; }
+    .cl-row:hover, .cl-row:has(:focus-visible) { background: var(--surface-sunken); }
+    .cl-row.cl-active { background: var(--row-selected-bg); }
+    .cl-row.cl-active::before { background: var(--accent-mark-strong); }
+    .cl-kind { grid-row: 1 / 3; align-self: center; display: grid; place-items: center; width: 2rem; height: 2rem; border-radius: var(--radius-md);
       background: var(--surface-inset); color: var(--text-secondary); }
+    /* A question's icon box and a neutral pill are greys of the hovered row's own grey: an edge keeps each a shape on it. */
+    .cl-kind:not(.cl-pipeline):not(.cl-run) { box-shadow: inset 0 0 0 1px var(--border-subtle); }
+    .cl-meta .pill-neutral { border-color: var(--border-subtle); }
     .cl-kind.cl-pipeline { background: var(--pill-brand-bg); color: var(--pill-brand-fg); }
     .cl-kind.cl-run { background: var(--pill-info-bg); color: var(--pill-info-fg); }
-    .cl-open { text-align: left; min-width: 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--text-primary);
+    .cl-open { grid-column: 2; grid-row: 1; text-align: left; min-width: 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--text-primary);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .cl-open::after { content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg); }
-    .cl-open:focus-visible { outline: none; }
-    .cl-open:focus-visible::after { outline: 2px solid var(--accent-mark); outline-offset: -2px; }
+    .cl-open:focus { outline: none; }
+    .cl-open:focus-visible::after { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
     .cl-active .cl-open { font-weight: 600; }
-    .cl-time { font-size: 11px; color: var(--text-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
-    .cl-meta { grid-column: 2 / 4; display: flex; align-items: center; gap: 0.375rem; min-width: 0; }
-    .cl-meta .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+    /* --text-muted is a card's grey; on the selected tint it is under 4.5:1 (contrast.spec.ts measures this pair). */
+    .cl-active .cl-time { color: var(--text-secondary); }
+    .cl-time { grid-column: 3; grid-row: 1; font-size: 11px; line-height: 1.25rem; color: var(--text-muted); white-space: nowrap;
+      font-variant-numeric: tabular-nums; }
+    .cl-meta { grid-column: 2 / 4; grid-row: 2; display: flex; align-items: center; gap: 0.375rem; min-width: 0; }
+    .cl-meta .pill { max-width: 100%; overflow: hidden; text-overflow: ellipsis; line-height: 1rem; padding-block: 0; }
     .cl-lift { position: relative; z-index: 1; }
-    .cl-actions { position: absolute; top: 0.3rem; right: 0.375rem; z-index: 1; display: flex; gap: 0.125rem; padding-left: 0.5rem;
-      background: var(--surface-sunken); opacity: 0; pointer-events: none; }
-    .cl-row:hover .cl-actions, .cl-row:focus-within .cl-actions, .cl-actions.cl-menu-open { opacity: 1; pointer-events: auto; }
+    .cl-actions { position: absolute; top: 0.375rem; right: 0.375rem; z-index: 1; display: flex; gap: 0.125rem; padding-left: 0.375rem;
+      background: inherit; border-radius: var(--radius-md); opacity: 0; pointer-events: none; }
+    .cl-row:hover .cl-actions, .cl-row:has(:focus-visible) .cl-actions, .cl-actions.cl-menu-open { opacity: 1; pointer-events: auto; }
+    /* While pin and More show, the title ends (with its ellipsis) before them rather than being cut under them. */
+    .cl-row:hover .cl-open, .cl-row:has(:focus-visible) .cl-open, .cl-row:has(.cl-menu-open) .cl-open { padding-right: 1rem; }
     .cl-pin-on { color: var(--accent-text); }
     .cl-rail-list { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; padding: 0.5rem 0; overflow-y: auto; min-height: 0; }
-    .cl-rail-btn.cl-active { background: var(--surface-sunken); box-shadow: inset 2px 0 0 var(--accent-mark); }
+    .cl-rail-btn.cl-active { background: var(--row-selected-bg); color: var(--accent-text); }
     @media (prefers-reduced-motion: no-preference) { .cl-actions { transition: opacity 120ms ease-out; } }
   `],
 })
@@ -291,7 +310,8 @@ export class ConversationList {
   icon(c: ConversationRow): string { return kindIcon(c); }
   kind(c: ConversationRow): ConversationKind { return kindOf(c); }
   badge(c: ConversationRow) { return badgeOf(c); }
-  time(c: ConversationRow): string { return relativeTime(c.dateUpdated, this.now(), this.zone); }
+  /** Under a day header the row says the time, not the day again (rowTime). */
+  when(c: ConversationRow, group: ListGroup['id']): string { return rowTime(c.dateUpdated, group, this.now(), this.zone); }
   tip(c: ConversationRow): string {
     const parts = [titleOf(c), KIND_LABEL[kindOf(c)]];
     if (c.firstQuestion && c.firstQuestion !== titleOf(c)) parts.push(`“${c.firstQuestion.length > 160 ? c.firstQuestion.slice(0, 159) + '…' : c.firstQuestion}”`);

@@ -257,6 +257,29 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
         }
       });
 
+      /**
+       * Owner 2026-10-13: a selected list row (the AI Assistant's conversations) takes --row-selected-bg, with an
+       * --accent-mark-strong mark inside it; keyboard focus rings it with --focus-ring. Its title, time and status
+       * pill must read on that tint as on a card.
+       */
+      it('a selected row (--row-selected-bg) keeps its text, pills, mark and focus ring readable', () => {
+        const off: string[] = [];
+        // Its time is --text-secondary there (conversation-list.ts): --text-muted is a grey for a card, 4.17:1 on this tint.
+        for (const fg of ['--text-primary', '--text-secondary', '--accent-text']) {
+          const r = measure(tokens, fg, '--row-selected-bg');
+          if (r < 4.5) off.push(`${fg} on --row-selected-bg: ${r}`);
+        }
+        for (const tone of PILLS) {
+          const r = measure(tokens, `--pill-${tone}-fg`, `--pill-${tone}-bg`, '--row-selected-bg');
+          if (r < 4.5) off.push(`pill-${tone} on --row-selected-bg: ${r}`);
+        }
+        for (const mark of ['--accent-mark-strong', '--focus-ring']) {
+          const r = measure(tokens, mark, '--row-selected-bg');
+          if (r < 3) off.push(`${mark} on --row-selected-bg: ${r}`);
+        }
+        expect(off).toEqual([]);
+      });
+
       /** UI that carries meaning without text (WCAG 1.4.11): a filled button is seen as a button. */
       it('the primary and danger buttons stand 3:1 off the page and the card', () => {
         for (const fill of ['--btn-primary-bg', '--btn-danger-bg']) {
