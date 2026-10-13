@@ -71,7 +71,6 @@ export function yesNoAsCheckbox(field: PipelineField): PipelineField {
 .pipeline-overview > li:last-child .pipeline-part { border-right: 0; }
 .pipeline-part:hover { background: var(--surface-inset); }
 .pipeline-part:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.pipeline-part.is-current { box-shadow: inset 0 -2px 0 0 var(--accent-mark-strong); }
 .pipeline-part-state { flex: none; display: inline-grid; place-items: center; width: 1.375rem; height: 1.375rem; border-radius: 9999px; font-size: 0.75rem; border: 1px solid var(--border-subtle); background: var(--surface-sunken); color: var(--text-muted); }
 .pipeline-part[data-state="done"] .pipeline-part-state { background: color-mix(in oklab, var(--color-ok-500) 14%, transparent); border-color: color-mix(in oklab, var(--color-ok-500) 45%, transparent); color: var(--color-ok-500); }
 .pipeline-part[data-state="missing"] .pipeline-part-state { background: color-mix(in oklab, var(--color-warn-500) 14%, transparent); border-color: color-mix(in oklab, var(--color-warn-500) 45%, transparent); color: var(--color-warn-500); }
@@ -879,11 +878,6 @@ export class TaskEdit implements OnInit {
   });
 
   stateWord(state: PartState): string { return STATE_WORDS[state]; }
-
-  /** A part is "here" when its tab is the one open. */
-  partIsCurrent(part: OverviewPart): boolean {
-    return this.activeTab() === part.target.tab;
-  }
 
   /** Opens the tab a part is set on, and brings its place on that tab into view. */
   goTo(part: OverviewPart): void {

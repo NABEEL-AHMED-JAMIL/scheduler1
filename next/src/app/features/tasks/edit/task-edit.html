@@ -56,7 +56,7 @@
           @for (part of overview(); track part.id; let n = $index) {
             <li>
               <button type="button" class="pipeline-part" [attr.data-part]="part.id" [attr.data-state]="part.state"
-                      [class.is-current]="partIsCurrent(part)" (click)="goTo(part)"
+                      (click)="goTo(part)"
                       [attr.aria-label]="(n + 1) + '. ' + part.label + ': ' + stateWord(part.state) + '. ' + part.detail">
                 <span class="pipeline-part-state" aria-hidden="true">
                   @switch (part.state) {

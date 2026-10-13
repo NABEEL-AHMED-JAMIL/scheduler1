@@ -24,6 +24,7 @@ const PIPELINES_SHOWN = 8;
     .facet-row { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.25rem 0.375rem; border-radius: var(--radius-sm);
       font-size: 13px; line-height: 1.25rem; color: var(--text-secondary); cursor: pointer; min-width: 0; }
     .facet-row:hover { background: var(--surface-inset); }
+    .facet-row > input { flex: none; }
     .facet-row.is-on { color: var(--text-primary); font-weight: 500; }
     .facet-row.is-empty { color: var(--text-muted); }
     .facet-label { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

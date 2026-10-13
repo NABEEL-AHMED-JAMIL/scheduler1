@@ -285,7 +285,7 @@
         <h3 class="chart-title" id="run-histogram-title">Runs over time</h3>
         <span class="chart-sub">{{ histogramSub() }}</span>
       </div>
-      <app-bar-chart [data]="histogram()" [height]="96" [clickable]="false"
+      <app-bar-chart [data]="histogram()" [height]="96" [clickable]="false" [hideValues]="true"
                      [emptyMessage]="facetsUnavailable() ? 'The counts could not be read.' : 'No runs in this window.'" />
     </section>
   }
