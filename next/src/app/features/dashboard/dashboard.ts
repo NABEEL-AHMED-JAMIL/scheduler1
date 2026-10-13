@@ -1,3 +1,4 @@
+import { WaitingForReview } from './waiting-for-review';
 import { DateField } from '../../shared/ui/date-field';
 import { BillingBrief } from '../billing/billing-brief';
 import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
@@ -54,7 +55,7 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 @Component({
   selector: 'app-dashboard',
-  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted],
+  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted, WaitingForReview],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
