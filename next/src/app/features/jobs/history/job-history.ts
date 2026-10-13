@@ -7,7 +7,6 @@ import { Subscription, auditTime, filter } from 'rxjs';
 
 import { Router, RouterLink } from '@angular/router';
 import { ReviewWaiting } from './review-waiting';
-import { RunsViews } from './runs-views';
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -68,7 +67,7 @@ interface JobQueue {
 @Component({
   selector: 'app-job-history',
   imports: [PageHeader, RefreshButton, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
-    ReviewWaiting, RunsViews],
+    ReviewWaiting],
   templateUrl: './job-history.html',
 })
 export class JobHistory {

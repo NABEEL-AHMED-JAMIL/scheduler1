@@ -1,13 +1,12 @@
 <div class="page">
   <!-- UX review B3 (E1): the By date view of the one Runs page; owner 2026-10-12: one date-range control in the header. -->
-  <app-page-header title="Runs" crumb="By date">
+  <app-page-header title="Runs">
     <p subtitle class="page-subtitle" data-test="runs-range">Every run from {{ rangeLabel() }}: waiting, running and finished.</p>
     <div class="flex items-center gap-2">
       <app-date-range [value]="range()" [storageKey]="rangeStore" [maxSpanDays]="366" label="Date range for runs" (rangeChange)="applyRange($event)" />
       <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
     </div>
   </app-page-header>
-  <app-runs-views active="date" />
   <app-managed-banner what="runs' status" still="You can still see every run and its logs." />
 
   @if (hasMore()) {
@@ -141,7 +140,7 @@
                  anyone else gets the same words without a link the page guard would bounce. -->
             <td class="mono text-[color:var(--text-muted)] whitespace-nowrap">
               @if (canOpenJobs()) {
-                <a class="link-inline" [routerLink]="['/pipelines/schedules', row.jobId, 'runs', row.jobQueueId, 'logs']"
+                <a class="link-inline" [routerLink]="['/pipelines/schedules', row.jobId, 'runs', row.jobQueueId]"
                    [title]="'Open the run log for #' + row.jobQueueId">#{{ row.jobQueueId }}</a>
               } @else { #{{ row.jobQueueId }} }
             </td>

@@ -9,7 +9,6 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { localIsoDay, localIsoDaysAgo } from '../../shared/ui/local-day';
 import { DateRange, DateRangePicker, presetRange, rangeKey, rangeText, restoreRange } from '../../shared/ui/date-range';
-import { RunsViews } from '../jobs/history/runs-views';
 import { instantOf } from '../../core/instant';
 import { formatDuration } from '../../shared/ui/time-format';
 import { AuthService } from '../../core/auth/auth.service';
@@ -67,7 +66,7 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner, DateRangePicker, RunsViews],
+  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner, DateRangePicker],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {

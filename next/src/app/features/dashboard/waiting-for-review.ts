@@ -27,7 +27,7 @@ import { TaskCountService } from '../workflows/task-count.service';
           <!-- Owner 2026-10-12: lead with what is waiting. An administrator's runs come first; what waits for them
                personally is the small line under it, never a "nothing" beside a count. -->
           @if (leadsWithRuns()) {
-            <a class="text-base font-semibold link-inline" routerLink="/pipelines/executions" data-test="waiting-runs">{{ runsLabel() }}</a>
+            <a class="text-base font-semibold link-inline" routerLink="/runs/latest" data-test="waiting-runs">{{ runsLabel() }}</a>
             @if (tasks() > 0) {
               <a class="text-xs link-inline" routerLink="/workflows/inbox" data-test="waiting-tasks">{{ tasksLabel() }} for you or your groups</a>
             } @else {

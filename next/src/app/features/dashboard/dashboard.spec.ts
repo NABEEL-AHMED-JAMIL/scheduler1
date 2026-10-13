@@ -104,7 +104,7 @@ describe('drilling into an hour from the breakdown', () => {
       row({ jobId: undefined as unknown as number, jobName: 'Nightly load', completed: 3 }),
       'Completed', 3);
 
-    expect(navigated[0]).toEqual(['/pipelines/executions']);
+    expect(navigated[0]).toEqual(['/runs/latest']);
     expect(JSON.stringify(navigated[0])).not.toContain('undefined');
   });
 

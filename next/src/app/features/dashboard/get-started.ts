@@ -23,13 +23,13 @@ export interface StartState {
 }
 
 const STEPS: Omit<StartStep, 'done'>[] = [
-  { key: 'storage', title: 'Connect your storage', link: '/integration/connectors/storage', linkLabel: 'Connections › Storage',
+  { key: 'storage', title: 'Connect your storage', link: '/connections/storage', linkLabel: 'Connections › Storage',
     why: 'Where pipelines read files from and keep what they write: an S3, Azure, MinIO or FTP connection of your own.' },
-  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/inbox', linkLabel: 'Inbox', optional: true,
+  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/file-drop', linkLabel: 'Inbox', optional: true,
     why: 'Files people upload land in your storage, each under a key a pipeline step can read. A schedule can also start when one arrives.' },
-  { key: 'topic', title: 'Add a topic', link: '/configuration/kafka', linkLabel: 'Kafka & Topics',
+  { key: 'topic', title: 'Add a topic', link: '/settings/kafka', linkLabel: 'Kafka & Topics',
     why: 'Every pipeline publishes on a topic. It goes through the platform’s Kafka connection unless you add your own.' },
-  { key: 'registry', title: 'Define its registry task', link: '/configuration/task-registry', linkLabel: 'Task Registry',
+  { key: 'registry', title: 'Define its registry task', link: '/settings/task-registry', linkLabel: 'Task Registry',
     why: 'New pipeline there: an id, a name and the topic. This is what a pipeline picks as its registry task.' },
   { key: 'pipeline', title: 'Create the pipeline and build its steps', link: '/pipelines/new', linkLabel: 'New pipeline',
     why: 'Pick the topic and the registry task, create it, then Build its steps: read a file, work on the rows, keep the result.' },

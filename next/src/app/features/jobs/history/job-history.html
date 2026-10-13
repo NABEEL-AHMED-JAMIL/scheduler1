@@ -21,7 +21,6 @@
 
   <!-- UX review B3 (E1): Latest and By date, the two views of the one Runs page. -->
   @if (!jobId() && !isDrillDown()) {
-    <app-runs-views active="latest" />
     <app-review-waiting />
   }
 
@@ -146,7 +145,7 @@
                         <span class="mono truncate min-w-0" [title]="a.fileName">{{ a.fileName }}</span>
                         @if (a.outcome === 'Started' && a.jobQueueId) {
                           <a class="link-inline shrink-0 whitespace-nowrap"
-                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId, 'logs']">run #{{ a.jobQueueId }}</a>
+                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId]">run #{{ a.jobQueueId }}</a>
                         } @else if (a.outcome === 'Waiting') {
                           <!-- MIG-360: not dropped -- its turn comes when the run in flight ends. -->
                           <span class="text-[color:var(--text-muted)] shrink-0 whitespace-nowrap" [title]="a.reason || ''"
@@ -184,7 +183,7 @@
                            [title]="'Document #' + a.extractionId + ', ' + approvalWord(a.approval)">Document #{{ a.extractionId }}</a>
                         @if (a.outcome === 'Started' && a.jobQueueId) {
                           <a class="link-inline shrink-0 whitespace-nowrap"
-                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId, 'logs']">run #{{ a.jobQueueId }}</a>
+                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId]">run #{{ a.jobQueueId }}</a>
                         } @else if (a.outcome === 'Waiting') {
                           <!-- Not dropped: its turn comes when the run in flight ends. -->
                           <span class="text-[color:var(--text-muted)] shrink-0 whitespace-nowrap" [title]="a.reason || ''"
@@ -466,7 +465,7 @@
                 @if (run.jobId) {
                   <a class="btn btn-ghost btn-icon btn-sm" data-test="run-logs" title="Open the run: its steps, outputs and logs"
                      [attr.aria-label]="'Open run #' + run.jobQueueId"
-                     [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" /></a>
+                     [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId]"><app-icon name="file" /></a>
                 }
               </div>
             </td>

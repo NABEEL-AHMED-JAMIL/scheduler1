@@ -34,7 +34,7 @@
         <app-stat-tile label="Active schedules" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok"
                        link="/pipelines/schedules" hint="Schedules that are turned on" />
         <app-stat-tile label="Running now" [value]="errors().running ? '—' : runningNow()" icon="play" tone="info"
-                       link="/pipelines/executions" hint="Runs in flight now" />
+                       link="/runs/latest" hint="Runs in flight now" />
         <app-stat-tile label="Last run completed" [value]="errors().running ? '—' : completed()" icon="checkCircle" tone="ok"
                        link="/pipelines/schedules" hint="Schedules whose latest run completed" />
         <app-stat-tile label="Last run failed" [value]="errors().running ? '—' : failed()" icon="xCircle" tone="crit"
