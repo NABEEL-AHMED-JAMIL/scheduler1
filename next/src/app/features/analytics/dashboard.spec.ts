@@ -6,7 +6,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { Router, provideRouter } from '@angular/router';
 import { Subject, of } from 'rxjs';
 import {
-  Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
+  Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters, figuresFirst } from './dashboard';
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { KIND_IDS } from './widget-kinds';
@@ -319,7 +319,23 @@ describe('what a board costs to open', () => {
     // reveals that it is a live query.
     expect(harness.board.cost()).toContain('2 widgets');
     expect(harness.board.cost()).toContain('three at a time');
-    expect(harness.board.cost()).toContain('nothing here is stored from last time');
+    expect(harness.board.cost()).toContain('the server answers at once what it already read for the same data');
+  });
+
+  it('runs the board\'s figures first, then the rest in display order (MIG-344)', () => {
+    const harness = boardWith({
+      widgets: [
+        widgetOn({ analyticsDashboardWidgetId: 100 }),
+        widgetOn({ analyticsDashboardWidgetId: 101, visualizationType: 'kpi' }),
+        widgetOn({ analyticsDashboardWidgetId: 102 }),
+        widgetOn({ analyticsDashboardWidgetId: 103, visualizationType: 'kpiTrend' }),
+        widgetOn({ analyticsDashboardWidgetId: 104 }),
+      ],
+    });
+    harness.board.openDashboard(BOARD);
+    expect([101, 103, 100].map(id => harness.runOf(id).state)).toEqual(['running', 'running', 'running']);
+    expect(harness.board.queue()).toEqual([102, 104]);
+    expect(figuresFirst([1, 2, 3], [widgetOn({ analyticsDashboardWidgetId: 3, visualizationType: 'kpi' })])).toEqual([3, 1, 2]);
   });
 
   it('counts an empty board as costing nothing', () => {

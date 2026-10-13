@@ -39,13 +39,13 @@ const WIDGETS: DashboardWidget[] = [
   { analyticsDashboardWidgetId: 101, analyticsDashboardId: 7, widgetTitle: 'Orders', analyticsQueryId: 22, visualizationType: 'table' },
 ];
 
-function harness(params: Record<string, string | string[]> = {}) {
+function harness(params: Record<string, string | string[]> = {}, widgets: DashboardWidget[] = WIDGETS) {
   const queries: Subject<any>[] = [];
   const query = vi.fn(() => { const s = new Subject<any>(); queries.push(s); return s.asObservable(); });
   const saveDashboard = vi.fn((d: Dashboard) => of(OK(d)));
   const api = {
     query, analyze: vi.fn(() => new Subject<any>().asObservable()), cancel: vi.fn(() => of(OK(undefined))),
-    fetchAllDashboards: () => of(OK([BOARD])), fetchDashboardById: () => of(OK({ ...BOARD, widgets: WIDGETS })),
+    fetchAllDashboards: () => of(OK([BOARD])), fetchDashboardById: () => of(OK({ ...BOARD, widgets })),
     fetchAllAnalyses: () => of(OK([])), fetchAllQueries: () => of(OK([BY_REGION, ROWS])), saveDashboard,
     saveWidget: vi.fn((w: DashboardWidget) => of(OK(w))), deleteWidget: vi.fn(), deleteDashboard: vi.fn(), schema: vi.fn(),
   };
@@ -82,6 +82,18 @@ describe('a board with a filter bar', () => {
       { key: 'region', columns: ['region'], family: 'text', values: ['North'] },
     ]);
     expect(h.board.pagedTable(WIDGETS[1])).toMatchObject({ connection: 'meridian-s3', sql: 'select * from dataset' });
+  });
+
+  it('a table loading its first page holds one of the board\'s three slots, and gives it back when it lands (MIG-344)', () => {
+    const tiles = (id: number): DashboardWidget => ({ analyticsDashboardWidgetId: id, analyticsDashboardId: 7, widgetTitle: `Tile ${id}`,
+      analyticsQueryId: 21, visualizationType: 'barH' });
+    const h = harness({}, [tiles(100), WIDGETS[1], tiles(102), tiles(103), tiles(104)]);
+    // The table is reading its first page: two tile queries, not three.
+    expect(h.query).toHaveBeenCalledTimes(2);
+    h.board.onTableRead(WIDGETS[1], { state: 'done' } as any);
+    expect(h.query).toHaveBeenCalledTimes(3);
+    h.settle([['North', '10']]);
+    expect(h.query).toHaveBeenCalledTimes(4);
   });
 
   it('a tile says it was filtered, and names a filter its data could not take', () => {

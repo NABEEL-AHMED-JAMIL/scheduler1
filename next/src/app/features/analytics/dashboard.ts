@@ -49,6 +49,16 @@ import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, a
  * analytics governor admits, so one board never holds them all.
  */
 const BOARD_PARALLEL = 3;
+/**
+ * The order a board's queue runs in (MIG-344): its figures first -- a KPI is one row, read in milliseconds, and what a
+ * reader looks at first -- then everything else in display order. Stable: tiles of one kind keep their order.
+ */
+export function figuresFirst(ids: number[], widgets: DashboardWidget[]): number[] {
+  const kinds = new Map(widgets.map(widget => [widget.analyticsDashboardWidgetId, widget.visualizationType]));
+  const figure = (id: number) => { const kind = kinds.get(id); return kind === 'kpi' || kind === 'kpiTrend'; };
+  return [...ids.filter(figure), ...ids.filter(id => !figure(id))];
+}
+
 /** The governor's "too busy right now" refusal, which a tile retries once rather than shows. */
 const BUSY = /Too many analytics queries are running/i;
 
@@ -76,13 +86,14 @@ export { DatasetRegistry } from './dataset-registry';
  * service written in a UI.
  *
  * So the tiles run AT MOST THREE AT ONCE (BOARD_PARALLEL; owner 2026-10-12: tiles load in parallel,
- * with skeletons), in display order, and the queue is visible while it drains. A board therefore
+ * with skeletons), the board's figures first and then in display order (figuresFirst, MIG-344), and the queue is
+ * visible while it drains. A table's first page counts against the three as well. A board therefore
  * holds at most three of the four permits no matter how many tiles are on it, and always leaves
  * one for somebody else; a tile the governor turns away for being busy retries once. The exchange
  * is stated on the board itself, and there are three ways out of the wait -- Stop abandons the rest
  * and cancels what is in flight, each tile re-runs on its own, and adding a tile runs only that
  * tile rather than the board again. A table widget pages itself (board/board-table.ts) and is not
- * queued at all. The filter bar (board/board-filters.ts) travels with every run; the server applies it.
+ * queued, but while its first page loads it holds one of the three slots (the queue always keeps one). The filter bar (board/board-filters.ts) travels with every run; the server applies it.
  *
  * Changing a tile's chart kind runs NOTHING. It draws the result already in hand a different
  * way, which is the whole reason a widget is a reference plus a visualization choice and not a
@@ -597,6 +608,8 @@ export class Dashboards implements OnInit, OnDestroy {
     const id = widget.analyticsDashboardWidgetId;
     if (id === undefined) return;
     this.tableReads.update(all => ({ ...all, [id]: read }));
+    // A table's first page shares the board's slots (next()): one landing frees one for the queue.
+    if (read.state !== 'running') this.next(this.epoch);
   }
 
   /** What the board's filters did to this tile: its "Filtered" marker and the filters that could not land. */
@@ -886,7 +899,7 @@ export class Dashboards implements OnInit, OnDestroy {
     const count = this.widgets().length;
     if (!count) return 'An empty board costs nothing to open.';
     return `${count} ${count === 1 ? 'widget' : 'widgets'}, and opening this board runs `
-      + `${count === 1 ? 'it' : 'each of them'} again — nothing here is stored from last time. `
+      + `${count === 1 ? 'it' : 'each of them'} again — the server answers at once what it already read for the same data. `
       + 'They run three at a time, in order, so this board never holds more than three of the '
       + 'server\'s four query permits however many widgets are on it.';
   });
@@ -1966,7 +1979,7 @@ export class Dashboards implements OnInit, OnDestroy {
     }
     if (!ids.length) return;
     this.epoch++;
-    this.queue.set(ids);
+    this.queue.set(figuresFirst(ids, this.widgets()));
     this.batch.set(ids.length);
     for (const id of ids) {
       this.mark(id, { state: 'queued', error: '', view: null, queryId: '' });
@@ -1984,7 +1997,11 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   private next(epoch: number): void {
     if (epoch !== this.epoch) return;
-    while (this.runningIds().length < BOARD_PARALLEL && this.queue().length) {
+    // MIG-344: a table's first page is a read like any tile's, so it counts against the three; the queue still always
+    // has one slot of its own, so a table that never reports cannot stop the board.
+    const tables = Object.values(this.tableReads()).filter(read => read.state === 'running').length;
+    const slots = BOARD_PARALLEL - Math.min(tables, BOARD_PARALLEL - 1);
+    while (this.runningIds().length < slots && this.queue().length) {
       const [id, ...rest] = this.queue();
       this.queue.set(rest);
       const widget = this.widgets().find(item => item.analyticsDashboardWidgetId === id);
