@@ -1,23 +1,23 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Kafka &amp; Topics</h1>
-      <p class="page-subtitle">
-        The brokers your pipelines publish through, live: are they up, do your topics exist, who reads them and how far
-        behind. Pick a connection on the left. Secrets are encrypted and never sent back to the browser.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Kafka &amp; Topics</h1>
+        <p class="page-subtitle">
+          The brokers your pipelines publish through, live: are they up, do your topics exist, who reads them and how far
+          behind. Pick a connection on the left. Secrets are encrypted and never sent back to the browser.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load(); loadHealth(true)" />
+        @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New connection
+        </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadHealth(true)" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (!locked()) {
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New connection
-      </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="Kafka connections and topics" still="You can still test them." />
 
   @if (!loading() && !error() && profiles().length && !defaultProfile()) {

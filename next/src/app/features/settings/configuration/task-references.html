@@ -1,18 +1,18 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">{{ copy().title }}</h1>
-      <p class="page-subtitle">{{ copy().subtitle }}</p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">{{ copy().title }}</h1>
+        <p class="page-subtitle">{{ copy().subtitle }}</p>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New {{ copy().singular }}
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2 ml-auto">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New {{ copy().singular }}
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <app-table-shell [heading]="copy().title" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
@@ -31,6 +31,12 @@
         <input class="input" placeholder="Search name, value or description" aria-label="Search entries"
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
+    </ng-container>
+    <!-- UX review 2026-10-12 (A8, G10): the empty list's next step is in the box. -->
+    <ng-container empty-action>
+      @if (!search().trim()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />Add one</button>
+      }
     </ng-container>
 
     <table class="table-modern">

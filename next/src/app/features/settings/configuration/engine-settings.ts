@@ -7,6 +7,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { instantOf } from '../../../core/instant';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { EngineSetting, fetchLimitError } from './configuration.models';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 const ENDPOINT = () => `${API_BASE}/setting.json/engineSettings`;
 
@@ -21,7 +23,7 @@ const EDITABLE_KEYS = new Set(['QUEUE_FETCH_LIMIT']);
  */
 @Component({
   selector: 'app-engine-settings',
-  imports: [TableShell, Icon, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe],
   templateUrl: './engine-settings.html',
 })
 export class EngineSettings implements OnInit {

@@ -25,6 +25,8 @@ import { TaskStatePill } from '../../tasks/steps/task-switch';
 import { Pipeline, PipelineDialog, PipelineField } from '../pipelines/pipeline-dialog';
 import { TaskPanel, TaskPanelData, TaskPanelResult } from './task-panel';
 import { REGISTRY_KINDS, RegistryRow, TASK_STATES, filterRows, kindCounts, registryRows } from './task-registry.model';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** The whole scope's pipeline numbers, from pipeline.json/list, whatever filter is on. */
 interface PipelineSummary { total: number; active: number; fields: number; topics: number; untopped: number; }
@@ -44,7 +46,7 @@ const EMPTY_SUMMARY: PipelineSummary = { total: 0, active: 0, fields: 0, topics:
  */
 @Component({
   selector: 'app-task-registry',
-  imports: [MineFilter, StatTile, TableShell, TaskStatePill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, StatTile, TableShell, TaskStatePill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
   templateUrl: './task-registry.html',
 })
 export class TaskRegistry implements OnInit {

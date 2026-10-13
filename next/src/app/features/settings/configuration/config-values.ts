@@ -12,6 +12,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { ConfigValueDialog, ConfigValueDialogData } from './config-value-dialog';
 import { PipelineConfig, TenantOption, configReference, workspaceLabel } from './configuration.models';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 const ENDPOINT = () => `${API_BASE}/setting.json/pipelineConfig`;
 
@@ -22,7 +24,7 @@ const ENDPOINT = () => `${API_BASE}/setting.json/pipelineConfig`;
  */
 @Component({
   selector: 'app-config-values',
-  imports: [TableShell, StatTile, Icon, Combobox, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, TableShell, StatTile, Icon, Combobox, ServerTimePipe],
   templateUrl: './config-values.html',
 })
 export class ConfigValues implements OnInit {

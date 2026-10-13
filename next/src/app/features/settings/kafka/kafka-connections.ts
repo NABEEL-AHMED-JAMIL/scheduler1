@@ -27,6 +27,8 @@ import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpParams } from '@angular/common/http';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { profileLabel } from './platform-default';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
 export interface TenantName {
@@ -149,7 +151,7 @@ export function healthTone(state: string | null | undefined): 'ok' | 'warn' | 'c
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './kafka-connections.html',
 })

@@ -1,24 +1,24 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Task Registry</h1>
-      <p class="page-subtitle">
-        Every task a pipeline's steps can run — what it reads and writes, its settings, how it retries and who may
-        add it — and every existing pipeline as a Legacy task, still edited in its own dialog: its topic, payload
-        fields and AI steps.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Task Registry</h1>
+        <p class="page-subtitle">
+          Every task a pipeline's steps can run — what it reads and writes, its settings, how it retries and who may
+          add it — and every existing pipeline as a Legacy task, still edited in its own dialog: its topic, payload
+          fields and AI steps.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <app-refresh-button [loading]="loading() || tasksLoading()" (refresh)="load()" />
+        @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New registry task
+        </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2 ml-auto">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || tasksLoading()">
-        <app-icon name="refresh" [class.spin]="loading() || tasksLoading()" />Refresh
-      </button>
-      @if (!locked()) {
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New registry task
-      </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="pipelines and tasks" />
 
   @if (isPlatformAdmin()) {
@@ -32,7 +32,7 @@
     </div>
   }
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' switched on', icon: 'layers', tone: 'info' },
       { label: 'Unavailable', value: taskTiles().unavailable, foot: taskTiles().unavailable ? 'the platform cannot run yet' : 'every task can run', icon: 'alert', tone: taskTiles().unavailable ? 'warn' : 'muted' },
