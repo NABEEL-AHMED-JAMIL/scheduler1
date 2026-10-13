@@ -452,7 +452,10 @@ export class JobHistory {
 
     // The list endpoint is the only place the job's name is available. Every name is kept, not
     // only this job's: an hour across every job lists runs of many jobs, and bare numbers there
-    // said nothing about which job each run belonged to.
+    // said nothing about which job each run belonged to. It is the Schedules page's list (page jobs): a reader holding
+    // Runs by date alone -- the Reviewer profile, on Runs › Latest -- was refused it on every open, a 403 in the console;
+    // their rows keep the schedule's number, as Runs › By date's do.
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('jobs')) return;
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
