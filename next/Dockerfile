@@ -26,8 +26,12 @@ RUN npx ng build --configuration production
 # not an SSR build, so a plain file server is the whole runtime. The `@angular/build:application`
 # builder writes to dist/next/browser/, not dist/next/ itself; copying the wrong one serves an
 # empty directory that 403s on every request, which is the single easiest mistake to make here.
+#
+# nginx 1.30, the current stable line (vulnerabilities review 2026-10-13, group B): 1.27 was a mainline branch and is
+# end of life, with no more fixes. nginx.conf needs nothing new for it (gzip, the SPA fallback, the cache headers and
+# the embed's auth_request are all in the official image's build).
 # ─────────────────────────────────────────────
-FROM nginx:1.27-alpine AS production
+FROM nginx:1.30-alpine AS production
 
 RUN rm -rf /usr/share/nginx/html/*
 COPY --from=builder /app/dist/next/browser /usr/share/nginx/html
