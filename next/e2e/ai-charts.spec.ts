@@ -45,8 +45,12 @@ async function direct(request: APIRequestContext, s: Session, connection: string
 }
 
 async function ask(page: Page, question: string): Promise<void> {
+  const before = await page.locator('[data-turn]').count();
   await page.locator('#ask-question').fill(question);
   await page.locator('[data-test="ask"]').click();
+  // The new turn first: the one before it is already answered, and would pass the wait below at once.
+  await expect(page.locator('[data-turn]')).toHaveCount(before + 1);
+  await expect(page.locator('[data-turn]').first().locator('h3')).toContainText(question);
   await expect(page.locator('[data-turn]').first()).toHaveAttribute('data-state', /answered|failed/, { timeout: ANSWER_MS });
   await expect(page.locator('[data-turn]').first()).toHaveAttribute('data-state', 'answered');
   await expect(page.locator('[data-turn]').first().locator('[data-test="chart-answer"]')).toBeVisible({ timeout: 30_000 });

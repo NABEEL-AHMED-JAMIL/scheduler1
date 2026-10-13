@@ -74,20 +74,51 @@ const NUMBER_TEXT = /^-?\d+(\.\d+)?([eE][-+]?\d+)?$/;
  * first, the date column is put first (a line runs along it, one per group); and rows ordered newest-first are put in
  * the date's own order, so a line does not run backwards. The query and its table keep the order they came in.
  */
-export function chartRows(columns: string[], rows: (string | null)[][]):
-    { columns: string[]; rows: (string | null)[][]; names: string[]; changed: boolean } {
+export function chartRows(columns: string[], rows: (string | null)[][], measure?: string | null):
+    { columns: string[]; rows: (string | null)[][]; names: string[]; changed: boolean; dated: boolean } {
   const filled = (i: number) => rows.map(r => r[i]).filter((v): v is string => v !== null && v !== undefined && v !== '');
   const isDate = (i: number) => { const v = filled(i); return v.length > 0 && v.every(x => DATE_TEXT.test(x)); };
   const isNumber = (i: number) => { const v = filled(i); return v.length > 0 && v.every(x => NUMBER_TEXT.test(x.trim())); };
   const nameAt = columns.map((_, i) => i).filter(i => !isNumber(i) || isDate(i));
+  // The one figure the chart is about, when it was named: the other figures stay in the table, not on the chart.
+  const kept = measure && columns.includes(measure)
+    ? columns.map((_, i) => i).filter(i => nameAt.includes(i) || columns[i] === measure) : columns.map((_, i) => i);
   const date = nameAt.find(isDate);
-  if (date === undefined) return { columns, rows, names: nameAt.map(i => columns[i]), changed: false };
-  const order = [date, ...columns.map((_, i) => i).filter(i => i !== date)];
+  if (date === undefined) {
+    const narrowed = kept.length !== columns.length;
+    return { columns: kept.map(i => columns[i]), rows: narrowed ? rows.map(r => kept.map(i => r[i] ?? null)) : rows,
+      names: nameAt.map(i => columns[i]), changed: narrowed, dated: false };
+  }
+  const order = [date, ...kept.filter(i => i !== date)];
   const moved = rows.map(r => order.map(i => r[i] ?? null));
   const sorted = moved.map((r, i) => ({ r, i })).sort((x, y) =>
     String(x.r[0] ?? '').localeCompare(String(y.r[0] ?? '')) || x.i - y.i).map(x => x.r);
-  const changed = date !== order[0] || order.some((at, i) => at !== i) || sorted.some((r, i) => r !== moved[i]);
-  return { columns: order.map(i => columns[i]), rows: sorted, names: [date, ...nameAt.filter(i => i !== date)].map(i => columns[i]), changed };
+  const changed = order.length !== columns.length || order.some((at, i) => at !== i) || sorted.some((r, i) => r !== moved[i]);
+  return { columns: order.map(i => columns[i]), rows: sorted, names: [date, ...nameAt.filter(i => i !== date)].map(i => columns[i]), changed, dated: true };
+}
+
+/** The kinds that draw two figures or more against each other: every figure stays on them. */
+const MANY_FIGURES: ReadonlySet<string> = new Set(['barLine', 'scatter', 'scatterTrend', 'bubble', 'effectScatter', 'parallel', 'radar',
+  'candlestick', 'table', 'pivot']);
+
+const squash = (text: string | null | undefined) => (text ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * The one figure a chart answer is about, when its rows carry several (a rate beside the counts behind it): the column
+ * the model named as its y axis, else one that reads as a rate or a share, else the last -- an aggregate lands at the end
+ * of a select list. Null when there is one figure, or the kind draws figures against each other.
+ */
+export function chartMeasure(answer: ChartAnswer): string | null {
+  if (MANY_FIGURES.has(answer.chart?.kind ?? '')) return null;
+  const numbers = answer.columns.filter((_, i) => {
+    const values = answer.rows.map(r => r[i]).filter((v): v is string => v !== null && v !== undefined && v !== '');
+    return values.length > 0 && values.every(v => NUMBER_TEXT.test(v.trim())) && !values.every(v => DATE_TEXT.test(v));
+  });
+  if (numbers.length < 2) return null;
+  const y = squash(answer.chart?.yAxis);
+  return numbers.find(c => y && squash(c) === y)
+    ?? numbers.find(c => /rate|pct|percent|share|ratio/i.test(c))
+    ?? numbers[numbers.length - 1];
 }
 
 /**
@@ -96,7 +127,7 @@ export function chartRows(columns: string[], rows: (string | null)[][]):
  * every group into one line or one bar per name, which is a different question).
  */
 export function answerView(answer: ChartAnswer): WidgetView {
-  const { columns, rows } = chartRows(answer.columns, answer.rows);
+  const { columns, rows } = chartRows(answer.columns, answer.rows, chartMeasure(answer));
   const view = queryView({ columns, rows, rowCount: answer.rowCount, truncated: answer.truncated }, answer.chart?.additive ?? null);
   const dims = view.chart?.dims ?? [];
   if (dims.length < 2) return view;
@@ -151,10 +182,11 @@ const quoteName = (name: string) => `"${name.replace(/"/g, '""')}"`;
  * The figures are the same query's; only the columns' order and the rows' order differ.
  */
 export function chartSql(answer: ChartAnswer): string {
-  const drawn = chartRows(answer.columns, answer.rows);
+  const drawn = chartRows(answer.columns, answer.rows, chartMeasure(answer));
   if (!drawn.changed) return answer.sql;
   const inner = answer.sql.trim().replace(/;\s*$/, '');
-  return `SELECT ${drawn.columns.map(quoteName).join(', ')}\nFROM (\n${inner}\n) AS answer\nORDER BY ${drawn.names.map(quoteName).join(', ')}`;
+  const select = `SELECT ${drawn.columns.map(quoteName).join(', ')}\nFROM (\n${inner}\n) AS answer`;
+  return drawn.dated ? `${select}\nORDER BY ${drawn.names.map(quoteName).join(', ')}` : select;
 }
 
 /** What analyticsWorkspace.json/pinChart takes (MIG-357). */

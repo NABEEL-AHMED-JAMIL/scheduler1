@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { KIND_IDS } from '../widget-kinds';
 import { widgetConfigOf } from '../widget-view';
 import {
-  ANSWER_KINDS, ChartAnswer, answerSettings, answerView, chartRows, chartSql, fitKind, pinRequest, suggestCharts, suggestionAnswer, tableAnswer,
+  ANSWER_KINDS, ChartAnswer, answerSettings, answerView, chartMeasure, chartRows, chartSql, fitKind, pinRequest, suggestCharts, suggestionAnswer, tableAnswer,
 } from './chart-answer';
 
 /**
@@ -103,7 +103,8 @@ describe('chart answer -- rows with two columns of names (revenue by category pe
     expect(columns).toEqual(['month', 'category', 'total_revenue']);
     expect(rows).toEqual([['2025-11-01', 'Sports', '279117.07'], ['2025-11-01', 'Books', '37047.28'],
       ['2025-12-01', 'Sports', '273031.99'], ['2025-12-01', 'Books', '35604.25']]);
-    expect(chartRows(['region', 'n'], [['North', '3']])).toEqual({ columns: ['region', 'n'], rows: [['North', '3']], names: ['region'], changed: false });
+    expect(chartRows(['region', 'n'], [['North', '3']])).toEqual({ columns: ['region', 'n'], rows: [['North', '3']], names: ['region'], changed: false,
+      dated: false });
   });
 
   it('pins the statement wrapped to return the rows the chart drew, the figures the same query\'s', () => {
@@ -118,6 +119,27 @@ describe('chart answer -- rows with two columns of names (revenue by category pe
     const fitted = fitKind(view, 'line');
     expect(fitted).toMatchObject({ kind: 'lineSmooth', fellBack: true });
     expect(fitted.reason).toContain('Shown as smooth line instead');
+  });
+});
+
+describe('chart answer -- several figures, one question (a rate beside its counts)', () => {
+  const rates = answer({
+    columns: ['age_band', 'total_encounters', 'readmitted_count', 'readmission_rate_pct'],
+    rows: [['[70-80)', '26068', '3069', '11.77'], ['[60-70)', '22483', '2502', '11.13'], ['[50-60)', '17256', '1668', '9.67']],
+  }, { kind: 'groupedBar', yAxis: 'Readmission rate (%)' });
+
+  it('charts the rate the question asked for, and keeps the counts in the table', () => {
+    expect(chartMeasure(rates)).toBe('readmission_rate_pct');
+    expect(chartMeasure({ ...rates, chart: { ...rates.chart!, yAxis: 'readmitted_count' } })).toBe('readmitted_count');
+    expect(chartMeasure({ ...rates, chart: { ...rates.chart!, kind: 'barLine' } })).toBeNull();
+    const view = answerView(rates);
+    expect(view.columns).toEqual(['age_band', 'readmission_rate_pct']);
+    expect(view.marks.map(m => m.value)).toEqual([11.77, 11.13, 9.67]);
+    expect(fitKind(view, 'groupedBar').kind).not.toBe('barLine');
+  });
+
+  it('pins the statement narrowed to the rate it charts', () => {
+    expect(chartSql(rates)).toBe(`SELECT "age_band", "readmission_rate_pct"\nFROM (\n${rates.sql}\n) AS answer`);
   });
 });
 
