@@ -354,7 +354,7 @@
       <div class="flex-1 min-h-0 overflow-y-auto p-3.5">
         @switch (tab()) {
           @case ('flow') {
-            <app-flow-panel class="block h-full" [flow]="flow()" [canCreate]="canCreatePipelines()" [question]="isQuestion()" />
+            <app-flow-panel class="block h-full" [flow]="flow()" [messageId]="flowMessageId()" [canCreate]="canCreatePipelines()" [question]="isQuestion()" />
           }
           @case ('chart') {
             <!-- MIG-357: the chart_data tool's answer, drawn with the dashboards' chart engine; loaded only when shown. -->

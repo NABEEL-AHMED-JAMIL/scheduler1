@@ -77,6 +77,12 @@ export class RankedBar {
   readonly clickable = input(false);
   /** Formats the rolled-up "Other" row so it matches the rows it summarises. */
   readonly formatValue = input<((value: number) => string) | null>(null);
+  /**
+   * One measure ranked across its categories (an analytics chart): every bar one colour -- the length says the value, and a
+   * rainbow would say the bars were different things (AI hard-workflow test, 2026-10-13). Off for a breakdown whose rows
+   * are kinds of things (files by type, jobs on a queue), each its own colour.
+   */
+  readonly single = input(false);
   readonly picked = output<RankedItem>();
 
   /* Built from the palette rather than hand-listed, so a colour added to styles.css is drawn
@@ -132,7 +138,7 @@ export class RankedBar {
       title: capTitle(row.name),
       percent: Math.round((row.value / total) * 100),
       width: Math.max(2, (row.value / largest) * 100),
-      color: row.color ?? this.palette[index % this.palette.length],
+      color: row.color ?? this.palette[this.single() ? 0 : index % this.palette.length],
     }));
   });
 }

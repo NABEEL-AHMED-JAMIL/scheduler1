@@ -1154,7 +1154,8 @@ components:
       enum: [queued, running, completed, failed, skipped, interrupted]
     ReviewStatus:
       type: string
-      enum: [not_required, pending, approved, rejected]
+      description: "not_applicable: the pipeline asks for a review, but the run ended without results (failed, skipped, interrupted or missed) -- nothing waits for a reviewer."
+      enum: [not_required, pending, approved, rejected, not_applicable]
     Pipeline:
       type: object
       required: [id, name]

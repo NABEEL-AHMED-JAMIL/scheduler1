@@ -212,7 +212,8 @@ export class JobLogs implements OnInit, OnDestroy {
   /** The run's Approval steps: the request it waits at, the reader's task about it, the groups' names. */
   readonly approvals = inject(RunApprovalStore);
   /** The Next steps box is drawn (the run waits for an approval, or its results need a review): the strip shares the row with it. */
-  readonly hasNext = computed(() => !!this.approvals.waiting() || (!!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED'));
+  readonly hasNext = computed(() => !!this.approvals.waiting() || (!!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED'
+    && this.review()!.reviewStatus !== 'NOT_APPLICABLE'));
   /** The page's clock: a running run's Duration and the Next steps' "7 h ago" move with it. */
   readonly now = signal(Date.now());
   /** UX review 2026-10-12 (run page fix): the header's one status -- "Completed · waiting for review". */

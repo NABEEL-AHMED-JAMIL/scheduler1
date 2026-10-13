@@ -40,7 +40,7 @@ export type DecisionRoute =
   host: { class: 'contents' },
   template: `
     @if (review(); as r) {
-      @if (r.reviewStatus !== 'NOT_REQUIRED') {
+      @if (r.reviewStatus !== 'NOT_REQUIRED' && r.reviewStatus !== 'NOT_APPLICABLE') {
         <section class="card p-4 flex flex-col gap-3 h-full run-next" data-test="next-steps" aria-labelledby="next-steps-heading">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="next-steps-heading" class="text-sm font-semibold mr-auto">{{ r.reviewStatus === 'PENDING' ? 'Next steps' : 'Review' }}</h2>

@@ -11,7 +11,7 @@ import { SchemaForm } from '../../tasks/steps/schema-form';
 import { StepsApi } from '../../tasks/steps/steps.service';
 import { BucketChoice, JsonSchema, PromptChoice, StepTaskEntry } from '../../tasks/steps/steps.model';
 import { CreatePipeline, CreatePipelineData, CreatedPipeline } from './create-pipeline';
-import { FlowDefinition, PipelineFlowArtifact, flowVerdict, graphOf, withStepConfig } from './flow.model';
+import { CreatedFlow, FlowDefinition, PipelineFlowArtifact, flowVerdict, graphOf, withStepConfig } from './flow.model';
 import { RunFollow } from './run-follow';
 
 /**
@@ -37,7 +37,8 @@ import { RunFollow } from './run-follow';
           <h3 class="font-semibold truncate min-w-0" [title]="f.name">{{ f.name }}</h3>
           <span class="pill" [class]="'pill pill-' + verdict().tone" data-verdict>{{ verdict().label }}</span>
           <span class="pill pill-neutral">{{ f.definition.steps.length }} steps</span>
-          <span class="pill" [class]="created() ? 'pill pill-ok' : 'pill pill-neutral'">{{ created() ? 'Created' : 'Not saved' }}</span>
+          <span class="pill" [class]="created() && !needsUpdate() ? 'pill pill-ok' : 'pill pill-neutral'" data-saved-state>{{ created() ? (needsUpdate()
+            ? 'Changed since created' : 'Created') : 'Not saved' }}</span>
           <span class="flex-1"></span>
           <div class="seg" role="group" aria-label="Layout">
             <button type="button" class="seg-btn" [class.seg-on]="direction() === 'TB'" [attr.aria-pressed]="direction() === 'TB'" (click)="direction.set('TB')"
@@ -47,7 +48,10 @@ import { RunFollow } from './run-follow';
           </div>
           <button type="button" class="btn btn-ghost btn-sm" (click)="copy()" title="Copy Core's definition as JSON"><app-icon name="copy" />JSON</button>
           @if (canCreate() && !created()) {
-            <button type="button" class="btn btn-primary btn-sm" data-create (click)="create()"><app-icon name="save" />Create pipeline</button>
+            <button type="button" class="btn btn-primary btn-sm" data-create [disabled]="opening()" (click)="create()"><app-icon name="save" />Create pipeline</button>
+          }
+          @if (canCreate() && needsUpdate()) {
+            <button type="button" class="btn btn-primary btn-sm" data-update [disabled]="opening()" (click)="create()"><app-icon name="save" />Update pipeline</button>
           }
           @if (builderTask(); as taskId) {
             <a class="btn btn-default btn-sm" [routerLink]="['/pipelines', taskId, 'edit']" [queryParams]="{ tab: 'steps' }"><app-icon name="external" />Open in step builder</a>
@@ -65,18 +69,31 @@ import { RunFollow } from './run-follow';
         @if (created(); as c) {
           <div class="rounded-lg border border-subtle px-3 py-2.5 flex flex-col gap-2" data-created>
             <p class="text-sm flex flex-wrap items-center gap-2">
-              <app-icon name="checkCircle" class="icon-ok" />Created <span class="font-medium">{{ c.jobName }}</span>
-              <span class="pill pill-neutral mono">{{ c.pipelineId }}</span><span class="text-xs text-[color:var(--text-muted)]">schedule {{ c.jobId }}</span>
+              <app-icon name="checkCircle" class="icon-ok" />Created as <span class="font-medium">{{ c.jobName }}</span>
+              @if (c.pipelineId) { <span class="pill pill-neutral mono">{{ c.pipelineId }}</span> }
+              @if (c.version) { <span class="text-xs text-[color:var(--text-muted)]">version {{ c.version }}</span> }
+              @if (c.jobId) { <span class="text-xs text-[color:var(--text-muted)]">schedule {{ c.jobId }}</span> }
             </p>
+            @if (needsUpdate()) {
+              <p class="text-xs text-[color:var(--warn-text)]" data-needs-update>The flow changed after it was created: press Update pipeline to save the
+                change as a new version. Create pipeline is not offered again, so it is never made twice.</p>
+            }
             @if (runId() != null) {
               <app-run-follow [jobId]="c.jobId" [jobQueueId]="runId()" [jobName]="c.jobName" initialStatus="Queue" />
-            } @else {
+            } @else if (c.jobId) {
               <div class="flex flex-wrap gap-2">
                 <button type="button" class="btn btn-primary btn-sm" [disabled]="starting()" (click)="runNow()"><app-icon name="play" [busy]="starting()" />Run now</button>
                 <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', c.jobId, 'edit']"><app-icon name="clock" />Schedule</a>
               </div>
             }
           </div>
+        }
+        @if (f.notes?.length) {
+          <ul class="text-xs flex flex-col gap-1 list-none m-0 p-0 text-[color:var(--text-secondary)]" aria-label="Notes on the flow" data-flow-notes>
+            @for (note of f.notes; track $index) {
+              <li class="flex items-start gap-1.5"><app-icon name="info" size="0.9em" class="mt-0.5 shrink-0" />{{ note }}</li>
+            }
+          </ul>
         }
         @if (node(); as n) {
           <section class="fp-inspector rounded-lg border border-subtle px-3 py-2.5 flex flex-col gap-2 overflow-y-auto" aria-label="Selected step" data-inspector>
@@ -90,7 +107,7 @@ import { RunFollow } from './run-follow';
             @if (n.problems?.length) {
               <ul class="text-xs flex flex-col gap-1 list-none m-0 p-0">
                 @for (p of n.problems; track $index) {
-                  <li class="flex items-start gap-1.5" [class]="p.kind === 'error' ? 'text-crit-500' : 'text-[color:var(--warn-text)]'">
+                  <li class="flex items-start gap-1.5" [class]="p.kind === 'error' ? 'text-crit-500' : 'text-[color:var(--warn-text)]'" [attr.data-problem]="p.kind">
                     <app-icon [name]="p.kind === 'error' ? 'alert' : 'info'" size="0.9em" class="mt-0.5 shrink-0" />{{ p.message }}
                   </li>
                 }
@@ -108,6 +125,10 @@ import { RunFollow } from './run-follow';
             @for (p of stepsWithProblems(); track p.id) {
               <button type="button" class="flex items-center gap-1 hover:underline" [class]="p.error ? 'text-crit-500' : 'text-[color:var(--warn-text)]'"
                       (click)="selected.set(p.id)"><app-icon [name]="p.error ? 'alert' : 'info'" size="0.9em" />{{ p.label }}</button>
+            }
+            @for (w of flowWarnings(); track $index) {
+              <span class="basis-full flex items-start gap-1.5 text-[color:var(--warn-text)]" data-flow-warning><app-icon name="alert" size="0.9em"
+                class="mt-0.5 shrink-0" />{{ w }}</span>
             }
             <span>Select a step to see what it does and fill its settings; ask in the chat to change the flow.</span>
           </div>
@@ -138,6 +159,8 @@ export class FlowPanel {
   private readonly toast = inject(ToastService);
 
   readonly flow = input<PipelineFlowArtifact | null>(null);
+  /** The flow's message: recorded as the one created. */
+  readonly messageId = input<number | null>(null);
   readonly canCreate = input(false);
   /** The open conversation has answers but no flow: a question, which the empty state says plainly. */
   readonly question = input(false);
@@ -163,7 +186,26 @@ export class FlowPanel {
 
   /** Settings the person filled, by step key; kept across a redraw for the steps the edit kept. */
   private readonly filled = signal<Record<string, Record<string, unknown>>>({});
-  readonly created = signal<CreatedPipeline | null>(null);
+  /**
+   * The pipeline made from this conversation's flow: the flow's own record (ai-service keeps it, so a reload still knows),
+   * or the one just created here, kept while the same flow is shown.
+   */
+  readonly created = linkedSignal<PipelineFlowArtifact | null, CreatedPipeline | null>({
+    source: this.flow,
+    computation: (f, previous) => {
+      if (f?.created?.pipelineKey) return fromRecord(f.created, f.name);
+      return previous?.value && previous.source?.name === f?.name ? previous.value : null;
+    },
+  });
+  /** The flow saved from this panel (created, or updated): it needs no Update. */
+  private readonly savedHere = signal<PipelineFlowArtifact | null>(null);
+  /** A flow edited after its pipeline was created: Update pipeline saves it as the next version. */
+  readonly needsUpdate = computed(() => {
+    const f = this.flow();
+    return !!f && !!f.created?.pipelineKey && !f.saved && this.savedHere() !== f;
+  });
+  /** The Create or Update dialog is open: a second press opens nothing. */
+  readonly opening = signal(false);
   readonly runId = signal<number | null>(null);
   readonly starting = signal(false);
 
@@ -184,6 +226,8 @@ export class FlowPanel {
   /** The steps the person must look at, as one-click links under the canvas. */
   readonly stepsWithProblems = computed(() => (this.flow()?.flow.nodes ?? []).filter(n => n.problems?.length)
     .map(n => ({ id: n.id, label: n.label, error: n.problems!.some(p => p.kind === 'error') })));
+  /** The flow's warnings in its own words: what it does that it does not read as (all rows in one; two reviews). */
+  readonly flowWarnings = computed(() => (this.flow()?.problems ?? []).filter(p => p.kind === 'warning').map(p => p.message));
   readonly builderTask = computed(() => this.created()?.taskDetailId ?? this.flow()?.taskDetailId ?? null);
 
   /** The definition Create saves: the design's, with what the person filled. */
@@ -209,7 +253,7 @@ export class FlowPanel {
 
   private loadChoices(): void {
     const name = this.flow()?.name ?? '';
-    if (this.created() && name !== this.flowName) { this.created.set(null); this.runId.set(null); }
+    if (name !== this.flowName) this.runId.set(null);
     this.flowName = name;
     if (this.loaded) return;
     this.loaded = true;
@@ -243,15 +287,21 @@ export class FlowPanel {
     if (d && await copyText(JSON.stringify(d, null, 2))) this.toast.success('Definition copied.');
   }
 
+  /** Create pipeline -- or, for a flow whose pipeline exists, Update pipeline: one dialog at a time, never a second pipeline. */
   create(): void {
     const f = this.flow();
     const definition = this.definition();
-    if (!f || !definition) return;
-    const data: CreatePipelineData = { flow: f, definition };
+    if (!f || !definition || this.opening()) return;
+    const update = this.created() ? (f.created ?? toRecord(this.created()!)) : null;
+    if (this.created() && !this.needsUpdate()) return;
+    this.opening.set(true);
+    const data: CreatePipelineData = { flow: f, definition, messageId: this.messageId(), update };
     this.dialog.open<CreatedPipeline | null>(CreatePipeline, { data, disableClose: true }).closed.subscribe(created => {
+      this.opening.set(false);
       if (created) {
         this.created.set(created);
-        this.toast.success(`${created.jobName} created.`);
+        this.savedHere.set(f);
+        this.toast.success(update ? `${created.jobName} updated${created.version ? ' to version ' + created.version : ''}.` : `${created.jobName} created.`);
       }
     });
   }
@@ -274,4 +324,14 @@ export class FlowPanel {
       this.starting.set(false);
     }
   }
+}
+
+/** The flow's record of its pipeline, as the run card reads it. */
+function fromRecord(c: CreatedFlow, flowName: string): CreatedPipeline {
+  return { pipelineId: c.pipelineId ?? '', pipelineKey: c.pipelineKey, taskDetailId: c.taskDetailId ?? 0, jobId: c.jobId ?? 0,
+    jobName: c.name || flowName, version: c.version ?? null };
+}
+
+function toRecord(c: CreatedPipeline): CreatedFlow {
+  return { pipelineKey: c.pipelineKey, pipelineId: c.pipelineId, taskDetailId: c.taskDetailId, jobId: c.jobId, name: c.jobName, version: c.version };
 }

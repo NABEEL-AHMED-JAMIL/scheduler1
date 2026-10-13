@@ -54,8 +54,12 @@ export function runStatusLook(runStatus: string | null | undefined, reviewStatus
   if (!runStatus) return null;
   const look = RUN_LOOK[runStatus.toLowerCase()] ?? { word: runStatus, tone: 'neutral' as Tone, icon: '' };
   if (waitingForApproval) return { label: `${look.word} · waiting for approval`, tone: 'warn', icon: 'clock' };
+  // AI hard-workflow test (2026-10-13): only a completed run's results wait for a review -- never "Failed · waiting for
+  // review" (Core answers NOT_APPLICABLE for a run that ended without results; an older Core said PENDING).
+  const completed = runStatus.toLowerCase() === 'completed';
   switch (reviewStatus) {
-    case 'PENDING': return { label: `${look.word} · waiting for review`, tone: 'warn', icon: 'clock' };
+    case 'PENDING': return completed ? { label: `${look.word} · waiting for review`, tone: 'warn', icon: 'clock' }
+      : { label: look.word, tone: look.tone, icon: look.icon };
     case 'APPROVED': return { label: `${look.word} · approved`, tone: 'ok', icon: 'checkCircle' };
     case 'REJECTED': return { label: `${look.word} · rejected`, tone: 'crit', icon: 'xCircle' };
     default: return { label: look.word, tone: look.tone, icon: look.icon };

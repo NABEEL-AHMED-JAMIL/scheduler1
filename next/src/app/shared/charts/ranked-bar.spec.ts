@@ -96,4 +96,22 @@ describe('ranked bar cursor', () => {
     expect(inert.classList).not.toContain('cursor-pointer');
     expect(rendered(false).some(button => button.classList.contains('cursor-pointer'))).toBe(false);
   });
+
+});
+
+describe('ranked bar colours', () => {
+  function rows(inputs: Record<string, unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(RankedBar);
+    for (const [name, value] of Object.entries(inputs)) fixture.componentRef.setInput(name, value);
+    fixture.detectChanges();
+    return fixture.componentInstance.rows();
+  }
+
+  it('draws one measure ranked across its categories in one colour, not a rainbow', () => {
+    const data = [{ name: '[20-30)', value: 14.2 }, { name: '[80-90)', value: 12.1 }, { name: '[70-80)', value: 11.8 }];
+    expect(new Set(rows({ data, single: true, max: 10 }).map(r => r.color)).size).toBe(1);
+    expect(new Set(rows({ data, max: 10 }).map(r => r.color)).size).toBe(3);
+  });
 });

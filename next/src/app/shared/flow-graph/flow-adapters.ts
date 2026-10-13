@@ -312,10 +312,12 @@ export function aiFlowGraph(artifact: AiFlowLike, tasks?: readonly PipelineTaskL
     const problems = n.problems ?? [];
     const errors = problems.filter(p => p.kind === 'error').length;
     const settings = problems.filter(p => p.kind === 'setting').length;
-    const tone: FlowTone | null = errors ? 'crit' : settings ? 'warn' : null;
+    const warnings = problems.filter(p => p.kind === 'warning').length;
+    const tone: FlowTone | null = errors ? 'crit' : settings || warnings ? 'warn' : null;
     const badges: string[] = [];
     if (errors) badges.push(errors === 1 ? '1 error' : `${errors} errors`);
     if (settings) badges.push(settings === 1 ? 'needs 1 setting' : `needs ${settings} settings`);
+    if (warnings) badges.push(warnings === 1 ? '1 warning' : `${warnings} warnings`);
     const kind = (KINDS as string[]).includes(n.kind) ? n.kind as FlowNodeKind : 'other';
     return { id: n.id, label: n.label, sub: n.task ?? n.sub ?? null, kind, icon: n.task ? TASK_ICONS[n.task] ?? null : null, tone, badges };
   });

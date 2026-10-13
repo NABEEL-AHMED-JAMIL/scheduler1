@@ -6,13 +6,20 @@ import { firstValueFrom } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { SERVER_ZONE } from '../../../core/instant';
 import { Icon } from '../../../shared/ui/icon';
-import { FlowDefinition, FlowTrigger, PipelineFlowArtifact, pipelineIdOf } from './flow.model';
+import { CreatedFlow, FlowDefinition, FlowTrigger, PipelineFlowArtifact, pipelineIdOf, triggerWhen } from './flow.model';
 import { ConversationApi } from './conversation.api';
 
 export interface CreatePipelineData {
   flow: PipelineFlowArtifact;
   /** The definition with the settings the person filled in the flow panel. */
   definition: FlowDefinition;
+  /** The flow's message in the conversation: the one recorded as created (none: the newest flow). */
+  messageId?: number | null;
+  /**
+   * The pipeline this conversation already created: the dialog saves the changed steps as its next version (Core's own
+   * pipeline.json/steps/save) and creates nothing new.
+   */
+  update?: CreatedFlow | null;
 }
 
 /** What was created: everything the run card and "Open in step builder" need. */
@@ -22,6 +29,8 @@ export interface CreatedPipeline {
   taskDetailId: number;
   jobId: number;
   jobName: string;
+  /** The steps' version Core saved. */
+  version?: number | null;
 }
 
 export interface Topic { sourceTaskTypeId: number; serviceName: string; status?: string; }
@@ -66,10 +75,15 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
   template: `
     <div class="cp-dialog card shadow-xl flex flex-col" role="dialog" aria-labelledby="create-pipeline-title">
       <header class="px-5 pt-4 pb-3 border-b border-subtle">
-        <h2 id="create-pipeline-title" class="font-semibold text-base">Create pipeline</h2>
-        <p class="text-xs text-[color:var(--text-muted)] mt-0.5">Saved in this workspace as you. Nothing runs until you press Run now.</p>
+        <h2 id="create-pipeline-title" class="font-semibold text-base">{{ data.update ? 'Update pipeline' : 'Create pipeline' }}</h2>
+        <p class="text-xs text-[color:var(--text-muted)] mt-0.5" data-runs-when>{{ subtitle() }}</p>
       </header>
       <div class="px-5 py-4 overflow-y-auto flex flex-col gap-3 min-h-0">
+      @if (data.update; as u) {
+        <p class="text-sm">Saves the changed steps of <span class="font-medium">{{ u.name || u.pipelineId }}</span>
+          @if (u.pipelineId) { <span class="pill pill-neutral mono">{{ u.pipelineId }}</span> } as a new version. Its schedule and runs stay as
+          they are; change when it runs under Schedules.</p>
+      } @else {
         <label class="flex flex-col gap-1 text-sm">
           <span class="font-medium">Name</span>
           <input class="input" maxlength="120" [value]="name()" [disabled]="busy() || !!created()" (input)="setName($any($event.target).value)" />
@@ -92,12 +106,23 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
         <div class="text-sm flex flex-col gap-1">
           <span class="font-medium">Starts</span>
           <span class="text-[color:var(--text-secondary)]">{{ triggerText() }}</span>
+          @if (data.flow.trigger.type === 'schedule') {
+            <label class="flex items-center gap-2 text-sm mt-1">
+              <input type="checkbox" [checked]="withoutSchedule()" [disabled]="busy() || !!created()" (change)="withoutSchedule.set($any($event.target).checked)"
+                     data-without-schedule />
+              Create without schedule: it runs only when you press Run now
+            </label>
+          }
         </div>
-        @if (data.flow.problems.length) {
+      }
+        @if (blocking().length) {
           <p class="text-xs rounded-md px-2.5 py-2 bg-warn-500/5 text-[color:var(--warn-text)]" role="note">
-            The flow still has {{ data.flow.problems.length }} problem{{ data.flow.problems.length === 1 ? '' : 's' }}; Core checks the steps again
+            The flow still has {{ blocking().length }} problem{{ blocking().length === 1 ? '' : 's' }}; Core checks the steps again
             and refuses them if they are wrong. Fill the settings in the flow panel first.
           </p>
+        }
+        @for (w of warnings(); track $index) {
+          <p class="text-xs rounded-md px-2.5 py-2 bg-warn-500/5 text-[color:var(--warn-text)]" role="note" data-create-warning>{{ w }}</p>
         }
         @if (steps().length) {
           <ol class="list-none m-0 p-0 flex flex-col gap-1.5" aria-label="What is being created" data-create-steps>
@@ -119,9 +144,15 @@ export function jobPayload(name: string, taskDetailId: number, trigger: FlowTrig
           <button type="button" class="btn btn-primary btn-sm" (click)="ref.close(c)"><app-icon name="check" />Done</button>
         } @else {
           <button type="button" class="btn btn-default btn-sm" [disabled]="busy()" (click)="ref.close(null)">Cancel</button>
-          <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !canCreate()" (click)="create()">
-            <app-icon name="save" [busy]="busy()" />Create pipeline
-          </button>
+          @if (data.update) {
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="busy()" (click)="update()">
+              <app-icon name="save" [busy]="busy()" />Update pipeline
+            </button>
+          } @else {
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !canCreate()" (click)="create()">
+              <app-icon name="save" [busy]="busy()" />Create pipeline
+            </button>
+          }
         }
       </footer>
     </div>
@@ -142,10 +173,20 @@ export class CreatePipeline implements OnInit {
   readonly busy = signal(false);
   readonly created = signal<CreatedPipeline | null>(null);
   readonly steps = signal<{ label: string; state: StepState; note?: string }[]>([]);
+  /** A scheduled flow created as on demand only: no timetable on its schedule. */
+  readonly withoutSchedule = signal(false);
+  private readonly today = new Intl.DateTimeFormat('en-CA', { timeZone: SERVER_ZONE }).format(new Date());
+  /** The trigger Core is asked for: the flow's, or manual when the person creates it without its schedule. */
+  readonly trigger = computed<FlowTrigger>(() => (this.withoutSchedule() ? { type: 'manual' } : this.data.flow.trigger));
+  /** What will really happen once it is created -- a schedule runs on its own, from today. */
+  readonly subtitle = computed(() => this.data.update ? 'Saved in this workspace as you, as the pipeline\'s next version.'
+    : `Saved in this workspace as you. ${triggerWhen(this.trigger(), this.today)}`);
+  readonly blocking = computed(() => this.data.flow.problems.filter(p => p.kind !== 'warning'));
+  readonly warnings = computed(() => this.data.flow.problems.filter(p => p.kind === 'warning').map(p => p.message));
 
   readonly canCreate = computed(() => !!this.name().trim() && /^[A-Z][A-Z0-9_]{1,39}$/.test(this.pipelineId()) && this.topicId() != null);
   readonly triggerText = computed(() => {
-    const t = this.data.flow.trigger;
+    const t = this.trigger();
     if (t.type === 'schedule') return `On a schedule: every ${t.every ?? 'day'}${t.at ? ' at ' + t.at : ''} (America/Chicago).`;
     if (t.type === 'inbox') return 'When a file lands in the pipeline\'s inbox (an inbox trigger on its schedule).';
     return 'On demand: Run now, or the API.';
@@ -169,10 +210,38 @@ export class CreatePipeline implements OnInit {
     if (this.pipelineId() === before) this.pipelineId.set(pipelineIdOf(value));
   }
 
-  async create(): Promise<void> {
-    if (!this.canCreate() || this.busy()) return;
+  /**
+   * Update pipeline: the changed steps saved as the next version of the pipeline this conversation created, through Core's
+   * own save (which checks them once more) -- never a second pipeline.
+   */
+  async update(): Promise<void> {
+    const u = this.data.update;
+    if (!u || this.busy() || this.created()) return;
     this.busy.set(true);
-    const trigger = this.data.flow.trigger;
+    this.steps.set([{ label: 'Steps', state: 'todo' }]);
+    try {
+      let version: number | null = null;
+      await this.step('Steps', async () => {
+        const r = await this.post('/pipeline.json/steps/save', { pipelineKey: u.pipelineKey, format: 'json', text: JSON.stringify(this.data.definition) });
+        version = (r.data as { version?: number } | undefined)?.version ?? null;
+        return r.message || `${this.data.definition.steps.length} steps saved.`;
+      });
+      const updated: CreatedPipeline = { pipelineId: u.pipelineId ?? '', pipelineKey: u.pipelineKey, taskDetailId: u.taskDetailId ?? 0,
+        jobId: u.jobId ?? 0, jobName: u.name || this.data.flow.name, version };
+      this.created.set(updated);
+      this.report(updated);
+    } catch {
+      // The step says why; the pipeline stays at its earlier version.
+    } finally {
+      this.busy.set(false);
+    }
+  }
+
+  async create(): Promise<void> {
+    // Once: a second press (or a second dialog) never makes a second pipeline.
+    if (!this.canCreate() || this.busy() || this.created() || this.data.update) return;
+    this.busy.set(true);
+    const trigger = this.trigger();
     const labels = CREATE_STEPS.filter(l => l !== 'Trigger' || trigger.type === 'inbox');
     this.steps.set(labels.map(label => ({ label, state: 'todo' as StepState })));
     const name = this.name().trim();
@@ -187,9 +256,11 @@ export class CreatePipeline implements OnInit {
       });
       const pipelineKey = await this.pipelineKeyOf(pid);
       // 2. Its steps: Core checks the definition once more and refuses it with its problems.
+      let version: number | null = null;
       await this.step('Steps', async () => {
         const r = await this.post('/pipeline.json/steps/save', { pipelineKey, format: 'json', text: JSON.stringify(this.data.definition) });
-        return `${this.data.definition.steps.length} steps saved${(r.data as { version?: number } | undefined)?.version ? ' as version ' + (r.data as { version: number }).version : ''}.`;
+        version = (r.data as { version?: number } | undefined)?.version ?? null;
+        return `${this.data.definition.steps.length} steps saved${version ? ' as version ' + version : ''}.`;
       });
       // 3. A pipeline task on it: what a schedule runs.
       let taskDetailId = 0;
@@ -201,9 +272,8 @@ export class CreatePipeline implements OnInit {
       });
       // 4. The schedule (a job): Auto on the flow's timetable, otherwise Manual.
       let jobId = 0;
-      const today = new Intl.DateTimeFormat('en-CA', { timeZone: SERVER_ZONE }).format(new Date());
       await this.step('Schedule', async () => {
-        const r = await this.post('/sourceJob.json/addSourceJob', jobPayload(name, taskDetailId, trigger, today));
+        const r = await this.post('/sourceJob.json/addSourceJob', jobPayload(name, taskDetailId, trigger, this.today));
         jobId = Number(/jobId (\d+)/.exec(r.message ?? '')?.[1] ?? NaN);
         if (!Number.isFinite(jobId)) throw new Error('The schedule was saved but its id did not come back; find it under Schedules.');
         return `Schedule ${jobId}, ${trigger.type === 'schedule' ? 'on its timetable' : 'run on demand'}.`;
@@ -215,7 +285,7 @@ export class CreatePipeline implements OnInit {
           return 'A file in the inbox starts a run.';
         });
       }
-      this.created.set({ pipelineId: pid, pipelineKey, taskDetailId, jobId, jobName: name });
+      this.created.set({ pipelineId: pid, pipelineKey, taskDetailId, jobId, jobName: name, version });
       this.report(this.created()!);
     } catch {
       // The failing step says why; whatever was created before it stays (and is named there).
@@ -231,8 +301,9 @@ export class CreatePipeline implements OnInit {
   private report(c: CreatedPipeline): void {
     const id = Number(this.router?.parseUrl(this.router.url).queryParams['c']);
     if (!Number.isInteger(id) || id <= 0) return;
-    this.conversations.pipelineCreated(id, { pipelineKey: c.pipelineKey, pipelineId: c.pipelineId, taskDetailId: c.taskDetailId, jobId: c.jobId,
-      name: c.jobName }).subscribe({ error: () => undefined });
+    this.conversations.pipelineCreated(id, { pipelineKey: c.pipelineKey, pipelineId: c.pipelineId || undefined,
+      taskDetailId: c.taskDetailId || undefined, jobId: c.jobId || undefined, name: c.jobName, version: c.version ?? null,
+      messageId: this.data.messageId ?? null }).subscribe({ error: () => undefined });
   }
 
   private async step(label: string, work: () => Promise<string>): Promise<void> {
