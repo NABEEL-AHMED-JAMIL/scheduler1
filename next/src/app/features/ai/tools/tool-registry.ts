@@ -31,6 +31,14 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
   selector: 'app-tool-registry',
   imports: [RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox, ManagedBanner],
   templateUrl: './tool-registry.html',
+  styles: `
+    .tool-group th { background: var(--surface-sunken); text-align: left; padding: 0.4rem 1rem; text-transform: none; letter-spacing: 0;
+      border-bottom: 1px solid var(--border-subtle); }
+    .tool-group-title { font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
+    .tool-group-count { margin-left: 0.375rem; font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+    .tool-group-sub { margin-left: 0.75rem; font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+    .tool-group:hover { background: none; }
+  `,
 })
 export class ToolRegistry implements OnInit {
   private readonly api = inject(AssistantApi);
@@ -59,6 +67,14 @@ export class ToolRegistry implements OnInit {
       (!this.kindFilter() || t.kind === this.kindFilter())
       && (!this.stateFilter() || toolState(t).label === this.stateFilter())
       && (!q || `${t.name} ${t.title} ${t.description ?? ''}`.toLowerCase().includes(q)));
+  });
+  /** UX final TL1: the shown tools by kind, Reads first, each group only when it has a tool. */
+  readonly groups = computed(() => {
+    const list = this.filtered();
+    return [
+      { kind: 'read', label: 'Reads', sub: 'Look things up; never change anything.', tools: list.filter(t => t.kind !== 'write') },
+      { kind: 'write', label: 'Writes', sub: 'Run, save or delete something in the workspace.', tools: list.filter(t => t.kind === 'write') },
+    ].filter(g => g.tools.length);
   });
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.kindFilter() || !!this.stateFilter());
 

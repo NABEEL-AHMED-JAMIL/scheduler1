@@ -305,12 +305,12 @@ export const PINNED: Record<string, unknown> = {
       "/settings"
     ],
     "rows": [
-      "get_sourcesData sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
-      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Workspace administratorReads | — | Enabled | Never",
-      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Workspace memberReads | — | Enabled | 29 Sep, 06:57",
-      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Workspace memberWrites | Asks first | Enabled | 29 Sep, 06:58",
-      "delete_fileDelete a file | Storage | bucket, key → result | Workspace memberWrites | Asks first | Enabled | Never",
-      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Workspace memberReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
+      "Data sourcesget_sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
+      "Call a saved API requestcall_api | API collections | requestId, environmentId?, variables? → dataset ref | Workspace administratorReads | — | Enabled | Never",
+      "Pipeline jobsget_jobs | Pipelines | search?, limit? → list | Workspace memberReads | — | Enabled | 29 Sep, 06:57",
+      "Join datasetsjoin_data | Pipeline engine | datasetRef, config? → list | Workspace memberReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never",
+      "Run a pipeline jobrun_pipeline | Pipelines | jobId → result | Workspace memberWrites | Asks first | Enabled | 29 Sep, 06:58",
+      "Delete a filedelete_file | Storage | bucket, key → result | Workspace memberWrites | Asks first | Enabled | Never"
     ]
   },
   "the tool registry, as a workspace administrator": {
@@ -363,12 +363,12 @@ export const PINNED: Record<string, unknown> = {
       "/settings/values"
     ],
     "rows": [
-      "get_sourcesData sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
-      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Workspace administratorReads | — | Enabled | Never",
-      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Workspace memberReads | — | Enabled | 29 Sep, 06:57",
-      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Workspace memberWrites | Asks first | Enabled | 29 Sep, 06:58",
-      "delete_fileDelete a file | Storage | bucket, key → result | Workspace memberWrites | Asks first | Enabled | Never",
-      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Workspace memberReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
+      "Data sourcesget_sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
+      "Call a saved API requestcall_api | API collections | requestId, environmentId?, variables? → dataset ref | Workspace administratorReads | — | Enabled | Never",
+      "Pipeline jobsget_jobs | Pipelines | search?, limit? → list | Workspace memberReads | — | Enabled | 29 Sep, 06:57",
+      "Join datasetsjoin_data | Pipeline engine | datasetRef, config? → list | Workspace memberReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never",
+      "Run a pipeline jobrun_pipeline | Pipelines | jobId → result | Workspace memberWrites | Asks first | Enabled | 29 Sep, 06:58",
+      "Delete a filedelete_file | Storage | bucket, key → result | Workspace memberWrites | Asks first | Enabled | Never"
     ]
   }
 };

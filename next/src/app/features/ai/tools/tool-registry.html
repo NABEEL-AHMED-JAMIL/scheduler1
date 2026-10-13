@@ -73,13 +73,23 @@
         </tr>
       </thead>
       <tbody>
-        @for (t of filtered(); track t.name) {
+        <!-- UX final TL1: grouped by what a tool does -- Reads, then Writes (the registry's own kind) -- each row led by
+             the tool's name in words, its machine name small and mono beneath. -->
+        @for (g of groups(); track g.kind) {
+          <tr class="tool-group" [attr.data-group]="g.kind">
+            <th scope="colgroup" colspan="7">
+              <span class="tool-group-title">{{ g.label }}</span>
+              <span class="tool-group-count">{{ g.tools.length }}</span>
+              <span class="tool-group-sub">{{ g.sub }}</span>
+            </th>
+          </tr>
+        @for (t of g.tools; track t.name) {
           @let s = state(t);
           @let flow = io(t);
           <tr [attr.data-row]="t.name" [attr.data-state]="s.label">
             <td class="max-w-72">
-              <div class="mono font-medium truncate" [title]="t.name">{{ t.name }}</div>
-              <div class="text-xs text-[color:var(--text-muted)] line-clamp-2" [title]="tip(t.description)">{{ t.title }}</div>
+              <div class="font-medium line-clamp-2" [title]="tip(t.description)" data-test="tool-title">{{ t.title }}</div>
+              <div class="mono text-[11px] text-[color:var(--text-muted)] truncate" [title]="t.name" data-test="tool-name">{{ t.name }}</div>
             </td>
             <td class="hidden xl:table-cell whitespace-nowrap">{{ service(t) }}</td>
             <td class="hidden xl:table-cell max-w-64 text-xs break-words"><span class="mono">{{ flow.input }}</span> → {{ flow.output }}</td>
@@ -107,13 +117,17 @@
                 }
               </div>
               @if (s.reason) {
-                <p class="text-xs mt-1 line-clamp-2" [class]="s.tone === 'crit' ? 'text-crit-500' : 'text-[color:var(--text-muted)]'" [title]="tip(s.reason)">{{ s.reason }}</p>
+                <!-- UX final TL1: why, in full and muted (it is an explanation, not an alarm: the pill says Blocked). -->
+                <p class="text-xs mt-1 text-[color:var(--text-muted)] flex items-start gap-1 [overflow-wrap:anywhere]" data-test="tool-reason">
+                  <app-icon [name]="s.label === 'Blocked' ? 'lock' : 'info'" size="0.9em" class="shrink-0 mt-px" /><span>{{ s.reason }}</span>
+                </p>
               }
             </td>
             <td class="text-xs whitespace-nowrap">
               @if (t.lastUsedAt; as at) { {{ at | serverTime: 'recent' }} } @else { <span class="text-[color:var(--text-muted)]">Never</span> }
             </td>
           </tr>
+        }
         }
       </tbody>
     </table>

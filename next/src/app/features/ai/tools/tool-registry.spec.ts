@@ -188,4 +188,37 @@ describe('Tool Registry', () => {
     box.dispatchEvent(new Event('change'));
     expect(api.setEnabled).toHaveBeenCalledWith('get_jobs', false, 2924);
   });
+
+  // UX final TL1: the name in words leads, the machine name under it; Reads and Writes are grouped; a blocked tool's
+  // reason is whole and muted, not cut in red.
+  it('leads each row with the tool\'s name in words, its machine name small beneath', () => {
+    const { row } = render();
+    const first = row('run_pipeline').querySelector('td')!;
+    const [title, name] = [first.querySelector('[data-test="tool-title"]')!, first.querySelector('[data-test="tool-name"]')!];
+    expect(title.textContent!.trim()).toBe('Run a pipeline job');
+    expect(name.textContent!.trim()).toBe('run_pipeline');
+    expect(name.classList).toContain('mono');
+    expect(title.compareDocumentPosition(name) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('groups the rows Reads, then Writes, with a count, and follows the kind filter', () => {
+    const { el, screen, fixture } = render();
+    const order = Array.from(el.querySelectorAll('tbody tr')).map(tr => tr.getAttribute('data-group') ?? tr.getAttribute('data-row'));
+    expect(order).toEqual(['read', 'get_jobs', 'call_api', 'join_data', 'get_reports', 'read_s3', 'write', 'run_pipeline']);
+    const head = el.querySelector('tr[data-group="read"]')!;
+    expect(head.querySelector('.tool-group-title')!.textContent).toBe('Reads');
+    expect(head.querySelector('.tool-group-count')!.textContent).toBe('5');
+    screen.kindFilter.set('write');
+    fixture.detectChanges();
+    expect(Array.from(el.querySelectorAll('tbody tr[data-group]')).map(tr => tr.getAttribute('data-group'))).toEqual(['write']);
+  });
+
+  it('says why a tool is blocked in full, muted, with an icon', () => {
+    const { row } = render();
+    const reason = row('join_data').querySelector('[data-test="tool-reason"]')!;
+    expect(reason.textContent!.trim()).toBe('No user-facing endpoint.');
+    expect(reason.className).not.toContain('line-clamp');
+    expect(reason.className).not.toContain('text-crit');
+    expect(reason.querySelector('app-icon')).not.toBeNull();
+  });
 });
