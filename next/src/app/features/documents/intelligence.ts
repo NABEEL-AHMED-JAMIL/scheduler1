@@ -34,7 +34,13 @@ const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset', 'intake'];
 /** A type's glyph on its card, from what it is for. */
 const TYPE_ICONS: Record<string, string> = {
   invoice: 'file', purchase_order: 'briefcase', contract: 'edit', id_document: 'user', application_form: 'list',
+  // The kinds a healthcare workspace adds most (UX review B4, DI2): matched by key, so any workspace's type of that kind gets them.
+  lab_report: 'chart', referral: 'mail', referral_letter: 'mail', claim: 'shield', claim_form: 'shield',
+  discharge_summary: 'list', prescription: 'edit', consent_form: 'checkCircle',
 };
+
+/** Document types a healthcare workspace typically reads, named in the empty states (generic examples, no workspace's data). */
+export const EXAMPLE_DOCUMENT_TYPES = 'a lab report, a referral letter, a claim form or a discharge summary';
 
 /** How the recent documents can be narrowed by state: what the row shows. */
 const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Failed', 'Unclassified', 'Queued', 'Running', 'Read'];
@@ -67,6 +73,7 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
 })
 export class DocumentIntelligence implements OnInit {
   private readonly api = inject(DocumentsApi);
+  readonly exampleTypes = EXAMPLE_DOCUMENT_TYPES;
   private readonly auth = inject(AuthService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

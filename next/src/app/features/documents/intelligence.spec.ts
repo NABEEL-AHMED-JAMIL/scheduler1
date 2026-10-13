@@ -113,13 +113,39 @@ describe('DocumentIntelligence -- overview', () => {
     expect(cards.textContent).toContain('Custom type');
   });
 
+  /** UX review B4 (DI1): four header buttons became the standard header -- Refresh, the ⋮ overflow, the one primary. */
   it('offers no type change to anyone but an administrator', async () => {
     const { fixture, el } = screenWith({ admin: false });
     await fixture.whenStable();
     expect(el.textContent).not.toContain('Custom type');
-    expect(el.textContent).not.toContain('New document type');
-    expect(el.textContent).toContain('Read a stored file');
+    (el.querySelector('[data-test="intelligence-more"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(document.body.textContent).not.toContain('New document type');
+    expect(document.body.textContent).toContain('Read a stored file');
     expect(el.textContent).toContain('Upload documents');
+  });
+
+  it('keeps the header to Refresh, the overflow and one primary', async () => {
+    const { fixture, el } = screenWith();
+    await fixture.whenStable();
+    const actions = el.querySelector('.page-head-actions')!;
+    const buttons = [...actions.querySelectorAll(':scope > button, :scope > app-refresh-button')];
+    expect(buttons).toHaveLength(3);
+    expect(actions.querySelectorAll('.btn-primary')).toHaveLength(1);
+    expect(actions.querySelector('.btn-primary')!.textContent).toContain('Upload documents');
+    expect(actions.querySelector('[data-overflow]')).not.toBeNull();
+    (el.querySelector('[data-test="intelligence-more"]') as HTMLButtonElement).click();
+    await fixture.whenStable();
+    expect(document.body.textContent).toContain('New document type');
+  });
+
+  it('names healthcare documents in its empty states, as examples', async () => {
+    const { fixture, el, screen } = screenWith();
+    await fixture.whenStable();
+    screen.extractions.set([]);
+    screen.reads.set([]);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="recent"]')!.textContent).toContain('a lab report, a referral letter, a claim form or a discharge summary');
   });
 
   it('lists every extraction, linked to its review, then the reads not yet extracted', async () => {

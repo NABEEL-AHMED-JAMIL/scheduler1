@@ -202,6 +202,20 @@ describe('Inbox -- settings', () => {
     expect(api.settings).toHaveBeenCalledTimes(1);
   });
 
+  /** UX review B4 (IN1): the header's "Inbox settings" repeated the Settings card; the card's own Change is the one place. */
+  it('changes the settings from the Settings card, not a second header button', async () => {
+    const { opened } = screenWith({ closeWith: false });
+    const fixture = TestBed.createComponent(Inbox);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.page-head-actions')!.textContent).not.toContain('settings');
+    const change = el.querySelector('[data-test="inbox-settings"]') as HTMLButtonElement;
+    expect(change.closest('section')!.textContent).toContain('Storage connection');
+    change.click();
+    expect(opened[0].component).toBe(InboxSettingsDialog);
+  });
+
   it('offers no change to a member', () => {
     const { dialog, screen } = screenWith({ admin: false });
     expect(screen.canManage()).toBe(false);

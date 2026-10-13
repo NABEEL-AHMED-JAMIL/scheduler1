@@ -80,11 +80,11 @@ export class Inbox implements OnInit {
   readonly configured = computed(() => !!this.settings()?.configured);
   readonly capText = computed(() => { const s = this.settings(); return s ? capSentence(s) : ''; });
   readonly notConfiguredText = computed(() => this.canManage()
-    ? 'The inbox is not set up. Choose which of the workspace\'s storage connections takes the files, and members can then upload here; '
-      + 'a job with an inbox trigger starts when a matching file arrives.'
+    ? 'The file drop is not set up. Choose which of the workspace\'s storage connections takes the files, and members can then upload here; '
+      + 'a schedule set to start when a file arrives starts when a matching one does.'
     : this.auth.builderLocked()
-      ? 'The inbox is not set up for this workspace. Our team sets it up: contact your account team.'
-      : 'The inbox is not set up for this workspace. Ask a workspace admin to choose the storage connection it uses.');
+      ? 'The file drop is not set up for this workspace. Our team sets it up: contact your account team.'
+      : 'The file drop is not set up for this workspace. Ask a workspace admin to choose the storage connection it uses.');
   readonly finished = computed(() => this.queue().filter(q => q.state === 'done' || q.state === 'refused').length);
   readonly kinds = ACCEPTED_KINDS;
   readonly formatSize = formatSize;

@@ -78,18 +78,18 @@ type Mode = 'view' | 'edit' | 'copy' | 'new' | 'version';
           <section class="flex flex-col gap-3" aria-label="Details">
             <div class="form-grid">
               <app-field label="Name" for="typeName" [required]="editing()">
-                <input id="typeName" class="input" [value]="name()" [readOnly]="!editing()" (input)="name.set($any($event.target).value)" />
+                <input id="typeName" class="input" [value]="name()" [readOnly]="!editing()" [attr.placeholder]="mode() === 'new' ? 'e.g. Lab report' : null" (input)="name.set($any($event.target).value)" />
               </app-field>
               <app-field label="Key" for="typeKey" [hint]="mode() === 'new' ? 'lower_snake_case; it cannot change later.' : ''">
-                <input id="typeKey" class="input mono" [value]="typeKey()" [readOnly]="mode() !== 'new'" (input)="typeKey.set($any($event.target).value)" />
+                <input id="typeKey" class="input mono" [value]="typeKey()" [readOnly]="mode() !== 'new'" [attr.placeholder]="mode() === 'new' ? 'lab_report' : null" (input)="typeKey.set($any($event.target).value)" />
               </app-field>
             </div>
             <app-field label="What it is" for="typeDescription" hint="A sentence the model reads when it decides what a document is.">
-              <textarea id="typeDescription" class="input min-h-16" rows="2" [value]="def().description ?? ''" [readOnly]="!editing()" (input)="patch({ description: $any($event.target).value })"></textarea>
+              <textarea id="typeDescription" class="input min-h-16" rows="2" [value]="def().description ?? ''" [readOnly]="!editing()" [attr.placeholder]="mode() === 'new' ? 'e.g. A laboratory report: the patient, the ordering clinician, and one row per test with its result and reference range.' : null" (input)="patch({ description: $any($event.target).value })"></textarea>
             </app-field>
             <div class="form-grid">
               <app-field label="Words on the page" for="typeKeywords" hint="Comma-separated hints for classification.">
-                <input id="typeKeywords" class="input" [value]="keywords()" [readOnly]="!editing()" (change)="patch({ keywords: split($any($event.target).value) })" />
+                <input id="typeKeywords" class="input" [value]="keywords()" [readOnly]="!editing()" [attr.placeholder]="mode() === 'new' ? 'e.g. specimen, reference range, result' : null" (change)="patch({ keywords: split($any($event.target).value) })" />
               </app-field>
               <app-field label="Auto-approve at" for="typeThreshold" hint="A document whose every value is at least this sure, with no problem, is approved on its own. Empty: never.">
                 <div class="flex items-center gap-1.5">

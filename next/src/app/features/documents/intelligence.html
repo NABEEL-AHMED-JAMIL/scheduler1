@@ -1,22 +1,20 @@
 <div class="page">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">{{ tab() === 'types' ? 'Document types' : 'Documents in' }}</h1>
-        <p class="page-subtitle">
-          Upload documents, mail them to the workspace's email-in address, or read one from a storage connection; each one is
-          read, split into fields against its document type and checked. Values it is not sure of go to the review queue.
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
+  <!-- UX review B4 (DI1): the standard header -- Refresh, the overflow (a new type, a stored file) and the one primary. -->
+  <app-page-header [title]="tab() === 'types' ? 'Document types' : 'Documents in'"
+                   subtitle="Upload, mail in or read stored documents; each is split into fields against its document type, and values it is unsure of go to Document review.">
+    <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
+    <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow data-test="intelligence-more" [cdkMenuTriggerFor]="headerMenu" aria-label="More actions">
+      <app-icon name="dots" size="1.05em" />
+    </button>
+    <ng-template #headerMenu>
+      <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
         @if (canManage()) {
-          <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
+          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openType(null)"><app-icon name="plus" />New document type</button>
         }
-        <button type="button" class="btn btn-default btn-sm" (click)="readDocument()"><app-icon name="folder" />Read a stored file</button>
-        <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="readDocument()"><app-icon name="folder" />Read a stored file</button>
       </div>
-    </div>
+    </ng-template>
+    <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
   </app-page-header>
   <app-managed-banner what="document types" />
 
@@ -29,7 +27,7 @@
   @switch (tab()) {
     @case ('types') {
       <app-table-shell data-test="types" heading="Document types" columnsKey="document-types" [loading]="!types().length && !typesError()" [error]="typesError()"
-                       [isEmpty]="!types().length" [shown]="types().length" emptyMessage="No document types." emptyIcon="file" (retry)="loadTypes()">
+                       [isEmpty]="!types().length" [shown]="types().length" [emptyMessage]="'No document types yet. Add one for each kind of document you receive: ' + exampleTypes + '.'" emptyIcon="file" (retry)="loadTypes()">
         <table class="table-modern">
           <thead>
             <tr>
@@ -211,7 +209,7 @@
 
       <app-table-shell data-test="recent" heading="Recent documents" columnsKey="document-recent" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="recent().length"
-                       [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : 'No documents yet. Upload one: a PDF or an image.'"
+                       [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : 'No documents yet. Upload one as a PDF or an image: ' + exampleTypes + '.'"
                        emptyIcon="file" (retry)="load()">
         <ng-container toolbar>
           <select class="input max-w-40" aria-label="Document type" [value]="typeFilter()" (change)="typeFilter.set($any($event.target).value)">
