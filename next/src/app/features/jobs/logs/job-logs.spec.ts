@@ -26,13 +26,15 @@ const LOGS = {
 };
 const STEPS = [{ promptName: 'CSV analyst', run: { runId: 9, status: 'ok', promptVersion: 1, stepTag: 'analysis', output: '**Files** look like sales.\n\n* one\n* two', latencyMs: 9900, tokensIn: 10, tokensOut: 2 } }];
 
-function page() {
+/** UX review 2026-10-12 (R1): the page opens on Steps; the entries are the Log tab's, the AI answers their own tab's. */
+function page(tab: 'steps' | 'ai' | 'outputs' | 'log' = 'log') {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
     { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
   const fixture = TestBed.createComponent(JobLogs);
   fixture.componentRef.setInput('jobId', '2808');
   fixture.componentRef.setInput('jobQueueId', '6839');
+  fixture.componentInstance.tab.set(tab);
   fixture.detectChanges();
   const http = TestBed.inject(HttpTestingController);
   http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).flush({ status: API_SUCCESS, data: LOGS });
@@ -65,7 +67,7 @@ describe('JobLogs', () => {
   });
 
   it('renders an AI step\'s answer as formatted text, with the chip in sentence case', () => {
-    const { el } = page();
+    const { el } = page('ai');
     const step = el.querySelector('.ai-step-output')!;
     expect(step.querySelector('strong')?.textContent).toBe('Files');
     expect(step.textContent).not.toContain('**');
@@ -169,6 +171,7 @@ describe('JobLogs for a run that does not exist', () => {
     const fixture = TestBed.createComponent(JobLogs);
     fixture.componentRef.setInput('jobId', '2808');
     fixture.componentRef.setInput('jobQueueId', '6839');
+    fixture.componentInstance.tab.set('log');
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
     http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog'))
@@ -198,7 +201,7 @@ describe('JobLogs for a run that does not exist', () => {
  */
 describe('JobLogs on the console clock', () => {
   it('writes the run and the AI step with the shared duration format', () => {
-    const { el, component } = page();
+    const { el, component } = page('ai');
     expect(component.duration()).toBe('2m 8s');
     expect(el.textContent).toContain('9.9s');
     expect(el.textContent).not.toContain('9.9 s');
@@ -235,7 +238,7 @@ describe('JobLogs with the run\'s steps', () => {
     steps: [{ stepExecutionId: null, index: 0, key: 'legacy', task: 'legacy', status: 'Completed', datasets: [], log: 'run' }] };
 
   function withSteps(timeline: unknown) {
-    const { fixture, el } = page();
+    const { fixture, el } = page('steps');
     const http = TestBed.inject(HttpTestingController);
     const asks = http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions'));
     // One question for the steps, even though the run's first read landed while it was out.
@@ -243,21 +246,38 @@ describe('JobLogs with the run\'s steps', () => {
     expect(asks[0].request.params.get('jobQueueId')).toBe('6839');
     asks[0].flush({ status: API_SUCCESS, data: timeline });
     fixture.detectChanges();
-    return { el };
+    return { el, fixture };
   }
 
-  it('shows an engine run\'s steps above its entries', () => {
-    const { el } = withSteps(ENGINE);
+  it('shows an engine run\'s steps on the Steps tab, and its entries on the Log tab', () => {
+    const { el, fixture } = withSteps(ENGINE);
     const steps = el.querySelector('.exec-steps')!;
     expect(steps).not.toBeNull();
     expect(steps.querySelectorAll('.exec-step').length).toBe(1);
-    expect(steps.compareDocumentPosition(el.querySelector('app-table-shell')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(el.querySelector('app-table-shell')).toBeNull();
+    (el.querySelector('[data-tab="log"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelector('app-table-shell')).not.toBeNull();
+    expect(el.querySelector('.exec-steps')).toBeNull();
   });
 
   it('adds nothing to a legacy run\'s page', () => {
-    const { el } = withSteps(LEGACY);
+    const { el, fixture } = withSteps(LEGACY);
     expect(el.querySelector('.exec-steps')).toBeNull();
+    (el.querySelector('[data-tab="log"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
     expect(el.querySelectorAll('.log-timeline li').length).toBe(3);
+  });
+
+  it('opens on Steps, with the AI answers, outputs and log a tab each, and the summary above them', () => {
+    const { el } = withSteps(ENGINE);
+    expect(Array.from(el.querySelectorAll('[data-test="run-tabs"] [role="tab"]')).map(t => t.getAttribute('data-tab')))
+      .toEqual(['steps', 'ai', 'outputs', 'log']);
+    expect(el.querySelector('[data-tab="steps"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(el.querySelector('[data-tab="ai"]')?.textContent).toContain('AI answers (1)');
+    const summary = el.querySelector('[data-test="run-summary"]')!;
+    expect(summary.textContent).toContain('2m 8s');
+    expect(summary.compareDocumentPosition(el.querySelector('[data-test="run-tabs"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -308,6 +328,7 @@ describe('JobLogs at scale', () => {
     const fixture = TestBed.createComponent(JobLogs);
     fixture.componentRef.setInput('jobId', '2808');
     fixture.componentRef.setInput('jobQueueId', '6839');
+    fixture.componentInstance.tab.set('log');
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
     const auditLogs = Array.from({ length: lines }, (_, i) => ({

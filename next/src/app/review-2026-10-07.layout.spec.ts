@@ -27,10 +27,13 @@ describe('console review 2026-10-07: layout', () => {
     expect(tagWith(await read('src/app/features/catalog/catalog.html'), 'heading="Assets"')).not.toContain('scrollRows');
   });
 
-  it('bounds a run\'s AI steps in a scroll box, so forty answers do not push the steps and the log off the page', async () => {
-    const tag = tagWith(await read('src/app/features/jobs/logs/job-logs.html'), 'data-test="ai-steps"');
-    expect(tag).toContain('max-h-[32rem]');
-    expect(tag).toContain('overflow-y-auto');
+  it('keeps a run\'s AI answers out of the way: a tab of their own, under the summary and the review (UX review 2026-10-12, R1)', async () => {
+    const html = await read('src/app/features/jobs/logs/job-logs.html');
+    // Forty answers used to push the steps and the log off the page; now they wait on their own tab, collapsed.
+    expect(html.indexOf('<app-run-decision')).toBeGreaterThan(0);
+    expect(html.indexOf('<app-run-decision')).toBeLessThan(html.indexOf('data-test="run-tabs"'));
+    expect(html.indexOf("@case ('ai')")).toBeLessThan(html.indexOf('<app-run-ai-answers'));
+    expect(html).not.toContain('data-test="ai-steps"');
   });
 
   it('keeps the Kafka topics table wide enough to show a topic\'s name on a tablet', async () => {

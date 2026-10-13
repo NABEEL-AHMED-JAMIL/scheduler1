@@ -2,7 +2,7 @@ import { toneClass } from '../../../shared/ui/tone';
 import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { NgTemplateOutlet } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StickToBottom } from '../../../shared/ui/stick-to-bottom';
@@ -14,13 +14,21 @@ import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { formatDuration } from '../../../shared/ui/time-format';
-import { Markdown } from '../../../shared/ui/markdown';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { LogSegment, logSegments, pathParts } from './log-segments';
 import { RunSteps } from '../run-steps/run-steps';
+import { RunDecision } from '../run-steps/run-decision';
+import { RunAiAnswers } from './run-ai-answers';
+import { AuthService } from '../../../core/auth/auth.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { Crumb } from '../../../core/nav/nav-tree';
+
+/** The run page's tabs (UX review 2026-10-12, R1). */
+export type RunTab = 'steps' | 'ai' | 'outputs' | 'log';
+export function runTabOf(value: string | null): RunTab {
+  return value === 'ai' || value === 'outputs' || value === 'log' ? value : 'steps';
+}
 
 interface AuditLog {
   jobAuditLogId?: number;
@@ -35,8 +43,15 @@ const RENDER_STEP = 2000;
 
 @Component({
   selector: 'app-job-logs',
-  imports: [PageHeader, RefreshButton, StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented, RunSteps],
+  imports: [PageHeader, RefreshButton, StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Segmented, RunSteps,
+    RunDecision, RunAiAnswers],
   templateUrl: './job-logs.html',
+  styles: `
+    .run-facts dt { font-size: 11px; color: var(--text-muted); margin-bottom: 0.125rem; }
+    .run-facts dd { font-size: 0.8125rem; color: var(--text-primary); min-width: 0; }
+    .run-related a { color: var(--text-secondary); }
+    .run-related a:hover { color: var(--text-primary); }
+  `,
 })
 export class JobLogs implements OnInit, OnDestroy {
   /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
@@ -73,12 +88,53 @@ export class JobLogs implements OnInit, OnDestroy {
     const name = this.job()?.jobName;
     return `Run #${this.jobQueueId()}` + (name ? ` · ${name}` : '');
   });
-  /** Run & review › Schedules & triggers › <the schedule's runs> › Run #8214. */
-  readonly trail = computed<Crumb[]>(() => [
+  private readonly auth = inject(AuthService);
+  private readonly router = inject(Router);
+  private readonly activated = inject(ActivatedRoute);
+  /** A reviewer holds the Queue, not Schedules: the schedule's pages are not theirs to open (UX review 2026-10-12, R2). */
+  readonly canOpenSchedule = computed(() => this.auth.canOpen('jobs'));
+  /**
+   * Run & review › Schedules & triggers › <the schedule's runs> › Run #8214; for a reviewer, Run & review › Review inbox ›
+   * Run #8214 -- the way they came.
+   */
+  readonly trail = computed<Crumb[]>(() => this.canOpenSchedule() ? [
     { label: 'Run & review' },
     { label: 'Schedules & triggers', link: '/pipelines/schedules' },
     { label: this.job()?.jobName ? `${this.job().jobName} · runs` : 'Schedule runs', link: `/pipelines/schedules/${this.jobId()}/executions` },
+  ] : [
+    { label: 'Run & review' },
+    ...(this.auth.canOpen('task-inbox') ? [{ label: 'Review inbox', link: '/workflows/inbox' }] : []),
   ]);
+
+  /**
+   * UX review 2026-10-12 (R3): the run's way forward and back -- its pipeline, the dashboards its results feed, and what it
+   * cost -- each where the reader may open it.
+   */
+  readonly related = computed<{ label: string; icon: string; link: string; query?: Record<string, string> }[]>(() => {
+    const job = this.job();
+    const out: { label: string; icon: string; link: string; query?: Record<string, string> }[] = [];
+    const taskDetailId = job?.taskDetail?.taskDetailId;
+    if (taskDetailId && this.auth.isTenantAdmin?.() && this.auth.canOpen('tasks')) {
+      out.push({ label: 'Pipeline', icon: 'layers', link: `/pipelines/${taskDetailId}/edit`, query: { tab: 'steps' } });
+    }
+    if (this.canOpenSchedule()) out.push({ label: 'All runs of this schedule', icon: 'history', link: `/pipelines/schedules/${this.jobId()}/executions` });
+    if (this.auth.canOpen('analytics-dashboards')) out.push({ label: 'Dashboards', icon: 'chart', link: '/data/analytics/dashboards' });
+    if (this.auth.isTenantAdmin?.()) out.push({ label: 'Cost in Billing', icon: 'database', link: '/billing/usage' });
+    return out;
+  });
+
+  /** UX review 2026-10-12 (R1): Steps · AI answers · Outputs · Log, kept in the address (?tab=). */
+  readonly tab = signal<RunTab>(runTabOf(this.activated.snapshot?.queryParamMap?.get('tab') ?? null));
+  readonly tabs = computed(() => [
+    { id: 'steps' as RunTab, label: 'Steps', icon: 'layers' },
+    { id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' },
+    { id: 'outputs' as RunTab, label: 'Outputs', icon: 'file' },
+    { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length})` : 'Log', icon: 'terminal' },
+  ]);
+  setTab(tab: RunTab): void {
+    this.tab.set(tab);
+    this.router.navigate([], { relativeTo: this.activated, queryParams: { tab: tab === 'steps' ? null : tab }, queryParamsHandling: 'merge', replaceUrl: true });
+  }
   /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
   readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
   readonly showDetail = signal(true);

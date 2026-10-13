@@ -1,117 +1,73 @@
 <div class="page">
-  <!-- UX review 2026-10-12 (A2, R1): the run's number and schedule as the title, its status beside it; the breadcrumb
-       leads back to the schedule's runs. The one Refresh: the quiet re-read, so the entries stay put while it runs. -->
+  <!-- UX review 2026-10-12 (A2, R1, R3): the run as a detail page. Its number and schedule as the title, its status beside
+       it; links to its pipeline, its results and what it cost; a summary beside the Next steps (Reject then Approve); then
+       tabs: Steps, AI answers, Outputs, Log. The review used to sit under thirty raw AI answers, below the fold. -->
   <app-page-header [title]="heading()" [trail]="trail()" [crumb]="'Run #' + jobQueueId()">
     @if (run()?.jobStatus) { <app-status pills [label]="run().jobStatus" /> }
     <app-refresh-button [loading]="loading() || refreshing()" (refresh)="refresh()" />
     <p subtitle class="page-subtitle">
-      What the worker reported during run <span class="mono">#{{ jobQueueId() }}</span>
-      of schedule <span class="mono">#{{ jobId() }}</span>.
+      Run <span class="mono">#{{ jobQueueId() }}</span> of
+      @if (canOpenSchedule()) { <a class="link-inline" [routerLink]="['/pipelines/schedules', jobId(), 'executions']">{{ job()?.jobName || 'schedule #' + jobId() }}</a> }
+      @else { {{ job()?.jobName || 'schedule #' + jobId() }} }
+      @if (job()?.taskDetail?.taskName) { · pipeline {{ job().taskDetail.taskName }} }
     </p>
+    @if (related().length) {
+      <p meta class="run-related flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" data-test="run-related">
+        @for (r of related(); track r.label) {
+          <a class="link-inline inline-flex items-center gap-1" [routerLink]="r.link" [queryParams]="r.query ?? null"><app-icon [name]="r.icon" size="0.95em" />{{ r.label }}</a>
+        }
+      </p>
+    }
   </app-page-header>
 
   @if (job() || run(); as _) {
-    <div class="card overflow-clip">
-      <button type="button" class="w-full flex items-center gap-2 px-4 py-2.5 text-left"
-              [attr.aria-expanded]="showDetail()"
-              (click)="showDetail.set(!showDetail())">
-        <app-icon name="briefcase" class="icon-info" />
-        <span class="text-sm font-semibold">Job &amp; queue detail</span>
-        @if (run()?.jobStatus) { <app-status [label]="run().jobStatus" /> }
-        <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted ml-auto" />
-      </button>
-
-      @if (showDetail()) {
-        <div class="detail-panel grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-          @if (job(); as j) {
-            <div>
-              <div class="detail-head">Job</div>
-              <dl class="detail-list">
-                <dt>Name</dt>
-                <dd class="truncate">
-                  <a class="text-accent hover:underline"
-                     [routerLink]="['/pipelines/schedules', jobId(), 'executions']">{{ j.jobName }}</a>
-                </dd>
-                <dt>Execution</dt><dd>{{ j.execution || '—' }}</dd>
-                <dt>State</dt><dd><app-status [label]="j.jobStatus" [quiet]="true" /></dd>
-                @if (j.taskDetail?.taskName) {
-                  <dt>Task</dt><dd class="truncate">{{ j.taskDetail.taskName }}</dd>
-                }
-              </dl>
-            </div>
-          }
-
+    <div class="grid gap-4 lg:grid-cols-3 items-start run-top">
+      <section class="card p-4 lg:col-span-2 min-w-0" aria-label="This run" data-test="run-summary">
+        <dl class="run-facts grid gap-x-6 gap-y-3 grid-cols-2 sm:grid-cols-4">
           @if (run(); as r) {
-            <div>
-              <div class="detail-head">This run</div>
-              <dl class="detail-list">
-                <dt>Run</dt><dd class="mono">#{{ r.jobQueueId }}</dd>
-                <dt>Started</dt>
-                <dd>{{ r.startTime ? (r.startTime | serverTime:'dateTimeSec') : '—' }}</dd>
-                <dt>Ended</dt>
-                <dd>{{ r.endTime ? (r.endTime | serverTime:'dateTimeSec') : '—' }}</dd>
-                <dt>Duration</dt><dd class="tabular">{{ duration() }}</dd>
-              </dl>
-            </div>
-
-            <div class="min-w-0">
-              <div class="detail-head">Reported</div>
-              @if (r.jobStatusMessage) {
-                <p class="text-xs leading-relaxed break-words">{{ r.jobStatusMessage }}</p>
-              } @else {
-                <p class="text-xs text-[color:var(--text-muted)]">No closing message.</p>
-              }
-              <div class="text-[11px] text-[color:var(--text-muted)] mt-2">
-                {{ logs().length }} log {{ logs().length === 1 ? 'entry' : 'entries' }}
-              </div>
-            </div>
+            <div><dt>Status</dt><dd>@if (r.jobStatus) { <app-status [label]="r.jobStatus" /> } @else { — }</dd></div>
+            <div><dt>Started</dt><dd class="tabular">{{ r.startTime ? (r.startTime | serverTime:'dateTimeSec') : '—' }}</dd></div>
+            <div><dt>Ended</dt><dd class="tabular">{{ r.endTime ? (r.endTime | serverTime:'dateTimeSec') : '—' }}</dd></div>
+            <div><dt>Duration</dt><dd class="tabular">{{ duration() }}</dd></div>
           }
-        </div>
-
-        <!-- The pipeline's AI steps for this run: what each prompt answered, what it cost. -->
-        @if (aiSteps().length) {
-          <div class="detail-panel mt-3">
-            <!-- G11: a group's title, not the uppercase small caps the field labels use. -->
-            <h3 class="form-legend !mb-2">AI steps <span class="font-normal text-[color:var(--text-muted)]">({{ aiSteps().length }})</span></h3>
-            <!-- Its own scroll box: a run of forty images drew forty answers in full and pushed the steps and the log
-                 twelve thousand pixels down (review 2026-10-07). -->
-            <ul class="side-panel-list text-xs max-h-[32rem] overflow-y-auto overscroll-contain" data-test="ai-steps" tabindex="0"
-                aria-label="AI steps of this run">
-              @for (s of aiSteps(); track s.run.runId) {
-                <li>
-                  <div class="min-w-0">
-                    <span class="pill" [class]="'pill ' + (s.run.status === 'ok' ? 'pill-ok' : 'pill-crit')">{{ s.run.status === 'ok' ? 'Answered' : 'Failed' }}</span>
-                    <span class="ml-1 font-medium">{{ s.promptName || 'prompt' }}</span>
-                    <span class="text-[color:var(--text-muted)]"> v{{ s.run.promptVersion }} → <span class="mono">&lt;{{ s.run.stepTag }}&gt;</span></span>
-                    @if (s.run.status === 'ok') {
-                      @if (isJson(s.run.output)) {
-                        <pre class="prompt-out ai-step-output mt-1">{{ s.run.output }}</pre>
-                      } @else {
-                        <div class="prompt-out ai-step-output ai-step-md mt-1"><app-markdown [source]="s.run.output" /></div>
-                      }
-                    } @else {
-                      <div class="text-crit-500 mt-0.5">{{ s.run.error }}</div>
-                    }
-                  </div>
-                  <span class="text-[color:var(--text-muted)] whitespace-nowrap">
-                    @if (s.run.latencyMs != null) { {{ latency(s.run.latencyMs) }} }
-                    @if (s.run.tokensIn != null) { · {{ s.run.tokensIn }}→{{ s.run.tokensOut }} tokens }
-                    @if ((s.run.attempts ?? 1) > 1) { · {{ s.run.attempts }} attempts }
-                  </span>
-                </li>
-              }
-            </ul>
-          </div>
-        }
-      }
+          @if (job(); as j) {
+            <div><dt>Schedule</dt><dd class="truncate" [title]="j.jobName">{{ j.jobName }}</dd></div>
+            <div><dt>Started by</dt><dd>{{ j.execution === 'Auto' ? 'Its timetable' : j.execution || '—' }}</dd></div>
+            @if (j.taskDetail?.taskName) { <div class="col-span-2"><dt>Pipeline</dt><dd class="truncate" [title]="j.taskDetail.taskName">{{ j.taskDetail.taskName }}</dd></div> }
+          }
+          @if (run(); as r) {
+            <div class="col-span-2 sm:col-span-4 min-w-0"><dt>Reported</dt>
+              <dd class="break-words">{{ r.jobStatusMessage || 'No closing message.' }}</dd></div>
+          }
+        </dl>
+      </section>
+      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" />
     </div>
   }
 
-  <!-- MIG-251: a step-engine run's steps, Timeline and Console. A legacy run draws nothing here. -->
-  @if (!missing()) {
-    <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" (retried)="refresh()" />
-  }
+  <div class="tabs" role="tablist" aria-label="Run" data-test="run-tabs">
+    @for (t of tabs(); track t.id) {
+      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id"
+              [attr.data-tab]="t.id" (click)="setTab(t.id)"><app-icon [name]="t.icon" />{{ t.label }}</button>
+    }
+  </div>
 
+  @switch (tab()) {
+    @case ('steps') {
+      <!-- MIG-251: a step-engine run's steps, Timeline and Console. A legacy run draws nothing here. -->
+      @if (!missing()) {
+        <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" [withReview]="false" part="steps" (retried)="refresh()" />
+      }
+    }
+    @case ('ai') {
+      <app-run-ai-answers [answers]="aiSteps()" />
+    }
+    @case ('outputs') {
+      @if (!missing()) {
+        <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" [withReview]="false" part="outputs" />
+      }
+    }
+    @case ('log') {
   @if (hasInsights()) {
     @if (showInsights()) {
       <div class="card chart-card">
@@ -256,6 +212,8 @@
       }
     }
   </app-table-shell>
+    }
+  }
 
   <!-- A line as text and paths; a path opens its folder in the Object Browser and wraps only
        between names, so "orders_2026-09-a.csv" is never split at its hyphen. -->

@@ -183,26 +183,26 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/findSourceJobAuditLog?jobId=2833&jobQueueId=7331",
       "GET /sourceJob.json/stepExecutions?jobQueueId=7331",
-      "GET /aiPrompt.json/runsForJob?jobQueueId=7331"
+      "GET /aiPrompt.json/runsForJob?jobQueueId=7331",
+      "GET /sourceJob.json/review?jobQueueId=7331"
     ],
     "headings": [
       "Run #7331 · Reference CSV check (e2e)",
-      "Log entries (2 of 2)"
+      "Review"
     ],
     "buttons": [
-      "Console",
-      "Job & queue detail Completed",
+      "AI answers",
+      "Log (2)",
+      "Outputs",
       "Refresh",
-      "Table",
-      "Timeline",
-      "Timing"
+      "Steps"
     ],
     "columns": [],
-    "fields": [
-      "Search entries",
-      "Search log entries"
-    ],
+    "fields": [],
     "links": [
+      "/billing/usage",
+      "/data/analytics/dashboards",
+      "/pipelines/1854/edit?tab=steps",
       "/pipelines/schedules",
       "/pipelines/schedules/2833/executions"
     ]
