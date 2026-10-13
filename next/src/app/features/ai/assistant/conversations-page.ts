@@ -52,6 +52,7 @@ const DAYS: DayGroup[] = ['today', 'yesterday', 'week', 'older'];
       .cp-wide { display: table-cell; }
     }
     @media (min-width: 1280px) { .cp-grid:not(.cp-open) .cp-wide { display: table-cell; } }
+    @media (max-width: 1535px) { .cp-grid.cp-open .cp-title { max-width: 17rem; } }
   `],
 })
 export class ConversationsPage {

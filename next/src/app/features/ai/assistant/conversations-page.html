@@ -90,7 +90,7 @@
           <thead>
             <tr>
               <th scope="col">Conversation</th>
-              <th scope="col">Kind</th>
+              <th scope="col" class="cp-wide">Kind</th>
               <th scope="col">Status</th>
               <th scope="col" class="cp-wide">Pipeline</th>
               <th scope="col" class="cp-wide text-right">Messages</th>
@@ -114,7 +114,7 @@
                     </div>
                   </div>
                 </td>
-                <td class="whitespace-nowrap">{{ kindLabel[kindOf(c)] }}</td>
+                <td class="cp-wide whitespace-nowrap">{{ kindLabel[kindOf(c)] }}</td>
                 <td>@if (b) { <span class="pill" [class]="'pill-' + b.tone" data-badge>{{ b.label }}</span> }</td>
                 <td class="cp-wide">
                   @if (c.pipelineKey && c.taskDetailId) {
