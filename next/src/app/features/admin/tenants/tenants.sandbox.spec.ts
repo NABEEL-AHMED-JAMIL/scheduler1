@@ -55,8 +55,31 @@ describe('MIG-336: a workspace\'s sandbox on the Tenants page', () => {
     expect(page.sandboxParent({ sandboxOf: 9999 } as any)).toBe('workspace 9999');
     page.view.set('cards');
     fixture.detectChanges();
-    expect(el.querySelectorAll('button[data-create-sandbox]').length).toBe(1);
     expect(el.querySelectorAll('[data-sandbox-of]').length).toBe(1);
+  });
+
+  /** UX review B10 (PL1, G8): the table first, and a workspace's actions in its ⋮ in both views -- not nine buttons a card. */
+  it('opens on the table, with every action in the row\'s ⋮ menu in both views', async () => {
+    setup();
+    const fixture = TestBed.createComponent(Tenants);
+    fixture.detectChanges();
+    const page = fixture.componentInstance;
+    const el = fixture.nativeElement as HTMLElement;
+    expect(page.view()).toBe('table');
+    expect(el.querySelector('h1')?.textContent).toContain('Workspaces');
+    expect(el.querySelectorAll('[data-test="workspace-actions"]').length).toBe(3);
+    (el.querySelector('[data-test="workspace-actions"][aria-label="Actions for Harbor"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const menu = document.querySelector('[cdkMenu], .cdk-menu')!;
+    expect(menu.textContent).toContain('Create sandbox');
+    expect(menu.textContent).toContain('Page access');
+    expect(menu.textContent).toContain('Billing time zone');
+    page.view.set('cards');
+    fixture.detectChanges();
+    const card = el.querySelector('[data-test="workspace-card"]')!;
+    expect(card.querySelectorAll('button').length).toBeLessThanOrEqual(3);
+    expect(card.querySelector('[data-test="workspace-actions"]')).not.toBeNull();
   });
 
   it('asks first, saying what it makes, then makes it and reads the list again', async () => {

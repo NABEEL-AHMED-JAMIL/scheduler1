@@ -84,7 +84,7 @@ describe('Tenants pipeline count', () => {
     tasksResource().sub?.({ sourceTaskCount, pipelineCount } as any) ?? '';
 
   it('names the pipelines when they differ from the task count', () => {
-    expect(sub(19, 15)).toBe('15 pipelines');
+    expect(sub(19, 15)).toBe('15 distinct');
   });
 
   it('says nothing when every task is its own pipeline, which the task count already said', () => {
@@ -96,7 +96,7 @@ describe('Tenants pipeline count', () => {
   });
 
   it('reads as singular for one pipeline', () => {
-    expect(sub(4, 1)).toBe('1 pipeline');
+    expect(sub(4, 1)).toBe('1 distinct');
   });
 
   it('hangs off Tasks, not a column of its own', () => {

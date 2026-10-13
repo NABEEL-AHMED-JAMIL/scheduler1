@@ -82,7 +82,8 @@ interface ResourceCount {
 })
 export class Tenants implements OnInit {
   /** Tenants started as cards; the table is the addition, so cards stay the default. */
-  readonly view = signal<'table' | 'cards'>('cards');
+  /** UX review B10: the table first -- the question on this page is "which workspace", across them. */
+  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
@@ -102,13 +103,13 @@ export class Tenants implements OnInit {
 
   readonly resources: ResourceCount[] = [
     { key: 'userCount', label: 'Users', icon: 'users' },
-    { key: 'sourceJobCount', label: 'Jobs', icon: 'briefcase' },
+    { key: 'sourceJobCount', label: 'Schedules', icon: 'calendar' },
     {
-      key: 'sourceTaskCount', label: 'Tasks', icon: 'list',
+      key: 'sourceTaskCount', label: 'Pipelines', icon: 'list',
       // Only shown when it says something the task count does not. Equal numbers mean one task
       // per pipeline, which the task count already told you; zero tasks means nothing to add.
       sub: t => t.pipelineCount && t.pipelineCount !== t.sourceTaskCount
-        ? `${t.pipelineCount} pipeline${t.pipelineCount === 1 ? '' : 's'}`
+        ? `${t.pipelineCount} distinct`
         : '',
     },
     { key: 'sourceTaskTypeCount', label: 'Topics', icon: 'layers' },

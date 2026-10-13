@@ -1,35 +1,25 @@
 <div class="page">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Workspaces</h1>
-        <p class="page-subtitle">
-          A tenant is an isolated workspace — jobs, buckets, tasks and users never cross between them.
-        </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <app-refresh-button [loading]="loading()" (refresh)="listTenants()" />
-        <button type="button" class="btn btn-primary btn-sm" (click)="addTenant()">
-          <app-icon name="plus" />New tenant
-        </button>
-      </div>
-    </div>
+  <!-- UX review B10 (PL1): a table of workspaces with its actions in each row's ⋮, workspace not tenant. -->
+  <app-page-header title="Workspaces"
+                   subtitle="Each workspace is isolated: its pipelines, schedules, buckets and people never cross into another.">
+    <app-refresh-button [loading]="loading()" (refresh)="listTenants()" />
+    <button type="button" class="btn btn-primary btn-sm" (click)="addTenant()"><app-icon name="plus" />New workspace</button>
   </app-page-header>
 
   <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
-      { label: 'Tenants',  value: stats().tenants,  foot: stats().active + ' active', icon: 'globe', tone: 'info' },
-      { label: 'Users',    value: stats().users,    foot: 'across all tenants', icon: 'users', tone: 'info' },
-      { label: 'Jobs',     value: stats().jobs,     foot: stats().tasks + ' tasks', icon: 'briefcase', tone: 'info' },
+      { label: 'Workspaces', value: stats().tenants, foot: stats().active + ' active', icon: 'globe', tone: 'info' },
+      { label: 'Users',    value: stats().users,    foot: 'across all workspaces', icon: 'users', tone: 'info' },
+      { label: 'Schedules', value: stats().jobs,    foot: stats().tasks + ' pipelines', icon: 'calendar', tone: 'info' },
       { label: 'Unused',   value: stats().empty,    foot: 'no resources yet', icon: 'alert', tone: 'warn' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" [foot]="tile.foot" />
     }
   </div>
 
-  <app-table-shell heading="Tenants" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Workspaces" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tenants().length"
-                   [emptyMessage]="hasFilters() ? 'No tenants match the current filters.' : 'No tenants yet.'"
+                   [emptyMessage]="hasFilters() ? 'No workspace matches the current filters.' : 'No workspaces yet.'"
                    emptyIcon="building"
                    (retry)="listTenants()">
     <ng-container toolbar>
@@ -48,7 +38,7 @@
                 (change)="sort.toggle($any($event.target).value)">
           <option value="tenantName">Sort by name</option>
           <option value="userCount">Sort by users</option>
-          <option value="sourceJobCount">Sort by jobs</option>
+          <option value="sourceJobCount">Sort by schedules</option>
           <option value="dateCreated">Sort by created</option>
         </select>
         <button type="button" class="btn btn-ghost btn-icon btn-sm"
@@ -60,7 +50,7 @@
       }
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name or code" aria-label="Search tenants"
+        <input class="input" placeholder="Search name or code" aria-label="Search workspaces"
                [value]="search()" (input)="setSearch($any($event.target).value)" />
       </div>
       <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
@@ -80,13 +70,13 @@
           <tr>
             <th>
               <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === 'tenantName'" (click)="sort.toggle('tenantName')">
-                Tenant
+                Workspace
                 <app-icon [name]="sort.iconFor('tenantName')" size="0.875rem" [class]="sort.key() === 'tenantName' ? 'icon-info' : 'icon-muted'" />
               </button>
             </th>
             <th>Admin</th>
             @for (res of resources; track res.key) {
-              <th class="text-center">
+              <th class="text-right">
                 <button type="button" class="th-sort" [class.th-sort-active]="sort.key() === res.key" (click)="sort.toggle(res.key)">
                   {{ res.label }}
                   <app-icon [name]="sort.iconFor(res.key)" size="0.875rem" [class]="sort.key() === res.key ? 'icon-info' : 'icon-muted'" />
@@ -119,7 +109,7 @@
                 <div class="flex items-center gap-1 mt-0.5 min-w-0 text-[11px] text-[color:var(--text-muted)]">
                   <span class="mono truncate">{{ tenant.tenantCode }}</span>
                   <app-copy-button [value]="tenant.tenantCode" [copied]="copiedId() === tenant.tenantId"
-                                   copiedLabel="Tenant code copied" (copy)="copyCode(tenant)" />
+                                   copiedLabel="Workspace code copied" (copy)="copyCode(tenant)" />
                 </div>
               </td>
               <td class="max-w-56">
@@ -131,11 +121,11 @@
                     <div class="truncate text-[11px] text-[color:var(--text-muted)]">{{ tenant.adminEmail }}</div>
                   }
                 } @else {
-                  <span class="text-[color:var(--text-muted)]" title="No active tenant administrator — nobody can manage this workspace's users">—</span>
+                  <span class="text-[color:var(--text-muted)]" title="No active workspace administrator — nobody can manage this workspace's users">—</span>
                 }
               </td>
               @for (res of resources; track res.key) {
-                <td class="text-center tabular"
+                <td class="text-right tabular"
                     [class.text-[color:var(--text-muted)]]="!$any(tenant)[res.key]">
                   {{ $any(tenant)[res.key] || 0 }}
                   @if (res.sub && res.sub(tenant); as sub) {
@@ -157,53 +147,11 @@
               </td>
               <td class="text-right"><app-status [label]="tenant.status" [quiet]="true" /></td>
               <td class="text-right">
-                <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" data-test="workspace-actions"
                         [disabled]="busy() === tenant.tenantId"
-                        [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + tenant.tenantName">
+                        [cdkMenuTriggerFor]="workspaceMenu" [cdkMenuTriggerData]="{ $implicit: tenant }" [attr.aria-label]="'Actions for ' + tenant.tenantName">
                   <app-icon name="dots" size="1.05em" [busy]="busy() === tenant.tenantId" />
                 </button>
-                <ng-template #rowMenu>
-                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
-                            (cdkMenuItemTriggered)="viewUsers(tenant)">
-                      <app-icon name="users" class="icon-info" />Users
-                    </button>
-                    <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
-                            (cdkMenuItemTriggered)="viewAccessProfiles(tenant)">
-                      <app-icon name="shield" class="icon-info" />Access profiles
-                    </button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copyCode(tenant)">
-                      <app-icon name="copy" />Copy code
-                    </button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTenant(tenant)">
-                      <app-icon name="edit" />Edit
-                    </button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="apiLimits(tenant)">
-                      <app-icon name="zap" />API limits
-                    </button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="billingZone(tenant)" data-billing-zone-open>
-                      <app-icon name="clock" />Billing time zone
-                    </button>
-                    @if (canMakeSandbox(tenant)) {
-                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="createSandbox(tenant)" data-create-sandbox>
-                        <app-icon name="terminal" />Create sandbox
-                      </button>
-                    }
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="switchMode(tenant)">
-                      <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
-                    </button>
-                    <button cdkMenuItem class="menu-item"
-                            [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
-                            (cdkMenuItemTriggered)="toggleSuspend(tenant)">
-                      <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'" />
-                      {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
-                    </button>
-                    <button cdkMenuItem class="menu-item menu-item-danger"
-                            (cdkMenuItemTriggered)="deleteTenant(tenant)">
-                      <app-icon name="trash" class="icon-crit" />Delete
-                    </button>
-                  </div>
-                </ng-template>
               </td>
             </tr>
           }
@@ -212,7 +160,7 @@
     } @else {
     <div class="grid gap-3 p-4 lg:grid-cols-2 2xl:grid-cols-3">
       @for (tenant of paged(); track tenant.tenantId) {
-        <article class="card p-4 flex flex-col gap-3.5"
+        <article class="card p-4 flex flex-col gap-3.5" data-test="workspace-card"
                  [class.opacity-70]="tenant.status !== 'Active'">
           <div class="flex items-start justify-between gap-3 border-b pb-3 border-subtle"
               >
@@ -227,20 +175,19 @@
                 <span class="inline-flex items-center gap-1 min-w-0">
                   <span class="mono truncate">{{ tenant.tenantCode }}</span>
                   <app-copy-button [value]="tenant.tenantCode" [copied]="copiedId() === tenant.tenantId"
-                                   copiedLabel="Tenant code copied" (copy)="copyCode(tenant)" />
+                                   copiedLabel="Workspace code copied" (copy)="copyCode(tenant)" />
                 </span>
                 @if (tenant.dateCreated) {
                   <span>since {{ tenant.dateCreated | serverTime: 'date' }}</span>
                 }
                 <span class="pill" [class]="tenant.managementMode === 'MANAGED' ? 'pill pill-brand' : 'pill pill-neutral'">{{ modeLabel(tenant) }}</span>
               </div>
-              @if (tenant.adminName || tenant.adminEmail) {
-                <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-[color:var(--text-secondary)]"
-                     [title]="'tenant administrator' + (tenant.adminEmail ? ' — ' + tenant.adminEmail : '')">
-                  <app-icon name="shield" size="0.9em" class="icon-muted" />
-                  <span class="truncate">{{ tenant.adminName || tenant.adminEmail }}</span>
-                </div>
-              }
+              <!-- Always a line (PL1): a card without an administrator stood its figures 22px higher than its neighbour's. -->
+              <div class="mt-1.5 flex items-center gap-1.5 text-[11px] text-[color:var(--text-secondary)] min-h-4"
+                   [title]="(tenant.adminName || tenant.adminEmail) ? 'workspace administrator' + (tenant.adminEmail ? ' — ' + tenant.adminEmail : '') : 'No active workspace administrator'">
+                <app-icon name="shield" size="0.9em" class="icon-muted" />
+                <span class="truncate" [class.text-[color:var(--text-muted)]]="!(tenant.adminName || tenant.adminEmail)">{{ tenant.adminName || tenant.adminEmail || 'No administrator' }}</span>
+              </div>
             </div>
             <app-status [label]="tenant.status" [quiet]="true" />
           </div>
@@ -293,49 +240,16 @@
               </p>
             </div>
 
-          <div class="flex flex-wrap items-center gap-1.5 border-t pt-3 border-subtle"
-              >
-            <button type="button" class="btn btn-ghost btn-sm" (click)="viewUsers(tenant)"
-                    [disabled]="!tenant.userCount"
-                    [title]="tenant.userCount ? 'Show the users in this tenant' : 'This tenant has no users yet'">
+          <!-- B10 (G8): the card's nine inline actions are its ⋮ menu, as in the table. -->
+          <div class="flex items-center gap-1.5 border-t pt-3 border-subtle mt-auto">
+            <button type="button" class="btn btn-ghost btn-sm" (click)="viewUsers(tenant)" [disabled]="!tenant.userCount"
+                    [title]="tenant.userCount ? 'Show the users in this workspace' : 'This workspace has no users yet'">
               <app-icon name="users" [class.icon-info]="!!tenant.userCount" />Users
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="viewAccessProfiles(tenant)"
-                    [disabled]="!tenant.userCount" title="Who in this tenant can open which pages">
-              <app-icon name="shield" [class.icon-info]="!!tenant.userCount" />Access
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="editTenant(tenant)">
-              <app-icon name="edit" />Edit
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="apiLimits(tenant)" title="Rate limits and the monthly quota of its API clients">
-              <app-icon name="zap" />API limits
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="billingZone(tenant)" title="The days and months its usage is billed in">
-              <app-icon name="clock" />Billing time zone
-            </button>
-            @if (canMakeSandbox(tenant)) {
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="createSandbox(tenant)"
-                      title="A separate, unbilled workspace for its test keys" data-create-sandbox>
-                <app-icon name="terminal" />Create sandbox
-              </button>
-            }
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy() === tenant.tenantId" (click)="switchMode(tenant)"
-                    [title]="tenant.managementMode === 'MANAGED' ? 'Let its own administrators build it (signs its people out)' : 'Our team builds it (signs its people out)'">
-              <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
-            </button>
-            <button type="button" class="btn btn-ghost btn-sm"
-                    [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+            <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto" data-test="workspace-actions"
                     [disabled]="busy() === tenant.tenantId"
-                    (click)="toggleSuspend(tenant)"
-                    [title]="tenant.status === 'Active' ? 'Block sign-in for this tenant' : 'Allow sign-in again'">
-              <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'"
-                        [busy]="busy() === tenant.tenantId" />
-              {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
-            </button>
-            <button type="button" class="btn btn-ghost btn-icon btn-sm ml-auto"
-                    [disabled]="busy() === tenant.tenantId"
-                    title="Delete tenant" [attr.aria-label]="'Delete ' + tenant.tenantName" (click)="deleteTenant(tenant)">
-              <app-icon name="trash" class="icon-crit" [busy]="busy() === tenant.tenantId" />
+                    [cdkMenuTriggerFor]="workspaceMenu" [cdkMenuTriggerData]="{ $implicit: tenant }" [attr.aria-label]="'Actions for ' + tenant.tenantName">
+              <app-icon name="dots" size="1.05em" [busy]="busy() === tenant.tenantId" />
             </button>
           </div>
         </article>
@@ -345,4 +259,48 @@
     <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
+
+  <!-- One ⋮ menu for both views (B10): every action a workspace has, in one place. -->
+  <ng-template #workspaceMenu let-tenant>
+      <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+        <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
+                (cdkMenuItemTriggered)="viewUsers(tenant)">
+          <app-icon name="users" class="icon-info" />Users
+        </button>
+        <button cdkMenuItem class="menu-item" [disabled]="!tenant.userCount"
+                (cdkMenuItemTriggered)="viewAccessProfiles(tenant)">
+          <app-icon name="shield" class="icon-info" />Page access
+        </button>
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copyCode(tenant)">
+          <app-icon name="copy" />Copy code
+        </button>
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editTenant(tenant)">
+          <app-icon name="edit" />Edit
+        </button>
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="apiLimits(tenant)">
+          <app-icon name="zap" />API limits
+        </button>
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="billingZone(tenant)" data-billing-zone-open>
+          <app-icon name="clock" />Billing time zone
+        </button>
+        @if (canMakeSandbox(tenant)) {
+          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="createSandbox(tenant)" data-create-sandbox>
+            <app-icon name="terminal" />Create sandbox
+          </button>
+        }
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="switchMode(tenant)">
+          <app-icon name="briefcase" />{{ tenant.managementMode === 'MANAGED' ? 'Make self-managed' : 'Make managed' }}
+        </button>
+        <button cdkMenuItem class="menu-item"
+                [class]="tenant.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok'"
+                (cdkMenuItemTriggered)="toggleSuspend(tenant)">
+          <app-icon [name]="tenant.status === 'Active' ? 'pause' : 'play'" />
+          {{ tenant.status === 'Active' ? 'Suspend' : 'Reactivate' }}
+        </button>
+        <button cdkMenuItem class="menu-item menu-item-danger"
+                (cdkMenuItemTriggered)="deleteTenant(tenant)">
+          <app-icon name="trash" class="icon-crit" />Delete
+        </button>
+      </div>
+    </ng-template>
 </div>
