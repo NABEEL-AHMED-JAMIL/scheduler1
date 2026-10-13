@@ -315,3 +315,12 @@ describe('AI Assistant -- the thread\'s title', () => {
     expect(screen.threadTitle()).toBe('New conversation');
   });
 });
+
+describe('AI Assistant -- a design handed over from New pipeline (UX review 2026-10-12, P3)', () => {
+  it('puts the description in the composer, unsent, and drops it from the address', () => {
+    const { screen, api, navigate } = screenWith({ query: { prompt: 'Read the daily admissions file, flag readmissions within 30 days' } });
+    expect(screen.draft()).toBe('Read the daily admissions file, flag readmissions within 30 days');
+    expect(api.sendAsync).not.toHaveBeenCalled();
+    expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { prompt: null }, replaceUrl: true }));
+  });
+});

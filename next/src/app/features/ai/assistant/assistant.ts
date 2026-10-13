@@ -272,6 +272,13 @@ export class Assistant implements OnInit {
     if (this.canPickModel()) this.loadConnections();
     const id = Number(this.route.snapshot.queryParamMap.get('c'));
     if (Number.isInteger(id) && id > 0) this.open(id);
+    // UX review 2026-10-12 (P3): New pipeline's "Describe it to the AI Assistant" hands over what to build; it waits in
+    // the composer for the person to send, and the address forgets it.
+    const asked = (this.route.snapshot.queryParamMap.get('prompt') ?? '').trim();
+    if (asked && !(Number.isInteger(id) && id > 0)) {
+      this.draft.set(asked.slice(0, 4000));
+      this.router.navigate([], { relativeTo: this.route, queryParams: { prompt: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
   }
 
   // ----------------------------------------------------------------------------------------- loading
