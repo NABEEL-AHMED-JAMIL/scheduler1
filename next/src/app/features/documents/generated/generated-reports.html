@@ -1,15 +1,17 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Reports</h1>
-      <p class="page-subtitle">
-        Documents and files made from your data: renders saved to a bucket, and what recent runs put out.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Generated reports</h1>
+        <p class="page-subtitle">
+          Documents and files made from your data: renders saved to a bucket, and what recent runs put out.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <a class="btn btn-primary btn-sm" routerLink="/documents/converter"><app-icon name="plus" />Make a document</a>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <a class="btn btn-primary btn-sm" routerLink="/documents/converter"><app-icon name="plus" />Make a document</a>
-    </div>
-  </div>
+  </app-page-header>
 
   <app-table-shell heading="Generated outputs" [shown]="paged().length" [total]="filtered().length"
                    [loading]="loading()" [error]="objectsError() && runsError() ? objectsError() : ''" (retry)="load(true)"

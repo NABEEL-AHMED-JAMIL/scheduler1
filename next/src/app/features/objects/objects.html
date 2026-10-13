@@ -1,19 +1,21 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Browse files</h1>
-      <p class="page-subtitle">
-        Browse the storage behind any connection.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Browse files</h1>
+        <p class="page-subtitle">
+          Browse the storage behind any connection.
+        </p>
+      </div>
+      <div class="w-full sm:w-72 2xl:w-96">
+        <label class="label" for="bucket">Connection</label>
+        <!-- [selected] per option rather than [value] on the select: the options come from an
+             async list, and a value set on the select before they exist does not stick. -->
+        <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
+                      placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
+      </div>
     </div>
-    <div class="w-full sm:w-72 2xl:w-96">
-      <label class="label" for="bucket">Connection</label>
-      <!-- [selected] per option rather than [value] on the select: the options come from an
-           async list, and a value set on the select before they exist does not stick. -->
-      <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
-                    placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
-    </div>
-  </div>
+  </app-page-header>
 
   @if (!bucket()) {
     @if (unknownLink(); as link) {

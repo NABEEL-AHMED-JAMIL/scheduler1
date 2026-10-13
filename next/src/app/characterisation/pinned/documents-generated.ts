@@ -31,7 +31,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/runOutputs?jobQueueId=7405"
     ],
     "headings": [
-      "Reports",
+      "Generated reports",
       "Generated outputs (3 of 3)"
     ],
     "buttons": [

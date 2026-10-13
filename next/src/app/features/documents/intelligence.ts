@@ -25,6 +25,8 @@ import { ReadDocumentData, ReadDocumentDialog, ReadDocumentResult } from './read
 import { TypePanel, TypePanelData } from './type-panel';
 import { UploadDocumentsDialog, UploadDocumentsResult } from './upload-documents-dialog';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export type IntelligenceTab = 'overview' | 'types' | 'dataset' | 'intake';
 const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset', 'intake'];
@@ -52,7 +54,7 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
  */
 @Component({
   selector: 'app-document-intelligence',
-  imports: [RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './intelligence.html',
   styles: [`
     .type-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }

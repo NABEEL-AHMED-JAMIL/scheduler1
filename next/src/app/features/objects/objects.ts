@@ -26,6 +26,7 @@ import { Icon } from '../../shared/ui/icon';
 import { formatSize } from '../../shared/ui/format-size';
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -34,7 +35,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
+  imports: [PageHeader, DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {

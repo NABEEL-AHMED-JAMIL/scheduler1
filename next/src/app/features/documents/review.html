@@ -1,36 +1,37 @@
 <div class="page">
-  <a routerLink="/documents/review" class="link-inline text-xs inline-flex items-center gap-1 self-start"><app-icon name="arrowLeft" size="0.9em" />Back to the review queue</a>
-
-  <div class="page-head">
-    <div>
-      <h1 class="page-title [overflow-wrap:anywhere]">{{ title() }}</h1>
-      <p class="page-subtitle">{{ subtitle() }}</p>
-    </div>
-    @if (detail(); as d) {
-      <div class="flex items-center gap-2">
-        @if (editable()) {
-          <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
-            <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
-          </span>
-          <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
-            <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
-          </button>
-          @if (dirty()) {
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
-            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
-              @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
-            </button>
-          }
-          <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="reject()"><app-icon name="close" />Reject</button>
-          <button type="button" class="btn btn-primary btn-sm" data-test="approve" [disabled]="!!busy()" (click)="approve()">
-            @if (busy() === 'approve') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="check" /> }Approve &amp; next
-          </button>
-        } @else {
-          <app-status [label]="statusText()" />
-        }
+  <!-- The breadcrumb leads back to Document review (UX review 2026-10-12, A2). -->
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title [overflow-wrap:anywhere]">{{ title() }}</h1>
+        <p class="page-subtitle">{{ subtitle() }}</p>
       </div>
-    }
-  </div>
+      @if (detail(); as d) {
+        <div class="flex items-center gap-2">
+          @if (editable()) {
+            <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
+              <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
+              <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
+            </button>
+            @if (dirty()) {
+              <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
+              <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
+                @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
+              </button>
+            }
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="reject()"><app-icon name="close" />Reject</button>
+            <button type="button" class="btn btn-primary btn-sm" data-test="approve" [disabled]="!!busy()" (click)="approve()">
+              @if (busy() === 'approve') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="check" /> }Approve &amp; next
+            </button>
+          } @else {
+            <app-status [label]="statusText()" />
+          }
+        </div>
+      }
+    </div>
+  </app-page-header>
 
   @if (loading() && !detail()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading the document…</div>

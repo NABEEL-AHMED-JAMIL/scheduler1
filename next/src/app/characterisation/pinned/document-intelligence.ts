@@ -219,7 +219,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/dataset?documentTypeId=1001&page=0&size=50"
     ],
     "headings": [
-      "Document Intelligence",
+      "Documents in",
       "Dataset (1 of 1)"
     ],
     "buttons": [
@@ -263,7 +263,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentType.json/fetchAll"
     ],
     "headings": [
-      "Document Intelligence",
+      "Documents in",
       "Document types"
     ],
     "buttons": [
@@ -305,7 +305,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
-      "Document Intelligence",
+      "Documents in",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
@@ -373,7 +373,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
-      "Document Intelligence",
+      "Documents in",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
@@ -442,7 +442,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentOcr.json/fetchAll"
     ],
     "headings": [
-      "Review queue",
+      "Document review",
       "Documents (1 of 1)"
     ],
     "buttons": [

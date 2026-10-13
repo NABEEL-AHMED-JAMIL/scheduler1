@@ -19,6 +19,7 @@ import { DocumentsApi } from './documents.service';
 import { PageViewer, ViewerBox } from './page-viewer';
 import { ConfidenceBar } from './confidence-bar';
 import { RejectDialog, RejectDialogData } from './reject-dialog';
+import { PageHeader } from '../../shared/ui/page-header';
 
 type Busy = '' | 'save' | 'approve' | 'reject' | 'claim';
 
@@ -45,7 +46,7 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
  */
 @Component({
   selector: 'app-document-review',
-  imports: [RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar],
+  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar],
   templateUrl: './review.html',
   styles: [`
     .review-split { display: grid; gap: 1rem; align-items: start; grid-template-columns: minmax(0, 1fr); }

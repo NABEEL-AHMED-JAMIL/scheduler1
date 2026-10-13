@@ -10,12 +10,14 @@ import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { FileDropzone } from '../../../shared/ui/file-dropzone';
 import { ReadAloudService } from '../../../shared/ui/read-aloud.service';
 import { ReadAlongText } from '../../../shared/ui/read-along-text';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
 @Component({
   selector: 'app-transcript',
-  imports: [Icon, Segmented, FileDropzone, ReadAlongText],
+  imports: [PageHeader, ActionsBar, Icon, Segmented, FileDropzone, ReadAlongText],
   templateUrl: './transcript.html',
 })
 export class Transcript implements OnDestroy {

@@ -14,6 +14,8 @@ import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
 import { CatalogApi } from './catalog.api';
 import { CatalogAsset, CatalogSummary, freshnessText, kindText, sensitivityTone, tagText, whereText } from './catalog.model';
 import { CatalogPanel, CatalogPanelData } from './catalog-panel';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 type KindFilter = '' | 'dataset' | 'file' | 'document_type';
 
@@ -29,7 +31,7 @@ type KindFilter = '' | 'dataset' | 'file' | 'document_type';
  */
 @Component({
   selector: 'app-catalog',
-  imports: [StatStrip, TableShell, Icon, Segmented, Pagination],
+  imports: [RefreshButton, PageHeader, StatStrip, TableShell, Icon, Segmented, Pagination],
   templateUrl: './catalog.html',
 })
 export class Catalog implements OnInit {

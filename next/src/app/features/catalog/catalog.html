@@ -1,15 +1,17 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Data Catalog</h1>
-      <p class="page-subtitle">
-        Every dataset, file and document type in this workspace: what it holds, who owns it, how fresh it is, and which fields are sensitive.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Data Catalog</h1>
+        <p class="page-subtitle">
+          Every dataset, file and document type in this workspace: what it holds, who owns it, how fresh it is, and which fields are sensitive.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
+      </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
-    </div>
-  </div>
+  </app-page-header>
 
   @if (kpis().length) {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance" />

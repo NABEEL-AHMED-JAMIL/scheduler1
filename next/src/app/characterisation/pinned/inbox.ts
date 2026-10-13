@@ -10,7 +10,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/colleagues"
     ],
     "headings": [
-      "Inbox",
+      "File drop",
       "No inbox yet"
     ],
     "buttons": [
@@ -31,7 +31,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /appUser.json/listUsers"
     ],
     "headings": [
-      "Inbox",
+      "File drop",
       "No inbox yet"
     ],
     "buttons": [
@@ -52,7 +52,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/colleagues"
     ],
     "headings": [
-      "Inbox",
+      "File drop",
       "Upload",
       "Settings",
       "Arrivals"
@@ -108,7 +108,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /appUser.json/listUsers"
     ],
     "headings": [
-      "Inbox",
+      "File drop",
       "Upload",
       "Settings",
       "Arrivals"

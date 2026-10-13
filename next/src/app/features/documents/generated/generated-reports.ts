@@ -17,6 +17,7 @@ import { ShareDialog, ShareResult } from '../../objects/dialogs/share-dialog';
 import { FAN_OUT, GeneratedService, RecentOutputs } from './generated.service';
 import { GeneratedReport, mergeReports, reportsFromObjects } from './generated.model';
 import { ReportPreviewDialog } from './report-preview-dialog';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 /** Subfolders of the reports folder listed too (one level), at most this many. */
 export const SUBFOLDER_CAP = 10;
@@ -38,7 +39,7 @@ const isPdf = (r: GeneratedReport) => r.type.toLowerCase() === 'pdf';
  */
 @Component({
   selector: 'app-generated-reports',
-  imports: [Icon, Combobox, RouterLink, ServerTimePipe, TableShell, Pagination],
+  imports: [PageHeader, Icon, Combobox, RouterLink, ServerTimePipe, TableShell, Pagination],
   templateUrl: './generated-reports.html',
 })
 export class GeneratedReports implements OnInit {

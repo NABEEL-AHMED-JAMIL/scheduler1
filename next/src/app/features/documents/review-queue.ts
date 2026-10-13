@@ -15,6 +15,8 @@ import {
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
  * The review queue (MIG-272, Documents > Review queue, page key document-review): the documents Document Intelligence
@@ -24,24 +26,24 @@ import { ConfidenceBar } from './confidence-bar';
  */
 @Component({
   selector: 'app-review-queue',
-  imports: [RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar],
   template: `
     <div class="page">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title">Review queue</h1>
-          <p class="page-subtitle">
-            Documents that Document Intelligence did not approve on its own, oldest first. Open one to check the values it was
-            not sure about, correct them, and approve or reject it.
-          </p>
+      <app-page-header>
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Document review</h1>
+            <p class="page-subtitle">
+              Documents that Document Intelligence did not approve on its own, oldest first. Open one to check the values it was
+              not sure about, correct them, and approve or reject it.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <app-refresh-button [loading]="loading()" (refresh)="load()" />
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-            <app-icon name="refresh" [class.spin]="loading()" />Refresh
-          </button>
-          <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
-        </div>
-      </div>
+      </app-page-header>
 
       <app-table-shell data-test="queue" heading="Documents" columnsKey="document-review-queue" [loading]="loading()" [error]="error()"
                        [isEmpty]="!items().length" [shown]="items().length" [total]="total()"

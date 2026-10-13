@@ -19,6 +19,7 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { Pagination } from '../../../shared/ui/pagination';
 import { createPager } from '../../../shared/ui/pager';
 import { RenderPanel } from './render-panel';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 interface FormatFamily {
   key: string;
@@ -56,7 +57,7 @@ interface ConvertResult {
 
 @Component({
   selector: 'app-converter',
-  imports: [Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel],
+  imports: [PageHeader, Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel],
   templateUrl: './converter.html',
 })
 export class Converter implements OnInit {

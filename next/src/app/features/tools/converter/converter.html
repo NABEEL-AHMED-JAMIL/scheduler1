@@ -1,12 +1,14 @@
 <div class="page-tool">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Document Converter</h1>
-      <p class="page-subtitle">
-        Convert between Office, OpenDocument, PDF, Markdown and image formats, or render a dataset as a document.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Document Converter</h1>
+        <p class="page-subtitle">
+          Convert between Office, OpenDocument, PDF, Markdown and image formats, or render a dataset as a document.
+        </p>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   <div class="card p-4 space-y-4">
     <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />

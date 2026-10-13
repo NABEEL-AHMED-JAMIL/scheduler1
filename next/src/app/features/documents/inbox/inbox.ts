@@ -22,6 +22,8 @@ import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** One file on its way to the inbox. */
 export interface QueuedUpload {
@@ -49,7 +51,7 @@ const LIST_LIMIT = 50;
  */
 @Component({
   selector: 'app-inbox',
-  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton, NeedsWorkspace],
+  imports: [RefreshButton, PageHeader, Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton, NeedsWorkspace],
   templateUrl: './inbox.html',
 })
 export class Inbox implements OnInit {

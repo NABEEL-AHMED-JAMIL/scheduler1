@@ -1,23 +1,23 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Inbox</h1>
-      <p class="page-subtitle">
-        Upload files for this workspace's pipelines. Each file's kind and size are checked, it is stored in the
-        workspace's bucket, and it starts every job whose inbox trigger matches its name.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">File drop</h1>
+        <p class="page-subtitle">
+          Upload files for this workspace's pipelines. Each file's kind and size are checked, it is stored in the
+          workspace's bucket, and it starts every job whose inbox trigger matches its name.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (!noWorkspace()) {
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        }
+        @if (canManage() && configured()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="openSettings()"><app-icon name="settings" />Inbox settings</button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (!noWorkspace()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-      }
-      @if (canManage() && configured()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="openSettings()"><app-icon name="settings" />Inbox settings</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="inbox settings" />
 
   @if (noWorkspace()) {

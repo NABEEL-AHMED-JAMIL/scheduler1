@@ -1,23 +1,23 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Document Intelligence</h1>
-      <p class="page-subtitle">
-        Upload documents, mail them to the workspace's email-in address, or read one from a storage connection; each one is
-        read, split into fields against its document type and checked. Values it is not sure of go to the review queue.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Documents in</h1>
+        <p class="page-subtitle">
+          Upload documents, mail them to the workspace's email-in address, or read one from a storage connection; each one is
+          read, split into fields against its document type and checked. Values it is not sure of go to the review queue.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
+        @if (canManage()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
+        }
+        <button type="button" class="btn btn-default btn-sm" (click)="readDocument()"><app-icon name="folder" />Read a stored file</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading() || datasetLoading()">
-        <app-icon name="refresh" [class.spin]="loading() || datasetLoading()" />Refresh
-      </button>
-      @if (canManage()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="readDocument()"><app-icon name="folder" />Read a stored file</button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="document types" />
 
   <div class="tabs" role="tablist" aria-label="Document Intelligence">
