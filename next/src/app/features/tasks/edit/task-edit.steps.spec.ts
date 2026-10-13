@@ -59,10 +59,11 @@ describe('TaskEdit and the step builder', () => {
     expect(asked).toEqual(['100175']);
     expect(component.stepsMode()).toBe(true);
     expect(component.activeTab()).toBe('steps');
-    expect(component.pageTabs.map(t => t.label)).toEqual(['Details', 'Steps', 'Settings', 'YAML', 'JSON']);
+    // UX review 2026-10-12 (B2): Schedules lists what runs it; History holds the versions (out of Settings).
+    expect(component.pageTabs().map(t => t.label)).toEqual(['Details', 'Steps', 'Settings', 'Schedules', 'History', 'YAML', 'JSON']);
   });
 
-  it('opens a legacy pipeline on today\'s form, with no tabs', () => {
+  it('opens a legacy pipeline on its Details, the other tabs beside it (B2)', () => {
     const { component, asked } = editor({ task: { ...TASK, pipelineId: 'REF_CSV_CHECK_V1' } });
     expect(asked).toEqual(['100167']);
     expect(component.stepsMode()).toBe(false);
@@ -85,6 +86,18 @@ describe('TaskEdit and the step builder', () => {
     const { component, navigate } = editor();
     component.setTab('yaml');
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { tab: 'yaml' }, queryParamsHandling: 'merge', replaceUrl: true }));
+  });
+
+  it('opens Schedules on its own, the builder keeping its last tab (B2)', () => {
+    const { component } = editor({ tab: 'schedules' });
+    expect(component.activeTab()).toBe('schedules');
+    expect(component.builderTab()).toBe('steps');
+  });
+
+  it('opens History as a builder tab (B2)', () => {
+    const { component } = editor({ tab: 'history' });
+    expect(component.activeTab()).toBe('history');
+    expect(component.builderTab()).toBe('history');
   });
 
   it('stays on the tab it was asked for, a text tab included', () => {

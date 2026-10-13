@@ -216,7 +216,11 @@ export interface StepLogLine { level?: string | null; message?: string | null; l
 export interface StepLog { stepExecutionId: number; stepKey: string; attempt: number; lines: StepLogLine[]; }
 
 /** One of the task's schedules (sourceTask.json/fetchAllLinkJobsWithSourceTaskId). */
-export interface LinkedJob { jobId: number; jobName: string; jobStatus?: string | null; execution?: string | null; }
+export interface LinkedJob {
+  jobId: number; jobName: string; jobStatus?: string | null; execution?: string | null;
+  /** The last run's status and when it ran (fetchAllLinkJobsWithSourceTaskId sends both). */
+  jobRunningStatus?: string | null; lastJobRun?: string | null;
+}
 
 /** One run of a job (sourceJob.json/fetchSourceJobQueueListWithJobId). */
 export interface RunRow { jobQueueId: number; jobStatus?: string | null; startTime?: string | null; endTime?: string | null; jobStatusMessage?: string | null; }

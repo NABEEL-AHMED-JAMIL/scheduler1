@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Dialog } from '@angular/cdk/dialog';
-import { Router } from '@angular/router';
+import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Confirm } from '../../../shared/ui/confirm';
@@ -10,16 +10,16 @@ import { StepsApi } from './steps.service';
 import { StepBuilder, savedStepsLayout } from './step-builder';
 import { useMemoryStorage } from '../../../shared/testing/memory-storage';
 import { StepPanel } from './step-panel';
-import { RunDrawer } from './run-drawer';
 import { SampleDialog } from './sample-dialog';
 import { DefinitionView, definitionJson } from './steps.model';
 import { HandedDraft, PipelineDraftHandoff } from './draft-handoff';
 
 /**
  * MIG-249: the step builder on a pipeline's edit page. Ordered step cards (drag, move up/down, delete, open in the
- * side panel), Add step from the Task Registry, Settings, and YAML and JSON tabs showing the same definition; then
- * Validate, Test with sample, Run now, Schedule and Save. Editing in YAML and in the builder save the same definition;
- * validation errors point at the step.
+ * side panel), grouped by stage, Add step from the Task Registry, Settings, History, and YAML and JSON tabs showing
+ * the same definition; Test with sample. Validate, Save and Discard are the page's save bar's (UX review 2026-10-12,
+ * B2), which calls them here; Run now and Schedule are the page header's (task-edit.spec.ts). Editing in YAML and in the
+ * builder save the same definition; validation errors point at the step.
  */
 const VIEW: DefinitionView = {
   legacy: false,
@@ -81,7 +81,6 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
       return { closed: of(reply) };
     }),
   };
-  const router = { navigate: vi.fn() };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -90,14 +89,13 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
       provideZonelessChangeDetection(),
       { provide: StepsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
-      { provide: Router, useValue: router },
+      provideRouter([]),
       { provide: ToastService, useValue: toast },
     ],
   });
   if (opts.offer) TestBed.inject(PipelineDraftHandoff).offer(view.pipelineKey, opts.offer);
   const fixture = TestBed.createComponent(StepBuilder);
   fixture.componentRef.setInput('view', view);
-  fixture.componentRef.setInput('taskDetailId', 1864);
   fixture.componentRef.setInput('canManage', opts.canManage ?? true);
   fixture.componentRef.setInput('isAdmin', opts.isAdmin ?? true);
   fixture.detectChanges();
@@ -106,9 +104,14 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
   const tab = (name: string) => { fixture.componentRef.setInput('tab', name); fixture.detectChanges(); };
   const button = (name: string | RegExp) => Array.from(el.querySelectorAll<HTMLButtonElement>('button'))
     .find(b => { const n = (b.getAttribute('aria-label') || b.textContent || '').trim(); return typeof name === 'string' ? n === name : name.test(n); });
-  const click = (name: string | RegExp) => { const b = button(name); expect(b, String(name)).toBeTruthy(); b!.click(); fixture.detectChanges(); };
+  // The page's save bar (B2) calls these: its Save, Validate and Discard are not the builder's buttons any more.
+  const bar: Record<string, () => void> = { Save: () => builder.save(), Validate: () => builder.validate(), Discard: () => builder.discard() };
+  const click = (name: string | RegExp) => {
+    if (typeof name === 'string' && bar[name]) { bar[name](); fixture.detectChanges(); return; }
+    const b = button(name); expect(b, String(name)).toBeTruthy(); b!.click(); fixture.detectChanges();
+  };
   const cards = () => Array.from(el.querySelectorAll('.step-card')).map(c => c.getAttribute('data-step'));
-  return { fixture, el, builder, api, dialog, opened, router, toast, tab, button, click, cards, setAnswer: (a: unknown) => { answer = a; } };
+  return { fixture, el, builder, api, dialog, opened, toast, tab, button, click, cards, setAnswer: (a: unknown) => { answer = a; } };
 }
 
 describe('StepBuilder -- the step cards', () => {
@@ -123,7 +126,7 @@ describe('StepBuilder -- the step cards', () => {
     click('Move keep up');
     expect(cards()).toEqual(['keep', 'read']);
     expect(builder.dirty()).toBe(true);
-    expect(el.textContent).toContain('Unsaved changes');
+    expect(el.querySelector('[data-step="keep"] .step-index')!.textContent!.trim()).toBe('1');
     click('Move keep down');
     expect(cards()).toEqual(['read', 'keep']);
     expect(builder.dirty()).toBe(false);
@@ -216,7 +219,7 @@ describe('StepBuilder -- a draft handed over (MIG-252)', () => {
       { version: 1, pipelineDefinitionId: 1000, createdBy: 12, dateCreated: '2026-09-29T04:14:59.098917Z' },
     ];
     const { tab, el } = build({ view: { ...VIEW, version: 2, versions } });
-    tab('settings');
+    tab('history');
     const rows = [...el.querySelectorAll('tbody tr')].filter(r => r.textContent!.includes('v2') || r.textContent!.includes('v1'));
     expect(rows.map(r => r.lastElementChild!.textContent!.trim())).toEqual(['Claude Demo Admin', 'User #12']);
   });
@@ -312,12 +315,12 @@ describe('StepBuilder -- one definition, three views', () => {
   });
 
   it('reads the pipeline again after a save, for its new version', () => {
-    const { click, api, builder, el } = build();
+    const { click, api, builder } = build();
     click('Move keep up');
     click('Save');
     expect(api.definition).toHaveBeenCalledWith(100175);
     expect(builder.dirty()).toBe(false);
-    expect(el.textContent).toContain('Version 2');
+    expect(builder.versionText()).toBe('Version 2');
   });
 });
 
@@ -356,9 +359,11 @@ describe('StepBuilder -- Settings', () => {
     expect(builder.draft().settings).toBeUndefined();
   });
 
-  it('lists the saved versions', () => {
+  it('lists the saved versions on History, not on Settings (B2)', () => {
     const { tab, el } = build();
     tab('settings');
+    expect(Array.from(el.querySelectorAll('th')).some(th => th.textContent === 'Version')).toBe(false);
+    tab('history');
     const versions = Array.from(el.querySelectorAll('table')).find(t => t.querySelector('th')!.textContent === 'Version')!;
     expect(versions.textContent).toContain('v1');
   });
@@ -439,45 +444,24 @@ describe('StepBuilder -- Test with sample, Run now, Schedule', () => {
     expect(api.validate).toHaveBeenCalled();
   });
 
-  it('runs the task\'s schedule and opens the run as it happens', () => {
-    const { click, api, opened } = build();
-    click('Run now');
-    expect(api.run).toHaveBeenCalledWith(2848);
-    expect(api.runs).toHaveBeenCalledWith(2848);
-    const drawer = opened.find(o => o.component === RunDrawer)!;
-    expect(drawer.data).toMatchObject({ jobQueueId: 7401, jobId: 2848 });
-  });
-
-  it('saves unsaved changes before it runs, and does not run when the save is refused', () => {
-    const { click, api } = build();
-    click('Move keep up');
-    expect(api.run).not.toHaveBeenCalled();
-    api.save.mockReturnValueOnce(of({ status: 'ERROR', message: 'no', data: { problems: [] } }) as any);
-    click('Save & run now');
-    expect(api.save).toHaveBeenCalledTimes(1);
-    expect(api.run).not.toHaveBeenCalled();
-    click('Save & run now');
-    expect(api.save).toHaveBeenCalledTimes(2);
-    expect(api.run).toHaveBeenCalledWith(2848);
-  });
-
-  it('cannot run a task no schedule runs, and says to schedule one', () => {
-    const { button, el } = build({ jobs: [] });
-    expect(button('Run now')!.disabled).toBe(true);
-    expect(el.textContent).toContain('No schedule runs this pipeline yet');
-  });
-
-  it('opens a new schedule for this task', () => {
-    const { click, router } = build();
-    click('Schedule');
-    expect(router.navigate).toHaveBeenCalledWith(['/pipelines/schedules/new'], { queryParams: { taskDetailId: 1864 } });
-  });
-
-  it('offers no Save, Run now or edits to someone who cannot save', () => {
-    const { button } = build({ canManage: false });
-    expect(button('Save')).toBeUndefined();
-    expect(button('Run now')).toBeUndefined();
+  it('offers no edits to someone who cannot save, and its save saves nothing', async () => {
+    const { button, builder, api } = build({ canManage: false });
+    expect(button(/Test with sample/)).toBeUndefined();
     expect(button('Delete step read')).toBeUndefined();
+    builder.move(1, -1);
+    expect(await builder.saveNow()).toBe(false);
+    expect(api.save).not.toHaveBeenCalled();
+  });
+
+  it('saves for the page\'s save bar, and says whether it saved (B2)', async () => {
+    const { builder, api } = build();
+    expect(await builder.saveNow()).toBe(true);
+    expect(api.save).not.toHaveBeenCalled();
+    builder.move(1, -1);
+    api.save.mockReturnValueOnce(of({ status: 'ERROR', message: 'no', data: { problems: [] } }) as any);
+    expect(await builder.saveNow()).toBe(false);
+    expect(await builder.saveNow()).toBe(true);
+    expect(api.save).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -498,34 +482,45 @@ describe('StepBuilder -- the Task Registry', () => {
     expect(el.textContent).toContain('Only a workspace administrator can add this task.');
   });
 
-  it('lists the workspace\'s tasks under Settings, legacy aside, and switches one', () => {
-    const { tab, el, api, fixture, builder } = build();
-    tab('settings');
-    const rows = Array.from(el.querySelectorAll('[data-task]')).map(r => r.getAttribute('data-task'));
-    expect(rows).toEqual(['sample', 'select', 'filter', 'read_api']);
-    const unavailable = el.querySelector<HTMLInputElement>('[data-task="read_api"] input[role="switch"]')!;
-    expect(unavailable.disabled).toBe(true);
-    expect(el.querySelector('[data-task="read_api"]')!.textContent).toContain('integration-service is not there yet');
-    const select = el.querySelector<HTMLInputElement>('[data-task="select"] input[role="switch"]')!;
-    select.checked = false;
-    select.dispatchEvent(new Event('change'));
-    fixture.detectChanges();
-    expect(api.switchTask).toHaveBeenCalledWith('select', false);
-    expect(builder.tasks().find(t => t.code === 'select')!.enabled).toBe(false);
-    expect(builder.taskOptions().find(o => o.value === 'select')!.disabled).toBe(true);
-  });
-
-  it('puts a switched task back to its default', () => {
-    const { tab, api, click } = build();
-    tab('settings');
-    click('Put Filter rows back to its default');
-    expect(api.switchTask).toHaveBeenCalledWith('filter', null);
-  });
-
-  it('shows no switches to someone who is not a workspace administrator', () => {
-    const { tab, el } = build({ isAdmin: false });
+  it('leaves the workspace\'s task switches to Settings › Task Registry (B2, P7)', () => {
+    const { tab, el } = build();
     tab('settings');
     expect(el.querySelectorAll('[data-task]')).toHaveLength(0);
+    expect(el.querySelectorAll('input[role="switch"]')).toHaveLength(0);
+    const moved = el.querySelector('[data-test="task-switches-moved"] a')!;
+    expect(moved.getAttribute('href')).toBe('/settings/task-registry');
+  });
+});
+
+describe('StepBuilder -- stages and the ways to review (B2)', () => {
+  const STAGED: DefinitionView = { ...VIEW, definition: { version: 1, steps: [
+    { key: 'read', task: 'sample' }, { key: 'check', task: 'validate' }, { key: 'label', task: 'ai_prompt' },
+    { key: 'keep', task: 'select' }, { key: 'ok', task: 'approval', name: 'Clinical sign-off' }, { key: 'save', task: 'save_file' },
+  ] } };
+  const STAGE_TASKS = [...TASKS,
+    { code: 'validate', name: 'Validate', kind: 'Process', backingService: 'integration-service', enabled: true, available: true },
+    { code: 'ai_prompt', name: 'AI prompt', kind: 'Process', backingService: 'ai-service', enabled: true, available: true },
+    { code: 'approval', name: 'Approval', kind: 'Process', backingService: 'core', enabled: true, available: true },
+    { code: 'save_file', name: 'Save File', kind: 'Output', backingService: 'core', enabled: true, available: true },
+  ];
+
+  it('groups the steps by stage, in order, numbered as they run', () => {
+    const { el, cards } = build({ view: STAGED, tasks: STAGE_TASKS });
+    const stages = Array.from(el.querySelectorAll('.step-stage')).map(s => s.getAttribute('data-stage'));
+    expect(stages).toEqual(['read', 'check', 'ai', 'transform', 'review', 'write']);
+    expect(cards()).toEqual(['read', 'check', 'label', 'keep', 'ok', 'save']);
+    expect(el.querySelector('#stage-read')).toBeTruthy();
+    expect(el.querySelector('#stage-write')!.textContent).toContain('Where the results go');
+    expect(el.querySelector('[data-step="save"] .step-index')!.textContent!.trim()).toBe('6');
+  });
+
+  it('names the three ways a person approves the work, each linked (W2)', () => {
+    const { tab, el } = build({ view: STAGED, tasks: STAGE_TASKS });
+    tab('settings');
+    const ways = el.querySelector('[data-test="review-ways"]')!;
+    expect(ways.textContent).toContain('This pipeline has 1 (Clinical sign-off)');
+    const links = Array.from(ways.querySelectorAll('a')).map(a => a.getAttribute('href'));
+    expect(links).toEqual(['/workflows/designer?key=pipeline-run-review', '/workflows/designer?key=pipeline-step-approval']);
   });
 });
 

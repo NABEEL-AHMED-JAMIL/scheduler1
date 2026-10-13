@@ -123,6 +123,8 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
     }
     /* Each way it can run is a card to pick: an icon, a name and a line of what it means. */
     .choice-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+    /* S2: "Also starts when" -- the add-on starts, under the one-of choice. */
+    .form-subsection-title { margin: 1.25rem 0 0.5rem; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
     .choice-card {
       display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.875rem 1rem; text-align: left; cursor: pointer;
       border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-raised);

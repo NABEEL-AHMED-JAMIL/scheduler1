@@ -19,6 +19,7 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { sensitivityText } from '../../shared/ui/sensitivity';
 import { parseTopicPartition } from '../../shared/ui/topic';
 import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
@@ -59,6 +60,16 @@ interface SourceTask {
   sourceTaskType?: { sourceTaskTypeId?: number; serviceName?: string; queueTopicPartition?: string };
   taskPayload?: string;
   totalLinksJobs?: number;
+  /**
+   * UX review 2026-10-12 (B2, P1): what a user needs from the list, from Core's listSourceTask -- the steps in the
+   * latest definition (0: it runs as its legacy step), its outputs, the data's sensitivity, whether its results wait
+   * for a review, and its newest run. Absent from an older Core: the columns read "—".
+   */
+  stepCount?: number | null;
+  outputCount?: number | null;
+  sensitivity?: string | null;
+  reviewRequired?: boolean | null;
+  lastRun?: { jobQueueId: number; jobId: number; jobStatus?: string | null; at?: string | null } | null;
 }
 
 @Component({
@@ -415,6 +426,17 @@ export class Tasks implements OnInit {
   }
 
   /** "topic=scrapping-topic&partitions=[*]" -> "scrapping-topic", read as the editor reads it. */
+  /** The data's sensitivity in words (Public, Internal, Sensitive). */
+  sensitivityText(level: string): string { return sensitivityText(level); }
+
+  /** "8 steps, 3 outputs", "Runs as its legacy step", or "—" from a Core that does not say. */
+  stepsText(task: SourceTask): string {
+    if (task.stepCount == null) return '—';
+    if (task.stepCount === 0) return 'Runs as its legacy step';
+    const outputs = task.outputCount ? `, ${task.outputCount} output${task.outputCount === 1 ? '' : 's'}` : '';
+    return `${task.stepCount} step${task.stepCount === 1 ? '' : 's'}${outputs}`;
+  }
+
   topicOf(raw?: string): string {
     return parseTopicPartition(raw).topic;
   }

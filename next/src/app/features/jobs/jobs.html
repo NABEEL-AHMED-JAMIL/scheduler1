@@ -69,7 +69,7 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, job, task or workspace' : 'Search id, job or task'"
+        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, schedule, pipeline or workspace' : 'Search id, schedule or pipeline'"
                aria-label="Search jobs"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
@@ -106,14 +106,15 @@
       <thead>
         <tr>
           <th class="w-10">
-            <input type="checkbox" class="checkbox" aria-label="Select all jobs on this page"
+            <input type="checkbox" class="checkbox" aria-label="Select all schedules on this page"
                    [checked]="allOnPageSelected()"
                    [indeterminate]="someOnPageSelected()"
                    [disabled]="!selectableOnPage().length"
                    (change)="toggleSelectAllOnPage()" />
           </th>
           <th class="w-8"></th>
-          <th>Job</th>
+          <!-- UX review 2026-10-12 (G12, S1): one word per thing -- a schedule runs a pipeline. -->
+          <th>Schedule</th>
           <!-- Whose job it is, beside its name, for the one role whose list mixes workspaces. It waits
                for xl like Task and Execution; on a narrower screen the Workspace filter still narrows. -->
           @if (seesWorkspaces()) {
@@ -122,16 +123,17 @@
           <!-- Task, Execution and Created wait for xl, as the metadata columns wait for 2xl: at 1024
                they pushed Run status and the row's menu past the card edge. None is lost -- the
                task is in the row's panel, and Schedule already reads "On demand" for Manual. -->
-          <th class="hidden xl:table-cell">Task</th>
-          <th class="hidden xl:table-cell">Execution</th>
+          <th class="hidden xl:table-cell">Pipeline</th>
+          <th class="hidden xl:table-cell">Mode</th>
           <!-- A floor so "Ends 2026-12-31" is not broken at its hyphens. -->
-          <th class="min-w-40 xl:min-w-52">Schedule</th>
-          <th>Next / last run</th>
+          <th class="min-w-40 xl:min-w-52">When</th>
           <th class="hidden xl:table-cell">Created</th>
-          <th>Run status</th>
           <!-- Metadata columns wait for a wide screen, as on Tasks; the detail row still spans them. -->
           <th class="hidden 2xl:table-cell">Created by</th>
           <th class="hidden 2xl:table-cell">Updated by</th>
+          <!-- S1: the runs and the schedule's own state side by side at the right, not two pills far apart. -->
+          <th>Next / last run</th>
+          <th>Run status</th>
           <th class="text-right">State</th>
           <th class="w-12 col-pin-right th-actions">Actions</th>
         </tr>
@@ -145,7 +147,7 @@
                      [checked]="selected().has(job.jobId)"
                      [disabled]="!selectable(job)"
                      [attr.aria-label]="'Select ' + job.jobName"
-                     [title]="selectable(job) ? '' : (job.jobStatus === 'Delete' ? 'Deleted jobs cannot be selected' : 'Already queued or running')"
+                     [title]="selectable(job) ? '' : (job.jobStatus === 'Delete' ? 'Deleted schedules cannot be selected' : 'Already queued or running')"
                      (change)="toggleSelect(job)" />
             </td>
             <td>
@@ -195,6 +197,15 @@
                 </div>
               }
             </td>
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ job.dateCreated ? (job.dateCreated | serverTime:'date') : '—' }}
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.createdByName || ''">{{ job.createdByName || '—' }}</span>
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.updatedByName || ''">{{ job.updatedByName || '—' }}</span>
+            </td>
             <td class="whitespace-nowrap">
               @if (nextRun(job); as nextRunAt) {
                 <div class="text-[color:var(--text-secondary)]">
@@ -204,9 +215,6 @@
               <div class="text-xs text-[color:var(--text-muted)]">
                 {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'recent')) : 'Never run' }}
               </div>
-            </td>
-            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ job.dateCreated ? (job.dateCreated | serverTime:'date') : '—' }}
             </td>
             <td>
               <div class="flex items-center gap-1.5">
@@ -219,19 +227,13 @@
                 }
               </div>
             </td>
-            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
-              <span class="block truncate" [title]="job.createdByName || ''">{{ job.createdByName || '—' }}</span>
-            </td>
-            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
-              <span class="block truncate" [title]="job.updatedByName || ''">{{ job.updatedByName || '—' }}</span>
-            </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <!-- The pinned cell paints its own background over the scrolled columns, which also
                  painted over the selected row's tint; it takes the tint back here. -->
             <td class="text-right col-pin-right"
                 [class.bg-[var(--surface-sunken)]]="selected().has(job.jobId)">
               <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu" (cdkMenuOpened)="checkAiSteps(job)"
-                      [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('job #' + job.jobId))">
+                      [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('schedule #' + job.jobId))">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>

@@ -57,11 +57,11 @@ async function render(role: Role, rows: SourceJob[] = ROWS) {
 }
 
 describe('Jobs workspace column and filter (platform administrator)', () => {
-  it('shows a Workspace column after Job, with each row\'s workspace', async () => {
+  it('shows a Workspace column after Schedule, with each row\'s workspace', async () => {
     const { headings, bodyRows } = await render('PLATFORM_ADMIN');
     const heads = headings();
     expect(heads).toContain('Workspace');
-    expect(heads.indexOf('Workspace')).toBe(heads.indexOf('Job') + 1);
+    expect(heads.indexOf('Workspace')).toBe(heads.indexOf('Schedule') + 1);
     const at = heads.indexOf('Workspace');
     const cells = bodyRows().map(tr => (tr.children[at]?.textContent ?? '').trim());
     expect(cells).toEqual(['Acme Ops', 'Borealis', 'Workspace #3']);

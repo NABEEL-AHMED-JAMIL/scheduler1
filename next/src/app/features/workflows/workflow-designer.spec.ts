@@ -246,3 +246,20 @@ describe('Workflow designer -- a sign-in with no workspace', () => {
     expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();
   });
 });
+
+/** UX review 2026-10-12 (W2): a pipeline's workflow says where a pipeline switches it on. */
+describe('Workflow designer -- pipeline workflows link back (W2)', () => {
+  it('says a run review is switched on in a pipeline\'s Settings › Review, and a purchase workflow says nothing of pipelines', () => {
+    const plain = screenWith();
+    expect(plain.el.querySelector('[data-test="pipeline-link"]')).toBeNull();
+    const { screen, el, fixture } = screenWith();
+    screen.current.set({ ...WORKFLOW, key: 'pipeline-run-review', name: 'Pipeline run review', subjectType: 'pipeline_run' });
+    fixture.detectChanges();
+    const note = el.querySelector('[data-test="pipeline-link"]')!;
+    expect(note.textContent).toContain('Settings › Review');
+    expect(note.querySelector('a')!.getAttribute('href')).toBe('/pipelines/list');
+    screen.current.set({ ...WORKFLOW, key: 'pipeline-step-approval', name: 'Pipeline step approval', subjectType: 'pipeline_step' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="pipeline-link"]')!.textContent).toContain('Approval step');
+  });
+});

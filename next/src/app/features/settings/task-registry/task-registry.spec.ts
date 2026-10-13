@@ -183,3 +183,28 @@ describe('Task Registry -- a Legacy row saves exactly as the Pipelines list did 
     expect(toast.error).toHaveBeenCalledWith('The pipeline could not be deleted.');
   });
 });
+
+/** UX review 2026-10-12 (B2, P7): the workspace's task switches moved here from a pipeline's Settings tab. */
+describe('Task Registry -- the workspace\'s task switches', () => {
+  it('switches a step task on its row and shows Core\'s answer; a legacy row has no switch', () => {
+    const { screen, toast } = screenWith();
+    const post = TestBed.inject(HttpClient).post as unknown as ReturnType<typeof vi.fn>;
+    post.mockReturnValue(of({ status: 'SUCCESS', message: "'filter' is off in this workspace.",
+      data: { ...TASKS[0], enabled: false, overridden: true, disabledReason: 'Switched off in this workspace.' } }));
+    expect(screen.canSwitch()).toBe(true);
+    const filter = screen.rows().find(r => r.code === 'filter')!;
+    screen.switchTask(filter.task, false);
+    expect(post).toHaveBeenCalledWith(expect.stringContaining('/pipeline.json/steps/tasks/enabled'), { code: 'filter', enabled: false });
+    expect(toast.success).toHaveBeenCalled();
+    expect(screen.rows().find(r => r.code === 'filter')!).toMatchObject({ state: 'Off', overridden: true });
+  });
+
+  it('keeps the row as it was when Core refuses', () => {
+    const { screen, toast } = screenWith();
+    const post = TestBed.inject(HttpClient).post as unknown as ReturnType<typeof vi.fn>;
+    post.mockReturnValue(of({ status: 'ERROR', message: 'Only a workspace administrator switches tasks.' }));
+    screen.switchTask(screen.rows().find(r => r.code === 'filter')!.task, false);
+    expect(toast.error).toHaveBeenCalledWith('Only a workspace administrator switches tasks.');
+    expect(screen.rows().find(r => r.code === 'filter')!.state).toBe('On');
+  });
+});

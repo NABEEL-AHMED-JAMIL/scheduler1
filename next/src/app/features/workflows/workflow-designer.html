@@ -140,6 +140,20 @@
             @if (dirty()) { <span class="pill pill-warn" data-test="unpublished-chip"><app-icon name="edit" size="0.9em" />Unpublished changes</span> }
           </div>
           @if (wf.description) { <p class="designer-desc">{{ wf.description }}</p> }
+          <!-- UX review 2026-10-12 (W2): a pipeline's review is built in three places; a pipeline workflow says where it is
+               switched on, so the three link to each other. -->
+          @switch (wf.subjectType) {
+            @case ('pipeline_run') {
+              <p class="designer-desc" data-test="pipeline-link">Used when a pipeline's results need our team's review: a pipeline's
+                <a class="link-inline" routerLink="/pipelines/list">Settings › Review</a> switches it on, and the run waits in the Review inbox.
+                For a pause at one step instead, a pipeline adds an Approval step (Pipeline step approval).</p>
+            }
+            @case ('pipeline_step') {
+              <p class="designer-desc" data-test="pipeline-link">Used by a pipeline's Approval step: the run pauses at that step until it is approved.
+                Add one from Add step on a <a class="link-inline" routerLink="/pipelines/list">pipeline</a>'s Steps tab;
+                to review a whole run's results instead, use the pipeline's Settings › Review (Pipeline run review).</p>
+            }
+          }
           <div class="tabs designer-tabs" role="tablist" aria-label="View">
             <button type="button" class="tab" role="tab" [class.tab-active]="view() === 'steps'" [attr.aria-selected]="view() === 'steps'" (click)="view.set('steps')" data-test="tab-steps">
               <app-icon name="layers" />Steps <span class="pill pill-neutral">{{ steps().length }}</span></button>

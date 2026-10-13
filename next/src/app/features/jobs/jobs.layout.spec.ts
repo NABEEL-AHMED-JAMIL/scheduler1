@@ -50,17 +50,23 @@ describe('Run history layout', () => {
 });
 
 describe('Jobs table layout', () => {
-  it('waits for a wide screen before showing Task, Execution and Created', async () => {
+  it('waits for a wide screen before showing Pipeline, Mode and Created', async () => {
     const html = await read('jobs.html');
     const cells: Array<[string, string]> = [
-      ['>Task</th>', '@if (job.taskDetail?.taskName)'],
-      ['>Execution</th>', "@if (job.execution === 'Auto')"],
+      ['>Pipeline</th>', '@if (job.taskDetail?.taskName)'],
+      ['>Mode</th>', "@if (job.execution === 'Auto')"],
       ['>Created</th>', '{{ job.dateCreated ?'],
     ];
     for (const [head, cell] of cells) {
       expect(classesOf(html, head, 'th'), head).toEqual(expect.arrayContaining(['hidden', 'xl:table-cell']));
       expect(classesOf(html, cell), cell).toEqual(expect.arrayContaining(['hidden', 'xl:table-cell']));
     }
+  });
+
+  it('puts Run status and State side by side at the right (S1)', async () => {
+    const html = await read('jobs.html');
+    const heads = [...html.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map(m => m[1].trim()).filter(Boolean);
+    expect(heads.slice(-4)).toEqual(['Next / last run', 'Run status', 'State', 'Actions']);
   });
 
   it('keeps the actions pinned to the right edge', async () => {
@@ -102,5 +108,25 @@ describe('Job editor weekday toggles', () => {
     expect(block).toContain('name="check"');
     const ts = await read('edit/job-edit.ts');
     expect(ts).toMatch(/\.seg-multi \.seg-btn\[aria-pressed="true"\]\s*\{[^}]*var\(--btn-primary-bg\)/);
+  });
+});
+
+/** UX review 2026-10-12 (S2): the schedule's form keeps the one-of choice apart from the starts that add to it. */
+describe('Schedule form -- When it runs (S2)', () => {
+  it('puts "Also starts when" under its own label, after the one-of choice, and numbers AI models', async () => {
+    const html = await read('edit/job-edit.html');
+    const when = html.slice(html.indexOf('When it runs</h2>'));
+    const radios = when.indexOf('role="radiogroup"');
+    const also = when.indexOf('Also starts when</h3>');
+    expect(radios).toBeGreaterThanOrEqual(0);
+    expect(also).toBeGreaterThan(radios);
+    expect(when.slice(radios, also)).not.toContain('id="onArrival"');
+    expect(when.slice(also)).toContain('id="onArrival"');
+    expect(html).toContain('<span class="step-no">4</span>AI models');
+  });
+
+  it('links back to the pipeline it runs', async () => {
+    const html = await read('edit/job-edit.html');
+    expect(html).toContain(`data-test="open-pipeline" [routerLink]="['/pipelines', pid, 'edit']"`);
   });
 });

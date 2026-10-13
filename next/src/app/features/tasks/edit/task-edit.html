@@ -1,7 +1,37 @@
 <div class="page-form">
   <!-- UX review 2026-10-12 (A2, P4): the pipeline's name as the title, its status beside it; the breadcrumb leads back. -->
-  <app-page-header [title]="heading()" subtitle="A pipeline describes one unit of work and where it reads and writes.">
+  <!-- UX review 2026-10-12 (B2): the pipeline's name, its status and version beside it; Run now and Schedule on the
+       title's line (Run now the one primary). Saving is the save bar's, at the editor's foot. -->
+  <app-page-header [title]="heading()" subtitle="A pipeline describes one unit of work: where it reads, what it does to the rows, who reviews them and where they go.">
     @if (isEdit() && loadedStatus()) { <app-status pills [label]="loadedStatus()" /> }
+    @if (versionPill(); as v) { <span pills class="pill pill-neutral mono" [title]="'Steps version ' + v">v{{ v }}</span> }
+    @if (isEdit() && !loading() && !loadError()) {
+      @if (!locked()) {
+        <button type="button" class="btn btn-default btn-sm" data-test="header-schedule" [disabled]="!taskIdNumber()" (click)="schedule()">
+          <app-icon name="calendar" />Schedule
+        </button>
+      }
+      @if (jobs().length > 1) {
+        <button type="button" class="btn btn-primary btn-sm" data-test="header-run" [disabled]="!!running()" [cdkMenuTriggerFor]="runMenu"
+                [attr.title]="runHint() || null">
+          <app-icon name="play" [class.spin]="running()" />{{ runLabel() }}<app-icon name="chevronDown" size="0.85em" />
+        </button>
+        <ng-template #runMenu>
+          <div cdkMenu class="card shadow-xl py-1 min-w-64 text-sm" aria-label="Which schedule to run">
+            @for (j of jobs(); track j.jobId) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="runNow(j.jobId)">
+                <app-icon name="play" />{{ j.jobName }} <span class="text-[color:var(--text-muted)] mono text-xs">#{{ j.jobId }}</span>
+              </button>
+            }
+          </div>
+        </ng-template>
+      } @else {
+        <button type="button" class="btn btn-primary btn-sm" data-test="header-run" [disabled]="!!running() || !jobs().length"
+                [attr.title]="runHint() || null" (click)="runNow()">
+          <app-icon name="play" [class.spin]="running()" />{{ runLabel() }}
+        </button>
+      }
+    }
   </app-page-header>
   <app-managed-banner what="pipelines" />
 
@@ -18,13 +48,38 @@
       </app-load-error>
     </div>
   } @else {
-    <!-- MIG-249: a pipeline with steps is edited as steps; Details is today's form, unchanged. A legacy pipeline
-         shows no tabs at all -- the page below is the whole of it, as before. -->
-    @if (stepsMode()) {
+    @if (isEdit()) {
+      <!-- UX review 2026-10-12 (B2, P5): the pipeline's parts in the order they are set up, each with its state and a
+           way to where it is set: Source -> Steps -> Review -> Outputs -> Schedule & triggers. -->
+      <nav class="card p-0 overflow-hidden" aria-label="Pipeline overview" data-test="pipeline-overview">
+        <ol class="pipeline-overview">
+          @for (part of overview(); track part.id; let n = $index) {
+            <li>
+              <button type="button" class="pipeline-part" [attr.data-part]="part.id" [attr.data-state]="part.state"
+                      [class.is-current]="partIsCurrent(part)" (click)="goTo(part)"
+                      [attr.aria-label]="(n + 1) + '. ' + part.label + ': ' + stateWord(part.state) + '. ' + part.detail">
+                <span class="pipeline-part-state" aria-hidden="true">
+                  @switch (part.state) {
+                    @case ('done') { <app-icon name="check" size="0.8em" /> }
+                    @case ('missing') { <app-icon name="alert" size="0.8em" /> }
+                    @default { {{ n + 1 }} }
+                  }
+                </span>
+                <span class="min-w-0">
+                  <span class="pipeline-part-label">{{ part.label }} <span class="pipeline-part-word">{{ stateWord(part.state) }}</span></span>
+                  <span class="pipeline-part-detail">{{ part.detail }}</span>
+                </span>
+              </button>
+            </li>
+          }
+        </ol>
+      </nav>
+      <!-- MIG-249: Details is the pipeline's own form; Steps, Settings, History, YAML and JSON are the step builder's;
+           Schedules lists what runs it. -->
       <div class="tabs" role="tablist" aria-label="Pipeline">
-        @for (t of pageTabs; track t.id) {
+        @for (t of pageTabs(); track t.id) {
           <button type="button" role="tab" class="tab" [class.tab-active]="activeTab() === t.id" [attr.aria-selected]="activeTab() === t.id"
-                  (click)="setTab(t.id)">{{ t.label }}</button>
+                  [attr.data-tab]="t.id" (click)="setTab(t.id)">{{ t.label }}</button>
         }
       </div>
     }
@@ -42,7 +97,7 @@
         <button type="button" class="btn btn-primary btn-sm" (click)="setTab('steps')"><app-icon name="layers" />Build its steps</button>
       </div>
     }
-    <form [formGroup]="form" (ngSubmit)="save()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
+    <form [formGroup]="form" (ngSubmit)="saveAll()" class="card p-4" [class.hidden]="activeTab() !== 'details'">
       <!-- MIG-254: read-only in a MANAGED workspace (an unstyled block fieldset: .form-lock). -->
       <fieldset class="form-lock" [disabled]="locked()">
       <div class="form-section">
@@ -213,18 +268,68 @@
       }
 
       </fieldset>
-      <!-- UX review 2026-10-12 (A5, G6, P6): one save bar, stuck to the editor's foot: the change state on the left, Cancel
-           then the primary on the right. -->
-      <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [state]="form.dirty ? 'Unsaved changes' : 'No changes'" label="Save the pipeline">
-        <a routerLink="/pipelines/list" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
-        <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
-          {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create pipeline') }}
-        </button>
-      </app-actions-bar>
     </form>
     @if (stepsMode() && stepsView(); as view) {
-      <app-step-builder [class.hidden]="activeTab() === 'details'" [view]="view" [tab]="builderTab()" [taskDetailId]="taskIdNumber()"
+      <app-step-builder [class.hidden]="activeTab() === 'details' || activeTab() === 'schedules'" [view]="view" [tab]="builderTab()"
                         [canManage]="!locked()" [isAdmin]="isAdmin()" (saved)="stepsSaved($event)" />
+    }
+    @if (activeTab() === 'schedules') {
+      <app-section title="Schedules & triggers" [card]="true" data-test="pipeline-schedules"
+                   sub="When this pipeline runs. A schedule runs it on a timetable or only when started; it can also start when a file arrives or a document is approved (set on the schedule).">
+        @if (!locked()) {
+          <button section-actions type="button" class="btn btn-default btn-sm" [disabled]="!taskIdNumber()" (click)="schedule()"><app-icon name="plus" />New schedule</button>
+        }
+        @if (!jobsLoaded()) {
+          <p class="text-sm text-[color:var(--text-muted)]">Reading the schedules…</p>
+        } @else if (jobs().length) {
+          <div class="overflow-x-auto">
+            <table class="table-modern">
+              <thead><tr><th>Schedule</th><th>Runs</th><th>Last run</th><th class="text-right">State</th></tr></thead>
+              <tbody>
+                @for (j of jobs(); track j.jobId) {
+                  <tr [attr.data-job]="j.jobId">
+                    <td><a class="link-inline font-medium" [routerLink]="['/pipelines/schedules', j.jobId, 'edit']">{{ j.jobName }}</a>
+                      <span class="mono text-xs text-[color:var(--text-muted)] ml-1">#{{ j.jobId }}</span></td>
+                    <td class="text-sm">{{ j.execution === 'Manual' ? 'Only when started' : 'On a timetable' }}</td>
+                    <td class="text-sm whitespace-nowrap">
+                      @if (j.lastJobRun) {
+                        <a class="link-inline inline-flex items-center gap-1.5" [routerLink]="['/pipelines/schedules', j.jobId, 'executions']">
+                          <app-status [label]="j.jobRunningStatus || '—'" />{{ j.lastJobRun | serverTime:'recent' }}
+                        </a>
+                      } @else { <span class="text-[color:var(--text-muted)]">Never</span> }
+                    </td>
+                    <td class="text-right"><app-status [label]="j.jobStatus || 'Active'" [quiet]="true" /></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <app-empty-state icon="calendar" title="Not scheduled yet"
+                           message="A schedule runs this pipeline on a timetable, when a file arrives or a document is approved, or only when someone presses Run now.">
+            @if (!locked()) { <button type="button" class="btn btn-primary btn-sm" [disabled]="!taskIdNumber()" (click)="schedule()"><app-icon name="plus" />New schedule</button> }
+          </app-empty-state>
+        }
+      </app-section>
+    }
+    <!-- UX review 2026-10-12 (A5, G6, P6, B2): the editor's one save place, stuck to its foot on every tab: the change
+         state on the left; Discard, Validate and Save on the right. Saves the details and the steps alike. -->
+    @if (activeTab() !== 'schedules') {
+      <app-actions-bar class="rounded-b-card" [state]="saveState()" label="Save the pipeline" data-test="pipeline-save-bar">
+        @if (!isEdit()) {
+          <a routerLink="/pipelines/list" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
+        } @else if (dirty() && !locked()) {
+          <button type="button" class="btn btn-ghost" [disabled]="saving()" (click)="discardAll()"><app-icon name="close" />Discard</button>
+        }
+        @if (builder(); as b) {
+          <button type="button" class="btn btn-default" data-test="validate" [disabled]="!!b.busy()" (click)="b.validate()">
+            <app-icon name="checkCircle" [class.spin]="b.busy() === 'validate'" />Validate
+          </button>
+        }
+        <button type="button" class="btn btn-primary" data-test="save" [disabled]="saving() || locked() || (isEdit() && !dirty())" (click)="saveAll()">
+          {{ saving() ? 'Saving…' : (isEdit() ? 'Save' : 'Create pipeline') }}
+        </button>
+      </app-actions-bar>
     }
   }
 </div>

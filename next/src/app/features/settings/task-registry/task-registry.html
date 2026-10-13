@@ -109,7 +109,7 @@
           <th>Kind</th>
           <th>Service</th>
           <th>Input → output</th>
-          <th>State</th>
+          <th>{{ canSwitch() ? 'In this workspace' : 'State' }}</th>
           <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>
@@ -143,7 +143,17 @@
             </td>
             <td class="text-xs whitespace-nowrap">{{ row.input }} <span class="text-[color:var(--text-muted)]">→</span> {{ row.output }}</td>
             <td class="text-xs max-w-72">
-              <app-task-state [state]="row.state" [reason]="row.reason" [overridden]="row.overridden" />
+              @if (canSwitch() && !row.legacy) {
+                <!-- B2 (P7, P8): the switch is the state's control -- one thing that says On or Off, not a pill and a box. -->
+                <div class="flex items-center gap-2" [attr.data-switch]="row.code">
+                  <app-task-switch [task]="row.task" [busy]="!!switching()" (switched)="switchTask(row.task, $event)" />
+                  <span class="font-medium">{{ row.state }}</span>
+                  @if (row.overridden) { <span class="pill pill-neutral" title="This workspace switched it; Default puts it back">Switched here</span> }
+                </div>
+                @if (row.reason) { <p class="mt-1 text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">{{ row.reason }}</p> }
+              } @else {
+                <app-task-state [state]="row.state" [reason]="row.reason" [overridden]="row.overridden" />
+              }
             </td>
             <td>
               @if (row.pipeline; as p) {
