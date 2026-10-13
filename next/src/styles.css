@@ -1703,6 +1703,8 @@ html.dark {
     border-color: var(--border-subtle);
   }
   .form-section-title { @apply text-sm font-semibold mb-4; }
+  /* A group of fields under a legend reads as a section, never as one more field label (UX review 2026-10-12, G11). */
+  .form-legend { @apply text-sm font-semibold mb-3; color: var(--text-primary); }
   /* MIG-254: a MANAGED workspace's editors disable everything through one fieldset, an unstyled block. Chromium
      sometimes never lays out the inside of a size container within a fieldset (on a cold load the task form's
      Basics had a 0-high section and an unresolved grid, about half the time), so nothing in the lock is a
@@ -2583,3 +2585,6 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .ask-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, 34rem); column-gap: 1.5rem; align-items: start; }
   .ask-split > .ask-sources { border-top: 0; padding-top: 0; border-left: 1px solid var(--border-subtle); padding-left: 1rem; }
 }
+
+/* The top bar's active link (Home): unlayered, so it outranks the link's own colour utilities. */
+.nav-top-active { color: var(--accent-text); background: var(--accent-soft); }

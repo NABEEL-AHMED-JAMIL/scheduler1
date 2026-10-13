@@ -1,13 +1,13 @@
 import { Component, DestroyRef, HostListener, ViewContainerRef, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
-import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { roleLabel } from '../../core/auth/auth.models';
 import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
-import { NAV, NavChild, NavItem } from '../../core/nav/nav-tree';
+import { NAV, NavChild, NavItem, placeOf } from '../../core/nav/nav-tree';
 import { NotificationBell } from './notification-bell';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
@@ -22,7 +22,7 @@ const COLLAPSED_KEY = 'etl_nav_collapsed';
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, NgTemplateOutlet, Icon, BrandMark, NotificationBell],
+  imports: [RouterOutlet, RouterLink, NgTemplateOutlet, Icon, BrandMark, NotificationBell],
   templateUrl: './shell.html',
 })
 export class Shell {
@@ -158,11 +158,24 @@ export class Shell {
     this.openMenu.update(current => (current === label ? null : label));
   }
 
+  /**
+   * Where the current address sits in the menu: the group, and the one entry whose address is the longest prefix of it
+   * -- the same answer the breadcrumb gives. A prefix match per link lit two entries at once once the groups mixed
+   * sections (Pipelines under Build, Runs at /pipelines/executions under Run & review).
+   */
+  private readonly place = computed(() => placeOf(this.currentUrl()));
+
   /** True while the current route is one of this section's children -- open or not. */
   isSectionActive(item: NavItem): boolean {
-    const url = this.currentUrl();
-    const path = url.split(/[?#]/)[0];
-    return !!item.children?.some(child => path === child.path || path.startsWith(child.path + '/'));
+    return this.place().group?.label === item.label;
+  }
+
+  /** True for the one entry the current address belongs to. */
+  isActive(child: NavChild | NavItem): boolean {
+    const at = this.place().entry;
+    if (!at) return false;
+    const query = (c: NavChild | NavItem) => ('query' in c ? JSON.stringify(c.query ?? null) : 'null');
+    return at.path === child.path && query(at) === query(child);
   }
 
   @HostListener('document:click', ['$event'])

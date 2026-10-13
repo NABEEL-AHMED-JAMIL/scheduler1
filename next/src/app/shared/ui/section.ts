@@ -31,8 +31,8 @@ import { Component, ViewEncapsulation, input } from '@angular/core';
     <header class="ui-section-head">
       <div class="min-w-0 flex-1">
         @switch (level()) {
-          @case (3) { <h3 class="section-title">@if (number()) { <span class="section-num">{{ number() }}</span> }{{ title() }}</h3> }
-          @default { <h2 class="section-title">@if (number()) { <span class="section-num">{{ number() }}</span> }{{ title() }}</h2> }
+          @case (3) { <h3 class="section-title">@if (number()) { <span class="section-num">{{ number() }}</span>{{ " " }}}{{ title() }}</h3> }
+          @default { <h2 class="section-title">@if (number()) { <span class="section-num">{{ number() }}</span>{{ " " }}}{{ title() }}</h2> }
         }
         @if (sub()) { <p class="section-sub">{{ sub() }}</p> }
         <ng-content select="[sub]" />

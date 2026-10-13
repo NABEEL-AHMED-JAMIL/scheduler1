@@ -13,9 +13,8 @@
       <nav class="hidden nav:flex wide:hidden items-center gap-0.5 flex-1" aria-label="Main menu">
         @for (item of nav(); track item.label; let i = $index, count = $count) {
           @if (item.path) {
-            <a [routerLink]="item.path"
-               routerLinkActive="!text-accent !bg-accent-soft"
-               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+            <a [routerLink]="item.path" [class.nav-top-active]="isActive(item)"
+               [attr.aria-current]="isActive(item) ? 'page' : null"
                class="px-1 xl:px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
                       text-[color:var(--text-secondary)]
                       hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]">
@@ -156,8 +155,7 @@
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path" (click)="mobileOpen.set(false)"
-               routerLinkActive="nav-child-active"
-               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+               [class.nav-child-active]="isActive(item)" [attr.aria-current]="isActive(item) ? 'page' : null"
                class="nav-child font-medium">
               @if (item.icon) { <app-icon [name]="item.icon" size="1em" class="nav-child-icon" /> }
               <span class="text-sm">{{ item.label }}</span>
@@ -187,7 +185,7 @@
       <nav class="app-sidebar-scroll">
         @for (item of nav(); track item.label) {
           @if (item.path) {
-            <a [routerLink]="item.path" routerLinkActive="nav-child-active" [routerLinkActiveOptions]="{ exact: false }"
+            <a [routerLink]="item.path" [class.nav-child-active]="isActive(item)" [attr.aria-current]="isActive(item) ? 'page' : null"
                class="nav-child side-link font-medium" [attr.title]="collapsed() ? item.label : null">
               <app-icon [name]="item.icon || 'chart'" size="1em" class="nav-child-icon" />
               <span class="side-label text-sm">{{ item.label }}</span>
@@ -225,7 +223,7 @@
                 @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
                 @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
                   <a [routerLink]="child.path" [queryParams]="child.query ?? null"
-                     routerLinkActive="nav-child-active" [routerLinkActiveOptions]="{ exact: !!child.exact }"
+                     [class.nav-child-active]="isActive(child)" [attr.aria-current]="isActive(child) ? 'page' : null"
                      class="nav-child side-link" [attr.title]="child.hint || null">
                     <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                     <span class="side-label text-sm">{{ child.label }}</span>
@@ -258,8 +256,7 @@
      sidebar's flyouts and the phone panel. -->
 <ng-template #entry let-child>
   <a [routerLink]="child.path" [queryParams]="child.query ?? null" (click)="openMenu.set(null); mobileOpen.set(false)"
-     routerLinkActive="nav-child-active"
-     [routerLinkActiveOptions]="{ exact: !!child.exact }"
+     [class.nav-child-active]="isActive(child)" [attr.aria-current]="isActive(child) ? 'page' : null"
      class="nav-child">
     <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
     <span class="min-w-0">

@@ -18,7 +18,7 @@ import { Component, ViewEncapsulation } from '@angular/core';
     /* Twelve columns; every field the whole row below 48rem. */
     .form-row { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: 1.25rem; row-gap: 1.25rem; }
     .form-row > * { grid-column: span 12; min-width: 0; }
-    .form-row + .form-row { margin-top: 1.25rem; }
+    .form-row + * { margin-top: 1.25rem; }
     @media (min-width: 48rem) {
       .form-row > .fr-2 { grid-column: span 2; }
       .form-row > .fr-3 { grid-column: span 3; }

@@ -9,7 +9,7 @@ import { Icon } from './icon';
 @Component({
   selector: 'app-refresh-button',
   imports: [Icon],
-  host: { 'data-refresh': '', class: 'contents' },
+  host: { 'data-refresh': '', class: 'refresh-host inline-flex' },
   styles: `
     .refresh-btn { position: relative; }
     .refresh-live { position: absolute; top: 0.1875rem; right: 0.1875rem; width: 0.375rem; height: 0.375rem; }

@@ -59,10 +59,13 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
   selector: 'app-table-shell',
   imports: [Icon, BlurLoader, LoadError, RowSnap, EmptyState],
   styles: `
+    /* UX review 2026-10-12 (A6, G7): the filters start straight after the heading (or at the left edge when the heading
+       takes its own line), and Columns keeps the far right. Pushed right, they left 50-95px of nothing on the left. */
     .table-toolbar-controls {
-      display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end;
+      display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-start;
       gap: 0.5rem; min-width: 0;
     }
+    .table-toolbar-columns { margin-left: auto; }
     /* The search box grows into the line's free room and shrinks before anything wraps; pages' own max-w-* caps
        made it the first thing cut ("Search name, code, service or t"). */
     .table-toolbar-controls ::ng-deep .search-field { flex: 1 1 15rem; min-width: 12rem; max-width: 24rem; }
@@ -90,7 +93,7 @@ export function markNumberColumns(table: HTMLTableElement, labels: string[]): vo
         @if (columns().length >= 5) {
           <!-- Owner, 2026-09-24: choose which columns to see. Read from the table's own headings, so every
                list gets it; remembered per table. Blank and Actions columns always stay. -->
-          <div class="relative">
+          <div class="relative table-toolbar-columns">
             <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="columnsOpen()"
                     (click)="columnsOpen.set(!columnsOpen())" (keydown.escape)="columnsOpen.set(false)">
               <app-icon name="eye" />Columns

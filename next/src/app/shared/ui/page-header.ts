@@ -1,6 +1,6 @@
-import { Component, ViewEncapsulation, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, ViewEncapsulation, afterNextRender, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { NavigationEnd, Router, RouterLink } from '@angular/router';
+import { NavigationEnd, Router } from '@angular/router';
 import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
 
 /**
@@ -26,7 +26,6 @@ import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
  */
 @Component({
   selector: 'app-page-header',
-  imports: [RouterLink],
   host: { class: 'page-header' },
   // Global on purpose: the rules order and space the content a page projects into it.
   encapsulation: ViewEncapsulation.None,
@@ -41,17 +40,21 @@ import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
     .breadcrumbs a { color: var(--text-muted); }
     .breadcrumbs a:hover { color: var(--text-primary); text-decoration: underline; text-underline-offset: 2px; }
     /* The actions sit on the title's line, not on the subtitle's last line. */
-    .page-head.is-header { align-items: flex-start; }
+    .page-header > .page-head { align-items: flex-start; }
     .page-head-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; min-width: 0; }
     .page-head-title > .page-title { min-width: 0; overflow-wrap: anywhere; }
-    .page-head-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; min-height: 2rem; }
+    .page-head-actions,
+    .page-header > .page-head > div:last-child:not(:first-child) {
+      display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; min-height: 2rem;
+    }
     .page-head-actions:empty { display: none; }
     /* The fixed order (A2, G3): Refresh first, the secondary buttons, the overflow, and the one primary rightmost --
        whatever order a template writes them in. A wrapper the template keeps (a div of buttons) is laid out the same. */
     .page-head-actions > div:not([data-overflow]) { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 0.5rem; }
-    .page-head-actions .refresh-btn { order: -1; }
-    .page-head-actions > [data-overflow], .page-head-actions > div > [data-overflow] { order: 9; }
-    .page-head-actions > .btn-primary, .page-head-actions > div > .btn-primary { order: 10; }
+    .page-head-actions > .refresh-host, .page-header > .page-head > div:last-child:not(:first-child) > .refresh-host { order: -1; }
+    .page-header :is(.page-head-actions, .page-head > div:last-child:not(:first-child)) > [data-overflow] { order: 9; }
+    .page-header :is(.page-head-actions, .page-head > div:last-child:not(:first-child)) > .btn-primary { order: 10; }
+    .page-head-actions > div > .btn-primary { order: 10; }
     .page-head-actions .input { width: auto; }
   `,
   template: `
@@ -60,7 +63,7 @@ import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
         @for (c of crumbs(); track $index; let last = $last) {
           <li>
             @if (c.link && !last) {
-              <a [routerLink]="c.link" [queryParams]="c.query ?? null">{{ c.label }}</a>
+              <a [attr.href]="hrefOf(c)" (click)="go($event, c)">{{ c.label }}</a>
             } @else {
               <span [attr.aria-current]="last ? 'page' : null">{{ c.label }}</span>
             }
@@ -68,23 +71,27 @@ import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
         }
       </ol>
     </nav>
-    <div class="page-head is-header">
-      <div class="page-head-main">
-        <div class="page-head-title">
-          <h1 class="page-title">{{ title() }}</h1>
-          <ng-content select="[pills]" />
+    <!-- A page that keeps its own heading block wraps it: it is shown as written, under the breadcrumb. -->
+    <ng-content select=".page-head" />
+    @if (title()) {
+      <div class="page-head is-header">
+        <div class="page-head-main">
+          <div class="page-head-title">
+            <h1 class="page-title">{{ title() }}</h1>
+            <ng-content select="[pills]" />
+          </div>
+          @if (subtitle()) { <p class="page-subtitle">{{ subtitle() }}</p> }
+          <ng-content select="[subtitle]" />
+          <ng-content select="[meta]" />
         </div>
-        @if (subtitle()) { <p class="page-subtitle">{{ subtitle() }}</p> }
-        <ng-content select="[subtitle]" />
-        <ng-content select="[meta]" />
+        <div class="page-head-actions"><ng-content /></div>
       </div>
-      <div class="page-head-actions"><ng-content /></div>
-    </div>
+    }
   `,
 })
 export class PageHeader {
   /** The page's name: the object's name on a detail or editor page ("Brain tumour MRI grading", not "Edit pipeline"). */
-  readonly title = input.required<string>();
+  readonly title = input('');
   /** One line, at most two, saying what the page is for. Longer explanations go in a section's sub-line. */
   readonly subtitle = input('');
   /**
@@ -95,19 +102,54 @@ export class PageHeader {
   /** The steps before the last, when the menu's tree is not where this page sits. */
   readonly trail = input<Crumb[] | null>(null);
 
-  private readonly router = inject(Router);
-  private readonly url = signal(this.router.url);
+  // Optional: a screen's own unit test often has no router; the header then shows the trail without following the URL.
+  private readonly router = inject(Router, { optional: true });
+  private readonly url = signal(this.router?.url ?? '');
+  private readonly host = inject(ElementRef).nativeElement as HTMLElement;
+  private readonly destroyRef = inject(DestroyRef);
+  /** A wrapped heading block's own h1, read as it renders (it can follow the data: an object's name). */
+  private readonly projectedTitle = signal('');
 
   constructor() {
-    this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
+    this.router?.events?.pipe(takeUntilDestroyed()).subscribe(event => {
       if (event instanceof NavigationEnd) this.url.set(event.urlAfterRedirects);
+    });
+    // A wrapped heading block's h1 can change after the first render (an object's name arriving): followed with a
+    // MutationObserver on the host, which is all it watches.
+    afterNextRender(() => {
+      const read = () => {
+        const h1 = this.host.querySelector(':scope > .page-head h1');
+        // The name only: a pill or a status written inside the heading is not part of it.
+        const name = h1?.cloneNode(true) as HTMLElement | undefined;
+        name?.querySelectorAll('.pill, app-status, app-sensitivity, [pills]').forEach(el => el.remove());
+        const text = (name?.textContent ?? '').replace(/\s+/g, ' ').replace(/\s*[—–-]\s*$/, '').trim();
+        if (text !== this.projectedTitle()) this.projectedTitle.set(text);
+      };
+      read();
+      if (typeof MutationObserver === 'undefined') return;
+      const observer = new MutationObserver(read);
+      observer.observe(this.host, { subtree: true, childList: true, characterData: true });
+      this.destroyRef.onDestroy(() => observer.disconnect());
     });
   }
 
   readonly crumbs = computed<Crumb[]>(() => {
-    const last = this.crumb() || this.title();
+    const last = this.crumb() || this.title() || this.projectedTitle();
     const trail = this.trail();
     if (trail) return [...trail, { label: last }];
     return crumbsFor(this.url(), last, !!this.crumb());
   });
+
+  /** A crumb's address: a plain link, so it opens in a new tab like any other. */
+  hrefOf(c: Crumb): string {
+    const query = c.query ? '?' + new URLSearchParams(c.query).toString() : '';
+    return (c.link ?? '') + query;
+  }
+
+  /** Followed inside the app (no reload) unless the reader asked for a new tab or window. */
+  go(event: MouseEvent, c: Crumb): void {
+    if (!this.router || !c.link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    void this.router.navigate([c.link], { queryParams: c.query ?? {} });
+  }
 }
