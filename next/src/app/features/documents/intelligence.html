@@ -2,7 +2,7 @@
   <app-page-header>
     <div class="page-head">
       <div>
-        <h1 class="page-title">Documents in</h1>
+        <h1 class="page-title">{{ tab() === 'types' ? 'Document types' : 'Documents in' }}</h1>
         <p class="page-subtitle">
           Upload documents, mail them to the workspace's email-in address, or read one from a storage connection; each one is
           read, split into fields against its document type and checked. Values it is not sure of go to the review queue.
