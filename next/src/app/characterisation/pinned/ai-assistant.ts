@@ -259,6 +259,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/ai/assistant",
       "/settings",
+      "/settings/alerts",
       "/settings/home-pages",
       "/settings/kafka",
       "/settings/model-connections",
@@ -354,6 +355,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/ai/assistant",
       "/settings",
+      "/settings/alerts",
       "/settings/home-pages",
       "/settings/kafka",
       "/settings/model-connections",

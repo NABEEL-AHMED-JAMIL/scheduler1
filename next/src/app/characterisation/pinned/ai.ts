@@ -187,6 +187,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/pipelines/prompts?connection=1047",
       "/settings",
+      "/settings/alerts",
       "/settings/home-pages",
       "/settings/kafka",
       "/settings/model-connections",
@@ -252,6 +253,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/pipelines/prompts?connection=1047",
       "/settings",
+      "/settings/alerts",
       "/settings/home-pages",
       "/settings/kafka",
       "/settings/model-connections",

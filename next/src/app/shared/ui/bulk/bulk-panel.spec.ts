@@ -56,6 +56,18 @@ describe('BulkPanel: the confirm panel of a bulk decision', () => {
     expect(text('[data-bulk-act]')).toBe('Approve 3');
   });
 
+  it('MIG-355: a bulk retry asks no comment, says Retry and Retried, and names a retry\'s refusals in words', () => {
+    const { send, text, q, act, panel } = open('retry', 3, r => of(answer(r, { done: done(2), skipped: [
+      { id: 9, label: 'Run #9', reason: 'pipeline-changed', message: 'Step 1 changed.' }] })));
+    expect(send.mock.calls[0][1]).toEqual({ action: 'retry', comment: null, bulkId: panel.bulkId, dryRun: true });
+    expect(text('[data-bulk-plan-line]')).toBe('2 of the 3 runs will be retried.');
+    expect(q('[data-bulk-comment]')).toBeNull();
+    expect(text('[data-bulk-act]')).toBe('Retry 2');
+    expect(text('[data-bulk-skipped]')).toContain('The pipeline changed before the failed step');
+    act().click();
+    expect(send.mock.calls[1][1]).toEqual({ action: 'retry', comment: null, bulkId: panel.bulkId, dryRun: false });
+  });
+
   it('groups what will be skipped by reason, in words', () => {
     const { el } = open('approve', 5, r => of(answer(r, { done: done(1), skipped: [
       { id: 1, label: 'Run #1', reason: 'already-decided', message: 'This run\'s results are already approved.' },

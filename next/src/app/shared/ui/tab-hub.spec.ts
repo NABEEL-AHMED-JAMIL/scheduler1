@@ -107,7 +107,8 @@ describe('tab hubs: the strip lists the tabs the reader may open', () => {
 
   it('Latest shows for whoever holds Schedules or Runs by date; By date for Runs by date only', () => {
     expect(strip('/runs/latest', 'TENANT_USER', ['jobs', 'reports'])).toEqual(['Latest (open)', 'Analytics']);
-    expect(strip('/runs/by-date', 'TENANT_USER', ['queue', 'reports'])).toEqual(['Latest', 'By date (open)', 'Analytics']);
+    // MIG-355: Runs › Failed is the Queue's too.
+    expect(strip('/runs/by-date', 'TENANT_USER', ['queue', 'reports'])).toEqual(['Latest', 'By date (open)', 'Analytics', 'Failed']);
   });
 
   it('a page the reader may open that is not one of their tabs shows no strip around it (Data policies for a member)', () => {

@@ -322,6 +322,14 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-355: Runs › Failed -- the Queue's reads (message.json/failedRuns is its group); retry needs Schedules, as on the run page.
+        path: 'runs/failed',
+        title: 'Failed runs',
+        loadComponent: () => import('./features/runs/failed/failed-runs').then(m => m.FailedRuns),
+        data: { pageKey: 'queue' },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'runs/analytics',
         title: 'Run analytics',
         loadComponent: () =>
@@ -570,6 +578,14 @@ export const routes: Routes = [
         loadComponent: () => import('./features/ai/tools/tool-registry').then(m => m.ToolRegistry),
         data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
+      },
+      {
+        // MIG-355: the workspace's alert rules and alerts; every call behind it (reliability.json/alerts) is TENANT_ADMIN.
+        path: 'settings/alerts',
+        title: 'Alerts',
+        loadComponent: () => import('./features/settings/alerts/alerts').then(m => m.Alerts),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
       },
       {
         path: 'settings/model-connections',

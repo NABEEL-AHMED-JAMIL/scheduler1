@@ -309,6 +309,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/runs/failed",
+      "title": "Failed runs",
+      "pageKey": "queue",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/runs/analytics",
       "title": "Run analytics",
       "pageKey": "reports",
@@ -556,6 +565,15 @@ export const PINNED: Record<string, unknown> = {
       "pageKey": "ai-prompts",
       "guards": [
         "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/alerts",
+      "title": "Alerts",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
       ],
       "lazy": true
     },

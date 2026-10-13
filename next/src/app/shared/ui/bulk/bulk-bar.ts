@@ -41,10 +41,15 @@ import { BulkPanel, BulkPanelData } from './bulk-panel';
             <button type="button" class="link-inline" (click)="selection().selectMatching()" data-bulk-matching>{{ matchingLabel() }}</button>
           </span>
         } @else if (selection().full()) {
-          <span class="bulk-bar-note">At most {{ cap }} at a time.</span>
+          <span class="bulk-bar-note">At most {{ selection().cap }} at a time.</span>
         }
         @if (selection().matchError()) { <span class="bulk-bar-note text-crit-500" role="alert">{{ selection().matchError() }}</span> }
         <div class="bulk-bar-actions">
+          @if (kind() === 'retry') {
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="selection().matching()" (click)="open('retry')" data-bulk-retry-runs>
+              <app-icon name="refresh" />Retry from failed step
+            </button>
+          } @else {
           @if (canReject()) {
             <button type="button" class="btn btn-default btn-sm btn-intent-crit" [disabled]="selection().matching()" (click)="open('reject')" data-bulk-reject>
               <app-icon name="close" />Reject
@@ -53,6 +58,7 @@ import { BulkPanel, BulkPanelData } from './bulk-panel';
           <button type="button" class="btn btn-primary btn-sm" [disabled]="selection().matching()" (click)="open('approve')" data-bulk-approve>
             <app-icon name="check" />Approve
           </button>
+          }
           <button type="button" class="btn btn-ghost btn-sm" (click)="selection().clear()" data-bulk-clear>Clear</button>
         </div>
       </div>
@@ -71,6 +77,8 @@ export class BulkBar {
   /** How many match (null when the list cannot say). */
   readonly matchTotal = input<number | null>(null);
   readonly canReject = input(true);
+  /** MIG-355: what the picked rows are for -- a review decision (Reject, Approve) or a retry of failed runs. */
+  readonly kind = input<'review' | 'retry'>('review');
   /** Inside a list's own frame (the inbox's list): drawn as its foot rather than floating over it. */
   readonly flush = input(false);
   readonly decided = output<BulkAnswer>();
@@ -85,8 +93,9 @@ export class BulkBar {
 
   readonly matchingLabel = computed(() => {
     const total = this.matchTotal();
-    if (total == null) return `Select all matching (up to ${BULK_CAP})`;
-    if (total > BULK_CAP) return `Select the first ${BULK_CAP} of ${total.toLocaleString('en-US')} matching`;
+    const cap = this.selection().cap;
+    if (total == null) return `Select all matching (up to ${cap})`;
+    if (total > cap) return `Select the first ${cap} of ${total.toLocaleString('en-US')} matching`;
     return `Select all ${total.toLocaleString('en-US')} matching`;
   });
 

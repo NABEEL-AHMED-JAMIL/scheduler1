@@ -17,7 +17,8 @@ export const CONFIRM_ABOVE = 25;
 /** One comment applies to each item; the services keep at most this many characters. */
 export const COMMENT_MAX = 500;
 
-export type BulkAction = 'approve' | 'reject';
+/** MIG-355 added retry: failed runs tried again, each by the single retry's rules (no comment). */
+export type BulkAction = 'approve' | 'reject' | 'retry';
 
 /** One item of a bulk answer: done (or "would be done" in a dry run), skipped with a reason, or failed. */
 export interface BulkItem {
@@ -59,6 +60,8 @@ export interface BulkMatch<T> {
  */
 export interface BulkSource<T> {
   idOf(row: T): number;
+  /** At most this many may be picked; {@link BULK_CAP} when absent (the bulk retry takes 50). */
+  cap?: number;
   /** "task" and "tasks", "run" and "runs", "document" and "documents". */
   noun: readonly [string, string];
   /** What the items are counted by: "workflow", "pipeline", "document type". */
@@ -81,6 +84,15 @@ export const REASON_TEXT: Record<string, string> = {
   'changed': 'Changed since it was listed',
   'not-approval': 'Not an approval',
   'not-found': 'Not found',
+  // MIG-355: a retry's refusals (MIG-345's kinds).
+  'run-not-failed': 'The run is not failed (already retried, or running again)',
+  'run-in-flight': 'Another run of the pipeline is in flight',
+  'pipeline-inactive': 'The pipeline is not active',
+  'workspace-paused': 'The workspace is paused',
+  'pipeline-changed': 'The pipeline changed before the failed step: run it again from the start',
+  'input-changed': 'An input file changed since the run read it',
+  'outputs-expired': 'The kept outputs of the steps before it expired',
+  'not-resumable': 'Cannot resume from the failed step',
 };
 
 const REASON_ORDER = Object.keys(REASON_TEXT);
@@ -154,7 +166,9 @@ export class BulkSelection<T> {
   /** Select all matching is reading the rows. */
   readonly matching = signal(false);
   readonly matchError = signal('');
-  readonly full = computed(() => this.count() >= BULK_CAP);
+  readonly full = computed(() => this.count() >= this.cap);
+  /** The most that may be picked: the source's own cap, else BULK_CAP. */
+  get cap(): number { return this.source.cap ?? BULK_CAP; }
   private reading?: Subscription;
 
   constructor(readonly source: BulkSource<T>) {}
@@ -173,7 +187,7 @@ export class BulkSelection<T> {
     const next = new Map(this.picked());
     if (on) {
       if (next.has(id)) return true;
-      if (next.size >= BULK_CAP) return false;
+      if (next.size >= this.cap) return false;
       next.set(id, row);
     } else {
       next.delete(id);
@@ -189,7 +203,7 @@ export class BulkSelection<T> {
     for (const row of rows) {
       const id = this.source.idOf(row);
       if (!on) next.delete(id);
-      else if (!next.has(id) && next.size < BULK_CAP) next.set(id, row);
+      else if (!next.has(id) && next.size < this.cap) next.set(id, row);
     }
     this.matched.set(null);
     this.picked.set(next);
@@ -212,7 +226,7 @@ export class BulkSelection<T> {
       next: match => {
         const next = new Map<number, T>();
         for (const row of match.rows) {
-          if (next.size >= BULK_CAP) break;
+          if (next.size >= this.cap) break;
           next.set(this.source.idOf(row), row);
         }
         this.picked.set(next);

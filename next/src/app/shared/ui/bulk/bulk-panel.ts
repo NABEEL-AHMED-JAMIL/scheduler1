@@ -67,7 +67,7 @@ export const DRY_RUN_COMMENT = 'Checking which items can be rejected.';
               <p class="text-sm font-medium mb-3" role="status" data-bulk-result-line>{{ resultLine() }}</p>
               @if (r.done.length) {
                 <section class="bulk-section" data-bulk-result-done>
-                  <h3 class="bulk-heading"><app-icon name="checkCircle" size="0.95em" class="icon-ok" />{{ data.action === 'approve' ? 'Approved' : 'Rejected' }} ({{ r.done.length }})</h3>
+                  <h3 class="bulk-heading"><app-icon name="checkCircle" size="0.95em" class="icon-ok" />{{ pastTitle() }} ({{ r.done.length }})</h3>
                   <ul class="bulk-items bulk-flat">
                     @for (item of r.done; track item.id) { <li><ng-container *ngTemplateOutlet="named; context: { $implicit: item }" /></li> }
                   </ul>
@@ -133,7 +133,7 @@ export const DRY_RUN_COMMENT = 'Checking which items can be rejected.';
                 </ul>
               </section>
             }
-            @if (p.done.length) {
+            @if (p.done.length && data.action !== 'retry') {
               <div class="form-lock bulk-section">
                 <label class="label" for="bulk-comment">Comment @if (data.action === 'reject') { <span class="text-crit-500">(required)</span> } @else { <span class="text-[color:var(--text-muted)] font-normal">(optional)</span> }</label>
                 <textarea id="bulk-comment" class="input resize-y" rows="3" [attr.maxlength]="max" [value]="comment()"
@@ -168,9 +168,9 @@ export const DRY_RUN_COMMENT = 'Checking which items can be rejected.';
           @if (stage() === 'send-failed') {
             <button type="button" class="btn btn-default btn-sm ml-auto" (click)="send()" data-bulk-retry><app-icon name="refresh" />Try again</button>
           }
-          <button type="button" class="btn btn-sm" [class.ml-auto]="stage() !== 'send-failed'" [class.btn-primary]="data.action === 'approve'"
+          <button type="button" class="btn btn-sm" [class.ml-auto]="stage() !== 'send-failed'" [class.btn-primary]="data.action !== 'reject'"
                   [class.btn-danger]="data.action === 'reject'" [disabled]="!canSend()" (click)="send()" data-bulk-act>
-            <app-icon [name]="data.action === 'approve' ? 'check' : 'close'" [busy]="stage() === 'sending'" />{{ actLabel() }}
+            <app-icon [name]="data.action === 'approve' ? 'check' : data.action === 'retry' ? 'refresh' : 'close'" [busy]="stage() === 'sending'" />{{ actLabel() }}
           </button>
         }
       </div>
@@ -199,10 +199,14 @@ export class BulkPanel<T> implements OnInit {
   readonly comment = signal('');
   readonly typed = signal('');
 
-  readonly verb = computed(() => this.data.action === 'approve' ? 'Approve' : 'Reject');
-  readonly past = computed(() => this.data.action === 'approve' ? 'approved' : 'rejected');
+  readonly verb = computed(() => ({ approve: 'Approve', reject: 'Reject', retry: 'Retry' })[this.data.action]);
+  readonly past = computed(() => ({ approve: 'approved', reject: 'rejected', retry: 'retried' })[this.data.action]);
+  readonly pastTitle = computed(() => ({ approve: 'Approved', reject: 'Rejected', retry: 'Retried' })[this.data.action]);
   readonly heading = computed(() => `${this.verb()} ${countOf(this.data.rows.length, this.data.source.noun)}`);
-  readonly subtitle = computed(() => this.stage() === 'result' ? 'The decision is recorded item by item.' : 'Each item is decided on its own, as if one by one.');
+  readonly subtitle = computed(() => this.data.action === 'retry'
+    ? (this.stage() === 'result' ? 'Each run was retried on its own; its audit line names this bulk retry.'
+      : 'Each run is retried on its own from the step that failed, as if one by one.')
+    : this.stage() === 'result' ? 'The decision is recorded item by item.' : 'Each item is decided on its own, as if one by one.');
   readonly groups = computed<ItemGroup[]>(() => byGroup(this.plan()?.done ?? [], `No ${this.data.source.groupNoun}`));
   readonly reasons = computed<ItemGroup[]>(() => byReason(this.plan()?.skipped ?? []));
   readonly toDecide = computed(() => this.plan()?.done.length ?? 0);
@@ -231,7 +235,7 @@ export class BulkPanel<T> implements OnInit {
   });
 
   readonly actLabel = computed(() => {
-    if (this.stage() === 'sending') return this.data.action === 'approve' ? 'Approving…' : 'Rejecting…';
+    if (this.stage() === 'sending') return ({ approve: 'Approving…', reject: 'Rejecting…', retry: 'Retrying…' })[this.data.action];
     return this.toDecide() ? `${this.verb()} ${this.toDecide()}` : `Nothing to ${this.data.action}`;
   });
 

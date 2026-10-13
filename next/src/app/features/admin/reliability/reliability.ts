@@ -11,6 +11,7 @@ import { daySeries } from '../../../shared/charts/day-series';
 import { statusColor } from '../../../shared/charts/status-color';
 import { BillingSlo, BurnRate, PipelineRunsSlo, ReliabilityApi, RunGroup, SloWindow } from './reliability.service';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { PlatformHealthView } from './platform-health';
 
 export type RangeDays = '7' | '28' | '90';
 
@@ -173,7 +174,7 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-reliability',
-  imports: [PageHeader, Icon, StatTile, Segmented, BarChart, DecimalPipe, NgTemplateOutlet, RouterLink, ServerTimePipe],
+  imports: [PageHeader, Icon, StatTile, Segmented, BarChart, DecimalPipe, NgTemplateOutlet, RouterLink, ServerTimePipe, PlatformHealthView],
   templateUrl: './reliability.html',
   // Local to the page, on the console's tokens: the status cards' big word and figures, the callout, the section head
   // (text beside its two tiles, wrapping under them when narrow) and a table that scrolls inside its own box.

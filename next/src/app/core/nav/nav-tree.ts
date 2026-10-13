@@ -162,13 +162,15 @@ export const NAV: NavItem[] = [
     children: [
       {
         label: 'Runs', path: '/runs', icon: 'history',
-        hint: 'Recent runs, runs by date, and how they measure up',
+        hint: 'Recent runs, runs by date, how they measure up, and the ones that failed',
         tabs: [
           // UX review B3 (E1): Latest lists every schedule's newest runs and what waits for review -- for whoever holds
           // Schedules or Runs by date.
           { label: 'Latest', path: '/runs/latest', pageKeys: ['jobs', 'queue'], icon: 'history' },
           { label: 'By date', path: '/runs/by-date', pageKey: 'queue', icon: 'calendar' },
           { label: 'Analytics', path: '/runs/analytics', pageKey: 'reports', icon: 'chart' },
+          // MIG-355: every failed or timed-out run, grouped by error pattern, retried from the failed step -- the Queue's reads.
+          { label: 'Failed', path: '/runs/failed', pageKey: 'queue', icon: 'alert' },
         ],
       },
       // The reviewer's home: its own entry, never a tab (a tab would add a click to the page they open every day).
@@ -235,7 +237,7 @@ export const NAV: NavItem[] = [
       },
       {
         label: 'Settings', path: '/settings', icon: 'settings',
-        hint: 'Models, tools, tasks, Kafka and the values a task reads',
+        hint: 'Models, tools, tasks, Kafka, the values a task reads, and alerts',
         tabs: [
           { label: 'Model connections', path: '/settings/model-connections', icon: 'server', adminOnly: true },
           // Open to a member holding the Prompts page, as before: the list is TENANT_USER.
@@ -246,6 +248,8 @@ export const NAV: NavItem[] = [
           { label: 'Configuration values', path: '/settings/values', icon: 'key', adminOnly: true },
           { label: 'Home pages', path: '/settings/home-pages', icon: 'globe', adminOnly: true },
           { label: 'Task groups', path: '/settings/task-groups', icon: 'layers', adminOnly: true },
+          // MIG-355: the workspace's alert rules and alerts; every call behind it is TENANT_ADMIN.
+          { label: 'Alerts', path: '/settings/alerts', icon: 'bell', adminOnly: true },
         ],
       },
       {

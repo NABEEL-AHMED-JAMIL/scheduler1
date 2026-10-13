@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">Reliability</h1>
-        <p class="page-subtitle">Pipeline execution and billing against their 99.99% targets, from stored rows.</p>
+        <p class="page-subtitle">Every service's health and the platform's alerts, then pipeline execution and billing against their 99.99% targets.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="range()" (valueChange)="setRange($event)" />
@@ -11,6 +11,13 @@
       </div>
     </div>
   </app-page-header>
+
+  <!-- MIG-355: each service's health (Core's minute samples of what the services serve), Kafka lag, disk, billing
+       reconciliation, and the platform's alerts and rules. Part of this page's own lazy chunk; its chart's library loads on
+       first draw (app-echart). No @defer: its runtime would join the initial bundle. -->
+  <app-platform-health />
+
+  <h2 class="text-lg font-semibold m-0 mt-2">Objectives</h2>
 
   <!-- Firing rules, collapsed: one plain line per objective, the rule lines behind Details. -->
   @if (alertGroups().length) {
