@@ -4,8 +4,13 @@
       <div>
         <h1 class="page-title">Document Converter</h1>
         <p class="page-subtitle">
-          Convert between Office, OpenDocument, PDF, Markdown and image formats, or render a dataset as a document.
+          Convert between Office, OpenDocument, PDF, Markdown and image formats, or make a PDF from a dataset.
         </p>
+      </div>
+      <!-- UX final CV1: the standard header's actions; what a PDF from a dataset (or a run) makes is listed in
+           Generated reports, whose "PDF from a dataset" opens this page on that source. -->
+      <div class="flex items-center gap-2">
+        <a class="btn btn-default btn-sm" routerLink="/data/reports" data-test="to-generated-reports"><app-icon name="file" />Generated reports</a>
       </div>
     </div>
   </app-page-header>

@@ -4,7 +4,7 @@ import { HttpClient, HttpEventType } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { BucketSummary, StorageService } from '../../objects/storage.service';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../../shared/ui/object-picker';
 import { PreviewDialog } from '../../objects/preview/preview-dialog';
@@ -136,8 +136,10 @@ export class Converter implements OnInit {
     { id: 'upload', label: 'Upload a file', icon: 'upload' },
     { id: 'bucket', label: 'From a bucket', icon: 'folder' },
     // MIG-253: rows rendered through a template (media-service's render), not a file converted.
-    { id: 'dataset', label: 'Dataset → PDF', icon: 'table' },
-    { id: 'execution', label: 'From an execution', icon: 'play' },
+    // UX final CV1: the same job as Generated reports' "PDF from a dataset" button, in the same words; a run, not an
+    // execution (review G12).
+    { id: 'dataset', label: 'PDF from a dataset', icon: 'table' },
+    { id: 'execution', label: 'PDF from a run', icon: 'play' },
   ];
   /** Converting a file (upload or bucket), as opposed to rendering rows. */
   readonly fileMode = computed(() => this.mode() === 'upload' || this.mode() === 'bucket');
@@ -223,7 +225,13 @@ export class Converter implements OnInit {
     });
   }
 
+  /** Optional: the converter is also built directly in a spec, outside any route. */
+  private readonly route = inject(ActivatedRoute, { optional: true });
+
   ngOnInit(): void {
+    // ?mode=dataset opens straight on that source: Generated reports' "PDF from a dataset" links here (UX final CV1).
+    const asked = this.route?.snapshot?.queryParamMap?.get('mode');
+    if (asked && this.modeOptions.some(o => o.id === asked)) this.mode.set(asked as ConverterMode);
     this.loadTasks();
     this.storage.buckets().subscribe({
       next: r => { if (r.status === API_SUCCESS) this.buckets.set(r.data ?? []); },

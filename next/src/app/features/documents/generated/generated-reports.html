@@ -7,22 +7,24 @@
           Documents and files made from your data: renders saved to a bucket, and what recent runs put out.
         </p>
       </div>
+      <!-- UX final RP1/CV1: Refresh first as an icon, the primary rightmost. "PDF from a dataset" is the converter's
+           own mode of that name, opened on it. -->
       <div class="flex items-center gap-2">
-        <a class="btn btn-primary btn-sm" routerLink="/tools/converter"><app-icon name="plus" />Make a document</a>
+        <app-refresh-button [loading]="loading()" (refresh)="load(true)" />
+        <a class="btn btn-primary btn-sm" routerLink="/tools/converter" [queryParams]="{ mode: 'dataset' }" data-test="pdf-from-dataset">
+          <app-icon name="plus" />PDF from a dataset
+        </a>
       </div>
     </div>
   </app-page-header>
 
   <app-table-shell heading="Generated outputs" [shown]="paged().length" [total]="filtered().length"
                    [loading]="loading()" [error]="objectsError() && runsError() ? objectsError() : ''" (retry)="load(true)"
-                   [isEmpty]="!filtered().length" emptyIcon="file" [showSubbar]="true"
-                   [emptyMessage]="query() ? 'Nothing here matches that.' : 'Nothing generated yet. Make a document in the converter and save it to a bucket, or run a pipeline that writes files.'">
+                   [isEmpty]="!filtered().length" emptyIcon="file"
+                   [emptyMessage]="query() ? 'Nothing here matches that.' : 'Nothing generated yet. Make a PDF from a dataset in the converter and save it to a bucket, or run a pipeline that writes files.'">
+    <!-- UX final RP1: the filters sit in the toolbar, left-aligned straight after the heading (review 2.2), not on a
+         grey band of their own inside the card. -->
     <ng-container toolbar>
-      <button type="button" class="btn btn-default btn-sm" (click)="load(true)" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-    </ng-container>
-    <ng-container subbar>
       <div class="w-56 max-w-full">
         <app-combobox ariaLabel="Bucket" [selected]="bucket()" (selectedChange)="pickBucket($event)"
                       placeholder="Choose a bucket" [allowClear]="false" [options]="bucketOptions()" />
@@ -46,7 +48,7 @@
           <th class="text-right">Size</th>
           <th>Status</th>
           <th>Owner</th>
-          <th class="w-40 th-actions">Actions</th>
+          <th class="w-14 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -82,32 +84,35 @@
                     [title]="r.expiresAt ? (r.status === 'Expired' ? 'Expired ' : 'Expires ') + (r.expiresAt | serverTime: 'dateTime') : ''">{{ r.status }}</span>
             </td>
             <td class="max-w-40 truncate text-[color:var(--text-secondary)]" [title]="r.owner || 'Not recorded'">{{ r.owner || '—' }}</td>
-            <td>
-              <div class="flex items-center justify-end gap-1.5">
-                <button type="button" class="btn-circle btn-circle-info" [disabled]="!canPreview(r)"
-                        [title]="canPreview(r) ? 'Preview' : 'The run no longer holds this dataset'"
-                        [attr.aria-label]="'Preview ' + r.name" (click)="preview(r)">
-                  <app-icon name="eye" size="0.9em" />
-                </button>
-                <button type="button" class="btn-circle btn-circle-info" [disabled]="!canPreview(r)"
-                        title="Download" [attr.aria-label]="'Download ' + r.name" (click)="download(r)">
-                  <app-icon name="download" size="0.9em" />
-                </button>
-                <button type="button" class="btn-circle btn-circle-info" [disabled]="!canShare(r)"
-                        [title]="canShare(r) ? 'Email this file' : 'Only a file in a bucket can be emailed'"
-                        [attr.aria-label]="'Email ' + r.name" (click)="share(r)">
-                  <app-icon name="send" size="0.9em" />
-                </button>
-                @if (storageParams(r); as at) {
-                  <a class="btn-circle btn-circle-info" routerLink="/data/files" [queryParams]="at"
-                     title="Open in storage" [attr.aria-label]="'Open ' + r.name + ' in storage'">
-                    <app-icon name="folder" size="0.9em" />
-                  </a>
-                } @else {
-                  <button type="button" class="btn-circle btn-circle-info" disabled title="Kept by the run, not in a bucket"
-                          [attr.aria-label]="'Open ' + r.name + ' in storage'"><app-icon name="folder" size="0.9em" /></button>
-                }
-              </div>
+            <!-- UX final RP1: row actions in the ⋮ column, with the table's own right padding (four icon buttons
+                 touched the card's edge). A disabled entry still says why. -->
+            <td class="text-right whitespace-nowrap">
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + r.name"
+                      data-test="row-menu">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #rowMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                  <button cdkMenuItem type="button" class="menu-item" [disabled]="!canPreview(r)" (cdkMenuItemTriggered)="preview(r)"
+                          [title]="canPreview(r) ? '' : 'The run no longer holds this dataset'">
+                    <app-icon name="eye" />Preview
+                  </button>
+                  <button cdkMenuItem type="button" class="menu-item" [disabled]="!canPreview(r)" (cdkMenuItemTriggered)="download(r)">
+                    <app-icon name="download" />Download
+                  </button>
+                  <button cdkMenuItem type="button" class="menu-item" [disabled]="!canShare(r)" (cdkMenuItemTriggered)="share(r)"
+                          [title]="canShare(r) ? '' : 'Only a file in a bucket can be emailed'">
+                    <app-icon name="send" />Email this file
+                  </button>
+                  @if (storageParams(r); as at) {
+                    <a cdkMenuItem class="menu-item" routerLink="/data/files" [queryParams]="at"><app-icon name="folder" />Open in storage</a>
+                  } @else {
+                    <button cdkMenuItem type="button" class="menu-item" disabled title="Kept by the run, not in a bucket">
+                      <app-icon name="folder" />Open in storage
+                    </button>
+                  }
+                </div>
+              </ng-template>
             </td>
           </tr>
         }

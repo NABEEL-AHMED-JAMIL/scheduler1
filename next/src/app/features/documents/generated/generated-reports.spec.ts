@@ -156,3 +156,35 @@ describe('Documents › Reports', () => {
     expect(p.filtered().map(r => r.name)).toEqual(['Q3.pdf']);
   });
 });
+
+describe('Generated reports layout (UX final RP1, CV1)', () => {
+  it('puts the filters in the list\'s toolbar and Refresh first in the page header, as an icon', () => {
+    const { fixture } = page();
+    const el = fixture.nativeElement as HTMLElement;
+    const controls = el.querySelector('app-table-shell .table-toolbar-controls')!;
+    expect(controls.querySelector('app-combobox')).not.toBeNull();
+    expect(controls.querySelector('input[aria-label="Folder"]')).not.toBeNull();
+    expect(controls.querySelector('input[aria-label="Find a report"]')).not.toBeNull();
+    expect(el.querySelector('app-table-shell .bg-sunken')).toBeNull();
+    const actions = el.querySelector('app-page-header .page-head > div:last-child')!;
+    expect(actions.firstElementChild!.tagName.toLowerCase()).toBe('app-refresh-button');
+    expect(actions.lastElementChild!.classList).toContain('btn-primary');
+    expect(el.querySelector('app-table-shell .table-toolbar')!.textContent).not.toContain('Refresh');
+  });
+
+  it('names its primary as the converter\'s mode, and opens the converter on it', () => {
+    const { fixture } = page();
+    const link = (fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>('[data-test="pdf-from-dataset"]')!;
+    expect(link.textContent!.trim()).toBe('PDF from a dataset');
+    expect(link.getAttribute('href')).toBe('/tools/converter?mode=dataset');
+  });
+
+  it('keeps each row\'s actions in one ⋮ menu named after the row', () => {
+    const { fixture, p } = page();
+    const el = fixture.nativeElement as HTMLElement;
+    const menus = [...el.querySelectorAll<HTMLButtonElement>('[data-test="row-menu"]')];
+    expect(menus.length).toBe(p.paged().length);
+    expect(menus[0].getAttribute('aria-label')).toBe('Actions for ' + p.paged()[0].name);
+    expect(el.querySelectorAll('tbody .btn-circle').length).toBe(0);
+  });
+});

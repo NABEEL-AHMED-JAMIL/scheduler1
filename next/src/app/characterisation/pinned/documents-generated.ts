@@ -35,15 +35,10 @@ export const PINNED: Record<string, unknown> = {
       "Generated outputs (3 of 3)"
     ],
     "buttons": [
+      "Actions for UI-CHECK Q3.pdf",
+      "Actions for customers-clean.json",
       "Clear",
       "Columns",
-      "Download UI-CHECK Q3.pdf",
-      "Download customers-clean.json",
-      "Email UI-CHECK Q3.pdf",
-      "Email customers-clean.json",
-      "Open customers-clean.json in storage",
-      "Preview UI-CHECK Q3.pdf",
-      "Preview customers-clean.json",
       "Refresh"
     ],
     "columns": [
@@ -72,11 +67,9 @@ export const PINNED: Record<string, unknown> = {
       "/data/ask",
       "/data/catalog",
       "/data/files",
-      "/data/files?bucket=ui-review-s3&prefix=registry-live-check%2F",
-      "/data/files?bucket=ui-review-s3&prefix=reports%2F",
       "/data/reports",
       "/pipelines/schedules/2849/runs/7405",
-      "/tools/converter"
+      "/tools/converter?mode=dataset"
     ]
   },
   "a file's details, written by a recent run": {
@@ -114,11 +107,11 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "A table in a bucket",
       "Columns",
-      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
-      "From an execution",
       "Make PDF",
+      "PDF from a dataset",
+      "PDF from a run",
       "Paste rows",
       "Preview",
       "Refresh",
@@ -156,6 +149,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
       "/tools",
       "/tools/converter",
       "/tools/transcript"
@@ -173,11 +167,11 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
-      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
-      "From an execution",
       "Make PDF",
+      "PDF from a dataset",
+      "PDF from a run",
       "Preview",
       "Refresh",
       "Supported formats",
@@ -216,6 +210,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
       "/tools",
       "/tools/converter",
       "/tools/transcript"

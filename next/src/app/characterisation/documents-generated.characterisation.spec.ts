@@ -55,13 +55,13 @@ describe('MIG-253: Documents -- the converter\'s render modes, Reports, and a fi
 
   it('the converter, Dataset → PDF', async () => {
     const v = await visit('/tools/converter', 'TENANT_ADMIN', null, RENDER);
-    const requests = await click(v, 'Dataset → PDF');
+    const requests = await click(v, 'PDF from a dataset');
     pin(FILE, 'the converter, Dataset → PDF', { requests, ...surfaceOf(v.main) }, PINNED);
   });
 
   it('the converter, From an execution', async () => {
     const v = await visit('/tools/converter', 'TENANT_ADMIN', null, { ...RENDER, ...RUNS });
-    const requests = await click(v, 'From an execution');
+    const requests = await click(v, 'PDF from a run');
     pin(FILE, 'the converter, From an execution', { requests, ...surfaceOf(v.main) }, PINNED);
   });
 
