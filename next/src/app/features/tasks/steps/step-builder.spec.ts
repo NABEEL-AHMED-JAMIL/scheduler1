@@ -559,6 +559,47 @@ describe('StepBuilder -- the review setting', () => {
   });
 });
 
+/** Bulk review (2026-10-12): a pipeline may require individual review -- its runs and its Approval steps, never in bulk. */
+describe('StepBuilder -- individual review', () => {
+  const withReview = (review: object): DefinitionView => ({ ...VIEW, definition: { ...VIEW.definition, settings: { review } } as DefinitionView['definition'] });
+
+  it('writes settings.review.individual: true, and drops it when unticked', () => {
+    const { builder, fixture, el, tab } = build();
+    tab('settings');
+    const box = el.querySelector<HTMLInputElement>('#reviewIndividual')!;
+    expect(box.checked).toBe(false);
+    expect(el.textContent).toContain('Requires individual review (never approved or rejected in bulk)');
+    expect(el.textContent).toContain('Approval steps');
+    box.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toEqual({ individual: true });
+    box.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toBeUndefined();
+  });
+
+  it('ticking a party keeps the review\'s other keys -- its reviewers and individual review', () => {
+    const reviewers = { kind: 'group', value: '1063' };
+    const { builder, fixture, el, tab } = build({ view: withReview({ required: ['internal'], reviewers, individual: true }) });
+    tab('settings');
+    expect(el.querySelector<HTMLInputElement>('#reviewIndividual')!.checked).toBe(true);
+    el.querySelector<HTMLInputElement>('#reviewCustomer')!.click();
+    fixture.detectChanges();
+    expect(builder.draft().settings?.review).toEqual({ required: ['customer', 'internal'], reviewers, individual: true });
+    builder.setReviewRequired('internal', false);
+    builder.setReviewRequired('customer', false);
+    expect(builder.draft().settings?.review).toEqual({ reviewers, individual: true });
+    builder.setReviewIndividual(false);
+    expect(builder.draft().settings?.review).toEqual({ reviewers });
+  });
+
+  it('is read-only to someone who cannot change the pipeline', () => {
+    const { el, tab } = build({ canManage: false });
+    tab('settings');
+    expect(el.querySelector<HTMLInputElement>('#reviewIndividual')!.disabled).toBe(true);
+  });
+});
+
 /** 2026-10-12: the steps as a flow on the shared graph canvas, beside the list; the viewer's choice is remembered. */
 describe('StepBuilder -- List or Flow', () => {
   useMemoryStorage();

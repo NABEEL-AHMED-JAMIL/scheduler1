@@ -114,6 +114,15 @@
                 </label>
               </div>
             </app-field>
+            <!-- Bulk review (2026-10-12): a pipeline whose every result must be looked at on its own. -->
+            <app-field label="Individual review" for="reviewIndividual"
+                       hint="Each run's review, and each request of this pipeline's Approval steps, is decided on its own: bulk approve and bulk reject skip them.">
+              <label class="flex items-center gap-2 text-sm pt-1">
+                <input id="reviewIndividual" type="checkbox" class="checkbox" [checked]="reviewIndividual()" [disabled]="!canManage()"
+                       (change)="setReviewIndividual($any($event.target).checked)" />
+                Requires individual review (never approved or rejected in bulk)
+              </label>
+            </app-field>
           </div>
         </div>
         @if (isAdmin() && canManage() && switchable().length) {

@@ -1,5 +1,5 @@
 import { Avatar } from '../../shared/ui/avatar';
-import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -20,6 +20,9 @@ import { ValueView, labelOf, valueKind } from './value-kind';
 import { ReviewWaiting } from '../jobs/history/review-waiting';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
+import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
+import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
+import { BULK_CAP, BulkAnswer, BulkMatch, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 
 export type InboxTab = 'mine' | 'groups' | 'done' | 'requests';
 
@@ -42,9 +45,17 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, ReviewWaiting],
+  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, ReviewWaiting, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
+  styles: `
+    /* Bulk review: an approval task's row with its checkbox before it; the row's own button keeps the click. */
+    .inbox-pick-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--border-subtle); }
+    .inbox-pick-row > .inbox-row { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-left: 0.5rem; }
+    .inbox-pick-row.is-picked { background: var(--surface-sunken); }
+    .inbox-pick-cell { flex: none; display: flex; align-items: flex-start; padding: 0.75rem 0 0 0.85rem; width: 2.15rem; }
+    .inbox-pick-all { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+  `,
 })
 export class TaskInbox implements OnInit {
   private readonly api = inject(WorkflowsApi);
@@ -102,6 +113,27 @@ export class TaskInbox implements OnInit {
   private followLinkedTask = false;
 
   readonly me = computed(() => this.auth.user()?.appUserId ?? null);
+
+  // ---- bulk review (2026-10-12) -----------------------------------------------------------------------------------
+
+  /** Waiting for me and My groups pick approval tasks for a bulk decision; Done and My requests have nothing to decide. */
+  readonly canPick = computed(() => this.tab() === 'mine' || this.tab() === 'groups');
+  readonly taskById = computed(() => new Map(this.rows().map(t => [t.id, t])));
+  /** The approval tasks shown that the reader may decide: the page Select all picks. */
+  readonly pagePicks = computed<InboxTask[]>(() => {
+    if (!this.canPick()) return [];
+    const byId = this.taskById();
+    return this.shown().map(i => byId.get(i.id)).filter((t): t is InboxTask => !!t && this.pickable(t));
+  });
+  readonly bulk = new BulkSelection<InboxTask>({
+    idOf: t => t.id,
+    noun: ['task', 'tasks'],
+    groupNoun: 'workflow',
+    matching: () => this.matchingTasks(),
+    // Looked up when sent: the screen's tests stand in their own WorkflowsApi and no HTTP client.
+    send: (rows, request) => this.injector.get(BulkReviewApi).tasks({ taskIds: rows.map(t => t.id) }, request),
+  });
+  readonly pageState = computed(() => this.bulk.pageState(this.pagePicks()));
 
   readonly rows = computed<InboxTask[]>(() => {
     switch (this.tab()) {
@@ -226,6 +258,11 @@ export class TaskInbox implements OnInit {
   readonly requestFields = computed<FieldView[]>(() => this.fieldViews(this.request()?.subject));
 
   constructor() {
+    // A selection belongs to the list it was made from: another tab, search or filter starts it again.
+    effect(() => {
+      this.tab(); this.query(); this.statusFilter(); this.workflowFilter();
+      untracked(() => this.bulk.clear());
+    });
     // Keep the open row in view: after a click, a key, a decision or a reload re-draws the list.
     afterRenderEffect({ read: () => {
       const id = this.selectedId();
@@ -597,6 +634,79 @@ export class TaskInbox implements OnInit {
   readonly doneCount = computed(() => this.tabCount(this.done().length, this.badge.done(), this.complete('done')));
   readonly requestsCount = computed(() => this.tabCount(this.requests().length, this.badge.requests(), this.complete('requests')));
   readonly mineOverdue = computed(() => this.mine().some(t => t.overdue));
+
+  /** An approval task, open, not the reader's own request: theirs to decide, so theirs to pick. */
+  pickable(t: InboxTask): boolean {
+    return t.stepType === 'approval' && t.state === 'Open' && t.requestState !== 'Approved' && !(t.requestedBy != null && t.requestedBy === this.me());
+  }
+
+  /** Why an approval task's checkbox is off. */
+  pickTitle(t: InboxTask | undefined): string {
+    if (!t || this.pickable(t)) return '';
+    if (t.requestedBy != null && t.requestedBy === this.me()) return 'Your own request: someone else decides it.';
+    return 'No longer waiting for a decision.';
+  }
+
+  pickTask(id: number, box: HTMLInputElement): void {
+    const t = this.taskById().get(id);
+    if (!t) return;
+    if (!this.bulk.toggle(t, box.checked)) {
+      box.checked = false;
+      this.toast.error(`At most ${BULK_CAP} at a time.`);
+    }
+  }
+
+  /**
+   * Select all matching: the open tab read again by the service with the same search, a hundred at a time, its approval
+   * tasks the reader may decide under the same status and workflow filters, until there are more than the cap or none is
+   * left (twenty pages at most). The total is known only when the list ran out.
+   */
+  private matchingTasks(): Observable<BulkMatch<InboxTask>> {
+    const tab = this.tab() === 'groups' ? 'groups' : 'mine';
+    const q = this.query().trim() || null;
+    const status = this.statusFilter();
+    const workflow = this.workflowFilter();
+    const keep = (t: InboxTask) => this.pickable(t) && (!status || this.stateLabel(t) === status) && (!workflow || (t.workflowName ?? '') === workflow);
+    return new Observable<BulkMatch<InboxTask>>(out => {
+      const found = new Map<number, InboxTask>();
+      let pages = 0;
+      let reading: { unsubscribe(): void } | undefined;
+      const read = (cursor: string | null) => {
+        reading = this.api[tab]({ cursor, limit: INBOX_PAGE_SIZE, q }).subscribe({
+          next: r => {
+            if (r.status !== API_SUCCESS) { out.error({ error: { message: r.message || 'The matching tasks could not be read.' } }); return; }
+            for (const t of r.data ?? []) if (keep(t)) found.set(t.id, t);
+            const next = r.paging?.nextCursor ?? null;
+            pages++;
+            if (found.size > BULK_CAP || !next || pages >= 20) {
+              out.next({ rows: [...found.values()].slice(0, BULK_CAP), total: next ? null : found.size });
+              out.complete();
+            } else {
+              read(next);
+            }
+          },
+          error: err => out.error(err),
+        });
+      };
+      read(null);
+      return () => reading?.unsubscribe();
+    });
+  }
+
+  /** A bulk decision made: the decided tasks leave the lists, the rest is read again, and a decided open task moves on. */
+  bulkDecided(answer: BulkAnswer): void {
+    const done = new Set(answer.done.map(i => Number(i.id)));
+    if (!done.size) { this.refreshKeeping(null); return; }
+    const open = this.selectedTask();
+    const next = open != null && done.has(open) ? this.shownIds().find(id => !done.has(id)) ?? null : open;
+    this.mine.update(list => list.filter(t => !done.has(t.id)));
+    this.groups.update(list => list.filter(t => !done.has(t.id)));
+    this.refreshKeeping(null);
+    if (open != null && done.has(open)) {
+      if (next != null) this.openTask(next);
+      else { this.selectedTask.set(null); this.detail.set(null); }
+    }
+  }
 
   // ---- words ------------------------------------------------------------------------------------------------------
 

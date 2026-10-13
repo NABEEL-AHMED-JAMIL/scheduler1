@@ -448,11 +448,29 @@ export class StepBuilder {
     return !!this.draft().settings?.review?.required?.includes(party);
   }
 
-  /** MIG-237: tick or untick a party; nobody ticked drops the setting (no review). */
+  /**
+   * MIG-237: tick or untick a party; nobody ticked drops `required`. The review's other keys -- its reviewers, individual
+   * review -- stay as they are; nothing left drops the setting (no review).
+   */
   setReviewRequired(party: 'internal' | 'customer', on: boolean): void {
     const now = (this.draft().settings?.review?.required ?? []).filter(p => p !== party);
     const required = on ? [...now, party].sort() as ('internal' | 'customer')[] : now;
-    this.draft.update(d => updateSettings(d, { review: required.length ? { required } : undefined }));
+    this.setReview({ required: required.length ? required : undefined });
+  }
+
+  /** Whether the pipeline requires individual review (settings.review.individual). */
+  readonly reviewIndividual = computed(() => this.draft().settings?.review?.individual === true);
+
+  /** Bulk review (2026-10-12): never approved or rejected in bulk -- written as true, dropped when false. */
+  setReviewIndividual(on: boolean): void {
+    this.setReview({ individual: on ? true : undefined });
+  }
+
+  /** Changes keys of settings.review and keeps the others; a key set to undefined goes, and an empty review goes with it. */
+  private setReview(change: Partial<NonNullable<Settings['review']>>): void {
+    const next: Record<string, unknown> = { ...(this.draft().settings?.review ?? {}), ...change };
+    for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key];
+    this.draft.update(d => updateSettings(d, { review: Object.keys(next).length ? next as Settings['review'] : undefined }));
   }
 
   settingProblem(path: string): string {

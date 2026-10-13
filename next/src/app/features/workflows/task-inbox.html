@@ -81,6 +81,13 @@
           </select>
         </div>
         <div class="inbox-count">
+          @if (canPick() && pagePicks().length) {
+            <label class="inbox-pick-all" title="Select every approval task shown that you may decide">
+              <input type="checkbox" class="checkbox" aria-label="Select all approval tasks shown" data-bulk-page
+                     [checked]="pageState() === 'all'" [indeterminate]="pageState() === 'some'"
+                     (change)="bulk.setPage(pagePicks(), $any($event.target).checked)" />
+            </label>
+          }
           <span class="inbox-count-line">
             <span data-test="shown-line">{{ shownLine() }}</span>
             <!-- What every row shares, said once rather than on each row's second line. -->
@@ -107,15 +114,22 @@
             <span>{{ g.label }}</span><span class="inbox-day-count">{{ g.rows.length }}</span>
           </div>
           @for (item of g.rows; track item.kind + item.id) {
-            <button type="button" class="inbox-row" [class.is-on]="selectedId() === item.id" [class.is-crit]="item.crit"
-                    [attr.aria-current]="selectedId() === item.id ? 'true' : null" (click)="openItem(item)"
-                    [attr.data-task]="item.kind === 'task' ? item.id : null" [attr.data-request]="item.kind === 'request' ? item.id : null">
-              <!-- The name is cut, never its trailing reference (#1016): often the one thing that tells rows apart. -->
-              <span class="inbox-row-title" [title]="item.title"><span class="inbox-title-name">{{ item.name }}</span>@if (item.ref) {<span class="inbox-title-ref">{{ ' ' + item.ref }}</span>}</span>
-              <span class="inbox-row-time" [title]="item.timeTitle">{{ item.time }}</span>
-              <span class="inbox-row-sub">{{ item.sub }}</span>
-              <span class="inbox-row-status"><span [class]="'inbox-dot is-' + item.tone"></span>{{ item.status }}</span>
-            </button>
+            @if (canPick() && item.kind === 'task') {
+              <!-- Bulk review: an approval task the reader may decide has a checkbox before it; another task keeps the space. -->
+              @let task = taskById().get(item.id);
+              <div class="inbox-pick-row" [class.is-picked]="bulk.hasId(item.id)">
+                <span class="inbox-pick-cell">
+                  @if (task?.stepType === 'approval') {
+                    <input type="checkbox" class="checkbox" [attr.data-bulk-pick]="item.id" [checked]="bulk.hasId(item.id)"
+                           [disabled]="!task || !pickable(task)" [title]="pickTitle(task)" [attr.aria-label]="'Select ' + item.title"
+                           (change)="pickTask(item.id, $any($event.target))" />
+                  }
+                </span>
+                <ng-container *ngTemplateOutlet="row; context: { $implicit: item }" />
+              </div>
+            } @else {
+              <ng-container *ngTemplateOutlet="row; context: { $implicit: item }" />
+            }
           }
         } @empty {
           <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">
@@ -147,6 +161,9 @@
           </div>
         }
       </div>
+      @if (canPick()) {
+        <app-bulk-bar [selection]="bulk" [flush]="true" [pageRows]="pagePicks()" [moreMatch]="hasMore()" (decided)="bulkDecided($event)" />
+      }
     </section>
 
     <!-- The task, or the request -->
@@ -292,6 +309,19 @@
   </div>
   }
 </div>
+
+<!-- A row of the list: the request's title and its time, then step · workflow and the status. -->
+<ng-template #row let-item>
+  <button type="button" class="inbox-row" [class.is-on]="selectedId() === item.id" [class.is-crit]="item.crit"
+          [attr.aria-current]="selectedId() === item.id ? 'true' : null" (click)="openItem(item)"
+          [attr.data-task]="item.kind === 'task' ? item.id : null" [attr.data-request]="item.kind === 'request' ? item.id : null">
+    <!-- The name is cut, never its trailing reference (#1016): often the one thing that tells rows apart. -->
+    <span class="inbox-row-title" [title]="item.title"><span class="inbox-title-name">{{ item.name }}</span>@if (item.ref) {<span class="inbox-title-ref">{{ ' ' + item.ref }}</span>}</span>
+    <span class="inbox-row-time" [title]="item.timeTitle">{{ item.time }}</span>
+    <span class="inbox-row-sub">{{ item.sub }}</span>
+    <span class="inbox-row-status"><span [class]="'inbox-dot is-' + item.tone"></span>{{ item.status }}</span>
+  </button>
+</ng-template>
 
 <!-- A heading's title: its trailing reference (#1016) never breaks across lines. -->
 <ng-template #titled let-title>

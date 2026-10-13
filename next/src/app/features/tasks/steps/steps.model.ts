@@ -40,8 +40,12 @@ export interface Settings {
   defaultOnError?: string;
   /** MIG-243: public, internal or sensitive -- the level of the data the pipeline handles; the data policy for it applies. */
   sensitivity?: string;
-  /** MIG-237: whose review the run's results wait for (internal, customer); absent means no review. */
-  review?: { required?: ('internal' | 'customer')[] };
+  /**
+   * MIG-237: whose review the run's results wait for (internal, customer); absent means no review. MIG-361: whose Task
+   * inbox the internal review goes to (reviewers). Bulk review (2026-10-12): individual -- the run's review and the
+   * pipeline's Approval steps are never approved or rejected in bulk.
+   */
+  review?: { required?: ('internal' | 'customer')[]; reviewers?: { kind?: string; value?: string } | null; individual?: boolean };
 }
 
 export interface Source { type?: string; config?: Record<string, unknown>; }

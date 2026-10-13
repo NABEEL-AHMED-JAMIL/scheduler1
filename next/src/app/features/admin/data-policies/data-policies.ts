@@ -16,6 +16,7 @@ import {
 } from './data-policy.model';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { ReviewPolicyCard } from './review-policy-card';
 
 type Switch = 'aiWriteTools' | 'minFieldsWarning';
 
@@ -30,7 +31,7 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
  */
 @Component({
   selector: 'app-data-policies',
-  imports: [RefreshButton, PageHeader, Icon, LoadError, BlurLoader, Combobox, RouterLink],
+  imports: [RefreshButton, PageHeader, Icon, LoadError, BlurLoader, Combobox, RouterLink, ReviewPolicyCard],
   templateUrl: './data-policies.html',
   styles: `
     .policy-table { table-layout: fixed; min-width: 56rem; }
