@@ -16,6 +16,8 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
  * Invoices as rail and pane: every month closed into a bill on the left, the one picked on the
@@ -25,7 +27,7 @@ import { WorkspacePicker } from './workspace-picker';
  */
 @Component({
   selector: 'app-invoices',
-  imports: [Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './invoices.html',
 })

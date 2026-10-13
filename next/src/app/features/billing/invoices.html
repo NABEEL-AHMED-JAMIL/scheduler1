@@ -1,35 +1,35 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Invoices</h1>
-      <p class="page-subtitle">
-        Every month closed into a bill. Pick one on the left; its lines, documents, payments and
-        story are on the right, with a QR code of its number for the printed page.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Invoices</h1>
+        <p class="page-subtitle">
+          Every month closed into a bill. Pick one on the left; its lines, documents, payments and
+          story are on the right, with a QR code of its number for the printed page.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (isPlatformAdmin()) {
+          <label class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">Month
+            <input class="input w-40 py-1 text-xs mono" type="month" [value]="closePeriod()" (input)="closePeriod.set($any($event.target).value)" aria-label="Month to close" />
+          </label>
+          <button type="button" class="btn btn-primary btn-sm" (click)="draft()" [disabled]="closing()" [title]="workspaces.tenantId() ? 'A draft from the meter for the month, for this workspace' : 'A draft for every workspace'">
+            <app-icon name="plus" [busy]="closing()" />{{ closing() ? 'Drafting…' : 'Draft month' }}
+          </button>
+        }
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="pageMenu" aria-label="Billing actions"><app-icon name="dots" size="1.05em" /></button>
+        <ng-template #pageMenu>
+          <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+            <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editAccount()"><app-icon name="edit" />Billing profile</button>
+            <button cdkMenuItem class="menu-item" [cdkMenuItemDisabled]="statementBusy()" (cdkMenuItemTriggered)="statement()"><app-icon name="file" [busy]="statementBusy()" />Statement for this year</button>
+          </div>
+        </ng-template>
+      </div>
     </div>
-    <div class="flex items-center gap-2 flex-wrap">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (isPlatformAdmin()) {
-        <label class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">Month
-          <input class="input w-40 py-1 text-xs mono" type="month" [value]="closePeriod()" (input)="closePeriod.set($any($event.target).value)" aria-label="Month to close" />
-        </label>
-        <button type="button" class="btn btn-primary btn-sm" (click)="draft()" [disabled]="closing()" [title]="workspaces.tenantId() ? 'A draft from the meter for the month, for this workspace' : 'A draft for every workspace'">
-          <app-icon name="plus" [busy]="closing()" />{{ closing() ? 'Drafting…' : 'Draft month' }}
-        </button>
-      }
-      <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="pageMenu" aria-label="Billing actions"><app-icon name="dots" size="1.05em" /></button>
-      <ng-template #pageMenu>
-        <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
-          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editAccount()"><app-icon name="edit" />Billing profile</button>
-          <button cdkMenuItem class="menu-item" [cdkMenuItemDisabled]="statementBusy()" (cdkMenuItemTriggered)="statement()"><app-icon name="file" [busy]="statementBusy()" />Statement for this year</button>
-        </div>
-      </ng-template>
-    </div>
-  </div>
+  </app-page-header>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     <app-stat-tile label="Overdue" [value]="summary().overdue" icon="alert" [tone]="summary().overdue ? 'crit' : 'muted'"
                    [foot]="summary().overdue ? totals(summary().overdueTotals) + ' past due' : 'nothing past due'" />
     <app-stat-tile label="Open" [value]="summary().open" icon="clock" [tone]="summary().open ? 'info' : 'muted'"

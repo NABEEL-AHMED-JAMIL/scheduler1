@@ -12,6 +12,8 @@ import { formatQuantity, formatUnitPrice, localIsoDate } from './billing-format'
 import { RateCardEditor, RateCardEditorData } from './rate-card-editor';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
  * Rate cards: the calculation behind every bill, kept as versions. The default card prices
@@ -21,7 +23,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
  */
 @Component({
   selector: 'app-rate-cards',
-  imports: [Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './rate-cards.html',
 })
 export class RateCards implements OnInit {

@@ -13,6 +13,8 @@ import { BillingApi, DayRow, MeterLine, PricedWith, RunRow, SERVICES, SubjectRow
 import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, pluralUnit, shiftDay } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
 const SUBJECTS_SHOWN = 25;
@@ -36,7 +38,7 @@ function isTiny(amount: number): boolean {
  */
 @Component({
   selector: 'app-billing',
-  imports: [Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, ServerTimePipe, RouterLink],
   templateUrl: './billing.html',
 })
 export class Billing implements OnInit {

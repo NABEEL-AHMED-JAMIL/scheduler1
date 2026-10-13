@@ -11,11 +11,12 @@ import { WorkspacePicker } from './workspace-picker';
 import { BillingApi, BillingAnalytics as Analytics, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentListRow, paymentMethodLabel } from './billing.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { formatBytes, formatMoney, formatMoneyRound, monthShort, workspaceLabels } from './billing-format';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /** The platform's view: invoiced, collected, open and overdue across every workspace, and who churns data. */
 @Component({
   selector: 'app-billing-analytics',
-  imports: [Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented, ServerTimePipe],
+  imports: [PageHeader, Icon, StatTile, BarChart, RouterLink, DecimalPipe, Segmented, ServerTimePipe],
   templateUrl: './billing-analytics.html',
 })
 export class BillingAnalyticsPage implements OnInit {
