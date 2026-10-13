@@ -299,7 +299,7 @@
         <div>
           <h2 class="section-title">What failed, and why</h2>
           <p class="section-sub">
-            The error each failed run reported. Open a job for its full run history, or a run
+            The error each failed run reported. Open a schedule for its full run history, or a run
             for the lines the pipeline wrote while it was failing.
           </p>
         </div>
@@ -321,7 +321,7 @@
                     <span class="reason-count tabular">{{ r.count }}</span>
                     <span class="reason-bar"><span class="reason-fill" [style.width.%]="(r.count / failureReasons()[0].count) * 100"></span></span>
                     <span class="reason-text mono truncate">{{ r.sample }}</span>
-                    <span class="reason-meta">{{ r.count === 1 ? 'run' : 'runs' }} across {{ r.tasks }} task{{ r.tasks === 1 ? '' : 's' }}</span>
+                    <span class="reason-meta">{{ r.count === 1 ? 'run' : 'runs' }} across {{ r.tasks }} pipeline{{ r.tasks === 1 ? '' : 's' }}</span>
                   </button>
                 </li>
               }
@@ -339,7 +339,7 @@
             }
             <div class="search-field max-w-56">
               <app-icon name="search" size="0.95em" />
-              <input class="input" placeholder="Find by job, task or error" aria-label="Find a failed run" [value]="failureSearch()" (input)="setFailureSearch($any($event.target).value)" />
+              <input class="input" placeholder="Find by schedule, pipeline or error" aria-label="Find a failed run" [value]="failureSearch()" (input)="setFailureSearch($any($event.target).value)" />
             </div>
           </ng-container>
           <table class="table-modern">
