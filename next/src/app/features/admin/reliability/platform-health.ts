@@ -8,7 +8,7 @@ import { EChart } from '../../../shared/charts/echart/echart';
 import { ChartThemes } from '../../../shared/charts/echart/chart-themes';
 import { CONSOLE_THEME } from '../../../shared/charts/echart/echart-theme';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
-import { AlertsApi, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
+import { AlertsApi, PlannedDeploy, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
 import { AlertRules } from '../../settings/alerts/alert-rules';
 
 export type HealthMetric = 'requestsPerMin' | 'errorsPerMin' | 'meanMs' | 'heapUsedMb' | 'cpuPct';
@@ -29,9 +29,26 @@ export function statusWord(status: string | undefined): { word: string; tone: 'o
   }
 }
 
-/** A service's 24 hours as one line per service, for the picked figure: an ECharts option. */
+/** The series that marks the planned deploys: a dashed line at each start and a band to its end, in the muted text colour. */
+export const PLANNED_DEPLOYS = 'Planned deploys';
+
+function deployMarks(deploys: PlannedDeploy[], text: string): Record<string, unknown> {
+  return {
+    name: PLANNED_DEPLOYS, type: 'line', data: [], silent: true, color: text, lineStyle: { type: 'dashed', width: 1 },
+    markLine: {
+      silent: true, symbol: ['none', 'none'], label: { show: false }, lineStyle: { color: text, type: 'dashed', width: 1, opacity: 0.7 },
+      data: deploys.map(d => ({ xAxis: d.start, name: `${d.service} deploy` })),
+    },
+    markArea: {
+      silent: true, itemStyle: { color: text, opacity: 0.12 },
+      data: deploys.map(d => [{ xAxis: d.start, name: `${d.service} deploy` }, { xAxis: d.closes }]),
+    },
+  };
+}
+
+/** A service's 24 hours as one line per service, for the picked figure, with the planned deploys marked: an ECharts option. */
 export function healthOption(services: ServiceHealth[], metric: HealthMetric, palette: string[], text: string, border: string,
-  asOf?: string): Record<string, unknown> {
+  asOf?: string, deploys: PlannedDeploy[] = []): Record<string, unknown> {
   const shown = services.filter(s => s.series && s.series.at.length);
   // The axis is the last 24 hours whatever the samples hold: a first hour of samples is drawn at the right end, not spread.
   const end = asOf ? Date.parse(asOf) : NaN;
@@ -43,18 +60,33 @@ export function healthOption(services: ServiceHealth[], metric: HealthMetric, pa
     tooltip: { trigger: 'axis', valueFormatter: (v: number | null) => (v == null ? '—' : Number(v).toLocaleString('en-US')) },
     xAxis: { type: 'time', ...(Number.isNaN(end) ? {} : { min: end - 86_400_000, max: end }), axisLabel: { color: text, fontSize: 11, hideOverlap: true }, axisLine: { lineStyle: { color: border } } },
     yAxis: { type: 'value', min: 0, axisLabel: { color: text, fontSize: 11 }, splitLine: { lineStyle: { color: border, opacity: 0.5 } } },
-    series: shown.map(s => ({
-      name: s.service, type: 'line', showSymbol: s.series!.at.length < 4, symbolSize: 4, smooth: false, connectNulls: false, lineStyle: { width: 1.5 },
-      data: s.series!.at.map((at, i) => [at, (s.series![metric] as (number | null)[])[i]]),
-    })),
+    series: [
+      ...shown.map(s => ({
+        name: s.service, type: 'line', showSymbol: s.series!.at.length < 4, symbolSize: 4, smooth: false, connectNulls: false, lineStyle: { width: 1.5 },
+        data: s.series!.at.map((at, i) => [at, (s.series![metric] as (number | null)[])[i]]),
+      })),
+      ...(deploys.length ? [deployMarks(deploys, text)] : []),
+    ],
   };
+}
+
+/** How long a planned deploy's window was open, in words: "2 min", "45 s", or "running". */
+export function deployLength(d: PlannedDeploy): string {
+  if (d.state === 'open') return 'running';
+  const seconds = Math.max(0, Math.round((Date.parse(d.closes) - Date.parse(d.start)) / 1000));
+  return seconds < 90 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+}
+
+/** A service's restarts in 24 hours that were not a planned deploy: the ones that alerted. */
+export function unplannedRestarts(s: ServiceHealth): number {
+  return Math.max(0, (s.restarts24h ?? 0) - (s.plannedRestarts24h ?? 0));
 }
 
 /**
  * MIG-355: Platform › Reliability's health view -- every service's status, heap, CPU, request and error rate, mean latency
  * and restarts in 24 hours, from Core's minute samples of what the services already serve (Actuator; nothing new runs);
- * the 24 hours as one chart per figure; Kafka lag, disk and the billing reconciliation; then the platform's alerts and the
- * rules that raise them.
+ * the 24 hours as one chart per figure, the planned deploys marked on it (scripts/deploy.sh's windows: their restarts
+ * raised no alert); Kafka lag, disk and the billing reconciliation; then the platform's alerts and the rules that raise them.
  */
 @Component({
   selector: 'app-platform-health',
@@ -90,7 +122,7 @@ export function healthOption(services: ServiceHealth[], metric: HealthMetric, pa
               <th class="text-right">Requests/min</th>
               <th class="text-right">Errors</th>
               <th class="text-right">Mean latency</th>
-              <th class="text-right">Restarts (24 h)</th>
+              <th class="text-right" title="Restarts in 24 hours; a planned deploy's restart (scripts/deploy.sh) raises no alert and is counted apart.">Restarts (24 h)</th>
               <th>Started</th>
             </tr>
           </thead>
@@ -107,7 +139,7 @@ export function healthOption(services: ServiceHealth[], metric: HealthMetric, pa
                 <td class="text-right tabular" [class.text-crit-500]="(s.errorsPerMin ?? 0) > 0">
                   {{ s.errorsPerMin != null ? (s.errorsPerMin | number:'1.0-2') : '—' }}@if (s.errorPct != null) { <span class="text-[color:var(--text-muted)]"> ({{ s.errorPct }}%)</span> }</td>
                 <td class="text-right tabular">{{ s.meanMs != null ? (s.meanMs | number:'1.0-0') + ' ms' : '—' }}</td>
-                <td class="text-right tabular" [class.text-warn-500]="(s.restarts24h ?? 0) > 0">{{ s.restarts24h ?? '—' }}</td>
+                <td class="text-right tabular whitespace-nowrap" [class.text-warn-500]="unplanned(s) > 0" [attr.data-planned]="s.plannedRestarts24h ?? 0">{{ s.restarts24h ?? '—' }}@if (s.plannedRestarts24h) { <span class="text-[11px] text-[color:var(--text-muted)]"> ({{ s.plannedRestarts24h }} planned)</span> }</td>
                 <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ s.startedAt ? (s.startedAt | serverTime:'recent') : '—' }}</td>
               </tr>
             } @empty {
@@ -124,6 +156,19 @@ export function healthOption(services: ServiceHealth[], metric: HealthMetric, pa
           <app-segmented class="ml-auto" ariaLabel="Figure" [options]="metricOptions" [value]="metric()" (valueChange)="metric.set($event)" />
         </div>
         <app-echart [option]="option()" [theme]="theme().ref" [height]="260" [label]="metricLabel() + ' over the last 24 hours'" />
+        @if (deploys().length) {
+          <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs mt-1" data-test="planned-deploys">
+            <span class="font-medium text-[color:var(--text-secondary)]" title="Announced by scripts/deploy.sh: a restart or unhealthy minute of that service inside its window raises no alert. Dashed on the chart.">Planned deploys</span>
+            @for (d of deploys(); track d.service + d.start) {
+              <span class="whitespace-nowrap" [attr.data-service]="d.service" [attr.data-state]="d.state">
+                <span class="font-medium">{{ d.service }}</span>
+                <span class="text-[color:var(--text-secondary)]"> {{ d.start | serverTime:'recent' }}, {{ length(d) }}</span>
+                @if (d.outcome === 'failed') { <span class="text-crit-500"> · failed</span> }
+                @if (d.state === 'expired') { <span class="text-warn-500" title="The deploy never ended its window; it ran out at its maximum."> · expired</span> }
+              </span>
+            }
+          </div>
+        }
       </section>
 
       <div class="probe-grid" data-test="health-probes">
@@ -173,10 +218,11 @@ export class PlatformHealthView implements OnInit, OnDestroy {
   readonly theme = computed(() => this.themes.resolve(CONSOLE_THEME));
 
   readonly services = computed(() => this.health()?.services ?? []);
+  readonly deploys = computed(() => this.health()?.deploys ?? []);
   readonly metricLabel = computed(() => METRIC_LABEL[this.metric()]);
   readonly option = computed(() => {
     const t = this.theme();
-    return healthOption(this.services(), this.metric(), t.palette, t.tokens.textSecondary, t.tokens.border, this.health()?.asOf);
+    return healthOption(this.services(), this.metric(), t.palette, t.tokens.textSecondary, t.tokens.border, this.health()?.asOf, this.deploys());
   });
   readonly summary = computed(() => {
     const all = this.services();
@@ -214,6 +260,10 @@ export class PlatformHealthView implements OnInit, OnDestroy {
   }
 
   status(s: ServiceHealth) { return statusWord(s.status); }
+
+  unplanned(s: ServiceHealth): number { return unplannedRestarts(s); }
+
+  length(d: PlannedDeploy): string { return deployLength(d); }
 
   group(p: Probe): string { return p.probe.replace(/^kafka-lag:/, ''); }
 }

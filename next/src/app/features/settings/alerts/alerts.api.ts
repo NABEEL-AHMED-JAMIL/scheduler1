@@ -97,7 +97,24 @@ export interface ServiceHealth {
   meanMs?: number | null;
   restarts24h?: number;
   minutesNotUp24h?: number;
+  /** Of those, inside a planned deploy window (scripts/deploy.sh announced it): what the rules did not alert on. */
+  plannedRestarts24h?: number;
+  plannedMinutesNotUp24h?: number;
   series?: ServiceSeries;
+}
+
+/**
+ * A planned deploy of one service (scripts/deploy.sh announces it in Redis; Core reads it): its restart and its minutes
+ * not UP inside the window raise no alert. `closes` is its end, or its maximum when it never said so ("expired").
+ */
+export interface PlannedDeploy {
+  service: string;
+  start: string;
+  end: string | null;
+  expires: string;
+  closes: string;
+  state: 'open' | 'ended' | 'expired';
+  outcome: 'ok' | 'failed' | null;
 }
 
 export interface Probe { probe: string; readAt: string | null; ok: boolean; reading: number | null; detail: string | null; }
@@ -108,6 +125,8 @@ export interface PlatformHealth {
   services: ServiceHealth[];
   probes: Probe[];
   incidents: Alert[];
+  /** The 24 hours' planned deploys, newest first (absent from a Core older than them). */
+  deploys?: PlannedDeploy[];
 }
 
 @Injectable({ providedIn: 'root' })

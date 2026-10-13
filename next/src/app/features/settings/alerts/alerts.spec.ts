@@ -8,8 +8,8 @@ import { of } from 'rxjs';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AlertRules } from './alert-rules';
-import { Alert, AlertRule, minutes, recommendedRules, ruleSentence } from './alerts.api';
-import { healthOption, statusWord } from '../../admin/reliability/platform-health';
+import { Alert, AlertRule, PlannedDeploy, ServiceHealth, minutes, recommendedRules, ruleSentence } from './alerts.api';
+import { PLANNED_DEPLOYS, deployLength, healthOption, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
 import { notificationTarget, openableTarget } from '../../notifications/notification-links';
 
 /** MIG-355: alerts and their rules -- the list, the open alerts with Resolve, the recommended rules, and the words. */
@@ -107,5 +107,28 @@ describe('Alerts', () => {
     expect(option.series[0].showSymbol).toBe(true);
     expect(option.xAxis.max - option.xAxis.min).toBe(86_400_000);
     expect(option.series[0].data).toEqual([['2026-10-13T13:00:00Z', 900]]);
+  });
+
+  it('marks each planned deploy on the day, and counts its restart apart', () => {
+    const deploys: PlannedDeploy[] = [
+      { service: 'transcriber', start: '2026-10-13T13:30:00Z', end: '2026-10-13T13:31:10Z', expires: '2026-10-13T13:45:00Z',
+        closes: '2026-10-13T13:31:10Z', state: 'ended', outcome: 'ok' },
+      { service: 'process', start: '2026-10-13T12:00:00Z', end: null, expires: '2026-10-13T12:15:00Z', closes: '2026-10-13T12:15:00Z',
+        state: 'expired', outcome: null },
+    ];
+    const media: ServiceHealth = { service: 'media', status: 'UP', series: { at: ['2026-10-13T13:00:00Z'], heapUsedMb: [900], requestsPerMin: [4],
+      errorsPerMin: [0], meanMs: [12], cpuPct: [3], up: [true] } };
+    const option = healthOption([media], 'heapUsedMb', ['#111'], '#222', '#333', '2026-10-13T14:00:00Z', deploys) as {
+      series: { name: string; markLine?: { data: { xAxis: string }[] }; markArea?: { data: { xAxis: string }[][] } }[] };
+    expect(option.series.map(s => s.name)).toEqual(['media', PLANNED_DEPLOYS]);
+    expect(option.series[1].markLine!.data.map(d => d.xAxis)).toEqual(['2026-10-13T13:30:00Z', '2026-10-13T12:00:00Z']);
+    expect(option.series[1].markArea!.data[1].map(d => d.xAxis)).toEqual(['2026-10-13T12:00:00Z', '2026-10-13T12:15:00Z']);
+    const none = healthOption([media], 'heapUsedMb', ['#111'], '#222', '#333', '2026-10-13T14:00:00Z') as { series: unknown[] };
+    expect(none.series.length).toBe(1);
+    expect(deployLength(deploys[0])).toBe('70 s');
+    expect(deployLength(deploys[1])).toBe('15 min');
+    expect(deployLength({ ...deploys[0], state: 'open', end: null })).toBe('running');
+    expect(unplannedRestarts({ service: 'transcriber', status: 'UP', restarts24h: 3, plannedRestarts24h: 2 })).toBe(1);
+    expect(unplannedRestarts({ service: 'transcriber', status: 'UP', restarts24h: 1, plannedRestarts24h: 2 })).toBe(0);
   });
 });
