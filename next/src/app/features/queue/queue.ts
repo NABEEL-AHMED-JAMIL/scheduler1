@@ -355,7 +355,7 @@ export class Queue implements OnInit {
 
   /** The run's job by name, or its number when the list does not have it. */
   jobName(row: { jobId: number }): string {
-    return this.jobNames().get(row.jobId) ?? `Job #${row.jobId}`;
+    return this.jobNames().get(row.jobId) ?? `Schedule #${row.jobId}`;
   }
 
   private loadJobNames(): void {

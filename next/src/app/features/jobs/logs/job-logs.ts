@@ -59,6 +59,15 @@ export function runTrail(jobId: string, jobName: string | null | undefined, can:
   return can.inbox ? above('/workflows/inbox/run') : [{ label: 'Run & review' }];
 }
 
+/** UX review R3: the boards a schedule's outputs feed (analytics lists the schedules behind each board), by name. */
+export function boardsFedBy(boards: { analyticsDashboardId?: number | null; dashboardName?: string | null; pipelines?: { jobId: number }[] | null }[],
+                            jobId: number): { id: number; name: string }[] {
+  return boards
+    .filter(b => b.analyticsDashboardId != null && (b.pipelines ?? []).some(p => Number(p.jobId) === Number(jobId)))
+    .map(b => ({ id: b.analyticsDashboardId!, name: b.dashboardName?.trim() || `Dashboard #${b.analyticsDashboardId}` }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
 /** Whether the run's pipeline has AI steps: an AI step in its timeline, an AI trace, or an answer of the older AI steps. */
 export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unknown[] } | null, answers: number): boolean {
   return answers > 0 || !!timeline?.aiSteps?.length || (timeline?.steps ?? []).some(s => stepKind(s.task) === 'ai');
@@ -163,11 +172,28 @@ export class JobLogs implements OnInit, OnDestroy {
     if (taskDetailId && this.auth.isTenantAdmin?.() && this.auth.canOpen('tasks')) {
       out.push({ label: pipeline ? `Pipeline: ${pipeline}` : 'Pipeline', icon: 'layers', link: `/pipelines/${taskDetailId}/edit`, query: { tab: 'steps' }, test: 'pipeline' });
     }
-    if (this.auth.canOpen('analytics-dashboards')) out.push({ label: 'Dashboards', icon: 'chart', link: '/data/analytics/dashboards', test: 'dashboards' });
+    // UX review R3: the boards this schedule's outputs feed are named after the row ("Feeds: …"); Dashboards only when none is known.
+    if (this.auth.canOpen('analytics-dashboards') && !this.feeds().length) {
+      out.push({ label: 'Dashboards', icon: 'chart', link: '/data/analytics/dashboards', test: 'dashboards' });
+    }
     // UX review B9: the run's own cost, shared out of the month's priced lines.
     if (this.auth.isTenantAdmin?.()) out.push({ label: 'What this run cost', icon: 'database', link: '/billing/usage', query: { run: String(this.jobQueueId()) }, test: 'cost' });
     return out;
   });
+  /**
+   * UX review 2026-10-13 (R3): the dashboards this run's outputs feed -- the boards whose files come from this schedule, as
+   * analytics names them (the boards' "Made by", B5) -- for a reader who may open Dashboards.
+   */
+  readonly feeds = signal<{ id: number; name: string }[]>([]);
+  private readFeeds(): void {
+    const job = Number(this.jobId());
+    if (!job || !this.auth.canOpen('analytics-dashboards')) return;
+    this.http.get<ApiResponse<{ analyticsDashboardId?: number | null; dashboardName?: string | null; pipelines?: { jobId: number }[] | null }[]>>(
+      `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).subscribe({
+        next: r => this.feeds.set(boardsFedBy(r?.status === API_SUCCESS ? r.data ?? [] : [], job)),
+        error: () => this.feeds.set([]),
+      });
+  }
   /** The pipeline's name when its page is not the reader's to open: said once, in the link row, as text. */
   readonly pipelineText = computed(() => this.related().some(r => r.test === 'pipeline') ? null : this.job()?.taskDetail?.taskName ?? null);
 
@@ -563,6 +589,7 @@ export class JobLogs implements OnInit, OnDestroy {
     this.load();
     this.listen();
     this.readBackfill();
+    this.readFeeds();
   }
 
   /** MIG-347: the backfill this run is part of, if any -- asked once (Schedules' read; nothing for a reader without it). */
@@ -618,7 +645,7 @@ export class JobLogs implements OnInit, OnDestroy {
     if (!this.validIds()) {
       this.loading.set(false);
       this.missing.set(true);
-      this.error.set('That link is missing the run it refers to. Open the run from the job\'s '
+      this.error.set('That link is missing the run it refers to. Open the run from the schedule\'s '
         + 'history instead.');
       return;
     }
@@ -678,7 +705,7 @@ export class JobLogs implements OnInit, OnDestroy {
     this.run.set(null);
     this.logs.set([]);
     this.missing.set(true);
-    this.error.set(`Run #${this.jobQueueId().trim()} of job #${this.jobId().trim()} does not exist or was deleted.`);
+    this.error.set(`Run #${this.jobQueueId().trim()} of schedule #${this.jobId().trim()} does not exist or was deleted.`);
   }
 
 }

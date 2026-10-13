@@ -45,7 +45,7 @@ export const PINNED: Record<string, unknown> = {
       "Filter by execution type",
       "Filter by run status",
       "Search id, schedule or pipeline",
-      "Search jobs",
+      "Search schedules",
       "Select Reference CSV check (e2e)",
       "Select UI-REVIEW Clean customers (manual, notify on completion)",
       "Select all schedules on this page"
@@ -70,7 +70,7 @@ export const PINNED: Record<string, unknown> = {
         "Task: #1854 Reference: CSV check and summarise",
         "Topic: etl.reference (all partitions)",
         "Storage: View in bucket",
-        "Email notifications: Emails person@example.com when this job completes, fails or is skipped.Change completes fails is skipped"
+        "Email notifications: Emails person@example.com when this schedule completes, fails or is skipped.Change completes fails is skipped"
       ],
       "code": [
         "<csvCheck><inputKey>reference/input/sample.csv</inputKey><outputPrefix>reference/output</outputPrefix><maxRejectPercent>50</maxRejectPercent><requiredColumns>id,name</requiredColumns><numericColumns>amount</numericColumns><deleteInput>false</deleteInput><bucket>etl-bucket</bucket></csvCheck>"
@@ -98,12 +98,11 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Ask about this schedule",
       "Backfill…",
-      "Collapse job detail",
       "Columns",
       "Completed 1",
-      "Copy",
-      "Job & task detail#2833",
+      "Expand the schedule details",
       "Refresh",
+      "Schedule details#2833Pipeline: Reference: CSV check and summarise · On demand",
       "Show the full message for run #7331"
     ],
     "columns": [
@@ -124,7 +123,6 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/pipelines",
-      "/pipelines/1854/edit",
       "/pipelines/schedules",
       "/pipelines/schedules/2833/runs/7331"
     ]
@@ -192,6 +190,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/findSourceJobAuditLog?jobId=2833&jobQueueId=7331",
       "GET /sourceJob.json/backfills/ofRun?jobQueueId=7331",
+      "GET /analyticsWorkspace.json/fetchAllDashboards",
       "GET /aiPrompt.json/runsForJob?jobQueueId=7331",
       "GET /billing.json/runCost?jobQueueId=7331",
       "GET /sourceJob.json/stepExecutions?jobQueueId=7331",
@@ -435,7 +434,7 @@ export const PINNED: Record<string, unknown> = {
       "Filter by execution type",
       "Filter by run status",
       "Search id, schedule or pipeline",
-      "Search jobs",
+      "Search schedules",
       "Select Reference CSV check (e2e)",
       "Select UI-REVIEW Clean customers (manual, notify on completion)",
       "Select all schedules on this page"
@@ -490,7 +489,7 @@ export const PINNED: Record<string, unknown> = {
       "Filter by execution type",
       "Filter by run status",
       "Search id, schedule or pipeline",
-      "Search jobs",
+      "Search schedules",
       "Select Reference CSV check (e2e)",
       "Select UI-REVIEW Clean customers (manual, notify on completion)",
       "Select all schedules on this page"

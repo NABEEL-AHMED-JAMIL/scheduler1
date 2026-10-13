@@ -7,10 +7,19 @@
       <span pills class="pill pill-{{ s.tone }} run-status-pill" data-test="run-status"><app-icon [name]="s.icon" size="0.85em" />{{ s.label }}</span>
     }
     <app-refresh-button [loading]="loading() || refreshing()" (refresh)="refresh()" />
-    @if (related().length || pipelineText()) {
+    @if (related().length || pipelineText() || feeds().length) {
       <p meta class="run-related flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" data-test="run-related">
         @for (r of related(); track r.label) {
           <a class="link-inline inline-flex items-center gap-1" [routerLink]="r.link" [queryParams]="r.query ?? null" [attr.data-link]="r.test"><app-icon [name]="r.icon" size="0.95em" />{{ r.label }}</a>
+        }
+        <!-- UX review R3: the dashboards this run's outputs feed, each its own link. -->
+        @if (feeds().length) {
+          <span class="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[color:var(--text-secondary)]" data-link="feeds">
+            <app-icon name="chart" size="0.95em" />Feeds:
+            @for (b of feeds(); track b.id; let last = $last) {
+              <a class="link-inline" [routerLink]="'/data/analytics/dashboards'" [queryParams]="{ board: b.id }" [attr.data-board]="b.id">{{ b.name }}</a>@if (!last) {<span>, </span>}
+            }
+          </span>
         }
         @if (pipelineText(); as p) { <span class="inline-flex items-center gap-1 text-[color:var(--text-secondary)]"><app-icon name="layers" size="0.95em" />Pipeline: {{ p }}</span> }
       </p>
@@ -56,7 +65,7 @@
 
   @switch (tab()) {
     @case ('steps') {
-      <app-run-steps-table (showInLog)="showStepInLog($event)" (retried)="refresh()" />
+      <app-run-steps-table [backfillId]="backfill()?.backfillId ?? null" (showInLog)="showStepInLog($event)" (retried)="refresh()" />
     }
     @case ('map') {
       @if (store.timeline(); as t) {

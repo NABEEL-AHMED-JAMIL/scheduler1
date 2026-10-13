@@ -48,6 +48,11 @@ export class Invoices implements OnInit {
   readonly status = signal<string>('');
   readonly search = signal('');
   readonly selectedNumber = signal<string | null>(null);
+  /**
+   * The invoice the address names, for the breadcrumb (UX review 2026-10-13): Administration & billing › Billing ›
+   * Invoices › INV-…, from the menu's tree, where the projected title made it Invoices › Invoices.
+   */
+  readonly addressNumber = signal<string | null>(null);
   /** The newest invoice, shown while the address names none; not written to the address. */
   readonly preview = signal<string | null>(null);
   /** What the pane shows: the picked invoice, else the preview. */
@@ -93,7 +98,7 @@ export class Invoices implements OnInit {
 
   ngOnInit(): void {
     if (this.route.snapshot.paramMap.get('number')) this.pane.set('detail');
-    this.route.paramMap.subscribe(p => { const n = p.get('number'); if (n) this.selectedNumber.set(n); });
+    this.route.paramMap.subscribe(p => { const n = p.get('number'); this.addressNumber.set(n || null); if (n) this.selectedNumber.set(n); });
     this.workspaces.ready(() => this.load());
   }
 

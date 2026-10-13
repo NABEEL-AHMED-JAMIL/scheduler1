@@ -54,7 +54,7 @@ describe('Bulk delete of a Failed job', () => {
     page.selected.set(new Set([51]));
     page.deleteSelected();
     await Promise.resolve();
-    expect(confirms[0]?.title).toBe('Delete 1 job?');
+    expect(confirms[0]?.title).toBe('Delete 1 schedule?');
     expect(requests.map(r => r.url)).toEqual([expect.stringContaining('deleteSourceJob')]);
   });
 

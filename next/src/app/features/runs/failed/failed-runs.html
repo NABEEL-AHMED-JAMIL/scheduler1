@@ -123,14 +123,18 @@
                   <tr class="cursor-pointer" (click)="open(run)" [attr.data-run]="run.runId" tabindex="0" (keydown.enter)="open(run)">
                     @if (canBulkRetry()) {
                       <td (click)="$event.stopPropagation()">
-                        @if (run.retryable) {
+                        @if (retryableHere(run)) {
                           <input type="checkbox" class="checkbox" [checked]="selection.has(run)" [attr.aria-label]="'Select run ' + run.runId"
                                  (change)="toggleRow(run, $event)" />
                         }
                       </td>
                     }
                     <td class="mono whitespace-nowrap text-[color:var(--text-secondary)]">#{{ run.runId }}
-                      @if (run.attempt > 1) { <span class="text-[11px] text-[color:var(--text-muted)]">attempt {{ run.attempt }}</span> }</td>
+                      @if (run.attempt > 1) { <span class="text-[11px] text-[color:var(--text-muted)]">attempt {{ run.attempt }}</span> }
+                      @if (run.backfillId) {
+                        <span class="block text-[11px] text-[color:var(--text-muted)] font-sans" data-test="failed-backfill"
+                              [title]="'Retried by its backfill: Runs › Backfills, Retry failed'">backfill #{{ run.backfillId }}</span>
+                      }</td>
                     @if (platform()) { <td class="max-w-40 truncate" [title]="run.workspace || ''">{{ run.workspace || ('Workspace ' + run.tenantId) }}</td> }
                     <td class="max-w-56">
                       <span class="block truncate" [title]="run.pipeline || ''">{{ run.pipeline || '—' }}</span>

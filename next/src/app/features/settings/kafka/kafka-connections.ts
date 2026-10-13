@@ -418,7 +418,7 @@ export class KafkaConnections implements OnInit {
     const ok = await confirmWith(this.dialog, {
       title: `Delete ${type.serviceName}?`,
       body: linked
-        ? `${linked} task${linked === 1 ? '' : 's'} use this topic. Deleting it also marks their jobs deleted — they will stop running.`
+        ? `${linked} pipeline${linked === 1 ? '' : 's'} use this topic. Deleting it also marks their schedules deleted — they will stop running.`
         : 'No task uses this topic.',
       confirmLabel: 'Delete topic',
       danger: true,

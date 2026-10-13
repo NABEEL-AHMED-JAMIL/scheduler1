@@ -42,7 +42,7 @@ export interface RunWithData {
         (cancelled)="ref.close(false)" (confirmed)="run()">
       @if (loading()) {
         <p class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]" role="status">
-          <app-icon name="refresh" class="spin" />Reading this job's AI steps…
+          <app-icon name="refresh" class="spin" />Reading this schedule's AI steps…
         </p>
       } @else if (problem()) {
         <p class="flex items-start gap-2 text-sm text-crit-500" role="alert">
@@ -51,7 +51,7 @@ export interface RunWithData {
       } @else if (!hasChoice()) {
         <p class="flex items-start gap-2 text-sm text-[color:var(--text-secondary)]">
           <app-icon name="info" class="mt-0.5 shrink-0 icon-info" />
-          <span>This job's pipeline has no AI steps, so there is no model to choose. Run now runs it as it is.</span>
+          <span>This schedule's pipeline has no AI steps, so there is no model to choose. Run now runs it as it is.</span>
         </p>
       } @else {
         @if (parameters().length) {
@@ -96,7 +96,7 @@ export class RunWithDialog {
         next: response => {
           this.loading.set(false);
           if (response.status !== API_SUCCESS) {
-            this.problem.set(response.message || 'This job\'s AI steps could not be read.');
+            this.problem.set(response.message || 'This schedule\'s AI steps could not be read.');
             return;
           }
           const steps = stepsOf(response.data);
@@ -108,7 +108,7 @@ export class RunWithDialog {
         },
         error: err => {
           this.loading.set(false);
-          this.problem.set(err?.error?.message || 'This job\'s AI steps could not be read.');
+          this.problem.set(err?.error?.message || 'This schedule\'s AI steps could not be read.');
         },
       });
   }

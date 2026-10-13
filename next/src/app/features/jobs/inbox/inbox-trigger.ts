@@ -45,11 +45,11 @@ export function arrivalsOf(data: unknown): InboxArrival[] {
 
 /** The trigger in one sentence, in the words Core's save answers with. */
 export function triggerSentence(trigger: InboxTrigger | null | undefined): string {
-  if (!trigger?.configured) return 'No file in the inbox starts this job.';
-  if (trigger.enabled === false) return 'The inbox trigger is off: files that arrive do not start this job.';
+  if (!trigger?.configured) return 'No file in the inbox starts this schedule.';
+  if (trigger.enabled === false) return 'The inbox trigger is off: files that arrive do not start this schedule.';
   const files = trigger.filePattern
-    ? `Every file named like ${trigger.filePattern} that arrives in the inbox starts this job.`
-    : 'Every file that arrives in the inbox starts this job.';
+    ? `Every file named like ${trigger.filePattern} that arrives in the inbox starts this schedule.`
+    : 'Every file that arrives in the inbox starts this schedule.';
   const batch = Number(trigger.batchSize ?? 1);
   return batch > 1 ? `${files} Files that arrive while a run is going wait; the next run takes up to ${batch} of them.` : files;
 }

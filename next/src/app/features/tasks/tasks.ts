@@ -317,13 +317,13 @@ export class Tasks implements OnInit {
       // Offering a confirm here would be offering a choice that does not exist -- the server
       // refuses it. Better to say why, and point at the thing that has to happen first.
       this.toast.error(
-        `"${task.taskName}" is used by ${linked} job${linked > 1 ? 's' : ''}. ` +
-        `Point those jobs at another task, or delete them, before deleting this one.`);
+        `"${task.taskName}" is used by ${linked} schedule${linked > 1 ? 's' : ''}. ` +
+        `Point those schedules at another pipeline, or delete them, before deleting this one.`);
       return;
     }
     const ok = await confirmWith(this.dialog, {
       title: 'Delete task',
-      body: `"${task.taskName}" will be deleted. No jobs are bound to it.`,
+      body: `"${task.taskName}" will be deleted. No schedule runs it.`,
       confirmLabel: 'Delete',
       danger: true,
     });

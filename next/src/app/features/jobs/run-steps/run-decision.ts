@@ -93,7 +93,7 @@ export type DecisionRoute =
                 @if (route().by === 'admin' && rejecting()) {
                   <label class="flex items-center gap-2 text-sm">
                     <input id="runDecisionRerun" type="checkbox" class="checkbox" [checked]="rerun()" (change)="rerun.set($any($event.target).checked)" />
-                    Run the job again
+                    Run the schedule again
                   </label>
                 }
                 <!-- Reject, then Approve: the primary is rightmost (review G3). -->

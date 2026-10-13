@@ -62,7 +62,15 @@ export interface FailedRun {
   signature: string;
   pattern: string;
   link: string;
+  /** Failed (not interrupted) and not one of a backfill's runs, whose backfill retries it. */
   retryable: boolean;
+  /** UX review 2026-10-13: the backfill this run is part of (Runs › Backfills, Retry failed), else null. */
+  backfillId?: number | null;
+}
+
+/** Whether Runs › Failed may retry the run itself: a backfill's run is its backfill's to retry. */
+export function retryableHere(run: Pick<FailedRun, 'retryable' | 'backfillId'>): boolean {
+  return run.retryable && !run.backfillId;
 }
 
 export interface FailedRunsAnswer {

@@ -80,6 +80,7 @@ describe('bulk answers in words', () => {
     expect(reasonText('bulk-off')).toBe('Bulk approve is off in this workspace');
     expect(reasonText('not-completed')).toContain('not completed');
     expect(reasonText('changed')).toBe('Changed since it was listed');
+    expect(reasonText('part-of-backfill')).toBe('Part of a backfill: retry failed days from the backfill');
     expect(reasonText('not-yours')).toBe('Not yours to decide');
     expect(reasonText('cannot-approve')).toBe('Cannot be approved as it stands');
   });

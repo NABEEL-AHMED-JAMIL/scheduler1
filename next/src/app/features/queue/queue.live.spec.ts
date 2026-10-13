@@ -133,7 +133,7 @@ describe('Queue rows lead somewhere', () => {
   it('shows plain text to someone whose profile has Queue but not Jobs, the job by its number', () => {
     const el = render(false);
     expect(el.querySelectorAll('table a').length).toBe(0);
-    expect(el.textContent).toContain('Job #2838');
+    expect(el.textContent).toContain('Schedule #2838');
     expect(el.textContent).not.toContain('Nightly ledger check');
   });
 
@@ -142,6 +142,6 @@ describe('Queue rows lead somewhere', () => {
     const queue = TestBed.runInInjectionContext(() => new Queue());
     queue.ngOnInit();
     queue.rows.set([row(), row({ jobQueueId: 1, jobId: 9 })]);
-    expect(queue.byJob().map(b => b.name)).toEqual(['Nightly ledger check', 'Job #9']);
+    expect(queue.byJob().map(b => b.name)).toEqual(['Nightly ledger check', 'Schedule #9']);
   });
 });

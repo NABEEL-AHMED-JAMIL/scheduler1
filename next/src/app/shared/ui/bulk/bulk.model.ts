@@ -93,6 +93,8 @@ export const REASON_TEXT: Record<string, string> = {
   'input-changed': 'An input file changed since the run read it',
   'outputs-expired': 'The kept outputs of the steps before it expired',
   'not-resumable': 'Cannot resume from the failed step',
+  // UX review 2026-10-13: a backfill's run is retried by its backfill (Runs › Backfills, Retry failed).
+  'part-of-backfill': 'Part of a backfill: retry failed days from the backfill',
 };
 
 const REASON_ORDER = Object.keys(REASON_TEXT);

@@ -78,7 +78,7 @@ describe('Run history empty message', () => {
   });
 
   it('says the job never ran only when that is what it means', () => {
-    expect(history().emptyMessage()).toBe('This job has never run.');
+    expect(history().emptyMessage()).toBe('This schedule has never run.');
   });
 });
 

@@ -109,7 +109,7 @@ export function withJobDimension(data: RunData): RunData {
   const job: string[] = [];
   const index = new Map<string, number>();
   const rows: RunRow[] = data.rows.map(row => {
-    const name = row[JOB_NAME] || '(no job)';
+    const name = row[JOB_NAME] || '(no schedule)';
     let at = index.get(name);
     if (at === undefined) { at = job.length; job.push(name); index.set(name, at); }
     return [row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7] ?? 0,

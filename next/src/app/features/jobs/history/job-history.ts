@@ -276,7 +276,7 @@ export class JobHistory {
     this.statusFilter() || this.search().trim() ? 'No runs match the current filters.'
       : this.isDrillDown() ? 'No runs in this hour.'
       : !this.jobId() ? (activeCount(this.explorerFilter()) ? 'No run matches these filters.' : 'No schedule ran in this window. Widen it on the left, or open a schedule to see its whole history.')
-      : 'This job has never run.');
+      : 'This schedule has never run.');
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
   readonly summary = computed(() => {
@@ -291,7 +291,20 @@ export class JobHistory {
   readonly showInsights = signal(false);
   /** The job and its task, so the run list has the context the old screen showed beside it. */
   readonly detail = signal<any | null>(null);
-  readonly showDetail = signal(true);
+  /**
+   * UX review E3 (2026-10-13): the schedule's details start folded -- the runs are what the page is for, and the details
+   * (timetable, triggers, the pipeline and its payload) sat above them at y≈850. The folded line says the pipeline and when.
+   */
+  readonly showDetail = signal(false);
+  /** The folded line: "Pipeline: Daily readmissions · Daily at 06:00". */
+  detailSummary(job: any): string {
+    const parts: string[] = [];
+    if (job?.taskDetail?.taskName) parts.push(`Pipeline: ${job.taskDetail.taskName}`);
+    if (job?.execution === 'Manual' || !job?.scheduler) parts.push('On demand');
+    else if (job.scheduler.frequency === 'Cron') parts.push(`Cron ${job.scheduler.cronExpression ?? ''}`.trim());
+    else parts.push([job.scheduler.frequency, job.scheduler.startTime ? `at ${clockTime(job.scheduler.startTime)}` : ''].filter(Boolean).join(' '));
+    return parts.filter(Boolean).join(' · ');
+  }
   readonly payloadCopied = signal(false);
   readonly search = signal('');
 
@@ -606,7 +619,7 @@ export class JobHistory {
           if (!this.isDrillDown() && isMissingRecord(response)) {
             this.missing.set(true);
             this.runs.set([]);
-            this.error.set(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+            this.error.set(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
           } else if (!silent) {
             this.error.set(response.message);
           }

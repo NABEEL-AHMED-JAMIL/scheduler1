@@ -220,7 +220,7 @@ export class StorageConnections implements OnInit {
     const kafka = kafkaDependencyNote(await kafkaProfilesUsing(this.http, connection.alias));
     const ok = await confirmWith(this.dialog, {
       title: `Delete ${connection.connectionName}?`,
-      body: `"${connection.connectionName}" will be removed. Jobs and tasks pointing at "${connection.alias}" will stop resolving.`
+      body: `"${connection.connectionName}" will be removed. Pipelines pointing at "${connection.alias}" will stop resolving.`
         + (kafka ? ` ${kafka}` : ''),
       confirmLabel: 'Delete connection',
       danger: true,

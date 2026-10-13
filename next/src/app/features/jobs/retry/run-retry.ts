@@ -42,6 +42,21 @@ export interface RetryPlan {
   restartRefusal?: string | null;
   /** On a refused retry: which was asked for. */
   mode?: string | null;
+  /** UX review 2026-10-13: the backfill the run is part of -- its own Retry failed retries it, never these. */
+  backfillId?: number | null;
+}
+
+/**
+ * UX review 2026-10-13: a backfill's run is retried by its backfill (Runs › Backfills, Retry failed), with its date, in a
+ * lane of its own -- Core refuses both of a run's retries. Every place that would offer them says this and links there.
+ */
+export function backfillRetryNote(backfillId: number): string {
+  return `Part of backfill #${backfillId}: retry failed days from the backfill.`;
+}
+
+/** The backfill's detail on Runs › Backfills (its periods, and Retry failed). */
+export function backfillLink(backfillId: number): { link: string; query: Record<string, string> } {
+  return { link: '/runs/backfills', query: { backfill: String(backfillId) } };
 }
 
 /** An attempt someone asked for (run_attempt), as the run's timeline lists them. */

@@ -1,4 +1,4 @@
-import { Component, computed, inject, model } from '@angular/core';
+import { Component, computed, inject, input, model } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from './icon';
 
@@ -22,8 +22,8 @@ import { Icon } from './icon';
             [class.btn-default]="!only()"
             [attr.aria-pressed]="only()"
             [title]="only()
-              ? 'Showing only what you created — click to show everything'
-              : 'Show only what you created'"
+              ? 'Showing only ' + what() + ' — click to show everything'
+              : 'Show only ' + what()"
             (click)="only.set(!only())">
       <app-icon [name]="only() ? 'check' : 'user'" />
       Only mine
@@ -37,6 +37,8 @@ export class MineFilter {
   private readonly auth = inject(AuthService);
 
   readonly only = model(false);
+  /** What "mine" means on this list, for the tooltip: "what you created" unless the list says more. */
+  readonly what = input('what you created');
   /** How many rows the filter is holding back, so the count is never a mystery. */
   readonly hidden = model(0);
 

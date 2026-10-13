@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { ManagedServiceApi } from '../managed-service/managed-service.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -178,9 +179,14 @@ export class Tenants implements OnInit {
 
   private readonly auth = inject(AuthService);
 
-  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
-
+  /** Narrows the list to the workspaces this person created or manages. Not persisted -- see MineFilter. */
   readonly onlyMine = signal(false);
+  /**
+   * UX review U2 (2026-10-13): the workspaces this platform administrator manages -- their open managed-service grants
+   * (Identity's myWorkspaces) -- count as theirs beside the ones they created. Read once; none when it cannot be read.
+   */
+  readonly managedByMe = signal<ReadonlySet<number>>(new Set());
+  private readonly managed = inject(ManagedServiceApi);
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -222,6 +228,15 @@ export class Tenants implements OnInit {
 
   ngOnInit(): void {
     this.listTenants();
+    this.readManaged();
+  }
+
+  private readManaged(): void {
+    if (typeof this.auth.isPlatformAdmin === 'function' && !this.auth.isPlatformAdmin()) return;
+    this.managed.myWorkspaces?.()?.subscribe({
+      next: r => this.managedByMe.set(new Set(r?.status === API_SUCCESS ? (r.data ?? []).filter(g => !g.revokedAt).map(g => g.tenantId) : [])),
+      error: () => this.managedByMe.set(new Set()),
+    });
   }
 
   resourceTotal(tenant: Tenant): number {
@@ -333,7 +348,7 @@ export class Tenants implements OnInit {
       body: suspending
         ? `Users in ${tenant.tenantName} will not be able to sign in.`
           + (this.resourceTotal(tenant)
-            ? ` Its ${this.resourceSummary(tenant)} are kept, and scheduled jobs keep their definitions.`
+            ? ` Its ${this.resourceSummary(tenant)} are kept, and its schedules keep their definitions.`
             : '')
         : `Users in ${tenant.tenantName} will be able to sign in again.`,
       confirmLabel: suspending ? 'Suspend' : 'Reactivate',
@@ -430,7 +445,7 @@ export class Tenants implements OnInit {
   }
 
   /**
-   * Applies the "Only mine" toggle.
+   * Applies the "Only mine" toggle: created by me, or managed by me (an open managed-service grant).
    *
    * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
    * count is already on the table header, so nothing needs recording.
@@ -440,7 +455,8 @@ export class Tenants implements OnInit {
       return rows;
     }
     const myId = this.auth.user()?.appUserId ?? null;
-    return rows.filter(row => isMine(row, myId));
+    const managed = this.managedByMe();
+    return rows.filter(row => isMine(row, myId) || managed.has((row as { tenantId?: number }).tenantId ?? -1));
   }
 
   /**

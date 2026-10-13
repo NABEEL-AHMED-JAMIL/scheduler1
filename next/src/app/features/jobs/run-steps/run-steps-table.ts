@@ -1,4 +1,5 @@
-import { Component, computed, inject, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { Icon } from '../../../shared/ui/icon';
@@ -8,7 +9,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { Avatar } from '../../../shared/ui/avatar';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
-import { RetryFrom, attemptSentence, stepLabel } from '../retry/run-retry';
+import { RetryFrom, attemptSentence, backfillLink, backfillRetryNote, stepLabel } from '../retry/run-retry';
 import { DATASET_FORMATS, PDF_FORMAT, StepApproval, approvalOutcome, failedStep } from './run-steps.model';
 import { OutputChip, StepRow, stepRows } from './run-page.model';
 import { RunApprovalStore } from './run-approval.store';
@@ -24,7 +25,7 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
  */
 @Component({
   selector: 'app-run-steps-table',
-  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, Avatar],
+  imports: [Icon, StatusPill, Segmented, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, Avatar, RouterLink],
   styles: `
     :host { display: block; }
     .rs-table { width: 100%; border-spacing: 0; font-size: 0.8125rem; }
@@ -81,16 +82,25 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
         @if (retryStep(); as failed) {
           <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle" data-test="run-retry">
             <app-icon name="alert" class="text-crit-500 shrink-0" />
-            <span class="text-xs text-[color:var(--text-secondary)] mr-auto">
-              Failed at step {{ failed.index + 1 }} <span class="mono">&lt;{{ failed.key }}&gt;</span>.
-              Fix the cause, then retry: the steps before it are not run again.
-            </span>
-            <button type="button" class="btn btn-default btn-sm" (click)="retry('start')" data-test="retry-from-start">
-              <app-icon name="refresh" />Run again from the start
-            </button>
-            <button type="button" class="btn btn-primary btn-sm" (click)="retry('failed_step')" data-test="retry-from-step">
-              <app-icon name="play" />Retry from {{ retryLabel() }}
-            </button>
+            @if (backfillId(); as backfill) {
+              <!-- UX review 2026-10-13: a backfill's run is retried by its backfill (Core refuses both retries here). -->
+              <span class="text-xs text-[color:var(--text-secondary)] mr-auto" data-test="retry-backfill">
+                Failed at step {{ failed.index + 1 }} <span class="mono">&lt;{{ failed.key }}&gt;</span>. {{ backfillNote(backfill) }}
+              </span>
+              <a class="btn btn-default btn-sm" [routerLink]="backfillAt(backfill).link" [queryParams]="backfillAt(backfill).query"
+                 data-test="retry-open-backfill"><app-icon name="layers" />Open backfill #{{ backfill }}</a>
+            } @else {
+              <span class="text-xs text-[color:var(--text-secondary)] mr-auto">
+                Failed at step {{ failed.index + 1 }} <span class="mono">&lt;{{ failed.key }}&gt;</span>.
+                Fix the cause, then retry: the steps before it are not run again.
+              </span>
+              <button type="button" class="btn btn-default btn-sm" (click)="retry('start')" data-test="retry-from-start">
+                <app-icon name="refresh" />Run again from the start
+              </button>
+              <button type="button" class="btn btn-primary btn-sm" (click)="retry('failed_step')" data-test="retry-from-step">
+                <app-icon name="play" />Retry from {{ retryLabel() }}
+              </button>
+            }
           </div>
         }
         @if (attemptDetail(); as detail) {
@@ -222,6 +232,10 @@ export class RunStepsTable {
   readonly showInLog = output<string>();
   /** MIG-345: the run was queued again (a retry); the page re-reads the run. */
   readonly retried = output<void>();
+  /** UX review 2026-10-13: the backfill this run is part of; its retries are the backfill's (Runs › Backfills, Retry failed). */
+  readonly backfillId = input<number | null>(null);
+  readonly backfillNote = backfillRetryNote;
+  readonly backfillAt = backfillLink;
 
   readonly String = String;
   readonly formats = DATASET_FORMATS;

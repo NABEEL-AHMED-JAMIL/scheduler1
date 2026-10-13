@@ -8,6 +8,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { reasonText, refusal } from '../../../shared/ui/bulk/bulk.model';
 import { FailedRun, FailedRunsApi, RetryPlan } from './failed-runs.api';
+import { backfillLink, backfillRetryNote } from '../../jobs/retry/run-retry';
 
 export interface FailedRunPanelData {
   run: FailedRun;
@@ -56,6 +57,15 @@ export interface FailedRunPanelData {
           <app-icon name="external" />Open the run</a>
       </div>
 
+      @if (run.backfillId; as backfill) {
+        <!-- UX review 2026-10-13: a backfill's run is retried by its backfill, not from here (Core refuses it). -->
+        <section class="mt-6" data-test="failed-backfill-note">
+          <h3 class="text-sm font-semibold mb-1">Retry</h3>
+          <p class="text-sm m-0 text-[color:var(--text-secondary)]">{{ backfillNote(backfill) }}
+            <a class="link-inline" [routerLink]="backfillAt(backfill).link" [queryParams]="backfillAt(backfill).query"
+               (click)="ref.close(false)">Open backfill #{{ backfill }}</a></p>
+        </section>
+      }
       @if (data.canRetry) {
         <section class="mt-6" data-test="failed-retry">
           <h3 class="text-sm font-semibold mb-1">Retry from the failed step</h3>
@@ -101,6 +111,8 @@ export class FailedRunPanel implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly run = this.data.run;
+  readonly backfillNote = backfillRetryNote;
+  readonly backfillAt = backfillLink;
   readonly plan = signal<RetryPlan | null>(null);
   readonly planLoading = signal(false);
   readonly planError = signal('');

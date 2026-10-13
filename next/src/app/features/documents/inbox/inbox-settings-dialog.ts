@@ -115,7 +115,7 @@ export class InboxSettingsDialog {
   async turnOff(): Promise<void> {
     const ok = await confirmWith(this.dialog, {
       title: 'Turn off the inbox?',
-      body: 'Members can no longer upload to it, and no new file starts a job. The files already in the inbox stay in '
+      body: 'Members can no longer upload to it, and no new file starts a run. The files already in the inbox stay in '
         + 'the bucket, and you can turn it on again later.',
       confirmLabel: 'Turn off', danger: true,
     });

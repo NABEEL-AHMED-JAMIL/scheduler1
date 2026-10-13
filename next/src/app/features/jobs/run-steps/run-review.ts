@@ -98,7 +98,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
                   </label>
                   <label class="flex items-center gap-2 text-sm">
                     <input id="reviewRerun" type="checkbox" class="checkbox" [checked]="rerun()" (change)="rerun.set($any($event.target).checked)" />
-                    Run the job again
+                    Run the schedule again
                   </label>
                   <div class="flex gap-2">
                     <button type="button" class="btn btn-danger btn-sm" [disabled]="busy() || !reason().trim()" (click)="decide('REJECTED')">Reject results</button>

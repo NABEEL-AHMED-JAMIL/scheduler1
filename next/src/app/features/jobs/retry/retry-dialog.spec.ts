@@ -7,7 +7,7 @@ import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { RetryDialog } from './retry-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
-import { attemptSentence, planOf, resumeLabel, stepLabel } from './run-retry';
+import { attemptSentence, backfillLink, backfillRetryNote, planOf, resumeLabel, stepLabel } from './run-retry';
 import { RunStepsTable } from '../run-steps/run-steps-table';
 import { RunTimelineStore } from '../run-steps/run-timeline.store';
 import { failedStep } from '../run-steps/run-steps.model';
@@ -31,7 +31,7 @@ function openDialog(data: Record<string, unknown> = { jobQueueId: 7701 }) {
   const close = vi.fn();
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ imports: [RetryDialog], providers: [provideHttpClient(), provideHttpClientTesting(),
+  TestBed.configureTestingModule({ imports: [RetryDialog], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
     { provide: DIALOG_DATA, useValue: data }, { provide: DialogRef, useValue: { close } }, { provide: ToastService, useValue: toast }] });
   const fixture = TestBed.createComponent(RetryDialog);
   fixture.detectChanges();
@@ -123,6 +123,28 @@ describe('Retry a failed run', () => {
   });
 });
 
+describe('Retry a backfill\'s run (UX review 2026-10-13)', () => {
+  it('says the backfill retries it, links there, and offers neither retry', () => {
+    const { fixture, ask, el, close } = openDialog();
+    ask.flush({ status: API_SUCCESS, message: 'Run 7701 is part of backfill #12.', data: { ...PLAN, resumable: false, restartable: false,
+      refusalKind: 'not-resumable', refusal: 'Run 7701 is part of backfill #12: retry its failed dates from the backfill (Runs › Backfills).',
+      restartRefusal: 'Run 7701 is part of backfill #12.', backfillId: 12 } });
+    fixture.detectChanges();
+    const note = el.querySelector('[data-test="retry-backfill"]')!;
+    expect(note.textContent).toContain('Part of backfill #12: retry failed days from the backfill.');
+    const link = note.querySelector('a')!;
+    expect(link.getAttribute('href')).toBe('/runs/backfills?backfill=12');
+    expect(el.querySelector('[data-test="retry-resume"]')).toBeNull();
+    expect(button(el, 'Retry from step 3 <enrich>')).toBeUndefined();
+    expect(close).not.toHaveBeenCalled();
+  });
+
+  it('words the note and the link the same everywhere', () => {
+    expect(backfillRetryNote(7)).toBe('Part of backfill #7: retry failed days from the backfill.');
+    expect(backfillLink(7)).toEqual({ link: '/runs/backfills', query: { backfill: '7' } });
+  });
+});
+
 describe('Retry wording', () => {
   it('names the step by number, name and key', () => {
     expect(stepLabel(2, 'enrich')).toBe('step 3 <enrich>');
@@ -171,6 +193,23 @@ describe('Run logs: the retry of a failed run', () => {
     expect(bar.textContent).toContain('Failed at step 3');
     expect(el.querySelector('[data-test="retry-from-step"]')!.textContent!.trim()).toBe('Retry from step 3 <enrich>');
     expect(el.querySelector('[data-test="retry-from-start"]')!.textContent!.trim()).toBe('Run again from the start');
+  });
+
+  it('on a backfill\'s run, says the backfill retries it and links there instead of offering the retries', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [RunStepsTable],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), RunTimelineStore] });
+    const fixture = TestBed.createComponent(RunStepsTable);
+    fixture.componentRef.setInput('backfillId', 12);
+    const http = TestBed.inject(HttpTestingController);
+    TestBed.inject(RunTimelineStore).load('7701');
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/stepExecutions')).flush({ status: API_SUCCESS, data: failed });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="retry-backfill"]')!.textContent).toContain('Part of backfill #12: retry failed days from the backfill.');
+    expect(el.querySelector('[data-test="retry-open-backfill"]')!.getAttribute('href')).toBe('/runs/backfills?backfill=12');
+    expect(el.querySelector('[data-test="retry-from-step"]')).toBeNull();
+    expect(el.querySelector('[data-test="retry-from-start"]')).toBeNull();
   });
 
   it('offers no retry for a completed run, or for an earlier attempt shown', () => {

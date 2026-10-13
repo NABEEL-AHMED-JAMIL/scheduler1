@@ -55,8 +55,9 @@ const INTAKES = [
 const MAILBOX = { configured: true, active: true, address: 'abcdefghij0123456789@docs.etl-console.local', domain: 'docs.etl-console.local',
   enabled: true, maxFiles: 20, maxFileSizeMb: 20 };
 
-function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown } = {}) {
+function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown; triggers?: unknown[]; schedules?: boolean } = {}) {
   const api = {
+    documentTriggers: vi.fn(() => ok(opts.triggers ?? [])),
     stats: vi.fn(() => ok(STATS)),
     types: vi.fn(() => ok(TYPES)),
     reads: vi.fn(() => ok(READS)),
@@ -83,7 +84,8 @@ function screenWith(opts: { admin?: boolean; tab?: string; closed?: unknown } = 
       { provide: DocumentsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }),
+        canOpen: (page: string) => page !== 'jobs' || (opts.schedules ?? true) } },
     ],
   });
   const router = TestBed.inject(Router);
@@ -106,11 +108,34 @@ describe('DocumentIntelligence -- overview', () => {
   it('shows the active types with their documents, and a custom type for an administrator', async () => {
     const { fixture, el } = screenWith();
     await fixture.whenStable();
-    const cards = el.querySelector('[data-test="type-cards"]')!;
-    expect(cards.textContent).toContain('Purchase order');
-    expect(cards.textContent).toContain('6 fields · 5 docs');
-    expect(cards.textContent).not.toContain('UI-CHECK old');
-    expect(cards.textContent).toContain('Custom type');
+    const types = el.querySelector('[data-test="type-starts"]')!;
+    expect(types.textContent).toContain('Purchase order');
+    expect(types.textContent).toContain('6 fields · 5 docs');
+    expect(types.textContent).not.toContain('UI-CHECK old');
+    expect(types.textContent).toContain('Custom type');
+  });
+
+  /** UX review DI1 (2026-10-13): what an approved document of each type starts, in place of the types again as cards. */
+  it('says which schedules an approved document of each type starts, for a reader of Schedules', async () => {
+    const { fixture, el, api } = screenWith({ triggers: [
+      { jobId: 2990, jobName: 'Invoice intake', jobStatus: 'Active', documentTypeId: 1000, enabled: true },
+      { jobId: 2991, jobName: 'Invoice audit', jobStatus: 'Inactive', documentTypeId: 1000, enabled: true },
+    ] });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.documentTriggers).toHaveBeenCalled();
+    const what = (key: string) => el.querySelector(`[data-type="${key}"] [data-test="type-start-what"]`)!;
+    expect(what('invoice').textContent!.replace(/\s+/g, ' ').trim()).toBe('Starts Invoice intake, Invoice audit (schedule not active)');
+    expect(what('invoice').querySelector('a')!.getAttribute('href')).toBe('/pipelines/schedules/2990/executions');
+    expect(what('purchase_order').textContent).toContain('Starts nothing');
+    expect(el.querySelector('[data-test="type-cards"]')).toBeNull();
+  });
+
+  it('asks nothing of Schedules for a reader without the page', async () => {
+    const { fixture, el, api } = screenWith({ schedules: false });
+    await fixture.whenStable();
+    expect(api.documentTriggers).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-type="invoice"] [data-test="type-start-what"]')!.textContent!.trim()).toBe('—');
   });
 
   /** UX review B4 (DI1): four header buttons became the standard header -- Refresh, the ⋮ overflow, the one primary. */

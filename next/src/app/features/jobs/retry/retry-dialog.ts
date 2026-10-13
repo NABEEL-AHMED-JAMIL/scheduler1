@@ -6,7 +6,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { FormDialog } from '../../../shared/ui/form-dialog';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { RetryFrom, RetryPlan, planOf, resumeLabel, stepLabel } from './run-retry';
+import { RouterLink } from '@angular/router';
+import { RetryFrom, RetryPlan, backfillLink, backfillRetryNote, planOf, resumeLabel, stepLabel } from './run-retry';
 
 export interface RetryDialogData {
   jobQueueId: number;
@@ -22,14 +23,14 @@ export interface RetryDialogData {
  */
 @Component({
   selector: 'app-retry-dialog',
-  imports: [FormDialog, Icon, ServerTimePipe],
+  imports: [FormDialog, Icon, ServerTimePipe, RouterLink],
   template: `
     <app-form-dialog
         heading="Retry this run"
         [subtitle]="'Run #' + data.jobQueueId + (plan() ? ' failed on attempt ' + plan()!.attempt + '. The retry is attempt ' + plan()!.nextAttempt + ' of the same run.' : '')"
         [confirmLabel]="confirmLabel()" busyLabel="Queuing…"
         [cancelLabel]="canConfirm() ? 'Cancel' : 'Close'"
-        [showConfirm]="!!plan()"
+        [showConfirm]="!!plan() && !plan()!.backfillId"
         [confirmDisabled]="!canConfirm()"
         [saving]="running()"
         size="wide"
@@ -41,6 +42,14 @@ export interface RetryDialogData {
       } @else if (problem() && !plan()) {
         <p class="flex items-start gap-2 text-sm text-crit-500" role="alert">
           <app-icon name="alert" class="mt-0.5 shrink-0" />{{ problem() }}
+        </p>
+      } @else if (plan()?.backfillId) {
+        <!-- UX review 2026-10-13: a backfill's run is retried by its backfill, which Core says before either choice. -->
+        <p class="flex items-start gap-2 text-sm" data-test="retry-backfill">
+          <app-icon name="layers" class="mt-0.5 shrink-0 icon-muted" />
+          <span>{{ backfillNote(plan()!.backfillId!) }}
+            <a class="link-inline" [routerLink]="backfill(plan()!.backfillId!).link" [queryParams]="backfill(plan()!.backfillId!).query"
+               (click)="ref.close(false)">Open backfill #{{ plan()!.backfillId }}</a></span>
         </p>
       } @else if (plan(); as p) {
         <div role="radiogroup" aria-label="Where the retry starts" class="space-y-3 text-sm">
@@ -127,12 +136,14 @@ export class RetryDialog {
   readonly running = signal(false);
 
   readonly resumeLabel = resumeLabel;
+  readonly backfillNote = backfillRetryNote;
+  readonly backfill = backfillLink;
   label(index: number, key: string, name?: string | null): string { return stepLabel(index, key, name); }
 
   readonly canConfirm = computed(() => {
     const plan = this.plan();
     const from = this.from();
-    if (!plan || !from) return false;
+    if (!plan || !from || plan.backfillId) return false;
     return from === 'start' ? plan.restartable : plan.resumable;
   });
 

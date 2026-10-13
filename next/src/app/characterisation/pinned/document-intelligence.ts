@@ -305,18 +305,20 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/stats?days=30",
       "GET /documentType.json/fetchAll",
       "GET /documentOcr.json/fetchAll",
+      "GET /sourceJob.json/documentTrigger",
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
       "Documents in",
+      "What approved documents start",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
-      "Invoice: 4 fields, 0 documents",
+      "Invoice",
       "More actions",
-      "Purchase order: 4 fields, 1 document",
+      "Purchase order",
       "Refresh",
       "Upload documents"
     ],
@@ -375,19 +377,21 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/stats?days=30",
       "GET /documentType.json/fetchAll",
       "GET /documentOcr.json/fetchAll",
+      "GET /sourceJob.json/documentTrigger",
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
       "Documents in",
+      "What approved documents start",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
       "Custom type",
-      "Invoice: 4 fields, 0 documents",
+      "Invoice",
       "More actions",
-      "Purchase order: 4 fields, 1 document",
+      "Purchase order",
       "Refresh",
       "Upload documents"
     ],

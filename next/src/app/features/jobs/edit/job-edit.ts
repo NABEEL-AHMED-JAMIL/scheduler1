@@ -285,7 +285,7 @@ export class JobEdit implements OnInit {
   /** How many approved documents that waited for a run in flight the next run takes (1: each document its own run). */
   readonly documentBatch = signal<number | string>(1);
   readonly documentTypeError = computed(() => (this.onApproval() && this.documentTypeId() === null
-    ? 'Choose the document type whose approved documents start this job.' : ''));
+    ? 'Choose the document type whose approved documents start this schedule.' : ''));
   readonly documentBatchError = computed(() => (this.onApproval() ? documentBatchProblem(this.documentBatch()) : ''));
   private readonly savedDocumentTrigger = signal<DocumentTrigger | null>(null);
   /** The workspace's document types (Document Intelligence), read the first time the document start is shown; null until then. */
@@ -482,7 +482,7 @@ export class JobEdit implements OnInit {
     this.loadMissing.set(false);
     // An id that is not a number cannot name a job; asking anyway only earned the server's refusal.
     if (!isRecordId(this.jobId())) {
-      this.missing('That link does not point to a job.');
+      this.missing('That link does not point to a schedule.');
       return;
     }
     this.loading.set(true);
@@ -492,11 +492,11 @@ export class JobEdit implements OnInit {
         this.loading.set(false);
         // Another person's job reads exactly like a missing one for a tenant user (JobOwnership).
         if (isMissingRecord(response) || (response.status === API_SUCCESS && !response.data)) {
-          this.missing(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+          this.missing(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
           return;
         }
         if (response.status !== API_SUCCESS) {
-          this.loadError.set(response.message || 'That job could not be loaded.');
+          this.loadError.set(response.message || 'That schedule could not be loaded.');
           return;
         }
         const job = response.data;
@@ -538,8 +538,8 @@ export class JobEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        if (isMissingRecord(err)) this.missing(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
-        else this.loadError.set(err?.error?.message || 'That job could not be loaded.');
+        if (isMissingRecord(err)) this.missing(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
+        else this.loadError.set(err?.error?.message || 'That schedule could not be loaded.');
       },
     });
   }
@@ -616,8 +616,8 @@ export class JobEdit implements OnInit {
   private saveExtras(jobId: number | null): Observable<string[]> {
     if (jobId === null || !Number.isFinite(jobId)) {
       return of([
-        ...(this.triggerRequest(0) ? ['the job\'s id did not come back, so its inbox trigger was not set.'] : []),
-        ...(this.documentRequest(0) ? ['the job\'s id did not come back, so its document trigger was not set.'] : []),
+        ...(this.triggerRequest(0) ? ['the schedule\'s id did not come back, so its inbox trigger was not set.'] : []),
+        ...(this.documentRequest(0) ? ['the schedule\'s id did not come back, so its document trigger was not set.'] : []),
       ]);
     }
     const asks: Observable<string>[] = [];
@@ -832,7 +832,7 @@ export class JobEdit implements OnInit {
         if (response.status !== API_SUCCESS) {
           this.saving.set(false);
           if (this.refusedCron(response.message)) return;
-          this.toast.error(response.message || 'The job could not be saved.');
+          this.toast.error(response.message || 'The schedule could not be saved.');
           return;
         }
         const jobId = this.isEdit() ? Number(value.jobId ?? this.jobId())
@@ -844,7 +844,7 @@ export class JobEdit implements OnInit {
             this.router.navigate(['/pipelines/schedules']);
             return;
           }
-          this.toast.error(`${this.isEdit() ? 'The job was updated' : 'The job was created'}, but ${problems.join(' ')}`);
+          this.toast.error(`${this.isEdit() ? 'The schedule was updated' : 'The schedule was created'}, but ${problems.join(' ')}`);
           // A new job is saved already: staying on "New schedule" would offer to create it again.
           if (!this.isEdit()) this.router.navigate(['/pipelines/schedules']);
         });
@@ -852,7 +852,7 @@ export class JobEdit implements OnInit {
       error: err => {
         this.saving.set(false);
         if (this.refusedCron(err?.error?.message)) return;
-        this.toast.error(err?.error?.message || 'The job could not be saved.');
+        this.toast.error(err?.error?.message || 'The schedule could not be saved.');
       },
     });
   }

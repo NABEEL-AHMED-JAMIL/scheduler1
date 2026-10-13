@@ -53,7 +53,7 @@
         <input class="input" placeholder="Search name or code" aria-label="Search workspaces"
                [value]="search()" (input)="setSearch($any($event.target).value)" />
       </div>
-      <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
+      <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" what="the workspaces you created or manage" />
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()">
           <app-icon name="close" />Clear

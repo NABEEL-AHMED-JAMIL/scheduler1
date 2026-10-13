@@ -186,8 +186,8 @@
                 @if (stat.jobCount) {
                   <div class="grid grid-cols-3 gap-px rounded-lg overflow-hidden bg-subtle">
                     @for (tile of [
-                      { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
-                      { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
+                      { label: 'Schedules', value: stat.jobCount, hint: stat.activeJobs + ' active' },
+                      { label: 'Pipelines', value: stat.taskCount, hint: 'run by their schedules' },
                       { label: 'Runs',  value: stat.runCount,
                         hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
                     ]; track tile.label) {
@@ -219,7 +219,7 @@
                 @if (statFor(user); as stat) {
                   @if (!stat.jobCount) {
                     <span class="text-[color:var(--border-strong)]">·</span>
-                    <span>No jobs</span>
+                    <span>No schedules</span>
                   }
                 }
                 @if (user.createdByName) {
@@ -436,7 +436,7 @@
                 @if (stat.jobCount || stat.runCount) {
                   <div class="tabular">
                     {{ stat.jobCount }}
-                    <span class="text-[color:var(--text-muted)] text-xs">jobs</span>
+                    <span class="text-[color:var(--text-muted)] text-xs">schedules</span>
                   </div>
                   @if (stat.runCount) {
                     <div class="text-xs text-[color:var(--text-muted)] tabular">

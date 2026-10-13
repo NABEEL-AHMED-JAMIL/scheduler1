@@ -4,12 +4,13 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { Dialog } from '@angular/cdk/dialog';
+import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { FailedRuns } from './failed-runs';
-import { FailedRun, FailedRunsAnswer, dayLabel, windowOf } from './failed-runs.api';
+import { FailedRunPanel } from './failed-run-panel';
+import { FailedRun, FailedRunsAnswer, dayLabel, retryableHere, windowOf } from './failed-runs.api';
 
 /**
  * MIG-355: Runs › Failed -- the failed runs of the dates with their facets and error patterns, a facet or a pattern
@@ -120,6 +121,19 @@ describe('Runs › Failed', () => {
     expect(member.el.querySelectorAll('[data-run] input[type="checkbox"]').length).toBe(0);
   });
 
+  it('a backfill\'s run is listed with its backfill, never picked for a bulk retry, and its detail offers no retry (UX review 2026-10-13)', () => {
+    const opened: { run: FailedRun; canRetry: boolean }[] = [];
+    const s = screen('TENANT_ADMIN', opened);
+    answer(s, { ...ANSWER, items: [run(8001), run(8002, { backfillId: 12, retryable: false })] });
+    expect(s.el.querySelector('[data-run="8002"] [data-test="failed-backfill"]')?.textContent).toContain('backfill #12');
+    expect(s.el.querySelector('[data-run="8002"] input[type="checkbox"]')).toBeNull();
+    expect(s.component.retryableOnPage().map(r => r.runId)).toEqual([8001]);
+    // Even were Core to call it retryable, the console keeps a backfill's run out of a retry.
+    expect(retryableHere({ retryable: true, backfillId: 12 })).toBe(false);
+    (s.el.querySelector('[data-run="8002"]') as HTMLElement).click();
+    expect(opened[0].canRetry).toBe(false);
+  });
+
   it('a platform administrator sees the workspace of each run and no retry', () => {
     const opened: { canRetry: boolean }[] = [];
     const s = screen('PLATFORM_ADMIN', opened);
@@ -135,5 +149,25 @@ describe('Runs › Failed', () => {
     expect(dayLabel('2026-10-13')).toBe('Tue 13 Oct');
     const w = windowOf('2026-10-13', '2026-10-13');
     expect(Date.parse(w.to) - Date.parse(w.from)).toBe(86_400_000);
+  });
+});
+
+describe('Runs › Failed: a backfill\'s run in the detail (UX review 2026-10-13)', () => {
+  it('says its backfill retries it, links there, and asks Core for no retry plan', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [FailedRunPanel],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: DIALOG_DATA, useValue: { run: run(8002, { backfillId: 12, retryable: false }), canRetry: false, canRestart: true } },
+        { provide: DialogRef, useValue: { close: () => {} } }],
+    });
+    const fixture = TestBed.createComponent(FailedRunPanel);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const note = el.querySelector('[data-test="failed-backfill-note"]')!;
+    expect(note.textContent).toContain('Part of backfill #12: retry failed days from the backfill.');
+    expect(note.querySelector('a')!.getAttribute('href')).toBe('/runs/backfills?backfill=12');
+    expect(el.querySelector('[data-test="failed-retry-button"]')).toBeNull();
+    TestBed.inject(HttpTestingController).expectNone(r => r.url.endsWith('/sourceJob.json/retryPlan'));
   });
 });

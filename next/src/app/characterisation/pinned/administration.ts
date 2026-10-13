@@ -161,7 +161,8 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants"
+      "GET /tenant.json/listTenants",
+      "GET /managedService.json/myWorkspaces"
     ],
     "headings": [
       "Workspaces",

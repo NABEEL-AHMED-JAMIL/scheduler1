@@ -7,7 +7,7 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
-import { JobLogs, runHasAi, runTrail } from './job-logs';
+import { JobLogs, boardsFedBy, runHasAi, runTrail } from './job-logs';
 import { AuthService } from '../../../core/auth/auth.service';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -150,7 +150,7 @@ describe('JobLogs for a run that does not exist', () => {
 
   it('says the run does not exist and offers a way back, not Try again', () => {
     const { el, component } = missingRun();
-    expect(component.error()).toBe('Run #6839 of job #2808 does not exist or was deleted.');
+    expect(component.error()).toBe('Run #6839 of schedule #2808 does not exist or was deleted.');
     expect(component.missing()).toBe(true);
     expect([...el.querySelectorAll('button')].some(b => /Try again/.test(b.textContent!))).toBe(false);
     expect([...el.querySelectorAll('a')].some(a => /Back to schedules/.test(a.textContent!))).toBe(true);
@@ -542,5 +542,35 @@ describe('Run page: a run waiting at an Approval step', () => {
     const crumbs = (el: HTMLElement) => [...el.querySelectorAll('.breadcrumbs li')].map(li => li.textContent!.trim());
     expect(crumbs(waiting(null).el)).toEqual(['Run & review', 'Runs', 'Run #8298']);
     expect(crumbs(waiting(null, 'admin').el)).toEqual(['Build', 'Pipelines', 'Schedules & triggers', 'Bulk approval step test #4 · runs', 'Run #8298']);
+  });
+
+  /** UX review 2026-10-13 (R3): the header's link row names the dashboards this run's outputs feed. */
+  it('links the dashboards this schedule\'s outputs feed, by name, in place of the plain Dashboards link', () => {
+    const { el, fixture } = waiting(null, 'admin');
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).flush({ status: API_SUCCESS, data: [
+      { analyticsDashboardId: 1450, dashboardName: 'Readmissions', pipelines: [{ jobId: 2977 }] },
+      { analyticsDashboardId: 1448, dashboardName: 'Cohort overview', pipelines: [{ jobId: 2977 }, { jobId: 2903 }] },
+      { analyticsDashboardId: 1451, dashboardName: 'Claims', pipelines: [{ jobId: 2903 }] },
+    ] });
+    fixture.detectChanges();
+    const feeds = el.querySelector('[data-link="feeds"]')!;
+    expect(feeds.textContent!.replace(/\s+/g, ' ').trim()).toBe('Feeds: Cohort overview, Readmissions');
+    expect([...feeds.querySelectorAll('a')].map(a => a.getAttribute('href'))).toEqual([
+      '/data/analytics/dashboards?board=1448', '/data/analytics/dashboards?board=1450']);
+    expect(el.querySelector('[data-link="dashboards"]')).toBeNull();
+  });
+
+  it('keeps the plain Dashboards link when no board names the schedule, and reads no boards for a reader without them', () => {
+    const { el, fixture } = waiting(null, 'admin');
+    TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards'))
+      .flush({ status: API_SUCCESS, data: [{ analyticsDashboardId: 1451, dashboardName: 'Claims', pipelines: [{ jobId: 2903 }] }] });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-link="feeds"]')).toBeNull();
+    expect(el.querySelector('[data-link="dashboards"]')).not.toBeNull();
+    waiting(null, 'reviewer');
+    TestBed.inject(HttpTestingController).expectNone(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards'));
+    expect(boardsFedBy([{ analyticsDashboardId: null, dashboardName: 'x', pipelines: [{ jobId: 1 }] },
+      { analyticsDashboardId: 7, dashboardName: ' ', pipelines: [{ jobId: 1 }] }], 1)).toEqual([{ id: 7, name: 'Dashboard #7' }]);
   });
 });

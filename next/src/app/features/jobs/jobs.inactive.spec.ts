@@ -71,8 +71,8 @@ describe('an inactive job', () => {
 
   it('explains why both are off', () => {
     const { jobs } = jobsFor();
-    expect(jobs.runBlockedReason(inactive())).toBe('Activate this job to run it');
-    expect(jobs.skipBlockedReason(inactive())).toBe('Activate this job to run it');
+    expect(jobs.runBlockedReason(inactive())).toBe('Activate this schedule to run it');
+    expect(jobs.skipBlockedReason(inactive())).toBe('Activate this schedule to run it');
   });
 
   it('an active one still offers both', () => {
@@ -87,7 +87,7 @@ describe('an inactive job', () => {
     const { jobs } = jobsFor();
     const running = autoJob({ jobRunningStatus: 'Running' });
     expect(jobs.canRunNow(running)).toBe(false);
-    expect(jobs.runBlockedReason(running)).toBe('This job is already queued or running');
+    expect(jobs.runBlockedReason(running)).toBe('This schedule is already queued or running');
   });
 });
 
@@ -97,8 +97,8 @@ describe('Run selected with inactive jobs in the selection', () => {
     jobs.jobs.set([autoJob({ jobId: 1 }), inactive({ jobId: 2 }), inactive({ jobId: 3 })]);
     jobs.selected.set(new Set([1, 2, 3]));
     jobs.runSelected();
-    expect(confirms[0].title).toBe('Run 1 job?');
-    expect(confirms[0].body).toContain('2 inactive jobs are left out');
+    expect(confirms[0].title).toBe('Run 1 schedule?');
+    expect(confirms[0].body).toContain('2 inactive schedules are left out');
   });
 
   it('refuses a selection of inactive jobs only, naming the reason', () => {
@@ -107,7 +107,7 @@ describe('Run selected with inactive jobs in the selection', () => {
     jobs.selected.set(new Set([2]));
     jobs.runSelected();
     expect(confirms).toHaveLength(0);
-    expect(toast.error).toHaveBeenCalledWith('Select at least one active job that is not already running.');
+    expect(toast.error).toHaveBeenCalledWith('Select at least one active schedule that is not already running.');
   });
 
   it('still lets an inactive job be selected, because Delete selected takes it', () => {

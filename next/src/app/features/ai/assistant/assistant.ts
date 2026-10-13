@@ -55,7 +55,7 @@ export const SUGGESTIONS: { group: string; icon: string; prompts: string[] }[] =
     'Design a pipeline: pull patients and observations from FHIR daily, compute risk flags, summarise with AI, approve, dashboard.',
     'Design a pipeline: every night read orders.csv from storage, keep the paid orders, and save them as a CSV.',
   ] },
-  { group: 'Ask about runs', icon: 'zap', prompts: ['How did my last run go?', 'Which runs failed this week?', 'Which pipeline jobs do I have?'] },
+  { group: 'Ask about runs', icon: 'zap', prompts: ['How did my last run go?', 'Which runs failed this week?', 'Which schedules do I have?'] },
   { group: 'Look things up', icon: 'database', prompts: ['List the data sources in this workspace.', 'What can a pipeline step point at here?'] },
 ];
 

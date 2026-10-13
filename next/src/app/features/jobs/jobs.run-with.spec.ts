@@ -97,7 +97,7 @@ describe('Schedules row: the inbox trigger', () => {
     const { screen, gets } = jobs({ '/sourceJob.json/inboxTrigger': TRIGGER });
     screen.toggleRow(JOB);
     expect(gets.filter(g => g.startsWith('/sourceJob.json/inboxTrigger'))).toEqual(['/sourceJob.json/inboxTrigger?jobId=2849']);
-    expect(screen.triggerNote(JOB)).toBe('Every file named like *.csv that arrives in the inbox starts this job.');
+    expect(screen.triggerNote(JOB)).toBe('Every file named like *.csv that arrives in the inbox starts this schedule.');
     screen.toggleRow(JOB);
     screen.toggleRow(JOB);
     expect(gets.filter(g => g.startsWith('/sourceJob.json/inboxTrigger'))).toHaveLength(1);

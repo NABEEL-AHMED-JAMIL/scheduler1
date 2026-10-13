@@ -42,8 +42,8 @@ export const PINNED: Record<string, unknown> = {
       "Send",
       "Tool calls",
       "What can a pipeline step point at here?",
-      "Which pipeline jobs do I have?",
-      "Which runs failed this week?"
+      "Which runs failed this week?",
+      "Which schedules do I have?"
     ],
     "columns": [],
     "fields": [
@@ -194,8 +194,8 @@ export const PINNED: Record<string, unknown> = {
       "Send",
       "Tool calls",
       "What can a pipeline step point at here?",
-      "Which pipeline jobs do I have?",
-      "Which runs failed this week?"
+      "Which runs failed this week?",
+      "Which schedules do I have?"
     ],
     "columns": [],
     "fields": [

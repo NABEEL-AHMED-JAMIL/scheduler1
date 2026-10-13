@@ -56,12 +56,12 @@ export function typeName(documentTypeId: number | null | undefined, names?: Read
 
 /** The trigger in one sentence, in the words Core's save answers with. */
 export function triggerSentence(trigger: DocumentTrigger | null | undefined, names?: ReadonlyMap<number, string> | null): string {
-  if (!trigger?.configured) return 'No approved document starts this job.';
-  if (trigger.enabled === false) return 'The document trigger is off: documents that are approved do not start this job.';
+  if (!trigger?.configured) return 'No approved document starts this schedule.';
+  if (trigger.enabled === false) return 'The document trigger is off: documents that are approved do not start this schedule.';
   const type = typeName(trigger.documentTypeId, names);
   const documents = names?.has(Number(trigger.documentTypeId))
-    ? `Every document of '${type}' that is approved starts this job.`
-    : `Every document of ${type} that is approved starts this job.`;
+    ? `Every document of '${type}' that is approved starts this schedule.`
+    : `Every document of ${type} that is approved starts this schedule.`;
   const batch = Number(trigger.batchSize ?? 1);
   return batch > 1
     ? `${documents} Documents approved while a run is going wait; the next run takes up to ${batch} of them.`

@@ -165,7 +165,8 @@
             <!-- The column that gives: it takes the width the others leave and ends in an ellipsis
                  there, so it never runs on under the pinned actions column (UI review U5). -->
             <td class="w-full max-w-0 min-w-40">
-              <span class="truncate block" [title]="row.jobStatusMessage">
+              <!-- UX review E2: two lines and an ellipsis, the whole message on hover. -->
+              <span class="line-clamp-2 break-words" [title]="row.jobStatusMessage || ''">
                 {{ row.jobStatusMessage || '—' }}
               </span>
             </td>

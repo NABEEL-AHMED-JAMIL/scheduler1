@@ -57,11 +57,11 @@ interface WaitingAnswer {
               @if (canBulk()) {
                 <input type="checkbox" class="checkbox" [attr.data-bulk-pick]="run.jobQueueId"
                        [checked]="bulk.has(run)" [disabled]="!!run.individual"
-                       [attr.aria-label]="'Select run #' + run.jobQueueId + ' of ' + (run.jobName || 'job ' + run.jobId)"
+                       [attr.aria-label]="'Select run #' + run.jobQueueId + ' of ' + (run.jobName || 'schedule ' + run.jobId)"
                        [title]="run.individual ? 'Its pipeline requires individual review: open the run to decide it.' : ''"
                        (change)="pick(run, $any($event.target).checked)" />
               }
-              <span class="font-medium min-w-0 truncate">{{ run.jobName || 'Job ' + run.jobId }}</span>
+              <span class="font-medium min-w-0 truncate">{{ run.jobName || 'Schedule ' + run.jobId }}</span>
               <span class="mono text-[color:var(--text-muted)]">run #{{ run.jobQueueId }}</span>
               @if (run.finishedAt) {
                 <span class="text-xs text-[color:var(--text-muted)]">finished {{ run.finishedAt | serverTime:'recent' }}</span>

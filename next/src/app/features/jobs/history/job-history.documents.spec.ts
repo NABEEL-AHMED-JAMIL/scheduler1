@@ -45,6 +45,8 @@ function open(answers: { trigger?: unknown; approvals?: unknown } = {}) {
     { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
   const fixture = TestBed.createComponent(JobHistory);
   fixture.componentRef.setInput('jobId', '2848');
+  // UX review E3: the schedule's details start folded; these read the triggers inside them.
+  fixture.componentInstance.showDetail.set(true);
   fixture.detectChanges();
   const http = TestBed.inject(HttpTestingController);
   const reply = (path: string, data: unknown) =>
@@ -97,7 +99,7 @@ describe('Executions: runs an approved document started', () => {
   it('says which type starts it, and what the last documents did', () => {
     const { el } = open();
     const block = el.querySelector<HTMLElement>('.document-trigger')!;
-    expect(block.textContent).toContain('Every document of \'Intake form\' that is approved starts this job.');
+    expect(block.textContent).toContain('Every document of \'Intake form\' that is approved starts this schedule.');
     expect(block.textContent).toContain('Document #815');
     expect(block.textContent).toContain('The job is inactive.');
     expect(block.querySelector('a[href="/documents/review/812"]')).not.toBeNull();
@@ -136,10 +138,10 @@ describe('Executions: runs an approved document started', () => {
 describe('document trigger wording', () => {
   const names = new Map([[1007, 'Intake form']]);
   it('says what the trigger does in Core\'s words', () => {
-    expect(triggerSentence(TRIGGER, names)).toBe('Every document of \'Intake form\' that is approved starts this job.');
-    expect(triggerSentence(TRIGGER)).toBe('Every document of document type 1007 that is approved starts this job.');
+    expect(triggerSentence(TRIGGER, names)).toBe('Every document of \'Intake form\' that is approved starts this schedule.');
+    expect(triggerSentence(TRIGGER)).toBe('Every document of document type 1007 that is approved starts this schedule.');
     expect(triggerSentence({ ...TRIGGER, enabled: false })).toContain('off');
-    expect(triggerSentence({ jobId: 1, configured: false })).toBe('No approved document starts this job.');
+    expect(triggerSentence({ jobId: 1, configured: false })).toBe('No approved document starts this schedule.');
     expect(triggerSentence({ ...TRIGGER, batchSize: 10 }, names)).toContain('the next run takes up to 10 of them');
     expect(waitingSentence({ ...TRIGGER, waiting: 0 })).toBe('');
     expect(waitingSentence({ ...TRIGGER, waiting: 1 })).toBe('1 document waits for the run in flight to end.');

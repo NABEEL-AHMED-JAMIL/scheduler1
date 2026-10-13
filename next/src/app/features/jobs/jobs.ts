@@ -446,7 +446,7 @@ export class Jobs implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load jobs.');
+        this.error.set(err?.error?.message || 'Could not load the schedules.');
       },
     });
   }
@@ -563,7 +563,7 @@ export class Jobs implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
           this.busyJob.set(null);
-          this.toast.error(response.message || 'That job could not be read.');
+          this.toast.error(response.message || 'That schedule could not be read.');
           return;
         }
         const payload = clonePayload(response.data);
@@ -586,7 +586,7 @@ export class Jobs implements OnInit {
       },
       error: err => {
         this.busyJob.set(null);
-        this.toast.error(err?.error?.message || 'That job could not be read.');
+        this.toast.error(err?.error?.message || 'That schedule could not be read.');
       },
     });
   }
@@ -636,15 +636,15 @@ export class Jobs implements OnInit {
 
   /** The tooltip on a Run now that is off; empty when it is on. */
   runBlockedReason(job: SourceJob): string {
-    if (job.jobStatus !== 'Active') return 'Activate this job to run it';
-    return this.isInFlight(job) ? 'This job is already queued or running' : '';
+    if (job.jobStatus !== 'Active') return 'Activate this schedule to run it';
+    return this.isInFlight(job) ? 'This schedule is already queued or running' : '';
   }
 
   /** The tooltip on a Skip next run that is off; empty when it is on. */
   skipBlockedReason(job: SourceJob): string {
-    if (job.jobStatus !== 'Active') return 'Activate this job to run it';
-    if (this.isInFlight(job)) return 'This job is already queued or running';
-    return this.canSkipNext(job) ? '' : 'Only scheduled jobs have a next run';
+    if (job.jobStatus !== 'Active') return 'Activate this schedule to run it';
+    if (this.isInFlight(job)) return 'This schedule is already queued or running';
+    return this.canSkipNext(job) ? '' : 'Only a schedule with a timetable has a next run';
   }
 
   /**
@@ -823,7 +823,7 @@ export class Jobs implements OnInit {
     if (this.busyJob() === job.jobId) return;
     const activating = job.jobStatus !== 'Active';
     const ok = await confirmWith(this.dialog, {
-      title: activating ? 'Activate job' : 'Deactivate job',
+      title: activating ? 'Activate schedule' : 'Deactivate schedule',
       body: activating
         // A Manual job has no schedule to resume: activating it only makes it runnable again.
         ? (job.execution === 'Manual'
@@ -856,7 +856,7 @@ export class Jobs implements OnInit {
   async remove(job: SourceJob): Promise<void> {
     if (this.busyJob() === job.jobId) return;
     const ok = await confirmWith(this.dialog, {
-      title: 'Delete job',
+      title: 'Delete schedule',
       body: `"${job.jobName}" will be deleted and will stop running. Its run history is kept.`,
       confirmLabel: 'Delete',
       danger: true,
@@ -916,13 +916,13 @@ export class Jobs implements OnInit {
     const candidates = this.selectedJobs().filter(job => this.selectable(job));
     const jobs = candidates.filter(job => this.canRunNow(job));
     if (!jobs.length) {
-      this.toast.error('Select at least one active job that is not already running.');
+      this.toast.error('Select at least one active schedule that is not already running.');
       return;
     }
     const left = candidates.length - jobs.length;
-    const leftOut = left ? ` ${left} inactive job${left > 1 ? 's are' : ' is'} left out.` : '';
+    const leftOut = left ? ` ${left} inactive schedule${left > 1 ? 's are' : ' is'} left out.` : '';
     this.confirmBulk({
-      title: `Run ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
+      title: `Run ${jobs.length} schedule${jobs.length > 1 ? 's' : ''}?`,
       body: `Each one is queued immediately, ignoring its schedule.${leftOut}`,
       confirmLabel: 'Run them',
     }, jobs, 'run', 'queued');
@@ -938,17 +938,17 @@ export class Jobs implements OnInit {
   deleteSelected(): void {
     const jobs = this.selectedJobs();
     if (!jobs.length) {
-      this.toast.error('Select at least one job to delete.');
+      this.toast.error('Select at least one schedule to delete.');
       return;
     }
     const blocked = jobs.filter(job => this.isInFlight(job));
     if (blocked.length) {
       const names = blocked.slice(0, 3).map(job => `#${job.jobId} (${job.jobRunningStatus})`).join(', ');
-      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} jobs are` : names + ' is'} queued or running. Wait for the run to finish.`);
+      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} schedules are` : names + ' is'} queued or running. Wait for the run to finish.`);
       return;
     }
     this.confirmBulk({
-      title: `Delete ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
+      title: `Delete ${jobs.length} schedule${jobs.length > 1 ? 's' : ''}?`,
       body: 'They stop running and leave the list. Their run history is kept.',
       confirmLabel: 'Delete them',
       danger: true,
@@ -1003,7 +1003,7 @@ export class Jobs implements OnInit {
         if (failures.length) {
           this.toast.error(`${ok} ${verb}, ${failures.length} failed: ${failures.slice(0, 2).join('; ')}`);
         } else {
-          this.toast.success(`${ok} job${ok > 1 ? 's' : ''} ${verb}.`);
+          this.toast.success(`${ok} schedule${ok > 1 ? 's' : ''} ${verb}.`);
         }
         // A delete removes its rows outright, and only the ones the server actually deleted:
         // a row whose call failed is still there and hiding it would say otherwise.

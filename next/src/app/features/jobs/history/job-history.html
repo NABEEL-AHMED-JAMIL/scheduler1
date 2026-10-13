@@ -31,7 +31,7 @@
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
       <span class="text-[color:var(--text-secondary)]">Filtered to</span>
       @if (jobStatus()) { <span class="pill pill-brand">{{ jobStatus() }}</span> }
-      @if (isAllJobs()) { <span class="pill pill-neutral">Every job</span> }
+      @if (isAllJobs()) { <span class="pill pill-neutral">Every schedule</span> }
       <span class="text-[color:var(--text-secondary)]">
         on {{ dayLabel(targetDate()) }}, {{ hourRange(targetHr()) }}
       </span>
@@ -49,9 +49,12 @@
         <button type="button" class="flex flex-1 min-w-0 items-center gap-2 text-left"
                 [attr.aria-expanded]="showDetail()"
                 (click)="showDetail.set(!showDetail())">
-          <app-icon name="briefcase" class="icon-info shrink-0" />
-          <span class="text-sm font-semibold truncate">Job &amp; task detail</span>
+          <app-icon name="calendar" class="icon-info shrink-0" />
+          <span class="text-sm font-semibold whitespace-nowrap">Schedule details</span>
           <span class="pill pill-neutral shrink-0">#{{ job.jobId }}</span>
+          @if (!showDetail()) {
+            <span class="text-xs text-[color:var(--text-muted)] truncate min-w-0" data-test="schedule-detail-summary">{{ detailSummary(job) }}</span>
+          }
         </button>
 
         @if (!isAllJobs()) {
@@ -68,7 +71,7 @@
 
         <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
                 [attr.aria-expanded]="showDetail()"
-                [attr.aria-label]="showDetail() ? 'Collapse job detail' : 'Expand job detail'"
+                [attr.aria-label]="showDetail() ? 'Collapse the schedule details' : 'Expand the schedule details'"
                 (click)="showDetail.set(!showDetail())">
           <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted" />
         </button>
@@ -79,7 +82,7 @@
             >
 
           <div>
-            <div class="detail-head">Job</div>
+            <div class="detail-head">Schedule</div>
             <dl class="detail-list">
               <dt>Name</dt><dd>{{ job.jobName }}</dd>
               <dt>State</dt><dd><app-status [label]="job.jobStatus" [quiet]="true" /></dd>
@@ -92,7 +95,7 @@
           </div>
 
           <div>
-            <div class="detail-head">Schedule</div>
+            <div class="detail-head">Timetable</div>
             @if (job.scheduler; as s) {
               <!--
                 A job switched from Auto to Manual keeps this row -- the editor posts no schedulers
@@ -103,7 +106,7 @@
               -->
               @if (job.execution === 'Manual') {
                 <p class="text-xs text-[color:var(--text-muted)]">
-                  Runs on demand only. Its timetable is held, and resumes if this job is set back to Auto.
+                  Runs on demand only. Its timetable is held, and resumes if this schedule is set back to Auto.
                 </p>
               } @else {
                 <dl class="detail-list">
@@ -121,7 +124,7 @@
                          dispatcher records each passed slot as Missed. A time here never arrives. -->
                     @if (job.jobStatus !== 'Active') {
                       <span class="text-[color:var(--text-muted)]"
-                            title="Passed slots are recorded as Missed; the timetable resumes when the job is activated">Paused while inactive</span>
+                            title="Passed slots are recorded as Missed; the timetable resumes when the schedule is activated">Paused while inactive</span>
                     }
                     @else if (s.expired) { <span class="text-warn-500">Expired</span> }
                     @else { {{ s.nextRunAt ? (s.nextRunAt | serverTime:'recent') : '—' }} }
@@ -213,8 +216,8 @@
               @for (chip of notifyChips(job); track chip.label) {
                 <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
                       [title]="chip.on
-                        ? 'An email is sent when this job ' + chip.label
-                        : 'No email is sent when this job ' + chip.label">
+                        ? 'An email is sent when this schedule ' + chip.label
+                        : 'No email is sent when this schedule ' + chip.label">
                   <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
                 </span>
               }
@@ -232,10 +235,10 @@
           </div>
 
           <div class="min-w-0">
-            <div class="detail-head">Linked task</div>
+            <div class="detail-head">Pipeline</div>
             @if (job.taskDetail; as task) {
               <dl class="detail-list">
-                <dt>Task</dt>
+                <dt>Name</dt>
                 <dd class="truncate">
                   @if (canManageTasks()) {
                     <a class="text-accent hover:underline"
@@ -248,13 +251,13 @@
                 </dd>
                 <dt>Type</dt><dd class="truncate">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
                 <dt>Topic</dt><dd class="mono truncate">{{ topicOf(task.sourceTaskType?.queueTopicPartition) }}</dd>
-                <dt>Pipeline</dt><dd class="truncate">{{ task.pipelineId || '—' }}</dd>
+                <dt>Pipeline id</dt><dd class="truncate">{{ task.pipelineId || '—' }}</dd>
                 <dt>Home page</dt><dd class="truncate">{{ task.homePageId || '—' }}</dd>
               </dl>
 
               @if (task.taskPayload) {
                 <div class="flex items-center gap-2 mt-3 mb-1">
-                  <span class="detail-head mb-0">Task payload</span>
+                  <span class="detail-head mb-0">Payload</span>
                   <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload()">
                     <app-icon [name]="payloadCopied() ? 'check' : 'copy'"
                               [class.icon-ok]="payloadCopied()" size="0.85em" />
@@ -265,7 +268,7 @@
                     >{{ task.taskPayload }}</pre>
               }
             } @else {
-              <p class="text-xs text-[color:var(--text-muted)]">No task linked.</p>
+              <p class="text-xs text-[color:var(--text-muted)]">No pipeline linked.</p>
             }
           </div>
         </div>
@@ -306,7 +309,7 @@
         <h3 class="chart-title">How long each run took</h3>
         <p class="chart-sub">
           Most recent {{ durationTrend().length }} runs, oldest first. A rising slope means the
-          job is getting slower.
+          schedule's runs are getting slower.
         </p>
         @if (durationTrend().length) {
           <app-bar-chart [data]="durationTrend()" [height]="104" unit="duration" />
@@ -455,19 +458,21 @@
                      a failure reason runs to a paragraph and a tooltip cannot be selected or
                      copied. Long ones open into the same box the task payload uses. -->
                 @if (isLongMessage(run.jobStatusMessage)) {
-                  <!-- A chevron, like the Jobs row toggle: the underlined text alone read as a
-                       plain message that happened to be cut off. -->
+                  <!-- A chevron, like the Schedules row toggle: the underlined text alone read as a
+                       plain message that happened to be cut off. UX review E2: two lines and an ellipsis in
+                       the cell, the whole message on hover, and the row's expand below for copying. -->
                   <button type="button"
-                          class="flex items-center gap-1 w-full text-left link-inline"
+                          class="flex items-start gap-1 w-full text-left link-inline"
                           [attr.aria-expanded]="isMessageOpen(run.jobQueueId)"
                           [attr.aria-label]="(isMessageOpen(run.jobQueueId) ? 'Hide' : 'Show') + ' the full message for run #' + run.jobQueueId"
-                          [title]="isMessageOpen(run.jobQueueId) ? 'Hide the full message' : 'Show the full message'"
+                          [title]="run.jobStatusMessage"
+                          data-test="run-message"
                           (click)="toggleMessage(run.jobQueueId)">
-                    <span class="truncate min-w-0">{{ run.jobStatusMessage }}</span>
-                    <app-icon [name]="isMessageOpen(run.jobQueueId) ? 'chevronDown' : 'chevronRight'" class="icon-muted shrink-0" />
+                    <span class="line-clamp-2 min-w-0 break-words">{{ run.jobStatusMessage }}</span>
+                    <app-icon [name]="isMessageOpen(run.jobQueueId) ? 'chevronDown' : 'chevronRight'" class="icon-muted shrink-0 mt-0.5" />
                   </button>
                 } @else {
-                  <span class="truncate block">{{ run.jobStatusMessage }}</span>
+                  <span class="line-clamp-2 break-words" [title]="run.jobStatusMessage" data-test="run-message">{{ run.jobStatusMessage }}</span>
                 }
               } @else {
                 <span class="text-[color:var(--text-muted)]">—</span>

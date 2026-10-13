@@ -46,7 +46,7 @@ describe('waiting for review', () => {
       { jobQueueId: 1, jobId: 2, jobName: null, finishedAt: null, required: ['internal', 'customer'], decisions: [{ party: 'internal' }] },
     ] } });
     expect(el.textContent).toContain('Needs the customer review');
-    expect(el.textContent).toContain('Job 2');
+    expect(el.textContent).toContain('Schedule 2');
     expect(el.textContent).not.toContain('Show all');
   });
 

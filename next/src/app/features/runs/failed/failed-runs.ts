@@ -15,7 +15,7 @@ import { BulkBar } from '../../../shared/ui/bulk/bulk-bar';
 import { BulkAnswer, BulkRequest, BulkSelection, BulkSource } from '../../../shared/ui/bulk/bulk.model';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import {
-  ErrorGroup, FacetValue, FailedQuery, FailedRun, FailedRunsAnswer, FailedRunsApi, dayLabel, windowOf,
+  ErrorGroup, FacetValue, FailedQuery, FailedRun, FailedRunsAnswer, FailedRunsApi, dayLabel, retryableHere, windowOf,
 } from './failed-runs.api';
 import { FailedRunPanel, FailedRunPanelData } from './failed-run-panel';
 
@@ -126,7 +126,8 @@ export class FailedRuns implements OnInit {
       this.api.bulkRetry(rows.map(r => r.runId), request.bulkId, request.dryRun).pipe(map(r => r)),
   };
   readonly selection = new BulkSelection<FailedRun>(this.source);
-  readonly retryableOnPage = computed(() => this.items().filter(r => r.retryable));
+  readonly retryableOnPage = computed(() => this.items().filter(retryableHere));
+  readonly retryableHere = retryableHere;
 
   ngOnInit(): void {
     const q = this.route.snapshot.queryParamMap;
@@ -225,7 +226,7 @@ export class FailedRuns implements OnInit {
   }
 
   open(run: FailedRun): void {
-    const data: FailedRunPanelData = { run, canRetry: this.canRetry() && run.retryable, canRestart: this.auth.role() === 'TENANT_ADMIN' };
+    const data: FailedRunPanelData = { run, canRetry: this.canRetry() && retryableHere(run), canRestart: this.auth.role() === 'TENANT_ADMIN' };
     const ref = this.dialog.open<boolean, FailedRunPanelData, FailedRunPanel>(FailedRunPanel, sidePanelConfig(data, 'wide', 'right'));
     ref.closed.subscribe(retried => { if (retried) this.load(); });
   }

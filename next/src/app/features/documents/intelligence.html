@@ -193,20 +193,41 @@
     @default {
       <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Document Intelligence at a glance" />
 
-      <section aria-label="Document types" class="type-cards" data-test="type-cards">
-        @for (t of activeTypes(); track t.documentTypeId) {
-          <button type="button" class="card p-4 type-card" [attr.aria-label]="t.name + ': ' + countOf(t.fieldCount ?? 0, 'field') + ', ' + countOf(documentsOf(t), 'document')" (click)="openType(t)">
-            <app-icon [name]="typeIcon(t)" size="1.25rem" class="text-[color:var(--text-secondary)]" />
-            <span class="font-medium text-sm truncate w-full">{{ t.name }}</span>
-            <span class="text-xs text-[color:var(--text-muted)]">{{ countOf(t.fieldCount ?? 0, 'field') }} · {{ countOf(documentsOf(t), 'doc') }}</span>
-            @if (!t.builtIn) { <span class="pill pill-neutral">This workspace</span> }
-          </button>
-        }
-        @if (canManage()) {
-          <button type="button" class="card p-4 type-card type-card-add" (click)="openType(null)">
-            <app-icon name="plus" size="1.25rem" /><span class="text-xs">Custom type</span>
-          </button>
-        }
+      <!-- UX review DI1 (2026-10-13): the types once, with what an approved document of each starts (the schedules set to
+           run "Also when a document is approved", MIG-364) -- not the Document types view again as cards. -->
+      <section class="card overflow-hidden" aria-labelledby="type-starts-title" data-test="type-starts">
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 pt-3 pb-2">
+          <h3 class="chart-title m-0" id="type-starts-title">What approved documents start</h3>
+          <span class="chart-sub">A schedule set to run when a document of its type is approved starts once per approved document (or batch).</span>
+          @if (canManage()) {
+            <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="openType(null)"><app-icon name="plus" />Custom type</button>
+          }
+        </div>
+        <ul class="type-starts">
+          @for (row of typeStarts(); track row.type.documentTypeId) {
+            <li class="type-start" [attr.data-type]="row.type.typeKey">
+              <app-icon [name]="typeIcon(row.type)" class="text-[color:var(--text-secondary)]" />
+              <button type="button" class="link-inline font-medium text-left truncate" [title]="row.type.name" (click)="openType(row.type)">{{ row.type.name }}</button>
+              <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ countOf(row.type.fieldCount ?? 0, 'field') }} · {{ countOf(documentsOf(row.type), 'doc') }}</span>
+              <span class="text-xs min-w-0" data-test="type-start-what">
+                @if (!canSeeSchedules()) {
+                  <span class="text-[color:var(--text-muted)]">—</span>
+                } @else if (triggers() === null) {
+                  <span class="text-[color:var(--text-muted)]">Reading the schedules…</span>
+                } @else if (row.starts.length) {
+                  <span class="text-[color:var(--text-secondary)]">Starts </span>
+                  @for (s of row.starts; track s.jobId; let last = $last) {
+                    <a class="link-inline" [routerLink]="['/pipelines/schedules', s.jobId, 'executions']" [attr.data-job]="s.jobId">{{ s.name }}</a>@if (!s.on) {<span class="text-[color:var(--text-muted)]"> ({{ s.why }})</span>}@if (!last) {<span>, </span>}
+                  }
+                } @else {
+                  <span class="text-[color:var(--text-muted)]">Starts nothing: set it on a schedule (Also when a document is approved)</span>
+                }
+              </span>
+            </li>
+          } @empty {
+            <li class="px-4 py-3 text-sm text-[color:var(--text-muted)] border-t border-subtle">No active document types.</li>
+          }
+        </ul>
       </section>
 
       <app-table-shell data-test="recent" heading="Recent documents" columnsKey="document-recent" [loading]="loading()" [error]="error()"

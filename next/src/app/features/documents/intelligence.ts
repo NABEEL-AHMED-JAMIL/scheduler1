@@ -19,7 +19,7 @@ import {
   CHANNEL_LABELS, DatasetRow, DocumentType, Extraction, IntakeRow, Mailbox, OcrDocument, RecentRow, TypeStats, lowLine, recentRows, refusalText,
   totalsOf,
 } from './documents.model';
-import { DocumentsApi } from './documents.service';
+import { DocumentTriggerRow, DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
 import { ReadDocumentData, ReadDocumentDialog, ReadDocumentResult } from './read-document-dialog';
 import { TypePanel, TypePanelData } from './type-panel';
@@ -67,12 +67,11 @@ const RECENT_STATES = ['In review', 'Approved', 'Auto-approved', 'Rejected', 'Fa
   imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, StatStrip, Pagination, DataText, ServerTimePipe, ConfidenceBar, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './intelligence.html',
   styles: [`
-    .type-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    @media (min-width: 640px) { .type-cards { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
-    @media (min-width: 1280px) { .type-cards { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
-    .type-card { text-align: left; display: flex; flex-direction: column; gap: 0.375rem; min-width: 0; }
-    .type-card:hover { border-color: var(--border-strong); }
-    .type-card-add { border-style: dashed; align-items: center; justify-content: center; color: var(--text-secondary); }
+    /* UX review DI1: one line per active type -- its name, its numbers, and the schedules its approved documents start. */
+    .type-starts { list-style: none; margin: 0; padding: 0; }
+    .type-start { display: grid; grid-template-columns: 1.25rem minmax(10rem, 16rem) 9rem minmax(0, 1fr); gap: 0.75rem; align-items: center;
+      padding: 0.5rem 1rem; border-top: 1px solid var(--border-subtle); font-size: 0.8125rem; }
+    @media (max-width: 767px) { .type-start { grid-template-columns: 1.25rem minmax(0, 1fr); } .type-start > :nth-child(n+3) { grid-column: 2; } }
   `],
 })
 export class DocumentIntelligence implements OnInit {
@@ -133,6 +132,19 @@ export class DocumentIntelligence implements OnInit {
   /** Documents per type over the stats' days, for the type cards. */
   private readonly docsByType = computed(() => new Map(this.stats().map(s => [s.documentTypeId, s.documents])));
   readonly activeTypes = computed(() => this.types().filter(t => t.status === 'Active'));
+  /** UX review DI1: the schedules an approved document starts -- Schedules' read, so only for a reader who holds it. */
+  readonly canSeeSchedules = computed(() => typeof this.auth.canOpen === 'function' && this.auth.canOpen('jobs'));
+  readonly triggers = signal<DocumentTriggerRow[] | null>(null);
+  /** Each active type with the schedules its approved documents start (switched-off triggers say so). */
+  readonly typeStarts = computed(() => {
+    const triggers = this.triggers() ?? [];
+    return this.activeTypes().map(type => ({
+      type,
+      starts: triggers.filter(t => Number(t.documentTypeId) === Number(type.documentTypeId))
+        .map(t => ({ jobId: t.jobId, name: t.jobName || `Schedule #${t.jobId}`, on: t.enabled && t.jobStatus === 'Active',
+          why: !t.enabled ? 'trigger off' : t.jobStatus !== 'Active' ? 'schedule not active' : '' })),
+    }));
+  });
   readonly recent = computed(() => recentRows(this.reads(), this.extractions()));
   readonly filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
@@ -209,6 +221,12 @@ export class DocumentIntelligence implements OnInit {
     if (this.overviewRead) this.loadStats();
     this.overviewRead = true;
     this.api.reads().subscribe({ next: r => { if (r.status === API_SUCCESS) this.reads.set(r.data ?? []); }, error: () => this.reads.set([]) });
+    if (this.canSeeSchedules()) {
+      this.api.documentTriggers?.()?.subscribe({
+        next: r => this.triggers.set(r.status === API_SUCCESS && Array.isArray(r.data) ? r.data : []),
+        error: () => this.triggers.set([]),
+      });
+    }
     this.api.extractions().subscribe({
       next: r => {
         this.loading.set(false);

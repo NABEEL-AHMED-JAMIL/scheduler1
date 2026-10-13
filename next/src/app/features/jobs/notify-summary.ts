@@ -53,8 +53,8 @@ export function notifyCount(job: NotifyFlags): number {
 export function notifySentence(job: NotifyFlags): string {
   const on = notifyChips(job).filter(chip => chip.on).map(chip => chip.label);
   const who = job.assignedUsername?.trim() || 'the assigned user';
-  if (!on.length) return `No email is sent to ${who} about this job.`;
-  return `Emails ${who} when this job ${joinWords(on)}.`;
+  if (!on.length) return `No email is sent to ${who} about this schedule.`;
+  return `Emails ${who} when this schedule ${joinWords(on)}.`;
 }
 
 /** "a", "a or b", "a, b or c" -- an Oxford-less list, as the sentence reads aloud. */

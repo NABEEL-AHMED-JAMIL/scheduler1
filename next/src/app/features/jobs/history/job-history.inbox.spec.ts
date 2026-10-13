@@ -35,6 +35,8 @@ function open(answers: { trigger?: unknown; arrivals?: unknown } = {}) {
     { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
   const fixture = TestBed.createComponent(JobHistory);
   fixture.componentRef.setInput('jobId', '2848');
+  // UX review E3: the schedule's details start folded; these read the triggers inside them.
+  fixture.componentInstance.showDetail.set(true);
   fixture.detectChanges();
   const http = TestBed.inject(HttpTestingController);
   const reply = (path: string, data: unknown) =>
@@ -70,7 +72,7 @@ describe('Executions: runs a file started', () => {
   it('says what the trigger takes, and what the last files did', () => {
     const { el } = open();
     const inbox = el.querySelector<HTMLElement>('.inbox-trigger')!;
-    expect(inbox.textContent).toContain('Every file named like *.csv that arrives in the inbox starts this job.');
+    expect(inbox.textContent).toContain('Every file named like *.csv that arrives in the inbox starts this schedule.');
     expect(inbox.textContent).toContain('live-customers.csv');
     expect(inbox.textContent).toContain('late.csv');
     expect(inbox.textContent).toContain('still in flight');
@@ -111,10 +113,10 @@ describe('Executions: runs a file started', () => {
 
 describe('inbox trigger wording', () => {
   it('says what the trigger does in Core\'s words', () => {
-    expect(triggerSentence(TRIGGER as any)).toBe('Every file named like *.csv that arrives in the inbox starts this job.');
-    expect(triggerSentence({ ...TRIGGER, filePattern: null } as any)).toBe('Every file that arrives in the inbox starts this job.');
+    expect(triggerSentence(TRIGGER as any)).toBe('Every file named like *.csv that arrives in the inbox starts this schedule.');
+    expect(triggerSentence({ ...TRIGGER, filePattern: null } as any)).toBe('Every file that arrives in the inbox starts this schedule.');
     expect(triggerSentence({ ...TRIGGER, enabled: false } as any)).toContain('off');
-    expect(triggerSentence({ jobId: 1, configured: false })).toBe('No file in the inbox starts this job.');
+    expect(triggerSentence({ jobId: 1, configured: false })).toBe('No file in the inbox starts this schedule.');
     expect(triggerSentence({ ...TRIGGER, batchSize: 10 } as any)).toContain('the next run takes up to 10 of them');
     expect(waitingSentence({ ...TRIGGER, waiting: 0 } as any)).toBe('');
     expect(waitingSentence({ ...TRIGGER, waiting: 1 } as any)).toBe('1 file waits for the run in flight to end.');

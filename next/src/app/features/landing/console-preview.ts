@@ -112,8 +112,8 @@ type View = 'dashboard' | 'jobs' | 'reports';
         @case ('jobs') {
           <div class="view">
             <div class="px-4 py-2.5 flex items-center gap-3 text-[11px] dim uppercase tracking-wider">
-              <span class="flex-1">Job</span>
-              <span class="w-24 hidden sm:block">Schedule</span>
+              <span class="flex-1">Schedule</span>
+              <span class="w-24 hidden sm:block">When</span>
               <span class="w-20 text-right">Status</span>
             </div>
             @for (row of jobRows; track row.name) {
@@ -194,12 +194,12 @@ export class ConsolePreview {
 
   readonly tabs: { id: View; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'jobs', label: 'Jobs' },
+    { id: 'jobs', label: 'Schedules' },
     { id: 'reports', label: 'Reports' },
   ];
 
   readonly tiles = [
-    { label: 'Total jobs', value: 40 },
+    { label: 'Total schedules', value: 40 },
     { label: 'Active', value: 30 },
     { label: 'Running', value: 2 },
     { label: 'Completed', value: 914 },

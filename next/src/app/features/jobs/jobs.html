@@ -29,7 +29,7 @@
         {{ stalledCount() }}
         {{ stalledCount() === 1 ? 'run has' : 'runs have' }}
         been in flight for over half an hour without an update. A worker that has finished but
-        cannot report back leaves a job looking busy for ever — check the worker's logs, and
+        cannot report back leaves a schedule looking busy for ever — check the worker's logs, and
         that its callback token still matches the server's.
       </p>
     </div>
@@ -70,7 +70,7 @@
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
         <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, schedule, pipeline or workspace' : 'Search id, schedule or pipeline'"
-               aria-label="Search jobs"
+               aria-label="Search schedules"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
       @if (seesOthersJobs()) {
@@ -388,8 +388,8 @@
                                it read as a run outcome on a panel that also shows one. -->
                           <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
                                 [title]="chip.on
-                                  ? 'An email is sent when this job ' + chip.label
-                                  : 'No email is sent when this job ' + chip.label">
+                                  ? 'An email is sent when this schedule ' + chip.label
+                                  : 'No email is sent when this schedule ' + chip.label">
                             <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
                           </span>
                         }
@@ -445,7 +445,7 @@
                                    (barClicked)="openRunLogs(job, $event)" />
                   } @else {
                     <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
-                      This job has not completed a run yet.
+                      This schedule has not completed a run yet.
                     </p>
                   }
                 </div>

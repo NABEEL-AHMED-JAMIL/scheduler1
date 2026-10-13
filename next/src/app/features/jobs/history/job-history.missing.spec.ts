@@ -34,7 +34,7 @@ function historyOf(jobId: string, answer: unknown) {
 describe('Run history of a job that does not exist', () => {
   it('says so, and offers no Try again', () => {
     const h = historyOf('41', { status: 'ERROR', message: 'SourceJob not found with 41.' });
-    expect(h.error()).toBe('Job #41 does not exist or was deleted.');
+    expect(h.error()).toBe('Schedule #41 does not exist or was deleted.');
     expect(h.missing()).toBe(true);
   });
 

@@ -14,7 +14,7 @@ import { JobAssistant } from './job-assistant';
   template: `
     <div class="fixed bottom-4 right-4 z-50 w-[34rem] max-w-[calc(100vw-2rem)] card shadow-2xl
                 flex flex-col overflow-hidden"
-         role="region" [attr.aria-label]="'Assistant for ' + (jobName() || 'job #' + jobId())"
+         role="region" [attr.aria-label]="'Assistant for ' + (jobName() || 'schedule #' + jobId())"
          [style.height]="minimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
       <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle">
         <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />

@@ -66,7 +66,7 @@ import { RunFollow } from './run-follow';
           <div class="rounded-lg border border-subtle px-3 py-2.5 flex flex-col gap-2" data-created>
             <p class="text-sm flex flex-wrap items-center gap-2">
               <app-icon name="checkCircle" class="icon-ok" />Created <span class="font-medium">{{ c.jobName }}</span>
-              <span class="pill pill-neutral mono">{{ c.pipelineId }}</span><span class="text-xs text-[color:var(--text-muted)]">job {{ c.jobId }}</span>
+              <span class="pill pill-neutral mono">{{ c.pipelineId }}</span><span class="text-xs text-[color:var(--text-muted)]">schedule {{ c.jobId }}</span>
             </p>
             @if (runId() != null) {
               <app-run-follow [jobId]="c.jobId" [jobQueueId]="runId()" [jobName]="c.jobName" initialStatus="Queue" />

@@ -41,7 +41,7 @@ describe('Queue job names', () => {
   });
 
   it('falls back to the number for a job it does not know', () => {
-    expect(queue().jobName(run(9))).toBe('Job #9');
+    expect(queue().jobName(run(9))).toBe('Schedule #9');
   });
 
   it('finds a run by its job name', () => {
@@ -54,6 +54,6 @@ describe('Queue job names', () => {
   it('does not ask for the job list without the Schedules page, and keeps the numbers (review 2026-10-07)', () => {
     const q = queue(false);
     expect(q.gets.some(url => url.includes('listSourceJob'))).toBe(false);
-    expect(q.jobName(run(2844))).toBe('Job #2844');
+    expect(q.jobName(run(2844))).toBe('Schedule #2844');
   });
 });

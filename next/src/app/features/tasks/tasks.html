@@ -105,7 +105,7 @@
                       <button cdkMenuItem class="menu-item menu-item-danger"
                               [disabled]="task.taskStatus === 'Delete' || inUse(task)"
                               [title]="inUse(task)
-                                ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                                ? 'Used by ' + task.totalLinksJobs + ' schedule(s). Move or delete those first.'
                                 : 'Delete this task'"
                               (cdkMenuItemTriggered)="remove(task)">
                         <app-icon name="trash" class="icon-crit" />Delete
@@ -246,7 +246,7 @@
                     <button cdkMenuItem class="menu-item menu-item-danger"
                             [disabled]="task.taskStatus === 'Delete' || inUse(task)"
                             [title]="inUse(task)
-                              ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
+                              ? 'Used by ' + task.totalLinksJobs + ' schedule(s). Move or delete those first.'
                               : 'Delete this task'"
                             (cdkMenuItemTriggered)="remove(task)">
                       <app-icon name="trash" class="icon-crit" />Delete

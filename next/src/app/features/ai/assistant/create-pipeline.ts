@@ -206,7 +206,7 @@ export class CreatePipeline implements OnInit {
         const r = await this.post('/sourceJob.json/addSourceJob', jobPayload(name, taskDetailId, trigger, today));
         jobId = Number(/jobId (\d+)/.exec(r.message ?? '')?.[1] ?? NaN);
         if (!Number.isFinite(jobId)) throw new Error('The schedule was saved but its id did not come back; find it under Schedules.');
-        return `Job ${jobId}, ${trigger.type === 'schedule' ? 'on its timetable' : 'run on demand'}.`;
+        return `Schedule ${jobId}, ${trigger.type === 'schedule' ? 'on its timetable' : 'run on demand'}.`;
       });
       // 5. The inbox trigger, when a file starts the run.
       if (trigger.type === 'inbox') {

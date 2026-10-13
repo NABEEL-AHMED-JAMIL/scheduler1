@@ -257,9 +257,9 @@ export const PINNED: Record<string, unknown> = {
       "Completed 1",
       "Custom",
       "Hide charts",
-      "Job #28351 50%",
-      "Job #28381 50%",
       "Refresh",
+      "Schedule #28351 50%",
+      "Schedule #28381 50%",
       "Skip 1",
       "This month",
       "Today"

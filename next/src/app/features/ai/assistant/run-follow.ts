@@ -50,7 +50,7 @@ export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: strin
     <div class="flex flex-col gap-1.5 min-w-0" data-link="execution" [attr.data-run]="jobQueueId()" [attr.data-state]="state().label">
       <div class="flex flex-wrap items-center gap-2 min-w-0">
         <app-status [label]="state().label" />
-        <span class="font-medium truncate min-w-0" [title]="jobName() || ''">{{ jobName() || 'Job ' + jobId() }}</span>
+        <span class="font-medium truncate min-w-0" [title]="jobName() || ''">{{ jobName() || 'Schedule ' + jobId() }}</span>
         @if (jobQueueId() != null) { <span class="pill pill-neutral mono">run #{{ jobQueueId() }}</span> }
         @if (following()) {
           <span class="text-xs text-[color:var(--text-muted)] flex items-center gap-1" role="status">

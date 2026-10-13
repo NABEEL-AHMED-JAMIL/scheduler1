@@ -443,7 +443,7 @@
               <td class="hidden xl:table-cell text-right tabular">{{ f.fieldCount }}</td>
               @if (isAdmin()) {
                 <td>
-                  @if (f.startsJob) { {{ f.jobName || 'Job #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                  @if (f.startsJob) { {{ f.jobName || 'Schedule #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                 </td>
                 <td class="text-right tabular">{{ f.submissions ?? 0 }}</td>
                 <td class="hidden xl:table-cell text-xs whitespace-nowrap">@if (f.dateUpdated) { {{ f.dateUpdated | serverTime: 'dateTime' }} }</td>

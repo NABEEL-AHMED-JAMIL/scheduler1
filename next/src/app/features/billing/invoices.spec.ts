@@ -9,6 +9,7 @@ import { WorkspacePicker } from './workspace-picker';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { crumbsFor } from '../../core/nav/nav-tree';
 
 /** The invoices list: chips that count and sum, a search, and drafting for the platform administrator only. */
 const ROWS = [
@@ -66,6 +67,15 @@ describe('Invoices', () => {
     component.select(component.rows()[1]);
     expect(component.pane()).toBe('detail');
     expect(page(false, 'INV-2026-09-0007').component.pane()).toBe('detail');
+  });
+
+  /** UX review 2026-10-13: the trail read "Invoices › Invoices"; the address's invoice is its last step, from the menu's tree. */
+  it('names the invoice the address names as the breadcrumb\'s last step, under Billing › Invoices', () => {
+    expect(page(false, 'INV-2026-09-0007').component.addressNumber()).toBe('INV-2026-09-0007');
+    expect(page(false).component.addressNumber()).toBeNull();
+    expect(crumbsFor('/billing/invoices/INV-2026-09-0007', 'INV-2026-09-0007', true).map(c => c.label))
+      .toEqual(['Administration & billing', 'Billing', 'Invoices', 'INV-2026-09-0007']);
+    expect(crumbsFor('/billing/invoices', 'Invoices').map(c => c.label)).toEqual(['Administration & billing', 'Billing', 'Invoices']);
   });
 
   it('selects the overdue bill first, or the one the address names, and writes the number to the address', () => {

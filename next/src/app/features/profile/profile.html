@@ -89,9 +89,9 @@
 
       @if (myOutcomes().length) {
         <div class="card chart-card">
-          <h3 class="chart-title">Your jobs right now</h3>
-          <p class="chart-sub">How the {{ jobsAssigned() }} jobs in your name last ran.</p>
-          <app-donut [data]="myOutcomes()" totalLabel="jobs" [colorFor]="outcomeColor" />
+          <h3 class="chart-title">Your schedules right now</h3>
+          <p class="chart-sub">How the {{ jobsAssigned() }} schedules in your name last ran.</p>
+          <app-donut [data]="myOutcomes()" totalLabel="schedules" [colorFor]="outcomeColor" />
         </div>
       }
       </div>
@@ -130,7 +130,7 @@
                lines and its neighbours do not. -->
           <div class="form-grid items-start">
             <app-field label="Display name" for="fullName" [required]="true" [error]="nameError()"
-                       hint="Shown in the header and wherever a job records who assigned it.">
+                       hint="Shown in the header and wherever a schedule records who assigned it.">
               <input id="fullName" class="input" placeholder="Your name"
                      [value]="name()" (input)="name.set($any($event.target).value)"
                      (keydown.enter)="saveName()" />
@@ -275,12 +275,12 @@
             <!-- A link only when the access profile lets this person open Schedules. -->
             @if (canOpenJobs()) {
               <a routerLink="/pipelines/schedules" class="group block rounded-card">
-                <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
+                <app-stat-tile label="Schedules" [value]="jobsAssigned()" icon="briefcase" tone="info"
                                [foot]="activeJobs() + ' active'"
                                class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
               </a>
             } @else {
-              <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
+              <app-stat-tile label="Schedules" [value]="jobsAssigned()" icon="briefcase" tone="info"
                              [foot]="activeJobs() + ' active'" class="h-full" />
             }
             <app-stat-tile label="Runs" [value]="recentRuns()" icon="play" tone="info"
@@ -350,11 +350,11 @@
             </p>
           } @else if (jobsAssigned()) {
             <p class="text-sm text-[color:var(--text-muted)]">
-              None of your {{ jobsAssigned() }} jobs has run yet.
+              None of your {{ jobsAssigned() }} schedules has run yet.
             </p>
           } @else {
             <p class="text-sm text-[color:var(--text-muted)]">
-              No jobs are assigned to you yet.
+              No schedules are assigned to you yet.
             </p>
           }
         </div>
