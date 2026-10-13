@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { PasswordRulesHint, newPasswordPlaceholder } from './password-rules';
+import { PasswordRulesHint, firstUnmetRule, newPasswordPlaceholder, ruleLines } from './password-rules';
 import { PasswordRules } from './account-security.api';
 
 const RULES: PasswordRules = {
@@ -63,5 +63,18 @@ describe('PasswordRulesHint', () => {
   it('shows nothing until the rules are known', () => {
     const fixture = hint('anything', null);
     expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="password-rules"]')).toBeNull();
+  });
+
+  it('speaks of their name and passwords in an administrator\'s reset of somebody else\'s', () => {
+    expect(ruleLines(RULES, '', 'theirs').map(l => l.text).slice(-2)).toEqual([
+      'Not a commonly used password, and not their sign-in name', 'Not any of their last 3 passwords',
+    ]);
+  });
+
+  it('names the first rule the console can check and the password misses, and never the server\'s', () => {
+    expect(firstUnmetRule(RULES, 'short')).toBe('at least 12 characters');
+    expect(firstUnmetRule(RULES, 'longbutlowercaseonly')).toBe('an upper-case letter');
+    expect(firstUnmetRule(RULES, 'Long enough 12')).toBe('');
+    expect(firstUnmetRule(null, 'x')).toBe('');
   });
 });

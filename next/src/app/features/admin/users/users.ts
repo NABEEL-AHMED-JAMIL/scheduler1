@@ -23,7 +23,8 @@ import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
-import { ResetPasswordDialog } from './reset-password-dialog';
+import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
+import { ResetPasswordNotice } from './reset-password-notice';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -81,7 +82,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
+  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox, ResetPasswordNotice],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -118,6 +119,8 @@ export class Users implements OnInit {
   readonly copiedKey = signal<string | null>(null);
 
   readonly busy = signal<number | null>(null);
+  /** The last reset that happened, for its notice (and its one "Copy password"); null once that notice is gone. */
+  readonly resetDone = signal<ResetPasswordResult | null>(null);
   readonly focusedTenantId = signal<number | null>(null);
 
   readonly sort = createSort<AppUser>('fullName');
@@ -453,31 +456,19 @@ export class Users implements OnInit {
   }
 
   resetPassword(user: AppUser): void {
-    // The length rule lives in the dialog now, on the field, so a short password never closes it. MIG-353: with the
-    // person's workspace's rules beside it.
-    this.dialog.open<string>(ResetPasswordDialog, {
-      hasBackdrop: true,
-      data: { name: user.fullName || user.username, tenantId: user.tenantId ?? null },
-    }).closed.subscribe(password => {
-      if (!password) return;
-      // The dialog is already gone by this point (it closes on submit, before this fires), so
-      // `busy` is what the row's own Edit/Reset/status/delete buttons key off of -- without it,
-      // this action alone gave no in-flight feedback anywhere and its own [disabled] guards
-      // (users.html:242-245, :426-428) were checking a signal this method never set.
-      this.busy.set(user.appUserId);
-      this.http.put<ApiResponse>(`${API_BASE}/appUser.json/resetPassword`,
-        { appUserId: user.appUserId, password }).subscribe({
-        next: response => {
-          this.busy.set(null);
-          response.status === API_SUCCESS
-            ? this.toast.success(response.message)
-            : this.toast.error(response.message);
-        },
-        error: err => {
-          this.busy.set(null);
-          this.toast.error(err?.error?.message || 'Could not reset the password.');
-        },
-      });
+    // The dialog makes the call and stays open until the server accepts the password: a refusal (a recent password,
+    // a common one) is said under its field, in the server's words. It used to close on submit and leave the call to
+    // this screen, whose toast was the only sign a reset had been refused -- and was easy to miss (2026-10-13).
+    // A new reset drops the previous notice, and its password, first.
+    this.resetDone.set(null);
+    const data: ResetPasswordData = {
+      appUserId: user.appUserId,
+      name: user.fullName || user.username,
+      tenantId: user.tenantId ?? null,
+      own: this.isSelf(user),
+    };
+    this.dialog.open<ResetPasswordResult>(ResetPasswordDialog, { hasBackdrop: true, data }).closed.subscribe(done => {
+      if (done) this.resetDone.set(done);
     });
   }
 

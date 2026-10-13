@@ -111,6 +111,7 @@ export const OUTCOME_LABEL: Record<string, string> = {
   SUCCESS: 'Signed in', FAILURE: 'Failed', LOCKED: 'Locked', UNLOCKED: 'Unlocked', MFA_ENROLLED: 'Two-factor on',
   MFA_DISABLED: 'Two-factor off', MFA_RESET: 'Two-factor reset', SIGNED_OUT: 'Signed out',
   PICTURE_SET: 'Picture changed', PICTURE_REMOVED: 'Picture removed',
+  PASSWORD_RESET: 'Password reset', PASSWORD_CHANGED: 'Password changed',
 };
 export const METHOD_LABEL: Record<string, string> = {
   PASSWORD: 'Password', MFA: 'Password + code', RECOVERY_CODE: 'Recovery code', SSO: 'Single sign-on', SAML: 'Single sign-on (SAML)',

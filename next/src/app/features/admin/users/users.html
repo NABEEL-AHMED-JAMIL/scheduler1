@@ -243,7 +243,7 @@
                   <app-icon name="edit" />Edit
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" (click)="resetPassword(user)"
-                        [disabled]="busy() === user.appUserId" title="Send a new one-time password">
+                        [disabled]="busy() === user.appUserId" title="Set a new password for them">
                   <app-icon name="key" />Reset
                 </button>
                 @if (lockedUntil(user)) {
@@ -551,3 +551,5 @@
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>
+
+<app-reset-password-notice [result]="resetDone()" (dismissed)="resetDone.set(null)" />

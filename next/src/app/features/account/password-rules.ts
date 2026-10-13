@@ -4,7 +4,7 @@ import { Icon } from '../../shared/ui/icon';
 import { PasswordRules } from './account-security.api';
 
 /** One rule beside a password field: met (ticked), not yet, or one the server checks (no tick either way). */
-interface RuleLine {
+export interface RuleLine {
   text: string;
   state: 'met' | 'unmet' | 'server';
 }
@@ -58,33 +58,12 @@ interface RuleLine {
 export class PasswordRulesHint {
   readonly rules = input<PasswordRules | null>(null);
   readonly password = input('');
+  /** Whose password the field sets: the person's own ("your") or, in an administrator's reset, somebody else's ("their"). */
+  readonly subject = input<'own' | 'theirs'>('own');
 
   readonly typed = computed(() => this.password().length > 0);
 
-  readonly lines = computed<RuleLine[]>(() => {
-    const r = this.rules();
-    if (!r) return [];
-    const pw = this.password();
-    const typed = pw.length > 0;
-    const out: RuleLine[] = [];
-    const min = r.passwordMinLength ?? 12;
-    out.push({ text: `At least ${min} characters`, state: typed && pw.length >= min ? 'met' : 'unmet' });
-    const classes: [boolean | null, string, RegExp][] = [
-      [r.passwordRequireUpper, 'An upper-case letter', /\p{Lu}/u],
-      [r.passwordRequireLower, 'A lower-case letter', /\p{Ll}/u],
-      [r.passwordRequireDigit, 'A digit', /\p{Nd}/u],
-      [r.passwordRequireSymbol, 'A symbol such as ! # or %', /[^\p{L}\p{Nd}]/u],
-    ];
-    for (const [needed, text, test] of classes) {
-      if (needed) out.push({ text, state: typed && test.test(pw) ? 'met' : 'unmet' });
-    }
-    out.push({ text: 'Not a commonly used password, and not your sign-in name', state: 'server' });
-    const history = r.passwordHistory ?? 0;
-    if (history > 0) {
-      out.push({ text: history === 1 ? 'Not the password you have now' : `Not any of your last ${history} passwords`, state: 'server' });
-    }
-    return out;
-  });
+  readonly lines = computed<RuleLine[]>(() => ruleLines(this.rules(), this.password(), this.subject()));
 
   /** Whether everything the console can check is met (the server checks the rest). */
   readonly allMet = computed(() => this.lines().every(line => line.state !== 'unmet'));
@@ -106,6 +85,44 @@ export class PasswordRulesHint {
     const line = this.lines().find(l => l.state === 'unmet');
     return line ? line.text.charAt(0).toLowerCase() + line.text.slice(1) : '';
   });
+}
+
+/** The rules beside a password field, each met, not yet, or the server's to check. */
+export function ruleLines(r: PasswordRules | null, pw: string, subject: 'own' | 'theirs' = 'own'): RuleLine[] {
+  if (!r) return [];
+  const typed = pw.length > 0;
+  const whose = subject === 'own' ? 'your' : 'their';
+  const out: RuleLine[] = [];
+  const min = r.passwordMinLength ?? 12;
+  out.push({ text: `At least ${min} characters`, state: typed && pw.length >= min ? 'met' : 'unmet' });
+  const classes: [boolean | null, string, RegExp][] = [
+    [r.passwordRequireUpper, 'An upper-case letter', /\p{Lu}/u],
+    [r.passwordRequireLower, 'A lower-case letter', /\p{Ll}/u],
+    [r.passwordRequireDigit, 'A digit', /\p{Nd}/u],
+    [r.passwordRequireSymbol, 'A symbol such as ! # or %', /[^\p{L}\p{Nd}]/u],
+  ];
+  for (const [needed, text, test] of classes) {
+    if (needed) out.push({ text, state: typed && test.test(pw) ? 'met' : 'unmet' });
+  }
+  out.push({ text: `Not a commonly used password, and not ${whose} sign-in name`, state: 'server' });
+  const history = r.passwordHistory ?? 0;
+  if (history > 0) {
+    out.push({
+      text: history === 1 ? `Not the password ${subject === 'own' ? 'you have' : 'they have'} now` : `Not any of ${whose} last ${history} passwords`,
+      state: 'server',
+    });
+  }
+  return out;
+}
+
+/**
+ * The first rule the console can check that this password does not meet yet ("at least 12 characters"), lower-cased to
+ * read after "Still needs:", or '' when every one it can check is met. The server's own (common, name, recent) are not
+ * among them: those it says on save.
+ */
+export function firstUnmetRule(rules: PasswordRules | null, pw: string): string {
+  const line = ruleLines(rules, pw).find(l => l.state === 'unmet');
+  return line ? line.text.charAt(0).toLowerCase() + line.text.slice(1) : '';
 }
 
 /** The placeholder of a field that sets a new password: the length the workspace asks for, before anything is typed. */

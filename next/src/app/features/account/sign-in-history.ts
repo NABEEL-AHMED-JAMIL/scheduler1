@@ -19,7 +19,7 @@ export function outcomeTone(outcome: string): string {
     case 'SUCCESS': return 'pill pill-ok';
     case 'FAILURE': return 'pill pill-crit';
     case 'LOCKED': return 'pill pill-crit';
-    case 'UNLOCKED': case 'MFA_ENROLLED': return 'pill pill-brand';
+    case 'UNLOCKED': case 'MFA_ENROLLED': case 'PASSWORD_RESET': case 'PASSWORD_CHANGED': return 'pill pill-brand';
     default: return 'pill pill-neutral';
   }
 }
