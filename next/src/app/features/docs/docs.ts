@@ -344,7 +344,7 @@ export class Docs implements AfterViewInit {
       ],
       todo: [
         'Add each person with their name, email and role: Workspace member or Workspace administrator.',
-        'Make page-access profiles for the jobs people do — for example a Reviewer who opens Review and the Runs, and a Viewer who reads Dashboards only — and give each member one.',
+        'Make page-access profiles for the work people do — for example a Reviewer who opens Review and the Runs, and a Viewer who reads Dashboards only — and give each member one.',
         'Set the workspace\'s sign-in rules: password length, lockout, idle sign-out, two-factor and single sign-on.',
       ],
       notes: [
