@@ -222,12 +222,25 @@ export async function sessionFor(request: APIRequestContext, role: Role): Promis
   return signInWithPassword(request, credentials.username, credentials.password);
 }
 
-/** A browser context signed in as the session: localStorage seeded on the app's own origin, where the app reads it. */
+/**
+ * A browser context signed in as the session: localStorage seeded on the app's own origin, where the app reads it.
+ *
+ * Seeded as the context's storage state, before the app ever loads. It used to open '/' and write the session after:
+ * the context inherits the config's storageState (global setup's token, dead fifteen minutes into a run), so the app
+ * booted on the dead token, its calls answered 401, and its failed refresh signed out AFTER the new session was written
+ * -- every pageAs spec late in a full run landed on Sign in (billing's, 2026-10-13).
+ */
 export async function pageAs(browser: Browser, s: Session, options: BrowserContextOptions = {}): Promise<Page> {
-  const context = await browser.newContext(options);
+  return pageWith(browser, s.data, options);
+}
+
+/** pageAs for a spec that keeps the console's session data itself (etl_auth_user's value) rather than a Session. */
+export async function pageWith(browser: Browser, data: Record<string, unknown>, options: BrowserContextOptions = {}): Promise<Page> {
+  const origin = new URL(options.baseURL ?? process.env['E2E_BASE_URL'] ?? 'http://localhost:4400').origin;
+  const context = await browser.newContext({ ...options, storageState: { cookies: [], origins: [{ origin,
+    localStorage: [{ name: 'etl_auth_user', value: JSON.stringify(data) }] }] } });
   const page = await context.newPage();
   await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
   return page;
 }
 

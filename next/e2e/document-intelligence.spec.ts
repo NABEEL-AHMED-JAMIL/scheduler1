@@ -1,7 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
+import { canSignIn, NEEDS, Session, sessionFor, pageWith } from './support/session';
 import { ensureObject } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
@@ -31,11 +31,8 @@ const VENDOR = `E2E vendor ${Date.now().toString(36)}`;
 interface Field { fieldId: number; fieldKey: string; tableKey?: string | null; label?: string; value: string | null; page?: number | null; box?: unknown; }
 
 async function pageAs(browser: Browser, s: Session, width = 1440, height = 900): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, s.data, { viewport: { width, height } });
 }
 
 /** GET or POST on the gateway, as the session; the envelope's data. */
