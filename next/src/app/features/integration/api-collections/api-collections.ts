@@ -142,7 +142,7 @@ export class ApiCollections implements OnInit {
   create(): void {
     const data: CollectionDialogData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
     this.dialog.open<number | null>(CollectionDialog, { data }).closed.subscribe(id => {
-      if (id) this.router.navigate(['/integration/api-collections', id]);
+      if (id) this.router.navigate(['/connections/api-collections', id]);
     });
   }
 
@@ -155,7 +155,7 @@ export class ApiCollections implements OnInit {
     const data: ImportDialogData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
     this.dialog.open<{ collectionId: number; open: boolean } | null>(ImportDialog, { data }).closed.subscribe(done => {
       if (!done) return;
-      if (done.open) this.router.navigate(['/integration/api-collections', done.collectionId]);
+      if (done.open) this.router.navigate(['/connections/api-collections', done.collectionId]);
       else this.load();
     });
   }

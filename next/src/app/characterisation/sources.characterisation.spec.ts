@@ -65,54 +65,54 @@ describe('MIG-248: Sources', () => {
   afterEach(() => restoreClock());
 
   it('the sources, as a workspace administrator', async () => {
-    const v = await visit('/integration/sources', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/sources', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the sources, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the sources, as a platform administrator', async () => {
-    const v = await visit('/integration/sources', 'PLATFORM_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/sources', 'PLATFORM_ADMIN', null, ANSWERS);
     pin(FILE, 'the sources, as a platform administrator', v.surface, PINNED);
   });
 
   it('the sources, as a tenant user with the page', async () => {
-    const v = await visit('/integration/sources', 'TENANT_USER', ALL_PAGES, ANSWERS);
+    const v = await visit('/connections/sources', 'TENANT_USER', ALL_PAGES, ANSWERS);
     pin(FILE, 'the sources, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('the sources, as a tenant user without the page', async () => {
-    const v = await visit('/integration/sources', 'TENANT_USER', TU_PAGES, ANSWERS);
+    const v = await visit('/connections/sources', 'TENANT_USER', TU_PAGES, ANSWERS);
     pin(FILE, 'the sources, as a tenant user without the page', v.surface, PINNED);
   });
 
   it('a source\'s row menu', async () => {
-    const v = await visit('/integration/sources', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/sources', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, /^Actions for LIVE-CHECK 0928/);
     pin(FILE, 'a source\'s row menu', overlay(), PINNED);
   });
 
   it('a file source opened in the side panel', async () => {
-    const v = await visit('/integration/sources', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/sources', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'LIVE-CHECK 0928 customers CSV');
     pin(FILE, 'a file source opened in the side panel', overlay(), PINNED);
   });
 
   it('the database connections, as a workspace administrator', async () => {
-    const v = await visit('/integration/sources?tab=connections', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/databases', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the database connections, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the data contracts, as a workspace administrator', async () => {
-    const v = await visit('/integration/sources?tab=contracts', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/contracts', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the data contracts, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the data contracts, as a tenant user with the page', async () => {
-    const v = await visit('/integration/sources?tab=contracts', 'TENANT_USER', ALL_PAGES, ANSWERS);
+    const v = await visit('/connections/contracts', 'TENANT_USER', ALL_PAGES, ANSWERS);
     pin(FILE, 'the data contracts, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('a contract opened in the side panel', async () => {
-    const v = await visit('/integration/sources?tab=contracts', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/contracts', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'wound_intake');
     pin(FILE, 'a contract opened in the side panel', overlay(), PINNED);
   });

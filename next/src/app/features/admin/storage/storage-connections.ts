@@ -24,7 +24,6 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
-import { ConnectionsTabs } from '../../integration/connections-tabs';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 
@@ -59,7 +58,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner, ConnectionsTabs],
+  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {

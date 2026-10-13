@@ -2,7 +2,7 @@
   <app-page-header>
     <div class="page-head">
       <div>
-        <h1 class="page-title">Sources</h1>
+        <h1 class="page-title">{{ heading() }}</h1>
         <p class="page-subtitle">
           Where a pipeline's data comes from: an API from API Collections, a file or folder in one of this workspace's
           storage connections, or a database query. Test one, preview its first rows and read the schema they suggest.
@@ -26,11 +26,13 @@
   </app-page-header>
   <app-managed-banner what="sources and data contracts" />
 
-  <div class="tabs" role="tablist" aria-label="Sources">
-    @for (t of tabs; track t.id) {
-      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
-    }
-  </div>
+  @if (!hubView) {
+    <div class="tabs" role="tablist" aria-label="Sources">
+      @for (t of tabs; track t.id) {
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
+      }
+    </div>
+  }
 
   @switch (tab()) {
     @case ('connections') {
@@ -151,7 +153,7 @@
 
         <div empty-action class="flex justify-center">
           @if (canManage() && !hasFilters()) { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
-          @if (!hasFilters()) { <a routerLink="/integration/api-collections" class="btn btn-ghost btn-sm ml-2">See API Collections</a> }
+          @if (!hasFilters()) { <a routerLink="/connections/api-collections" class="btn btn-ghost btn-sm ml-2">See API Collections</a> }
         </div>
 
         @if (view() === 'cards') {

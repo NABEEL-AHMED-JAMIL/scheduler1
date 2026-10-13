@@ -78,7 +78,7 @@ test.describe('Sources', () => {
   test('a file source: create → test → preview → schema', async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await pageAs(browser, s);
-    await page.goto('/integration/sources');
+    await page.goto('/connections/sources');
     await expect(page.getByRole('heading', { level: 1, name: 'Sources' })).toBeVisible();
 
     await page.getByRole('button', { name: 'New source' }).first().click();
@@ -123,7 +123,7 @@ test.describe('Sources', () => {
     test.setTimeout(90_000);
     const page = await pageAs(browser, s);
     const watch = watchForPassword(page);
-    await page.goto('/integration/sources?tab=connections');
+    await page.goto('/connections/databases');
     await page.getByRole('button', { name: 'New connection' }).first().click();
     const dialog = page.locator('app-connection-dialog');
     await dialog.locator('#dbName').fill(CONNECTION);
@@ -159,7 +159,7 @@ test.describe('Sources', () => {
   test('data contracts: install a template, propose one from a sample, validate payloads', async ({ browser }) => {
     test.setTimeout(120_000);
     const page = await pageAs(browser, s);
-    await page.goto('/integration/sources?tab=contracts');
+    await page.goto('/connections/contracts');
     const contracts = page.locator('[data-test="contracts"]');
     await expect(contracts).toContainText('result_manifest');
     await expect(contracts).toContainText('System · read-only');

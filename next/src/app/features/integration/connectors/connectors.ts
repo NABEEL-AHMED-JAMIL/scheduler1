@@ -15,7 +15,6 @@ import {
 } from './connectors.model';
 import { ConnectPanel, ConnectPanelData } from './connect-panel';
 import { ConnectionPanel, ConnectionPanelData } from './connection-panel';
-import { ConnectionsTabs } from '../connections-tabs';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { RouterLink } from '@angular/router';
@@ -35,7 +34,7 @@ type StateFilter = '' | 'Active' | 'Syncing' | 'Error' | 'Needs you' | 'Paused' 
  */
 @Component({
   selector: 'app-connectors',
-  imports: [RouterLink, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, Segmented, StatStrip, ConnectionsTabs],
+  imports: [RouterLink, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, Segmented, StatStrip],
   templateUrl: './connectors.html',
 })
 export class Connectors implements OnInit {

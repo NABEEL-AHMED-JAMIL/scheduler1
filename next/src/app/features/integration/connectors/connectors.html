@@ -17,7 +17,6 @@
       </div>
     </div>
   </app-page-header>
-  <app-connections-tabs active="connectors" />
   <app-managed-banner what="connections and what they sync" still="Testing a connection, granting access and syncing now" />
 
   @if (kpis().length) {
@@ -73,7 +72,7 @@
       <ng-container empty-action>
         @if (!connections().length) {
           @if (canBuild()) { <button type="button" class="btn btn-primary btn-sm" (click)="connect(null)"><app-icon name="plus" />New connection</button> }
-          <a routerLink="/integration/sources" class="btn btn-ghost btn-sm">See Sources</a>
+          <a routerLink="/connections/sources" class="btn btn-ghost btn-sm">See Sources</a>
         }
       </ng-container>
       <table class="table-modern">

@@ -21,7 +21,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
       <div class="card p-4 flex flex-col gap-3 max-w-2xl" data-oauth-callback>
         @if (problem()) {
           <p class="text-sm" role="alert"><app-icon name="alert" /> {{ problem() }}</p>
-          <a class="btn btn-default btn-sm w-fit" routerLink="/integration/connectors">Back to Connections</a>
+          <a class="btn btn-default btn-sm w-fit" routerLink="/connections/connectors">Back to Connections</a>
         } @else {
           <p class="text-sm" role="status"><app-icon name="refresh" class="spin" /> Finishing the grant…</p>
         }
@@ -49,7 +49,7 @@ export class OAuthCallback implements OnInit {
           this.problem.set(res.message || 'The grant could not be finished.');
           return;
         }
-        this.router.navigate(['/integration/connectors'], { queryParams: { connection: res.data.id }, replaceUrl: true });
+        this.router.navigate(['/connections/connectors'], { queryParams: { connection: res.data.id }, replaceUrl: true });
       },
       error: err => this.problem.set(err?.error?.message || 'Connector Hub could not be reached; start Connect again.'),
     });

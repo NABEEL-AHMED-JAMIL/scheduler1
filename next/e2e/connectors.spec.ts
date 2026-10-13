@@ -66,7 +66,7 @@ test.describe.serial('Connector Hub', () => {
     test.setTimeout(180_000);
     const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
     const name = NAME;
-    await page.goto('/integration/connectors');
+    await page.goto('/connections/connectors');
     // The connect panel takes the gallery the page has loaded: opened before it lands, it offers nothing to choose.
     await expect(page.locator('[data-connector="postgres"]')).toBeVisible();
     await page.locator('[data-new-connection]').click();
@@ -118,7 +118,7 @@ test.describe.serial('Connector Hub', () => {
     [1024, 768, 'tablet', 'light'], [768, 1024, 'tablet-portrait-dark', 'dark']] as const) {
     test(`the gallery, the connections and a connection (${label})`, async ({ browser, request }, info) => {
       const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!), width, height, scheme);
-      await page.goto('/integration/connectors');
+      await page.goto('/connections/connectors');
       await page.getByRole('heading', { name: 'Connector Hub' }).waitFor();
       await expect(page.locator('[data-connector="postgres"]')).toContainText('Connected');
       await expect(page.locator('[data-connector="mysql"]')).toContainText('Not yet');

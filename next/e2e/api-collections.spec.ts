@@ -71,7 +71,7 @@ test.describe('API Collections', () => {
     page.on('pageerror', e => { if (/NG0\d+/.test(e.message)) angularErrors.push(e.message); });
 
     // ---- create
-    await page.goto('/integration/api-collections');
+    await page.goto('/connections/api-collections');
     await expect(page.getByRole('heading', { level: 1, name: 'API Collections' })).toBeVisible();
     await page.getByRole('button', { name: 'New collection' }).first().click();
     await page.locator('#acName').fill(COLLECTION);
@@ -144,7 +144,7 @@ test.describe('API Collections', () => {
     await env.getByRole('button', { name: 'Cancel' }).click();
 
     // ---- import a Postman collection with a literal bearer token and a secret environment value
-    await page.goto('/integration/api-collections');
+    await page.goto('/connections/api-collections');
     await page.locator('main').getByRole('button', { name: 'Import' }).first().click();
     const dialog = page.locator('app-import-dialog');
     await dialog.locator('#impCollection').setInputFiles({ name: 'e2e.postman_collection.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify({

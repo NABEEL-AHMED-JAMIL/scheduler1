@@ -35,6 +35,10 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
+/** Tab hubs (2026-10-12): each view is a tab of Connections, at its own address. */
+export const SOURCES_VIEW_PATHS: Record<SourcesTab, string> = {
+  sources: '/connections/sources', connections: '/connections/databases', contracts: '/connections/contracts',
+};
 
 /**
  * Sources (MIG-248, Integration menu, page key sources): where a pipeline's data comes from -- an API from the
@@ -65,7 +69,14 @@ export class Sources implements OnInit {
   readonly tabs: { id: SourcesTab; label: string }[] = [
     { id: 'sources', label: 'Sources' }, { id: 'connections', label: 'Database connections' }, { id: 'contracts', label: 'Data contracts' },
   ];
-  readonly tab = signal<SourcesTab>(this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
+  /**
+   * Tab hubs (2026-10-12): the address names the view -- Connections › Sources, Databases or Data contracts -- and the
+   * hub's strip is the way between them, so the page's own tab strip is not shown. Without a view in the route (a unit
+   * test mounting the page alone) the page keeps its own tabs, read from ?tab=.
+   */
+  readonly hubView = (this.route.snapshot?.data?.['view'] as SourcesTab | undefined) ?? null;
+  readonly tab = signal<SourcesTab>(this.hubView ?? this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
+  readonly heading = computed(() => ({ sources: 'Sources', connections: 'Database connections', contracts: 'Data contracts' })[this.tab()]);
   readonly canManage = computed(() => this.auth.canBuild());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   private readonly tenants = signal<ComboboxOption[]>([]);
@@ -132,6 +143,12 @@ export class Sources implements OnInit {
   }
 
   ngOnInit(): void {
+    // An old link to a view by ?tab= (Sources' Database connections) opens that view's own tab.
+    const asked = this.route.snapshot?.queryParamMap?.get('tab');
+    if (this.hubView && asked && (TABS as string[]).includes(asked) && asked !== this.hubView) {
+      void this.router.navigate([SOURCES_VIEW_PATHS[asked as SourcesTab]], { replaceUrl: true });
+      return;
+    }
     this.readTab(this.tab());
     if (this.isPlatformAdmin()) {
       this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
@@ -151,6 +168,7 @@ export class Sources implements OnInit {
   }
 
   setTab(tab: SourcesTab): void {
+    if (this.hubView) { void this.router.navigateByUrl(SOURCES_VIEW_PATHS[tab]); return; }
     this.tab.set(tab);
     this.readTab(tab);
     this.router.navigate([], { relativeTo: this.route, queryParams: { tab: tab === 'sources' ? null : tab }, queryParamsHandling: 'merge', replaceUrl: true });
