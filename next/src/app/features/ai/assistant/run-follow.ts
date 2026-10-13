@@ -6,6 +6,7 @@ import { RouterLink } from '@angular/router';
 import { Subscription, auditTime, filter } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { JobEventsService } from '../../../core/socket/job-events.service';
+import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Timeline, runFinished } from '../../tasks/steps/steps.model';
@@ -68,10 +69,18 @@ export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: strin
       @if (failure(); as f) { <p class="text-xs text-crit-500 break-words">{{ f }}</p> }
       @if (error()) { <p class="text-xs text-[color:var(--text-muted)]">{{ error() }}</p> }
       <div class="flex flex-wrap gap-1.5">
-        @if (jobQueueId() != null) {
-          <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId(), 'logs']"><app-icon name="list" />Run logs</a>
+        <!-- UX review B6 (AI2): a run that finished leads to what it made -- the dashboard its output feeds, else its
+             Outputs -- and one waiting for review to the run page, where Approve and Reject are. -->
+        @if (results(); as r) {
+          <a class="btn btn-primary btn-sm" data-test="see-results" [routerLink]="r.link" [queryParams]="r.query"><app-icon name="chart" />{{ r.label }}</a>
         }
-        <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="zap" />Executions</a>
+        @if (state().label === 'Waiting for review' && jobQueueId() != null) {
+          <a class="btn btn-primary btn-sm" data-test="review-run" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId(), 'logs']"><app-icon name="checkCircle" />Review it</a>
+        }
+        @if (jobQueueId() != null) {
+          <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId(), 'logs']"><app-icon name="list" />Open the run</a>
+        }
+        <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="history" />All runs</a>
         @if (state().label === 'Failed' && jobQueueId() != null) {
           <button type="button" class="btn btn-default btn-sm" (click)="retry()"><app-icon name="refresh" />Retry</button>
         }
@@ -84,6 +93,7 @@ export class RunFollow implements OnInit {
   private readonly events = inject(JobEventsService);
   private readonly dialog = inject(Dialog);
   private readonly destroy = inject(DestroyRef);
+  private readonly auth = inject(AuthService, { optional: true });
 
   readonly jobId = input.required<number>();
   readonly jobQueueId = input<number | null | undefined>(null);
@@ -96,6 +106,17 @@ export class RunFollow implements OnInit {
   readonly following = signal(false);
 
   readonly state = computed(() => runState(this.timeline(), this.initialStatus()));
+  /** A board fed by this run's schedule (analytics' dashboards name the pipelines that feed them), once it finished. */
+  readonly board = signal<{ id: number; name: string } | null>(null);
+  /** Where "See results" goes once the run completed: the board its output feeds, else the run's Outputs. */
+  readonly results = computed(() => {
+    if (this.state().label !== 'Completed' || this.jobQueueId() == null) return null;
+    const board = this.board();
+    return board
+      ? { label: 'See results', link: ['/data/analytics/dashboards'], query: { board: board.id } as Record<string, unknown> }
+      : { label: 'See results', link: ['/pipelines/schedules', this.jobId(), 'runs', this.jobQueueId(), 'logs'], query: { tab: 'outputs' } as Record<string, unknown> };
+  });
+  private boardAsked = false;
 
   readonly progress = computed(() => {
     const steps = this.timeline()?.steps ?? [];
@@ -156,6 +177,7 @@ export class RunFollow implements OnInit {
         if (r.status === API_SUCCESS && r.data) {
           const before = this.timeline()?.runStatus;
           this.timeline.set(r.data);
+          if (this.state().label === 'Completed') this.findBoard();
           this.error.set('');
           if (before !== r.data.runStatus) this.tries = 0;
         } else {
@@ -167,6 +189,21 @@ export class RunFollow implements OnInit {
         this.error.set('The run could not be read just now; trying again.');
         this.next();
       },
+    });
+  }
+
+  /** Once, for a completed run: the first dashboard its schedule's output feeds (a reader without dashboards gets none). */
+  private findBoard(): void {
+    if (this.boardAsked || (typeof this.auth?.canOpen === 'function' && !this.auth.canOpen('analytics-dashboards'))) return;
+    this.boardAsked = true;
+    this.http.get<ApiResponse<{ analyticsDashboardId?: number; dashboardName: string; pipelines?: { jobId: number }[] }[]>>(
+      `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).pipe(takeUntilDestroyed(this.destroy)).subscribe({
+      next: r => {
+        const fed = (r.status === API_SUCCESS ? r.data ?? [] : [])
+          .find(d => d.analyticsDashboardId != null && (d.pipelines ?? []).some(p => Number(p.jobId) === Number(this.jobId())));
+        if (fed) this.board.set({ id: fed.analyticsDashboardId!, name: fed.dashboardName });
+      },
+      error: () => {},
     });
   }
 

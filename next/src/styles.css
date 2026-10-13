@@ -2602,3 +2602,9 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .brand-slot app-brand-mark { gap: 0.375rem; }
   .brand-slot .brand-e { width: 1.5rem; height: 1.5rem; }
 }
+
+/* UX review B6 (AI1): one chat composer -- the AI Assistant, Ask your data and the file chat. The box takes the row, its
+   actions sit at its foot on the right, one height, so Send lines up with the box's bottom edge in all three. */
+.chat-composer { display: flex; align-items: flex-end; gap: 0.5rem; min-width: 0; }
+.chat-composer > textarea { flex: 1 1 auto; min-width: 0; min-height: 3.75rem; max-height: 12rem; resize: vertical; }
+.chat-composer > .btn { flex: none; min-height: 1.75rem; }

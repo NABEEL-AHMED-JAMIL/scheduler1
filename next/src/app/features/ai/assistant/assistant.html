@@ -317,14 +317,15 @@
           </div>
         }
       </div>
-      <div class="flex gap-2 px-3.5 py-2.5 border-t border-subtle shrink-0">
-        <textarea class="input resize-none text-sm flex-1" rows="2" placeholder="Describe a pipeline, or ask about runs, sources or files…"
+      <!-- UX review B6 (AI1): one composer for the three chats (.chat-composer): the box, then Send at its foot, right. -->
+      <div class="chat-composer px-3.5 py-2.5 border-t border-subtle shrink-0" data-test="chat-composer">
+        <textarea class="input text-sm" rows="2" placeholder="Describe a pipeline, or ask about runs, sources or files…"
                   aria-label="Message the assistant" maxlength="4000" [value]="draft()"
                   (input)="draft.set($any($event.target).value)" (keydown)="onKeydown($event)"></textarea>
         @if (working()) {
-          <button type="button" class="btn btn-default btn-sm self-end" [disabled]="stopping()" (click)="stop()"><app-icon name="stop" />Stop</button>
+          <button type="button" class="btn btn-default btn-sm" [disabled]="stopping()" (click)="stop()"><app-icon name="stop" />Stop</button>
         } @else {
-          <button type="button" class="btn btn-primary btn-sm self-end" [disabled]="!draft().trim()" (click)="send()">
+          <button type="button" class="btn btn-primary btn-sm" data-test="chat-send" [disabled]="!draft().trim()" (click)="send()">
             <app-icon name="send" />Send
           </button>
         }

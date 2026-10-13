@@ -61,11 +61,31 @@ describe('RunFollow (the assistant run card)', () => {
 
     expect(el.querySelector('[data-state]')!.getAttribute('data-state')).toBe('Completed');
     expect(el.textContent).toContain('2 of 2 steps');
-    expect(el.textContent).toContain('Run logs');
+    expect(el.textContent).toContain('Open the run');
     expect(c.following()).toBe(false);
+    // UX review B6 (AI2): a completed run leads to what it made -- here the dashboard its schedule's output feeds.
+    http.expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).flush({ status: 'SUCCESS', message: '', data: [
+      { analyticsDashboardId: 1400, dashboardName: 'Other', pipelines: [{ jobId: 2907 }] },
+      { analyticsDashboardId: 1451, dashboardName: 'Riverside — Hospital readmission risk', pipelines: [{ jobId: 2905 }] }] });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="see-results"]')?.getAttribute('href')).toBe('/data/analytics/dashboards?board=1451');
     vi.advanceTimersByTime(60_000);
     http.expectNone(r => r.url.endsWith('/sourceJob.json/stepExecutions'));
     http.verify();
+  });
+
+  it('sends a completed run with no dashboard to its Outputs, and one waiting for review to its run page', () => {
+    const { fixture, http, answer, el } = card('Running');
+    answer(timeline('Completed', [step('read', 0, 'Completed')]));
+    http.expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).flush({ status: 'SUCCESS', message: '', data: [] });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="see-results"]')?.getAttribute('href')).toBe('/pipelines/schedules/2905/runs/8228/logs?tab=outputs');
+
+    const waiting = card('Running');
+    waiting.answer(timeline('Completed', [step('read', 0, 'Completed')], 'PENDING'));
+    waiting.fixture.detectChanges();
+    expect(waiting.el.querySelector('[data-test="see-results"]')).toBeNull();
+    expect(waiting.el.querySelector('[data-test="review-run"]')?.getAttribute('href')).toBe('/pipelines/schedules/2905/runs/8228/logs');
   });
 
   it('reads again on a job-status push for its job, not for another job', () => {

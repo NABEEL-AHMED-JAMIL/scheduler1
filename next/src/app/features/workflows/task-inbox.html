@@ -31,6 +31,11 @@
       <a routerLink="/administration/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
     </div>
   } @else {
+  <!-- UX review B6 (W1): the runs whose results wait for a review -- the AI Assistant's runs among them -- are part of the
+       review work, so an administrator finds them here as on Home and Runs; each opens its run page's Next steps. -->
+  @if (canDecideRuns() && tab() !== 'requests') {
+    <app-review-waiting data-test="inbox-runs-waiting" />
+  }
   <div class="tabs inbox-tabs" role="tablist" aria-label="Which tasks">
     <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'mine'" [class.tab-active]="tab() === 'mine'" (click)="pick('mine')" data-test="tab-mine">
       <app-icon name="inbox" />Waiting for me

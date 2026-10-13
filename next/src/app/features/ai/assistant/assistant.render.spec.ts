@@ -103,7 +103,9 @@ describe('AI Assistant -- as drawn', () => {
   it('links a run the assistant started to its logs and its executions, followed live', () => {
     const { el } = render([m({ messageId: 4, seq: 4, content: 'Queued.', links: [{ kind: 'execution', jobId: 2848, jobName: 'UI-CHECK', jobQueueId: 7404, status: 'Completed' }] })]);
     const links = Array.from(el.querySelectorAll<HTMLAnchorElement>('app-run-follow a')).map(a => [a.textContent!.trim(), a.getAttribute('href')]);
-    expect(links).toEqual([['Run logs', '/pipelines/schedules/2848/runs/7404/logs'], ['Executions', '/pipelines/schedules/2848/executions']]);
+    // UX review B6 (AI2): a completed run leads to what it made first (its Outputs, until a dashboard it feeds is known).
+    expect(links).toEqual([['See results', '/pipelines/schedules/2848/runs/7404/logs?tab=outputs'], ['Open the run', '/pipelines/schedules/2848/runs/7404/logs'],
+      ['All runs', '/pipelines/schedules/2848/executions']]);
   });
 
   it('draws a designed flow in the Flow tab, with its verdict', () => {
