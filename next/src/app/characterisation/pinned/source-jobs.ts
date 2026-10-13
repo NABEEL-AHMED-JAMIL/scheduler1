@@ -108,8 +108,9 @@ export const PINNED: Record<string, unknown> = {
         "Started",
         "Ended",
         "Duration",
+        "Status",
         "Message",
-        "Status · Logs"
+        "Actions"
       ]
     ],
     "fields": [
@@ -301,13 +302,14 @@ export const PINNED: Record<string, unknown> = {
     "columns": [
       [
         "Run",
-        "Job",
+        "Schedule",
         "Queued",
         "Started",
         "Ended",
         "Duration",
+        "Status",
         "Message",
-        "Status · Logs"
+        "Actions"
       ]
     ],
     "fields": [
