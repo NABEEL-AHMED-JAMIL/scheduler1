@@ -16,6 +16,8 @@ import { createPager } from '../../shared/ui/pager';
 import { openableTarget } from './notification-links';
 import { AuthService } from '../../core/auth/auth.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 interface Notification {
   notificationId: number;
@@ -43,7 +45,7 @@ interface NotificationListResponse
 
 @Component({
   selector: 'app-notifications',
-  imports: [ServerTimePipe, TableShell, Icon, Pagination],
+  imports: [RefreshButton, PageHeader, ServerTimePipe, TableShell, Icon, Pagination],
   templateUrl: './notifications.html',
 })
 export class Notifications implements OnInit {

@@ -1138,7 +1138,7 @@ export const PINNED: Record<string, unknown> = {
   ],
   "old address /admin/access-profiles": {
     "lands": "/administration/access-profiles",
-    "heading": "Access profiles"
+    "heading": "Page access"
   },
   "old address /admin/storage": {
     "lands": "/integration/storage-connections",
@@ -1150,7 +1150,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /admin/tenants": {
     "lands": "/administration/tenants",
-    "heading": "Tenants"
+    "heading": "Workspaces"
   },
   "old address /admin/users": {
     "lands": "/administration/users",
@@ -1230,7 +1230,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /jobs": {
     "lands": "/pipelines/schedules",
-    "heading": "Schedules"
+    "heading": "Schedules & triggers"
   },
   "old address /jobs/:jobId/assistant": {
     "lands": "/pipelines/schedules/2833/assistant",
@@ -1238,15 +1238,15 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /jobs/:jobId/edit": {
     "lands": "/pipelines/schedules/2833/edit",
-    "heading": "Edit schedule"
+    "heading": "Reference CSV check (e2e)"
   },
   "old address /jobs/:jobId/history": {
     "lands": "/pipelines/schedules/2833/executions",
-    "heading": "Executions — Reference CSV check (e2e)"
+    "heading": "Reference CSV check (e2e) · runs"
   },
   "old address /jobs/:jobId/runs/:jobQueueId/logs": {
     "lands": "/pipelines/schedules/2833/runs/7331/logs",
-    "heading": "Run logs"
+    "heading": "Run #7331 · Reference CSV check (e2e)"
   },
   "old address /jobs/bulk": {
     "lands": "/pipelines/schedules/bulk",
@@ -1254,7 +1254,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /jobs/history": {
     "lands": "/pipelines/executions",
-    "heading": "Executions"
+    "heading": "Runs"
   },
   "old address /jobs/new": {
     "lands": "/pipelines/schedules/new",
@@ -1278,7 +1278,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/jobs": {
     "lands": "/pipelines/schedules",
-    "heading": "Schedules"
+    "heading": "Schedules & triggers"
   },
   "old address /operations/jobs/:jobId/assistant": {
     "lands": "/pipelines/schedules/2833/assistant",
@@ -1286,15 +1286,15 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/jobs/:jobId/edit": {
     "lands": "/pipelines/schedules/2833/edit",
-    "heading": "Edit schedule"
+    "heading": "Reference CSV check (e2e)"
   },
   "old address /operations/jobs/:jobId/history": {
     "lands": "/pipelines/schedules/2833/executions",
-    "heading": "Executions — Reference CSV check (e2e)"
+    "heading": "Reference CSV check (e2e) · runs"
   },
   "old address /operations/jobs/:jobId/runs/:jobQueueId/logs": {
     "lands": "/pipelines/schedules/2833/runs/7331/logs",
-    "heading": "Run logs"
+    "heading": "Run #7331 · Reference CSV check (e2e)"
   },
   "old address /operations/jobs/bulk": {
     "lands": "/pipelines/schedules/bulk",
@@ -1302,7 +1302,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/jobs/history": {
     "lands": "/pipelines/executions",
-    "heading": "Executions"
+    "heading": "Runs"
   },
   "old address /operations/jobs/new": {
     "lands": "/pipelines/schedules/new",
@@ -1310,7 +1310,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/queue": {
     "lands": "/pipelines/queue",
-    "heading": "Queue"
+    "heading": "Runs by date"
   },
   "old address /operations/reports": {
     "lands": "/pipelines/run-analytics",
@@ -1322,7 +1322,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/tasks/:taskDetailId/edit": {
     "lands": "/pipelines/1854/edit",
-    "heading": "Edit pipeline"
+    "heading": "Reference: CSV check and summarise"
   },
   "old address /operations/tasks/bulk": {
     "lands": "/pipelines/bulk",
@@ -1334,7 +1334,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /queue": {
     "lands": "/pipelines/queue",
-    "heading": "Queue"
+    "heading": "Runs by date"
   },
   "old address /reports": {
     "lands": "/pipelines/run-analytics",
@@ -1374,7 +1374,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /tasks/:taskDetailId/edit": {
     "lands": "/pipelines/1854/edit",
-    "heading": "Edit pipeline"
+    "heading": "Reference: CSV check and summarise"
   },
   "old address /tasks/bulk": {
     "lands": "/pipelines/bulk",

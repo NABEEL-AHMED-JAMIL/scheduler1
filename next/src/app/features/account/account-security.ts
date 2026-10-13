@@ -11,6 +11,7 @@ import { AccountSecurityApi, METHOD_LABEL, PasswordRules, SessionRow, deviceOf }
 import { PasswordRulesHint } from './password-rules';
 import { SignInHistory } from './sign-in-history';
 import { TwoFactorCard } from './two-factor-card';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /**
  * MIG-353: My account › Security -- the person's own sign-in security, in one place: their password (the workspace's
@@ -19,7 +20,7 @@ import { TwoFactorCard } from './two-factor-card';
  */
 @Component({
   selector: 'app-account-security',
-  imports: [Icon, Field, ServerTimePipe, RouterLink, PasswordRulesHint, SignInHistory, TwoFactorCard],
+  imports: [PageHeader, Icon, Field, ServerTimePipe, RouterLink, PasswordRulesHint, SignInHistory, TwoFactorCard],
   templateUrl: './account-security.html',
 })
 export class AccountSecurity implements OnInit {

@@ -1,22 +1,22 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Notifications</h1>
-      <p class="page-subtitle">Job outcomes and assignments addressed to you.</p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Notifications</h1>
+        <p class="page-subtitle">Job outcomes and assignments addressed to you.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (unreadCount()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()"
+                  [disabled]="markingAll()">
+            <app-icon name="check" [busy]="markingAll()" />
+            {{ markingAll() ? 'Marking…' : 'Mark all read (' + unreadCount() + ')' }}
+          </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (unreadCount()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="markAllRead()"
-                [disabled]="markingAll()">
-          <app-icon name="check" [busy]="markingAll()" />
-          {{ markingAll() ? 'Marking…' : 'Mark all read (' + unreadCount() + ')' }}
-        </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
 
   <app-table-shell heading="Recent" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"

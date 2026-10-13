@@ -25,6 +25,7 @@ import { Field } from '../../shared/ui/field';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { AccountSecurityApi, PasswordRules } from '../account/account-security.api';
 import { PasswordRulesHint } from '../account/password-rules';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
 export interface ActivityRun {
@@ -74,7 +75,7 @@ const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [PhoneInput, Icon, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint],
+  imports: [PageHeader, PhoneInput, Icon, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {

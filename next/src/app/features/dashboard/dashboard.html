@@ -1,38 +1,38 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Dashboard</h1>
-      <p class="page-subtitle">
-        <!-- The range as the console writes a day ("24 Sep 2026"); the date boxes keep the ISO value. -->
-        Showing {{ dayLabel(appliedStart()) }} to {{ dayLabel(appliedEnd()) }}@if (scopeLabel(); as scope) {, {{ scope }}}
-        <!-- The figures follow job events on their own; this says how fresh they are. -->
-        @if (updatedAt(); as at) { · Updated {{ at | serverTime:'time' }} }
-      </p>
-    </div>
-    <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
-         buttons need 454px, which overflowed the page on a phone. -->
-    <div class="flex flex-wrap items-end gap-2">
-      <div class="flex-1 min-w-[9.5rem] sm:flex-none">
-        <label class="label" for="from">From</label>
-        <app-date-field inputId="from" label="From" [value]="startDate()" [max]="endDate()"
-                        (valueChange)="startDate.set($event)" />
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Home</h1>
+        <p class="page-subtitle">
+          <!-- The range as the console writes a day ("24 Sep 2026"); the date boxes keep the ISO value. -->
+          Showing {{ dayLabel(appliedStart()) }} to {{ dayLabel(appliedEnd()) }}@if (scopeLabel(); as scope) {, {{ scope }}}
+          <!-- The figures follow job events on their own; this says how fresh they are. -->
+          @if (updatedAt(); as at) { · Updated {{ at | serverTime:'time' }} }
+        </p>
       </div>
-      <div class="flex-1 min-w-[9.5rem] sm:flex-none">
-        <label class="label" for="to">To</label>
-        <app-date-field inputId="to" label="To" [value]="endDate()" [min]="startDate()"
-                        (valueChange)="endDate.set($event)" />
+      <!-- Wraps: a date field has an intrinsic minimum width and two of them plus the
+           buttons need 454px, which overflowed the page on a phone. -->
+      <div class="flex flex-wrap items-end gap-2">
+        <div class="flex-1 min-w-[9.5rem] sm:flex-none">
+          <label class="label" for="from">From</label>
+          <app-date-field inputId="from" label="From" [value]="startDate()" [max]="endDate()"
+                          (valueChange)="startDate.set($event)" />
+        </div>
+        <div class="flex-1 min-w-[9.5rem] sm:flex-none">
+          <label class="label" for="to">To</label>
+          <app-date-field inputId="to" label="To" [value]="endDate()" [min]="startDate()"
+                          (valueChange)="endDate.set($event)" />
+        </div>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!!rangeError()" (click)="applyRange()"><app-icon name="filter" />Apply</button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <!-- A full row of its own under the boxes, so the reason sits beside the fields it is about. -->
+        @if (rangeError()) {
+          <p id="range-error" class="field-note text-crit-500 basis-full" role="alert">{{ rangeError() }}</p>
+        }
       </div>
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!!rangeError()" (click)="applyRange()"><app-icon name="filter" />Apply</button>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
-      <button type="button" class="btn btn-ghost btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <!-- A full row of its own under the boxes, so the reason sits beside the fields it is about. -->
-      @if (rangeError()) {
-        <p id="range-error" class="field-note text-crit-500 basis-full" role="alert">{{ rangeError() }}</p>
-      }
     </div>
-  </div>
+  </app-page-header>
 
   <!-- MIG-324: a new workspace's way to its first run, until one has completed. -->
   <app-get-started />
@@ -45,18 +45,14 @@
     <!-- KPI tiles. Only Unread goes anywhere, so only it is a link. A tile whose read failed shows
          a dash rather than a zero that reads like a real count; Unread never depends on those reads. -->
     <app-blur-loader [active]="loading()" label="Loading…">
-      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 stat-strip stat-row is-md is-start" role="list">
         <app-stat-tile label="Total jobs"  [value]="errors().status ? '—' : totalJobs()"  icon="briefcase" tone="info" />
         <app-stat-tile label="Active jobs" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok" />
         <app-stat-tile label="Running now" [value]="errors().running ? '—' : runningNow()" icon="play" tone="info" />
         <app-stat-tile label="Last run completed" [value]="errors().running ? '—' : completed()" foot="jobs" icon="checkCircle" tone="ok" />
         <app-stat-tile label="Last run failed" [value]="errors().running ? '—' : failed()" foot="jobs" icon="xCircle" tone="crit" />
-        <!-- h-full on the link and the tile: the other tiles are grid items and stretch to the row,
-             this one sits inside a link and stayed at its own height, shorter than its neighbours. -->
-        <a routerLink="/notifications" class="block h-full rounded-card hover:shadow-md transition-shadow"
-           [attr.aria-label]="unread() + ' unread notifications'">
-          <app-stat-tile class="h-full" label="Unread" [value]="unread()" icon="bell" tone="warn" />
-        </a>
+        <!-- A7: the tile is the link (it filled its row only when told to while it sat inside one). -->
+        <app-stat-tile label="Unread" [value]="unread()" icon="bell" tone="warn" link="/notifications" hint="Unread notifications" />
       </div>
     </app-blur-loader>
   }

@@ -50,9 +50,11 @@ const BREAKDOWN_COLUMNS = [
 type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
 import { GetStarted } from './get-started';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 @Component({
   selector: 'app-dashboard',
-  imports: [ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted],
+  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {

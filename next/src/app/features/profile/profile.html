@@ -1,12 +1,14 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Your profile</h1>
-      <p class="page-subtitle">
-        How you appear across the console. Your role and workspace are set by an administrator.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Your profile</h1>
+        <p class="page-subtitle">
+          How you appear across the console. Your role and workspace are set by an administrator.
+        </p>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   @if (loading()) {
     <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">
@@ -243,7 +245,7 @@
           <!-- Four figures rather than three, and each one now says what it counts. "Have run"
                counted every job whose status was set and not Missed, which is neither a period
                nor an event -- it read as "today" and meant "ever". -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="grid grid-cols-2 lg:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
             <!-- A link only when the access profile lets this person open Schedules. -->
             @if (canOpenJobs()) {
               <a routerLink="/pipelines/schedules" class="group block rounded-card">

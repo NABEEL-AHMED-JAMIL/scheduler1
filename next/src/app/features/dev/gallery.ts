@@ -30,6 +30,7 @@ import { Histogram } from '../../shared/charts/histogram';
 import { ScatterPlot, ScatterPoint } from '../../shared/charts/scatter-plot';
 import { KpiCard } from '../../shared/charts/kpi-card';
 import { statusColor } from '../../shared/charts/status-color';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /** Every run state the scheduler has, in lifecycle order, then an entity's states. */
 export const GALLERY_STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Failed', 'Interrupt', 'Skip', 'Missed',
@@ -48,7 +49,7 @@ export const GALLERY_STATUSES = ['Queue', 'Start', 'Running', 'Completed', 'Fail
  */
 @Component({
   selector: 'app-gallery',
-  imports: [Icon, BrandMark, StatusPill, StatusFilterChip, StatStrip, StatTile, Segmented, ViewToggle, Combobox, Field,
+  imports: [PageHeader, Icon, BrandMark, StatusPill, StatusFilterChip, StatStrip, StatTile, Segmented, ViewToggle, Combobox, Field,
     FormDialog, SidePanel, Confirm, FileDropzone, Pagination, LoadError, TableShell, Donut, BarChart, LineChart, Heatmap,
     RankedBar, GroupedBar, SplitBar, Histogram, ScatterPlot, KpiCard],
   templateUrl: './gallery.html',
