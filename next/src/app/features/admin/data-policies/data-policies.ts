@@ -35,7 +35,8 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
   styles: `
     .policy-table { table-layout: fixed; min-width: 56rem; }
     .policy-table .policy-setting-col { width: 15rem; }
-    .policy-table tbody th { text-align: left; vertical-align: top; text-transform: none; letter-spacing: normal; }
+    .policy-table tbody th { text-align: left; vertical-align: top; text-transform: none; letter-spacing: normal; font-weight: 400;
+      padding: 0.625rem 1rem; border-bottom: 1px solid var(--border-subtle); }
     .policy-table td { vertical-align: top; }
   `,
 })

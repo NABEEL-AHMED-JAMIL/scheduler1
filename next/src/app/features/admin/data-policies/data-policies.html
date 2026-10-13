@@ -144,7 +144,7 @@
                   <td [attr.data-level]="c.d.sensitivity" data-row="retention">
                     @if (canEdit()) {
                       <label class="sr-only" [for]="'retention-' + c.d.sensitivity">Keep {{ text[c.d.sensitivity].label }} run files (days)</label>
-                      <input class="input max-w-40" type="number" min="1" max="3650" step="1" name="retention" [id]="'retention-' + c.d.sensitivity"
+                      <input class="input max-w-56" type="number" min="1" max="3650" step="1" name="retention" [id]="'retention-' + c.d.sensitivity"
                              placeholder="The pipeline's own" [value]="c.d.retention" [class.input-invalid]="!!problems()[c.i]"
                              [attr.aria-invalid]="problems()[c.i] ? 'true' : null" (input)="setRetention(c.i, $any($event.target).value)" />
                       @if (problems()[c.i]; as problem) { <p class="field-note text-crit-500">{{ problem }}</p> }
