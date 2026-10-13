@@ -54,7 +54,7 @@
   @if (truncated()) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="status">
       <app-icon name="info" class="text-[color:var(--text-muted)]" />
-      <span>Showing the first {{ forms().length }} pipelines. Narrow by topic to see the rest.</span>
+      <span>Showing the first {{ forms().length }} registry tasks. Narrow by topic to see the rest.</span>
     </div>
   }
 
@@ -62,7 +62,7 @@
                    [isEmpty]="!filtered().length" [shown]="shown().length" [total]="filtered().length"
                    [emptyMessage]="hasFilters()
                       ? 'No task matches the current filters.'
-                      : 'No tasks yet. Create a pipeline to let Source Task offer it, and let a task on it be filled in rather than hand-written.'"
+                      : 'No registry tasks yet. Add one so a pipeline step can run it, filled in field by field rather than hand-written.'"
                    emptyIcon="template"
                    (retry)="load()">
     <ng-container toolbar>
@@ -136,7 +136,7 @@
                     <a class="link-inline" [routerLink]="['/settings/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
                        [title]="'Publishes on ' + (p.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ p.topicName }}</a>
                   } @else {
-                    <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">No topic</span>
+                    <span class="pill pill-warn" title="Assign a topic; a pipeline cannot pick this task until then">No topic</span>
                   }
                 </div>
               }

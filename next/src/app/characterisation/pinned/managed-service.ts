@@ -124,7 +124,7 @@ export const PINNED: Record<string, unknown> = {
       "Filter by pipeline",
       "Filter by topic",
       "Search id, name, topic or pipeline",
-      "Search tasks"
+      "Search pipelines"
     ],
     "links": [
       "/pipelines",

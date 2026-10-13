@@ -117,7 +117,7 @@ export class TaskEdit implements OnInit {
    * instead of the form: an empty "Edit task" form would save as an update with no task id.
    */
   readonly loadError = signal('');
-  /** The task does not exist, so Try again is replaced with Back to tasks. */
+  /** The pipeline does not exist, so Try again is replaced with Back to pipelines. */
   readonly loadMissing = signal(false);
   readonly submitted = signal(false);
 
@@ -351,7 +351,7 @@ export class TaskEdit implements OnInit {
     // An id that is not a number cannot name a task; asking anyway answered with the server's
     // "not valid" sentence and a Try again that could only fail again.
     if (!isRecordId(this.taskDetailId())) {
-      this.missing('That link does not point to a task.');
+      this.missing('That link does not point to a pipeline.');
       return;
     }
     this.loading.set(true);
@@ -362,11 +362,11 @@ export class TaskEdit implements OnInit {
       next: response => {
         this.loading.set(false);
         if (isMissingRecord(response) || (response.status === API_SUCCESS && !response.data)) {
-          this.missing(`Task #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
+          this.missing(`Pipeline #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
           return;
         }
         if (response.status !== API_SUCCESS) {
-          this.loadError.set(response.message || 'That task could not be loaded.');
+          this.loadError.set(response.message || 'That pipeline could not be loaded.');
           return;
         }
         const task = response.data;
@@ -403,8 +403,8 @@ export class TaskEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        if (isMissingRecord(err)) this.missing(`Task #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
-        else this.loadError.set(err?.error?.message || 'That task could not be loaded.');
+        if (isMissingRecord(err)) this.missing(`Pipeline #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
+        else this.loadError.set(err?.error?.message || 'That pipeline could not be loaded.');
       },
     });
   }
@@ -1090,13 +1090,13 @@ export class TaskEdit implements OnInit {
           this.router.navigate(created ? ['/pipelines', Number(created[1]), 'edit'] : ['/pipelines/list']);
           done(true);
         } else {
-          this.toast.error(response.message || 'The task could not be saved.');
+          this.toast.error(response.message || 'The pipeline could not be saved.');
           done(false);
         }
       },
       error: err => {
         this.saving.set(false);
-        this.toast.error(err?.error?.message || 'The task could not be saved.');
+        this.toast.error(err?.error?.message || 'The pipeline could not be saved.');
         done(false);
       },
     });

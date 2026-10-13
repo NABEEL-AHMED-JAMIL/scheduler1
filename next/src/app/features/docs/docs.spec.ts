@@ -65,8 +65,49 @@ describe('Docs for someone already signed in, and on a narrow screen', () => {
     expect(details!.querySelectorAll('a[href^="#"]').length).toBe(page.querySelectorAll('nav[aria-label="Contents"] a').length);
   });
 
-  it('names where Run analytics (was Reports) lives', () => {
-    expect(mount().textContent).toContain('Pipelines → Run analytics');
+  it('names where Run analytics lives today', () => {
+    expect(mount().textContent).toContain('Run & review › Runs');
     expect(mount().textContent).not.toContain('→ Reports');
+  });
+});
+
+/**
+ * Owner 2026-10-13: the guide is rewritten for the current product -- the menu groups and tab hubs, the main flow from
+ * getting data in to billing, the Review home, roles -- with healthcare-safe wording and links into the console.
+ */
+describe('Docs for the current product', () => {
+  it('follows the main flow, in the menu\'s order', () => {
+    const titles = Array.from(mount().querySelectorAll('main h2[id]')).map(h => h.id);
+    expect(titles).toEqual(['start', 'people', 'data-in', 'build', 'run', 'review', 'results', 'monitor', 'billing', 'health-data', 'reference']);
+  });
+
+  it('never names the old menus or calls a pipeline a task or a schedule a job', () => {
+    const text = mount().textContent ?? '';
+    for (const gone of ['Operations', 'Source Jobs', 'Source Tasks', 'Configuration →', 'Assistants →', 'Review inbox', 'Task inbox']) {
+      expect(text, gone).not.toContain(gone);
+    }
+    expect(text).not.toMatch(/\b(a|the|each) (job|task)\b/i);
+  });
+
+  it('sends the reader to Review, its tabs and bulk review', () => {
+    const page = mount();
+    const review = page.querySelector('#review')!.closest('section')!;
+    const links = Array.from(review.querySelectorAll('[data-test="doc-where"] a')).map(a => a.getAttribute('href'));
+    expect(links).toEqual(['/review', '/review/approvals', '/review/runs', '/review/documents']);
+    expect(review.textContent).toContain('decide several at once');
+  });
+
+  it('maps the menu from its own tree, the Review hub and its tabs included', () => {
+    const rows = Array.from(mount().querySelectorAll('[data-test="doc-menu"] tbody tr'))
+      .map(r => Array.from(r.querySelectorAll('td')).map(td => td.textContent!.trim()).join(' | '));
+    expect(rows).toContain('Run & review | Review | All waiting, Approvals, Runs, Documents');
+    expect(rows.some(r => r.includes('My requests'))).toBe(false);
+  });
+
+  it('keeps healthcare wording safe: synthetic examples, and no claim of compliance', () => {
+    const text = mount().textContent ?? '';
+    expect(text).toContain('synthetic');
+    expect(text).not.toMatch(/HIPAA[- ]compliant|compliant with HIPAA/i);
+    expect(text).toContain('does not by itself make a workspace compliant');
   });
 });

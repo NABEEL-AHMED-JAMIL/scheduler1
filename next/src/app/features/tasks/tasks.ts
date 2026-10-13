@@ -248,7 +248,7 @@ export class Tasks implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
           this.busyTask.set(null);
-          this.toast.error(response.message || 'That task could not be read.');
+          this.toast.error(response.message || 'That pipeline could not be read.');
           return;
         }
         const source = response.data;
@@ -278,7 +278,7 @@ export class Tasks implements OnInit {
       },
       error: err => {
         this.busyTask.set(null);
-        this.toast.error(err?.error?.message || 'That task could not be read.');
+        this.toast.error(err?.error?.message || 'That pipeline could not be read.');
       },
     });
   }
@@ -322,7 +322,7 @@ export class Tasks implements OnInit {
       return;
     }
     const ok = await confirmWith(this.dialog, {
-      title: 'Delete task',
+      title: 'Delete pipeline',
       body: `"${task.taskName}" will be deleted. No schedule runs it.`,
       confirmLabel: 'Delete',
       danger: true,
@@ -365,13 +365,13 @@ export class Tasks implements OnInit {
           const rows = response.data ?? [];
           this.tasks.set(rows);
           if (isProbablyTruncated(rows.length)) {
-            this.toast.info(`Showing the first ${LIST_LIMIT} tasks. Narrow the search to see the rest.`);
+            this.toast.info(`Showing the first ${LIST_LIMIT} pipelines. Narrow the search to see the rest.`);
           }
         } else this.error.set(response.message);
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load tasks.');
+        this.error.set(err?.error?.message || 'Could not load pipelines.');
       },
     });
   }

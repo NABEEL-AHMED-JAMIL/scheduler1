@@ -327,7 +327,7 @@
                   }
                   @if (job.taskDetail?.taskDetailId) {
                     <div>
-                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Task</dt>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Pipeline</dt>
                       <dd class="mt-1">
                         <!-- The task editor is an admin's; anyone else gets the name, not a link to a refusal. -->
                         @if (canManageTasks()) {
@@ -402,7 +402,7 @@
                   <div class="detail-section">
                     <div class="flex flex-wrap items-baseline gap-2 mb-2">
                       <h3 class="text-xs font-semibold uppercase tracking-wider
-                                 text-[color:var(--text-secondary)]">Task payload</h3>
+                                 text-[color:var(--text-secondary)]">Pipeline payload</h3>
                       @if (payloadFor(job)) {
                         <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(job)">
                           <app-icon name="copy" size="0.85em" />Copy
@@ -413,7 +413,7 @@
                       <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
                           >{{ payload }}</pre>
                     } @else if (payloadFor(job) === '') {
-                      <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                      <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
                     } @else {
                       <p class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
                         <app-icon name="refresh" size="0.85em" class="spin" />Reading the task…

@@ -21,7 +21,7 @@ export const PINNED: Record<string, unknown> = {
       "Prompts (2 of 2)",
       "Build your own view",
       "Chart",
-      "Runs by task and outcome (1 of 1)"
+      "Runs by pipeline and outcome (1 of 1)"
     ],
     "buttons": [
       "0",
@@ -85,7 +85,7 @@ export const PINNED: Record<string, unknown> = {
         "Last call"
       ],
       [
-        "Task dimension",
+        "Pipeline dimension",
         "Completed 2 runs",
         "Skip 0 runs",
         "All total"
@@ -97,7 +97,6 @@ export const PINNED: Record<string, unknown> = {
       "All schedules",
       "Columns",
       "Find a pipeline",
-      "Find a task",
       "Measure",
       "Outcome",
       "Owner",
@@ -137,7 +136,7 @@ export const PINNED: Record<string, unknown> = {
       "Prompts (2 of 2)",
       "Build your own view",
       "Chart",
-      "Runs by task and outcome (1 of 1)"
+      "Runs by pipeline and outcome (1 of 1)"
     ],
     "buttons": [
       "0",
@@ -201,7 +200,7 @@ export const PINNED: Record<string, unknown> = {
         "Last call"
       ],
       [
-        "Task dimension",
+        "Pipeline dimension",
         "Completed 2 runs",
         "Skip 0 runs",
         "All total"
@@ -213,7 +212,6 @@ export const PINNED: Record<string, unknown> = {
       "All schedules",
       "Columns",
       "Find a pipeline",
-      "Find a task",
       "Measure",
       "Outcome",
       "Owner",

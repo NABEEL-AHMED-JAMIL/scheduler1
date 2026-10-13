@@ -296,8 +296,8 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
           {
             kind: 'text',
             text: facts.bucket
-              ? `Its task writes into ${targetPath(facts)}.`
-              : 'Its task has no storage configured, so it writes nowhere the browser can show.',
+              ? `Its pipeline writes into ${targetPath(facts)}.`
+              : 'Its pipeline has no storage configured, so it writes nowhere the browser can show.',
           },
           { kind: 'facts', rows },
         ],
@@ -346,7 +346,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
           {
             kind: 'facts',
             rows: [
-              { label: 'Task', value: facts.taskName ?? '—' },
+              { label: 'Pipeline', value: facts.taskName ?? '—' },
               { label: 'Type', value: facts.taskType ?? '—' },
               { label: 'Topic', value: facts.topic ?? '—' },
               { label: 'Pipeline', value: facts.pipelineId ?? '—' },

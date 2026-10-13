@@ -435,7 +435,7 @@ export class JobEdit implements OnInit {
       next: response => {
         if (response.status === API_SUCCESS) this.tasks.set(response.data ?? []);
       },
-      error: () => this.toast.error('Could not load the task list.'),
+      error: () => this.toast.error('Could not load the pipeline list.'),
     });
 
     // A Manual job has no schedule: the section is hidden, and its required fields (start date...) must not

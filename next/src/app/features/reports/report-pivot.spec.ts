@@ -123,7 +123,7 @@ describe('the exported grid says what the screen says', () => {
 
     const ri = pivot.pivot().rowLabels.indexOf('report-history');
     expect(lastExport!.rows[ri][1]).toBe(40);       // Completed: the shorter of 40 and 60
-    expect(lastExport!.columns).toEqual(['Task', 'Completed', 'Failed', 'Running', 'All']);
+    expect(lastExport!.columns).toEqual(['Pipeline', 'Completed', 'Failed', 'Running', 'All']);
   });
 
   it('empties a duration total the screen dashes out, and keeps a count of zero', () => {
@@ -315,7 +315,7 @@ describe('ReportPivot with many rows', () => {
     expect(pivot.dayAxis()).toBe('col');
     expect(pivot.labelOf(rows[1], 3)).toBe('2 Aug 2026');
     pivot.export('csv');
-    expect(lastExport!.columns).toEqual(['Task', '2026-08-01', '2026-08-02', 'All']);
+    expect(lastExport!.columns).toEqual(['Pipeline', '2026-08-01', '2026-08-02', 'All']);
     expect(lastExport!.title).toContain('(2026-08-01 to 2026-08-31)');
     expect(JSON.stringify(lastExport)).not.toContain('Aug 2026');
   });

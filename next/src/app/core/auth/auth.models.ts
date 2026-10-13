@@ -35,7 +35,7 @@ export const ROLE_META: Record<UserRole, { label: string; hint: string; pill: st
   },
   TENANT_ADMIN: {
     label: 'Workspace administrator',
-    hint: 'Also configures tasks, connections and users.',
+    hint: 'Also configures pipelines, connections and users.',
     pill: 'pill pill-brand',
     // The flipping mark token: brand-500 is the dark card's own colour, so the rule vanished there.
     accent: 'var(--accent-mark)',

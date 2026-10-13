@@ -505,7 +505,7 @@ export class Jobs implements OnInit {
   async copyPayload(job: SourceJob): Promise<void> {
     const payload = this.payloadFor(job);
     if (!payload) return;
-    if (await copyText(payload)) this.toast.success('Task payload copied.');
+    if (await copyText(payload)) this.toast.success('Payload copied.');
     else this.toast.error('Could not copy the payload.');
   }
 

@@ -9,7 +9,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "Schedules & triggers",
       "Schedules (2 of 2)",
-      "Task payload",
+      "Pipeline payload",
       "Recent runs"
     ],
     "buttons": [
@@ -67,7 +67,7 @@ export const PINNED: Record<string, unknown> = {
         "Pipeline: REF_CSV_CHECK_V1",
         "Bucket: etl-bucket",
         "Assigned to: person@example.com",
-        "Task: #1854 Reference: CSV check and summarise",
+        "Pipeline: #1854 Reference: CSV check and summarise",
         "Topic: etl.reference (all partitions)",
         "Storage: View in bucket",
         "Email notifications: Emails person@example.com when this schedule completes, fails or is skipped.Change completes fails is skipped"
