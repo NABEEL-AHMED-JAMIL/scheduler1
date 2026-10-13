@@ -119,7 +119,8 @@ export class JobLogs implements OnInit, OnDestroy {
     }
     if (this.canOpenSchedule()) out.push({ label: 'All runs of this schedule', icon: 'history', link: `/pipelines/schedules/${this.jobId()}/executions` });
     if (this.auth.canOpen('analytics-dashboards')) out.push({ label: 'Dashboards', icon: 'chart', link: '/data/analytics/dashboards' });
-    if (this.auth.isTenantAdmin?.()) out.push({ label: 'Cost in Billing', icon: 'database', link: '/billing/usage' });
+    // UX review B9: the run's own cost, shared out of the month's priced lines.
+    if (this.auth.isTenantAdmin?.()) out.push({ label: 'What this run cost', icon: 'database', link: '/billing/usage', query: { run: String(this.jobQueueId()) } });
     return out;
   });
 

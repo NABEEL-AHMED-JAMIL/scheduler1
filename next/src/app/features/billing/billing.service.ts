@@ -128,6 +128,19 @@ export interface RunRow {
 /** What every usage read names: a range, a workspace for a platform administrator, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
+/** UX review B9 (BL1): one run's share of the priced lines (billing.json/pipelineCosts, runCost). */
+export interface RunCostMeter { meter: string; label: string; quantity: number; unit: string; cost: number; }
+export interface RunCostRow {
+  jobQueueId: number; jobId: number | null; schedule: string | null; taskDetailId: number | null; pipeline: string | null;
+  status?: string | null; startedAt: string | null; lastUsageAt?: string | null; cost: number; meters: RunCostMeter[];
+}
+export interface PipelineCostRow { taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null; }
+export interface PipelineCosts {
+  from: string; to: string; zone: string | null; currency: string | null; total: number; attributed: number; notTiedToRun: number;
+  namesResolved?: boolean; pipelines: PipelineCostRow[]; runs: { total: number; page: number; limit: number; rows: RunCostRow[] };
+}
+export interface RunCost extends RunCostRow { from: string | null; to: string | null; currency: string | null; namesResolved?: boolean; }
+
 /** billing.json/summary: the bill in one glance, for a profile card or a dashboard row. */
 export interface BillingSummary {
   currency: string; monthToDate: number; periodStart: string; rateCardName?: string; rateCardVersion?: number; meterDown?: boolean;
@@ -215,6 +228,14 @@ export class BillingApi {
       params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
   }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
+  /** UX review B9: what each pipeline and run cost, shared out of the same priced lines (adds up to the range's total). */
+  pipelineCosts(q: UsageQuery, page = 1, limit = 25): Observable<ApiResponse<PipelineCosts>> {
+    return this.http.get<ApiResponse<PipelineCosts>>(`${this.base}/pipelineCosts`, {
+      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
+  }
+  runCost(jobQueueId: number, tenantId?: string | null): Observable<ApiResponse<RunCost>> {
+    return this.http.get<ApiResponse<RunCost>>(`${this.base}/runCost`, { params: { jobQueueId: String(jobQueueId), ...this.tenantParam(tenantId) } });
+  }
   refreshUsage(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refresh`, null); }
   /** Rolls the signed-in workspace's today and yesterday again: a workspace administrator's refresh. */
   refreshWorkspace(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refreshWorkspace`, null); }

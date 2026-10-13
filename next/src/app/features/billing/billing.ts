@@ -1,6 +1,7 @@
 import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { PipelineCosts } from './pipeline-costs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
@@ -38,7 +39,7 @@ function isTiny(amount: number): boolean {
  */
 @Component({
   selector: 'app-billing',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts],
   templateUrl: './billing.html',
 })
 export class Billing implements OnInit {
@@ -81,6 +82,9 @@ export class Billing implements OnInit {
   readonly shownLines = computed(() => this.showTinyLines() ? this.lines() : this.lines().filter(l => !isTiny(l.amount)));
   readonly days = signal<DayRow[]>([]);
   readonly currency = signal('USD');
+  /** UX review B9: the month on screen for the cost by pipeline and run, and a run opened from its run page (?run=). */
+  readonly usageQuery = computed(() => this.query());
+  readonly runParam = signal<number | null>(Number(inject(ActivatedRoute, { optional: true })?.snapshot?.queryParamMap?.get('run')) || null);
   readonly rateCard = signal<PricedWith | null>(null);
   /** Lines used and priced by no card -- neither this workspace's own nor the default: billed at 0, and said above the table. */
   readonly unpricedLines = computed(() => this.lines().filter(l => l.unpriced && Number(l.quantity) !== 0));

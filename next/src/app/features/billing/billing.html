@@ -188,8 +188,13 @@
       </app-table-shell>
     </div>
 
+    <!-- UX review B9 (BL1): what each pipeline and run cost, out of the same lines; it adds up to the month's total. -->
+    <div class="mt-6">
+      <app-pipeline-costs [query]="usageQuery()" [runId]="runParam()" [currency]="currency()" />
+    </div>
+
     <div class="mt-4">
-      <app-table-shell heading="Cost per run" [shown]="runs().length" [total]="runsTotal()" [loading]="runsLoading() && !runs().length"
+      <app-table-shell heading="Cost per model call" [shown]="runs().length" [total]="runsTotal()" [loading]="runsLoading() && !runs().length"
                        [isEmpty]="!runs().length" [error]="runsError()" (retry)="retryRuns()" emptyMessage="No model calls in this month yet." emptyIcon="chart">
         <ng-container toolbar>
           <span class="text-xs text-[color:var(--text-muted)]">Each model call at its own model's rate — before the month's allowances and tiers, which the lines above apply.</span>

@@ -22,6 +22,8 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
       { subject_type: 'object', subject_id: 'medaxis/sales/orders.csv', quantity: '2.0', events: 1, last: '2026-09-18T10:00:00Z', actor_user_id: 4385 },
     ] } })),
     runs: vi.fn((_q: UsageQuery, page: number) => of({ status: API_SUCCESS, data: { total: 3, page, limit: 25, rows: page === 1 ? RUNS.slice(0, 2) : RUNS.slice(2) } })),
+    pipelineCosts: vi.fn(() => of({ status: API_SUCCESS, data: { from: '', to: '', zone: null, currency: 'USD', total: 0, attributed: 0, notTiedToRun: 0, pipelines: [], runs: { total: 0, page: 1, limit: 25, rows: [] } } })),
+    runCost: vi.fn(() => of({ status: API_SUCCESS, data: null })),
     refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
     refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
   };
@@ -257,6 +259,8 @@ describe('Billing, rendered', () => {
       usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: DAYS } })),
       subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [] } })),
       runs: vi.fn(() => of({ status: API_SUCCESS, data: { total: 0, page: 1, limit: 25, rows: [] } })),
+      pipelineCosts: vi.fn(() => of({ status: API_SUCCESS, data: { from: '', to: '', zone: null, currency: 'USD', total: 0, attributed: 0, notTiedToRun: 0, pipelines: [], runs: { total: 0, page: 1, limit: 25, rows: [] } } })),
+      runCost: vi.fn(() => of({ status: API_SUCCESS, data: null })),
       refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
       refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
       ...over,
