@@ -1,7 +1,8 @@
-import { DateField } from '../../shared/ui/date-field';
+import { WaitingForReview } from './waiting-for-review';
+import { DateRange, DateRangePicker, RangePreset, presetRange, rangeKey, rangeText, restoreRange } from '../../shared/ui/date-range';
 import { BillingBrief } from '../billing/billing-brief';
 import { Component, DestroyRef, Injector, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Donut } from '../../shared/charts/donut';
 import { Bar, BarChart } from '../../shared/charts/bar-chart';
 import { daySeries } from '../../shared/charts/day-series';
@@ -13,7 +14,6 @@ import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { Icon } from '../../shared/ui/icon';
 import { statusColor } from '../../shared/charts/status-color';
-import { localIsoDaysAgo } from '../../shared/ui/local-day';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { dayLabel, hourRange } from '../../shared/ui/time-format';
 import { StatTile } from '../../shared/ui/stat-tile';
@@ -49,9 +49,12 @@ const BREAKDOWN_COLUMNS = [
 
 type BreakdownKey = typeof BREAKDOWN_COLUMNS[number];
 
+import { GetStarted } from './get-started';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 @Component({
   selector: 'app-dashboard',
-  imports: [ServerTimePipe, Pagination, Icon, DateField, RouterLink, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError],
+  imports: [RefreshButton, PageHeader, ServerTimePipe, Pagination, Icon, DateRangePicker, Donut, BarChart, Heatmap, BillingBrief, StatTile, TableShell, BlurLoader, LoadError, GetStarted, WaitingForReview],
   templateUrl: './dashboard.html',
 })
 export class Dashboard implements OnInit {
@@ -86,25 +89,16 @@ export class Dashboard implements OnInit {
   workspaceName(row: JobBreakdown): string { return workspaceName(row); }
   private readonly injector = inject(Injector);
 
-  /** What the date boxes hold, which may be half-edited. */
-  readonly startDate = signal(localIsoDaysAgo(6));
-  readonly endDate = signal(localIsoDaysAgo(0));
   /**
-   * The range the page last read. The subtitle, the day axis and Try again follow this one, so
-   * editing a box without pressing Apply does not relabel figures that are still the old range's.
+   * Owner 2026-10-12 / UX review B1 (D3): one date-range control (app-date-range), remembered per viewer. A preset
+   * applies the moment it is chosen; the subtitle, the day axis and Try again follow the applied range.
    */
-  readonly appliedStart = signal(localIsoDaysAgo(6));
-  readonly appliedEnd = signal(localIsoDaysAgo(0));
-
-  /**
-   * Why the boxes cannot be applied. From after To used to answer with zeros that read like a quiet
-   * week, and a cleared box sent an empty date the server refused.
-   */
-  readonly rangeError = computed(() => {
-    const iso = /^\d{4}-\d{2}-\d{2}$/;
-    if (!iso.test(this.startDate()) || !iso.test(this.endDate())) return 'Pick a date in both fields.';
-    return this.startDate() <= this.endDate() ? '' : 'From must be on or before To.';
-  });
+  readonly rangeStore = rangeKey('home', typeof this.auth.user === 'function' ? this.auth.user()?.appUserId : null);
+  readonly range = signal<DateRange>(restoreRange(this.rangeStore, '7d'));
+  readonly appliedStart = signal(this.range().from);
+  readonly appliedEnd = signal(this.range().to);
+  /** "6 Oct – 12 Oct 2026", as the subtitle says the range. */
+  readonly rangeLabel = computed(() => rangeText(this.appliedStart(), this.appliedEnd()));
 
   readonly jobStatus = signal<NameValue[]>([]);
   readonly jobRunning = signal<NameValue[]>([]);
@@ -112,7 +106,6 @@ export class Dashboard implements OnInit {
   readonly breakdown = signal<JobBreakdown[]>([]);
   /** The same signal the bell's badge shows, so marking read in one clears the other. */
   private readonly unreadCount = inject(UnreadCountService);
-  readonly unread = this.unreadCount.count;
 
   readonly loading = signal(true);
   /**
@@ -163,8 +156,14 @@ export class Dashboard implements OnInit {
    * Whose numbers these are, when they are not simply the reader's own workspace: a platform
    * administrator's totals add up every workspace, and the server says so on each one (MIG-46).
    */
+  /**
+   * Whose schedules the figures count. A platform administrator's add up every workspace; a tenant user's are only the
+   * schedules they made or are assigned (Core's JobOwnership) -- a Viewer opening a workspace of nine schedules read
+   * "Total jobs 0" with nothing saying why (review 2026-10-07).
+   */
   readonly scopeLabel = computed(() =>
-    this.jobStatus().some(d => d.allWorkspaces) ? 'all workspaces' : null);
+    this.jobStatus().some(d => d.allWorkspaces) ? 'all workspaces'
+      : this.auth.isTenantAdmin() ? null : 'the schedules you made or are assigned');
 
   /** The real statuses, with the "All" total removed so it can't appear as a slice. */
   readonly statusCategories = computed(() =>
@@ -218,7 +217,7 @@ export class Dashboard implements OnInit {
   readonly drillHeading = computed(() => {
     const cell = this.selectedCell();
     if (!cell) return '';
-    const whose = this.drillAllWorkspaces() ? 'Jobs in all workspaces on ' : 'Jobs on ';
+    const whose = this.drillAllWorkspaces() ? 'Schedules in all workspaces on ' : 'Schedules on ';
     return whose + (cell.day ? cell.day + ' ' : '') + dayLabel(cell.date) + ', ' + hourRange(cell.hr);
   });
 
@@ -308,7 +307,12 @@ export class Dashboard implements OnInit {
     const from = query.get('from') ?? '';
     const to = query.get('to') ?? '';
     if (ISO_DAY.test(from) && ISO_DAY.test(to) && from <= to) {
-      this.startDate.set(from); this.endDate.set(to);
+      // A linked range is a preset when it is one today (so the control lights it), else Custom.
+      const preset = (['today', '7d', '30d', 'month'] as RangePreset[]).find(p => {
+        const r = presetRange(p);
+        return r.from === from && r.to === to;
+      }) ?? 'custom';
+      this.range.set({ from, to, preset });
       this.appliedStart.set(from); this.appliedEnd.set(to);
     }
     const date = query.get('date') ?? '';
@@ -547,7 +551,7 @@ export class Dashboard implements OnInit {
     // /jobs/undefined/history -- a real URL that renders, reads "undefined" back out of the path
     // and hands it to every link on the page. The paramless route already means "this hour across
     // every job", which is the honest reading of a row that cannot say which job it is.
-    this.router.navigate(row.jobId ? ['/pipelines/schedules', row.jobId, 'executions'] : ['/pipelines/executions'],
+    this.router.navigate(row.jobId ? ['/pipelines/schedules', row.jobId, 'executions'] : ['/runs/latest'],
       { queryParams });
   }
 
@@ -574,7 +578,7 @@ export class Dashboard implements OnInit {
     if (status !== 'Total') {
       queryParams['jobStatus'] = status.charAt(0).toUpperCase() + status.slice(1);
     }
-    this.router.navigate(['/pipelines/executions'], { queryParams });
+    this.router.navigate(['/runs/latest'], { queryParams });
   }
 
   countFor(row: JobBreakdown, key: BreakdownKey): number {
@@ -591,18 +595,19 @@ export class Dashboard implements OnInit {
       .map(s => ({ ...s, pct: (s.count / total) * 100 }));
   }
 
-  applyRange(): void {
-    if (this.rangeError()) return;
-    this.appliedStart.set(this.startDate());
-    this.appliedEnd.set(this.endDate());
+  /** The range control's choice: read it at once (a preset needs no Apply). */
+  applyRange(range: DateRange): void {
+    if (!ISO_DAY.test(range.from) || !ISO_DAY.test(range.to) || range.from > range.to) return;
+    this.range.set(range);
+    this.appliedStart.set(range.from);
+    this.appliedEnd.set(range.to);
     this.load();
     this.clearCell();
   }
 
+  /** Back to the last seven days. */
   resetRange(): void {
-    this.startDate.set(localIsoDaysAgo(6));
-    this.endDate.set(localIsoDaysAgo(0));
-    this.applyRange();
+    this.applyRange({ ...presetRange('7d'), preset: '7d' });
   }
 
   private sum(data: NameValue[]): number {

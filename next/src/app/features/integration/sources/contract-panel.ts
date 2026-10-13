@@ -48,7 +48,7 @@ export interface ContractPanelData {
           </div>
           <div class="overflow-x-auto">
             <table class="table-modern">
-              <thead><tr><th>Version</th><th>State</th><th>Saved</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th>Version</th><th>State</th><th>Saved</th><th class="text-right th-actions">Actions</th></tr></thead>
               <tbody>
                 @for (v of versions(); track v.version) {
                   <tr [class.bg-sunken]="v.version === selected()">
@@ -141,7 +141,7 @@ export class ContractPanel {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
 
-  readonly payloadPlaceholder = '{"case_id": "WC-1001", "patient": {"mrn": "M-77"}}';
+  readonly payloadPlaceholder = '{"record_id": "R-1001", "customer": {"id": "C-77"}}';
   readonly contract = signal<ContractRow>(this.data.contract);
   readonly versions = signal<ContractVersionRow[]>([]);
   readonly selected = signal<number | null>(null);

@@ -1,0 +1,93 @@
+<app-side-panel [heading]="heading" [subtitle]="subtitle">
+  <form class="flex flex-col gap-5 min-w-0" novalidate (submit)="$event.preventDefault(); submit()" data-payment-form>
+    <!-- What is owed, before anything is typed: the figures the amount is checked against. -->
+    <dl class="pay-due" aria-label="Balance">
+      <div><dt>Total</dt><dd>{{ money(invoice.total) }}</dd></div>
+      <div><dt>Paid</dt><dd>{{ money(data.paid) }}</dd></div>
+      @if (data.credited > 0) { <div><dt>Credited</dt><dd>{{ money(data.credited) }}</dd></div> }
+      @if (data.pending > 0) { <div><dt>Awaiting verification</dt><dd>{{ money(data.pending) }}</dd></div> }
+      <div class="is-due"><dt>Balance due</dt><dd data-balance-due>{{ money(invoice.balance) }} <span class="text-xs font-normal text-[color:var(--text-muted)]">{{ currency }}</span></dd></div>
+    </dl>
+
+    @if (serverError() && !serverField()) {
+      <div class="step-notice step-notice-crit" role="alert" data-pay-error>
+        <app-icon name="alert" class="icon-crit shrink-0 mt-0.5" /><div>{{ serverError() }}</div>
+      </div>
+    }
+
+    <app-section title="Payment" [level]="3" [sub]="platformAdmin ? 'The money received against this invoice.' : 'What you paid, and how.'">
+      <app-form-row>
+        <app-field class="fr-4" label="Amount" for="payAmount" [required]="true" [error]="amountError()"
+                   [hint]="isFull() ? 'Pays the balance in full.' : amountValue() > 0 ? 'Part payment: leaves ' + money(leaves()) + ' open.' : ''">
+          <div class="pay-amount">
+            <span class="pay-currency" aria-hidden="true">{{ currency }}</span>
+            <input id="payAmount" class="input tabular" inputmode="decimal" autocomplete="off" [value]="amount()" [attr.aria-label]="'Amount in ' + currency"
+                   (input)="setAmount($any($event.target).value)" (blur)="touch('amount')" />
+          </div>
+          <div class="pay-quick">
+            <button type="button" class="btn btn-ghost btn-xs" (click)="payInFull()" [disabled]="open <= 0" data-pay-full>Pay in full · {{ money(open) }}</button>
+          </div>
+        </app-field>
+        <app-field class="fr-4" label="Method" for="payMethod">
+          <select id="payMethod" class="input" [value]="method()" (change)="method.set($any($event.target).value)">
+            @for (m of methods; track m.value) { <option [value]="m.value" [selected]="m.value === method()">{{ m.label }}</option> }
+          </select>
+        </app-field>
+        <app-field class="fr-4" [label]="platformAdmin ? 'Received on' : 'Paid on'" for="payDay" [error]="dayError()" [hint]="dayHint()">
+          <app-date-field inputId="payDay" [label]="platformAdmin ? 'Received on' : 'Paid on'" placeholder="Today" [value]="receivedOn()" [max]="today()" [clearable]="true"
+                          (valueChange)="setDay($event)" />
+        </app-field>
+      </app-form-row>
+      <app-form-row>
+        <app-field class="fr-6" label="Reference" for="payReference" [error]="referenceError()" hint="The bank's transfer reference, as on the statement.">
+          <input id="payReference" class="input mono" autocomplete="off" [value]="reference()" [attr.maxlength]="referenceMax + 1" placeholder="TRF-88213"
+                 (input)="reference.set($any($event.target).value)" (blur)="touch('reference')" />
+        </app-field>
+        <app-field class="fr-6" label="Note" for="payNote" [error]="noteError()" [hint]="platformAdmin ? 'For the payment\'s record; the workspace reads it.' : 'Anything the platform should know.'">
+          <input id="payNote" class="input" autocomplete="off" [value]="note()" [attr.maxlength]="noteMax + 1"
+                 (input)="note.set($any($event.target).value)" (blur)="touch('note')" />
+        </app-field>
+      </app-form-row>
+    </app-section>
+
+    <app-section [title]="platformAdmin ? 'Slip (optional)' : 'Payment slip'" [level]="3"
+                 [sub]="platformAdmin ? 'The transfer confirmation, kept with the payment.' : 'The transfer confirmation from your bank. The platform matches it to the payment.'">
+      <app-field label="Slip" for="paySlip" [required]="!platformAdmin" [error]="slipError()">
+        <div id="paySlip" tabindex="-1">
+          <app-file-dropzone [file]="slip()" (fileChange)="setSlip($event)" [accept]="slipAccept" prompt="Drop the slip here"
+                             hint="PDF, PNG or JPEG · up to 10 MB" />
+        </div>
+      </app-field>
+    </app-section>
+
+    @if (platformAdmin) {
+      <app-section title="How it counts" [level]="3">
+        <div class="pay-choice" role="radiogroup" aria-label="How it counts">
+          <label [class.is-on]="counting() === 'verified'" data-count-verified>
+            <input type="radio" name="payCounting" value="verified" [checked]="counting() === 'verified'" (change)="counting.set('verified')" />
+            <span><span class="text-sm font-medium block">Record as verified</span>
+              <span class="text-xs text-[color:var(--text-secondary)]">You have seen the money arrive. It counts at once and a receipt is issued.</span></span>
+          </label>
+          <label [class.is-on]="counting() === 'later'" data-count-later>
+            <input type="radio" name="payCounting" value="later" [checked]="counting() === 'later'" (change)="counting.set('later')" />
+            <span><span class="text-sm font-medium block">Record, verify later</span>
+              <span class="text-xs text-[color:var(--text-secondary)]">Listed as awaiting verification until someone checks the bank.</span></span>
+          </label>
+        </div>
+      </app-section>
+    }
+
+    <div class="step-notice pay-next" aria-live="polite" data-pay-next>
+      <app-icon name="info" class="icon-muted shrink-0 mt-0.5" />
+      <div><p class="text-sm font-medium mb-1">What happens next</p>
+        <ul class="text-xs text-[color:var(--text-secondary)] space-y-0.5">@for (s of nextSteps(); track $index) { <li>{{ s }}</li> }</ul></div>
+    </div>
+  </form>
+
+  <ng-container foot>
+    <span class="flex-1 text-xs text-[color:var(--text-muted)]">@if (submitted() && problems().length) { {{ problems().length === 1 ? 'One field needs' : problems().length + ' fields need' }} attention. }</span>
+    <button type="button" class="btn btn-ghost btn-sm" (click)="close()" [disabled]="busy()">Cancel</button>
+    <button type="button" class="btn btn-primary btn-sm" (click)="submit()" [disabled]="busy()" data-pay-submit>
+      <app-icon [name]="platformAdmin ? 'check' : 'upload'" [busy]="busy()" />{{ busy() ? 'Saving…' : primaryLabel() }}</button>
+  </ng-container>
+</app-side-panel>

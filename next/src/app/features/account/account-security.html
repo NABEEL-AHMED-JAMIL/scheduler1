@@ -1,0 +1,139 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">My security</h1>
+        <p class="page-subtitle">
+          How you sign in: your password, two-factor login, the places you are signed in, and every sign-in to your account.
+        </p>
+      </div>
+      <a routerLink="/profile" class="btn btn-default btn-sm"><app-icon name="user" />Your profile</a>
+    </div>
+  </app-page-header>
+
+  <div class="grid gap-4 xl:grid-cols-2 items-start">
+    <!-- Password -->
+    <section class="card p-4" aria-labelledby="password-heading" data-test="password-card">
+      <div class="flex items-start gap-2">
+        <app-icon name="key" class="icon-muted mt-0.5 shrink-0" />
+        <div class="min-w-0">
+          <h2 id="password-heading" class="text-sm font-semibold">Password</h2>
+          <p class="field-note text-[color:var(--text-muted)] mt-0.5">
+            Your current password is asked for too, so an unlocked screen is not enough to take the account. Changing it
+            signs you out everywhere else.
+          </p>
+        </div>
+      </div>
+      @if (auth.user()?.passwordExpired) {
+        <p class="field-note text-warn-500 flex items-start gap-1.5 mt-3" role="status">
+          <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+          <span>Your password is older than your workspace allows. Choose a new one to carry on.</span>
+        </p>
+      }
+      <div class="grid sm:grid-cols-2 gap-4 mt-4">
+        <app-field label="Current password" for="sec-current-password">
+          <input id="sec-current-password" type="password" class="input" autocomplete="current-password"
+                 placeholder="Your current password"
+                 [value]="currentPassword()" (input)="currentPassword.set($any($event.target).value)" />
+        </app-field>
+        <div>
+          <app-field label="New password" for="sec-new-password">
+            <input id="sec-new-password" type="password" class="input" autocomplete="new-password"
+                   [placeholder]="newPasswordHint()"
+                   [value]="newPassword()" (input)="newPassword.set($any($event.target).value)" />
+          </app-field>
+          <app-password-rules [rules]="rules()" [password]="newPassword()" />
+        </div>
+      </div>
+      @if (passwordError()) {
+        <p class="field-note text-crit-500 flex items-start gap-1.5 mt-3" role="alert" data-test="password-error">
+          <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+          <span>{{ passwordError() }}</span>
+        </p>
+      }
+      <div class="mt-4">
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="savingPassword() || !canChangePassword()"
+                (click)="changePassword()">
+          <app-icon name="key" [busy]="savingPassword()" />
+          {{ savingPassword() ? 'Changing…' : 'Change password' }}
+        </button>
+      </div>
+    </section>
+
+    <!-- Two-factor login -->
+    <app-two-factor-card />
+
+    <!-- Sessions -->
+    <section class="card p-4 xl:col-span-2" aria-labelledby="sessions-heading" data-test="sessions-card">
+      <div class="flex flex-wrap items-start gap-2">
+        <app-icon name="globe" class="icon-muted mt-0.5 shrink-0" />
+        <div class="min-w-0 flex-1">
+          <h2 id="sessions-heading" class="text-sm font-semibold">Where you're signed in</h2>
+          <p class="field-note text-[color:var(--text-muted)] mt-0.5">
+            @if (idleMinutes()) {
+              Each session signs out after {{ idleMinutes() }} minutes without activity.
+            }
+            Ending a session signs it out at once, wherever it is open.
+          </p>
+        </div>
+        <div class="flex gap-2">
+          <button type="button" class="btn btn-default btn-sm" (click)="loadSessions()" [disabled]="sessionsLoading()">
+            <app-icon name="refresh" [class.spin]="sessionsLoading()" />Refresh
+          </button>
+          @if (otherSessions()) {
+            <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="endOthers()"
+                    [disabled]="ending() !== null" data-test="end-other-sessions">
+              <app-icon name="logout" [busy]="ending() === 'others'" />Sign out everywhere else
+            </button>
+          }
+        </div>
+      </div>
+      @if (sessionsError()) {
+        <p class="field-note text-crit-500 mt-3" role="alert">{{ sessionsError() }}</p>
+      } @else {
+        <div class="overflow-x-auto mt-3">
+          <table class="table-modern" data-test="sessions">
+            <thead>
+              <tr>
+                <th>Device</th>
+                <th>Address</th>
+                <th>Signed in</th>
+                <th>Last active</th>
+                <th>How</th>
+                <th class="text-right th-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (s of sessions(); track s.sessionId) {
+                <tr>
+                  <td class="max-w-64">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="truncate" [title]="s.userAgent ?? ''">{{ device(s.userAgent) }}</span>
+                      @if (s.current) { <span class="pill pill-brand shrink-0">This session</span> }
+                    </div>
+                  </td>
+                  <td class="mono text-xs whitespace-nowrap">{{ s.ip || '—' }}</td>
+                  <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ s.signedInAt | serverTime: 'dateTime' }}</td>
+                  <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ s.lastActiveAt | serverTime: 'dateTime' }}</td>
+                  <td class="whitespace-nowrap">{{ methodText(s.method) }}</td>
+                  <td class="text-right whitespace-nowrap">
+                    <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" (click)="endSession(s)"
+                            [disabled]="ending() !== null">
+                      <app-icon name="logout" [busy]="ending() === s.sessionId" />{{ s.current ? 'Sign out' : 'End session' }}
+                    </button>
+                  </td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6" class="text-center text-sm text-[color:var(--text-muted)] py-6">
+                  {{ sessionsLoading() ? 'Loading…' : 'No other sessions.' }}
+                </td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </section>
+  </div>
+
+  <app-sign-in-history scope="mine" />
+</div>

@@ -1,46 +1,34 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { existsSync, readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
+import { ensureObject } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
  * MIG-272: Document Intelligence's review flow end to end, as a workspace administrator.
  *
- * Seeds a document through the API -- OCR of the live-check scan in workspace 2924's storage connection, then an
- * extraction of it as an invoice, which leaves the vendor and the total to a reviewer -- and then, in the console:
+ * Seeds a document through the API -- OCR of the live-check scan in Riverside Health's bucket, then an extraction of
+ * it as an invoice, which leaves the vendor and the total to a reviewer -- and then, in the console:
  * opens it for review, clicks a field and sees its box highlighted and scrolled into view on the page image, corrects
  * the values the model missed, approves (over a failing rule if the type's rules say so, which the screen asks about),
  * and finds the document's row in the invoice dataset.
  *
- * Needs media-service and ai-service behind :9098 (the workspace's default model connection -- the local Ollama
- * gemma3:1b -- answers in a few seconds), workspace 2924's storage connection ui-review-s3 holding
- * ocr-live-check/ocr-live-check.png, and a console at E2E_BASE_URL (default :4400) that has MIG-272.
- * Sign-in, either:
- *   E2E_TENANT_ADMIN_TOKEN                          a TENANT_ADMIN access token (e.g. from
- *                                                   etl-platform/scripts/mint-test-token.sh 4537 900), or
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD    a TENANT_ADMIN's credentials
- * What it makes -- an extraction, its corrections, an approved dataset row -- is left in place and marked with a
- * "UI-CHECK e2e" vendor: the workspace's owner clears test data.
+ * Needs media-service and ai-service behind :9098 (the workspace's default model connection, a local Ollama model)
+ * and a console at E2E_BASE_URL (default :4400) that has MIG-272. The scan is etl-platform's
+ * fixtures/ui-review/ocr-live-check/ocr-live-check.png (or E2E_OCR_FILE), put in the workspace's bucket once as
+ * e2e/ocr/ocr-live-check.png and kept for the next run (support/fixtures.ts names the bucket).
+ * Sign-in through support/session.ts (role admin).
+ * What it makes -- an extraction, its corrections, an approved dataset row -- stays (the service deletes none of them)
+ * and is marked with an "E2E vendor <stamp>" vendor.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
-const BUCKET = process.env['E2E_OCR_BUCKET'] ?? 'ui-review-s3';
-const KEY = process.env['E2E_OCR_KEY'] ?? 'ocr-live-check/ocr-live-check.png';
-const VENDOR = `UI-CHECK e2e vendor ${Date.now().toString(36)}`;
+const SCAN = process.env['E2E_OCR_FILE'] ?? resolve(__dirname, '../../../etl-platform/fixtures/ui-review/ocr-live-check/ocr-live-check.png');
+const BUCKET = () => process.env['E2E_OCR_BUCKET'] ?? riverside().storageAlias;
+const KEY = process.env['E2E_OCR_KEY'] ?? 'e2e/ocr/ocr-live-check.png';
+const VENDOR = `E2E vendor ${Date.now().toString(36)}`;
 
-interface Session { data: Record<string, unknown>; token: string; }
 interface Field { fieldId: number; fieldKey: string; tableKey?: string | null; label?: string; value: string | null; page?: number | null; box?: unknown; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
 
 async function pageAs(browser: Browser, s: Session, width = 1440, height = 900): Promise<Page> {
   const context = await browser.newContext({ viewport: { width, height } });
@@ -78,7 +66,7 @@ async function seed(request: APIRequestContext, s: Session): Promise<number> {
   const types = await call<{ documentTypeId: number; typeKey: string; builtIn: boolean; status: string }[]>(request, s, 'GET', '/documentType.json/fetchAll');
   const invoice = types.find(t => t.typeKey === 'invoice' && !t.builtIn && t.status === 'Active') ?? types.find(t => t.typeKey === 'invoice');
   expect(invoice, 'the invoice document type').toBeTruthy();
-  const asked = await call<{ ocrDocumentId: number; status: string }>(request, s, 'POST', '/documentOcr.json/request', { bucket: BUCKET, key: KEY });
+  const asked = await call<{ ocrDocumentId: number; status: string }>(request, s, 'POST', '/documentOcr.json/request', { bucket: BUCKET(), key: KEY });
   const read = await settled(() => call<{ ocrDocumentId: number; status: string }>(request, s, 'GET',
     `/documentOcr.json/fetchById?ocrDocumentId=${asked.ocrDocumentId}`), 'the OCR read');
   expect(read.status, 'the OCR read').toBe('Done');
@@ -95,10 +83,15 @@ async function seed(request: APIRequestContext, s: Session): Promise<number> {
 }
 
 test.describe('Document Intelligence', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
+  test.skip(!process.env['E2E_OCR_KEY'] && !existsSync(SCAN), `needs the scan ${SCAN} (or E2E_OCR_FILE / E2E_OCR_KEY)`);
 
   let s: Session;
-  test.beforeAll(async ({ request }) => { s = await session(request); });
+  test.beforeAll(async ({ request }) => {
+    s = await sessionFor(request, 'admin');
+    if (!process.env['E2E_OCR_KEY']) await ensureObject(request, s, BUCKET(), KEY, readFileSync(SCAN), 'image/png');
+  });
 
   test('review: a field\'s box is highlighted, a value corrected, the document approved into its dataset', async ({ browser, request }, info) => {
     test.setTimeout(300_000);
@@ -145,7 +138,7 @@ test.describe('Document Intelligence', () => {
     await expect(page).not.toHaveURL(new RegExp(`/documents/review/${extractionId}$`), { timeout: 20_000 });
 
     // ---- the dataset: the approved document's row, with the corrected vendor as typed
-    await page.goto('/documents/intelligence?tab=dataset');
+    await page.goto('/documents/in?tab=dataset');
     const dataset = page.locator('[data-test="dataset"]');
     await dataset.getByRole('combobox', { name: 'Document type' }).selectOption({ label: 'Invoice' });
     const row = dataset.locator('tbody tr', { hasText: `#${extractionId}` });

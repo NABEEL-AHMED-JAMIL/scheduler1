@@ -29,21 +29,23 @@ export interface ComparisonSide {
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div class="flex items-stretch gap-3 py-3 min-w-0">
-      <div class="flex flex-col gap-1 min-w-0 flex-1">
+      <!-- Each figure is the answer, as a single figure is: it grows with its column on the
+           .kpi-figure scale (16 to 30px), and is cut with its whole value in the tooltip. -->
+      <div class="@container flex flex-col gap-1 min-w-0 flex-1">
         <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate"
               [title]="cap(first().label)">{{ first().label }}</span>
-        <span class="text-2xl font-semibold tabular truncate">{{ shownFirst() }}</span>
+        <span class="kpi-figure truncate" [title]="shownFirst()">{{ shownFirst() }}</span>
       </div>
-      <div class="flex flex-col gap-1 min-w-0 flex-1 border-s border-subtle ps-3">
+      <div class="@container flex flex-col gap-1 min-w-0 flex-1 border-s border-subtle ps-3">
         <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] truncate"
               [title]="cap(second().label)">{{ second().label }}</span>
-        <span class="text-2xl font-semibold tabular truncate">{{ shownSecond() }}</span>
+        <span class="kpi-figure truncate" [title]="shownSecond()">{{ shownSecond() }}</span>
       </div>
-      <div class="flex flex-col gap-1 min-w-0 flex-1 border-s border-subtle ps-3">
+      <div class="@container flex flex-col gap-1 min-w-0 flex-1 border-s border-subtle ps-3">
         <span class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">
           Change
         </span>
-        <span class="text-2xl font-semibold tabular truncate"
+        <span class="kpi-figure truncate" [title]="delta().shown"
               [class.text-[color:var(--ok-text)]]="delta().direction === 'up'"
               [class.text-[color:var(--crit-text)]]="delta().direction === 'down'">
           {{ delta().shown }}

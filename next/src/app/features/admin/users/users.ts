@@ -23,10 +23,14 @@ import { Avatar } from '../../../shared/ui/avatar';
 import { createSort } from '../../../shared/ui/sort';
 import { UserDialog } from './user-dialog';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
-import { ResetPasswordDialog } from './reset-password-dialog';
+import { ResetPasswordData, ResetPasswordDialog, ResetPasswordResult } from './reset-password-dialog';
+import { ResetPasswordNotice } from './reset-password-notice';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { AccountSecurityApi, PersonStanding } from '../../account/account-security.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** What one user owns and how their runs have gone, from dashboard.json/userStatistics. */
 export interface UserStatistic {
@@ -70,15 +74,15 @@ export interface AppUser {
   tenantId?: number;
   tenantName?: string;
   tenantActive?: boolean;
-  avatarBucket?: string | null;
-  avatarKey?: string | null;
+  /** The version of their profile picture; null or absent when they have none. */
+  avatarVersion?: string | null;
   dateCreated?: string;
   lastLoginAt?: string;
 }
 
 @Component({
   selector: 'app-users',
-  imports: [MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
+  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox, ResetPasswordNotice],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -87,6 +91,7 @@ export class Users implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly profilesApi = inject(AccessProfilesService);
   private readonly dialog = inject(Dialog);
+  private readonly security = inject(AccountSecurityApi);
   private readonly toast = inject(ToastService);
   private readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
@@ -114,6 +119,8 @@ export class Users implements OnInit {
   readonly copiedKey = signal<string | null>(null);
 
   readonly busy = signal<number | null>(null);
+  /** The last reset that happened, for its notice (and its one "Copy password"); null once that notice is gone. */
+  readonly resetDone = signal<ResetPasswordResult | null>(null);
   readonly focusedTenantId = signal<number | null>(null);
 
   readonly sort = createSort<AppUser>('fullName');
@@ -239,6 +246,7 @@ export class Users implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.loadStats();
+    this.loadStanding();
     this.http.get<ApiResponse<AppUser[]>>(`${API_BASE}/appUser.json/listUsers`).subscribe({
       next: response => {
         this.loading.set(false);
@@ -351,7 +359,7 @@ export class Users implements OnInit {
   }
 
   /** Said on the row in place of the controls, so the absence is a rule rather than a gap. */
-  readonly managedByPlatformOnly = 'Only a platform administrator can manage another tenant administrator.';
+  readonly managedByPlatformOnly = 'Only a platform administrator can manage another workspace administrator.';
 
   async toggleStatus(user: AppUser): Promise<void> {
     const activating = user.status !== 'Active';
@@ -397,31 +405,70 @@ export class Users implements OnInit {
     });
   }
 
+  // ---- MIG-353: each person's sign-in standing -- a lock, two-factor -- and an administrator's unlock and reset ----
+
+  /** {appUserId: {lockedUntil, failedSignIns, mfaEnabled, ...}} from tenant.json/security/people. */
+  readonly standing = signal<Record<string, PersonStanding>>({});
+
+  private loadStanding(): void {
+    this.security.people().subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.standing.set(r.data ?? {}); },
+      error: () => { /* the list stands without it */ },
+    });
+  }
+
+  lockedUntil(user: AppUser): string | null {
+    return this.standing()[String(user.appUserId)]?.lockedUntil ?? null;
+  }
+
+  mfaOn(user: AppUser): boolean {
+    return !!this.standing()[String(user.appUserId)]?.mfaEnabled;
+  }
+
+  unlock(user: AppUser): void {
+    this.busy.set(user.appUserId);
+    this.security.unlock(user.appUserId).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status === API_SUCCESS) { this.toast.success(r.message); this.loadStanding(); } else this.toast.error(r.message);
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'Could not unlock the account.'); },
+    });
+  }
+
+  async resetMfa(user: AppUser): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Reset two-factor login for ${user.fullName || user.username}?`,
+      body: 'Their authenticator app and recovery codes stop working and they are signed out everywhere. If the workspace requires '
+        + 'two-factor login they set it up again at their next sign-in. Do this only when you are sure it is them asking.',
+      confirmLabel: 'Reset two-factor login',
+      danger: true,
+    });
+    if (!ok) return;
+    this.busy.set(user.appUserId);
+    this.security.resetMfa(user.appUserId).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status === API_SUCCESS) { this.toast.success(r.message); this.loadStanding(); } else this.toast.error(r.message);
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'Could not reset two-factor login.'); },
+    });
+  }
+
   resetPassword(user: AppUser): void {
-    // The length rule lives in the dialog now, on the field, so a short password never closes it.
-    this.dialog.open<string>(ResetPasswordDialog, {
-      hasBackdrop: true,
-      data: { name: user.fullName || user.username },
-    }).closed.subscribe(password => {
-      if (!password) return;
-      // The dialog is already gone by this point (it closes on submit, before this fires), so
-      // `busy` is what the row's own Edit/Reset/status/delete buttons key off of -- without it,
-      // this action alone gave no in-flight feedback anywhere and its own [disabled] guards
-      // (users.html:242-245, :426-428) were checking a signal this method never set.
-      this.busy.set(user.appUserId);
-      this.http.put<ApiResponse>(`${API_BASE}/appUser.json/resetPassword`,
-        { appUserId: user.appUserId, password }).subscribe({
-        next: response => {
-          this.busy.set(null);
-          response.status === API_SUCCESS
-            ? this.toast.success(response.message)
-            : this.toast.error(response.message);
-        },
-        error: err => {
-          this.busy.set(null);
-          this.toast.error(err?.error?.message || 'Could not reset the password.');
-        },
-      });
+    // The dialog makes the call and stays open until the server accepts the password: a refusal (a recent password,
+    // a common one) is said under its field, in the server's words. It used to close on submit and leave the call to
+    // this screen, whose toast was the only sign a reset had been refused -- and was easy to miss (2026-10-13).
+    // A new reset drops the previous notice, and its password, first.
+    this.resetDone.set(null);
+    const data: ResetPasswordData = {
+      appUserId: user.appUserId,
+      name: user.fullName || user.username,
+      tenantId: user.tenantId ?? null,
+      own: this.isSelf(user),
+    };
+    this.dialog.open<ResetPasswordResult>(ResetPasswordDialog, { hasBackdrop: true, data }).closed.subscribe(done => {
+      if (done) this.resetDone.set(done);
     });
   }
 
@@ -528,11 +575,36 @@ export class Users implements OnInit {
 
   /** Ring around the avatar: the same fact the status pill carries, said in the portrait. */
   /**
-   * Whose picture to ask the server for: only someone the list says has one (avatarKey is omitted
-   * when there is none). Asking for everyone sent a request per person per load, most of them 404s.
+   * Which picture to show: the version the list carries, or null when the person has none -- then app-avatar asks for
+   * nothing. Asking for everyone sent a request per person per load, most of them 404s.
    */
-  avatarOwner(user: AppUser): number | null {
-    return user.avatarKey ? user.appUserId : null;
+  avatarVersionOf(user: AppUser): string | null {
+    return user.avatarVersion || null;
+  }
+
+  /** Moderation: an administrator removes someone's picture; their initials show instead, everywhere. */
+  async removePicture(user: AppUser): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Remove ${user.fullName || user.username}'s profile picture?`,
+      body: 'Their initials are shown instead, everywhere their name appears. They can upload a new one. The removal is recorded '
+        + 'in the sign-in history with your name.',
+      confirmLabel: 'Remove picture',
+      danger: true,
+    });
+    if (!ok) return;
+    this.busy.set(user.appUserId);
+    this.http.delete<ApiResponse>(`${API_BASE}/appUser.json/avatar`, { params: { appUserId: user.appUserId } }).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status === API_SUCCESS) {
+          this.users.update(list => list.map(u => (u.appUserId === user.appUserId ? { ...u, avatarVersion: null } : u)));
+          this.toast.success(r.message);
+        } else {
+          this.toast.error(r.message);
+        }
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'Could not remove the picture.'); },
+    });
   }
 
   statusRing(status: string): string {

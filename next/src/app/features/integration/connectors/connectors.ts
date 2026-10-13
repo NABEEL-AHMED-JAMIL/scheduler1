@@ -15,6 +15,9 @@ import {
 } from './connectors.model';
 import { ConnectPanel, ConnectPanelData } from './connect-panel';
 import { ConnectionPanel, ConnectionPanelData } from './connection-panel';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { RouterLink } from '@angular/router';
 
 type Chip = '' | Category | 'connected';
 type StateFilter = '' | 'Active' | 'Syncing' | 'Error' | 'Needs you' | 'Paused' | 'Not connected';
@@ -31,7 +34,7 @@ type StateFilter = '' | 'Active' | 'Syncing' | 'Error' | 'Needs you' | 'Paused' 
  */
 @Component({
   selector: 'app-connectors',
-  imports: [Icon, TableShell, ManagedBanner, Segmented, StatStrip],
+  imports: [RouterLink, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, Segmented, StatStrip],
   templateUrl: './connectors.html',
 })
 export class Connectors implements OnInit {
@@ -164,7 +167,7 @@ export class Connectors implements OnInit {
     if (card && this.blocked(card)) return;
     this.dialog.open<void>(ConnectPanel, sidePanelConfig<ConnectPanelData>({
       cards: this.cards().filter(c => !this.blocked(c)), card, connection: null, changed: () => this.load(),
-    }, 'wide'));
+    }, 'wide', 'right'));
   }
 
   /** "Build custom (REST)": the REST connector, over one of the workspace's API Collections. */
@@ -176,6 +179,6 @@ export class Connectors implements OnInit {
   open(connectionId: number, name: string): void {
     this.dialog.open<void>(ConnectionPanel, sidePanelConfig<ConnectionPanelData>({
       connectionId, name, cards: this.cards(), changed: () => this.load(),
-    }, 'wide'));
+    }, 'wide', 'right'));
   }
 }

@@ -1,4 +1,6 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { deleteTopic } from './support/workspace';
 
 /**
  * Topics and pipelines, end to end, as a tenant administrator: a topic is added under the workspace's
@@ -8,15 +10,10 @@ import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test
  * is the searchable box, so the test types into it rather than choosing an <option>; the topic
  * boxes ask the server for what was typed, and the task's topic comes after its connection.
  *
- * Needs one real account, given through the environment so no password lives here:
- *
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD   a TENANT_ADMIN whose workspace has a Kafka
- *                                                  profile marked default
- *
- * Skips without it. Cleans up in reverse -- task, pipeline, topic -- through the API.
+ * Needs a TENANT_ADMIN whose workspace has a Kafka profile marked default (support/session.ts:
+ * role admin, Riverside Health's administrator). Everything it makes is named "E2E ..."
+ * and is cleaned up in reverse -- task, pipeline, topic -- through the API.
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 
 const STAMP = Date.now().toString(36);
 const TOPIC_NAME = `E2E topic ${STAMP}`;
@@ -25,22 +22,6 @@ const PIPELINE_ID = `E2E${STAMP.toUpperCase()}`;
 const PIPELINE_NAME = `E2E pipeline ${STAMP}`;
 const TASK_NAME = `E2E task ${STAMP}`;
 
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function signIn(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const answer = await request.post(`${api}/auth.json/login`, { data: { username, password }, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, session: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session.data);
-  return page;
-}
 
 /** Types into a searchable box and picks the row whose label contains `label`. */
 async function pick(page: Page, boxId: string, typed: string, label: string): Promise<void> {
@@ -53,7 +34,7 @@ async function pick(page: Page, boxId: string, typed: string, label: string): Pr
 }
 
 test.describe('topics and pipelines', () => {
-  test.skip(!admin.username || !admin.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
 
   let session: Session;
   let headers: Record<string, string>;
@@ -62,22 +43,22 @@ test.describe('topics and pipelines', () => {
   let taskId: number | null = null;
 
   test.beforeAll(async ({ request }) => {
-    session = await signIn(request, admin.username!, admin.password!);
-    headers = { Authorization: `Bearer ${session.token}` };
+    session = await sessionFor(request, 'admin');
+    headers = authOf(session);
   });
 
   test.afterAll(async ({ request }) => {
     if (!session) return;
     if (taskId) await request.put(`${api}/sourceTask.json/deleteSourceTask`, { headers, data: { taskDetailId: taskId } });
     if (pipelineKey) await request.delete(`${api}/pipeline.json/delete?pipelineKey=${pipelineKey}`, { headers });
-    if (topicId) await request.delete(`${api}/setting.json/deleteSourceTaskType?sourceTaskTypeId=${topicId}`, { headers });
+    if (topicId) await deleteTopic(request, session, topicId);
   });
 
   test('a topic is added under the profile, a pipeline on the topic, a task through both', async ({ browser, request }) => {
     const page = await pageAs(browser, session);
 
     // ── 1. Kafka & Topics: add a topic under the workspace's profile ─────────────────────
-    await page.goto('/configuration/kafka');
+    await page.goto('/settings/kafka');
     await page.getByRole('button', { name: 'Add topic' }).click();
     // The dialog animates in; a fill that lands mid-mount is dropped.
     await page.getByRole('heading', { name: 'New topic' }).waitFor();
@@ -93,13 +74,17 @@ test.describe('topics and pipelines', () => {
     const topicRow = page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME });
     await expect(topicRow).toBeVisible();
     await expect(topicRow.getByText(KAFKA_TOPIC)).toBeVisible();
-    await topicRow.getByRole('button', { name: 'Test topic' }).click();
-    await expect(topicRow.getByText(/reachable|does not exist|Could not reach/)).toBeVisible();
+    // The check lives in the row's actions menu now ("Check topic"), and answers under the topic's name.
+    await topicRow.getByRole('button', { name: `Actions for ${TOPIC_NAME}` }).click();
+    await page.getByRole('menuitem', { name: 'Check topic' }).click();
+    const answer = topicRow.locator('.kafka-cell-name div[class*="mt-0.5"]');
+    await expect(answer).toBeVisible({ timeout: 30_000 });
+    await expect(answer).not.toBeEmpty();
 
     // ── 2. Pipelines: define one on that topic (the topic box is searchable) ─────────────
     await page.goto('/configuration/pipelines');
-    await page.getByRole('button', { name: 'New pipeline' }).click();
-    await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
+    await page.getByRole('button', { name: 'New registry task' }).click();
+    await page.getByRole('heading', { name: 'New registry task' }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
     await page.locator('#pipelineName').fill(PIPELINE_NAME);
     await pick(page, 'pipelineTopic', STAMP, TOPIC_NAME);
@@ -115,7 +100,7 @@ test.describe('topics and pipelines', () => {
     expect(pipelineRow?.sourceTaskTypeId, 'the pipeline names the topic').toBe(topicId);
 
     // The topic row on the Kafka pane now names it (one pipeline shows inline, by name).
-    await page.goto('/configuration/kafka');
+    await page.goto('/settings/kafka');
     await expect(page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME }).locator('a', { hasText: PIPELINE_NAME })).toBeVisible();
 
     // ── 3. A task: connection → topic → pipeline, each list fetched on the pick before ──
@@ -126,12 +111,12 @@ test.describe('topics and pipelines', () => {
     // A tenant administrator's one default connection is picked for them; the topic was added under it.
     await expect(page.locator('#taskProfile')).not.toHaveValue('');
     await pick(page, 'taskType', STAMP, TOPIC_NAME);
-    await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', /this topic’s pipelines/);
+    await expect(page.locator('#pipeline')).toHaveAttribute('placeholder', /this topic’s (pipelines|registry tasks)/);
     await pick(page, 'pipeline', STAMP, PIPELINE_NAME);
     await expect(page.getByText(`Defined for ${PIPELINE_ID}`)).toBeVisible();
     await page.getByLabel('Input folder').fill('e2e/in');
-    await page.getByRole('button', { name: 'Create task' }).click();
-    await expect(page.getByText('Task created.')).toBeVisible();
+    await page.getByRole('button', { name: 'Create pipeline' }).click();
+    await expect(page.getByText('Pipeline created.')).toBeVisible();
     // listSourceTask is a POST with an optional search body; page/limit ride on the query string.
     const tasks = await (await request.post(`${api}/sourceTask.json/listSourceTask?page=1&limit=1000`, { headers, data: {} })).json();
     const taskRow = tasks.data.find((t: any) => t.taskName === TASK_NAME);

@@ -1,3 +1,5 @@
+import { AttemptDetail } from '../retry/run-retry';
+
 /**
  * MIG-251: what Core's step engine (MIG-230) says about one run, as sourceJob.json/stepExecutions answers it, and the
  * few readings the Executions screens make of it.
@@ -26,6 +28,8 @@ export interface StepExecution {
   stepExecutionId: number | null;
   index: number;
   key: string;
+  /** The step's name in its pipeline ("Vision model: DRAFT label"); null when it has none. */
+  name?: string | null;
   task: string;
   /** A JobStatus name: Queue, Running, Completed, Failed, Skip or Interrupt. */
   status: string | null;
@@ -39,6 +43,10 @@ export interface StepExecution {
   statusMessage?: string | null;
   error?: StepError | string | null;
   datasets?: StepDataset[];
+  /** MIG-345: a step a resumed attempt did not run again -- the attempt whose output it reused; null for a step that ran. */
+  reusedFromAttempt?: number | null;
+  /** MIG-346: an Approval step's request -- waiting, or how it was decided (times are UTC instants). */
+  approval?: StepApproval | null;
   /** "step": the step's own lines (stepLogs); "run": a legacy run, whose lines are the run's audit log. */
   log: 'step' | 'run';
 }
@@ -63,6 +71,46 @@ export interface RunAiStep {
   dateCreated?: string | null;
 }
 
+/** MIG-346: an Approval step's request: PENDING while the run waits; APPROVED, REJECTED, EXPIRED or CANCELLED once settled. */
+export interface StepApproval {
+  approvalId: number;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED' | string;
+  waiting: boolean;
+  title?: string | null;
+  reviewers?: { kind?: string | null; value?: string | null } | null;
+  requestedAt?: string | null;
+  expiresAt?: string | null;
+  decidedAt?: string | null;
+  decidedBy?: string | null;
+  /** Who decided, for their picture. */
+  decidedByUserId?: number | null;
+  comment?: string | null;
+}
+
+/**
+ * MIG-346: who an approval goes to, in words -- a group by its name when the reader may read it ("the Reviewer group"),
+ * else "the pipeline's reviewer group"; never its id (run page polish 2026-10-12).
+ */
+export function approvalReviewers(approval: StepApproval, groupNames: ReadonlyMap<string, string> = new Map()): string {
+  const who = approval.reviewers;
+  if (!who?.kind) return 'the workspace administrators';
+  if (who.kind === 'role') return who.value === 'TENANT_USER' ? 'the workspace users' : 'the workspace administrators';
+  const name = who.value ? groupNames.get(String(who.value)) : undefined;
+  return name ? `the ${name} group` : 'the pipeline\'s reviewer group';
+}
+
+/** MIG-346: an approval's outcome as a sentence ("Approved by Ana Ruiz (user 4641): totals match"). */
+export function approvalOutcome(approval: StepApproval, groupNames?: ReadonlyMap<string, string>): string {
+  const said = approval.comment ? `: ${approval.comment}` : '';
+  switch (approval.status) {
+    case 'APPROVED': return `Approved by ${approval.decidedBy ?? 'a reviewer'}${said}`;
+    case 'REJECTED': return `Rejected by ${approval.decidedBy ?? 'a reviewer'}${said}`;
+    case 'EXPIRED': return 'Nobody decided in time; the request expired';
+    case 'CANCELLED': return 'The run was closed before anyone decided';
+    default: return `Waiting for approval by ${approvalReviewers(approval, groupNames)} in Review`;
+  }
+}
+
 export interface StepTimeline {
   jobQueueId: number;
   jobId: number;
@@ -73,6 +121,10 @@ export interface StepTimeline {
   pipelineDefinitionId?: number | null;
   steps: StepExecution[];
   aiSteps?: RunAiStep[];
+  /** MIG-345: the run's attempts someone asked for (a resume or a restart), oldest first. */
+  attemptDetails?: AttemptDetail[];
+  /** MIG-346: the run waits at an Approval step of this attempt. */
+  waitingForApproval?: boolean;
 }
 
 export interface StepLogLine {
@@ -153,6 +205,8 @@ export interface RunOutput {
   format?: string | null;
   rowCount?: number | null;
   byteCount?: number | null;
+  /** ADR-027: a PDF's pages (render_pdf); null for any other file. */
+  pageCount?: number | null;
   recordedAt?: string | null;
   runDatasetId?: number | null;
   expiresAt?: string | null;
@@ -172,4 +226,15 @@ export function attachmentName(disposition: string | null | undefined): string {
   const match = /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(disposition ?? '');
   if (!match) return '';
   try { return decodeURIComponent(match[1]); } catch { return match[1]; }
+}
+
+/**
+ * MIG-345: the step a retry of this attempt would resume from -- the first that did not complete -- when the run failed
+ * on the latest attempt; null otherwise (Core decides whether it can, and says why not).
+ */
+export function failedStep(timeline: StepTimeline | null | undefined): StepExecution | null {
+  if (!timeline || timeline.runStatus !== 'Failed') return null;
+  const latest = Math.max(...(timeline.attempts?.length ? timeline.attempts : [timeline.attempt]));
+  if (timeline.attempt !== latest) return null;
+  return timeline.steps.find(step => step.status !== 'Completed') ?? null;
 }

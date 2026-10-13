@@ -15,6 +15,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
 import { RunWithDialog, RunWithData } from './ai-models/run-with-dialog';
+import { openBackfill } from '../runs/backfills/backfill-open';
 import { InboxTrigger, triggerOf, triggerSentence } from './inbox/inbox-trigger';
 import { JobAction, jobActionRequest } from './job-actions';
 import { parseTopicPartition } from '../../shared/ui/topic';
@@ -38,6 +39,8 @@ import { dayLabel } from '../../shared/ui/time-format';
 import { Combobox } from '../../shared/ui/combobox';
 import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export interface Scheduler {
   schedulerId: number;
@@ -114,7 +117,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -184,6 +187,14 @@ export class Jobs implements OnInit {
   readonly statusFilter = signal('');
   readonly executionFilter = signal('');
   readonly busyJob = signal<number | null>(null);
+  /**
+   * Review 2026-10-07: whether each schedule's pipeline has an AI step, read (sourceJob.json/aiModelChoice) the first
+   * time its row menu opens. "Run with a different AI model…" is offered only where it is true: on a pipeline with no AI
+   * step the dialog had nothing to choose. Absent until read; a failed read leaves it absent, and the item hidden.
+   */
+  readonly aiSteps = signal<Record<number, boolean>>({});
+  /** MIG-347: how many run parameters each schedule's pipeline declares, read with its AI steps; "Run with…" offers them. */
+  readonly parameterCounts = signal<Record<number, number>>({});
   readonly expanded = signal<Set<number>>(new Set());
   readonly selected = signal<Set<number>>(new Set());
 
@@ -435,7 +446,7 @@ export class Jobs implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load jobs.');
+        this.error.set(err?.error?.message || 'Could not load the schedules.');
       },
     });
   }
@@ -494,7 +505,7 @@ export class Jobs implements OnInit {
   async copyPayload(job: SourceJob): Promise<void> {
     const payload = this.payloadFor(job);
     if (!payload) return;
-    if (await copyText(payload)) this.toast.success('Task payload copied.');
+    if (await copyText(payload)) this.toast.success('Payload copied.');
     else this.toast.error('Could not copy the payload.');
   }
 
@@ -538,7 +549,7 @@ export class Jobs implements OnInit {
   }
 
   openRunLogs(job: SourceJob, bar: Bar): void {
-    this.router.navigate(['/pipelines/schedules', job.jobId, 'runs', bar.meta, 'logs']);
+    this.router.navigate(['/pipelines/schedules', job.jobId, 'runs', bar.meta]);
   }
 
   /**
@@ -552,7 +563,7 @@ export class Jobs implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
           this.busyJob.set(null);
-          this.toast.error(response.message || 'That job could not be read.');
+          this.toast.error(response.message || 'That schedule could not be read.');
           return;
         }
         const payload = clonePayload(response.data);
@@ -575,7 +586,7 @@ export class Jobs implements OnInit {
       },
       error: err => {
         this.busyJob.set(null);
-        this.toast.error(err?.error?.message || 'That job could not be read.');
+        this.toast.error(err?.error?.message || 'That schedule could not be read.');
       },
     });
   }
@@ -625,15 +636,15 @@ export class Jobs implements OnInit {
 
   /** The tooltip on a Run now that is off; empty when it is on. */
   runBlockedReason(job: SourceJob): string {
-    if (job.jobStatus !== 'Active') return 'Activate this job to run it';
-    return this.isInFlight(job) ? 'This job is already queued or running' : '';
+    if (job.jobStatus !== 'Active') return 'Activate this schedule to run it';
+    return this.isInFlight(job) ? 'This schedule is already queued or running' : '';
   }
 
   /** The tooltip on a Skip next run that is off; empty when it is on. */
   skipBlockedReason(job: SourceJob): string {
-    if (job.jobStatus !== 'Active') return 'Activate this job to run it';
-    if (this.isInFlight(job)) return 'This job is already queued or running';
-    return this.canSkipNext(job) ? '' : 'Only scheduled jobs have a next run';
+    if (job.jobStatus !== 'Active') return 'Activate this schedule to run it';
+    if (this.isInFlight(job)) return 'This schedule is already queued or running';
+    return this.canSkipNext(job) ? '' : 'Only a schedule with a timetable has a next run';
   }
 
   /**
@@ -705,6 +716,49 @@ export class Jobs implements OnInit {
    * MIG-251: Run now with the model each AI step runs on chosen for this run only. Offered when Run now is; the dialog
    * lists the job's AI steps, or says it has none.
    */
+  hasAiSteps(job: SourceJob): boolean {
+    return this.aiSteps()[job.jobId] === true;
+  }
+
+  /** On opening a row's menu: whether its pipeline has an AI step, asked once per schedule. */
+  checkAiSteps(job: SourceJob): void {
+    if (job.jobId in this.aiSteps()) return;
+    this.http.get<ApiResponse<{ steps?: unknown[]; parameters?: unknown[] }>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params: { jobId: String(job.jobId) } })
+      .subscribe({
+        next: r => {
+          if (r?.status !== API_SUCCESS) return;
+          const steps = Array.isArray(r.data?.steps) ? r.data!.steps!.length : 0;
+          this.aiSteps.update(known => ({ ...known, [job.jobId]: steps > 0 }));
+          const parameters = Array.isArray(r.data?.parameters) ? r.data!.parameters!.length : 0;
+          this.parameterCounts.update(known => ({ ...known, [job.jobId]: parameters }));
+        },
+        error: () => {},
+      });
+  }
+
+  /** MIG-347: whether "Run with…" has something to choose: an AI step's model or the pipeline's run parameters. */
+  hasRunWith(job: SourceJob): boolean {
+    return this.hasAiSteps(job) || (this.parameterCounts()[job.jobId] ?? 0) > 0;
+  }
+
+  /** "Run with…" when the pipeline has parameters; the AI wording when a model is all there is to choose. */
+  runWithLabel(job: SourceJob): string {
+    return (this.parameterCounts()[job.jobId] ?? 0) > 0 ? 'Run with…' : 'Run with a different AI model…';
+  }
+
+  /**
+   * MIG-347: "Backfill…" -- run the schedule for each day of a past range, beside its own runs (so a run in flight does not
+   * stop it); a switched-off schedule cannot start one. A started backfill opens in Runs › Backfills.
+   */
+  backfill(job: SourceJob): void {
+    if (job.jobStatus !== 'Active') return;
+    openBackfill(this.dialog, { jobId: job.jobId, jobName: job.jobName, readsCosts: this.auth.isTenantAdmin() }).then(started => {
+      if (!started) return;
+      this.toast.success(`Backfill #${started.backfillId} of ${job.jobName} started: ${started.total} period(s).`);
+      this.router.navigate(['/runs/backfills'], { queryParams: { backfill: started.backfillId } });
+    });
+  }
+
   runWith(job: SourceJob): void {
     if (!this.canRunNow(job) || this.busyJob() === job.jobId) return;
     const data: RunWithData = { jobId: job.jobId, jobName: job.jobName };
@@ -769,7 +823,7 @@ export class Jobs implements OnInit {
     if (this.busyJob() === job.jobId) return;
     const activating = job.jobStatus !== 'Active';
     const ok = await confirmWith(this.dialog, {
-      title: activating ? 'Activate job' : 'Deactivate job',
+      title: activating ? 'Activate schedule' : 'Deactivate schedule',
       body: activating
         // A Manual job has no schedule to resume: activating it only makes it runnable again.
         ? (job.execution === 'Manual'
@@ -802,7 +856,7 @@ export class Jobs implements OnInit {
   async remove(job: SourceJob): Promise<void> {
     if (this.busyJob() === job.jobId) return;
     const ok = await confirmWith(this.dialog, {
-      title: 'Delete job',
+      title: 'Delete schedule',
       body: `"${job.jobName}" will be deleted and will stop running. Its run history is kept.`,
       confirmLabel: 'Delete',
       danger: true,
@@ -862,13 +916,13 @@ export class Jobs implements OnInit {
     const candidates = this.selectedJobs().filter(job => this.selectable(job));
     const jobs = candidates.filter(job => this.canRunNow(job));
     if (!jobs.length) {
-      this.toast.error('Select at least one active job that is not already running.');
+      this.toast.error('Select at least one active schedule that is not already running.');
       return;
     }
     const left = candidates.length - jobs.length;
-    const leftOut = left ? ` ${left} inactive job${left > 1 ? 's are' : ' is'} left out.` : '';
+    const leftOut = left ? ` ${left} inactive schedule${left > 1 ? 's are' : ' is'} left out.` : '';
     this.confirmBulk({
-      title: `Run ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
+      title: `Run ${jobs.length} schedule${jobs.length > 1 ? 's' : ''}?`,
       body: `Each one is queued immediately, ignoring its schedule.${leftOut}`,
       confirmLabel: 'Run them',
     }, jobs, 'run', 'queued');
@@ -884,17 +938,17 @@ export class Jobs implements OnInit {
   deleteSelected(): void {
     const jobs = this.selectedJobs();
     if (!jobs.length) {
-      this.toast.error('Select at least one job to delete.');
+      this.toast.error('Select at least one schedule to delete.');
       return;
     }
     const blocked = jobs.filter(job => this.isInFlight(job));
     if (blocked.length) {
       const names = blocked.slice(0, 3).map(job => `#${job.jobId} (${job.jobRunningStatus})`).join(', ');
-      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} jobs are` : names + ' is'} queued or running. Wait for the run to finish.`);
+      this.toast.error(`Cannot delete while ${blocked.length > 3 ? `${blocked.length} schedules are` : names + ' is'} queued or running. Wait for the run to finish.`);
       return;
     }
     this.confirmBulk({
-      title: `Delete ${jobs.length} job${jobs.length > 1 ? 's' : ''}?`,
+      title: `Delete ${jobs.length} schedule${jobs.length > 1 ? 's' : ''}?`,
       body: 'They stop running and leave the list. Their run history is kept.',
       confirmLabel: 'Delete them',
       danger: true,
@@ -949,7 +1003,7 @@ export class Jobs implements OnInit {
         if (failures.length) {
           this.toast.error(`${ok} ${verb}, ${failures.length} failed: ${failures.slice(0, 2).join('; ')}`);
         } else {
-          this.toast.success(`${ok} job${ok > 1 ? 's' : ''} ${verb}.`);
+          this.toast.success(`${ok} schedule${ok > 1 ? 's' : ''} ${verb}.`);
         }
         // A delete removes its rows outright, and only the ones the server actually deleted:
         // a row whose call failed is still there and hiding it would say otherwise.
@@ -980,6 +1034,12 @@ export class Jobs implements OnInit {
   clearSelection(): void { this.selected.set(new Set()); }
 
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  /** MIG-324: the list's own word is the menu's (schedules), and an empty one says what a schedule does. */
+  readonly emptyMessage = computed(() => this.hasFilters()
+    ? 'No schedules match the current filters.'
+    : this.locked()
+      ? 'No schedules yet.'
+      : 'No schedules yet. New schedule runs a pipeline on a timetable, when a file arrives in the inbox, or when you say so.');
   readonly hasFilters = computed(() =>
     !!(this.search() || this.statusFilter() || this.executionFilter() || this.workspaceFilter() || this.onlyMine()));
 

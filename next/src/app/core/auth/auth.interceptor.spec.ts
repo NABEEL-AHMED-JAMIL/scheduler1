@@ -280,6 +280,26 @@ describe('authInterceptor', () => {
     expect(loggedOut).toBe(false);
   });
 
+  // MIG-353: the server's idle sign-out. Its refusal signs out once, with the reason the login page shows; the error
+  // the refusal hands on reached the catchError below as well, which signed out a second time without it.
+  it('signs out once, saying why, when the refresh is refused for inactivity', () => {
+    const reasons: (string | undefined)[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [{
+        provide: AuthService,
+        useValue: {
+          accessToken: 'expired',
+          refresh: () => of({ status: 'ERROR', message: 'You were signed out after a period of inactivity. Please sign in again.' }),
+          logout: (reason?: string) => { reasons.push(reason); },
+        },
+      }],
+    });
+    TestBed.runInInjectionContext(() => authInterceptor(new HttpRequest('GET', '/api/v1/x'),
+      (() => throwError(() => new HttpErrorResponse({ status: 401 }))) as any)).subscribe({ error: () => {} });
+    expect(reasons).toEqual(['idle']);
+  });
+
   it('leaves a failure that is not a 401 to the caller', () => {
     let loggedOut = false;
     TestBed.resetTestingModule();

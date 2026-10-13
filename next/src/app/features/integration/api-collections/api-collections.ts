@@ -26,6 +26,8 @@ import { InUseDialog, InUseData } from './in-use-dialog';
 import { saveCollectionKeepingAuth } from './collection-save';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * API Collections (MIG-247, Integration menu, page key api-collections): the workspace's reusable APIs.
@@ -37,7 +39,7 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
  */
 @Component({
   selector: 'app-api-collections',
-  imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
+  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem,
     CdkMenuTrigger, RouterLink, ManagedBanner],
   templateUrl: './api-collections.html',
 })
@@ -140,7 +142,7 @@ export class ApiCollections implements OnInit {
   create(): void {
     const data: CollectionDialogData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
     this.dialog.open<number | null>(CollectionDialog, { data }).closed.subscribe(id => {
-      if (id) this.router.navigate(['/integration/api-collections', id]);
+      if (id) this.router.navigate(['/connections/api-collections', id]);
     });
   }
 
@@ -153,7 +155,7 @@ export class ApiCollections implements OnInit {
     const data: ImportDialogData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
     this.dialog.open<{ collectionId: number; open: boolean } | null>(ImportDialog, { data }).closed.subscribe(done => {
       if (!done) return;
-      if (done.open) this.router.navigate(['/integration/api-collections', done.collectionId]);
+      if (done.open) this.router.navigate(['/connections/api-collections', done.collectionId]);
       else this.load();
     });
   }

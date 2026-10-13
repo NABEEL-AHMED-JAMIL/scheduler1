@@ -65,7 +65,7 @@ import { ThemeService } from '../../core/theme.service';
                        [control]="form.get('organisationName')" [submitted]="submitted()"
                        hint="The name your workspace will carry." [errorMessages]="tooLong">
               <input id="organisationName" class="input" formControlName="organisationName" maxlength="255"
-                     placeholder="Northwind Logistics" />
+                     placeholder="Acme Ltd" />
             </app-field>
 
             <div class="form-grid">

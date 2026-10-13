@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "a connection, as a workspace administrator": {
-    "url": "/integration/connectors",
+    "url": "/connections/connectors",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -10,7 +10,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /connectorHub.json/connection/list"
     ],
     "headings": [
-      "Connector Hub",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -43,7 +43,15 @@ export const PINNED: Record<string, unknown> = {
       "Search connectors",
       "State"
     ],
-    "links": [],
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
+    ],
     "panel": {
       "headings": [
         "Shop DB (demo)",
@@ -87,7 +95,7 @@ export const PINNED: Record<string, unknown> = {
     }
   },
   "the gallery and connections, as a tenant user with the page": {
-    "url": "/integration/connectors",
+    "url": "/connections/connectors",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -95,7 +103,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /connectorHub.json/connection/list"
     ],
     "headings": [
-      "Connector Hub",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -124,10 +132,17 @@ export const PINNED: Record<string, unknown> = {
       "Search connectors",
       "State"
     ],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources"
+    ]
   },
   "the gallery and connections, as a workspace administrator": {
-    "url": "/integration/connectors",
+    "url": "/connections/connectors",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -136,7 +151,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /connectorHub.json/connection/list"
     ],
     "headings": [
-      "Connector Hub",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -169,16 +184,24 @@ export const PINNED: Record<string, unknown> = {
       "Search connectors",
       "State"
     ],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
+    ]
   },
   "the page, as a tenant user without it": {
-    "url": "/unauthorized?page=connector-hub",
+    "url": "/unauthorized?page=connector-hub&title=Connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Connector Hub isn't part of your access"
+      "Connections isn't part of your access"
     ],
     "buttons": [
       "Request access"

@@ -54,29 +54,29 @@ describe('MIG-253: Documents -- the converter\'s render modes, Reports, and a fi
   afterEach(() => restoreClock());
 
   it('the converter, Dataset → PDF', async () => {
-    const v = await visit('/documents/converter', 'TENANT_ADMIN', null, RENDER);
-    const requests = await click(v, 'Dataset → PDF');
+    const v = await visit('/tools/converter', 'TENANT_ADMIN', null, RENDER);
+    const requests = await click(v, 'PDF from a dataset');
     pin(FILE, 'the converter, Dataset → PDF', { requests, ...surfaceOf(v.main) }, PINNED);
   });
 
   it('the converter, From an execution', async () => {
-    const v = await visit('/documents/converter', 'TENANT_ADMIN', null, { ...RENDER, ...RUNS });
-    const requests = await click(v, 'From an execution');
+    const v = await visit('/tools/converter', 'TENANT_ADMIN', null, { ...RENDER, ...RUNS });
+    const requests = await click(v, 'PDF from a run');
     pin(FILE, 'the converter, From an execution', { requests, ...surfaceOf(v.main) }, PINNED);
   });
 
   it('Reports, as a workspace administrator', async () => {
-    const v = await visit('/documents/reports', 'TENANT_ADMIN', null, { ...RUNS, ...REPORTS_FOLDER });
+    const v = await visit('/data/reports', 'TENANT_ADMIN', null, { ...RUNS, ...REPORTS_FOLDER });
     pin(FILE, 'Reports, as a workspace administrator', v.surface, PINNED);
   });
 
   it('Reports, as a tenant user without the page', async () => {
-    const v = await visit('/documents/reports', 'TENANT_USER', TU_PAGES);
+    const v = await visit('/data/reports', 'TENANT_USER', TU_PAGES);
     pin(FILE, 'Reports, as a tenant user without the page', v.surface, PINNED);
   });
 
   it('a file\'s details, written by a recent run', async () => {
-    const v = await visit(`/documents/files?bucket=${LIVE_IDS.bucket}&prefix=registry-live-check/`, 'TENANT_ADMIN', null, {
+    const v = await visit(`/data/files?bucket=${LIVE_IDS.bucket}&prefix=registry-live-check/`, 'TENANT_ADMIN', null, {
       ...RUNS, ...REPORTS_FOLDER,
       'GET /storage.json/listObjects': ok({ objects: [{ name: 'customers-clean.json', key: KEY, folder: false, size: 169,
         lastModified: '2026-09-29T12:07:05Z', contentType: 'application/json' }] }),

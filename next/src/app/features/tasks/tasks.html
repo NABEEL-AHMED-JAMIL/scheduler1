@@ -1,31 +1,31 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-    <h1 class="page-title">Pipelines</h1>
-    <p class="page-subtitle">
-      A pipeline describes one unit of work and where it reads and writes. Schedules point at these.
-    </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+      <h1 class="page-title">Pipelines</h1>
+      <p class="page-subtitle">
+        A pipeline describes one unit of work and where it reads and writes. Schedules point at these.
+      </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
+             Both routes behind these links are guarded, so for a tenant user they only ever led to
+             /unauthorized -- an offer the console already knows it cannot keep. -->
+        @if (auth.canManageTasks()) {
+          <a routerLink="/pipelines/bulk" class="btn btn-default btn-sm">
+            <app-icon name="upload" />Bulk import
+          </a>
+          <a routerLink="/pipelines/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New pipeline</a>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
-           Both routes behind these links are guarded, so for a tenant user they only ever led to
-           /unauthorized -- an offer the console already knows it cannot keep. -->
-      @if (auth.canManageTasks()) {
-        <a routerLink="/pipelines/bulk" class="btn btn-default btn-sm">
-          <app-icon name="upload" />Bulk import
-        </a>
-        <a routerLink="/pipelines/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New pipeline</a>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="pipelines" />
 
-  <app-table-shell heading="Tasks" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Pipelines" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="tasks().length"
-                   [emptyMessage]="hasFilters() ? 'No tasks match the filters.' : 'No tasks yet.'"
+                   [emptyMessage]="emptyMessage()"
                    emptyIcon="list"
                    (retry)="load()">
     <ng-container toolbar>
@@ -54,7 +54,7 @@
       <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
         <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, name, topic, pipeline or workspace' : 'Search id, name, topic or pipeline'"
-               aria-label="Search tasks"
+               aria-label="Search pipelines"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" />
@@ -105,8 +105,8 @@
                       <button cdkMenuItem class="menu-item menu-item-danger"
                               [disabled]="task.taskStatus === 'Delete' || inUse(task)"
                               [title]="inUse(task)
-                                ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
-                                : 'Delete this task'"
+                                ? 'Used by ' + task.totalLinksJobs + ' schedule(s). Move or delete those first.'
+                                : 'Delete this pipeline'"
                               (cdkMenuItemTriggered)="remove(task)">
                         <app-icon name="trash" class="icon-crit" />Delete
                         @if (task.totalLinksJobs) {
@@ -119,37 +119,23 @@
               </div>
             </div>
 
+            <!-- UX review 2026-10-12 (B2, P1): what the pipeline does and how it last went, not where it publishes. -->
             <dl class="text-xs grid gap-1">
               <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Type</dt>
-                <dd class="truncate min-w-0">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Steps</dt>
+                <dd class="truncate min-w-0">{{ stepsText(task) }}</dd>
               </div>
               <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Topic</dt>
-                <dd class="mono truncate min-w-0">
-                  {{ topicOf(task.sourceTaskType?.queueTopicPartition) || '—' }}
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Last run</dt>
+                <dd class="truncate min-w-0">
+                  @if (task.lastRun; as run) {
+                    <app-status [label]="run.jobStatus || '—'" /> {{ run.at ? (run.at | serverTime: 'recent') : '' }}
+                  } @else { Never }
                 </dd>
               </div>
               <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Pipeline</dt>
-                <dd class="truncate min-w-0" [title]="task.pipelineId">{{ task.pipelineId || '—' }}</dd>
-              </div>
-              <!-- Where it reads and writes is the question a task card is usually opened for. -->
-              <div class="flex gap-2 min-w-0">
-                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Storage</dt>
-                <dd class="mono truncate min-w-0" [title]="storageFlow(task)">
-                  @if (hasStorage(task)) {
-                    @if (task.bucket) {
-                      {{ task.bucket }}
-                    } @else if (usesDefaultBucket(task)) {
-                      <span class="font-sans text-[color:var(--text-muted)] italic"
-                            title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</span>
-                    }
-                    @if (storageFlow(task); as flow) {
-                      <span class="text-[color:var(--text-muted)]"> · {{ flow }}</span>
-                    }
-                  } @else { — }
-                </dd>
+                <dt class="text-[color:var(--text-muted)] shrink-0 w-16">Data</dt>
+                <dd class="truncate min-w-0">{{ task.sensitivity ? sensitivityText(task.sensitivity) : 'Not set' }}@if (task.reviewRequired) { · reviewed }</dd>
               </div>
             </dl>
 
@@ -177,19 +163,19 @@
           @if (seesWorkspaces()) {
             <th class="hidden xl:table-cell">Workspace</th>
           }
-          <!-- Type waits for xl: at 1024 it pushed Status and the row menu off the card, and the
-               Topic beside it already says where the work goes. -->
-          <th class="hidden xl:table-cell">Type</th>
-          <th>Topic</th>
-          <th>Pipeline</th>
-          <th>Storage</th>
+          <!-- UX review 2026-10-12 (B2, P1): what a user needs -- its steps, schedules, last run and the data's
+               sensitivity. The topic, registry task and storage are infrastructure: under the row's Advanced. -->
+          <th class="num">Steps</th>
+          <th class="num">Schedules</th>
+          <th>Last run</th>
+          <th class="hidden xl:table-cell">Data</th>
           <!-- Metadata, not identity: hidden until there is width for it, so Status and the
                row menu stay on screen instead of behind a horizontal scrollbar. -->
           <th class="hidden 2xl:table-cell">Created by</th>
           <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">Status</th>
           <!-- Pinned, so a long topic or bucket name can never push the menu off-screen again. -->
-          <th class="w-16 col-pin-right"><span class="sr-only">Actions</span></th>
+          <th class="w-16 col-pin-right th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -199,40 +185,40 @@
               <button type="button" class="btn btn-ghost btn-icon btn-xs"
                       (click)="toggleRow(task)"
                       [attr.aria-expanded]="expanded().has(task.taskDetailId)"
-                      [attr.aria-label]="expanded().has(task.taskDetailId) ? 'Hide payload' : 'Show payload'">
+                      [attr.aria-label]="expanded().has(task.taskDetailId) ? 'Hide details' : 'Show schedules and details'">
                 <app-icon [name]="expanded().has(task.taskDetailId) ? 'chevronDown' : 'chevronRight'" />
               </button>
             </td>
             <td class="max-w-64">
-              <div class="font-medium truncate" [title]="task.taskName">{{ task.taskName || '—' }}</div>
+              <a class="font-medium truncate block link-inline" [routerLink]="['/pipelines', task.taskDetailId, 'edit']" [title]="task.taskName">{{ task.taskName || '—' }}</a>
               <div class="mono text-[color:var(--text-muted)]">#{{ task.taskDetailId }}</div>
             </td>
             @if (seesWorkspaces()) {
               <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate"
                   [title]="workspaceName(task)">{{ workspaceName(task) }}</td>
             }
-            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] max-w-44 truncate">
-              {{ task.sourceTaskType?.serviceName || '—' }}
+            <td class="num">
+              @if (task.stepCount == null) { — }
+              @else if (task.stepCount === 0) { <span class="pill pill-neutral" title="No steps saved: it runs as its legacy step, its payload sent to its worker">Legacy</span> }
+              @else { {{ task.stepCount }} }
             </td>
-            <td>
-              @if (topicOf(task.sourceTaskType?.queueTopicPartition); as topic) {
-                <span class="mono text-[color:var(--text-secondary)]">{{ topic }}</span>
-              } @else { — }
+            <td class="num">
+              @if (task.totalLinksJobs) { {{ task.totalLinksJobs }} }
+              @else { <span class="text-[color:var(--text-muted)]" title="No schedule runs this pipeline yet">0</span> }
             </td>
-            <td class="text-[color:var(--text-secondary)] max-w-40 truncate"
-                [title]="task.pipelineId">{{ task.pipelineId || '—' }}</td>
-            <td class="text-[color:var(--text-secondary)]">
-              @if (hasStorage(task)) {
-                @if (task.bucket) {
-                  <div class="mono whitespace-nowrap">{{ task.bucket }}</div>
-                } @else if (usesDefaultBucket(task)) {
-                  <div class="text-xs text-[color:var(--text-muted)] italic"
-                       title="This task sets no <bucket> tag, so it uses the platform's default bucket.">default bucket</div>
-                }
-                @if (storageFlow(task); as flow) {
-                  <div class="mono text-[color:var(--text-muted)]">{{ flow }}</div>
-                }
-              } @else { — }
+            <td class="whitespace-nowrap">
+              @if (task.lastRun; as run) {
+                <a class="inline-flex items-center gap-1.5 link-inline" [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId]"
+                   [title]="'Run #' + run.jobQueueId">
+                  <app-status [label]="run.jobStatus || '—'" />
+                  <span class="text-xs text-[color:var(--text-secondary)]">{{ run.at ? (run.at | serverTime: 'recent') : '#' + run.jobQueueId }}</span>
+                </a>
+              } @else { <span class="text-xs text-[color:var(--text-muted)]">{{ task.stepCount != null ? 'Never' : '—' }}</span> }
+            </td>
+            <td class="hidden xl:table-cell text-xs whitespace-nowrap">
+              @if (task.sensitivity) { <span class="pill" [class.pill-warn]="task.sensitivity === 'sensitive'" [class.pill-neutral]="task.sensitivity !== 'sensitive'">{{ sensitivityText(task.sensitivity) }}</span> }
+              @else { <span class="text-[color:var(--text-muted)]">Not set</span> }
+              @if (task.reviewRequired) { <span class="pill pill-neutral ml-1" title="Its results wait for a review">Reviewed</span> }
             </td>
             <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ task.createdByName || '—' }}
@@ -260,8 +246,8 @@
                     <button cdkMenuItem class="menu-item menu-item-danger"
                             [disabled]="task.taskStatus === 'Delete' || inUse(task)"
                             [title]="inUse(task)
-                              ? 'Used by ' + task.totalLinksJobs + ' job(s). Move or delete those first.'
-                              : 'Delete this task'"
+                              ? 'Used by ' + task.totalLinksJobs + ' schedule(s). Move or delete those first.'
+                              : 'Delete this pipeline'"
                             (cdkMenuItemTriggered)="remove(task)">
                       <app-icon name="trash" class="icon-crit" />Delete
                       @if (task.totalLinksJobs) {
@@ -281,27 +267,8 @@
                    grew to ten when Created by and Updated by were added, and to eleven with a
                    platform administrator's Workspace column. -->
               <td [attr.colspan]="seesWorkspaces() ? 10 : 9" class="!py-3">
-                @if (task.taskPayload) {
-                  <div class="flex items-center gap-2 mb-1.5">
-                    <app-icon name="file" size="0.9em" class="icon-muted" />
-                    <span class="text-xs font-semibold">Payload</span>
-                    @if (task.totalLinksJobs) {
-                      <span class="pill pill-neutral">{{ task.totalLinksJobs }} schedule{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
-                    }
-                    <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(task)">
-                      <app-icon [name]="copiedId() === task.taskDetailId ? 'check' : 'copy'"
-                                [class.icon-ok]="copiedId() === task.taskDetailId" size="0.85em" />
-                      {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}
-                    </button>
-                  </div>
-                  <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
-                      >{{ task.taskPayload }}</pre>
-                } @else {
-                  <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
-                }
-
                 @if (task.totalLinksJobs) {
-                  <div class="flex items-center gap-2 mt-4 mb-1.5">
+                  <div class="flex items-center gap-2 mb-1.5">
                     <app-icon name="briefcase" size="0.9em" class="icon-muted" />
                     <span class="text-xs font-semibold">Schedules that run this pipeline</span>
                     @if (linkedLoading() === task.taskDetailId) {
@@ -356,6 +323,42 @@
                     }
                   }
                 }
+                <!-- UX review 2026-10-12 (B2, P2): the schedules first; the infrastructure and the legacy payload after them. -->
+                @if (!task.totalLinksJobs) {
+                  <p class="text-xs text-[color:var(--text-muted)]">No schedule runs this pipeline yet. <a class="link-inline" [routerLink]="['/pipelines/schedules/new']" [queryParams]="{ taskDetailId: task.taskDetailId }">Schedule it</a></p>
+                }
+                <details class="mt-4" data-test="pipeline-advanced">
+                  <summary class="text-xs font-semibold cursor-pointer">Advanced: topic, registry task, storage and payload</summary>
+                  <dl class="text-xs grid gap-1 mt-2 mb-3">
+                    <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] w-24 shrink-0">Type</dt><dd>{{ task.sourceTaskType?.serviceName || '—' }}</dd></div>
+                    <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] w-24 shrink-0">Topic</dt><dd class="mono">{{ topicOf(task.sourceTaskType?.queueTopicPartition) || '—' }}</dd></div>
+                    <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] w-24 shrink-0">Registry task</dt><dd class="mono">{{ task.pipelineId || '—' }}</dd></div>
+                    <div class="flex gap-2"><dt class="text-[color:var(--text-muted)] w-24 shrink-0">Storage</dt><dd class="mono">
+                      @if (hasStorage(task)) {
+                        @if (task.bucket) { {{ task.bucket }} } @else if (usesDefaultBucket(task)) { <span class="font-sans italic text-[color:var(--text-muted)]">default bucket</span> }
+                        @if (storageFlow(task); as flow) { · {{ flow }} }
+                      } @else { — }
+                    </dd></div>
+                  </dl>
+                  @if (task.taskPayload) {
+                    <div class="flex items-center gap-2 mb-1.5">
+                      <app-icon name="file" size="0.9em" class="icon-muted" />
+                      <span class="text-xs font-semibold">Payload</span>
+                      @if (task.totalLinksJobs) {
+                        <span class="pill pill-neutral">{{ task.totalLinksJobs }} schedule{{ task.totalLinksJobs === 1 ? '' : 's' }}</span>
+                      }
+                      <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(task)">
+                        <app-icon [name]="copiedId() === task.taskDetailId ? 'check' : 'copy'"
+                                  [class.icon-ok]="copiedId() === task.taskDetailId" size="0.85em" />
+                        {{ copiedId() === task.taskDetailId ? 'Copied' : 'Copy' }}
+                      </button>
+                    </div>
+                    <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
+                        >{{ task.taskPayload }}</pre>
+                  } @else {
+                    <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
+                  }
+                </details>
               </td>
             </tr>
           }

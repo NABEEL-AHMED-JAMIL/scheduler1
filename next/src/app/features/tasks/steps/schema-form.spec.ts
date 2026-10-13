@@ -249,6 +249,25 @@ describe('SchemaForm -- a prompt setting', () => {
     return { el: fixture.nativeElement as HTMLElement, fixture, changes };
   }
 
+  it('offers the workspace\'s buckets for a bucket setting, and still takes an alias typed by hand (MIG-321)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', { type: 'object', properties: { bucket: { type: 'string', format: 'bucket', title: 'Bucket' } } });
+    fixture.componentRef.setInput('value', null);
+    fixture.componentRef.setInput('buckets', [{ alias: 'ui-review-s3', label: 'Review bucket' }]);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const box = el.querySelector<HTMLInputElement>('#cfg-bucket')!;
+    expect(box.getAttribute('list')).toBe('cfg-bucket-buckets');
+    expect(Array.from(el.querySelectorAll('#cfg-bucket-buckets option')).map(o => (o as HTMLOptionElement).value)).toEqual(['ui-review-s3']);
+    box.value = 'archive';
+    box.dispatchEvent(new Event('input'));
+    expect(changes[changes.length - 1]).toEqual({ bucket: 'archive' });
+  });
+
   it('offers the prompts by name and stores the chosen id as a number', () => {
     const { el, fixture, changes } = promptForm([{ id: 41, label: 'Wound assessment' }, { id: 42, label: 'Summary' }], { promptId: 42 });
     const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
@@ -266,5 +285,62 @@ describe('SchemaForm -- a prompt setting', () => {
     const select = el.querySelector<HTMLSelectElement>('#cfg-promptId')!;
     expect(Array.from(select.options).map(o => o.textContent!.trim())).toContain('Prompt 99 (not an active prompt here)');
     expect(select.value).toBe('99');
+  });
+});
+
+/**
+ * MIG-364: the Read documents step names a document type: a choice of the workspace's types, stored as its id. Optional,
+ * so empty is the documents whose approval started the run.
+ */
+describe('SchemaForm -- a document-type setting', () => {
+  const TYPE_SCHEMA: JsonSchema = { type: 'object',
+    properties: { documentTypeId: { type: 'integer', format: 'document-type', title: 'Document type' } } };
+
+  function typeForm(types: { id: number; label: string }[], value: Record<string, unknown> | null, schema: JsonSchema = TYPE_SCHEMA) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [SchemaForm], providers: [provideZonelessChangeDetection()] });
+    const fixture = TestBed.createComponent(SchemaForm);
+    fixture.componentRef.setInput('schema', schema);
+    fixture.componentRef.setInput('value', value);
+    fixture.componentRef.setInput('documentTypes', types);
+    const changes: Record<string, unknown>[] = [];
+    fixture.componentInstance.valueChange.subscribe(v => changes.push(v));
+    fixture.detectChanges();
+    const select = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-documentTypeId')!;
+    return { select, fixture, changes };
+  }
+
+  it('offers the types by name, empty as the documents that started the run, and stores the id as a number', () => {
+    const { select, fixture, changes } = typeForm([{ id: 1007, label: 'Intake form' }, { id: 1008, label: 'Referral letter' }], { documentTypeId: 1008 });
+    expect(select.tagName).toBe('SELECT');
+    expect(Array.from(select.options).map(o => o.textContent!.trim()))
+      .toEqual(['The documents that started the run', 'Intake form', 'Referral letter']);
+    expect(select.value).toBe('1008');
+    select.value = '1007';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(changes.at(-1)).toEqual({ documentTypeId: 1007 });
+    select.value = '';
+    select.dispatchEvent(new Event('change'));
+    expect(changes.at(-1)).toEqual({});
+  });
+
+  it('asks for a choice when the type is required', () => {
+    const { select } = typeForm([{ id: 1007, label: 'Intake form' }], null,
+      { ...TYPE_SCHEMA, required: ['documentTypeId'] });
+    expect(select.options[0].textContent!.trim()).toBe('Choose a document type…');
+  });
+
+  it('keeps a saved type the workspace no longer has, by its id', () => {
+    const { select } = typeForm([{ id: 1007, label: 'Intake form' }], { documentTypeId: 1099 });
+    expect(Array.from(select.options).map(o => o.textContent!.trim())).toContain('Document type 1099 (not in this workspace)');
+    expect(select.value).toBe('1099');
+  });
+
+  it('reaches a document-type setting inside a group', () => {
+    const { fixture } = typeForm([{ id: 1007, label: 'Intake form' }], { source: { documentTypeId: 1007 } },
+      { type: 'object', properties: { source: TYPE_SCHEMA } });
+    const nested = (fixture.nativeElement as HTMLElement).querySelector<HTMLSelectElement>('#cfg-source-documentTypeId')!;
+    expect(nested.value).toBe('1007');
   });
 });

@@ -1,22 +1,22 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">API Collections</h1>
-      <p class="page-subtitle">
-        Reusable APIs for this workspace. Pipelines and sources reference an API here; they never copy its configuration.
-        Secrets live in a collection's environments and are never shown again once saved.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">API Collections</h1>
+        <p class="page-subtitle">
+          Reusable APIs for this workspace. Pipelines and sources reference an API here; they never copy its configuration.
+          Secrets live in a collection's environments and are never shown again once saved.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canManage()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="importFiles()"><app-icon name="upload" />Import</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New collection</button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (canManage()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="importFiles()"><app-icon name="upload" />Import</button>
-        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New collection</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="API collections" />
 
   <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="API collections at a glance" />
@@ -57,7 +57,7 @@
               <span class="stat-glyph shrink-0"><app-icon name="code" /></span>
               <div class="min-w-0 flex-1">
                 <h3 class="font-semibold truncate">
-                  <a class="link-inline" [routerLink]="['/integration/api-collections', c.collectionId]">{{ c.name }}</a>
+                  <a class="link-inline" [routerLink]="['/connections/api-collections', c.collectionId]">{{ c.name }}</a>
                 </h3>
                 <p class="text-xs text-[color:var(--text-muted)]">
                   {{ sourceLabel(c.sourceFormat) }} · v{{ c.currentVersion ?? 0 }}@if (isPlatformAdmin()) { · {{ workspace(c) }} }
@@ -69,7 +69,7 @@
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="cardMenu" [attr.aria-label]="'Actions for ' + c.name"><app-icon name="dots" size="1.05em" /></button>
                   <ng-template #cardMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                      <a cdkMenuItem class="menu-item" [routerLink]="['/integration/api-collections', c.collectionId]"><app-icon name="eye" />Open</a>
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/connections/api-collections', c.collectionId]"><app-icon name="eye" />Open</a>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit details</button>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setStatus(c)"><app-icon [name]="c.status === 'Active' ? 'pause' : 'play'" />{{ c.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
                       <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
@@ -101,14 +101,14 @@
             <th>Updated</th>
             @if (isPlatformAdmin()) { <th>Workspace</th> }
             <th class="text-right">State</th>
-            @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+            @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
           </tr>
         </thead>
         <tbody>
           @for (c of filtered(); track c.collectionId) {
             <tr>
               <td class="max-w-80">
-                <a class="link-inline font-medium" [routerLink]="['/integration/api-collections', c.collectionId]">{{ c.name }}</a>
+                <a class="link-inline font-medium" [routerLink]="['/connections/api-collections', c.collectionId]">{{ c.name }}</a>
                 @if (c.description) { <app-data-text class="block text-xs text-[color:var(--text-muted)]" [value]="c.description" label="Description" /> }
               </td>
               <td class="whitespace-nowrap">{{ sourceLabel(c.sourceFormat) }}</td>
@@ -126,7 +126,7 @@
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + c.name"><app-icon name="dots" size="1.05em" /></button>
                   <ng-template #rowMenu>
                     <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                      <a cdkMenuItem class="menu-item" [routerLink]="['/integration/api-collections', c.collectionId]"><app-icon name="eye" />Open</a>
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/connections/api-collections', c.collectionId]"><app-icon name="eye" />Open</a>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(c)"><app-icon name="edit" />Edit details</button>
                       <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setStatus(c)"><app-icon [name]="c.status === 'Active' ? 'pause' : 'play'" />{{ c.status === 'Active' ? 'Deactivate' : 'Activate' }}</button>
                       <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>

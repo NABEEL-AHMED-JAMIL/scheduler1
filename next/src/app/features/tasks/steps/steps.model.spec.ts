@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   Definition, StepTaskEntry, addStep, canonical, coerce, inputColumns, isMapSchema, mapValueKind, outputColumns, refusalOf, definitionJson, fieldsOf, isLegacyDefinition, moveStep, nextKey, problemsByStep,
   removeStep, replaceStep, runFinished, sampleRowsOf, schemaSupported, seedConfig, taskEntry, taskOptions, toYaml, updateSettings,
-  withSample, parseSampleRows,
+  withSample, parseSampleRows, usesWebhook, usesDocumentType,
 } from './steps.model';
 
 /**
@@ -310,7 +310,7 @@ describe('steps model -- a config form from the task\'s JSON Schema', () => {
     expect(fields.map(f => [f.name, f.kind, f.itemKind ?? ''])).toEqual([
       ['column', 'column', ''], ['with', 'step', ''], ['query', 'textarea', ''], ['title', 'textarea', ''], ['message', 'textarea', ''],
       ['groupBy', 'columns', ''], ['value', 'scalar', ''], ['values', 'list', 'scalar'], ['columns', 'json', ''], ['maybe', 'text', ''],
-      ['bucket', 'text', ''], ['headers', 'object', ''], ['rows', 'objects', ''],
+      ['bucket', 'bucket', ''], ['headers', 'object', ''], ['rows', 'objects', ''],
     ]);
     expect(isMapSchema(fields[11].schema)).toBe(true);
     expect(mapValueKind(fields[11].schema)).toBe('text');
@@ -373,6 +373,39 @@ describe('steps model -- Test with sample', () => {
     expect(parseSampleRows('[{"a": {"b": 1}}]').error).toBe('Row 1, a: a value is text, a number, true/false or null.');
     expect(parseSampleRows('[{').error).toMatch(/^Not JSON/);
     expect(parseSampleRows('[]').error).toBe('At least one row.');
+  });
+});
+
+describe('fieldsOf -- MIG-364', () => {
+  it('reads an integer with the document-type hint as a document type choice, and knows a task that names one', () => {
+    const schema = { type: 'object', properties: { documentTypeId: { type: 'integer', format: 'document-type', title: 'Document type' } } };
+    expect(fieldsOf(schema)[0].kind).toBe('document-type');
+    expect(usesDocumentType(schema)).toBe(true);
+    expect(usesDocumentType({ type: 'object', properties: { source: schema } })).toBe(true);
+    expect(usesDocumentType({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
+  });
+});
+
+describe('fieldsOf -- MIG-346', () => {
+  it('reads an integer with the webhook hint as a webhook choice, and knows a task that names one', () => {
+    const schema = { type: 'object', properties: { webhookId: { type: 'integer', format: 'webhook' }, send: { type: 'string', enum: ['summary', 'rows'] } } };
+    expect(fieldsOf(schema)[0].kind).toBe('webhook');
+    expect(usesWebhook(schema)).toBe(true);
+    expect(usesWebhook({ type: 'object', properties: { promptId: { type: 'integer', format: 'prompt' } } })).toBe(false);
+    expect(schemaSupported(schema)).toBe(true);
+  });
+
+  it('draws the new steps\' settings as forms: append, sort, limit, approval, render_pdf sections', () => {
+    const order = { type: 'array', items: { type: 'object', properties: { column: { type: 'string', format: 'column' },
+      direction: { type: 'string', enum: ['asc', 'desc'] } }, required: ['column'] } };
+    expect(fieldsOf({ type: 'object', properties: { steps: { type: 'array', items: { type: 'string', format: 'step' } } } })[0].kind).toBe('list');
+    expect(fieldsOf({ type: 'object', properties: { by: order } })[0].kind).toBe('objects');
+    expect(schemaSupported({ type: 'object', properties: { rows: { type: 'integer' }, by: order } })).toBe(true);
+    const reviewers = { type: 'object', properties: { kind: { type: 'string', enum: ['role', 'group'] }, value: { type: 'string' } } };
+    expect(fieldsOf({ type: 'object', properties: { reviewers } })[0].kind).toBe('object');
+    const sections = { type: 'array', items: { type: 'object', properties: { title: { type: 'string', format: 'template' },
+      input: { type: 'string', format: 'step' }, columns: { type: 'array', items: { type: 'string', format: 'column' } } } } };
+    expect(schemaSupported({ type: 'object', properties: { sections } })).toBe(true);
   });
 });
 

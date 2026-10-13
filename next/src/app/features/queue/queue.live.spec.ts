@@ -124,14 +124,17 @@ describe('Queue rows lead somewhere', () => {
 
   it('links the run to its logs and the job to its history', () => {
     const hrefs = [...render().querySelectorAll('table a')].map(a => a.getAttribute('href'));
-    expect(hrefs).toContain('/pipelines/schedules/2838/runs/7359/logs');
+    expect(hrefs).toContain('/pipelines/schedules/2838/runs/7359');
     expect(hrefs).toContain('/pipelines/schedules/2838/executions');
   });
 
-  it('shows plain text to someone whose profile has Queue but not Jobs', () => {
+  // Review 2026-10-07: the job names come from the Schedules page's list, which the service refuses a Queue-only reader
+  // (a 403 on every open); their rows are named by number, as they always were once that refusal landed.
+  it('shows plain text to someone whose profile has Queue but not Jobs, the job by its number', () => {
     const el = render(false);
     expect(el.querySelectorAll('table a').length).toBe(0);
-    expect(el.textContent).toContain('Nightly ledger check');
+    expect(el.textContent).toContain('Schedule #2838');
+    expect(el.textContent).not.toContain('Nightly ledger check');
   });
 
   it('names the job in the busiest-jobs chart', () => {
@@ -139,6 +142,6 @@ describe('Queue rows lead somewhere', () => {
     const queue = TestBed.runInInjectionContext(() => new Queue());
     queue.ngOnInit();
     queue.rows.set([row(), row({ jobQueueId: 1, jobId: 9 })]);
-    expect(queue.byJob().map(b => b.name)).toEqual(['Nightly ledger check', 'Job #9']);
+    expect(queue.byJob().map(b => b.name)).toEqual(['Nightly ledger check', 'Schedule #9']);
   });
 });

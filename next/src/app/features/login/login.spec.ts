@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { of } from 'rxjs';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
-import { Login } from './login';
+import { Login, safeReturn } from './login';
+import { SignInApi } from './sign-in.api';
 import { AuthService } from '../../core/auth/auth.service';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
@@ -105,5 +106,101 @@ describe('Login -- ways out', () => {
 
   it('does not show bullets in the empty password field, as if one were already filled in', () => {
     expect(render({}).querySelector('#password')!.getAttribute('placeholder') ?? '').not.toContain('•');
+  });
+});
+
+/**
+ * MIG-353: the steps after the password -- a two-factor code (or a recovery code) when the account has it on, and the
+ * company sign-in -- and the reason a session ended for inactivity.
+ */
+describe('Login -- two-factor and single sign-on (MIG-353)', () => {
+  function withApi(login: () => unknown, api: Record<string, unknown>) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [Login],
+      providers: [
+        provideRouter([]),
+        { provide: AuthService, useValue: { login, signedIn: () => {} } },
+        { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
+        { provide: SignInApi, useValue: api },
+      ],
+    });
+    const fixture = TestBed.createComponent(Login);
+    fixture.detectChanges();
+    return fixture;
+  }
+
+  it('says the session ended for inactivity', () => {
+    const page = render({ reason: 'idle' });
+    expect(page.querySelector('[role="status"]')?.textContent).toContain('signed out because the console was not used');
+  });
+
+  it('asks for the code when the password answers a challenge, and sends it with the challenge', () => {
+    const verifyMfa = vi.fn(() => of({ status: 'SUCCESS', message: '', data: { accessToken: 'a', refreshToken: 'r' } }));
+    const fixture = withApi(
+      () => of({ status: 'SUCCESS', message: '', data: { mfaRequired: true, mfaToken: 'challenge-1', username: 'me' } }),
+      { verifyMfa });
+    const login = fixture.componentInstance;
+    login.form.setValue({ username: 'me', password: 'right' });
+    login.submit();
+    fixture.detectChanges();
+    const page = fixture.nativeElement as HTMLElement;
+    expect(login.stage()).toBe('code');
+    expect(page.querySelector('#mfa-code')).not.toBeNull();
+    expect(login.form.controls.password.value).toBe('');
+    login.code.set('123 456');
+    login.submitCode();
+    expect(verifyMfa).toHaveBeenCalledWith('challenge-1', '123456', null);
+  });
+
+  it('sends a recovery code as one, not as an app code', () => {
+    const verifyMfa = vi.fn(() => of({ status: 'ERROR', message: 'That code did not work.' }));
+    const fixture = withApi(
+      () => of({ status: 'SUCCESS', message: '', data: { mfaRequired: true, mfaToken: 'challenge-2' } }), { verifyMfa });
+    const login = fixture.componentInstance;
+    login.form.setValue({ username: 'me', password: 'right' });
+    login.submit();
+    login.toggleRecovery();
+    login.code.set('abcd-efgh');
+    login.submitCode();
+    fixture.detectChanges();
+    expect(verifyMfa).toHaveBeenCalledWith('challenge-2', null, 'abcd-efgh');
+    expect((fixture.nativeElement as HTMLElement).querySelector('[role="alert"]')?.textContent).toContain('That code did not work.');
+    expect(login.stage()).toBe('code');
+  });
+
+  it('goes back to the password when the challenge is spent', () => {
+    const fixture = withApi(
+      () => of({ status: 'SUCCESS', message: '', data: { mfaRequired: true, mfaToken: 'c' } }),
+      { verifyMfa: () => of({ status: 'ERROR', message: 'This sign-in has expired. Please sign in again.' }) });
+    const login = fixture.componentInstance;
+    login.form.setValue({ username: 'me', password: 'right' });
+    login.submit();
+    login.code.set('123456');
+    login.submitCode();
+    expect(login.stage()).toBe('password');
+    expect(login.error()).toContain('sign in again');
+  });
+
+  it('starts single sign-on by the work address and refuses one without a domain', () => {
+    const ssoStart = vi.fn(() => of({ status: 'ERROR', message: 'Single sign-on is not set up for that address.' }));
+    const fixture = withApi(() => undefined, { ssoStart });
+    const login = fixture.componentInstance;
+    login.showCompany();
+    login.companyEmail.set('not-an-address');
+    login.startSso(false);
+    expect(ssoStart).not.toHaveBeenCalled();
+    expect(login.error()).toBe('Type your work email address.');
+    login.companyEmail.set('ana@example.org');
+    login.startSso(false);
+    expect(ssoStart).toHaveBeenCalledWith({ email: 'ana@example.org' });
+    expect(login.error()).toBe('Single sign-on is not set up for that address.');
+  });
+
+  it('follows only a path of its own after signing in', () => {
+    expect(safeReturn('/jobs')).toBe('/jobs');
+    expect(safeReturn('//evil.example')).toBe('/');
+    expect(safeReturn('https://evil.example')).toBe('/');
+    expect(safeReturn(null)).toBe('/');
   });
 });

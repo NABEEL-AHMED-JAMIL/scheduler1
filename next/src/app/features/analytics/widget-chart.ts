@@ -1,4 +1,4 @@
-import { Component, computed, input, output } from '@angular/core';
+import { Component, computed, inject, input, output } from '@angular/core';
 import { BarChart, Bar, BarSegment } from '../../shared/charts/bar-chart';
 import { Donut } from '../../shared/charts/donut';
 import { readableCell } from '../../shared/charts/number-format';
@@ -9,17 +9,31 @@ import { Comparison, ComparisonSide } from '../../shared/charts/comparison';
 import { Histogram } from '../../shared/charts/histogram';
 import { ResultSummary } from '../../shared/charts/result-summary';
 import { RankedBar } from '../../shared/charts/ranked-bar';
-import { chartColor } from '../../shared/charts/status-color';
+import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
 import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
 import { WidgetTable } from './widget-table';
+import { KpiTrend } from './charts/kpi-trend';
 import { DataText } from '../../shared/ui/data-text';
-import { KINDS } from './widget-kinds';
-import type { PivotGrid, WidgetVisualization } from './analytics.service';
-import type { Mark, WidgetView } from './dashboard';
+import { KINDS, kindInfo } from './widget-kinds';
+import type { EChartKind, PivotGrid, WidgetVisualization } from './analytics.service';
+import { EChart, EChartClick } from '../../shared/charts/echart/echart';
+import { ChartPalette } from '../../shared/charts/echart/chart-palette';
+import { ChartThemes } from '../../shared/charts/echart/chart-themes';
+import { CONSOLE_THEME } from '../../shared/charts/echart/echart-theme';
+import { ChartSettings } from './charts/chart-settings';
+import { naturalHeight, optionFor, pickerOf } from './charts/chart-options';
+import { markFor } from './charts/mark-pick';
+import { tableOf } from './charts/chart-table';
+import type { Mark, WidgetView } from './widget-view';
 
 /** How many rows a tile's table shows; the rest are one click away. */
 export const WIDGET_ROWS = 8;
 export const WIDGET_HEIGHT = 180;
+/**
+ * The default for a kind ECharts draws. Taller than the SVG kinds' 180: a legend, a toolbox and a
+ * slider share the box with the plot, and a sunburst or a calendar at 180 is a thumbnail.
+ */
+export const ECHART_HEIGHT = 260;
 export const WIDGET_HEIGHT_MIN = 120;
 export const WIDGET_HEIGHT_MAX = 600;
 
@@ -31,24 +45,34 @@ export const WIDGET_HEIGHT_MAX = 600;
  */
 @Component({
   selector: 'app-widget-chart',
-  imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText],
+  imports: [BarChart, Donut, KpiCard, KpiTrend, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText, EChart, ChartPalette],
   template: `
     @if (view(); as v) {
       <!-- In a row layout a compact kind (a figure, a ring, ranked bars, a summary) is capped and
            the figure is centred; a table, a line or a bar chart takes the whole row. Without this
            a donut's legend sat at the far right of a 950px tile and a single figure read like the
            first cell of an empty table. -->
-      <div [class]="shell()">
+      <!-- The SVG kinds read --chart-N; a named theme re-points those on this element alone. -->
+      <div [class]="shell()" [appChartPalette]="theme().id" [paletteOrder]="settings().colors?.order">
+      @if (echartKind(); as kind) {
+        <app-echart [option]="echartOption()" [theme]="theme().ref" [renderer]="settings().renderer ?? 'canvas'"
+                    [height]="drawHeight()" [label]="chartLabel()" [attr.data-kind]="kind" (clicked)="echartClicked($event)" />
+      } @else {
       @switch (drawn()) {
         @case ('kpi') {
           <app-kpi-card [value]="kpiValue(v)" [label]="measureName(v)" [caption]="kpiCaption(v)"
                         [align]="layout() === 'row' ? 'center' : 'start'" [size]="layout() === 'row' ? 'lg' : 'md'" />
         }
+        @case ('kpiTrend') { <app-kpi-trend [marks]="v.marks" [label]="measureName(v)" [format]="figure" /> }
         @case ('line') { <app-line-chart [data]="points(v)" [height]="height()" [format]="figure" /> }
         @case ('area') { <app-line-chart [data]="points(v)" [filled]="true" [height]="height()" [format]="figure" /> }
         @case ('cumulative') { <app-line-chart [data]="cumulativePoints(v)" [height]="height()" [format]="figure" /> }
         @case ('groupedBar') {
-          @if (v.pivot; as grid) { <app-grouped-bar [groupNames]="pivotGroupNames(grid)" [series]="pivotSeries(grid)" /> }
+          <!-- A row per group: past the tile's cap it scrolls inside the tile rather than making the
+               tile (and every tile beside it) thousands of pixels tall. -->
+          @if (v.pivot; as grid) {
+            <div class="chart-scroll" [style.max-height.px]="scrollCap"><app-grouped-bar [groupNames]="pivotGroupNames(grid)" [series]="pivotSeries(grid)" /></div>
+          }
         }
         @case ('pivot') {
           @if (v.pivot; as grid) {
@@ -100,20 +124,29 @@ export const WIDGET_HEIGHT_MAX = 600;
         @case ('distributionSummary') { <app-result-summary [data]="v.marks" mode="distribution" [dimensionLabel]="dimensionName(v)" /> }
         @case ('comparison') { <app-comparison [first]="sides(v).first" [second]="sides(v).second" /> }
         @case ('ranked') {
-          <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="false" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          <div class="chart-scroll" [style.max-height.px]="scrollCap">
+            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="false" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          </div>
         }
         @case ('rankedShare') {
-          <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="true" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          <div class="chart-scroll" [style.max-height.px]="scrollCap">
+            <app-ranked-bar [data]="v.marks" [max]="v.marks.length" [showPercent]="true" [formatValue]="figure" [clickable]="clickable()" (picked)="picked.emit($any($event))" />
+          </div>
         }
         @case ('bar') {
           <app-bar-chart [data]="v.marks" [height]="height()" [format]="figure" [clickable]="clickable()" (barClicked)="picked.emit($any($event))" />
         }
-        @case ('donut') { <app-donut [data]="v.marks" [totalLabel]="''" [format]="figure" /> }
+        @case ('donut') { <app-donut [data]="donutMarks(v)" [totalLabel]="''" [format]="figure" /> }
         @default { <app-widget-table [columns]="v.columns" [rows]="tileRows(v)" [measureColumn]="v.measureColumn" /> }
+      }
       }
       </div>
     }
   `,
+  styles: [`
+    /* A list of rows that outgrew its tile scrolls in place; the page is not scrolled by the wheel at its ends. */
+    .chart-scroll { overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+  `],
 })
 export class WidgetChart {
   readonly view = input.required<WidgetView>();
@@ -127,15 +160,99 @@ export class WidgetChart {
   readonly maxRows = input(WIDGET_ROWS);
   /** 'tile' in a grid cell; 'row' when the widget has a whole row and compact kinds should not sprawl. */
   readonly layout = input<'tile' | 'row'>('tile');
+  /** The widget's "Chart settings" (charts/chart-settings.ts). Empty draws every default. */
+  readonly settings = input<ChartSettings>({});
+  /** The board's theme; the widget's own `settings.colors.theme` wins over it. */
+  readonly boardTheme = input<string | null | undefined>(null);
+  /** Whether the ECharts toolbox (save as PNG, data view, restore zoom) is offered. */
+  readonly interactive = input(false);
+  /** What a saved image and the data view are called. */
+  readonly name = input('');
+  /**
+   * Whether a kind that lists categories down the page (horizontal bars) may grow past `height`
+   * to give each bar a readable row, up to WIDGET_HEIGHT_MAX. Off where the author set a height.
+   */
+  readonly autoHeight = input(true);
+  /** A board's colour per value (charts/board-colors.ts), so a value is one colour on every tile. */
+  readonly colorKeys = input<ReadonlyMap<string, number> | null>(null);
+
+  /** The tallest a row-per-category SVG kind draws before it scrolls inside the tile. */
+  protected readonly scrollCap = WIDGET_HEIGHT_MAX;
+
+  private readonly themes = inject(ChartThemes);
+
+  /** The theme this chart draws in, resolved for the mode on screen. */
+  readonly theme = computed(() =>
+    this.themes.resolve(this.settings().colors?.theme ?? this.boardTheme() ?? CONSOLE_THEME, this.settings().colors?.order));
+
+  /** The kind, when app-echart draws it. */
+  readonly echartKind = computed<EChartKind | null>(() => {
+    const kind = this.drawn();
+    return kindInfo(kind)?.engine === 'echarts' ? kind as EChartKind : null;
+  });
+
+  /** The result split into dimensions and measures, as the ECharts kinds read it. */
+  private readonly table = computed(() => this.view().chart ?? tableOf(this.view(), { additive: this.view().additive }));
+
+  /**
+   * The drawing's height: what was asked, or -- for horizontal bars -- a row per bar up to the
+   * cap, past which the bars scroll inside the chart (the option's dataZoom) instead.
+   */
+  readonly drawHeight = computed(() => {
+    const asked = this.height();
+    if (!this.autoHeight() || (this.echartKind() !== 'barH' && this.echartKind() !== 'pictorialBar')) return asked;
+    const table = this.table();
+    const categories = table.dims.length ? new Set(table.dims[0].values).size : 0;
+    return naturalHeight(Math.min(categories, (this.settings().topN ?? categories) + 1), asked, Math.max(asked, WIDGET_HEIGHT_MAX));
+  });
+
+  readonly echartOption = computed(() => {
+    const kind = this.echartKind();
+    if (!kind) return null;
+    const theme = this.theme();
+    return optionFor(this.view(), kind, this.settings(), { palette: theme.palette, tokens: theme.tokens },
+      { interactive: this.interactive(), name: this.name(), height: this.drawHeight(), clickable: this.clickable(),
+        colorKeys: this.colorKeys() });
+  });
+
+  /**
+   * A click on an ECharts mark, emitted as the SVG kinds emit theirs: the Mark of the row (or the
+   * group of rows) it stands for, and only where that mark can narrow. Read against the option on
+   * screen NOW, so a click that lands as the kind changes maps through the new chart, not the old.
+   */
+  echartClicked(click: EChartClick): void {
+    if (!this.clickable()) return;
+    const mark = markFor(this.view(), pickerOf(this.echartOption())?.(click) ?? null);
+    if (mark?.operands?.length) this.picked.emit(mark);
+  }
+
+  /**
+   * The ring's slices: past the colours the palette can tell apart, the smallest are added into
+   * one "Other" slice -- the rule a Top-N with the bucket on follows -- where the figures add up.
+   * issuesFor refuses the ring for figures that do not, so a tail is only ever summed when it can be.
+   */
+  donutMarks(view: WidgetView): Mark[] {
+    const marks = view.marks;
+    if (marks.length <= CHART_SLOTS || !view.additive) return marks;
+    const sorted = [...marks].sort((a, b) => b.value - a.value);
+    const rolled = sorted.filter(mark => mark.name === 'Other');
+    const ranked = sorted.filter(mark => mark.name !== 'Other');
+    const kept = ranked.slice(0, CHART_SLOTS - 1);
+    const rest = [...ranked.slice(CHART_SLOTS - 1), ...rolled];
+    return [...kept, { name: 'Other', value: rest.reduce((sum, mark) => sum + mark.value, 0), inert: true }];
+  }
+
+  readonly chartLabel = computed(() => `${kindInfo(this.drawn())?.label ?? 'Chart'}: ${this.measureName(this.view())} by ${this.dimensionName(this.view())}`);
 
   /** The kinds that read best at a bounded width, however wide the row is. */
-  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary']);
+  private static readonly COMPACT: ReadonlySet<string> = new Set(['kpi', 'donut', 'comparison', 'dimensionSummary', 'trendSummary', 'distributionSummary', 'gauge', 'halfDonut', 'rose', 'funnel', 'radar']);
 
   /** The wrapper's classes for the layout: a cap on compact kinds in a row, nothing otherwise. */
   readonly shell = computed(() => {
     if (this.layout() !== 'row') return 'min-w-0';
     const kind = this.drawn();
     if (kind === 'kpi') return 'min-w-0 mx-auto max-w-2xl';
+    if (kind === 'kpiTrend') return 'min-w-0';
     return WidgetChart.COMPACT.has(kind) ? 'min-w-0 max-w-3xl' : 'min-w-0';
   });
 

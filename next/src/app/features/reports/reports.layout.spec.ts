@@ -20,18 +20,27 @@ const classesOf = (source: string, marker: string, tag = 'td'): string[] => {
 };
 
 describe('status columns stay on screen', () => {
-  it('pins the Queue status cell, which carries the in-flight menu', async () => {
+  /** Owner 2026-10-12: on every run list the status sits right before the message; the pinned column holds the actions. */
+  it('puts the Queue status before the message and pins the in-flight menu', async () => {
     const html = await read('queue/queue.html');
-    expect(classesOf(html, '>Status</th>', 'th')).toContain('col-pin-right');
-    expect(classesOf(html, '<app-status [label]="row.jobStatus"')).toContain('col-pin-right');
+    expect(html.indexOf('<th class="w-32">Status</th>')).toBeGreaterThan(-1);
+    expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Message</th>'));
+    expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '[cdkMenuTriggerFor]="menu"', 'td')).toContain('col-pin-right');
   });
 
-  it('gives the Failed runs status its own header and pins the Logs link', async () => {
-    // Owner, 2026-10-01: one "Outcome" header sat over the pill and the link, so the pill had none.
+  it('gives the Failed runs status its own header before the error and pins the run link', async () => {
     const html = await read('reports/reports.html');
-    expect(html).toContain('<th>Status</th>');
-    expect(classesOf(html, '>Logs</th>', 'th')).toContain('col-pin-right');
-    expect(classesOf(html, '(click)="openRunLogs(failure)"')).toContain('col-pin-right');
+    expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Error</th>'));
+    expect(classesOf(html, '(click)="openRunLogs(failure)"', 'td')).toContain('col-pin-right');
+  });
+
+  it('puts the Runs status before the message, the pinned column keeping only the actions', async () => {
+    const html = await read('jobs/history/job-history.html');
+    expect(html.indexOf('<th class="w-32">Status</th>')).toBeGreaterThan(-1);
+    expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Message</th>'));
+    expect(html).not.toContain('Status · Logs');
+    expect(classesOf(html, 'data-test="run-retry"', 'button')).toContain('btn-icon');
   });
 
   it('pins the Task health state cell', async () => {

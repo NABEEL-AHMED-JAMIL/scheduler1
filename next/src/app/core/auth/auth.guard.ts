@@ -55,8 +55,18 @@ export const pageGuard: CanActivateFn = (route) => {
   const router = inject(Router);
 
   const page = route.data?.['pageKey'] as PageKey | undefined;
-  if (page && !auth.canOpen(page)) {
-    return router.createUrlTree(['/unauthorized'], { queryParams: { page } });
+  // UX review 2026-10-12 (R2): a route several pages open (the run page: Schedules or the Queue) names them all in
+  // `pageKeys`; holding any one of them is enough, and a refusal names the first.
+  const anyOf = route.data?.['pageKeys'] as PageKey[] | undefined;
+  if (anyOf?.length && !anyOf.some(key => auth.canOpen(key))) {
+    const title = typeof route.routeConfig?.title === 'string' ? route.routeConfig.title : undefined;
+    return router.createUrlTree(['/unauthorized'], { queryParams: title ? { page: anyOf[0], title } : { page: anyOf[0] } });
+  }
+  if (!anyOf?.length && page && !auth.canOpen(page)) {
+    // The screen's own title as well: several screens open with one page's access (the AI Assistant with Prompts),
+    // and "Prompts isn't part of your access" on the AI Assistant names the wrong thing (MIG-321).
+    const title = typeof route.routeConfig?.title === 'string' ? route.routeConfig.title : undefined;
+    return router.createUrlTree(['/unauthorized'], { queryParams: title ? { page, title } : { page } });
   }
   return true;
 };

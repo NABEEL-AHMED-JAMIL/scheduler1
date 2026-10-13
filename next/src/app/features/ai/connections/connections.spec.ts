@@ -74,6 +74,22 @@ describe('Model connections -- the selection lives in the address', () => {
   });
 });
 
+describe('Model connections -- one pane at a time below 1024 px (review 2026-10-07, M17)', () => {
+  it('opens on the list; picking a connection opens it, and Back to list goes back', () => {
+    const { screen } = screenAt(null);
+    expect(screen.selectedId()).toBe(1);                // the pane still has one to show from 1024 px
+    expect(screen.pane()).toBe('list');
+    screen.select(ROWS[1]);
+    expect(screen.pane()).toBe('detail');
+    screen.pane.set('list');
+    expect(screen.selectedId()).toBe(2);
+  });
+
+  it('opens on the connection a link names', () => {
+    expect(screenAt('2').screen.pane()).toBe('detail');
+  });
+});
+
 describe('Model connections -- what the selected connection has been doing', () => {
   it('reads the picked connection\'s activity and draws each day as succeeded and failed', () => {
     const { screen, asked } = screenAt(null);
@@ -103,5 +119,24 @@ describe('Model connections -- what the selected connection has been doing', () 
     expect(screen.kindLabel('document')).toBe('Document Intelligence');
     expect(screen.kindLabel('ask')).toBe('Ask your data');
     expect(screen.kindLabel('something-new')).toBe('something-new');
+  });
+});
+
+describe('Model connections -- a failed run says why in words (UX final MC1)', () => {
+  it('turns the stored error into a sentence, keeping the raw text for Details', () => {
+    const { screen } = screenAt(null);
+    expect(screen.runError(ACTIVITY.recent[0].error)).toEqual({ text: 'Model not found.', raw: null });
+    expect(screen.runError('HTTP 400: {"error":"{\\"error\\":\\"model not found\\"}"}')!.text).toBe('Model not found (HTTP 400).');
+  });
+
+  it('draws it wrapped with its icon, never cut, and the raw text under Details', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/ai/connections/connections.html`, 'utf8');
+    const block = html.slice(html.indexOf('data-test="run-error"') - 200, html.indexOf('data-test="run-error-details"') + 400);
+    expect(block).toContain('runError(r.error)');
+    expect(block).not.toContain('truncate');
+    expect(block).toContain('<details');
+    expect(html).not.toContain('{{ r.error }}');
   });
 });

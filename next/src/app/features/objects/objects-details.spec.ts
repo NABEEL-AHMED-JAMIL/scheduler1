@@ -32,7 +32,8 @@ describe('Object browser: a file\'s details', () => {
     expect(open).toHaveBeenCalledWith(FileDetails, expect.objectContaining({
       data: { bucket: 'ui-review-s3', key: 'data/a.csv', name: 'a.csv', size: 12, lastModified: '2026-09-29T12:00:00Z',
         contentType: 'text/csv' },
-      panelClass: 'side-panel-host',
+      // UX review 2026-10-12 (A9): a file's details slide over the right, beside the list.
+      panelClass: ['side-panel-host', 'side-panel-right'],
     }));
   });
 });

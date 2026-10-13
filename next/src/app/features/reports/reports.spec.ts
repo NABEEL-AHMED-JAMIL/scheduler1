@@ -22,7 +22,7 @@ function reportsFor() {
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
       { provide: Router, useValue: { navigate: () => {} } },
       // The model-calls cost line asks billing only for an admin; these tests are not about it.
-      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false, canOpen: () => true } },
       { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
     ],
   });
@@ -261,7 +261,7 @@ describe('Reports builder across a reload', () => {
       provideRouter([]),
       { provide: HttpClient, useValue: { get: () => of({ status: 'ERROR', message: '' }), post: () => of({ status: 'ERROR', message: '' }) } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false, canOpen: () => true } },
       { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
     ] });
     const fixture = TestBed.createComponent(Reports);

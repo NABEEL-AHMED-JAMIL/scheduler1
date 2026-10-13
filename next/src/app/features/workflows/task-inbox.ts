@@ -1,7 +1,9 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Avatar } from '../../shared/ui/avatar';
+import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
@@ -9,25 +11,50 @@ import { Combobox, ComboboxOption } from '../../shared/ui/combobox';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
-import { Colleague, Decision, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi } from './workflows.api';
-import { HistoryLine, historyLines, shortTime } from './history';
+import { Observable } from 'rxjs';
+import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi } from './workflows.api';
+import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 import { TaskCountService } from './task-count.service';
+import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
+import { ValueView, labelOf, valueKind } from './value-kind';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
+import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
+import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
+import { BULK_CAP, BulkAnswer, BulkMatch, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 
 export type InboxTab = 'mine' | 'groups' | 'done' | 'requests';
 
-/** How many tasks a tab's list holds at most: the workflow service's Inbox.LIMIT. */
-export const INBOX_LIST_LIMIT = 200;
+/** A page of a tab's list: the workflow service's Inbox.DEFAULT_LIMIT (it pages by cursor, at most 200 at a time). */
+export const INBOX_PAGE_SIZE = 100;
+
+const TABS: InboxTab[] = ['mine', 'groups', 'done', 'requests'];
+type PerTab<T> = Record<InboxTab, T>;
+const perTab = <T>(value: T): PerTab<T> => ({ mine: value, groups: value, done: value, requests: value });
+
+/** A request's field with how its value reads (value-kind.ts). */
+export interface FieldView { label: string; value: string; view: ValueView; }
 
 /**
- * The Task inbox (MIG-276): the approvals and tasks waiting for the reader, as the design preview draws it -- the list on
- * the left (Mine, My groups, Done), the task on the right with the request's fields, its history, a comment and the
- * decisions -- and My requests, where a requester follows (and may cancel) what they started. Every decision carries an
- * Idempotency-Key; whether the reader may make it is the server's, per task.
+ * The Task inbox (MIG-276), laid out as a mail client (owner, 2026-10-06): tabs over two panes that fill the screen and
+ * scroll on their own -- the list, searchable and filtered, under day headers; the task with its decisions straight
+ * under its title, the request's details and its history -- and My requests, where a requester follows (and may cancel)
+ * what they started. Below 1024 px the list takes the width and a task opens over it, with a way back. Every decision
+ * carries an Idempotency-Key; whether the reader may make it is the server's, per task.
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [FormsModule, RouterLink, Icon, StatusPill, Combobox],
+  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
+  host: { '(document:keydown)': 'onKey($event)' },
+  styles: `
+    /* Bulk review: an approval task's row with its checkbox before it; the row's own button keeps the click. */
+    .inbox-pick-row { display: flex; align-items: stretch; border-bottom: 1px solid var(--border-subtle); }
+    .inbox-pick-row > .inbox-row { flex: 1 1 auto; min-width: 0; border-bottom: 0; padding-left: 0.5rem; }
+    .inbox-pick-row.is-picked { background: var(--surface-sunken); }
+    .inbox-pick-cell { flex: none; display: flex; align-items: flex-start; padding: 0.75rem 0 0 0.85rem; width: 2.15rem; }
+    .inbox-pick-all { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
+  `,
 })
 export class TaskInbox implements OnInit {
   private readonly api = inject(WorkflowsApi);
@@ -37,6 +64,8 @@ export class TaskInbox implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly badge = inject(TaskCountService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly tab = signal<InboxTab>('mine');
   readonly mine = signal<InboxTask[]>([]);
@@ -45,6 +74,13 @@ export class TaskInbox implements OnInit {
   readonly requests = signal<RequestRow[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** Where each tab's next page starts; null once the whole list is in. */
+  readonly next = signal<PerTab<string | null>>(perTab(null));
+  /** The search each tab's rows were read with on the service ("Search all"); '' for the whole list. */
+  readonly searched = signal<PerTab<string>>(perTab(''));
+  readonly loadingMore = signal(false);
+  /** A page's size: the service's default. */
+  pageSize = INBOX_PAGE_SIZE;
 
   readonly selectedTask = signal<number | null>(null);
   readonly detail = signal<TaskDetail | null>(null);
@@ -59,7 +95,42 @@ export class TaskInbox implements OnInit {
   readonly passing = signal(false);
   readonly busy = signal(false);
 
+  /** The list's search and filters, over the rows already loaded. */
+  readonly query = signal('');
+  readonly statusFilter = signal('');
+  readonly workflowFilter = signal('');
+  /** Below 1024 px one pane shows at a time: the list, or the task opened from it. */
+  readonly pane = signal<'list' | 'detail'>('list');
+  /** "Now" for the day headers and relative times; moves on with every load. */
+  readonly now = signal(Date.now());
+  private readonly searchBox = viewChild<ElementRef<HTMLInputElement>>('search');
+  /** The selection moved by keyboard: the row takes the focus as well as the scroll. */
+  private focusRow = false;
+  /** A ?task= link: once the lists are in, show the tab that task is on (a done task's link opens Done). */
+  private followLinkedTask = false;
+
   readonly me = computed(() => this.auth.user()?.appUserId ?? null);
+
+  // ---- bulk review (2026-10-12) -----------------------------------------------------------------------------------
+
+  /** Waiting for me and My groups pick approval tasks for a bulk decision; Done and My requests have nothing to decide. */
+  readonly canPick = computed(() => this.tab() === 'mine' || this.tab() === 'groups');
+  readonly taskById = computed(() => new Map(this.rows().map(t => [t.id, t])));
+  /** The approval tasks shown that the reader may decide: the page Select all picks. */
+  readonly pagePicks = computed<InboxTask[]>(() => {
+    if (!this.canPick()) return [];
+    const byId = this.taskById();
+    return this.shown().map(i => byId.get(i.id)).filter((t): t is InboxTask => !!t && this.pickable(t));
+  });
+  readonly bulk = new BulkSelection<InboxTask>({
+    idOf: t => t.id,
+    noun: ['task', 'tasks'],
+    groupNoun: 'workflow',
+    matching: () => this.matchingTasks(),
+    // Looked up when sent: the screen's tests stand in their own WorkflowsApi and no HTTP client.
+    send: (rows, request) => this.injector.get(BulkReviewApi).tasks({ taskIds: rows.map(t => t.id) }, request),
+  });
+  readonly pageState = computed(() => this.bulk.pageState(this.pagePicks()));
 
   readonly rows = computed<InboxTask[]>(() => {
     switch (this.tab()) {
@@ -84,9 +155,10 @@ export class TaskInbox implements OnInit {
     return !!d && d.state === 'Open' && d.requestState !== 'Approved' && !this.ownRequest() && this.tab() !== 'done';
   });
 
+  /** The task's history, its own lines without its name: the heading already says it. */
   readonly taskHistory = computed<HistoryLine[]>(() => {
     const d = this.detail();
-    return d ? historyLines(d.history, id => this.name(id), key => this.stepName(key, d.tasks)) : [];
+    return d ? dropOwnStep(historyLines(d.history, id => this.name(id), key => this.stepName(key, d.tasks)), d.name) : [];
   });
 
   readonly requestHistory = computed<HistoryLine[]>(() => {
@@ -94,7 +166,126 @@ export class TaskInbox implements OnInit {
     return r ? historyLines(r.history, id => this.name(id), key => this.stepName(key, r.tasks)) : [];
   });
 
+  // ---- the list ---------------------------------------------------------------------------------------------------
+
+  /** The open tab's rows as the list draws them: title first, step and workflow under it, status and time beside. */
+  readonly items = computed<ListItem[]>(() => {
+    const now = this.now();
+    if (this.tab() === 'requests') return this.requests().map(r => this.requestItem(r, now));
+    return this.rows().map(t => this.taskItem(t, now));
+  });
+
+  /**
+   * What every loaded row shares -- its workflow, and for tasks its step -- said once over the list instead of on each
+   * row's second line, where it is only noise ("Alex approves the visit · MIG-279 visit approval" forty times). A
+   * workflow filter makes the workflow common too.
+   */
+  readonly common = computed(() => {
+    const filtered = this.workflowFilter();
+    const tasks = this.tab() !== 'requests';
+    const all = tasks ? this.rows() : this.requests();
+    const workflow = filtered || commonOf(all.map(r => r.workflowName ?? ''));
+    const step = tasks ? commonOf(this.rows().map(t => t.name)) : '';
+    return { workflow, step };
+  });
+
+  /** The common part as the list's label: "Alex approves the visit · MIG-279 visit approval". */
+  readonly commonLine = computed(() => [this.common().step, this.common().workflow].filter(Boolean).join(' · '));
+
+  readonly hasFilters = computed(() => !!(this.query().trim() || this.statusFilter() || this.workflowFilter()));
+
+  readonly shown = computed<ListItem[]>(() => {
+    const query = this.query().trim();
+    const status = this.statusFilter();
+    const workflow = this.workflowFilter();
+    return this.items().filter(i => (!status || i.status === status) && (!workflow || i.workflow === workflow)
+      && (!query || matchesSearch(i.haystack, query)));
+  });
+
+  readonly groupsShown = computed(() => groupRows(this.shown()));
+  readonly statusChoices = computed(() => choicesOf(this.items().map(i => i.status)));
+  readonly workflowChoices = computed(() => choicesOf(this.items().map(i => i.workflow)).sort((a, b) => a.value.localeCompare(b.value)));
+  private readonly shownIds = computed(() => this.shown().map(i => i.id));
+  readonly selectedId = computed(() => this.tab() === 'requests' ? this.selectedRequest() : this.selectedTask());
+
+  /** The open tab has more rows than are loaded. */
+  readonly hasMore = computed(() => !!this.next()[this.tab()]);
+
+  /** The open tab's total, as the service counts it (0 until the count is in). */
+  private readonly total = computed(() => {
+    switch (this.tab()) {
+      case 'groups': return this.badge.groups();
+      case 'done': return this.badge.done();
+      case 'requests': return this.badge.requests();
+      default: return this.badge.mine();
+    }
+  });
+
+  /** "12 of 100 shown" while a filter is on; "100 of 240 tasks" while more are to load; the count otherwise. */
+  readonly shownLine = computed(() => {
+    const all = this.items().length;
+    const tasks = this.tab() !== 'requests';
+    const noun = (n: number) => tasks ? (n === 1 ? 'task' : 'tasks') : (n === 1 ? 'request' : 'requests');
+    if (this.hasFilters()) return `${this.shown().length} of ${all} shown`;
+    if (!this.hasMore()) return `${all} ${noun(all)}`;
+    const total = this.total();
+    return total > all ? `${all} of ${total.toLocaleString('en-US')} ${noun(total)}` : `${all} ${noun(all)} loaded`;
+  });
+
+  /**
+   * While more rows are to load, a search or filter looks only at those loaded, and says so -- or, after Search all, at
+   * the service's matches loaded so far.
+   */
+  readonly partialNote = computed(() => {
+    if (!this.hasFilters() || !this.hasMore()) return '';
+    const loaded = this.items().length;
+    const q = this.query().trim();
+    if (q && this.searched()[this.tab()] === q) return `Searching ${loaded} matches loaded; Load more for the rest.`;
+    return `Searching ${loaded} loaded; Load more to search further.`;
+  });
+
+  /** Search all: the search is not yet the one the service answered for this tab. */
+  readonly canSearchAll = computed(() => {
+    const q = this.query().trim();
+    return !!q && this.hasMore() && this.searched()[this.tab()] !== q;
+  });
+
+  /** The request's details, each with how its value reads. */
+  readonly taskFields = computed<FieldView[]>(() => this.fieldViews(this.detail()?.subject));
+  readonly requestFields = computed<FieldView[]>(() => this.fieldViews(this.request()?.subject));
+
+  constructor() {
+    // A selection belongs to the list it was made from: another tab, search or filter starts it again.
+    effect(() => {
+      this.tab(); this.query(); this.statusFilter(); this.workflowFilter();
+      untracked(() => this.bulk.clear());
+    });
+    // Keep the open row in view: after a click, a key, a decision or a reload re-draws the list.
+    afterRenderEffect({ read: () => {
+      const id = this.selectedId();
+      this.shown();
+      if (id == null) return;
+      const row = this.host.nativeElement.querySelector<HTMLElement>(`.inbox-row.is-on`);
+      if (!row) return;
+      row.scrollIntoView?.({ block: 'nearest' });
+      if (this.focusRow) { this.focusRow = false; row.focus({ preventScroll: true }); }
+    } }, { injector: this.injector });
+    // A task or request opened from the list starts at its top, where its title and decisions are.
+    let top: string | null = null;
+    afterRenderEffect({ write: () => {
+      const open = this.tab() === 'requests' ? `r${this.request()?.id ?? ''}` : `t${this.detail()?.id ?? ''}`;
+      if (open === top) return;
+      top = open;
+      const pane = this.host.nativeElement.querySelector<HTMLElement>('.inbox-detail');
+      if (pane) pane.scrollTop = 0;
+    } }, { injector: this.injector });
+  }
+
+  /** A sign-in with no workspace of its own (a platform administrator's): tasks are a workspace's, so nothing is read. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   ngOnInit(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     const params = this.route.snapshot.queryParamMap;
     const path = this.route.snapshot.routeConfig?.path ?? '';
     if (path.endsWith('requests')) {
@@ -103,48 +294,217 @@ export class TaskInbox implements OnInit {
       if (id) this.openRequest(id);
     }
     const task = Number(params.get('task'));
-    if (task) this.openTask(task);
+    if (task) { this.followLinkedTask = true; this.openTask(task, true); }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     this.load();
   }
 
+  /**
+   * Every tab's first page, read afresh (Refresh, and the first load); each keeps its Search all. After a decision the
+   * lists keep their loaded pages instead (refreshKeeping).
+   */
   load(): void {
+    if (this.noWorkspace()) return;
+    this.now.set(Date.now());
     this.loading.set(true);
     this.error.set('');
-    let pending = 4;
-    const settle = () => { if (--pending === 0) this.loading.set(false); };
-    const take = <T>(target: (rows: T[]) => void) => ({
-      next: (r: ApiResponse<T[]>) => {
-        if (r.status === API_SUCCESS) target(r.data ?? []);
-        else this.error.set(r.message || 'Your tasks could not be read.');
+    let pending = TABS.length;
+    for (const tab of TABS) {
+      this.readPage(tab, null, rows => {
+        this.setRows(tab, rows);
+        // The inbox opens on the first task, My requests on the newest.
+        if (tab === 'mine' && this.selectedTask() === null && this.tab() === 'mine' && rows.length) this.openTask(rows[0].id);
+        if (tab === 'requests' && this.selectedRequest() === null && this.tab() === 'requests' && rows.length) this.openRequest(rows[0].id);
+      }, () => {
+        if (--pending > 0) return;
+        this.loading.set(false);
+        if (this.followLinkedTask) { this.followLinkedTask = false; this.showLinkedTab(); }
+        else if (this.firstLoad) this.openWhereTheWorkIs();
+        this.firstLoad = false;
+      });
+    }
+    this.badge.refresh();
+  }
+
+  /** The open tab's next page, under the rows already loaded. */
+  loadMore(): void {
+    const tab = this.tab();
+    const cursor = this.next()[tab];
+    if (!cursor || this.loadingMore()) return;
+    this.loadingMore.set(true);
+    this.readPage(tab, cursor, rows => this.setRows(tab, appendPage(this.rowsOf(tab), rows)), () => this.loadingMore.set(false));
+  }
+
+  /** Search all: the open tab read again by the service, its rows those matching the search (step, title, workflow). */
+  searchAll(): void {
+    const tab = this.tab();
+    const q = this.query().trim();
+    if (!q) return;
+    this.searched.update(s => ({ ...s, [tab]: q }));
+    this.loadingMore.set(true);
+    this.readPage(tab, null, rows => this.setRows(tab, rows), () => this.loadingMore.set(false));
+  }
+
+  /** The search box: emptied, a tab read by Search all goes back to its whole list. */
+  setQuery(value: string): void {
+    this.query.set(value);
+    if (!value.trim()) this.dropSearchAll();
+  }
+
+  private dropSearchAll(): void {
+    const searched = this.searched();
+    const tabs = TABS.filter(t => searched[t]);
+    if (!tabs.length) return;
+    this.searched.set(perTab(''));
+    for (const tab of tabs) this.readPage(tab, null, rows => this.setRows(tab, rows), () => {});
+  }
+
+  /**
+   * After a decision: every tab's first page read again and laid over what is loaded, so the pages a person loaded stay
+   * and the task acted on leaves the open lists wherever it was (a task further down is not on the fresh first page).
+   */
+  private refreshKeeping(left: number | null): void {
+    this.now.set(Date.now());
+    const before = this.next();
+    for (const tab of TABS) {
+      const keep = this.rowsOf(tab);
+      this.readPage(tab, null, rows => {
+        const gone = tab === 'done' || tab === 'requests' ? null : left;
+        const headIsAll = !this.next()[tab];
+        this.setRows(tab, mergeHead(rows, keep, gone, headIsAll));
+        // The old tail's cursor still starts after the last row loaded (rows that slid onto the next page are kept, and
+        // Load more never draws one twice); a list that was all loaded stays so, and so does a fresh page that is all of it.
+        if (!headIsAll) this.next.update(n => ({ ...n, [tab]: before[tab] }));
+      }, () => {});
+    }
+    this.badge.refresh();
+  }
+
+  private rowsOf(tab: InboxTab): (InboxTask | RequestRow)[] {
+    switch (tab) {
+      case 'groups': return this.groups();
+      case 'done': return this.done();
+      case 'requests': return this.requests();
+      default: return this.mine();
+    }
+  }
+
+  private setRows(tab: InboxTab, rows: (InboxTask | RequestRow)[]): void {
+    switch (tab) {
+      case 'groups': this.groups.set(rows as InboxTask[]); break;
+      case 'done': this.done.set(rows as InboxTask[]); break;
+      case 'requests': this.requests.set(rows as RequestRow[]); break;
+      default: this.mine.set(rows as InboxTask[]);
+    }
+  }
+
+  /** One page of a tab (its Search all with it): the rows to take, and its next cursor recorded. */
+  private readPage(tab: InboxTab, cursor: string | null, take: (rows: (InboxTask | RequestRow)[]) => void, settle: () => void): void {
+    const page = { cursor, limit: this.pageSize, q: this.searched()[tab] || null };
+    const read: Observable<InboxPage<InboxTask | RequestRow>> = tab === 'requests' ? this.api.requests(page) : this.api[tab](page);
+    read.subscribe({
+      next: r => {
+        if (r.status === API_SUCCESS) {
+          this.next.update(n => ({ ...n, [tab]: r.paging?.nextCursor ?? null }));
+          take(r.data ?? []);
+        } else {
+          this.error.set(r.message || 'Your tasks could not be read.');
+        }
         settle();
       },
       error: () => { this.error.set('Your tasks could not be read.'); settle(); },
     });
-    this.api.mine().subscribe(take<InboxTask>(rows => {
-      this.mine.set(rows);
-      if (this.selectedTask() === null && this.tab() === 'mine' && rows.length) this.openTask(rows[0].id);
-    }));
-    this.api.groups().subscribe(take<InboxTask>(rows => this.groups.set(rows)));
-    this.api.done().subscribe(take<InboxTask>(rows => this.done.set(rows)));
-    this.api.requests().subscribe(take<RequestRow>(rows => this.requests.set(rows)));
-    this.badge.refresh();
   }
 
   pick(tab: InboxTab): void {
     this.tab.set(tab);
     this.passing.set(false);
+    this.pane.set('list');
+    // The choices are the tab's own; a search stays, as a mail client's does across folders.
+    this.statusFilter.set('');
+    this.workflowFilter.set('');
     if (tab === 'requests') {
-      const first = this.requests()[0];
-      if (first && this.selectedRequest() === null) this.openRequest(first.id);
+      const first = this.shownIds()[0];
+      if (first && this.selectedRequest() === null) this.openRequest(first);
       return;
     }
-    const first = this.rows()[0];
-    if (first) this.openTask(first.id);
+    const first = this.shownIds()[0];
+    if (first) this.openTask(first);
     else { this.selectedTask.set(null); this.detail.set(null); }
   }
 
-  openTask(id: number): void {
+  /** The first load only: a Refresh or a decision never moves the reader off the tab they chose. */
+  private firstLoad = true;
+
+  /**
+   * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their group's pool
+   * opened on an empty "Waiting for me" saying "Nothing is waiting for you" while My groups held five. When Mine is empty
+   * and My groups is not, it opens My groups on its first task; a link to a task or to My requests decides for itself.
+   */
+  private openWhereTheWorkIs(): void {
+    if (this.tab() !== 'mine' || this.mine().length || !this.groups().length) return;
+    this.pick('groups');
+  }
+
+  private showLinkedTab(): void {
+    const id = this.selectedTask();
+    if (this.tab() !== 'mine' || id == null || this.mine().some(t => t.id === id)) return;
+    if (this.groups().some(t => t.id === id)) this.tab.set('groups');
+    else if (this.done().some(t => t.id === id)) this.tab.set('done');
+  }
+
+  /** A row clicked: open it, and below 1024 px show it in place of the list. */
+  openItem(item: ListItem): void {
+    if (item.kind === 'request') this.openRequest(item.id, true);
+    else this.openTask(item.id, true);
+  }
+
+  /** Back to the list, below 1024 px. */
+  backToList(): void {
+    this.pane.set('list');
+    this.focusRow = true;
+    if (this.tab() !== 'requests') {
+      this.router.navigate([], { relativeTo: this.route, queryParams: { task: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
+  }
+
+  clearFilters(): void {
+    this.setQuery('');
+    this.statusFilter.set('');
+    this.workflowFilter.set('');
+  }
+
+  /** Up and Down (or j and k) move to the next row and open it; the row keeps the focus and stays in view. */
+  move(delta: number): void {
+    const id = stepFrom(this.shownIds(), this.selectedId(), delta);
+    if (id == null || id === this.selectedId()) return;
+    this.focusRow = true;
+    if (this.tab() === 'requests') this.openRequest(id);
+    else this.openTask(id);
+  }
+
+  /**
+   * The list's keys: / goes to the search, j and k move anywhere outside a field, the arrows move while the focus is in
+   * the list, Escape leaves the search. Nothing while a dialog is open or a field has the keyboard.
+   */
+  onKey(e: KeyboardEvent): void {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target?.closest('.cdk-overlay-container')) return;
+    const search = this.searchBox()?.nativeElement;
+    if (e.key === 'Escape' && search && target === search) { search.blur(); return; }
+    if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
+    if (e.key === '/') { e.preventDefault(); search?.focus(); return; }
+    const inList = !!target?.closest('[data-test="inbox-list"]');
+    const down = e.key === 'j' || (e.key === 'ArrowDown' && inList);
+    const up = e.key === 'k' || (e.key === 'ArrowUp' && inList);
+    if (!down && !up) return;
+    e.preventDefault();
+    this.move(down ? 1 : -1);
+  }
+
+  openTask(id: number, show = false): void {
+    if (show) this.pane.set('detail');
     this.selectedTask.set(id);
     this.detailError.set('');
     this.comment.set('');
@@ -161,7 +521,8 @@ export class TaskInbox implements OnInit {
     });
   }
 
-  openRequest(id: number): void {
+  openRequest(id: number, show = false): void {
+    if (show) this.pane.set('detail');
     this.selectedRequest.set(id);
     this.detailError.set('');
     this.api.request(id).subscribe({
@@ -187,12 +548,13 @@ export class TaskInbox implements OnInit {
       return;
     }
     this.busy.set(true);
+    const next = nextAfter(this.shownIds(), d.id);
     this.api.act(d.id, action, comment, `${d.id}:${action}:${crypto.randomUUID()}`).subscribe({
       next: r => {
         this.busy.set(false);
         if (r.status === API_SUCCESS) {
           this.toast.success(r.message);
-          this.afterChange(d.id);
+          this.afterChange(d.id, next);
         } else {
           this.toast.error(r.message);
         }
@@ -206,13 +568,14 @@ export class TaskInbox implements OnInit {
     const to = this.passTo();
     if (!d || to == null || this.busy()) return;
     this.busy.set(true);
+    const next = nextAfter(this.shownIds(), d.id);
     this.api.reassign(d.id, to, this.comment().trim() || null, `${d.id}:pass:${crypto.randomUUID()}`).subscribe({
       next: r => {
         this.busy.set(false);
         if (r.status === API_SUCCESS) {
           this.toast.success(`Passed to ${this.name(to)}.`);
           this.passing.set(false);
-          this.afterChange(d.id);
+          this.afterChange(d.id, next);
         } else {
           this.toast.error(r.message);
         }
@@ -229,34 +592,118 @@ export class TaskInbox implements OnInit {
     if (!ok) return;
     this.api.cancel(r.id, null, `${r.id}:cancel:${crypto.randomUUID()}`).subscribe({
       next: res => {
-        if (res.status === API_SUCCESS) { this.toast.success('Cancelled.'); this.openRequest(r.id); this.load(); }
+        if (res.status === API_SUCCESS) { this.toast.success('Cancelled.'); this.openRequest(r.id); this.refreshKeeping(null); }
         else this.toast.error(res.message);
       },
       error: () => this.toast.error('That could not be done. Try again.'),
     });
   }
 
-  private afterChange(taskId: number): void {
+  /**
+   * A decision made: on to the next task in the list, as a mail client moves on (the same one when it was the last), the
+   * pages already loaded kept.
+   */
+  private afterChange(taskId: number, next: number | null): void {
     this.comment.set('');
-    this.load();
-    this.openTask(taskId);
+    this.refreshKeeping(taskId);
+    this.openTask(next ?? taskId);
   }
 
   /**
-   * A tab's count (P2 #31): the list stops at the service's 200, so a full list reads the service's own count, or
-   * "200+" until that count is in, never a silent 200.
+   * A tab's count (P2 #31): its whole list once every row is loaded (and not narrowed by Search all), else the service's
+   * total, or "100+" until that count is in -- never a page size passed off as the total.
    */
-  tabCount(listed: number, counted: number): string {
-    if (listed < INBOX_LIST_LIMIT) return String(listed);
-    return counted > listed ? counted.toLocaleString('en-US') : `${listed}+`;
+  tabCount(listed: number, counted: number, complete: boolean): string {
+    if (complete) return String(listed);
+    return counted >= listed && counted > 0 ? counted.toLocaleString('en-US') : `${listed}+`;
+  }
+
+  private complete(tab: InboxTab): boolean {
+    return !this.next()[tab] && !this.searched()[tab];
   }
 
   /** P2 #36: nobody else in the workspace, so a request of one's own has no one to approve it. */
   readonly aloneInWorkspace = computed(() => this.colleaguesLoaded() && !this.colleagues().some(c => c.userId !== this.me()));
-  readonly mineCount = computed(() => this.tabCount(this.mine().length, this.badge.mine()));
-  readonly groupsCount = computed(() => this.tabCount(this.groups().length, this.badge.groups()));
-  /** The open tab's list is cut at the service's limit. */
-  readonly listCapped = computed(() => this.tab() !== 'requests' && this.rows().length >= INBOX_LIST_LIMIT);
+  readonly mineCount = computed(() => this.tabCount(this.mine().length, this.badge.mine(), this.complete('mine')));
+  readonly groupsCount = computed(() => this.tabCount(this.groups().length, this.badge.groups(), this.complete('groups')));
+  /** Whether anything waits for the reader's groups: the empty "Waiting for me" tab then points there (G10, W1). */
+  readonly groupsWaiting = computed(() => this.groups().length > 0 || this.badge.groups() > 0);
+  readonly doneCount = computed(() => this.tabCount(this.done().length, this.badge.done(), this.complete('done')));
+  readonly requestsCount = computed(() => this.tabCount(this.requests().length, this.badge.requests(), this.complete('requests')));
+  readonly mineOverdue = computed(() => this.mine().some(t => t.overdue));
+
+  /** An approval task, open, not the reader's own request: theirs to decide, so theirs to pick. */
+  pickable(t: InboxTask): boolean {
+    return t.stepType === 'approval' && t.state === 'Open' && t.requestState !== 'Approved' && !(t.requestedBy != null && t.requestedBy === this.me());
+  }
+
+  /** Why an approval task's checkbox is off. */
+  pickTitle(t: InboxTask | undefined): string {
+    if (!t || this.pickable(t)) return '';
+    if (t.requestedBy != null && t.requestedBy === this.me()) return 'Your own request: someone else decides it.';
+    return 'No longer waiting for a decision.';
+  }
+
+  pickTask(id: number, box: HTMLInputElement): void {
+    const t = this.taskById().get(id);
+    if (!t) return;
+    if (!this.bulk.toggle(t, box.checked)) {
+      box.checked = false;
+      this.toast.error(`At most ${BULK_CAP} at a time.`);
+    }
+  }
+
+  /**
+   * Select all matching: the open tab read again by the service with the same search, a hundred at a time, its approval
+   * tasks the reader may decide under the same status and workflow filters, until there are more than the cap or none is
+   * left (twenty pages at most). The total is known only when the list ran out.
+   */
+  private matchingTasks(): Observable<BulkMatch<InboxTask>> {
+    const tab = this.tab() === 'groups' ? 'groups' : 'mine';
+    const q = this.query().trim() || null;
+    const status = this.statusFilter();
+    const workflow = this.workflowFilter();
+    const keep = (t: InboxTask) => this.pickable(t) && (!status || this.stateLabel(t) === status) && (!workflow || (t.workflowName ?? '') === workflow);
+    return new Observable<BulkMatch<InboxTask>>(out => {
+      const found = new Map<number, InboxTask>();
+      let pages = 0;
+      let reading: { unsubscribe(): void } | undefined;
+      const read = (cursor: string | null) => {
+        reading = this.api[tab]({ cursor, limit: INBOX_PAGE_SIZE, q }).subscribe({
+          next: r => {
+            if (r.status !== API_SUCCESS) { out.error({ error: { message: r.message || 'The matching tasks could not be read.' } }); return; }
+            for (const t of r.data ?? []) if (keep(t)) found.set(t.id, t);
+            const next = r.paging?.nextCursor ?? null;
+            pages++;
+            if (found.size > BULK_CAP || !next || pages >= 20) {
+              out.next({ rows: [...found.values()].slice(0, BULK_CAP), total: next ? null : found.size });
+              out.complete();
+            } else {
+              read(next);
+            }
+          },
+          error: err => out.error(err),
+        });
+      };
+      read(null);
+      return () => reading?.unsubscribe();
+    });
+  }
+
+  /** A bulk decision made: the decided tasks leave the lists, the rest is read again, and a decided open task moves on. */
+  bulkDecided(answer: BulkAnswer): void {
+    const done = new Set(answer.done.map(i => Number(i.id)));
+    if (!done.size) { this.refreshKeeping(null); return; }
+    const open = this.selectedTask();
+    const next = open != null && done.has(open) ? this.shownIds().find(id => !done.has(id)) ?? null : open;
+    this.mine.update(list => list.filter(t => !done.has(t.id)));
+    this.groups.update(list => list.filter(t => !done.has(t.id)));
+    this.refreshKeeping(null);
+    if (open != null && done.has(open)) {
+      if (next != null) this.openTask(next);
+      else { this.selectedTask.set(null); this.detail.set(null); }
+    }
+  }
 
   // ---- words ------------------------------------------------------------------------------------------------------
 
@@ -281,13 +728,72 @@ export class TaskInbox implements OnInit {
   }
 
   dueLabel(t: InboxTask): string {
-    if (t.state !== 'Open') return t.actedAt ? shortTime(t.actedAt) : '';
+    if (t.state !== 'Open') return t.actedAt ? 'Acted ' + shortTime(t.actedAt) : '';
     if (!t.dueAt) return 'No due time';
     return (t.overdue ? 'Overdue · was due ' : 'Due ') + shortTime(t.dueAt);
   }
 
+  /** A title's name and trailing reference (#1016), for a heading that wraps the name but never the reference. */
+  refOf(title: string | null | undefined): { name: string; ref: string } {
+    return splitRef(title ?? '');
+  }
+
   when(iso: string | null | undefined): string {
     return shortTime(iso);
+  }
+
+  /** "5 min ago", "Yesterday, 14:05": a history line's time; the exact one is its tooltip. */
+  ago(iso: string | null | undefined): string {
+    return relativeTime(iso, this.now());
+  }
+
+  exact(iso: string | null | undefined): string {
+    return exactTime(iso);
+  }
+
+  /** A status's dot, in the status pill's families. */
+  toneOf(status: string): RowTone {
+    switch (status) {
+      case 'Overdue': case 'Rejected': case 'Failed': return 'crit';
+      case 'Pending': case 'Changes asked': case 'Waiting': return 'warn';
+      case 'Approved': case 'Done': case 'Completed': return 'ok';
+      case 'Running': return 'brand';
+      default: return 'neutral';
+    }
+  }
+
+  private taskItem(t: InboxTask, now: number): ListItem {
+    const status = this.stateLabel(t);
+    const open = t.state === 'Open';
+    const at = open ? t.dueAt : t.actedAt;
+    const people = [this.holder(t), this.name(t.requestedBy), this.name(t.actedBy), t.standingInFor ? this.name(t.standingInFor) : '']
+      .filter(p => p && p !== 'the workflow');
+    const common = this.common();
+    const sub = [common.step ? '' : t.name, common.workflow ? '' : t.workflowName, t.standingInFor ? `for ${this.name(t.standingInFor)}` : '']
+      .filter(Boolean).join(' · ');
+    const title = t.requestTitle || t.name;
+    return {
+      id: t.id, kind: 'task', title, ...splitRef(title), sub, status, tone: this.toneOf(status),
+      time: at ? (open ? 'Due ' : '') + compactTime(at, now, undefined, true) : '',
+      timeTitle: at ? (open ? 'Due ' : 'Acted ') + exactTime(at) : '',
+      crit: open && !!t.overdue, workflow: t.workflowName ?? '',
+      group: open ? dueGroup(t.dueAt, t.overdue, now) : pastGroup(t.actedAt, now),
+      haystack: [t.requestTitle, t.name, t.workflowName, ...people].join(' ').toLowerCase(),
+    };
+  }
+
+  private requestItem(r: RequestRow, now: number): ListItem {
+    const at = r.startedAt ?? r.endedAt;
+    const sub = this.common().workflow ? '' : r.workflowName;
+    return {
+      id: r.id, kind: 'request', title: r.title, ...splitRef(r.title), sub, status: r.state, tone: this.toneOf(r.state),
+      time: compactTime(at, now, undefined, true), timeTitle: at ? 'Started ' + exactTime(at) : '', crit: false, workflow: r.workflowName,
+      group: pastGroup(at, now), haystack: [r.title, r.workflowName, r.currentStep, this.name(r.requestedBy)].join(' ').toLowerCase(),
+    };
+  }
+
+  private fieldViews(subject: Record<string, unknown> | undefined | null): FieldView[] {
+    return this.fields(subject).map(f => ({ ...f, view: valueKind(f.value) }));
   }
 
   stateLabel(t: InboxTask): string {
@@ -316,10 +822,4 @@ export class TaskInbox implements OnInit {
     const me = this.auth.user();
     return me?.username && text === me.username && me.fullName ? me.fullName : text;
   }
-}
-
-function labelOf(key: string): string {
-  // Sentence case, as every label in the console: "submittedBy" is "Submitted by", "submissionId" "Submission ID".
-  const words = key.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim().toLowerCase().replace(/\bid\b/g, 'ID');
-  return words.charAt(0).toUpperCase() + words.slice(1);
 }

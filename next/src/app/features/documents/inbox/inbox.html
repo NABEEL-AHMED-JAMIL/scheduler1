@@ -1,36 +1,28 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Inbox</h1>
-      <p class="page-subtitle">
-        Upload files for this workspace's pipelines. Each file's kind and size are checked, it is stored in the
-        workspace's bucket, and it starts every job whose inbox trigger matches its name.
-      </p>
-    </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (canManage() && configured()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="openSettings()"><app-icon name="settings" />Inbox settings</button>
-      }
-    </div>
-  </div>
-  <app-managed-banner what="inbox settings" />
+  <!-- UX review B4 (IN1): one place for the settings -- the Settings card beside the upload, with its own Change. -->
+  <app-page-header title="File drop"
+                   subtitle="Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts every schedule set to start when a matching file arrives.">
+    @if (!noWorkspace()) {
+      <app-refresh-button [loading]="loading()" (refresh)="load()" />
+    }
+  </app-page-header>
+  <app-managed-banner what="file drop settings" />
 
-  @if (loading() && !settings()) {
-    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the inbox…</div>
+  @if (noWorkspace()) {
+    <app-needs-workspace what="The file drop is" todo="upload files to it" icon="upload" />
+  } @else if (loading() && !settings()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the file drop…</div>
   } @else if (error()) {
     <div class="card p-0">
       <app-load-error [message]="error()" (retry)="load()" />
     </div>
   } @else if (!configured()) {
     <div class="card p-8 flex flex-col items-center text-center gap-3">
-      <span class="stat-glyph"><app-icon name="inbox" /></span>
-      <h2 class="text-base font-semibold">No inbox yet</h2>
+      <span class="stat-glyph"><app-icon name="upload" /></span>
+      <h2 class="text-base font-semibold">No file drop yet</h2>
       <p class="text-sm text-[color:var(--text-secondary)] max-w-xl">{{ notConfiguredText() }}</p>
       @if (canManage()) {
-        <button type="button" class="btn btn-primary btn-sm" (click)="openSettings()"><app-icon name="settings" />Set up the inbox</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="openSettings()"><app-icon name="settings" />Set up the file drop</button>
       }
     </div>
   } @else {
@@ -45,8 +37,8 @@
                            (picked)="enqueue($event)" />
         @if (settings()?.connectionActive === false) {
           <p class="text-sm text-crit-500" role="alert">
-            The inbox's storage connection is not active, so it takes no files.
-            {{ canManage() ? 'Activate the connection, or choose another in Inbox settings.' : 'Ask a workspace admin to fix it.' }}
+            The file drop's storage connection is not active, so it takes no files.
+            {{ canManage() ? 'Activate the connection, or choose another under Settings › Change.' : 'Ask a workspace admin to fix it.' }}
           </p>
         }
 
@@ -88,7 +80,7 @@
         <div class="text-sm">
           <button type="button" class="btn btn-ghost btn-sm -ml-2" [attr.aria-expanded]="showKinds()" aria-controls="inboxKinds"
                   (click)="showKinds.set(!showKinds())">
-            <app-icon [name]="showKinds() ? 'chevronDown' : 'chevronRight'" />What the inbox accepts
+            <app-icon [name]="showKinds() ? 'chevronDown' : 'chevronRight'" />What the file drop accepts
           </button>
           @if (showKinds()) {
             <div id="inboxKinds">
@@ -110,7 +102,9 @@
       <section class="card p-4 flex flex-col gap-3 min-w-0" aria-labelledby="inboxSettingsHeading">
         <div class="flex items-center justify-between gap-2">
           <h2 id="inboxSettingsHeading" class="text-base font-semibold">Settings</h2>
-          @if (!canManage()) { <span class="pill pill-neutral">Read-only</span> }
+          @if (canManage()) {
+            <button type="button" class="btn btn-default btn-sm" data-test="inbox-settings" (click)="openSettings()"><app-icon name="edit" />Change</button>
+          } @else { <span class="pill pill-neutral">Read-only</span> }
         </div>
         @if (settings(); as s) {
           <dl class="flex flex-col gap-2.5 text-sm">
@@ -133,8 +127,8 @@
           </dl>
         }
         <p class="text-xs text-[color:var(--text-muted)] border-t border-subtle pt-3">
-          Which files start which job is set on the job: open a schedule and, under Event, turn on
-          "Start when a file arrives in the inbox".
+          Which files start which schedule is set on the schedule: open it and, under When it runs, turn on
+          "Start when a file arrives".
           <a class="link-inline" routerLink="/pipelines/schedules">Open Schedules</a>
         </p>
       </section>
@@ -142,13 +136,14 @@
   }
 
   @if (configured() || files().length) {
+    <!-- The fifty newest scroll in their own box with the header pinned; they made the page five screens long (review 2026-10-07). -->
     <app-table-shell heading="Arrivals" columnsKey="inbox-arrivals" [loading]="filesLoading()" [error]="filesError()"
-                     [isEmpty]="!files().length" [shown]="files().length" [scrollRows]="false"
+                     [isEmpty]="!files().length" [shown]="files().length"
                      emptyMessage="No file has arrived yet. Upload one above, or send one through the API."
                      emptyIcon="inbox" (retry)="loadFiles()">
       <ng-container toolbar>
         <p class="text-xs text-[color:var(--text-muted)]">
-          The newest {{ listLimit }}. The runs a file started are listed on each job, under Inbox trigger.
+          The newest {{ listLimit }}. The runs a file started are listed on each schedule.
           <a class="link-inline" routerLink="/pipelines/schedules">Schedules</a>
         </p>
       </ng-container>
@@ -168,6 +163,14 @@
               <td class="min-w-44 max-w-96">
                 <app-data-text class="block font-medium" [value]="f.fileName" label="File" />
                 @if (f.contentType) { <span class="block text-xs text-[color:var(--text-muted)]">{{ f.contentType }}</span> }
+                <!-- MIG-324: the key a pipeline's Read step names this file by. -->
+                @if (f.key) {
+                  <span class="flex items-center gap-1 min-w-0 text-xs text-[color:var(--text-muted)]">
+                    <span class="mono truncate" [title]="f.key">{{ f.key }}</span>
+                    <app-copy-button [value]="'the key of ' + f.fileName" [copied]="copiedKey() === f.arrivalId"
+                                     copiedLabel="Key copied" (copy)="copyKey(f)" />
+                  </span>
+                }
               </td>
               <td class="text-right tabular whitespace-nowrap">{{ formatSize(f.bytes) }}</td>
               <td class="whitespace-nowrap">{{ uploader(f) }}</td>

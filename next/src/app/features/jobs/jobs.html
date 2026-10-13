@@ -1,30 +1,24 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Schedules</h1>
-      <p class="page-subtitle">
-        When each pipeline runs. A schedule binds a pipeline to a timetable.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Schedules &amp; triggers</h1>
+        <p class="page-subtitle">
+          When each pipeline runs, and what starts it: a timetable, a file arriving or an approved document.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
+        <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
+        @if (!locked()) {
+          <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
+            <app-icon name="upload" />Bulk import
+          </a>
+          <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (live()) {
-        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
-              title="Connected — job status arrives as the pipeline reports it">
-          <span class="live-dot live-on"></span>Live
-        </span>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
-      @if (!locked()) {
-        <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
-          <app-icon name="upload" />Bulk import
-        </a>
-        <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="schedules" still="You can still run them." />
 
   @if (stalledCount()) {
@@ -35,7 +29,7 @@
         {{ stalledCount() }}
         {{ stalledCount() === 1 ? 'run has' : 'runs have' }}
         been in flight for over half an hour without an update. A worker that has finished but
-        cannot report back leaves a job looking busy for ever — check the worker's logs, and
+        cannot report back leaves a schedule looking busy for ever — check the worker's logs, and
         that its callback token still matches the server's.
       </p>
     </div>
@@ -45,10 +39,9 @@
   <app-stat-strip [items]="liveTiles()" [cols]="2" [smCols]="3" [lgCols]="5" align="start" size="md"
                   label="Live run counts" />
 
-  <app-table-shell heading="Jobs" [scrollRows]="false" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Schedules" [scrollRows]="false" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="jobs().length"
-                   [emptyMessage]="hasFilters()
-                      ? 'No jobs match the current filters.' : 'No jobs yet.'"
+                   [emptyMessage]="emptyMessage()"
                    emptyIcon="briefcase"
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">
@@ -76,8 +69,8 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, job, task or workspace' : 'Search id, job or task'"
-               aria-label="Search jobs"
+        <input class="input" [placeholder]="seesWorkspaces() ? 'Search id, schedule, pipeline or workspace' : 'Search id, schedule or pipeline'"
+               aria-label="Search schedules"
                [value]="search()" (input)="search.set($any($event.target).value); onFilterChange()" />
       </div>
       @if (seesOthersJobs()) {
@@ -113,14 +106,15 @@
       <thead>
         <tr>
           <th class="w-10">
-            <input type="checkbox" class="checkbox" aria-label="Select all jobs on this page"
+            <input type="checkbox" class="checkbox" aria-label="Select all schedules on this page"
                    [checked]="allOnPageSelected()"
                    [indeterminate]="someOnPageSelected()"
                    [disabled]="!selectableOnPage().length"
                    (change)="toggleSelectAllOnPage()" />
           </th>
           <th class="w-8"></th>
-          <th>Job</th>
+          <!-- UX review 2026-10-12 (G12, S1): one word per thing -- a schedule runs a pipeline. -->
+          <th>Schedule</th>
           <!-- Whose job it is, beside its name, for the one role whose list mixes workspaces. It waits
                for xl like Task and Execution; on a narrower screen the Workspace filter still narrows. -->
           @if (seesWorkspaces()) {
@@ -129,18 +123,19 @@
           <!-- Task, Execution and Created wait for xl, as the metadata columns wait for 2xl: at 1024
                they pushed Run status and the row's menu past the card edge. None is lost -- the
                task is in the row's panel, and Schedule already reads "On demand" for Manual. -->
-          <th class="hidden xl:table-cell">Task</th>
-          <th class="hidden xl:table-cell">Execution</th>
+          <th class="hidden xl:table-cell">Pipeline</th>
+          <th class="hidden xl:table-cell">Mode</th>
           <!-- A floor so "Ends 2026-12-31" is not broken at its hyphens. -->
-          <th class="min-w-40 xl:min-w-52">Schedule</th>
-          <th>Next / last run</th>
+          <th class="min-w-40 xl:min-w-52">When</th>
           <th class="hidden xl:table-cell">Created</th>
-          <th>Run status</th>
           <!-- Metadata columns wait for a wide screen, as on Tasks; the detail row still spans them. -->
           <th class="hidden 2xl:table-cell">Created by</th>
           <th class="hidden 2xl:table-cell">Updated by</th>
+          <!-- S1: the runs and the schedule's own state side by side at the right, not two pills far apart. -->
+          <th>Next / last run</th>
+          <th>Run status</th>
           <th class="text-right">State</th>
-          <th class="w-12 col-pin-right"><span class="sr-only">Actions</span></th>
+          <th class="w-12 col-pin-right th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -152,7 +147,7 @@
                      [checked]="selected().has(job.jobId)"
                      [disabled]="!selectable(job)"
                      [attr.aria-label]="'Select ' + job.jobName"
-                     [title]="selectable(job) ? '' : (job.jobStatus === 'Delete' ? 'Deleted jobs cannot be selected' : 'Already queued or running')"
+                     [title]="selectable(job) ? '' : (job.jobStatus === 'Delete' ? 'Deleted schedules cannot be selected' : 'Already queued or running')"
                      (change)="toggleSelect(job)" />
             </td>
             <td>
@@ -202,6 +197,15 @@
                 </div>
               }
             </td>
+            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
+              {{ job.dateCreated ? (job.dateCreated | serverTime:'date') : '—' }}
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.createdByName || ''">{{ job.createdByName || '—' }}</span>
+            </td>
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
+              <span class="block truncate" [title]="job.updatedByName || ''">{{ job.updatedByName || '—' }}</span>
+            </td>
             <td class="whitespace-nowrap">
               @if (nextRun(job); as nextRunAt) {
                 <div class="text-[color:var(--text-secondary)]">
@@ -211,9 +215,6 @@
               <div class="text-xs text-[color:var(--text-muted)]">
                 {{ job.lastJobRun ? ('Last ' + (when(job.lastJobRun) | serverTime:'recent')) : 'Never run' }}
               </div>
-            </td>
-            <td class="hidden xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap">
-              {{ job.dateCreated ? (job.dateCreated | serverTime:'date') : '—' }}
             </td>
             <td>
               <div class="flex items-center gap-1.5">
@@ -226,19 +227,13 @@
                 }
               </div>
             </td>
-            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
-              <span class="block truncate" [title]="job.createdByName || ''">{{ job.createdByName || '—' }}</span>
-            </td>
-            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] text-xs max-w-40">
-              <span class="block truncate" [title]="job.updatedByName || ''">{{ job.updatedByName || '—' }}</span>
-            </td>
             <td class="text-right"><app-status [label]="job.jobStatus" [quiet]="true" /></td>
             <!-- The pinned cell paints its own background over the scrolled columns, which also
                  painted over the selected row's tint; it takes the tint back here. -->
             <td class="text-right col-pin-right"
                 [class.bg-[var(--surface-sunken)]]="selected().has(job.jobId)">
-              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
-                      [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('job #' + job.jobId))">
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu" (cdkMenuOpened)="checkAiSteps(job)"
+                      [disabled]="busyJob() === job.jobId" [attr.aria-label]="'Actions for ' + (job.jobName || ('schedule #' + job.jobId))">
                 <app-icon name="dots" size="1.05em" />
               </button>
               <ng-template #menu>
@@ -247,9 +242,16 @@
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
-                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
-                          [title]="runBlockedReason(job) || 'Run now, choosing the model each AI step runs on'"
-                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with…</button>
+                  <!-- Only where the pipeline has an AI step or run parameters: elsewhere there is nothing to choose (review 2026-10-07, MIG-347). -->
+                  @if (hasRunWith(job)) {
+                  <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)" data-test="run-with"
+                          [title]="runBlockedReason(job) || 'Run now, choosing its parameters or the model each AI step runs on'"
+                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />{{ runWithLabel(job) }}</button>
+                  }
+                  <!-- MIG-347: a schedule run for each day of a past range, beside its own runs. -->
+                  <button cdkMenuItem class="menu-item" [disabled]="job.jobStatus !== 'Active'" data-test="backfill"
+                          [title]="job.jobStatus !== 'Active' ? 'Activate this schedule to backfill it' : 'Run it for each day of a past range'"
+                          (cdkMenuItemTriggered)="backfill(job)"><app-icon name="layers" />Backfill…</button>
                   @if (!locked()) {
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
                           [title]="skipBlockedReason(job)"
@@ -259,7 +261,7 @@
                   <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']"><app-icon name="clock" />Executions</a>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAssistant(job)">
-                    <app-icon name="chat" />Ask about this job
+                    <app-icon name="chat" />Ask about this schedule
                   </button>
                   @if (!locked()) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">
@@ -325,7 +327,7 @@
                   }
                   @if (job.taskDetail?.taskDetailId) {
                     <div>
-                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Task</dt>
+                      <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Pipeline</dt>
                       <dd class="mt-1">
                         <!-- The task editor is an admin's; anyone else gets the name, not a link to a refusal. -->
                         @if (canManageTasks()) {
@@ -358,7 +360,7 @@
                     <div>
                       <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Storage</dt>
                       <dd class="mt-1">
-                        <a class="link-inline" routerLink="/documents/files"
+                        <a class="link-inline" routerLink="/data/files"
                            [queryParams]="{ bucket: target.bucket, prefix: target.prefix }">
                           <app-icon name="folder" size="0.85em" class="icon-info" />View in bucket
                         </a>
@@ -386,8 +388,8 @@
                                it read as a run outcome on a panel that also shows one. -->
                           <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
                                 [title]="chip.on
-                                  ? 'An email is sent when this job ' + chip.label
-                                  : 'No email is sent when this job ' + chip.label">
+                                  ? 'An email is sent when this schedule ' + chip.label
+                                  : 'No email is sent when this schedule ' + chip.label">
                             <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
                           </span>
                         }
@@ -400,7 +402,7 @@
                   <div class="detail-section">
                     <div class="flex flex-wrap items-baseline gap-2 mb-2">
                       <h3 class="text-xs font-semibold uppercase tracking-wider
-                                 text-[color:var(--text-secondary)]">Task payload</h3>
+                                 text-[color:var(--text-secondary)]">Pipeline payload</h3>
                       @if (payloadFor(job)) {
                         <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload(job)">
                           <app-icon name="copy" size="0.85em" />Copy
@@ -411,7 +413,7 @@
                       <pre class="mono text-xs leading-relaxed rounded p-2.5 overflow-y-auto max-h-64 whitespace-pre-wrap break-words bg-code border border-subtle"
                           >{{ payload }}</pre>
                     } @else if (payloadFor(job) === '') {
-                      <p class="text-xs text-[color:var(--text-muted)]">This task has no payload configured.</p>
+                      <p class="text-xs text-[color:var(--text-muted)]">This pipeline has no payload configured.</p>
                     } @else {
                       <p class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">
                         <app-icon name="refresh" size="0.85em" class="spin" />Reading the task…
@@ -426,7 +428,7 @@
                                text-[color:var(--text-secondary)]">Recent runs</h3>
                     @if (runsByJob()[job.jobId]?.length) {
                       <span class="text-[11px] text-[color:var(--text-muted)]">
-                        Last {{ recentRunBars }} runs, oldest first · how long each took — click a bar for its logs
+                        Last {{ recentRunBars }} runs, oldest first · how long each took — click a bar to open the run
                       </span>
                     }
                     <a class="link-inline text-xs ml-auto" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']">
@@ -443,7 +445,7 @@
                                    (barClicked)="openRunLogs(job, $event)" />
                   } @else {
                     <p class="text-xs text-[color:var(--text-muted)] py-6 text-center">
-                      This job has not completed a run yet.
+                      This schedule has not completed a run yet.
                     </p>
                   }
                 </div>

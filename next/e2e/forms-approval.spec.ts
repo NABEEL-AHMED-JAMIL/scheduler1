@@ -1,45 +1,78 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, Browser, Page } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { getJson } from './support/workspace';
+import { archiveForm, cancelRunning, inactivateWorkflow, makeForm, makeWorkflow, openTaskOf, submitForm } from './support/forms';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
- * MIG-279, live and read-only: form 1001 ("MIG-277 visit check (synthetic)") starts the workflow
- * mig279-visit-approval; submission 1004's request was approved by Alex (4597). The administrator (4537) sees the
- * workflow on the form, the approval on Submissions, and opens the form's rows in Analytics Studio.
- * Sign-in: E2E_TENANT_ADMIN_TOKEN (mint-test-token.sh 4537 900).
+ * MIG-279, live: a form starts an approval workflow, and the approval shows where the administrator looks. The rebuilt
+ * workspace has no form with a workflow, so the spec makes them for the run: the workflow "E2E visit approval <stamp>"
+ * (an approval by Riverside's reviewer, role user), the form "E2E approval form <stamp>" that starts it, and one
+ * submission, which the reviewer approves through the task inbox's API. The administrator then sees the approval on
+ * Submissions, opens the form's rows in Analytics Studio, and finds the workflow named on the form in the builder.
+ * Afterwards the form is archived and the workflow switched off (neither service deletes); the submission, its request
+ * and its dataset row stay with them. Sign-in through support/session.ts (roles admin and user).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
+const STAMP = Date.now().toString(36);
+const FORM_NAME = `E2E approval form ${STAMP}`;
+const WORKFLOW_KEY = `e2e-visit-approval-${STAMP}`;
+const WORKFLOW_NAME = `E2E visit approval ${STAMP}`;
 
-async function pageAs(browser: Browser, request: APIRequestContext): Promise<Page> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), {
-    username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId, tenantId: claims.tenantId,
-    accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys });
-  return page;
+let s: Session;
+let form = 0;
+let approved = 0;
+
+async function pageAs(browser: Browser): Promise<Page> {
+  return signedIn(browser, s, { viewport: { width: 1440, height: 1000 } });
 }
 
-test.describe('Forms: approval and dataset (live, read-only)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+test.describe('Forms: approval and dataset (live)', () => {
+  test.skip(!canSignIn('admin') || !canSignIn('user'), `${NEEDS.admin}; ${NEEDS.user}`);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
 
-  test('the approval shows on Submissions, and the rows open in Analytics Studio', async ({ browser, request }) => {
-    const page = await pageAs(browser, request);
-    await page.goto('/forms/submissions?formId=1001');
-    await expect(page.locator('[data-submission="1004"] [data-approval] .pill')).toHaveText('Approved');
+  test.beforeAll(async ({ request }) => {
+    test.setTimeout(120_000);
+    s = await sessionFor(request, 'admin');
+    await makeWorkflow(request, s, WORKFLOW_KEY, WORKFLOW_NAME, 'form', [
+      { key: 'approve', name: 'Reviewer approves', type: 'approval',
+        assignee: { kind: 'user', value: String(riverside().reviewer) }, rejectNeedsComment: true },
+    ]);
+    form = await makeForm(request, s, FORM_NAME, [{ key: 'visit', label: 'Visit', type: 'text', required: true }], WORKFLOW_KEY);
+    approved = (await submitForm(request, s, form, { visit: `E2E visit ${STAMP}` })).submissionId;
+    // The reviewer approves it, as the Task inbox's Approve does.
+    const reviewer = await sessionFor(request, 'user');
+    const task = await openTaskOf(request, reviewer, WORKFLOW_KEY);
+    const acted = await (await request.post(`${api}/taskInbox.json/act`, { headers: { ...authOf(reviewer),
+      'Idempotency-Key': `e2e-${STAMP}-approve` }, data: { taskId: task.id, action: 'approve', comment: null } })).json();
+    expect(acted.status, `approve task ${task.id}: ${acted.message}`).toBe('SUCCESS');
+    await expect.poll(async () => ((await getJson(request, s, `/formSubmission.json/list?formId=${form}&limit=50`)).data ?? [])
+      .find((x: { submissionId: number }) => x.submissionId === approved)?.workflowStatus,
+    { timeout: 30_000, message: `submission ${approved}'s approval is recorded` }).toBe('Approved');
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (!s) return;
+    if (form) await archiveForm(request, s, form);
+    await cancelRunning(request, s, WORKFLOW_KEY);
+    await inactivateWorkflow(request, s, WORKFLOW_KEY);
+  });
+
+  test('the approval shows on Submissions, and the rows open in Analytics Studio', async ({ browser }) => {
+    const page = await pageAs(browser);
+    await page.goto(`/forms/submissions?formId=${form}`);
+    await expect(page.locator(`[data-submission="${approved}"] [data-approval] .pill`)).toHaveText('Approved');
 
     await page.locator('[data-open-analytics]').click();
     await expect(page).toHaveURL(/\/data\/analytics\?connection=/);
-    await expect(page.getByText('datasets/forms/form-1001/*.json').first()).toBeVisible();
+    await expect(page.getByText(`datasets/forms/form-${form}/*.json`).first()).toBeVisible();
   });
 
-  test('the form names its approval workflow in the builder', async ({ browser, request }) => {
-    const page = await pageAs(browser, request);
+  test('the form names its approval workflow in the builder', async ({ browser }) => {
+    const page = await pageAs(browser);
     await page.goto('/forms/builder');
-    await page.getByRole('button', { name: 'Edit MIG-277 visit check (synthetic)' }).click();
-    await expect(page.locator('[data-form-editor]')).toContainText('starts workflow "MIG-279 visit approval (synthetic)"');
+    await page.getByRole('button', { name: `Edit ${FORM_NAME}` }).click();
+    await expect(page.locator('[data-form-editor]')).toContainText(`starts workflow "${WORKFLOW_NAME}"`);
     await page.locator('[data-tab="settings"]').click();
-    await expect(page.locator('#formWorkflow')).toHaveValue('mig279-visit-approval');
+    await expect(page.locator('#formWorkflow')).toHaveValue(WORKFLOW_KEY);
   });
 });

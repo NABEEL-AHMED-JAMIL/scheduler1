@@ -1,12 +1,14 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Your profile</h1>
-      <p class="page-subtitle">
-        How you appear across the console. Your role and workspace are set by an administrator.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Your profile</h1>
+        <p class="page-subtitle">
+          How you appear across the console. Your role and workspace are set by an administrator.
+        </p>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   @if (loading()) {
     <div class="card p-10 text-center text-sm text-[color:var(--text-muted)]">
@@ -25,16 +27,19 @@
 
       <div class="space-y-4">
       <div class="card p-4 text-center">
-        <div class="relative inline-block">
-          @if (avatarUrl()) {
-            <img [src]="avatarUrl()" alt="Your profile picture"
-                 class="avatar-img size-28 mx-auto border-2 border-subtle" />
-          } @else {
-            <span class="avatar-initials size-28 text-3xl mx-auto">{{ auth.initials() }}</span>
-          }
+        <!-- Drop a picture on the portrait, or use the button; either opens the square crop. -->
+        <div class="relative inline-block rounded-full" data-test="profile-picture-drop"
+             [class.avatar-drop-active]="dragging()"
+             (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+          <app-avatar [appUserId]="me.appUserId" [version]="me.avatarVersion ?? null" [name]="me.fullName || me.username"
+                      [size]="7" class="block" />
           @if (uploading()) {
             <span class="absolute inset-0 rounded-full grid place-items-center bg-[color:var(--scrim-strong)]">
               <app-icon name="refresh" class="spin text-[color:var(--on-solid)]" size="1.4em" />
+            </span>
+          } @else if (dragging()) {
+            <span class="absolute inset-0 rounded-full grid place-items-center text-xs font-medium bg-[color:var(--scrim-strong)] text-[color:var(--on-solid)]">
+              Drop to use
             </span>
           }
         </div>
@@ -51,24 +56,19 @@
         <div class="flex items-center justify-center gap-2 mt-4">
           <!-- Focus lands on the hidden input, so the label draws the ring for it. -->
           <label class="btn btn-default btn-sm cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[color:var(--focus-ring)]"
-                 [class.opacity-50]="uploading() || !targetBucket()">
-            <app-icon name="upload" />{{ avatarUrl() ? 'Replace' : 'Add picture' }}
-            <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif"
-                   [disabled]="uploading() || !targetBucket()" (change)="onPicture($event)" />
+                 [class.opacity-50]="uploading()">
+            <app-icon name="upload" />{{ me.avatarVersion ? 'Replace' : 'Add picture' }}
+            <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp" data-test="profile-picture-input"
+                   [disabled]="uploading()" (change)="onPicture($event)" />
           </label>
-          @if (avatarUrl()) {
+          @if (me.avatarVersion) {
             <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
                     [disabled]="uploading()" (click)="removePicture()">
               <app-icon name="trash" />Remove
             </button>
           }
         </div>
-
-        @if (!targetBucket()) {
-          <p class="field-note text-warn-500 mt-2">
-            No storage connection is available, so there is nowhere to keep a picture.
-          </p>
-        }
+        <p class="field-note mt-2">PNG, JPEG or WebP, up to 5 MB. Location and camera details are removed.</p>
 
         <dl class="grid grid-cols-2 gap-3 mt-5 pt-5 border-t text-left border-subtle"
            >
@@ -89,15 +89,25 @@
 
       @if (myOutcomes().length) {
         <div class="card chart-card">
-          <h3 class="chart-title">Your jobs right now</h3>
-          <p class="chart-sub">How the {{ jobsAssigned() }} jobs in your name last ran.</p>
-          <app-donut [data]="myOutcomes()" totalLabel="jobs" [colorFor]="outcomeColor" />
+          <h3 class="chart-title">Your schedules right now</h3>
+          <p class="chart-sub">How the {{ jobsAssigned() }} schedules in your name last ran.</p>
+          <app-donut [data]="myOutcomes()" totalLabel="schedules" [colorFor]="outcomeColor" />
         </div>
       }
       </div>
 
       <div class="space-y-4">
-        @if (me.mustChangePassword) {
+        @if (me.mustChangePassword && auth.user()?.passwordExpired) {
+          <div class="card p-4 flex items-start gap-2.5 border-[color:var(--accent-mark)]" data-test="password-expired">
+            <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
+            <p class="text-sm">
+              <strong>Your password has expired.</strong>
+              <span class="text-[color:var(--text-secondary)]">
+                It is older than your workspace allows. Choose a new one below to carry on.
+              </span>
+            </p>
+          </div>
+        } @else if (me.mustChangePassword) {
           <div class="card p-4 flex items-start gap-2.5 border-[color:var(--accent-mark)]">
             <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
             <p class="text-sm">
@@ -120,7 +130,7 @@
                lines and its neighbours do not. -->
           <div class="form-grid items-start">
             <app-field label="Display name" for="fullName" [required]="true" [error]="nameError()"
-                       hint="Shown in the header and wherever a job records who assigned it.">
+                       hint="Shown in the header and wherever a schedule records who assigned it.">
               <input id="fullName" class="input" placeholder="Your name"
                      [value]="name()" (input)="name.set($any($event.target).value)"
                      (keydown.enter)="saveName()" />
@@ -192,14 +202,20 @@
           <div class="grid sm:grid-cols-2 gap-4 mt-4 max-w-xl">
             <app-field label="Current password" for="currentPassword">
               <input id="currentPassword" type="password" class="input" autocomplete="current-password"
+                     placeholder="Your current password"
                      [value]="currentPassword()"
                      (input)="currentPassword.set($any($event.target).value)" />
             </app-field>
-            <app-field label="New password" for="newPassword" hint="At least 8 characters.">
-              <input id="newPassword" type="password" class="input" autocomplete="new-password"
-                     [value]="newPassword()"
-                     (input)="newPassword.set($any($event.target).value)" />
-            </app-field>
+            <div>
+              <app-field label="New password" for="newPassword">
+                <input id="newPassword" type="password" class="input" autocomplete="new-password"
+                       [placeholder]="newPasswordHint()"
+                       [value]="newPassword()"
+                       (input)="newPassword.set($any($event.target).value)" />
+              </app-field>
+              <!-- MIG-353: the workspace's rules, ticked as they are met; the server names any it refuses. -->
+              <app-password-rules [rules]="rules()" [password]="newPassword()" />
+            </div>
           </div>
 
           @if (passwordError()) {
@@ -218,6 +234,32 @@
           </div>
         </div>
 
+        <!-- Owner 2026-10-13: the app themes, as the top bar's menu offers them, with larger previews. -->
+        <div class="card p-4" data-test="appearance">
+          <div class="flex items-baseline gap-2">
+            <h3 class="text-sm font-semibold">Appearance</h3>
+            @if (themeSaved() === 'saved') {
+              <span class="text-xs text-[color:var(--ok-text)] ml-auto" role="status">Saved to your account</span>
+            } @else if (themeSaved() === 'local') {
+              <span class="text-xs text-[color:var(--warn-text)] ml-auto" role="status">Kept on this device only</span>
+            }
+          </div>
+          <p class="field-note text-[color:var(--text-muted)] mt-1 mb-4">
+            The console's colours. Your choice is kept on your account, so it follows you to any device you sign in on.
+          </p>
+          <app-theme-chooser label="Theme" [value]="themes.choice()" (picked)="chooseTheme($event)" />
+          @if (workspaceThemeLabel(); as ws) {
+            <p class="text-xs text-[color:var(--text-muted)] mt-3" data-test="workspace-theme">
+              Your workspace's default is {{ ws }}.
+              @if (ownTheme()) {
+                <button type="button" class="link-inline" (click)="chooseTheme(null)">Use the workspace default</button>
+              } @else {
+                You are using it.
+              }
+            </p>
+          }
+        </div>
+
         <div class="card p-4">
           <div class="flex items-baseline gap-2 mb-4">
             <h3 class="text-sm font-semibold">Your activity</h3>
@@ -229,16 +271,16 @@
           <!-- Four figures rather than three, and each one now says what it counts. "Have run"
                counted every job whose status was set and not Missed, which is neither a period
                nor an event -- it read as "today" and meant "ever". -->
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div class="grid grid-cols-2 lg:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
             <!-- A link only when the access profile lets this person open Schedules. -->
             @if (canOpenJobs()) {
               <a routerLink="/pipelines/schedules" class="group block rounded-card">
-                <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
+                <app-stat-tile label="Schedules" [value]="jobsAssigned()" icon="briefcase" tone="info"
                                [foot]="activeJobs() + ' active'"
                                class="h-full transition-colors group-hover:border-[color:var(--accent-mark)]" />
               </a>
             } @else {
-              <app-stat-tile label="Jobs" [value]="jobsAssigned()" icon="briefcase" tone="info"
+              <app-stat-tile label="Schedules" [value]="jobsAssigned()" icon="briefcase" tone="info"
                              [foot]="activeJobs() + ' active'" class="h-full" />
             }
             <app-stat-tile label="Runs" [value]="recentRuns()" icon="play" tone="info"
@@ -308,11 +350,11 @@
             </p>
           } @else if (jobsAssigned()) {
             <p class="text-sm text-[color:var(--text-muted)]">
-              None of your {{ jobsAssigned() }} jobs has run yet.
+              None of your {{ jobsAssigned() }} schedules has run yet.
             </p>
           } @else {
             <p class="text-sm text-[color:var(--text-muted)]">
-              No jobs are assigned to you yet.
+              No schedules are assigned to you yet.
             </p>
           }
         </div>

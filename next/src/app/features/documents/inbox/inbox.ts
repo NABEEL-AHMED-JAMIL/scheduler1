@@ -18,6 +18,12 @@ import {
 import { InboxApi, InboxArrival } from './inbox.service';
 import { InboxSettingsDialog, InboxSettingsData } from './inbox-settings-dialog';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { NeedsWorkspace } from '../../../shared/ui/needs-workspace';
+import { CopyButton } from '../../../shared/ui/copy-button';
+import { copyText } from '../../../shared/ui/clipboard.util';
+import { ToastService } from '../../../shared/ui/toast.service';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** One file on its way to the inbox. */
 export interface QueuedUpload {
@@ -45,13 +51,14 @@ const LIST_LIMIT = 50;
  */
 @Component({
   selector: 'app-inbox',
-  imports: [Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Icon, TableShell, LoadError, StatusPill, DataText, FileDropzone, ServerTimePipe, RouterLink, ManagedBanner, CopyButton, NeedsWorkspace],
   templateUrl: './inbox.html',
 })
 export class Inbox implements OnInit {
   private readonly api = inject(InboxApi);
   private readonly dialog = inject(Dialog);
   private readonly auth = inject(AuthService);
+  private readonly toast = inject(ToastService);
 
   readonly settings = signal<InboxSettings | null>(null);
   readonly files = signal<InboxFile[]>([]);
@@ -61,6 +68,8 @@ export class Inbox implements OnInit {
   readonly filesError = signal('');
   readonly queue = signal<QueuedUpload[]>([]);
   readonly showKinds = signal(false);
+  /** The arrival whose key was just copied, so exactly one row ticks. */
+  readonly copiedKey = signal<string | null>(null);
   private readonly names = signal(new Map<number, string>());
   private nextId = 1;
   private sending = false;
@@ -71,32 +80,57 @@ export class Inbox implements OnInit {
   readonly configured = computed(() => !!this.settings()?.configured);
   readonly capText = computed(() => { const s = this.settings(); return s ? capSentence(s) : ''; });
   readonly notConfiguredText = computed(() => this.canManage()
-    ? 'The inbox is not set up. Choose which of the workspace\'s storage connections takes the files, and members can then upload here; '
-      + 'a job with an inbox trigger starts when a matching file arrives.'
+    ? 'The file drop is not set up. Choose which of the workspace\'s storage connections takes the files, and members can then upload here; '
+      + 'a schedule set to start when a file arrives starts when a matching one does.'
     : this.auth.builderLocked()
-      ? 'The inbox is not set up for this workspace. Our team sets it up: contact your account team.'
-      : 'The inbox is not set up for this workspace. Ask a workspace admin to choose the storage connection it uses.');
+      ? 'The file drop is not set up for this workspace. Our team sets it up: contact your account team.'
+      : 'The file drop is not set up for this workspace. Ask a workspace admin to choose the storage connection it uses.');
   readonly finished = computed(() => this.queue().filter(q => q.state === 'done' || q.state === 'refused').length);
   readonly kinds = ACCEPTED_KINDS;
   readonly formatSize = formatSize;
   readonly shortSha = shortSha;
   readonly listLimit = LIST_LIMIT;
 
+  /** A sign-in with no workspace (a platform administrator's own): the inbox is a workspace's, so nothing is read (review L6). */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.load();
-    // Names for an administrator, who may list the workspace's people whoever builds it (MIG-254).
+    // Names for an administrator, who may list the workspace's people whoever builds it (MIG-254); a member reads
+    // the colleagues the task inbox offers (MIG-321). Either refused, the user numbers stand in for the names.
     if (this.auth.isTenantAdmin()) {
       this.api.users().subscribe({
         next: r => {
           if (r.status !== API_SUCCESS) return;
           this.names.set(new Map((r.data ?? []).map(u => [u.appUserId, u.fullName || u.username || `User ${u.appUserId}`])));
         },
-        error: () => { /* the user numbers stand in for the names */ },
+        error: () => {},
+      });
+    } else {
+      this.api.colleagues().subscribe({
+        next: r => {
+          if (r.status !== API_SUCCESS) return;
+          this.names.set(new Map((r.data ?? []).map(u => [u.userId, u.fullName || u.username || `User ${u.userId}`])));
+        },
+        error: () => {},
       });
     }
   }
 
+  /**
+   * MIG-324: a pipeline's Read step names its file by the key the inbox stored it under (intake/<date>/<arrival>-<name>),
+   * which the list did not show: a new administrator could upload a file and then not tell a step where it was.
+   */
+  async copyKey(f: InboxFile): Promise<void> {
+    if (!f.key) return;
+    if (!(await copyText(f.key))) { this.toast.error('Could not copy the key. Select it and copy by hand.'); return; }
+    this.copiedKey.set(f.arrivalId);
+    setTimeout(() => { if (this.copiedKey() === f.arrivalId) this.copiedKey.set(null); }, 1500);
+  }
+
   load(): void {
+    if (this.noWorkspace()) return;
     this.loading.set(true);
     this.error.set('');
     this.api.settings().subscribe({

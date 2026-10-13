@@ -1,64 +1,61 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, APIRequestContext } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { bestEffort, getJson, jobs, postJson } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, pipeline } from './support/fixtures';
 
 /**
- * Wave 4: the Cron frequency in the schedule editor, end to end, as workspace 2924's administrator.
+ * Wave 4: the Cron frequency in the schedule editor, end to end, as Riverside Health's administrator.
  *
- *  - Job 2852 ("UI-CHECK cron daily 0300 B 0929", Inactive, Cron `0 3 * * *`) opens with Cron chosen and its
- *    expression in the field, and without Repeat every.
+ *  - The spec's own job, "E2E cron daily 0300" (Inactive, Cron `0 3 * * *`), opens with Cron chosen and its
+ *    expression in the field, and without Repeat every. It is found by that name (an earlier run's is reused, read
+ *    only), or created through the API on the rebuilt appointments pipeline's task (support/fixtures.ts) and deleted
+ *    again when the describe ends; it is never activated.
  *  - An expression Core refuses (`* * * * * *`: seconds are not 0) is refused on Save, and Core's sentence shows under
- *    the field. The refusal writes nothing; the editor is then left with Cancel. Nothing else is saved, and the job
- *    is never activated.
+ *    the field. The refusal writes nothing; the editor is then left with Cancel. Nothing else is saved.
  *
- * Needs Core with the Cron frequency (process 6f9261e) behind :9098 and a console at E2E_BASE_URL that has it (e.g.
- * `ng serve --port 4419`). Sign-in, either:
- *   E2E_TENANT_ADMIN_TOKEN                          a TENANT_ADMIN access token (e.g. from
- *                                                   etl-platform/scripts/mint-test-token.sh 4537 900), or
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD    a TENANT_ADMIN's credentials
+ * Sign-in through support/session.ts (role admin).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
+const CRON_JOB_NAME = 'E2E cron daily 0300';
+let CRON_JOB = Number(process.env['E2E_CRON_JOB'] ?? 0);
+/** The job this run made (and deletes), or 0 when it found one. */
+let MADE = 0;
 
-const CRON_JOB = Number(process.env['E2E_CRON_JOB'] ?? 2852);
-
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+/** The spec's Inactive Cron job, by name, made when the workspace has none. */
+async function cronJob(request: APIRequestContext, s: Session): Promise<number> {
+  const found = (await jobs(request, s)).find(j => j.jobName === CRON_JOB_NAME);
+  if (found) return found.jobId;
+  const made = await postJson(request, s, '/sourceJob.json/addSourceJob', {
+    jobName: CRON_JOB_NAME, taskDetail: { taskDetailId: pipeline('appointments').taskId }, execution: 'Auto', priority: 1, maxAttempts: 1,
+    retryBackoffSeconds: 30, jobStatus: 'Inactive', completeJob: false, failJob: false, skipJob: false,
+    schedulers: [{ startDate: null, startTime: '00:00', frequency: 'Cron', intervalValue: '1', cronExpression: '0 3 * * *',
+      daysOfWeek: null, dayOfMonth: null }],
+  });
+  expect(made.status, `create ${CRON_JOB_NAME}: ${made.message}`).toBe('SUCCESS');
+  MADE = (await jobs(request, s)).find(j => j.jobName === CRON_JOB_NAME)!.jobId;
+  return MADE;
 }
 
 test.describe('Schedules: Cron', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
 
   let s: Session;
   let before: Record<string, unknown>;
-  const detail = async (request: APIRequestContext) => (await (await request.get(
-    `${api}/sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=${CRON_JOB}`,
-    { headers: { Authorization: `Bearer ${s.token}` } })).json()).data;
+  const detail = async (request: APIRequestContext) =>
+    (await getJson(request, s, `/sourceJob.json/fetchSourceJobDetailWithSourceJobId?jobId=${CRON_JOB}`)).data;
 
   test.beforeAll(async ({ request }) => {
-    s = await session(request);
+    s = await sessionFor(request, 'admin');
+    CRON_JOB ||= await cronJob(request, s);
     before = await detail(request);
     // The fixture must be what the spec says it is, and it is never activated here.
     expect(before?.['jobStatus'], `job ${CRON_JOB} is Inactive`).toBe('Inactive');
     expect((before?.['scheduler'] as Record<string, unknown>)?.['frequency']).toBe('Cron');
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (s && MADE) await bestEffort(`delete job ${MADE}`, () => request.put(`${api}/sourceJob.json/deleteSourceJob`,
+      { headers: authOf(s), data: { jobId: MADE } }));
   });
 
   test('a Cron job opens on its expression; one Core refuses shows its reason under the field', async ({ browser, request }) => {

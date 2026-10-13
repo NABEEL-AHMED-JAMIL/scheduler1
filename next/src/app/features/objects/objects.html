@@ -1,19 +1,14 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Browse files</h1>
-      <p class="page-subtitle">
-        Browse the storage behind any connection.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Browse files</h1>
+        <p class="page-subtitle">
+          Browse the storage behind any connection.
+        </p>
+      </div>
     </div>
-    <div class="w-full sm:w-72 2xl:w-96">
-      <label class="label" for="bucket">Connection</label>
-      <!-- [selected] per option rather than [value] on the select: the options come from an
-           async list, and a value set on the select before they exist does not stick. -->
-      <app-combobox id="bucket" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
-                    placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
-    </div>
-  </div>
+  </app-page-header>
 
   @if (!bucket()) {
     @if (unknownLink(); as link) {
@@ -34,7 +29,7 @@
             }
           </p>
           @if (canConnectStorage()) {
-            <a routerLink="/integration/storage-connections" class="link-inline mt-2">Storage connections</a>
+            <a routerLink="/connections/storage" class="link-inline mt-2">Storage connections</a>
           }
         </div>
       </div>
@@ -54,17 +49,32 @@
         <button type="button" class="btn btn-default btn-sm mt-4" (click)="loadBuckets()"><app-icon name="refresh" />Try again</button>
       </div>
     } @else if (buckets().length) {
-      <div class="flex flex-col gap-3">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h2 class="text-sm font-semibold">Connections</h2>
-          <span class="text-sm text-[color:var(--text-muted)]">
-            {{ buckets().length }} configured — pick one to browse it
-          </span>
+      <!-- UX final BF1: the connections are a list like any other -- a card whose toolbar holds the heading and count,
+           then its search, left-aligned straight after the heading (review 2.2). The search used to float at the page
+           header's right, over an unrelated empty area. -->
+      <div class="card overflow-hidden" data-test="connections">
+        <div class="table-toolbar flex flex-wrap items-center gap-2 px-4 py-3 border-b border-subtle">
+          <h2 class="text-sm font-semibold">
+            Connections
+            <span class="text-[color:var(--text-muted)] font-normal">({{ shownBuckets().length }} of {{ buckets().length }})</span>
+          </h2>
+          <div class="search-field flex-1 min-w-48 max-w-80">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" type="search" placeholder="Search connections" aria-label="Search connections"
+                   [value]="connectionQuery()" (input)="connectionQuery.set($any($event.target).value)" />
+          </div>
+          <span class="text-xs text-[color:var(--text-muted)]">Pick one to browse its files.</span>
         </div>
 
+        @if (!shownBuckets().length) {
+          <p class="px-4 py-10 text-center text-sm text-[color:var(--text-muted)]" data-test="no-connection-match">
+            No connection matches “{{ connectionQuery() }}”.
+            <button type="button" class="link-inline" (click)="connectionQuery.set('')">Show all</button>
+          </p>
+        }
         <!-- At most three across: four made each card too narrow for its name and footer. -->
-        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-5">
-          @for (b of buckets(); track b.bucket) {
+        <div class="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 min-[2200px]:grid-cols-5" [class.hidden]="!shownBuckets().length">
+          @for (b of shownBuckets(); track b.bucket) {
             <!-- Each card says what the connection is and whose it is, not only its name: the
                  bucket and region it reads, how its last test went, and who made it when. -->
             <button type="button" class="connection-card card p-0 text-left flex flex-col transition-colors
@@ -121,12 +131,12 @@
         <div>
           <h2 class="text-base font-semibold">No storage is connected yet</h2>
           <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-sm">
-            A connection tells the console where a job may read from and write to. Add one and
+            A connection tells the console where a pipeline may read from and write to. Add one and
             it appears here.
           </p>
         </div>
         @if (canConnectStorage()) {
-          <a routerLink="/integration/storage-connections" class="btn btn-primary btn-sm">
+          <a routerLink="/connections/storage" class="btn btn-primary btn-sm">
             <app-icon name="plus" />Add a connection
           </a>
         } @else {
@@ -139,7 +149,13 @@
       <!-- Path + actions -->
       <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle"
           >
-        <nav class="flex items-center gap-1 text-sm mr-auto min-w-0 flex-wrap">
+        <!-- UX final BF1: the connection picker leads the browser's own toolbar, where it changes what the list below
+             shows. [selected] per option rather than [value]: the options come from an async list, and a value set
+             before they exist does not stick. -->
+        <label class="sr-only" for="bucket">Connection</label>
+        <app-combobox id="bucket" class="w-56 shrink-0" [selected]="bucket()" (selectedChange)="onBucketChange($event)"
+                      placeholder="Search connections…" [allowClear]="false" [options]="bucketOptions()" />
+        <nav class="flex items-center gap-1 text-sm mr-auto min-w-0 flex-wrap" aria-label="Folder">
           <button type="button" class="mono text-accent hover:underline" (click)="goToCrumb(-1)">
             {{ bucket() }}
           </button>
@@ -294,7 +310,7 @@
                 <th class="w-40">Modified</th>
                 <th class="w-24 text-right">Size</th>
                 <th class="w-36">Type</th>
-                <th class="w-16"><span class="sr-only">Actions</span></th>
+                <th class="w-16 th-actions">Actions</th>
               </tr>
             </thead>
             <tbody>

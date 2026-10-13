@@ -27,10 +27,11 @@ describe('Bulk import / export', () => {
    * Back was location.back(): opened directly or in a new tab it left the console. Each route
    * already carried a backTo that nothing read (UI audit, Low).
    */
+  // UX review 2026-10-12 (A2): the way back is the breadcrumb, Build › Pipelines › Bulk pipelines.
   it('links back to its own list rather than to the browser history', () => {
     const { el } = page();
-    const back = [...el.querySelectorAll('a')].find(a => /Back to pipelines/.test(a.textContent!));
-    expect(back?.getAttribute('href')).toBe('/pipelines');
+    const back = [...el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].find(a => a.textContent!.trim() === 'Pipelines');
+    expect(back?.getAttribute('href')).toBe('/pipelines/list');
   });
 
   /**
@@ -199,5 +200,29 @@ describe('Bulk schedules: the Cron row', () => {
     const note = el.querySelector('[data-template-note]');
     expect(note?.textContent).toContain('Recurrence');
     expect(note?.textContent).toContain('0 3 * * *');
+  });
+});
+
+// MIG-320: Harbor Health (MANAGED) walked as its own administrator: the importer refuses the upload (BuilderAction),
+// so the page says so up front, with no dropzone to pick a file into; export still works.
+describe('Bulk import in a MANAGED workspace', () => {
+  it('says importing is our team\'s, and offers no file to pick', async () => {
+    const { AuthService } = await import('../../core/auth/auth.service');
+    const { signal } = await import('@angular/core');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [BulkTransfer], providers: [
+      provideRouter([]),
+      { provide: HttpClient, useValue: {} },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+      { provide: AuthService, useValue: { builderLocked: () => true, managementMode: signal('MANAGED'), isManaged: () => true,
+        user: signal({ managementMode: 'MANAGED' }) } },
+    ] });
+    const fixture = TestBed.createComponent(BulkTransfer);
+    fixture.componentRef.setInput('kind', 'job');
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-import-locked]')?.textContent).toContain('done by our team');
+    expect(el.querySelector('app-file-dropzone')).toBeNull();
+    expect(fixture.componentInstance.locked()).toBe(true);
   });
 });

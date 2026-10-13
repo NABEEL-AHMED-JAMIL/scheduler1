@@ -19,13 +19,15 @@ class Host {
   readonly runs = signal(0);
 }
 
-function mounted() {
+async function mounted() {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host] });
   const fixture = TestBed.createComponent(Host);
   fixture.detectChanges();
-  // afterNextRender is what creates the view, and it is queued rather than run inline.
+  // afterNextRender is what creates the view, and it is queued rather than run inline; the view itself waits for
+  // CodeMirror's chunk (a dynamic import, held as a pending task), which whenStable waits for.
   TestBed.tick();
+  await fixture.whenStable();
   fixture.detectChanges();
   const element = fixture.nativeElement as HTMLElement;
   return {
@@ -40,23 +42,23 @@ function mounted() {
 }
 
 describe('the SQL editor wrapper', () => {
-  it('mounts a CodeMirror view holding the value it was given', () => {
-    const editor = mounted();
+  it('mounts a CodeMirror view holding the value it was given', async () => {
+    const editor = await mounted();
 
     expect(editor.element.querySelector('.cm-editor')).toBeTruthy();
     expect(editor.text()).toContain('select 1');
   });
 
-  it('writes a new value in from outside, which is how a saved query is loaded', () => {
-    const editor = mounted();
+  it('writes a new value in from outside, which is how a saved query is loaded', async () => {
+    const editor = await mounted();
     editor.host.text.set('select * from dataset');
     editor.fixture.detectChanges();
 
     expect(editor.text()).toContain('select * from dataset');
   });
 
-  it('emits what was typed, so the console holds the text rather than the editor', () => {
-    const editor = mounted();
+  it('emits what was typed, so the console holds the text rather than the editor', async () => {
+    const editor = await mounted();
     // Typed the way a person does: a transaction on the view, not a signal set from the host.
     const view = editor.view();
     view.dispatch({ changes: { from: view.state.doc.length, insert: ' + 1' } });
@@ -65,11 +67,11 @@ describe('the SQL editor wrapper', () => {
     expect(editor.host.text()).toBe('select 1 + 1');
   });
 
-  it('does not move the cursor when the value it is handed back is the one on screen', () => {
+  it('does not move the cursor when the value it is handed back is the one on screen', async () => {
     // The feedback loop this guards: typing emits valueChange, the caller stores it, and the
     // value input comes straight back. Replacing the document with itself would put the caret at
     // the end of it on every keystroke.
-    const editor = mounted();
+    const editor = await mounted();
     const view = editor.view();
     view.dispatch({ selection: { anchor: 3 } });
     editor.host.text.set('select 1');
@@ -78,8 +80,8 @@ describe('the SQL editor wrapper', () => {
     expect(view.state.selection.main.anchor).toBe(3);
   });
 
-  it('destroys the view with the component rather than leaving it on the document', () => {
-    const editor = mounted();
+  it('destroys the view with the component rather than leaving it on the document', async () => {
+    const editor = await mounted();
     const dom = editor.view().dom;
     expect(dom.parentElement).toBeTruthy();
 
@@ -92,12 +94,12 @@ describe('the SQL editor wrapper', () => {
     expect(dom.parentElement).toBeNull();
   });
 
-  it('runs on Ctrl/Cmd + Enter rather than inserting a blank line', () => {
+  it('runs on Ctrl/Cmd + Enter rather than inserting a blank line', async () => {
     // The default keymap binds Mod-Enter to "insert a blank line", so without the precedence
     // this shortcut would quietly type a newline instead of running anything. Which physical
     // modifier "Mod" is depends on the platform, and this reads it the same way CodeMirror does.
     const mac = /Mac/.test(navigator.platform);
-    const editor = mounted();
+    const editor = await mounted();
     const content = editor.element.querySelector('.cm-content') as HTMLElement;
     content.dispatchEvent(new KeyboardEvent('keydown', {
       key: 'Enter', code: 'Enter', ctrlKey: !mac, metaKey: mac, bubbles: true,
@@ -108,8 +110,8 @@ describe('the SQL editor wrapper', () => {
     expect(editor.host.text()).toBe('select 1');
   });
 
-  it('completes the dataset’s own column names, which is the point of a real editor', () => {
-    const editor = mounted();
+  it('completes the dataset’s own column names, which is the point of a real editor', async () => {
+    const editor = await mounted();
     const view = editor.view();
     // The schema handed in reaches the language's completion source. Asserted through the state
     // rather than by driving the popup, which needs a layout jsdom does not do.

@@ -1,52 +1,74 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { APIRequestContext } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
 
 /**
  * Rate cards, end to end: the platform administrator saves a new version of the calculation through the
  * editor, the page lists it with what changed, a bill drafted before keeps its version, and a
  * fresh draft is priced with the new one. A tenant administrator never sees the page.
  *
- * Needs a running metering service (etl_meter) behind the console, and:
- *   E2E_PLATFORM_ADMIN / E2E_PLATFORM_ADMIN_PASSWORD   a PLATFORM_ADMIN
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD       a TENANT_ADMIN, for the negative case
+ * Needs a running metering service (etl_meter) behind the console. Sign-in through support/session.ts:
+ *   platform  the TEST platform administrator (rebuild.json's platformAdmin) -- never the owner's own account
+ *   admin     a TENANT_ADMIN, for the negative case (Riverside Health's administrator)
+ *
+ * Rate cards are never deleted, and the version this saves ("E2E <stamp>: images at ...") is the platform's DEFAULT
+ * from the 1st of next month. So afterwards the card that was next month's default before the test (the demo's
+ * "Standard 2026") is saved again, unchanged, as a newer version from that same day: next month bills as it would have,
+ * and the two versions stay in the history.
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const platform = { username: process.env['E2E_PLATFORM_ADMIN'], password: process.env['E2E_PLATFORM_ADMIN_PASSWORD'] };
-const tenant = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
 
-interface Session { data: Record<string, any>; token: string; }
+interface Card { version: number; name: string; currency: string; effective_from: string;
+  items: { meter: string; unit: string; per: number; unit_price: number; included_quantity?: number; tiers?: unknown[] }[] }
 
-async function signIn(request: APIRequestContext, username: string, password: string): Promise<Session> {
-  const answer = await request.post(`${api}/auth.json/login`, { data: { username, password }, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
+/** Saves `base` again as the default from `day`: what puts next month back after the test's version. */
+async function restoreDefault(request: APIRequestContext, s: Session, base: Card, day: string): Promise<void> {
+  const r = await (await request.put(`${api}/billing.json/rateCard`, { headers: authOf(s), data: {
+    name: base.name, tenant_id: null, effective_from: day, currency: base.currency, based_on_version: base.version,
+    note: `Put back by the e2e suite after its rate-card check (v${base.version}'s items, unchanged)`,
+    items: base.items.map(i => ({ meter: i.meter, unit: i.unit, per: i.per, unit_price: i.unit_price,
+      included_quantity: i.included_quantity ?? 0, tiers: i.tiers ?? [] })),
+  } })).json();
+  if (r.status !== 'SUCCESS') console.log(`[e2e] could not put rate card v${base.version} back from ${day}: ${r.message}`);
 }
 
-async function pageAs(browser: Browser, session: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), session.data);
-  return page;
-}
 
 test.describe('rate cards', () => {
-  test.skip(!platform.username || !platform.password, 'Set E2E_PLATFORM_ADMIN(_PASSWORD) to run this.');
+  /** Next month's default before the test, the day it starts, and the name of the version the test saves. */
+  let undo: { s: Session; base: Card; day: string; name: string } | null = null;
+
+  test.afterAll(async ({ request }) => {
+    if (!undo) return;
+    const cards: Card[] = (await (await request.get(`${api}/billing.json/rateCards`, { headers: authOf(undo.s) })).json()).data?.cards ?? [];
+    if (cards.some(c => c.name === undo!.name)) await restoreDefault(request, undo.s, undo.base, undo.day);
+  });
 
   test('a new version is saved from the editor, listed, and prices only the bills that come after', async ({ browser, request }) => {
+    test.skip(!canSignIn('platform'), NEEDS.platform);
     test.setTimeout(120_000);
-    const session = await signIn(request, platform.username!, platform.password!);
-    const auth = { Authorization: `Bearer ${session.token}` };
+    const session = await sessionFor(request, 'platform');
+    const auth = authOf(session);
     const health = await (await request.get(`${api}/billing.json/health`, { headers: auth })).json();
     test.skip(health.status !== 'SUCCESS' || health.data?.status !== 'ok', 'The metering service is not up behind this console.');
 
     const before = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     const versionsBefore: number[] = before.data.cards.map((c: { version: number }) => c.version);
+    // The editor starts from the default card in effect, which an earlier run may have set to these very prices: pick
+    // a price and an allowance that differ from it, or "1 changed" never appears.
+    const today0 = new Date().toISOString().slice(0, 10);
+    const base = (await (await request.get(`${api}/billing.json/rateCard?day=${today0}`, { headers: auth })).json()).data;
+    const baseImages = (base?.items ?? []).find((i: { meter: string }) => i.meter === 'ai.vision.images');
+    const price = Number(baseImages?.unit_price) === 0.02 ? '0.03' : '0.02';
+    const included = Number(baseImages?.included_quantity) === 10 ? '11' : '10';
     const stamp = Date.now().toString(36);
-    const name = `e2e ${stamp}: images at 0.02`;
+    const name = `E2E ${stamp}: images at ${price}`;
+    const first = new Date(); first.setDate(1); first.setMonth(first.getMonth() + 1);
+    const day = first.toISOString().slice(0, 10);
+    const nextBase: Card = (await (await request.get(`${api}/billing.json/rateCard?day=${day}`, { headers: auth })).json()).data;
+    expect(nextBase?.items?.length, `the default card in effect on ${day}`).toBeGreaterThan(0);
+    undo = { s: session, base: nextBase, day, name };
 
     const page = await pageAs(browser, session);
-    await page.goto('/billing/rates');
+    await page.goto('/platform/rate-cards');
     await expect(page.getByRole('heading', { name: 'Rate cards' })).toBeVisible();
     await expect(page.getByText('Default card today')).toBeVisible();
 
@@ -55,9 +77,9 @@ test.describe('rate cards', () => {
     const panel = page.getByRole('dialog');
     await expect(panel.getByRole('heading', { name: /^New version from / })).toBeVisible();
     await panel.locator('#rcName').fill(name);
-    await panel.locator('#rcNote').fill('Playwright: images described at 0.02, 10 free a month');
-    await panel.getByLabel('Images described price').fill('0.02');
-    await panel.getByLabel('Images described included').fill('10');
+    await panel.locator('#rcNote').fill(`Playwright: images described at ${price}, ${included} free a month`);
+    await panel.getByLabel('Images described price').fill(price);
+    await panel.getByLabel('Images described included').fill(included);
     await expect(panel.getByText('1 changed')).toBeVisible();
     await panel.getByRole('button', { name: 'Save version' }).click();
     await expect(page.getByText(new RegExp(`${name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')} saved as v\\d+`))).toBeVisible();
@@ -69,8 +91,8 @@ test.describe('rate cards', () => {
     expect(versionsBefore).not.toContain(saved.version);
     expect(saved.tenant_id).toBeNull();
     const images = saved.items.find((i: { meter: string }) => i.meter === 'ai.vision.images');
-    expect(Number(images.unit_price)).toBe(0.02);
-    expect(Number(images.included_quantity)).toBe(10);
+    expect(Number(images.unit_price)).toBe(Number(price));
+    expect(Number(images.included_quantity)).toBe(Number(included));
     expect(saved.items.length).toBeGreaterThan(10);                     // everything else carried over
     await expect(page.getByRole('heading', { name: `${name} v${saved.version}` })).toBeVisible();
     await expect(page.getByText(/Changed from v\d+: Images described/)).toBeVisible();
@@ -94,15 +116,15 @@ test.describe('rate cards', () => {
   });
 
   test('a tenant administrator is kept off the page and cannot change the calculation', async ({ browser, request }) => {
-    test.skip(!tenant.username || !tenant.password, 'Set E2E_TENANT_ADMIN(_PASSWORD) to run this.');
-    const session = await signIn(request, tenant.username!, tenant.password!);
-    const auth = { Authorization: `Bearer ${session.token}` };
+    test.skip(!canSignIn('admin'), NEEDS.admin);
+    const session = await sessionFor(request, 'admin');
+    const auth = authOf(session);
     const refused = await (await request.put(`${api}/billing.json/rateCard`, { headers: auth, data: { name: 'x', effective_from: '2099-01-01', items: [] } })).json();
     expect(refused.status).toBe('ERROR');
     const list = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     expect(list.status).toBe('ERROR');
     const page = await pageAs(browser, session);
-    await page.goto('/billing/rates');
+    await page.goto('/platform/rate-cards');
     await expect(page.getByRole('heading', { name: 'Rate cards' })).toHaveCount(0);
     await page.goto('/billing/usage');
     await expect(page.getByText(/Priced with/)).toBeVisible();

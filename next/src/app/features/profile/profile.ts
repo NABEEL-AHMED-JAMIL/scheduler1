@@ -1,3 +1,4 @@
+import { CROP_SESSION } from '../../shared/ui/avatar-crop-session';
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -15,7 +16,8 @@ import { PhoneInput } from '../../shared/ui/phone-input';
 import { Icon } from '../../shared/ui/icon';
 import { CopyButton } from '../../shared/ui/copy-button';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { StorageService } from '../objects/storage.service';
+import { Avatar, AvatarCache } from '../../shared/ui/avatar';
+import { pictureProblem } from './picture-check';
 import { Donut } from '../../shared/charts/donut';
 import { statusColor } from '../../shared/charts/status-color';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -23,6 +25,13 @@ import { formatDuration } from '../../shared/ui/time-format';
 import { instantMs } from '../../core/instant';
 import { Field } from '../../shared/ui/field';
 import { StatTile } from '../../shared/ui/stat-tile';
+import { AccountSecurityApi, PasswordRules } from '../account/account-security.api';
+import { PasswordRulesHint, newPasswordPlaceholder } from '../account/password-rules';
+import { PageHeader } from '../../shared/ui/page-header';
+import { ThemeChooser } from '../../shared/ui/theme-chooser';
+import { ThemeChoice, ThemeService } from '../../core/theme.service';
+import { themeLabel } from '../../core/theme-options';
+import { ThemePreference } from '../../core/theme-preference';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
 export interface ActivityRun {
@@ -57,30 +66,37 @@ interface UserProfile {
   tenantName?: string;
   dateCreated?: string;
   lastLoginAt?: string;
-  avatarBucket?: string | null;
-  /** Server-nominated destination for a new picture. */
-  avatarUploadBucket?: string | null;
-  avatarKey?: string | null;
+  /** The version of their profile picture; null or absent when they have none. */
+  avatarVersion?: string | null;
   position?: string | null;
   /** E.164, exactly as the admin screen and the server hold it. */
   phoneNumber?: string | null;
+  /** Their own app theme, null when they never chose; and their workspace's default (null: System). */
+  theme?: string | null;
+  workspaceTheme?: string | null;
 }
-
-/** Anything the browser will actually render inline as a picture. */
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
-const MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
 @Component({
   selector: 'app-profile',
-  imports: [PhoneInput, Icon, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile],
+  imports: [PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint, ThemeChooser],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
-  private readonly storage = inject(StorageService);
+  readonly themes = inject(ThemeService);
+  private readonly themePreference = inject(ThemePreference);
+  /** After a pick: kept on the account, or (the server refused or was unreachable) on this device only. */
+  readonly themeSaved = signal<'saved' | 'local' | null>(null);
+  readonly ownTheme = computed(() => this.themePreference.own());
+  readonly workspaceThemeLabel = computed(() => {
+    const ws = this.themePreference.workspaceDefault();
+    return ws ? themeLabel(ws) : null;
+  });
+  private readonly pictures = inject(AvatarCache);
   readonly auth = inject(AuthService);
+  private readonly security = inject(AccountSecurityApi);
 
   readonly profile = signal<UserProfile | null>(null);
   readonly loading = signal(true);
@@ -103,26 +119,8 @@ export class Profile implements OnInit {
   private readonly notifications = inject(UnreadCountService);
   readonly unread = this.notifications.count;
 
-  /** Where a new picture goes. Avatars are small and personal, so they sit under one prefix
-      in whichever bucket is available rather than being scattered per tenant. */
-  /**
-   * Where a picture lives: <appUserId>/profile/avatar.<ext>.
-   *
-   * A folder per person rather than one flat prefix, so everything belonging to a user sits
-   * together and can be removed with them. The "profile" folder inside leaves room for whatever
-   * else a user might own later without it landing beside the picture.
-   *
-   * The filename is fixed rather than the uploaded one, so replacing a picture overwrites
-   * instead of leaving the previous file behind. Changing format (png to jpg) still strands the
-   * old object, but inside that user's own folder rather than mixed in with everyone else's.
-   */
-  private static folderFor(appUserId: number | null | undefined): string {
-    return `${appUserId}/profile/`;
-  }
-
-  /** Same blob URL the header uses -- fetched once, through the interceptor, so the token
-      travels with it. */
-  readonly avatarUrl = this.auth.avatarUrl;
+  /** A picture is being dragged over the portrait: it says it will take it. */
+  readonly dragging = signal(false);
 
   /** Owned by the phone component, which validates against the same metadata the server uses. */
   readonly phone = signal<string>('');
@@ -171,18 +169,8 @@ export class Profile implements OnInit {
    * exists, and sticks with the bucket already in use so a replacement lands beside the
    * original rather than orphaning it.
    */
-  /**
-   * Where a picture is written: whatever the server nominates.
-   *
-   * This used to pick from the buckets the person could see -- preferring MinIO, keeping the one
-   * already in use -- which meant the answer changed with the bucket list and a tenant with no
-   * storage of its own could not upload at all. The server names one bucket for every user, so
-   * there is nothing here to get wrong.
-   */
   /** Briefly true after a copy, so the button can confirm it worked. */
   readonly emailCopied = signal(false);
-
-  readonly targetBucket = computed(() => this.profile()?.avatarUploadBucket ?? '');
 
   /**
    * How many jobs are in this person's name.
@@ -236,8 +224,20 @@ export class Profile implements OnInit {
     return !!run.startTime && !run.endTime;
   }
 
+  /** Profile › Appearance: on screen at once, then kept on the account. null: back to the workspace's default. */
+  chooseTheme(choice: ThemeChoice | null): void {
+    this.themeSaved.set(null);
+    this.themePreference.choose(choice).subscribe(kept => this.themeSaved.set(kept ? 'saved' : 'local'));
+  }
+
   ngOnInit(): void {
     this.load();
+    if (!this.auth.isManagedSession()) {
+      this.security.myRules().subscribe({
+        next: r => { if (r.status === API_SUCCESS && r.data) this.rules.set(r.data); },
+        error: () => { /* the server still holds the rules */ },
+      });
+    }
     this.http.get<ApiResponse<UserActivity>>(`${API_BASE}/sourceJob.json/myActivity`).subscribe({
       next: r => {
         this.activityLoading.set(false);
@@ -259,6 +259,9 @@ export class Profile implements OnInit {
         this.loading.set(false);
         if (response.status === API_SUCCESS && response.data) {
           this.profile.set(response.data);
+          // The account's theme as it stands now, for Appearance: a session from before themes, or one whose
+          // workspace default changed since sign-in, learns it here. What is on screen stays this device's.
+          this.auth.patchUser({ theme: response.data.theme ?? null, workspaceTheme: response.data.workspaceTheme ?? null });
           // Every editable field, not just the name: a field left unset would render empty and
           // then read as "cleared" the next time anything was saved.
           this.resetDetails();
@@ -279,9 +282,12 @@ export class Profile implements OnInit {
   readonly newPassword = signal('');
   readonly savingPassword = signal(false);
   readonly passwordError = signal('');
+  /** MIG-353: the workspace's password rules, beside the new password. */
+  readonly rules = signal<PasswordRules | null>(null);
+  readonly newPasswordHint = computed(() => newPasswordPlaceholder(this.rules()));
 
   canChangePassword(): boolean {
-    return !!this.currentPassword() && this.newPassword().length >= 8;
+    return !!this.currentPassword() && this.newPassword().length >= (this.rules()?.passwordMinLength ?? 8);
   }
 
   /**
@@ -366,80 +372,101 @@ export class Profile implements OnInit {
     });
   }
 
+  /** A picture chosen with the button. */
   async onPicture(event: Event): Promise<void> {
     const input = event.target as HTMLInputElement;
     const file = input.files?.[0];
     input.value = '';
-    if (!file) return;
+    if (file) await this.pick(file);
+  }
 
-    if (!IMAGE_TYPES.includes(file.type)) {
-      this.toast.error('Pick a PNG, JPEG, WebP or GIF.');
+  /** A picture dropped on the portrait. */
+  async onDrop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    this.dragging.set(false);
+    const file = event.dataTransfer?.files?.[0];
+    if (file && !this.uploading()) await this.pick(file);
+  }
+
+  onDragOver(event: DragEvent): void {
+    if (!event.dataTransfer?.types?.includes('Files')) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    this.dragging.set(true);
+  }
+
+  /**
+   * Checked by its bytes (PNG, JPEG or WebP, at most 5 MB, never SVG), then cropped to a square in the dialog -- loaded
+   * only now, so Profile does not carry it -- and sent. The server checks it again, strips its metadata and keeps the
+   * 256 and 64 px copies.
+   */
+  async pick(file: File): Promise<void> {
+    const problem = await pictureProblem(file);
+    if (problem) {
+      this.toast.error(problem);
       return;
     }
-    if (file.size > MAX_AVATAR_BYTES) {
-      this.toast.error('That picture is over 2 MB — pick a smaller one.');
-      return;
-    }
-    const bucket = this.targetBucket();
-    if (!bucket) {
-      this.toast.error('There is no storage connection to keep a picture in.');
-      return;
-    }
+    const { AvatarCropDialog } = await import('../../shared/ui/avatar-crop-dialog');
+    this.dialog.open<Blob>(AvatarCropDialog, {
+      hasBackdrop: true,
+      ariaLabel: 'Position your picture',
+      providers: ref => [{ provide: CROP_SESSION, useValue: { file, close: (square?: Blob) => ref.close(square) } }],
+    }).closed.subscribe(cropped => {
+      if (cropped) this.upload(cropped);
+    });
+  }
 
-    const extension = file.name.slice(file.name.lastIndexOf('.') + 1).toLowerCase() || 'png';
-    const folder = Profile.folderFor(this.profile()?.appUserId);
-    const key = `${folder}avatar.${extension}`;
-
+  private upload(picture: Blob): void {
+    const form = new FormData();
+    form.append('file', picture, 'avatar.png');
     this.uploading.set(true);
-    this.storage.upload(bucket, folder, new File([file], `avatar.${extension}`))
-      .subscribe({
-        next: response => {
-          if (response.status !== API_SUCCESS) {
-            this.uploading.set(false);
-            this.toast.error(response.message);
-            return;
-          }
-          this.saveAvatar(bucket, key);
-        },
-        error: err => {
-          this.uploading.set(false);
-          this.toast.error(err?.error?.message || 'The upload failed.');
-        },
-      });
+    this.http.post<ApiResponse<{ avatarVersion: string | null }>>(`${API_BASE}/appUser.json/avatar`, form).subscribe({
+      next: response => this.pictureChanged(response, 'Picture updated.'),
+      error: err => {
+        this.uploading.set(false);
+        this.toast.error(err?.error?.message || 'The upload failed.');
+      },
+    });
   }
 
   removePicture(): void {
     // Asked first, in the app's own dialog: the picture is gone from every screen at once.
     confirmWith(this.dialog, { title: 'Remove your profile picture?', body: 'Your initials are shown instead, everywhere your name appears. You can upload a new one any time.', confirmLabel: 'Remove picture', danger: true })
-      .then(ok => { if (ok) this.saveAvatar('', ''); });
+      .then(ok => {
+        if (!ok) return;
+        this.uploading.set(true);
+        this.http.delete<ApiResponse<{ avatarVersion: string | null }>>(`${API_BASE}/appUser.json/avatar`).subscribe({
+          next: response => this.pictureChanged(response, 'Picture removed.'),
+          error: err => {
+            this.uploading.set(false);
+            this.toast.error(err?.error?.message || 'Could not remove the picture.');
+          },
+        });
+      });
   }
 
-  private saveAvatar(bucket: string, key: string): void {
-    this.http.put<ApiResponse<UserProfile>>(`${API_BASE}/appUser.json/updateOwnAvatar`,
-      { avatarBucket: bucket, avatarKey: key }).subscribe({
-      next: response => {
-        this.uploading.set(false);
-        if (response.status === API_SUCCESS && response.data) {
-          this.profile.set(response.data);
-          this.syncHeader(response.data);
-          this.toast.success(key ? 'Picture updated.' : 'Picture removed.');
-        } else {
-          this.toast.error(response.message);
-        }
-      },
-      error: err => {
-        this.uploading.set(false);
-        this.toast.error(err?.error?.message || 'Could not save the picture.');
-      },
-    });
+  /** The new version everywhere at once: this page, the top bar, and every avatar of this person already on screen. */
+  private pictureChanged(response: ApiResponse<{ avatarVersion: string | null }>, done: string): void {
+    this.uploading.set(false);
+    if (response.status !== API_SUCCESS) {
+      this.toast.error(response.message);
+      return;
+    }
+    const avatarVersion = response.data?.avatarVersion ?? null;
+    const me = this.profile();
+    if (me) {
+      this.pictures.forget(me.appUserId);
+      this.profile.set({ ...me, avatarVersion });
+    }
+    this.auth.patchUser({ avatarVersion });
+    this.toast.success(done);
   }
 
   /** Keeps the header avatar and name in step without a reload. */
   private syncHeader(p: UserProfile): void {
     this.auth.patchUser({
       fullName: p.fullName,
-      avatarBucket: p.avatarBucket ?? null,
-      avatarKey: p.avatarKey ?? null,
+      avatarVersion: p.avatarVersion ?? null,
     });
   }
 

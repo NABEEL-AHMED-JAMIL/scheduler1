@@ -1,20 +1,20 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Users</h1>
-      <p class="page-subtitle">
-        Roles are enforced on the server — they decide what a person can reach, not just what they see.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Users</h1>
+        <p class="page-subtitle">
+          Roles are enforced on the server — they decide what a person can reach, not just what they see.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New user
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New user
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   @if (focusedTenantId() !== null) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
@@ -23,12 +23,12 @@
         Showing users in <strong>{{ focusedTenantName() }}</strong> only.
       </span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearTenantFocus()">
-        <app-icon name="close" />Show all tenants
+        <app-icon name="close" />Show all workspaces
       </button>
     </div>
   }
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Users',            value: summary().total, icon: 'users', tone: 'info' },
       { label: 'Active',           value: summary().active, icon: 'checkCircle', tone: 'ok' },
@@ -67,7 +67,7 @@
       @if (canPickTenant() && tenantOptions().length > 1) {
         <div class="w-44">
           <app-combobox id="users-tenant" ariaLabel="Filter by tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event); pager.reset()"
-                        placeholder="All tenants" clearLabel="All tenants" [options]="tenantComboOptions()" />
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantComboOptions()" />
         </div>
       }
       <select class="input max-w-32" [value]="statusFilter()" aria-label="Filter by state"
@@ -78,7 +78,7 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, email or tenant" aria-label="Search users"
+        <input class="input" placeholder="Search name, email or workspace" aria-label="Search users"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />
@@ -107,8 +107,8 @@
                      colour alone is not a signal everybody receives. -->
                 <span class="rounded-full shrink-0 p-[2px] tone-ring"
                       [class]="toneClass(statusRing(user.status))">
-                  <app-avatar [appUserId]="avatarOwner(user)"
-                              [name]="user.fullName || user.username" [size]="2.75" />
+                  <app-avatar [appUserId]="user.appUserId" [version]="avatarVersionOf(user)"
+                              [name]="user.fullName || user.username" [size]="2.75" [decorative]="true" />
                 </span>
                 <div class="min-w-0 flex-1">
                   <div class="flex items-start gap-2">
@@ -186,8 +186,8 @@
                 @if (stat.jobCount) {
                   <div class="grid grid-cols-3 gap-px rounded-lg overflow-hidden bg-subtle">
                     @for (tile of [
-                      { label: 'Jobs',  value: stat.jobCount,  hint: stat.activeJobs + ' active' },
-                      { label: 'Tasks', value: stat.taskCount, hint: 'used by their jobs' },
+                      { label: 'Schedules', value: stat.jobCount, hint: stat.activeJobs + ' active' },
+                      { label: 'Pipelines', value: stat.taskCount, hint: 'run by their schedules' },
                       { label: 'Runs',  value: stat.runCount,
                         hint: successRate(stat) === null ? 'none finished' : successRate(stat) + '% success' }
                     ]; track tile.label) {
@@ -219,7 +219,7 @@
                 @if (statFor(user); as stat) {
                   @if (!stat.jobCount) {
                     <span class="text-[color:var(--border-strong)]">·</span>
-                    <span>No jobs</span>
+                    <span>No schedules</span>
                   }
                 }
                 @if (user.createdByName) {
@@ -243,9 +243,26 @@
                   <app-icon name="edit" />Edit
                 </button>
                 <button type="button" class="btn btn-ghost btn-sm" (click)="resetPassword(user)"
-                        [disabled]="busy() === user.appUserId" title="Send a new one-time password">
+                        [disabled]="busy() === user.appUserId" title="Set a new password for them">
                   <app-icon name="key" />Reset
                 </button>
+                @if (lockedUntil(user)) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="unlock(user)" [disabled]="busy() === user.appUserId">
+                    <app-icon name="lock" />Unlock
+                  </button>
+                }
+                @if (mfaOn(user)) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="resetMfa(user)" [disabled]="busy() === user.appUserId"
+                          title="Reset their two-factor login">
+                    <app-icon name="shield" />2FA
+                  </button>
+                }
+                @if (avatarVersionOf(user) && !isSelf(user)) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="removePicture(user)" [disabled]="busy() === user.appUserId"
+                          title="Remove their profile picture" data-test="user-remove-picture">
+                    <app-icon name="image" />Picture
+                  </button>
+                }
                 <button type="button" class="btn btn-ghost btn-sm"
                         [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
                         [disabled]="isSelf(user) || busy() === user.appUserId"
@@ -275,7 +292,7 @@
             { key: 'fullName',    label: 'Person' },
             { key: 'userRole',    label: 'Role' },
             { key: 'pageAccessProfileName', label: 'Access' },
-            { key: 'tenantName',  label: 'Tenant', hide: 'hidden xl:table-cell' },
+            { key: 'tenantName',  label: 'Workspace', hide: 'hidden xl:table-cell' },
             { key: 'lastLoginAt', label: 'Last sign-in', hide: 'hidden lg:table-cell' }
           ]; track column.key) {
             <th [class]="column.hide ?? ''">
@@ -303,7 +320,7 @@
             </th>
           }
           <th class="text-right">State</th>
-          <th class="w-12"><span class="sr-only">Actions</span></th>
+          <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -313,8 +330,8 @@
                  split across three columns they cost a third of the table's width to say it. -->
             <td class="max-w-72">
               <div class="flex items-center gap-2.5 min-w-0">
-                <app-avatar [appUserId]="avatarOwner(user)"
-                            [name]="user.fullName || user.username" [size]="2" class="shrink-0" />
+                <app-avatar [appUserId]="user.appUserId" [version]="avatarVersionOf(user)"
+                            [name]="user.fullName || user.username" [size]="2" [decorative]="true" class="shrink-0" />
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
                     <span class="font-medium truncate">{{ user.fullName || '—' }}</span>
@@ -419,7 +436,7 @@
                 @if (stat.jobCount || stat.runCount) {
                   <div class="tabular">
                     {{ stat.jobCount }}
-                    <span class="text-[color:var(--text-muted)] text-xs">jobs</span>
+                    <span class="text-[color:var(--text-muted)] text-xs">schedules</span>
                   </div>
                   @if (stat.runCount) {
                     <div class="text-xs text-[color:var(--text-muted)] tabular">
@@ -452,7 +469,16 @@
               }
             </td>
 
-            <td class="text-right"><app-status [label]="user.status" [quiet]="true" /></td>
+            <td class="text-right">
+              <div class="inline-flex flex-col items-end gap-1">
+                <app-status [label]="user.status" [quiet]="true" />
+                <!-- MIG-353: a lock in force (the workspace's lockout) and two-factor login, at a glance. -->
+                @if (lockedUntil(user)) {
+                  <span class="pill pill-crit" data-test="user-locked" [title]="'Locked until ' + (lockedUntil(user) | serverTime: 'dateTime')">Locked</span>
+                }
+                @if (mfaOn(user)) { <span class="pill pill-ok" title="Signs in with a code from an authenticator app">2FA</span> }
+              </div>
+            </td>
 
             <td class="text-right">
               <!-- No menu at all on a row this administrator cannot act on. Every item in it
@@ -481,6 +507,21 @@
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetPassword(user)">
                     <app-icon name="key" />Reset password
                   </button>
+                  @if (lockedUntil(user)) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="unlock(user)" data-test="user-unlock">
+                      <app-icon name="lock" />Unlock
+                    </button>
+                  }
+                  @if (mfaOn(user)) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetMfa(user)" data-test="user-reset-mfa">
+                      <app-icon name="shield" />Reset two-factor login
+                    </button>
+                  }
+                  @if (avatarVersionOf(user) && !isSelf(user)) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="removePicture(user)" data-test="user-remove-picture">
+                      <app-icon name="image" />Remove profile picture
+                    </button>
+                  }
                   <div class="my-1 border-t border-subtle"></div>
                   <button cdkMenuItem class="menu-item"
                           [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
@@ -510,3 +551,5 @@
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
 </div>
+
+<app-reset-password-notice [result]="resetDone()" (dismissed)="resetDone.set(null)" />

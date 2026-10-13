@@ -1,26 +1,29 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "no inbox yet, as a tenant user": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/inbox",
-      "GET /storage.json/inbox/files?limit=50"
+      "GET /storage.json/inbox/files?limit=50",
+      "GET /taskInbox.json/colleagues"
     ],
     "headings": [
-      "Inbox",
-      "No inbox yet"
+      "File drop",
+      "No file drop yet"
     ],
     "buttons": [
       "Refresh"
     ],
     "columns": [],
     "fields": [],
-    "links": []
+    "links": [
+      "/documents"
+    ]
   },
   "no inbox yet, as a workspace administrator": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -30,35 +33,44 @@ export const PINNED: Record<string, unknown> = {
       "GET /appUser.json/listUsers"
     ],
     "headings": [
-      "Inbox",
-      "No inbox yet"
+      "File drop",
+      "No file drop yet"
     ],
     "buttons": [
       "Refresh",
-      "Set up the inbox"
+      "Set up the file drop"
     ],
     "columns": [],
     "fields": [],
-    "links": []
+    "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types"
+    ]
   },
   "the inbox, as a tenant user with the page": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /storage.json/inbox",
-      "GET /storage.json/inbox/files?limit=50"
+      "GET /storage.json/inbox/files?limit=50",
+      "GET /taskInbox.json/colleagues"
     ],
     "headings": [
-      "Inbox",
+      "File drop",
       "Upload",
       "Settings",
       "Arrivals"
     ],
     "buttons": [
       "Columns",
+      "Copy the key of live-customers.csv",
       "Refresh",
-      "What the inbox accepts"
+      "What the file drop accepts"
     ],
     "columns": [
       [
@@ -73,17 +85,18 @@ export const PINNED: Record<string, unknown> = {
       "Choose files"
     ],
     "links": [
+      "/documents",
       "/pipelines/schedules"
     ]
   },
   "the inbox, as a tenant user without the page": {
-    "url": "/unauthorized?page=objects",
+    "url": "/unauthorized?page=objects&title=File%20drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Browse files isn't part of your access"
+      "File drop isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -95,7 +108,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the inbox, as a workspace administrator": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -105,16 +118,17 @@ export const PINNED: Record<string, unknown> = {
       "GET /appUser.json/listUsers"
     ],
     "headings": [
-      "Inbox",
+      "File drop",
       "Upload",
       "Settings",
       "Arrivals"
     ],
     "buttons": [
+      "Change",
       "Columns",
-      "Inbox settings",
+      "Copy the key of live-customers.csv",
       "Refresh",
-      "What the inbox accepts"
+      "What the file drop accepts"
     ],
     "columns": [
       [
@@ -129,12 +143,18 @@ export const PINNED: Record<string, unknown> = {
       "Choose files"
     ],
     "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types",
       "/pipelines/schedules"
     ]
   },
   "the settings dialog": {
     "headings": [
-      "Inbox settings"
+      "File drop settings"
     ],
     "buttons": [
       "Cancel",

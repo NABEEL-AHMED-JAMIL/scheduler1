@@ -159,6 +159,21 @@ describe('DocumentReview -- reading', () => {
     expect(el.querySelector('[data-test="rules"]')?.textContent).toContain('not checked');
   });
 
+  /** MIG-319: a possible duplicate says which document, and opens it. */
+  it('names the other document of a possible duplicate and opens it', async () => {
+    const duplicate: ReviewDetail = {
+      ...CORRECTED,
+      definition: { ...CORRECTED.definition!, rules: [...CORRECTED.definition!.rules, { rule: 'duplicate', fields: ['vendor_name', 'total'] }] },
+      checks: { ...CORRECTED.checks!, anyRuleFailed: true, rules: [CORRECTED.checks!.rules[0], { index: 2, rule: 'duplicate', status: 'failed',
+        message: 'Possible duplicate of INV-NW-1002.pdf: the same Vendor and Total.', fields: ['vendor_name', 'total'], relatedExtractionId: 1003 }] },
+    };
+    const { el } = await screenWith({ api: stubApi(duplicate) });
+    const rules = el.querySelector('[data-test="rules"]')!;
+    expect(rules.textContent).toContain('No other document has the same vendor, total');
+    expect(rules.textContent).toContain('Possible duplicate of INV-NW-1002.pdf: the same Vendor and Total.');
+    expect(rules.querySelector('[data-test="related-document"]')?.getAttribute('href')).toBe('/review/documents/1003');
+  });
+
   it('says so when the document cannot be read', async () => {
     const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404, error: { status: 'ERROR', message: 'No extraction 1005.' } }))) });
     const { el } = await screenWith({ api });
@@ -247,7 +262,7 @@ describe('DocumentReview -- corrections and decisions', () => {
     expect(api.correct).toHaveBeenCalledWith(1005, 0, [{ fieldId: 1014, value: 'Dock Supplies Ltd' }, { fieldId: 1019, value: '9820.00' }]);
     expect(api.approve).toHaveBeenCalledWith(1005, 1, false);
     // 1006 is claimed by someone else: the next free one is 1008.
-    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/documents/review', 1008]));
+    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1008]));
     expect(screen.dirty()).toBe(false);
   });
 
@@ -273,14 +288,14 @@ describe('DocumentReview -- corrections and decisions', () => {
     await screen.reject();
     expect(opened).toContain(RejectDialog);
     expect(api.reject).toHaveBeenCalledWith(1005, 'A duplicate of 1000.');
-    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/documents/review', 1008]));
+    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1008]));
   });
 
   it('goes back to the queue when nothing else is waiting', async () => {
     const api = stubApi(CORRECTED, { queue: vi.fn(() => ok({ total: 1, page: 0, size: 50, items: [{ extractionId: 1005, ocrDocumentId: 1001, status: 'Review', revision: 1 }] })) });
     const { screen, router, toast } = await screenWith({ api });
     await screen.approve();
-    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/documents/review']));
+    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/review/documents']));
     expect(toast.info).toHaveBeenCalledWith('Nothing else is waiting for review.');
   });
 
@@ -315,6 +330,27 @@ describe('DocumentReview -- corrections and decisions', () => {
       { tableKey: 'line_items', rowIndex: 0, fieldKey: 'description', value: 'Pallets' },
       { tableKey: 'line_items', rowIndex: 0, fieldKey: 'amount', value: '9820.00' },
     ]);
+  });
+
+  it('draws the line items to fit the card: Amount right-aligned at a set width, nothing clipped (UX final DR1)', async () => {
+    const withRow: ReviewDetail = { ...INVOICE, fields: [...INVOICE.fields,
+      { fieldId: 1031, fieldKey: 'description', tableKey: 'line_items', rowIndex: 0, value: '40 pallets', confidence: 0.91, page: 1,
+        problems: [], corrected: false, label: 'Description', type: 'text', required: false },
+      { fieldId: 1032, fieldKey: 'amount', tableKey: 'line_items', rowIndex: 0, value: '9820.00', confidence: 0.92, page: 1,
+        problems: [], corrected: false, label: 'Amount', type: 'money', required: false },
+    ] };
+    const { el } = await screenWith({ api: stubApi(withRow) });
+    const table = el.querySelector<HTMLTableElement>('[data-test="line-items"] table')!;
+    expect(table.classList).toContain('doc-lines');
+    // 1.75rem (#) + 7rem (Description) + 5.75rem (Amount).
+    expect(table.style.minWidth).toBe('14.5rem');
+    const heads = [...table.querySelectorAll('thead th')];
+    expect(heads.map(h => h.classList.contains('num'))).toEqual([false, false, true]);
+    expect(table.querySelectorAll('col.doc-col-num').length).toBe(1);
+    const amount = table.querySelector<HTMLTableCellElement>('td[data-field="1032"]')!;
+    expect(amount.classList).toContain('num');
+    expect(amount.querySelector('input')!.value).toBe('9820.00');
+    expect(table.querySelector('td[data-field="1031"]')!.classList).not.toContain('num');
   });
 
   it('claims the document and lets it go', async () => {

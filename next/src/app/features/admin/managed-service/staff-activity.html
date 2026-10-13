@@ -1,19 +1,19 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">{{ showWorkspace() ? 'Staff activity' : "Our team's activity" }}</h1>
-      <p class="page-subtitle">
-        @if (showWorkspace()) {
-          Every change our staff made in a customer's workspace during a managed session, newest first.
-        } @else {
-          Every change our team made in this workspace, newest first. Nothing they change here goes unrecorded.
-        }
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">{{ showWorkspace() ? 'Staff activity' : "Our team's activity" }}</h1>
+        <p class="page-subtitle">
+          @if (showWorkspace()) {
+            Every change our staff made in a customer's workspace during a managed session, newest first.
+          } @else {
+            Every change our team made in this workspace, newest first. Nothing they change here goes unrecorded.
+          }
+        </p>
+      </div>
+      <app-refresh-button [loading]="loading()" (refresh)="load()" />
     </div>
-    <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-      <app-icon name="refresh" [class.spin]="loading()" />Refresh
-    </button>
-  </div>
+  </app-page-header>
 
   <app-table-shell heading="Changes" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
                    [shown]="rows().length" [emptyMessage]="emptyMessage()" emptyIcon="history" (retry)="load()">
@@ -50,8 +50,13 @@
           <tr>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ a.createdAt ? (a.createdAt | serverTime: 'dateTimeSec') : '—' }}</td>
             <td class="max-w-56">
-              <div class="font-medium truncate">{{ name(a) }}</div>
-              @if (a.fullName && a.username) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ a.username }}</div> }
+              <div class="flex items-center gap-2 min-w-0">
+                <app-avatar [appUserId]="a.appUserId" [name]="name(a)" [size]="1.75" [decorative]="true" />
+                <div class="min-w-0">
+                  <div class="font-medium truncate">{{ name(a) }}</div>
+                  @if (a.fullName && a.username) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ a.username }}</div> }
+                </div>
+              </div>
             </td>
             @if (showWorkspace()) { <td class="max-w-56 truncate">{{ workspaceName(a) }}</td> }
             <td class="min-w-64">

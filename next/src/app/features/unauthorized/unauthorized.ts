@@ -25,12 +25,17 @@ import { ToastService } from '../../shared/ui/toast.service';
       <div class="card p-10 text-center max-w-lg mx-auto mt-8">
         <app-icon name="shield" size="2.25rem" class="icon-warn block mx-auto mb-4" />
         @if (page(); as page) {
-          <h1 class="text-xl font-semibold">{{ pageLabel() }} isn't part of your access</h1>
+          <h1 class="text-xl font-semibold">{{ screenLabel() }} isn't part of your access</h1>
           <p class="text-sm text-[color:var(--text-secondary)] mt-2 leading-relaxed">
             Your workspace admin decides which pages each person can open, and this one is not
             in your access profile{{ profileName() ? ' (' + profileName() + ')' : '' }}. If you
             need it for your work, ask — the request goes straight to their notifications.
           </p>
+          @if (screenLabel() !== pageLabel()) {
+            <p class="text-sm text-[color:var(--text-secondary)] mt-2" data-opens-with>
+              It opens with the {{ pageLabel() }} page in access profiles.
+            </p>
+          }
           <div class="flex items-center justify-center gap-2 mt-6">
             <button type="button" class="btn btn-primary btn-sm" [disabled]="asking() || asked()"
                     (click)="requestAccess(page)">
@@ -80,6 +85,10 @@ export class Unauthorized {
     const page = this.page();
     return page ? PAGE_LABELS[page] : '';
   });
+
+  /** The screen the person tried to open, by its title when the guard gave one; else the page's own name. */
+  readonly screenTitle = toSignal(this.route.queryParamMap.pipe(map(params => params.get('title'))), { initialValue: null as string | null });
+  readonly screenLabel = computed(() => this.screenTitle()?.trim() || this.pageLabel());
 
   readonly profileName = computed(() => this.auth.user()?.pageAccessProfileName ?? null);
 

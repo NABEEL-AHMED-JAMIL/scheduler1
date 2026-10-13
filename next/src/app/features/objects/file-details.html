@@ -22,7 +22,7 @@
         <dl class="grid grid-cols-[7rem_minmax(0,1fr)] gap-x-3 gap-y-1.5 text-sm m-0 [&>dt]:text-[color:var(--text-muted)] [&>dd]:m-0 [&>dd]:min-w-0">
           <dt>Execution</dt>
           <dd>
-            <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId, 'logs']">Run #{{ r.jobQueueId }}</a>
+            <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId]">Run #{{ r.jobQueueId }}</a>
             @if (r.created) { <span class="text-xs text-[color:var(--text-muted)]"> · {{ r.created | serverTime: 'dateTime' }}</span> }
           </dd>
           <dt>Pipeline</dt><dd class="break-words">{{ r.pipeline || '—' }}</dd>

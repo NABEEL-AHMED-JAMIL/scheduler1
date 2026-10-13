@@ -121,7 +121,7 @@ describe('Queue charts and table describe the same messages', () => {
 
     expect(queue.data().length).toBe(1);
     // No job list was read here, so the job is named by its number, as the table names it.
-    expect(queue.byJob()).toEqual([{ name: 'Job #30', value: 1 }]);
+    expect(queue.byJob()).toEqual([{ name: 'Schedule #30', value: 1 }]);
     // The one matching row never ended, so no duration bucket has anything in it.
     expect(queue.durations()).toEqual([]);
     const started = queue.flagSplit()[0];

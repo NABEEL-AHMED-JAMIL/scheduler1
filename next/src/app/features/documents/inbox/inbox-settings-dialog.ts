@@ -23,9 +23,9 @@ const MB = 1048576;
   selector: 'app-inbox-settings-dialog',
   imports: [FormDialog, Field, Icon],
   template: `
-    <app-form-dialog heading="Inbox settings"
-                     subtitle="Where files uploaded to the inbox are stored, and how large one may be."
-                     [confirmLabel]="data.settings.configured ? 'Save changes' : 'Turn on the inbox'" [saving]="saving()"
+    <app-form-dialog heading="File drop settings"
+                     subtitle="Where uploaded files are stored, and how large one may be."
+                     [confirmLabel]="data.settings.configured ? 'Save changes' : 'Turn on the file drop'" [saving]="saving()"
                      [confirmDisabled]="loadingBuckets()" (confirmed)="save()" (cancelled)="cancel()">
       @if (data.settings.configured) {
         <button footer-start type="button" class="btn btn-ghost btn-sm text-crit-500" [disabled]="saving()" (click)="turnOff()">
@@ -45,7 +45,7 @@ const MB = 1048576;
         </app-field>
         @if (bucketsError()) { <p class="text-sm text-crit-500" role="alert">{{ bucketsError() }}</p> }
         @if (!loadingBuckets() && !bucketsError() && !options().length) {
-          <p class="text-sm text-[color:var(--text-muted)]">This workspace has no storage connection yet. Add one under Integration › Storage Connections first.</p>
+          <p class="text-sm text-[color:var(--text-muted)]">This workspace has no storage connection yet. Add one under Connections › Storage first.</p>
         }
         <app-field label="Size limit (MB)" for="inboxCap" [error]="capError()" [hint]="capHint">
           <input id="inboxCap" class="input max-w-40" inputmode="numeric" [value]="capMb()" placeholder="No lower limit"
@@ -115,7 +115,7 @@ export class InboxSettingsDialog {
   async turnOff(): Promise<void> {
     const ok = await confirmWith(this.dialog, {
       title: 'Turn off the inbox?',
-      body: 'Members can no longer upload to it, and no new file starts a job. The files already in the inbox stay in '
+      body: 'Members can no longer upload to it, and no new file starts a run. The files already in the inbox stay in '
         + 'the bucket, and you can turn it on again later.',
       confirmLabel: 'Turn off', danger: true,
     });

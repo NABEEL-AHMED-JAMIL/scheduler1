@@ -9,6 +9,7 @@ import { WorkspacePicker } from './workspace-picker';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { crumbsFor } from '../../core/nav/nav-tree';
 
 /** The invoices list: chips that count and sum, a search, and drafting for the platform administrator only. */
 const ROWS = [
@@ -26,7 +27,8 @@ function page(platformAdmin: boolean, number: string | null = null, rows: typeof
   TestBed.configureTestingModule({ providers: [
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: toast }, { provide: Dialog, useValue: { open: () => ({ closed: of(false) }) } },
     { provide: Router, useValue: router }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
-    { provide: ActivatedRoute, useValue: { paramMap: of(new Map(number ? [['number', number]] : [])) } },
+    { provide: ActivatedRoute, useValue: { paramMap: of(new Map(number ? [['number', number]] : [])),
+      snapshot: { paramMap: new Map(number ? [['number', number]] : []) } } },
     { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => (platformAdmin ? '2905' : null), { set: vi.fn() }), options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin } },
   ] });
   const component = TestBed.runInInjectionContext(() => new Invoices());
@@ -56,6 +58,24 @@ describe('Invoices', () => {
     // MIG-211: a line that starts with the slip starts with a capital, and a month reads as everywhere else.
     expect(component.docsLabel({ ...component.rows()[3], documentKinds: [], pendingPayments: 1 })).toBe('Slip pending');
     expect(component.period({ ...component.rows()[3], periodStart: '2026-09-01' })).toBe('September 2026');
+  });
+
+  it('below 1024 px opens on the list, and an invoice once it is picked or named in the address (review 2026-10-07, M17)', () => {
+    const { component } = page(false);
+    expect(component.selectedNumber()).toBe('INV-2026-08-0003');   // the bill that needs a look, for the pane from 1024 px
+    expect(component.pane()).toBe('list');
+    component.select(component.rows()[1]);
+    expect(component.pane()).toBe('detail');
+    expect(page(false, 'INV-2026-09-0007').component.pane()).toBe('detail');
+  });
+
+  /** UX review 2026-10-13: the trail read "Invoices › Invoices"; the address's invoice is its last step, from the menu's tree. */
+  it('names the invoice the address names as the breadcrumb\'s last step, under Billing › Invoices', () => {
+    expect(page(false, 'INV-2026-09-0007').component.addressNumber()).toBe('INV-2026-09-0007');
+    expect(page(false).component.addressNumber()).toBeNull();
+    expect(crumbsFor('/billing/invoices/INV-2026-09-0007', 'INV-2026-09-0007', true).map(c => c.label))
+      .toEqual(['Administration & billing', 'Billing', 'Invoices', 'INV-2026-09-0007']);
+    expect(crumbsFor('/billing/invoices', 'Invoices').map(c => c.label)).toEqual(['Administration & billing', 'Billing', 'Invoices']);
   });
 
   it('selects the overdue bill first, or the one the address names, and writes the number to the address', () => {

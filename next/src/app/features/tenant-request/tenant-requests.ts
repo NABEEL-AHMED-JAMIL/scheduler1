@@ -19,6 +19,8 @@ import { Pagination } from '../../shared/ui/pagination';
 import { createPager } from '../../shared/ui/pager';
 import { RejectDialog } from './reject-dialog';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 interface TenantRequest {
   tenantRequestId: number;
@@ -43,7 +45,7 @@ interface TenantRequest {
  */
 @Component({
   selector: 'app-tenant-requests',
-  imports: [TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, ServerTimePipe, Pagination],
+  imports: [RefreshButton, PageHeader, TableShell, StatTile, StatusPill, Icon, CopyButton, ViewToggle, ServerTimePipe, Pagination],
   templateUrl: './tenant-requests.html',
   styles: [`
     /* An open row and its panel are one thing, so the border between them is dropped and the

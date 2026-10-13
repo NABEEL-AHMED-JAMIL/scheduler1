@@ -322,3 +322,23 @@ describe('AccessProfileDialog -- the default box', () => {
     expect(dialog.form.get('defaultProfile')!.enabled).toBe(true);
   });
 });
+
+/** UX review B8 (AP1): how a role and Page access combine, and one member's pages, worked out as the server does. */
+describe('AccessProfiles: who can open what', () => {
+  it('reads the people only when asked, and shows one member\'s pages by menu section, their own extras marked', () => {
+    const operator = profile(1, 'Operator', ['jobs', 'queue'], true, 1);
+    const people = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [
+      { appUserId: 44, fullName: 'Olivia Bennett', username: 'olivia', status: 'Active', pageAccessProfileId: null, pageAccessProfileName: null,
+        pageKeys: ['jobs', 'queue', 'objects'], allowedExceptions: ['objects'], withheldExceptions: ['reports'] }] }));
+    const { screen } = screenWith([operator], { people });
+    expect(people).not.toHaveBeenCalled();
+    screen.openPreview();
+    expect(people).toHaveBeenCalledTimes(1);
+    screen.previewId.set(44);
+    const v = screen.preview()!;
+    expect(v.profile).toBe('the default, Operator');
+    expect(v.sections.map(s => [s.section, s.pages.map(p => p.label)])).toEqual([['Pipelines', ['Source Jobs', 'Queue']], ['Object Browser', ['Browse files']]]);
+    expect(v.pages.find(p => p.key === 'objects')?.extra).toBe(true);
+    expect(v.withheld).toEqual(['Reports']);
+  });
+});

@@ -1,18 +1,18 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Engine settings</h1>
-      <p class="page-subtitle">
-        The scheduler's own settings, shared by every workspace. The fetch limit is how many queued
-        runs one scheduler pass claims; the two watermarks record where each cron last got to.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Engine settings</h1>
+        <p class="page-subtitle">
+          The scheduler's own settings, shared by every workspace. The fetch limit is how many queued
+          runs one scheduler pass claims; the two watermarks record where each cron last got to.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      </div>
     </div>
-    <div class="flex items-center gap-2 ml-auto">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <app-table-shell heading="Engine settings" [loading]="loading()" [error]="error()"
                    [isEmpty]="!settings().length" emptyMessage="No engine settings came back."
@@ -24,7 +24,7 @@
           <th>Setting</th>
           <th>Value</th>
           <th>Last changed</th>
-          <th class="w-40"><span class="sr-only">Actions</span></th>
+          <th class="w-40 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>

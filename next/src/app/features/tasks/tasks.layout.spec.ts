@@ -22,25 +22,35 @@ const classesOf = (source: string, marker: string, tag = 'td', from = 0): string
 };
 
 describe('Tasks table layout', () => {
-  it('waits for a wide screen before showing Type', async () => {
+  // UX review 2026-10-12 (B2, P1): Type, Topic, Registry task and Storage left the table for the row's Advanced; the
+  // Data column (sensitivity, review) is the one that waits for a wide screen now.
+  it('waits for a wide screen before showing Data', async () => {
     const html = await read('tasks.html');
     const table = html.indexOf('<table class="table-modern">');
-    expect(classesOf(html, '>Type</th>', 'th', table)).toEqual(expect.arrayContaining(['hidden', 'xl:table-cell']));
-    expect(classesOf(html, "{{ task.sourceTaskType?.serviceName || '—' }}", 'td', table))
+    expect(classesOf(html, '>Data</th>', 'th', table)).toEqual(expect.arrayContaining(['hidden', 'xl:table-cell']));
+    expect(classesOf(html, '@if (task.sensitivity) { <span class="pill"', 'td', table))
       .toEqual(expect.arrayContaining(['hidden', 'xl:table-cell']));
+  });
+
+  it('right-aligns the counts in tabular figures', async () => {
+    const html = await read('tasks.html');
+    const table = html.indexOf('<table class="table-modern">');
+    expect(classesOf(html, '>Steps</th>', 'th', table)).toContain('num');
+    expect(classesOf(html, '>Schedules</th>', 'th', table)).toContain('num');
   });
 
   it('pins the row menu to the right edge', async () => {
     const html = await read('tasks.html');
     const table = html.indexOf('<table class="table-modern">');
     expect(classesOf(html, '[cdkMenuTriggerFor]="taskMenu"', 'td', table)).toContain('col-pin-right');
-    expect(classesOf(html, '<span class="sr-only">Actions</span>', 'th', table)).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th', table)).toContain('col-pin-right');
   });
 
-  it('does not break a bucket name at its hyphens', async () => {
+  it('keeps the infrastructure under the row\'s Advanced, after the schedules', async () => {
     const html = await read('tasks.html');
-    const table = html.indexOf('<table class="table-modern">');
-    expect(classesOf(html, '{{ task.bucket }}', 'div', table)).toContain('whitespace-nowrap');
+    const row = html.slice(html.indexOf('@if (expanded().has(task.taskDetailId))'));
+    expect(row.indexOf('Schedules that run this pipeline')).toBeLessThan(row.indexOf('data-test="pipeline-advanced"'));
+    expect(row.slice(row.indexOf('data-test="pipeline-advanced"'))).toContain('Registry task');
   });
 });
 

@@ -57,12 +57,14 @@ function api(detail?: Partial<AssetDetail>) {
   };
 }
 
-function page(flag?: string) {
+function page(flag?: string, admin?: boolean) {
   const fake = api();
   const dialog = { open: vi.fn() };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
-    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: CatalogApi, useValue: fake }, { provide: Dialog, useValue: dialog }],
+    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: CatalogApi, useValue: fake }, { provide: Dialog, useValue: dialog },
+      ...(admin === undefined ? [] : [{ provide: AuthService, useValue: { isTenantAdmin: () => admin, isPlatformAdmin: () => false,
+        user: () => ({ appUserId: admin ? 4640 : 4641, tenantId: 2960 }) } }])],
   });
   const fixture = TestBed.createComponent(Catalog);
   if (flag) fixture.componentRef.setInput('flag', flag);
@@ -88,7 +90,7 @@ function panel(detail?: Partial<AssetDetail>) {
 describe('Data Catalog', () => {
   it('lists the assets with their owner, freshness, sensitive fields, sensitivity and quality, and counts them in the strip', () => {
     const { el, fake } = page();
-    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: undefined, withDeleted: false, page: 0, size: 50 });
+    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: undefined, withDeleted: false, withSystem: false, page: 0, size: 50 });
     expect(el.querySelector('h2')?.textContent).toContain('(2 of 244)');
     const rows = Array.from(el.querySelectorAll('tr[data-asset]'));
     expect(rows.map(r => r.getAttribute('data-asset'))).toEqual(['1346', '1010']);
@@ -105,11 +107,28 @@ describe('Data Catalog', () => {
 
   it('narrows by kind on the server and by flag through the address, from the first page', () => {
     const { screen, fake } = page('sensitive');
-    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: 'sensitive', withDeleted: false, page: 0, size: 50 });
+    expect(fake.list).toHaveBeenCalledWith({ q: undefined, kind: undefined, flag: 'sensitive', withDeleted: false, withSystem: false, page: 0, size: 50 });
     screen.goTo(3);
     expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 }));
     screen.setKind('dataset');
-    expect(fake.list).toHaveBeenLastCalledWith({ q: undefined, kind: 'dataset', flag: 'sensitive', withDeleted: false, page: 0, size: 50 });
+    expect(fake.list).toHaveBeenLastCalledWith({ q: undefined, kind: 'dataset', flag: 'sensitive', withDeleted: false, withSystem: false, page: 0, size: 50 });
+  });
+
+  it('leaves the platform\'s own files out unless an administrator shows them (review 2026-10-07, M13)', () => {
+    const member = page(undefined, false);
+    expect(member.el.querySelector('[data-system-files]')).toBeNull();
+
+    const { el, fake, fixture } = page(undefined, true);
+    fake.summary.mockReturnValue(of({ status: 'SUCCESS', message: '', data: { ...SUMMARY, systemAssets: 26 } }));
+    fixture.componentInstance.loadSummary();
+    fixture.detectChanges();
+    const toggle = el.querySelector<HTMLInputElement>('[data-system-files]')!;
+    expect(toggle.closest('label')!.textContent).toContain('Show system files (26)');
+    expect(fake.summary).toHaveBeenLastCalledWith(false);
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change'));
+    expect(fake.list).toHaveBeenLastCalledWith(expect.objectContaining({ withSystem: true, page: 0 }));
+    expect(fake.summary).toHaveBeenLastCalledWith(true);
   });
 
   it('pages on the server and cancels a search still in flight when a newer one starts', () => {
@@ -178,6 +197,59 @@ describe('Data Catalog asset panel', () => {
   });
 });
 
+describe('Data Catalog sensitive data (UX review B5, CT1)', () => {
+  it('says how many assets hold sensitive fields, with the way to them, and marks those rows', () => {
+    const { el } = page();
+    const callout = el.querySelector('[data-phi-callout]')!;
+    expect(callout.textContent).toContain('1 asset holds fields marked sensitive');
+    expect(callout.querySelector('a')?.getAttribute('href')).toBe('/data/catalog?flag=sensitive');
+    expect(el.querySelector('tr[data-asset="1346"] [data-sensitive-asset]')).not.toBeNull();
+    expect(el.querySelector('tr[data-asset="1010"] [data-sensitive-asset]')).toBeNull();
+  });
+
+  it('marks a sensitive column where it is listed, and flags an untagged one that reads like patient data', () => {
+    const { el } = panel({ columns: [
+      { position: 0, name: 'email', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: ['email'], tagsReviewed: false },
+      { position: 1, name: 'patient_id', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: [], tagsReviewed: false },
+      { position: 2, name: 'region', dataType: 'VARCHAR', nullPercent: 25, distinctCount: 2, tags: [], tagsReviewed: true }] });
+    expect(el.querySelector('tr[data-column="email"]')!.classList).toContain('is-sensitive');
+    expect(el.querySelector('tr[data-column="email"] [data-sensitive-column]')).not.toBeNull();
+    expect(el.querySelector('tr[data-column="patient_id"] [data-phi-column]')?.textContent).toContain('patient identifier');
+    expect(el.querySelector('tr[data-column="region"] [data-phi-column]')).toBeNull();
+    expect(el.querySelector('[data-phi-hint]')?.textContent).toContain('1 column looks like patient data');
+  });
+
+  it('names the scanner\'s health identifier tags and stops flagging the columns it tagged (CT1)', () => {
+    const { el } = panel({ columns: [
+      { position: 0, name: 'patient_id', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: ['medical_record_number'], tagsReviewed: false },
+      { position: 1, name: 'dob', dataType: 'DATE', nullPercent: 0, distinctCount: 3, tags: ['date_of_birth'], tagsReviewed: false },
+      { position: 2, name: 'zip', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: ['zip_code'], tagsReviewed: false },
+      { position: 3, name: 'age', dataType: 'BIGINT', nullPercent: 0, distinctCount: 3, tags: [], tagsReviewed: false }] });
+    expect(el.querySelector('tr[data-column="patient_id"]')!.textContent).toContain('medical record number');
+    expect(el.querySelector('tr[data-column="dob"]')!.textContent).toContain('date of birth');
+    expect(el.querySelector('tr[data-column="zip"]')!.textContent).toContain('ZIP code');
+    expect(el.querySelector('tr[data-column="patient_id"] [data-sensitive-column]')).not.toBeNull();
+    expect(el.querySelector('[data-phi-column]')).toBeNull();
+    expect(el.querySelector('[data-phi-hint]')).toBeNull();
+  });
+});
+
+describe('Data Catalog tags (CT1)', () => {
+  it('labels the health identifier tags and levels them as the service does', async () => {
+    const { TAGS, tagText, tagsLevel } = await import('./catalog.model');
+    expect(TAGS.map(t => t.id)).toEqual(expect.arrayContaining(['date_of_birth', 'medical_record_number', 'health_plan_number', 'zip_code']));
+    expect(tagText('date_of_birth')).toBe('date of birth');
+    expect(tagText('medical_record_number')).toBe('medical record number');
+    expect(tagText('health_plan_number')).toBe('health plan number');
+    expect(tagText('zip_code')).toBe('ZIP code');
+    expect(tagsLevel(['zip_code', 'email'])).toBe('Confidential');
+    expect(tagsLevel(['zip_code', 'date_of_birth'])).toBe('Restricted');
+    expect(tagsLevel(['medical_record_number'])).toBe('Restricted');
+    expect(tagsLevel(['card_number'])).toBe('Restricted');
+    expect(tagsLevel([])).toBe('Unclassified');
+  });
+});
+
 describe('Data Catalog model', () => {
   it('says how fresh an asset is from the server clock', () => {
     const now = new Date('2026-10-01T05:00:00Z');
@@ -196,5 +268,21 @@ describe('Data Catalog model', () => {
 
   it('names a document type by where it comes from', () => {
     expect(whereText({ ...ASSETS[0], kind: 'document_type', rowCount: 12 })).toBe('Document Intelligence · 12 rows');
+  });
+});
+
+describe('phiHint (UX review B5, CT1)', () => {
+  it('reads patient identifiers and health details from a column name', async () => {
+    const { phiHint } = await import('./catalog.model');
+    expect(phiHint('patient_id')).toBe('patient identifier');
+    expect(phiHint('MRN')).toBe('patient identifier');
+    expect(phiHint('dateOfBirth')).toBe('date of birth');
+    expect(phiHint('primary_diagnosis')).toBe('health detail');
+    expect(phiHint('discharge_date')).toBe('care date');
+    expect(phiHint('zip_code')).toBe('ZIP code');
+    expect(phiHint('home_address')).toBe('address');
+    expect(phiHint('risk_level')).toBeNull();
+    expect(phiHint('total')).toBeNull();
+    expect(phiHint('')).toBeNull();
   });
 });

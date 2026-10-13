@@ -23,7 +23,7 @@ describe('P2 #50: the first-run hint when no model connection exists', () => {
   it('tells a workspace administrator with no default connection, with the link to add one', () => {
     const { el } = render(true, []);
     expect(el.querySelector('[data-model-setup]')?.textContent).toContain('Ask your data needs a model');
-    expect(el.querySelector('a[href="/ai/connections"]')).not.toBeNull();
+    expect(el.querySelector('a[href="/settings/model-connections"]')).not.toBeNull();
   });
 
   it('says nothing once the workspace has an active default, and never asks for a tenant user', () => {

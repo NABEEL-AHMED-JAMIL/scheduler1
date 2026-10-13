@@ -1,21 +1,12 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-    <h1 class="page-title">Storage connections</h1>
-    <p class="page-subtitle">
-      S3, Azure, MinIO or FTP/FTPS. Passwords, secret keys and connection strings are encrypted
-      and never sent back to the browser.
-    </p>
-    </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (!locked()) {
-        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
-      }
-    </div>
-  </div>
+  <!-- UX review B7 (I1): the Storage tab of Connections -- one page, one title, its own address and gate (the hub's tabs: tab-hub.ts). -->
+  <app-page-header title="Connections"
+                   subtitle="S3, Azure, MinIO or FTP/FTPS that pipelines read and write. Passwords, secret keys and connection strings are encrypted and never sent back to the browser.">
+    <app-refresh-button [loading]="loading()" (refresh)="load()" />
+    @if (!locked()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New storage connection</button>
+    }
+  </app-page-header>
   <app-managed-banner what="storage connections" />
 
   <!-- The row answers "how much of this can a job use, and what is broken": what is in service,
@@ -30,7 +21,7 @@
        a passed and a failed row, and plug says "a connection" without implying a provider -- a
        cloud does not describe the FTP and MinIO connections it was counting. -->
   <div class="space-y-2">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
       @for (tile of [
         { label: 'In service', value: summary().active,   foot: 'of ' + summary().total + ' configured', icon: 'plug', tone: 'info' },
         { label: 'Tested OK',  value: summary().ok,       foot: 'last test passed', icon: 'checkCircle', tone: 'ok' },
@@ -52,7 +43,7 @@
   <app-table-shell heading="Connections" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length"
                    [total]="connections().length"
-                   [emptyMessage]="isFiltered() ? 'No connections match the filters.' : 'No connections configured yet.'"
+                   [emptyMessage]="emptyMessage()"
                    emptyIcon="plug"
                    [showSubbar]="selected().size > 0"
                    (retry)="load()">
@@ -196,10 +187,10 @@
           @if (canSeeWorkspace()) { <th>Workspace</th> }
           <th>Credentials</th>
           <th>Last test</th>
-          <th>Created by</th>
-          <th>Updated by</th>
+          <th class="hidden 2xl:table-cell">Created by</th>
+          <th class="hidden 2xl:table-cell">Updated by</th>
           <th class="text-right">State</th>
-          <th class="w-12"><span class="sr-only">Actions</span></th>
+          <th class="w-12 col-pin-right th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -263,14 +254,14 @@
                 </div>
               }
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ c.createdByName || '—' }}
             </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
+            <td class="hidden 2xl:table-cell text-[color:var(--text-secondary)] whitespace-nowrap text-xs">
               {{ c.updatedByName || '—' }}
             </td>
             <td class="text-right"><app-status [label]="c.status" [quiet]="true" /></td>
-            <td class="text-right">
+            <td class="text-right col-pin-right">
               <button type="button" class="btn btn-ghost btn-icon" [cdkMenuTriggerFor]="menu"
                       [disabled]="testing() === c.storageConnectionId" [attr.aria-label]="'Actions for ' + c.connectionName">
                 <app-icon name="dots" size="1.05em" />

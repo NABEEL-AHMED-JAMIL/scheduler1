@@ -1,34 +1,71 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor, sessionOf, signInWithPassword, tokenFor } from './support/session';
+import { lendPages } from './support/workspace';
+import { archiveForm, makeForm, submitForm } from './support/forms';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
- * MIG-277, live: a member (4597) fills in "MIG-277 visit check (synthetic)" (form 1001, made for this check): picks a
- * patient from the lookup, sees Antibiotic appear (and become required) when infection is Yes, adds table rows, uploads a
- * photo, draws a signature, and sends. It SUBMITS one submission and uploads two files, and leaves them.
- * Sign-in: E2E_TENANT_USER_TOKEN (mint-test-token.sh 4597 900).
+ * MIG-277, live: a member -- Riverside's reviewer (role user) -- fills in the spec's own visit form: picks a patient from
+ * the lookup, sees Antibiotic appear (and become required) when infection is Yes, adds table rows, uploads a photo, draws
+ * a signature, and sends.
+ *
+ * The rebuilt workspace has no such form, so the administrator makes two for the run -- "E2E patients <stamp>" (one
+ * submission, SYN-001, which the lookup offers) and "E2E visit check <stamp>" -- and archives both afterwards (forms are
+ * never deleted). The reviewer's profile does not hold Forms, so the page is lent to them for the test and their
+ * exceptions are put back exactly as they were. The submission and its two uploads stay with the archived form.
+ * Sign-in through support/session.ts (roles admin and user).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_USER_TOKEN'];
-const FORM = Number(process.env['E2E_EXTENDED_FORM'] ?? 1001);
-
-async function pageAs(browser: Browser, request: APIRequestContext): Promise<Page> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), {
-    username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId, tenantId: claims.tenantId,
-    accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys });
-  return page;
-}
+const STAMP = Date.now().toString(36);
+const VISIT = `E2E visit check ${STAMP}`;
 
 test.describe('Forms: lookup, rules, table, file, signature (live)', () => {
-  test.skip(!token, 'Set E2E_TENANT_USER_TOKEN to run this.');
+  test.skip(!canSignIn('user') || !canSignIn('admin'), `${NEEDS.user}; ${NEEDS.admin}`);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
+
+  let admin: Session;
+  let form = Number(process.env['E2E_EXTENDED_FORM'] ?? 0);
+  const made: number[] = [];
+  let giveBack: ((request: APIRequestContext) => Promise<void>) | null = null;
+
+  test.beforeAll(async ({ request }) => {
+    admin = await sessionFor(request, 'admin');
+    if (!form) {
+      const patients = await makeForm(request, admin, `E2E patients ${STAMP}`,
+        [{ key: 'patient_id', label: 'Patient id', type: 'text', required: true }]);
+      made.push(patients);
+      await submitForm(request, admin, patients, { patient_id: 'SYN-001' });
+      form = await makeForm(request, admin, VISIT, [
+        { key: 'patient', label: 'Patient', type: 'lookup', required: true, lookup: { formId: patients, field: 'patient_id' } },
+        { key: 'infected', label: 'Infected', type: 'yesNo', required: true },
+        { key: 'antibiotic', label: 'Antibiotic', type: 'text', required: false,
+          showWhen: { field: 'infected', op: 'eq', value: true }, requiredWhen: { field: 'infected', op: 'eq', value: true } },
+        { key: 'doses', label: 'Doses', type: 'table', required: false, maxRows: 2,
+          columns: [{ key: 'drug', label: 'Drug', type: 'text', required: true }, { key: 'mg', label: 'mg', type: 'number', required: false }] },
+        { key: 'photo', label: 'Photo', type: 'file', required: false, accept: ['png', 'jpg'], maxSizeMb: 5, maxFiles: 2 },
+        { key: 'signed', label: 'Signature', type: 'signature', required: true },
+      ]);
+      made.push(form);
+    }
+    giveBack = await lendPages(request, admin, riverside().reviewer, ['forms']);
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (giveBack) await giveBack(request);
+    for (const id of made) await archiveForm(request, admin, id);
+  });
+
+  async function pageAs(browser: Browser, request: APIRequestContext): Promise<Page> {
+    // A fresh sign-in, as after the page was lent (the server may remember what an existing token was allowed).
+    const token = tokenFor('user', { newSignIn: true });
+    const s = token ? await sessionOf(request, token)
+      : await signInWithPassword(request, process.env['E2E_TENANT_USER']!, process.env['E2E_TENANT_USER_PASSWORD']!);
+    return signedIn(browser, s, { viewport: { width: 1440, height: 1000 } });
+  }
 
   test('a member fills in every new field type and sends it', async ({ browser, request }) => {
     const page = await pageAs(browser, request);
-    await page.goto(`/forms/${FORM}/fill`);
-    await expect(page.getByRole('heading', { level: 1, name: 'MIG-277 visit check (synthetic)' })).toBeVisible();
+    await page.goto(`/forms/${form}/fill`);
+    await expect(page.getByRole('heading', { level: 1, name: VISIT })).toBeVisible();
 
     await page.locator('[data-field="patient"]').selectOption('SYN-001');
     await expect(page.locator('[data-field="antibiotic"]')).toHaveCount(0);

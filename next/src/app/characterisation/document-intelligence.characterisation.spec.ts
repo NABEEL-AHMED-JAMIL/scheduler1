@@ -121,38 +121,40 @@ describe('MIG-272: Document Intelligence', () => {
   afterEach(() => restoreClock());
 
   it('the overview, as a workspace administrator', async () => {
-    const v = await visit('/documents/intelligence', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/documents/in', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the overview, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the overview, as a tenant user with the page', async () => {
-    const v = await visit('/documents/intelligence', 'TENANT_USER', DOC_PAGES, ANSWERS);
+    const v = await visit('/documents/in', 'TENANT_USER', DOC_PAGES, ANSWERS);
     pin(FILE, 'the overview, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('the overview, as a tenant user without the page', async () => {
-    const v = await visit('/documents/intelligence', 'TENANT_USER', TU_PAGES, ANSWERS);
+    const v = await visit('/documents/in', 'TENANT_USER', TU_PAGES, ANSWERS);
     pin(FILE, 'the overview, as a tenant user without the page', v.surface, PINNED);
   });
 
   it('the document types, as a workspace administrator', async () => {
-    const v = await visit('/documents/intelligence?tab=types', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/documents/types', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the document types, as a workspace administrator', v.surface, PINNED);
   });
 
   it('a built-in type opened in the side panel', async () => {
-    const v = await visit('/documents/intelligence?tab=types', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/documents/types', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'Purchase order');
     pin(FILE, 'a built-in type opened in the side panel', overlay(), PINNED);
   });
 
   it('the dataset, as a workspace administrator', async () => {
-    const v = await visit('/documents/intelligence?tab=dataset', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/documents/datasets', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the dataset, as a workspace administrator', v.surface, PINNED);
   });
 
   it('read a document', async () => {
-    const v = await visit('/documents/intelligence', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/documents/in', 'TENANT_ADMIN', null, ANSWERS);
+    // UX review B4 (DI1): in the header's ⋮ overflow.
+    await click(v, 'More actions');
     await click(v, 'Read a stored file');
     pin(FILE, 'read a document', overlay(), PINNED);
   });

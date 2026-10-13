@@ -1,4 +1,5 @@
-import { Component, ElementRef, Injector, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, Injector, OnInit, computed, inject, input, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
 import { isMissingRecord, isRecordId } from '../../../core/api/missing-record';
 import { HttpClient } from '@angular/common/http';
@@ -19,22 +20,37 @@ import { SERVER_ZONE } from '../../../core/instant';
 import { dayLabel } from '../../../shared/ui/time-format';
 import { clockTime } from '../schedule-labels';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
-import { Observable, catchError, forkJoin, map, of } from 'rxjs';
-import { InboxTrigger, patternProblem, triggerOf } from '../inbox/inbox-trigger';
+import { Observable, Subject, catchError, debounceTime, forkJoin, map, of, switchMap } from 'rxjs';
+import { InboxTrigger, batchProblem, patternProblem, triggerOf } from '../inbox/inbox-trigger';
+import {
+  DocumentTrigger, batchProblem as documentBatchProblem, triggerOf as documentTriggerOf,
+} from '../documents/document-trigger';
+import { DocumentsApi } from '../../documents/documents.service';
+import { DocumentType } from '../../documents/documents.model';
 import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } from '../ai-models/ai-model-choice';
 import { AiModelPicks } from '../ai-models/ai-model-picks';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { AuthService } from '../../../core/auth/auth.service';
+import { Dialog } from '@angular/cdk/dialog';
+import { openBackfill } from '../../runs/backfills/backfill-open';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { StatusPill } from '../../../shared/ui/status-pill';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 const FREQUENCIES = [
-  { value: 'Mint',    label: 'Every N minutes', unit: 'minutes' },
-  { value: 'Hr',      label: 'Hourly',          unit: 'hours' },
-  { value: 'Daily',   label: 'Daily',           unit: 'days' },
-  { value: 'Weekly',  label: 'Weekly',          unit: 'weeks' },
-  { value: 'Monthly', label: 'Monthly',         unit: 'months' },
+  { value: 'Mint',    label: 'Every N minutes', choice: 'Minutes', unit: 'minute' },
+  { value: 'Hr',      label: 'Hourly',          choice: 'Hourly',  unit: 'hour' },
+  { value: 'Daily',   label: 'Daily',           choice: 'Daily',   unit: 'day' },
+  { value: 'Weekly',  label: 'Weekly',          choice: 'Weekly',  unit: 'week' },
+  { value: 'Monthly', label: 'Monthly',         choice: 'Monthly', unit: 'month' },
   // Wave 4 (Core 6f9261e): the expression is the cadence, so there is no interval and no unit.
-  { value: 'Cron',    label: 'Cron expression', unit: '' },
+  { value: 'Cron',    label: 'Cron expression', choice: 'Advanced (cron)', unit: '' },
 ];
+
+/** The next runs beside the form: what the scheduler would do with the timetable as it stands (schedulePreview). */
+interface Preview { runs: string[]; ends: boolean; error: string; loading: boolean; }
+const NO_PREVIEW: Preview = { runs: [], ends: false, error: '', loading: false };
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 /** Worked examples under the Cron field: minute hour day-of-month month day-of-week. */
 const CRON_EXAMPLES = [
@@ -87,7 +103,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner, DateField, TimeField],
+  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner, DateField, TimeField],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
@@ -96,12 +112,57 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
    * dark. The filled primary-button colours are defined for both themes.
    */
   styles: `
+    /* The form and, on a wide screen, what it makes beside it: in view while the form scrolls. */
+    .schedule-layout { display: grid; gap: 1.25rem; align-items: start; }
+    @media (min-width: 80rem) {
+      .schedule-layout { grid-template-columns: minmax(0, 1fr) 24rem; }
+      .schedule-summary { position: sticky; top: 1rem; }
+    }
+    .step-no {
+      display: inline-flex; align-items: center; justify-content: center; width: 1.375rem; height: 1.375rem;
+      margin-right: 0.5rem; border-radius: 9999px; font-size: 0.75rem;
+      background: var(--accent-soft); color: var(--accent-text);
+    }
+    /* Each way it can run is a card to pick: an icon, a name and a line of what it means. */
+    .choice-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+    /* S2: "Also starts when" -- the add-on starts, under the one-of choice. */
+    .form-subsection-title { margin: 1.25rem 0 0.5rem; font-size: 0.8125rem; font-weight: 600; color: var(--text-primary); }
+    .choice-card {
+      display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.875rem 1rem; text-align: left; cursor: pointer;
+      border: 1px solid var(--border-subtle); border-radius: var(--radius-card); background: var(--surface-raised);
+    }
+    .choice-card:hover:not(:disabled) { border-color: var(--border-strong); }
+    .choice-card[aria-checked="true"], .choice-card[data-checked="true"] {
+      border-color: var(--accent-mark-strong); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent-mark-strong);
+    }
+    .choice-card:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+    .choice-icon { color: var(--accent-text); margin-top: 0.125rem; }
+    .choice-title { display: block; font-size: 0.875rem; font-weight: 600; color: var(--text-primary); }
+    .choice-text { display: block; font-size: 0.8125rem; color: var(--text-secondary); margin-top: 0.125rem; }
+    .schedule-box { padding: 1rem; border-radius: var(--radius-card); background: var(--surface-sunken); }
+    /* The timetable read as a sentence, its blanks the fields. */
+    .sentence { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.625rem; font-size: 0.9375rem; }
+    .next-runs li {
+      display: flex; align-items: center; gap: 0.75rem; padding: 0.4375rem 0; font-size: 0.875rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+    .next-runs li:last-child { border-bottom: 0; }
     .seg-multi .seg-btn[aria-pressed="true"] {
       background: var(--btn-primary-bg);
       color: var(--btn-primary-fg);
       box-shadow: none;
     }
     .seg-multi .seg-btn[aria-pressed="true"]:hover:not(:disabled) {
+      background: var(--btn-primary-hover);
+      color: var(--btn-primary-fg);
+    }
+    /* How often: the chosen frequency filled as a chosen weekday is, so it never reads as two choices. */
+    .seg-solid .seg-btn[aria-checked="true"] {
+      background: var(--btn-primary-bg);
+      color: var(--btn-primary-fg);
+      box-shadow: none;
+    }
+    .seg-solid .seg-btn[aria-checked="true"]:hover:not(:disabled) {
       background: var(--btn-primary-hover);
       color: var(--btn-primary-fg);
     }
@@ -122,6 +183,16 @@ export class JobEdit implements OnInit {
   readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
 
   readonly frequencies = FREQUENCIES;
+  /** When it runs, in the words of a person choosing: the engine's Auto and Manual. */
+  readonly executionOptions = [
+    { value: 'Auto', label: 'On a timetable', text: 'By itself: every few minutes, daily, weekly or monthly.', icon: 'calendar' },
+    { value: 'Manual', label: 'Only when started', text: 'From Run now, or when a workflow starts it.', icon: 'play' },
+  ];
+  /** Advanced (priority, attempts, retry): closed until asked for, opened when one of them needs fixing. */
+  readonly advancedOpen = signal(false);
+  private readonly destroyRef = inject(DestroyRef);
+  private readonly previewAsks = new Subject<void>();
+  readonly preview = signal<Preview>(NO_PREVIEW);
   readonly days = DAYS;
   readonly notifyOptions = NOTIFY_OPTIONS;
   readonly monthDays = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -146,6 +217,21 @@ export class JobEdit implements OnInit {
   readonly selectedDays = signal<string[]>([]);
 
   readonly isEdit = computed(() => !!this.jobId());
+  /** UX review 2026-10-12 (A2, S2): the page is titled with the schedule's name, its status beside it. */
+  readonly loadedName = signal('');
+  readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Schedule') : 'New schedule');
+
+  /** MIG-347: this schedule run for each day of a past range (as saved); a started one opens in Runs › Backfills. */
+  backfill(): void {
+    const jobId = Number(this.jobId());
+    if (!jobId) return;
+    const name = this.loadedName();
+    openBackfill(this.injector.get(Dialog), { jobId, jobName: name, readsCosts: this.injector.get(AuthService).isTenantAdmin() }).then(started => {
+      if (!started) return;
+      this.toast.success(`Backfill #${started.backfillId} of ${name} started: ${started.total} period(s).`);
+      this.router.navigate(['/runs/backfills'], { queryParams: { backfill: started.backfillId } });
+    });
+  }
 
   readonly form: FormGroup = this.fb.group({
     jobId: [null],
@@ -184,7 +270,65 @@ export class JobEdit implements OnInit {
   readonly onArrival = signal(false);
   readonly filePattern = signal('');
   readonly patternError = computed(() => (this.onArrival() ? patternProblem(this.filePattern()) : ''));
+  /** MIG-360: how many files that waited for a run in flight the next run takes (1: each file its own run). */
+  readonly batchSize = signal<number | string>(1);
+  readonly batchError = computed(() => (this.onArrival() ? batchProblem(this.batchSize()) : ''));
   private readonly savedTrigger = signal<InboxTrigger | null>(null);
+
+  /**
+   * MIG-364: the second Event start -- run when a document of one type is approved, by a reviewer or automatically.
+   * Kept apart from the job as the inbox trigger is (sourceJob.json/documentTrigger), saved after the job and only when
+   * it changed; off keeps the type, saved as a trigger that is off.
+   */
+  readonly onApproval = signal(false);
+  readonly documentTypeId = signal<number | null>(null);
+  /** How many approved documents that waited for a run in flight the next run takes (1: each document its own run). */
+  readonly documentBatch = signal<number | string>(1);
+  readonly documentTypeError = computed(() => (this.onApproval() && this.documentTypeId() === null
+    ? 'Choose the document type whose approved documents start this schedule.' : ''));
+  readonly documentBatchError = computed(() => (this.onApproval() ? documentBatchProblem(this.documentBatch()) : ''));
+  private readonly savedDocumentTrigger = signal<DocumentTrigger | null>(null);
+  /** The workspace's document types (Document Intelligence), read the first time the document start is shown; null until then. */
+  readonly documentTypes = signal<DocumentType[] | null>(null);
+  private readonly documentsApi = inject(DocumentsApi);
+  /** The choices: the workspace's types by name, and a saved type the list no longer has, by its id. */
+  readonly documentTypeOptions = computed(() => {
+    const options = (this.documentTypes() ?? []).map(t => ({
+      id: Number(t.documentTypeId),
+      label: t.status && t.status !== 'Active' ? `${t.name} (inactive)` : t.name,
+    }));
+    const chosen = this.documentTypeId();
+    if (chosen !== null && this.documentTypes() !== null && !options.some(o => o.id === chosen)) {
+      options.push({ id: chosen, label: `Document type ${chosen} (not in this workspace)` });
+    }
+    return options;
+  });
+  /** The chosen type's name, for the summary beside the form. */
+  readonly documentTypeLabel = computed(() => {
+    const chosen = this.documentTypeId();
+    if (chosen === null) return '';
+    return this.documentTypes()?.find(t => Number(t.documentTypeId) === chosen)?.name ?? `document type ${chosen}`;
+  });
+
+  setOnApproval(on: boolean): void {
+    this.onApproval.set(on);
+    if (on) this.loadDocumentTypes();
+  }
+
+  pickDocumentType(value: string): void {
+    this.documentTypeId.set(value === '' ? null : Number(value));
+  }
+
+  /** Once: a list that cannot be read leaves the choice empty, and a saved type still shows by its id. */
+  private loadDocumentTypes(): void {
+    if (this.documentTypes() !== null || this.documentTypesAsked) return;
+    this.documentTypesAsked = true;
+    this.documentsApi.types().subscribe({
+      next: response => this.documentTypes.set(response.status === API_SUCCESS && Array.isArray(response.data) ? response.data : []),
+      error: () => this.documentTypes.set([]),
+    });
+  }
+  private documentTypesAsked = false;
 
   /**
    * MIG-251 on MIG-242: the model each AI step runs on when this schedule runs it (sourceJob.json/aiModelChoice). Only
@@ -195,7 +339,70 @@ export class JobEdit implements OnInit {
 
   /** A manual job has no timetable, so the whole schedule section is irrelevant. */
   readonly isScheduled = computed(() => this.executionValue() !== 'Manual');
-  private readonly executionValue = signal('Auto');
+  readonly executionValue = signal('Auto');
+
+  /** The rest of the form as a signal, for the summary beside it (form values are not signals). */
+  readonly values = signal<Record<string, any>>({});
+  readonly jobStatusValue = computed(() => String(this.values()['jobStatus'] ?? 'Active'));
+  readonly pipelineName = computed(() => {
+    const id = this.values()['taskDetailId'];
+    return id == null ? '' : (this.tasks().find(t => String(t.taskDetailId) === String(id))?.taskName ?? `Pipeline #${id}`);
+  });
+  /** The first run as set, for a timetable; nothing for Cron (the expression decides) or a job only started by hand. */
+  readonly startsLine = computed(() => {
+    if (!this.isScheduled() || this.isCron()) return '';
+    const schedule = this.schedule();
+    const date = schedule['startDate'];
+    if (!date) return '';
+    return `Starting ${dayLabel(date)} at ${clockTime(schedule['startTime']) || '00:00'}, server time.`;
+  });
+  readonly retryLine = computed(() => {
+    const v = this.values();
+    const attempts = Number(v['maxAttempts'] ?? 1);
+    const priority = `Priority ${v['priority'] ?? 1}`;
+    if (!(attempts > 1)) return `${priority}; a failed run is not retried.`;
+    return `${priority}; up to ${attempts} attempts, ${v['retryBackoffSeconds'] ?? 60} s apart at first.`;
+  });
+  readonly emailLine = computed(() => {
+    const v = this.values();
+    const on = this.notifyOptions.filter(o => !!v[o.control]).map(o => o.label.toLowerCase());
+    return on.length ? `When ${on.join(', ')}.` : 'Nobody is emailed.';
+  });
+
+  setExecution(value: string): void {
+    if (this.locked()) return;
+    this.form.get('executionType')!.setValue(value);
+  }
+
+  setFrequency(value: string): void {
+    if (this.locked()) return;
+    this.scheduler.get('frequency')!.setValue(value);
+  }
+
+  useCron(expression: string): void {
+    if (this.locked()) return;
+    this.scheduler.get('cronExpression')!.setValue(expression);
+  }
+
+  setActive(on: boolean): void {
+    this.form.get('jobStatus')!.setValue(on ? 'Active' : 'Inactive');
+  }
+
+  /** "at 02:00" for a day or longer; "from 00:00" when it repeats within a day. */
+  readonly timeWord = computed(() => (['Mint', 'Hr'].includes(this.frequencyValue()) ? 'from' : 'at'));
+
+  readonly attemptsWords = computed(() => {
+    const attempts = Number(this.values()['maxAttempts'] ?? 1);
+    return attempts > 1 ? `${attempts} attempts` : 'no retry';
+  });
+
+  /** A run as the preview lists it: Chicago wall clock, "2026-10-08T02:00", read without a time zone. */
+  runDay(run: string): string {
+    const [y, m, d] = run.slice(0, 10).split('-').map(Number);
+    return WEEKDAYS[new Date(Date.UTC(y, m - 1, d)).getUTCDay()];
+  }
+  runDate(run: string): string { return dayLabel(run.slice(0, 10)); }
+  runTime(run: string): string { return run.slice(11, 16); }
 
   /** Backoff only means anything once there is a second attempt to wait before. */
   readonly retryEnabled = computed(() => Number(this.maxAttemptsValue()) > 1);
@@ -208,8 +415,10 @@ export class JobEdit implements OnInit {
    * frequency -- and went on describing the old interval, time, day or end date.
    */
   private readonly schedule = signal<Record<string, any>>({});
-  readonly unit = computed(() =>
-    FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '');
+  readonly unit = computed(() => {
+    const unit = FREQUENCIES.find(f => f.value === this.frequencyValue())?.unit ?? '';
+    return unit && String(this.schedule()['intervalValue'] ?? '1') !== '1' ? `${unit}s` : unit;
+  });
 
   /** Wave 4: a Cron schedule -- the expression replaces the interval, the weekdays and the day of the month. */
   readonly isCron = computed(() => this.frequencyValue() === 'Cron');
@@ -226,7 +435,7 @@ export class JobEdit implements OnInit {
       next: response => {
         if (response.status === API_SUCCESS) this.tasks.set(response.data ?? []);
       },
-      error: () => this.toast.error('Could not load the task list.'),
+      error: () => this.toast.error('Could not load the pipeline list.'),
     });
 
     // A Manual job has no schedule: the section is hidden, and its required fields (start date...) must not
@@ -243,12 +452,27 @@ export class JobEdit implements OnInit {
     this.schedule.set(this.scheduler.getRawValue());
     this.scheduler.valueChanges.subscribe(() => this.schedule.set(this.scheduler.getRawValue()));
     this.form.get('maxAttempts')!.valueChanges.subscribe(v => this.maxAttemptsValue.set(Number(v)));
+    this.values.set(this.form.getRawValue());
+    this.form.valueChanges.subscribe(() => this.values.set(this.form.getRawValue()));
+    // The next runs follow the timetable a moment after it stops changing; only the newest question is answered.
+    this.previewAsks.pipe(
+      debounceTime(350),
+      switchMap(() => this.askPreview()),
+      takeUntilDestroyed(this.destroyRef),
+    ).subscribe(preview => this.preview.set(preview));
+    this.scheduler.valueChanges.subscribe(() => this.previewAsks.next());
+    this.form.get('executionType')!.valueChanges.subscribe(() => this.previewAsks.next());
+    this.previewAsks.next();
 
     if (this.isEdit()) {
       this.loadJob();
       if (isRecordId(this.jobId())) this.loadExtras();
     }
-    else if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
+    else {
+      // A new schedule starts today (the server's calendar) unless someone picks another day.
+      this.scheduler.patchValue({ startDate: new Intl.DateTimeFormat('en-CA', { timeZone: SERVER_ZONE }).format(new Date()) });
+      if (isRecordId(this.taskDetailId())) this.form.patchValue({ taskDetailId: Number(this.taskDetailId()) });
+    }
   }
 
   retryLoad(): void { this.loadJob(); }
@@ -258,7 +482,7 @@ export class JobEdit implements OnInit {
     this.loadMissing.set(false);
     // An id that is not a number cannot name a job; asking anyway only earned the server's refusal.
     if (!isRecordId(this.jobId())) {
-      this.missing('That link does not point to a job.');
+      this.missing('That link does not point to a schedule.');
       return;
     }
     this.loading.set(true);
@@ -268,14 +492,15 @@ export class JobEdit implements OnInit {
         this.loading.set(false);
         // Another person's job reads exactly like a missing one for a tenant user (JobOwnership).
         if (isMissingRecord(response) || (response.status === API_SUCCESS && !response.data)) {
-          this.missing(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+          this.missing(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
           return;
         }
         if (response.status !== API_SUCCESS) {
-          this.loadError.set(response.message || 'That job could not be loaded.');
+          this.loadError.set(response.message || 'That schedule could not be loaded.');
           return;
         }
         const job = response.data;
+        this.loadedName.set(job.jobName ?? '');
         this.form.patchValue({
           jobId: job.jobId,
           jobName: job.jobName,
@@ -308,12 +533,13 @@ export class JobEdit implements OnInit {
           this.selectedDays.set(((job.scheduler.daysOfWeek ?? '') as string).split(',')
             .filter(Boolean).map(normaliseDayCode)
             .filter((code: string) => DAYS.some(day => day.value === code)));
+          this.previewAsks.next();
         }
       },
       error: err => {
         this.loading.set(false);
-        if (isMissingRecord(err)) this.missing(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
-        else this.loadError.set(err?.error?.message || 'That job could not be loaded.');
+        if (isMissingRecord(err)) this.missing(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
+        else this.loadError.set(err?.error?.message || 'That schedule could not be loaded.');
       },
     });
   }
@@ -327,6 +553,18 @@ export class JobEdit implements OnInit {
         this.savedTrigger.set(trigger);
         this.onArrival.set(!!trigger?.configured && trigger.enabled !== false);
         this.filePattern.set(trigger?.filePattern ?? '');
+        this.batchSize.set(Number(trigger?.batchSize ?? 1));
+      },
+      error: () => {},
+    });
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentTrigger`, { params }).subscribe({
+      next: response => {
+        const trigger = response.status === API_SUCCESS ? documentTriggerOf(response.data) : null;
+        this.savedDocumentTrigger.set(trigger);
+        this.onApproval.set(!!trigger?.configured && trigger.enabled !== false);
+        this.documentTypeId.set(trigger?.documentTypeId === null || trigger?.documentTypeId === undefined ? null : Number(trigger.documentTypeId));
+        this.documentBatch.set(Number(trigger?.batchSize ?? 1));
+        if (trigger?.configured) this.loadDocumentTypes();
       },
       error: () => {},
     });
@@ -341,15 +579,34 @@ export class JobEdit implements OnInit {
   }
 
   /** The trigger request the form asks for, or null when it asks for what is already saved. */
-  private triggerRequest(jobId: number): { jobId: number; enabled: boolean; filePattern: string } | null {
+  private triggerRequest(jobId: number): { jobId: number; enabled: boolean; filePattern: string; batchSize?: number } | null {
     const saved = this.savedTrigger();
     const savedOn = !!saved?.configured && saved.enabled !== false;
     const pattern = this.filePattern().trim();
+    const savedBatch = Number(saved?.batchSize ?? 1);
+    const batch = Number(this.batchSize());
     if (this.onArrival()) {
-      if (savedOn && (saved?.filePattern ?? '') === pattern) return null;
-      return { jobId, enabled: true, filePattern: pattern };
+      if (savedOn && (saved?.filePattern ?? '') === pattern && batch === savedBatch) return null;
+      return batch === savedBatch ? { jobId, enabled: true, filePattern: pattern } : { jobId, enabled: true, filePattern: pattern, batchSize: batch };
     }
     return savedOn ? { jobId, enabled: false, filePattern: saved?.filePattern ?? '' } : null;
+  }
+
+  /** MIG-364: the document trigger request the form asks for, or null when it asks for what is already saved. */
+  private documentRequest(jobId: number): { jobId: number; enabled: boolean; documentTypeId?: number; batchSize?: number } | null {
+    const saved = this.savedDocumentTrigger();
+    const savedOn = !!saved?.configured && saved.enabled !== false;
+    const savedType = saved?.documentTypeId === null || saved?.documentTypeId === undefined ? null : Number(saved.documentTypeId);
+    const type = this.documentTypeId();
+    const savedBatch = Number(saved?.batchSize ?? 1);
+    const batch = Number(this.documentBatch());
+    if (this.onApproval()) {
+      if (savedOn && savedType === type && batch === savedBatch) return null;
+      const body = { jobId, enabled: true, documentTypeId: type ?? undefined };
+      return batch === savedBatch ? body : { ...body, batchSize: batch };
+    }
+    // Off keeps the type: Core keeps the saved one when none is sent, and this sends the one it has.
+    return savedOn ? (savedType === null ? { jobId, enabled: false } : { jobId, enabled: false, documentTypeId: savedType }) : null;
   }
 
   /**
@@ -358,7 +615,10 @@ export class JobEdit implements OnInit {
    */
   private saveExtras(jobId: number | null): Observable<string[]> {
     if (jobId === null || !Number.isFinite(jobId)) {
-      return of(this.triggerRequest(0) ? ['the job\'s id did not come back, so its inbox trigger was not set.'] : []);
+      return of([
+        ...(this.triggerRequest(0) ? ['the schedule\'s id did not come back, so its inbox trigger was not set.'] : []),
+        ...(this.documentRequest(0) ? ['the schedule\'s id did not come back, so its document trigger was not set.'] : []),
+      ]);
     }
     const asks: Observable<string>[] = [];
     const reason = (fallback: string) => (response: ApiResponse) =>
@@ -368,6 +628,12 @@ export class JobEdit implements OnInit {
       asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/inboxTrigger/save`, trigger).pipe(
         map(reason('the inbox trigger was not saved.')),
         catchError(err => of(err?.error?.message || 'the inbox trigger was not saved.'))));
+    }
+    const documents = this.documentRequest(jobId);
+    if (documents) {
+      asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/documentTrigger/save`, documents).pipe(
+        map(reason('the document trigger was not saved.')),
+        catchError(err => of(err?.error?.message || 'the document trigger was not saved.'))));
     }
     if (this.isEdit() && this.aiSteps().length && picksChanged(this.aiSteps(), this.modelPicks())) {
       asks.push(this.http.post<ApiResponse>(`${API_BASE}/sourceJob.json/aiModelChoice/save`, choiceBody(jobId, this.modelPicks())).pipe(
@@ -386,6 +652,42 @@ export class JobEdit implements OnInit {
   toggleDay(day: string): void {
     this.selectedDays.update(list =>
       list.includes(day) ? list.filter(d => d !== day) : [...list, day]);
+    this.previewAsks.next();
+  }
+
+  /** The schedule as a save would send it: the preview and the save read the same timetable. */
+  private schedulerPayload(): Record<string, any> {
+    const scheduler = this.scheduler.getRawValue();
+    const { cronExpression, ...timetable } = scheduler;
+    return this.isCron()
+      // Cron: the expression is the cadence. A blank start is left out for Core to default (today, 00:00), and the
+      // weekdays or day of the month a previous frequency picked are not carried along.
+      ? { ...timetable, startDate: timetable.startDate || null, startTime: timetable.startTime || null,
+        cronExpression: String(cronExpression ?? '').trim(), daysOfWeek: null, dayOfMonth: null }
+      : {
+        ...timetable,
+        daysOfWeek: this.selectedDays().length ? this.selectedDays().join(',') : null,
+        dayOfMonth: scheduler.dayOfMonth === '' ? null : scheduler.dayOfMonth,
+      };
+  }
+
+  private askPreview(): Observable<Preview> {
+    if (!this.isScheduled()) return of(NO_PREVIEW);
+    if (this.frequencyValue() === 'Weekly' && !this.selectedDays().length) {
+      return of({ ...NO_PREVIEW, error: 'Pick at least one day to see the runs.' });
+    }
+    this.preview.update(p => ({ ...p, loading: true }));
+    // A GET, the timetable in the query: a read, so a managed-service session's audit does not record each change.
+    const params: Record<string, string> = {};
+    for (const [key, value] of Object.entries(this.schedulerPayload())) {
+      if (value !== null && value !== undefined && value !== '' && key !== 'schedulerId') params[key] = String(value);
+    }
+    return this.http.get<ApiResponse<{ runs?: string[]; ends?: boolean }>>(`${API_BASE}/sourceJob.json/schedulePreview`,
+      { params }).pipe(
+      map(response => response.status === API_SUCCESS
+        ? { runs: response.data?.runs ?? [], ends: !!response.data?.ends, error: response.data?.runs?.length ? '' : (response.message || ''), loading: false }
+        : { ...NO_PREVIEW, error: (response.message || '').replace(/^SourceJob schedule: /, '') }),
+      catchError(() => of({ ...NO_PREVIEW, error: 'The next runs could not be worked out right now.' })));
   }
 
   /** Plain-language restatement of the schedule, so the timetable is checkable before saving. */
@@ -481,6 +783,7 @@ export class JobEdit implements OnInit {
     this.submitted.set(true);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
+      if (['priority', 'maxAttempts', 'retryBackoffSeconds'].some(name => this.form.get(name)?.invalid)) this.advancedOpen.set(true);
       this.toast.error('Check the highlighted fields.');
       // Focus stayed on Save, so a keyboard or screen-reader user had to go looking for the field.
       if (this.host) focusFirstInvalid(this.host.nativeElement, this.injector);
@@ -490,8 +793,13 @@ export class JobEdit implements OnInit {
       this.toast.error('Pick at least one day of the week.');
       return;
     }
-    if (this.patternError()) {
-      this.toast.error(this.patternError());
+    if (this.patternError() || this.batchError()) {
+      this.toast.error(this.patternError() || this.batchError());
+      return;
+    }
+    if (this.documentTypeError() || this.documentBatchError()) {
+      this.toast.error(this.documentTypeError() || this.documentBatchError());
+      this.host?.nativeElement.querySelector<HTMLElement>(this.documentTypeError() ? '#documentTypeId' : '#documentBatch')?.focus();
       return;
     }
 
@@ -511,17 +819,7 @@ export class JobEdit implements OnInit {
     };
 
     if (this.isScheduled()) {
-      const { cronExpression, ...timetable } = value.scheduler;
-      payload.schedulers = [this.isCron()
-        // Cron: the expression is the cadence. A blank start is left out for Core to default (today, 00:00), and the
-        // weekdays or day of the month a previous frequency picked are not carried along.
-        ? { ...timetable, startDate: timetable.startDate || null, startTime: timetable.startTime || null,
-          cronExpression: String(cronExpression ?? '').trim(), daysOfWeek: null, dayOfMonth: null }
-        : {
-          ...timetable,
-          daysOfWeek: this.selectedDays().length ? this.selectedDays().join(',') : null,
-          dayOfMonth: value.scheduler.dayOfMonth === '' ? null : value.scheduler.dayOfMonth,
-        }];
+      payload.schedulers = [this.schedulerPayload()];
     }
 
     this.saving.set(true);
@@ -534,7 +832,7 @@ export class JobEdit implements OnInit {
         if (response.status !== API_SUCCESS) {
           this.saving.set(false);
           if (this.refusedCron(response.message)) return;
-          this.toast.error(response.message || 'The job could not be saved.');
+          this.toast.error(response.message || 'The schedule could not be saved.');
           return;
         }
         const jobId = this.isEdit() ? Number(value.jobId ?? this.jobId())
@@ -542,11 +840,11 @@ export class JobEdit implements OnInit {
         this.saveExtras(jobId).subscribe(problems => {
           this.saving.set(false);
           if (!problems.length) {
-            this.toast.success(this.isEdit() ? 'Job updated.' : 'Job created.');
+            this.toast.success(this.isEdit() ? 'Schedule updated.' : 'Schedule created.');
             this.router.navigate(['/pipelines/schedules']);
             return;
           }
-          this.toast.error(`${this.isEdit() ? 'The job was updated' : 'The job was created'}, but ${problems.join(' ')}`);
+          this.toast.error(`${this.isEdit() ? 'The schedule was updated' : 'The schedule was created'}, but ${problems.join(' ')}`);
           // A new job is saved already: staying on "New schedule" would offer to create it again.
           if (!this.isEdit()) this.router.navigate(['/pipelines/schedules']);
         });
@@ -554,7 +852,7 @@ export class JobEdit implements OnInit {
       error: err => {
         this.saving.set(false);
         if (this.refusedCron(err?.error?.message)) return;
-        this.toast.error(err?.error?.message || 'The job could not be saved.');
+        this.toast.error(err?.error?.message || 'The schedule could not be saved.');
       },
     });
   }

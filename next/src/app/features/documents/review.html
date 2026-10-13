@@ -1,36 +1,37 @@
 <div class="page">
-  <a routerLink="/documents/review" class="link-inline text-xs inline-flex items-center gap-1 self-start"><app-icon name="arrowLeft" size="0.9em" />Back to the review queue</a>
-
-  <div class="page-head">
-    <div>
-      <h1 class="page-title [overflow-wrap:anywhere]">{{ title() }}</h1>
-      <p class="page-subtitle">{{ subtitle() }}</p>
-    </div>
-    @if (detail(); as d) {
-      <div class="flex items-center gap-2">
-        @if (editable()) {
-          <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
-            <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
-          </span>
-          <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
-            <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
-          </button>
-          @if (dirty()) {
-            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
-            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
-              @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
-            </button>
-          }
-          <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="reject()"><app-icon name="close" />Reject</button>
-          <button type="button" class="btn btn-primary btn-sm" data-test="approve" [disabled]="!!busy()" (click)="approve()">
-            @if (busy() === 'approve') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="check" /> }Approve &amp; next
-          </button>
-        } @else {
-          <app-status [label]="statusText()" />
-        }
+  <!-- The breadcrumb leads back to Document review (UX review 2026-10-12, A2). -->
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title [overflow-wrap:anywhere]">{{ title() }}</h1>
+        <p class="page-subtitle">{{ subtitle() }}</p>
       </div>
-    }
-  </div>
+      @if (detail(); as d) {
+        <div class="flex items-center gap-2">
+          @if (editable()) {
+            <span class="hidden md:inline text-xs text-[color:var(--text-muted)]" data-test="shortcuts">
+              <kbd class="kbd">A</kbd> approve · <kbd class="kbd">R</kbd> reject · <kbd class="kbd">↓</kbd> next field
+            </span>
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="claim()">
+              <app-icon [name]="claimedByMe() ? 'close' : 'lock'" />{{ claimedByMe() ? 'Let go' : 'Claim' }}
+            </button>
+            @if (dirty()) {
+              <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard changes</button>
+              <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="save()">
+                @if (busy() === 'save') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="save" /> }Save corrections
+              </button>
+            }
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="reject()"><app-icon name="close" />Reject</button>
+            <button type="button" class="btn btn-primary btn-sm" data-test="approve" [disabled]="!!busy()" (click)="approve()">
+              @if (busy() === 'approve') { <app-icon name="refresh" class="spin" /> } @else { <app-icon name="check" /> }Approve &amp; next
+            </button>
+          } @else {
+            <app-status [label]="statusText()" />
+          }
+        </div>
+      }
+    </div>
+  </app-page-header>
 
   @if (loading() && !detail()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading the document…</div>
@@ -45,17 +46,17 @@
         <app-icon name="lock" size="0.95em" />
         @switch (d.status) {
           @case ('Approved') {
-            {{ d.autoApproved ? 'Approved on its own' : 'Approved by ' + reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
+            @if (d.autoApproved) {Approved on its own} @else {Approved by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
           }
           @case ('Rejected') {
-            Rejected by {{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
+            Rejected by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
           }
           @case ('Failed') { The extraction failed: {{ d.error || 'no reason was given' }}. Extract the document again from Document Intelligence. }
           @default { This document is {{ statusText().toLowerCase() }}; it is not waiting for review. This view is read-only. }
         }
       </p>
     } @else if (claimedByOther()) {
-      <p class="note-bar note-bar-warn" role="note"><app-icon name="lock" size="0.95em" />Claimed by {{ reviewer(d.claimedBy, d.claimedByName) }}@if (d.claimedAt) { since {{ d.claimedAt | serverTime: 'recent' }}}. It is theirs until they let it go or the claim lapses; you can read it.</p>
+      <p class="note-bar note-bar-warn" role="note"><app-icon name="lock" size="0.95em" />Claimed by <app-avatar [appUserId]="d.claimedBy" [name]="reviewer(d.claimedBy, d.claimedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.claimedBy, d.claimedByName) }}@if (d.claimedAt) { since {{ d.claimedAt | serverTime: 'recent' }}}. It is theirs until they let it go or the claim lapses; you can read it.</p>
     }
 
     <div class="review-split">
@@ -105,8 +106,11 @@
                   }
                   <span>
                     {{ ruleWords(r) }}
-                    <span class="text-[color:var(--text-muted)]">· {{ r.status === 'passed' ? 'holds' : r.status === 'failed' ? 'fails' : 'not checked: a value it needs is missing' }}</span>
+                    <span class="text-[color:var(--text-muted)]">· {{ r.status === 'passed' ? 'holds' : r.status === 'failed' ? 'fails' : skipped(r) }}</span>
                     @if (r.status === 'failed' && r.message) { <span class="block text-crit-500">{{ r.message }}</span> }
+                    @if (r.status === 'failed' && r.relatedExtractionId) {
+                      <a class="link-inline" [routerLink]="['/review/documents', r.relatedExtractionId]" data-test="related-document">Open the other document</a>
+                    }
                   </span>
                 </p>
               } @empty {
@@ -131,16 +135,19 @@
               }
             </div>
             <div class="overflow-x-auto">
-              <table class="table-modern">
-                <thead><tr><th class="w-8">#</th>@for (c of t.columns; track c.key) { <th>{{ c.label }}</th> }</tr></thead>
+              <!-- UX final DR1: a fixed layout that fits the card (numbers right-aligned at a set width, text columns take
+                   the rest), and scrolls sideways only once a table is wider than its narrowest readable width. -->
+              <table class="table-modern doc-lines" [style.min-width.rem]="linesMinWidth(t)">
+                <colgroup><col class="doc-col-index" />@for (c of t.columns; track c.key) { <col [class.doc-col-num]="isNumber(c.type)" /> }</colgroup>
+                <thead><tr><th>#</th>@for (c of t.columns; track c.key) { <th [class.num]="isNumber(c.type)" [attr.title]="c.label">{{ c.label }}</th> }</tr></thead>
                 <tbody>
                   @for (row of t.rows; track row.index) {
                     <tr>
                       <td class="text-[color:var(--text-muted)]">{{ row.index + 1 }}</td>
-                      @for (cell of row.cells; track $index) {
-                        <td class="doc-cell" [class.doc-cell-active]="cell && selected() === cell.fieldId" [attr.data-field]="cell?.fieldId ?? null">
+                      @for (cell of row.cells; track $index; let ci = $index) {
+                        <td class="doc-cell" [class.num]="isNumber(t.columns[ci].type)" [class.doc-cell-active]="cell && selected() === cell.fieldId" [attr.data-field]="cell?.fieldId ?? null">
                           @if (cell) {
-                            <div class="flex flex-col gap-1">
+                            <div class="flex flex-col gap-1" [class.items-end]="isNumber(t.columns[ci].type)">
                               <input class="input mono text-xs w-full" [class.doc-field-low]="isFlagged(cell)" [value]="valueOf(cell)" [readOnly]="!editable()"
                                      [attr.aria-label]="nameOf(cell)" (focus)="select(cell.fieldId)" (input)="edit(cell.fieldId, $any($event.target).value)" />
                               <app-confidence-bar [value]="cell.confidence" [low]="isFlagged(cell)" />
@@ -155,7 +162,7 @@
                       <tr data-test="new-row">
                         <td class="text-[color:var(--text-muted)]">{{ nr.rowIndex + 1 }}</td>
                         @for (c of t.columns; track c.key) {
-                          <td class="doc-cell"><input class="input mono text-xs" [value]="nr.values[c.key]" [attr.aria-label]="'New row · ' + c.label" (input)="editNewRow(c.key, $any($event.target).value)" /></td>
+                          <td class="doc-cell" [class.num]="isNumber(c.type)"><input class="input mono text-xs w-full" [value]="nr.values[c.key]" [attr.aria-label]="'New row · ' + c.label" (input)="editNewRow(c.key, $any($event.target).value)" /></td>
                         }
                       </tr>
                     }
@@ -183,7 +190,7 @@
                     <app-data-text class="mono min-w-0 max-w-full" [value]="c.oldValue ?? '(empty)'" label="Was" />
                     <span aria-hidden="true">→</span>
                     <app-data-text class="mono min-w-0 max-w-full" [value]="c.newValue ?? '(empty)'" label="Now" />
-                    <span class="text-[color:var(--text-muted)]">· {{ reviewer(c.correctedBy, c.correctedByName) }}@if (c.dateCreated) {, {{ c.dateCreated | serverTime: 'recent' }}}</span>
+                    <span class="text-[color:var(--text-muted)]">· <app-avatar [appUserId]="c.correctedBy" [name]="reviewer(c.correctedBy, c.correctedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(c.correctedBy, c.correctedByName) }}@if (c.dateCreated) {, {{ c.dateCreated | serverTime: 'recent' }}}</span>
                   </li>
                 }
               </ul>

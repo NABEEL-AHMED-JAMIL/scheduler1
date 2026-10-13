@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { NEVER, Observable, of } from 'rxjs';
 import { Converter } from './converter';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -12,7 +12,7 @@ import { StorageService } from '../../objects/storage.service';
 const FAMILIES = [{ key: 'office', label: 'Office document', inputFormats: ['docx'], outputFormats: ['pdf', 'odt'] }];
 const TASK = (id: number) => ({ documentConverterTaskId: id, taskName: `task ${id}`, inputFileName: 'a.docx', inputFormat: 'docx', outputFormat: 'pdf', outputFileName: 'a.pdf', status: 'Completed' });
 
-function converter(get: (url: string) => Observable<unknown>) {
+function converter(get: (url: string) => Observable<unknown>, query: Record<string, string> = {}) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     provideRouter([]),
@@ -20,6 +20,7 @@ function converter(get: (url: string) => Observable<unknown>) {
     { provide: Dialog, useValue: { open: () => ({ closed: of(undefined) }) } },
     { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
     { provide: StorageService, useValue: { buckets: () => of({ status: 'SUCCESS', data: [] }), listObjects: () => NEVER } },
+    { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } },
   ] });
   const fixture = TestBed.createComponent(Converter);
   fixture.detectChanges();
@@ -88,5 +89,22 @@ describe('Converter, rendered', () => {
     c.onFile(new File(['x'.repeat(10)], 'letter.docx'));
     fixture.detectChanges();
     expect(el.textContent).toContain('10 B');
+  });
+});
+
+describe('Converter and Generated reports, one job in one wording (UX final CV1)', () => {
+  const empty = answer(() => ({ status: 'SUCCESS', data: [] }));
+
+  it('names its render modes as Generated reports does, and links to that page from its header', () => {
+    const { el, c } = converter(empty);
+    expect(c.modeOptions.map(o => o.label)).toEqual(['Upload a file', 'From a bucket', 'PDF from a dataset', 'PDF from a run']);
+    const link = el.querySelector<HTMLAnchorElement>('app-page-header .page-head [data-test="to-generated-reports"]')!;
+    expect(link.textContent!.trim()).toBe('Generated reports');
+    expect(link.getAttribute('href')).toBe('/data/reports');
+  });
+
+  it('opens on PDF from a dataset when the link asks for it, and ignores a mode it does not know', () => {
+    expect(converter(empty, { mode: 'dataset' }).c.mode()).toBe('dataset');
+    expect(converter(empty, { mode: 'nonsense' }).c.mode()).toBe('upload');
   });
 });

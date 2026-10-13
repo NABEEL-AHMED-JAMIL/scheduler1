@@ -71,7 +71,7 @@ describe('Form submissions', () => {
     expect(rows[0].textContent).toContain('nora@clinic.example');
     const run = rows[1].querySelector('a.pill') as HTMLAnchorElement;
     expect(run.textContent).toContain('Run started #7331');
-    expect(run.getAttribute('href')).toBe('/pipelines/schedules/2833/runs/7331/logs');
+    expect(run.getAttribute('href')).toBe('/pipelines/schedules/2833/runs/7331');
     expect(rows[1].textContent).toContain('User 4537');
   });
 

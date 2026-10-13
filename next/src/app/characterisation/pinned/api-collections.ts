@@ -11,7 +11,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections/api-collections/1000"
     ],
     "items": [
       "Open",
@@ -46,16 +46,16 @@ export const PINNED: Record<string, unknown> = {
       "Folder",
       "Method",
       "Name *(required)",
-      "Patients API",
+      "Orders API",
       "URL *(required)",
       "What it returns, and for what",
-      "{{baseUrl}}/v1/patients"
+      "{{baseUrl}}/v1/orders"
     ],
     "links": [],
     "items": []
   },
   "one collection, as a tenant user with the page": {
-    "url": "/integration/api-collections/1000",
+    "url": "/connections/api-collections/1000",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -66,14 +66,15 @@ export const PINNED: Record<string, unknown> = {
       "LIVE-CHECK 0928 httpbin",
       "APIs (2 of 2)",
       "Environments",
-      "Versions",
       "Used by"
     ],
     "buttons": [
       "Cards",
       "Columns",
       "Get status",
+      "History 3",
       "Metadata probe",
+      "Overview",
       "Refresh",
       "Table"
     ],
@@ -90,10 +91,6 @@ export const PINNED: Record<string, unknown> = {
       [
         "Environment",
         "Variables"
-      ],
-      [
-        "Version",
-        "Saved"
       ]
     ],
     "fields": [
@@ -101,11 +98,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/api-collections/1000?tab=history"
     ]
   },
   "one collection, as a workspace administrator": {
-    "url": "/integration/api-collections/1000",
+    "url": "/connections/api-collections/1000",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -117,7 +117,6 @@ export const PINNED: Record<string, unknown> = {
       "LIVE-CHECK 0928 httpbin",
       "APIs (2 of 2)",
       "Environments",
-      "Versions",
       "Used by"
     ],
     "buttons": [
@@ -129,8 +128,10 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Edit details",
       "Get status",
+      "History 3",
       "Metadata probe",
       "New environment",
+      "Overview",
       "Refresh",
       "Table"
     ],
@@ -149,10 +150,6 @@ export const PINNED: Record<string, unknown> = {
         "Environment",
         "Variables",
         "Actions"
-      ],
-      [
-        "Version",
-        "Saved"
       ]
     ],
     "fields": [
@@ -163,11 +160,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/api-collections/1000?tab=history"
     ]
   },
   "the list, as a platform administrator": {
-    "url": "/integration/api-collections",
+    "url": "/connections/api-collections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -206,11 +206,18 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   },
   "the list, as a tenant user with the page": {
-    "url": "/integration/api-collections",
+    "url": "/connections/api-collections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -243,11 +250,16 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources"
     ]
   },
   "the list, as a tenant user without the page": {
-    "url": "/unauthorized?page=api-collections",
+    "url": "/unauthorized?page=api-collections&title=API%20Collections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
@@ -265,7 +277,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a workspace administrator": {
-    "url": "/integration/api-collections",
+    "url": "/connections/api-collections",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -303,7 +315,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   }
 };

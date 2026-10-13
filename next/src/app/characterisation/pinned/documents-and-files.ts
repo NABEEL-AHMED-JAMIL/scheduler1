@@ -101,7 +101,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the converter, as a tenant user without the page": {
-    "url": "/unauthorized?page=tools-converter",
+    "url": "/unauthorized?page=tools-converter&title=Document%20Converter",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
@@ -119,14 +119,15 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the converter, as a workspace administrator": {
-    "url": "/documents/converter",
+    "url": "/tools/converter",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentConverter.json/fetchAllTasks",
       "GET /storage.json/buckets",
-      "GET /documentConverter.json/supportedFormats"
+      "GET /documentConverter.json/supportedFormats",
+      "GET /documentConverter.json/limits"
     ],
     "headings": [
       "Document Converter",
@@ -134,10 +135,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
-      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
-      "From an execution",
+      "PDF from a dataset",
+      "PDF from a run",
       "Refresh",
       "Supported formats",
       "Upload a file",
@@ -158,11 +159,15 @@ export const PINNED: Record<string, unknown> = {
       "Choose a file"
     ],
     "links": [
-      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
     ]
   },
   "the object browser, as a tenant user": {
-    "url": "/documents/files?bucket=ui-review-s3",
+    "url": "/data/files?bucket=ui-review-s3",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -204,10 +209,12 @@ export const PINNED: Record<string, unknown> = {
       "Upload",
       "Upload folder"
     ],
-    "links": []
+    "links": [
+      "/data"
+    ]
   },
   "the object browser, in a bucket": {
-    "url": "/documents/files?bucket=ui-review-s3",
+    "url": "/data/files?bucket=ui-review-s3",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -250,10 +257,17 @@ export const PINNED: Record<string, unknown> = {
       "Upload",
       "Upload folder"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   },
   "the object browser, no bucket chosen": {
-    "url": "/documents/files",
+    "url": "/data/files",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -262,16 +276,22 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Browse files",
-      "Connections"
+      "Connections (1 of 1)"
     ],
     "buttons": [
       "Browse UI-REVIEW LocalStack S3 (fake keys)"
     ],
     "columns": [],
     "fields": [
-      "Connection",
-      "Search connections…"
+      "Search connections"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   }
 };

@@ -95,7 +95,7 @@ describe('MIG-252: AI › AI Assistant and Tool Registry', () => {
 
   it('conversation 1000, confirmed and run, with its tool calls', async () => {
     const v = await visit('/ai/assistant?c=1000', 'TENANT_ADMIN', null, ANSWERS);
-    const opened = await click(v, 'Show tool calls');
+    const opened = await click(v, 'Tool calls');
     pin(FILE, 'conversation 1000, confirmed and run, with its tool calls',
       { ...v.surface, ...surfaceOf(v.main), opened, thread: threadOf(v) }, PINNED);
   });
@@ -111,17 +111,17 @@ describe('MIG-252: AI › AI Assistant and Tool Registry', () => {
   });
 
   it('the tool registry, as a workspace administrator', async () => {
-    const v = await visit('/ai/tools', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/tools', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the tool registry, as a workspace administrator', { ...v.surface, rows: rowsOf(v) }, PINNED);
   });
 
   it('the tool registry, as a tenant user with every page', async () => {
-    const v = await visit('/ai/tools', 'TENANT_USER', ALL_PAGES, ANSWERS);
+    const v = await visit('/settings/tools', 'TENANT_USER', ALL_PAGES, ANSWERS);
     pin(FILE, 'the tool registry, as a tenant user with every page', { ...v.surface, rows: rowsOf(v) }, PINNED);
   });
 
   it('the tool registry, as a platform administrator', async () => {
-    const v = await visit('/ai/tools', 'PLATFORM_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/tools', 'PLATFORM_ADMIN', null, ANSWERS);
     pin(FILE, 'the tool registry, as a platform administrator', { ...v.surface, rows: rowsOf(v) }, PINNED);
   });
 });

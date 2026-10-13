@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 import {
   CorrectionSent, DatasetPage, DocumentType, Extraction, IntakeAnswer, IntakeRow, Mailbox, OcrDocument, QueuePage, ReviewDetail, TypeDefinition,
@@ -39,6 +39,15 @@ export interface TypeSave {
  * A refusal comes back with its HTTP status (404, 409, 422, 429 ...) and the {status: ERROR, message} envelope, so a
  * caller reads the message from the error (documents.model's refusalText) as well as `status` on a 200.
  */
+/** One schedule an approved document of a type starts (DI1). */
+export interface DocumentTriggerRow {
+  jobId: number;
+  jobName: string | null;
+  jobStatus: string | null;
+  documentTypeId: number;
+  enabled: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class DocumentsApi {
   private readonly http = inject(HttpClient);
@@ -93,6 +102,12 @@ export class DocumentsApi {
 
   // ------------------------------------------------------------------------------------------ types
 
+  /** MIG-319: the workspace's buckets, which a lookup rule's list file is named by (its alias). */
+  buckets(): Observable<{ alias: string; label: string }[]> {
+    return this.http.get<ApiResponse<{ bucket: string; label?: string }[]>>(`${API_BASE}/storage.json/buckets`).pipe(
+      map(r => (r.data ?? []).filter(b => !!b.bucket).map(b => ({ alias: b.bucket, label: b.label || b.bucket }))));
+  }
+
   types(): Observable<ApiResponse<DocumentType[]>> {
     return this.http.get<ApiResponse<DocumentType[]>>(`${TYPES}/fetchAll`);
   }
@@ -130,6 +145,14 @@ export class DocumentsApi {
 
   extraction(extractionId: number): Observable<ApiResponse<Extraction>> {
     return this.http.get<ApiResponse<Extraction>>(`${EXTRACTION}/fetchById`, { params: { extractionId } });
+  }
+
+  /**
+   * UX review 2026-10-13 (DI1): the workspace's document triggers on the schedules the reader may see -- what an approved
+   * document of each type starts (Core's sourceJob.json/documentTrigger without a jobId; Schedules' page).
+   */
+  documentTriggers(): Observable<ApiResponse<DocumentTriggerRow[]>> {
+    return this.http.get<ApiResponse<DocumentTriggerRow[]>>(`${API_BASE}/sourceJob.json/documentTrigger`);
   }
 
   stats(days?: number): Observable<ApiResponse<TypeStats[]>> {

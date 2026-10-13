@@ -1,13 +1,14 @@
-import { test, expect, Page } from '@playwright/test';
+import { expect as expectNow, Page } from '@playwright/test';
+import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
+import { analyticsFixtures } from './support/analytics-fixtures';
 import AxeBuilder from '@axe-core/playwright';
-import { readFileSync } from 'fs';
 
 /**
- * The alias the deployed console gives the MinIO bucket that holds the fixtures. It was
- * "etl-bucket" when these specs were written and is "worker-store" on the current stack; an
- * alias nobody has fails every spec at the first select, which looks nothing like what it is.
+ * The alias of the storage connection that holds the fixtures: E2E_CONNECTION, else what
+ * analyticsFixtures() picks (the rebuilt workspace's own bucket, support/fixtures.ts). An alias
+ * nobody has fails every spec at the first select, which looks nothing like what it is.
  */
-const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
+let CONNECTION = process.env['E2E_CONNECTION'] ?? '';
 
 /**
  * WCAG 2.1 A and AA over the Analytics Studio, checked by axe rather than by eye.
@@ -30,26 +31,27 @@ const CONNECTION = process.env['E2E_CONNECTION'] ?? 'worker-store';
 
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 
-function signedIn(): boolean {
-  try {
-    const state = JSON.parse(readFileSync('e2e/.auth/state.json', 'utf8'));
-    return (state.origins ?? []).length > 0;
-  } catch {
-    return false;
-  }
-}
+test.skip(!signedIn(), NO_SESSION);
+// Opening a dataset reads it from S3 (a 38 MB CSV for orders); a slow read is not a failure, so each test has two minutes.
+test.describe.configure({ timeout: 120_000 });
+// ...and an analysis or a scan over it may answer after the usual fifteen seconds.
+const expect = expectNow.configure({ timeout: 45_000 });
 
-test.beforeEach(async () => {
-  test.skip(!signedIn(),
-    'No session. Start the stack and run with E2E_PASSWORD=… npx playwright test');
+// The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(600_000);   // the first run of all uploads 45 MB and saves ten boards; every later one only reads
+  const made = await analyticsFixtures(request, await defaultSession(request));
+  CONNECTION ||= made.connection;
 });
 
 async function openFixture(page: Page) {
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption(CONNECTION);
+  // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await page.locator('#a-conn').selectOption(CONNECTION);
   await page.getByRole('button', { name: /analytics-benchmark/ }).click();
   await page.getByRole('button', { name: /sales-10mb\.csv/ }).click();
-  await expect(page.getByText(/150K/)).toBeVisible();
+  await expect(page.getByText('150K rows')).toBeVisible({ timeout: 45_000 });   // the count reads the whole file from S3
 }
 
 /** Scans what is on screen and returns the violations, worst first. */
@@ -66,6 +68,7 @@ function describeAll(violations: Awaited<ReturnType<typeof scan>>): string {
 }
 
 test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ page }) => {
+  test.setTimeout(150_000);   // every tab is scanned only once it has finished reading the file
   // axe runs the instant each tab is clicked, so without this it can measure an element part-way
   // through a `transition-colors` and report a contrast ratio between two colours that exist in
   // neither state. That produced an intermittent failure here and in appearance.spec.ts naming
@@ -79,7 +82,11 @@ test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ pa
   const failures: string[] = [];
 
   for (const tab of tabs) {
-    await page.getByRole('button', { name: tab, exact: true }).click();
+    // By id: Quality's name grows ", N to look at" once its scan finds something (orders.csv has empty ratings).
+    await page.locator(`#a-tab-${tab.toLowerCase()}`).click();
+    // A tab that is still reading keeps its last answer on screen, blurred and dimmed under a spinner (aria-busy):
+    // scanned then, the dimmed headings fail contrast (Profile did, once in three runs). Scan what the reader settles on.
+    await expect(page.locator('#a-panel [aria-busy="true"]')).toHaveCount(0, { timeout: 30_000 });
     const violations = await scan(page);
     if (violations.length) failures.push(`${tab}:${describeAll(violations)}`);
   }
@@ -92,7 +99,9 @@ test('the dataset workspace has no WCAG A/AA violations on any tab', async ({ pa
 test('the browse screen has no WCAG A/AA violations before a dataset is opened', async ({ page }) => {
   // The empty state is a screen in its own right and the one every reader sees first.
   await page.goto('/objects/analytics');
-  await page.locator('select').first().selectOption(CONNECTION);
+  // The files are a panel now (owner, 2026-09-28): Choose a file opens it on the connection picker.
+  await page.getByRole('button', { name: 'Choose a file' }).click();
+  await page.locator('#a-conn').selectOption(CONNECTION);
   const violations = await scan(page);
   expect(violations, `axe found WCAG A/AA violations:${describeAll(violations)}`).toEqual([]);
 });

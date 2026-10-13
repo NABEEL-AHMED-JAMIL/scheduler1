@@ -1,1099 +1,71 @@
-import { Component, DestroyRef, LOCALE_ID, OnDestroy, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { PageHeader } from '../../shared/ui/page-header';
+import { Crumb } from '../../core/nav/nav-tree';
+import { AuthService } from '../../core/auth/auth.service';
+import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
-import { Subscription, from, mergeMap } from 'rxjs';
+import { Subscription, catchError, from, mergeMap, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
 import { confirmWith } from '../../shared/ui/confirm';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger } from '@angular/cdk/menu';
 import { LoadError } from '../../shared/ui/load-error';
-import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { WidgetTableDialog, WidgetTableData } from './widget-table';
 import { KINDS } from './widget-kinds';
 import { AnalyticsWidget, WidgetState as TileState } from './analytics-widget';
-import { WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN } from './widget-chart';
-import {
-  FilterBuilder, asFilterGroup, countFilterClauses, describeClause, emptyFilterGroup,
-  isNumericType, pruneFilters,
-} from './filter-builder';
-import {
-  Aggregation, AnalysisColumn, AnalysisRequest, AnalysisResult, AnalysisSort, AnalyticsService,
-  Dashboard, DashboardWidget, DatasetColumn, FilterGroup, FilterNode, Grain, PivotGrid,
-  QueryResult,
-  RegisteredDataset,
-  SavedAnalysis,
-  SavedQuery, TopN, WidgetVisualization,
-} from './analytics.service';
+import { ECHART_HEIGHT, WidgetChart, WIDGET_HEIGHT, WIDGET_HEIGHT_MAX, WIDGET_HEIGHT_MIN } from './widget-chart';
+import { FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, pruneFilters } from './filter-builder';
+import { AnalysisRequest, AnalyticsService, Dashboard, DashboardWidget, DatasetColumn, FilterGroup, SavedAnalysis, SavedQuery, WidgetVisualization, EChartKind } from './analytics.service';
+import { tableOf } from './charts/chart-table';
+import { rowsDrawn } from './charts/chart-fit';
+import { BoardSettings, ChartSettings, boardSettingsString, parseBoardSettings, parseSettings } from './charts/chart-settings';
+import { KindPicker } from './charts/kind-picker';
+import { ChartSettingsData, ChartSettingsPanel } from './charts/chart-settings-panel';
+import { KindPickerData, KindPickerPanel } from './charts/kind-picker-panel';
+import { ThemePicker } from '../../shared/charts/echart/theme-picker';
+import { themeLabel } from '../../shared/charts/echart/echart-theme';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
+import { kindInfo } from './widget-kinds';
+import { KindMenu, kindMenu } from './charts/kind-menu';
+import { KIND_ICONS } from './charts/kind-icons';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { BoardFilterBar } from './board/board-filter-bar';
+import { BoardFilterEditor, BoardFilterEditorData, FilterSourceOption } from './board/board-filter-editor';
+import { BoardTable, TableRead, TableSource } from './board/board-table';
+import {
+  BoardFilterDef, BoardFilterState, crossFilterOf, defaultRange, emptyFilterState, parseFilterDefs, restoreState, saveState,
+  stateFromParams, stateKey, stateToParams, tileFilterNote, toggleValue, wireFilters, withCrossFilterOperands,
+} from './board/board-filters';
+import { BoardSection, parseSections, sectionsByWidget, segmentsOf, withSection } from './board/board-sections';
+import { colorKeysOf } from './charts/board-colors';
+import { CHART_SLOTS } from '../../shared/charts/status-color';
+import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName, SPANS } from './widget-view';
 
 /**
- * One mark on a chart.
- *
- * One type for all three categorical charts because all three already agree on it: Bar, Slice
- * and RankedItem each read `name` and `value` and nothing else that a widget sets. A shape per
- * chart would be three conversions of the same two fields, and the first divergence between them
- * would be a tile whose ring and whose bars disagree about a total.
+ * How many of a board's tiles run at once (owner 2026-10-12: tiles load in parallel). Three of the four permits the
+ * analytics governor admits, so one board never holds them all.
  */
+const BOARD_PARALLEL = 3;
 /**
- * One dimension's RAW value behind a mark, with the column it came from.
- *
- * Raw and not rendered. `name` on a Mark is what the tile DRAWS -- dates shortened, decimals
- * trimmed, several dimensions joined with a middle dot -- and none of that is a filter operand.
- * "2024-03-01" drawn from a TIMESTAMP is not the string the column holds, and "north · retail"
- * is not any column's value at all.
+ * The order a board's queue runs in (MIG-344): its figures first -- a KPI is one row, read in milliseconds, and what a
+ * reader looks at first -- then everything else in display order. Stable: tiles of one kind keep their order.
  */
-export interface MarkOperand { field: string; value: string | null; }
-
-/**
- * A drawable figure and, when it can be, the row it identifies.
- *
- * `operands` is absent whenever this mark does NOT identify exactly one group -- see markOperands
- * and mergeMarks for the three ways that happens. Absent means "cannot be narrowed on", and the
- * board reads it that way rather than guessing.
- */
-export interface Mark {
-  name: string;
-  value: number;
-  operands?: MarkOperand[];
-  /**
-   * The same fact as "operands is absent", under the name the CHARTS read.
-   *
-   * Two names for one thing, and the alternative was worse: RankedBar and BarChart are shared
-   * components used by the object browser and the reports screen, and teaching them what a filter
-   * operand is to disable one row would couple them to the analytics filter model. So they get a
-   * plain boolean, and it is set in ONE statement -- at the end of mergeMarks, where operands are
-   * finally settled -- rather than at each of the places that decide to withhold them.
-   */
-  inert?: boolean;
+export function figuresFirst(ids: number[], widgets: DashboardWidget[]): number[] {
+  const kinds = new Map(widgets.map(widget => [widget.analyticsDashboardWidgetId, widget.visualizationType]));
+  const figure = (id: number) => { const kind = kinds.get(id); return kind === 'kpi' || kind === 'kpiTrend'; };
+  return [...ids.filter(figure), ...ids.filter(id => !figure(id))];
 }
 
-/**
- * The half of a tile that is about presentation rather than about which question it asks.
- *
- * Carried in the widget's existing `widget_config` TEXT column, which the schema, the POJO and
- * this client already round-trip on every edit and which nothing had ever written a byte into.
- * The V34 column comment nominates it for exactly this -- a finer layout "belongs in
- * widget_config until something server-side needs to read it" -- and nothing server-side reads
- * a height or a caption, so no migration and no backend change is involved.
- */
-interface WidgetConfig {
-  /** Drawing height in px for the chart kinds that take one. Absent means WIDGET_HEIGHT. */
-  height?: number;
-  /** A sentence the author writes under the tile. Absent means none; it is never invented. */
-  caption?: string;
-}
+/** The governor's "too busy right now" refusal, which a tile retries once rather than shows. */
+const BUSY = /Too many analytics queries are running/i;
 
-/**
- * The bounds a typed height is held to.
- *
- * The hard floor is lower than this: BarChart reserves 32px for a value line and a label and
- * then floors its track at 18 (bar-chart.ts), so below about 50 the bars stop shrinking while
- * the container keeps shrinking and the overflow escapes upward over the chart-kind select. 120
- * is the practical floor -- the histogram's own default -- and leaves a drawing that can still
- * be read. The ceiling is a screenful: past this a single tile pushes every other tile off the
- * board, which is a worse outcome than a slightly cramped chart.
- */
-
-/**
- * Reads a tile's presentation settings.
- *
- * Total: a widget written before this existed, a null, an empty string, a half-written value
- * and a JSON document of some entirely different shape all mean "no settings", because a tile
- * that throws while being drawn takes the whole board with it.
- */
-function widgetConfigOf(widget: DashboardWidget): WidgetConfig {
-  if (!widget.widgetConfig) return {};
-  try {
-    const parsed = JSON.parse(widget.widgetConfig);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as WidgetConfig : {};
-  } catch {
-    return {};
-  }
-}
-
-/** Serialises settings back, or null when there is nothing to keep -- never the string '{}'. */
-function widgetConfigString(config: WidgetConfig): string | null {
-  const kept: WidgetConfig = {};
-  if (config.height && config.height !== WIDGET_HEIGHT) kept.height = config.height;
-  if (config.caption && config.caption.trim()) kept.caption = config.caption.trim();
-  return Object.keys(kept).length ? JSON.stringify(kept) : null;
-}
-
-/**
- * Six slices, sixty bars.
- *
- * The same two limits the Canvas keeps and for the same reasons, which are facts about the
- * palette and the label width rather than about a dashboard: Donut and RankedBar colour their
- * marks from the categorical ramp, so a slice past the last slot repeats the first one's colour
- * and the legend then has two names against one swatch. The limit therefore IS the slot count --
- * CHART_SLOTS -- rather than a number copied beside it that can fall out of step with the
- * palette. Sixty bars is where a name under a bar stops fitting.
- */
-const DONUT_SLICES = CHART_SLOTS;
-const ORDERED_BARS = 60;
-
-/**
- * Aggregations whose parts add up to their whole.
- *
- * The list that decides whether a ring is allowed on a tile. A sum of sums is the sum; a sum of
- * averages is nothing at all, so a slice labelled "12%" over a column of averages is a figure
- * this screen would have invented. Identical to the Canvas's ADDITIVE and deliberately so --
- * MINIMUM and MAXIMUM are excluded from both even though they compose, because the minimum of
- * the minimums is a real figure that is still not a PART of anything.
- */
-const ADDITIVE: Aggregation[] = ['COUNT_ROWS', 'COUNT_NON_NULL', 'SUM'];
-
-/** A DATE column, and not a TIMESTAMP: only one of the two has no time to lose. */
-const DATE_ONLY_TYPE = /^DATE$/i;
-
-/**
- * A statistic as a number, or null when it is not one.
- *
- * Every cell crosses the wire as text, so "does this parse" is the only honest test of whether
- * arithmetic applies to it. A failure is not an error -- it is how a date column says it has no
- * length to draw.
- */
-function asNumber(text: string | null | undefined): number | null {
-  if (text === null || text === undefined) return null;
-  const trimmed = String(text).trim();
-  // Number('') is 0, which would turn an absent value into a measured zero.
-  if (!trimmed) return null;
-  const value = Number(trimmed);
-  return Number.isFinite(value) ? value : null;
-}
-
-/**
- * Scientific notation expanded back into a decimal, on the string and never through a float.
- *
- * <b>This is a SECOND COPY of analytics.ts's plainDecimal, and the copy is deliberate.</b> The
- * rule cannot be imported from there: the next pass reaches these components from the Studio's
- * own tab strip, which makes analytics.ts import this file, and importing back would close a
- * cycle between two component modules. It cannot move to a shared file either without editing
- * analytics.ts, which this pass does not own.
- *
- * A duplicated rule is exactly the drift this codebase warns about, so the duplication is pinned:
- * dashboard.spec.ts imports BOTH copies and asserts they agree on the same inputs, including the
- * measured defect this exists for -- `sum(amount)` returning "7.466125E7" for 74,661,250, which
- * a reader glancing at a tile reads as seven point something. When either copy is next touched,
- * the pair belongs in a shared file.
- */
-export function plainDecimal(text: string): string {
-  const trimmed = text.trim();
-  const match = /^([+-]?)(\d+)(?:\.(\d+))?[eE]([+-]?\d+)$/.exec(trimmed);
-  if (!match) return text;
-  const [, sign, whole, fraction = '', exponentText] = match;
-  const exponent = Number(exponentText);
-  const digits = whole + fraction;
-  const point = whole.length + exponent;
-  if (point <= 0) return `${sign}0.${'0'.repeat(-point)}${digits}`;
-  if (point >= digits.length) return sign + digits + '0'.repeat(point - digits.length);
-  return `${sign}${digits.slice(0, point)}.${digits.slice(point)}`;
-}
-
-/**
- * A DATE rendered as a date. The second copy of analytics.ts's dateOnly -- see plainDecimal.
- *
- * The zero time is required for the trim. A value carrying a real time under a column typed DATE
- * is a contradiction between the type and the value, and a contradiction should be shown rather
- * than tidied away.
- */
-export function dateOnly(text: string): string {
-  const match = /^(\d{4}-\d{2}-\d{2})[T ]00:00(?::00(?:\.0+)?)?$/.exec(text.trim());
-  return match ? match[1] : text;
-}
-
-/** One cell of an analysis result, rendered as what its column says it is. */
-function renderCell(column: AnalysisColumn | undefined, raw: string | null): string | null {
-  if (raw === null || raw === undefined) return null;
-  if (!column) return raw;
-  if (DATE_ONLY_TYPE.test(column.type ?? '')) return dateOnly(raw);
-  if (isNumericType(column.type)) return plainDecimal(raw);
-  return raw;
-}
-
-/**
- * Marks with duplicate labels added together, and a count of how many rows that swallowed.
- *
- * Not a tidy-up. RankedBar tracks its rows by name and Donut tracks its segments by name, so two
- * marks called "north" is a duplicate-key error rather than a chart. Merging is the only way to
- * draw them, and adding is the only merge that makes sense for the counts and totals a grouped
- * result carries -- but it is WRONG for an average, and only the reader knows which they saved.
- * So the count comes back and the tile says so whenever it is not zero.
- */
-function mergeMarks(pairs: Mark[]): { marks: Mark[]; merged: number } {
-  const byName = new Map<string, Mark>();
-  for (const pair of pairs) {
-    const existing = byName.get(pair.name);
-    if (existing) {
-      existing.value += pair.value;
-      // A merged mark no longer identifies one group, so it cannot be narrowed on. Two rows drew
-      // the same label because their raw values RENDER the same -- two timestamps in one day,
-      // "1.0" and "1.00" -- and filtering on either would return a figure that is not the one on
-      // screen. Dropped rather than picked between: see MarkOperand.
-      delete existing.operands;
-    } else {
-      byName.set(pair.name, pair.operands
-        ? { name: pair.name, value: pair.value, operands: pair.operands }
-        : { name: pair.name, value: pair.value });
-    }
-  }
-  // Insertion order is the result's own order, which is what "bars in order" is for: a saved
-  // analysis sorted by month has already said how its categories should read.
-  //
-  // `inert` is stamped here and nowhere else -- see Mark.inert. This is the last point at which
-  // operands can be withheld, so it is the only point at which "withheld" is settled.
-  //
-  // Only when SOMETHING here can be narrowed, which is what the word means: "this row alone does
-  // not respond, on a chart where the others do". Where nothing can -- a grained result, or a
-  // saved statement's result, which has no operands anywhere by construction -- the chart is
-  // un-buttoned whole and a per-row flag would say nothing.
-  const found = [...byName.values()];
-  const anyNarrowable = found.some(mark => !!mark.operands?.length);
-  const marks = anyNarrowable
-    ? found.map(mark => mark.operands?.length ? mark : { ...mark, inert: true })
-    : found;
-  return { marks, merged: pairs.length - byName.size };
-}
-
-/**
- * What one tile is showing, built ONCE when its result lands.
- *
- * Pre-rendered rather than computed in the template, because a template that formatted its own
- * cells would re-render every one of them on every change-detection pass -- and a board is many
- * tiles deep. It also means the notes, the marks and the rows are all derived from the same
- * response at the same instant, so nothing on a tile can be a note about a result that has since
- * been replaced.
- *
- * THERE IS NO PATH FROM HERE BACK TO THE SERVER. A view is thrown away and rebuilt on the next
- * run; it is never saved, and nothing about it is written to the widget row.
- */
-export interface WidgetView {
-  columns: string[];
-  /**
-   * Whether the measure has a total worth dividing.
-   *
-   * Carried on the view rather than re-derived, because two things need it -- the ring's refusal
-   * and the dimension summary's top-share fact -- and a second derivation is a second chance to
-   * disagree about whether an average adds up.
-   */
-  additive: boolean;
-  /**
-   * Which columns hold a MEASURE, index-aligned with `columns`.
-   *
-   * Carried because the table formats its cells and a dimension must not be formatted. readable()
-   * groups an integer -- 250000 into 250,000, which is the whole point of it over a money column
-   * -- and applied to a dimension it rewrote the data: a year column grouped by `order_year`
-   * printed 2,024 in the table while the chart beside it, which never touches readableCell,
-   * printed 2024. The same pass zero-strips a padded code held as text, so a store "007" read 7.
-   *
-   * All true on the saved-query path, where the server sends no roles at all and a numeric column
-   * is as likely to be a figure as a label. That is the behaviour that path already had.
-   */
-  measureColumn: boolean[];
-  /**
-   * Whether a Top-N discarded its tail, so these rows are not the whole of anything.
-   *
-   * On the VIEW as well as on the shape because the template needs it: the dimension summary is
-   * still worth drawing -- the group count and the spread are true -- but its top-share fact is
-   * not, and ResultSummary already takes an `additive` input that governs exactly that fact.
-   */
-  topNTrimmed: boolean;
-  /**
-   * The two-dimension result already shaped as a grid, composed server-side.
-   *
-   * Carried rather than recomposed. The server builds this for EVERY two-dimension analysis --
-   * keyed on the roll-up row indices so a real "Other" category and the Top-N bucket cannot
-   * collide -- and the dashboard read it zero times, so a cross-tab could only be shown as the
-   * long form: one row per (region, category) pair, which is the shape the grid exists to spare
-   * a reader. Null whenever the server sent none, which is its way of saying this result is not
-   * two-dimensional.
-   */
-  pivot: PivotGrid | null;
-  /**
-   * EVERY row the run returned, not the handful the tile draws -- tileRows() makes that cut.
-   * A null cell is a real null, not an empty string.
-   */
-  rows: (string | null)[][];
-  /** Rows in the WHOLE result. `rows.length` is what fitted on the tile. */
-  rowCount: number;
-  /** True when the result stopped at the server's row ceiling -- a partial answer. */
-  truncated: boolean;
-  marks: Mark[];
-  /** Everything the figures on this tile cannot say about themselves. */
-  notes: string[];
-  /** Why each kind cannot draw THIS result, or '' when it can. */
-  issues: Record<WidgetVisualization, string>;
-  /** When this ran, so no figure on a board is on screen without a time against it. */
-  ranAt: number;
-}
-
-/**
- * What a chart of these marks leaves out at the bottom, or null.
- *
- * RankedBar DROPS a row whose value is not above zero -- `data().filter(d => d.value > 0)` -- and
- * a dropped bar looks exactly like a category that was never in the data. On a board that is a
- * realistic result rather than an edge case: a sum over refunds is negative, and a count over a
- * group a filter emptied is zero. The rows stay in the table and the note says the chart is
- * missing them.
- */
-/**
- * A widget's own saved filters and the board's, combined into what is actually sent.
- *
- * <b>ANDed and NESTED, never flattened.</b> This is the rule the server already applies to drill
- * narrowings, and its reasoning is the argument here word for word: spreading a saved
- * `region = north OR region = south` into a top-level AND alongside a board condition turns it
- * into `region = north OR (region = south AND <board>)` -- a different question wearing the same
- * words. Both halves keep their own brackets.
- *
- * <b>Both halves are pruned first, and an empty half is dropped entirely rather than nested.</b>
- * The server refuses a group with no conditions in it outright -- "A filter group needs at least
- * one condition in it" -- so wrapping an empty board filter would turn every tile on the board
- * into an error the moment somebody opened the bar and typed nothing.
- *
- * Exported and pure so the rule can be tested without a component, which is where the OR case
- * belongs: it has no visible symptom, and a tile narrowed by the wrong predicate draws a
- * perfectly ordinary chart of the wrong rows.
- */
-export function combineFilters(saved: FilterNode | undefined,
-    board: FilterGroup | null): FilterGroup | undefined {
-
-  // `saved` is whatever was written into analysis_config, which for a single condition is the
-  // bare clause rather than a group of one. asFilterGroup makes both shapes safe to walk.
-  const savedGroup = asFilterGroup(saved);
-  const own = savedGroup ? pruneFilters(savedGroup) : null;
-  const bar = board ? pruneFilters(board) : null;
-  const haveOwn = !!own && own.clauses.length > 0;
-  const haveBar = !!bar && bar.clauses.length > 0;
-
-  if (!haveOwn && !haveBar) return undefined;
-  if (!haveBar) return own!;
-  if (!haveOwn) return bar!;
-  return { op: 'AND', clauses: [own!, bar!] };
-}
-
-/**
- * What the ANALYSIS asked for, which the result alone cannot say.
- *
- * Whether a line may be drawn is a fact about the sort, and whether a stack may be is a fact about
- * how many dimensions were grouped -- neither of which is visible in a list of rows. The response
- * carries the numbers; this carries the question, and it comes from the saved configuration for
- * the same reason the aggregation does.
- */
-export interface ResultShape {
-  sortedBy?: 'MEASURE' | 'DIMENSION';
-  /**
-   * Which way that sort ran.
-   *
-   * Carried because the AXIS alone does not say whether a line may be drawn. A result sorted by
-   * its dimension DESCENDING is in the dimension's own order and still runs backwards, and the
-   * gate below used to see only `sortedBy === 'DIMENSION'` and offer the line. "dimension, Z-A"
-   * is one click and an entirely reasonable choice for a date -- newest first, which is how
-   * anybody wanting the latest month at the top of the table beside it would sort -- and the tile
-   * then drew time running right to left and printed "Change -40.0% ... down" over a year that
-   * rose 67%.
-   */
-  sortDirection?: 'ASC' | 'DESC';
-  /**
-   * Whether a Top-N DISCARDED its tail rather than rolling it into an Other bucket.
-   *
-   * The one fact about a result that the result itself cannot carry: with includeOther off the
-   * server emits no roll-up row, so `other` is null and `rollupRows` is null, and five rows of a
-   * forty-region dataset are indistinguishable from a dataset with five regions. Every share
-   * drawn from them is then a share of the retained subset wearing the shape of a share of the
-   * whole -- a ring whose legend reads "north 34%" where north is 11% of the data, and a
-   * dimension summary that prints "of 2,100,000", naming a number that is not the total.
-   *
-   * The setting that makes the percentages wrong also makes the chart available: with the bucket
-   * ON, a limit of 6 returns 7 rows and the ring is refused for having too many slices.
-   */
-  topNTrimmed?: boolean;
-  /** Whether the server composed a cross-tab grid for this result -- its own "is this 2-D". */
-  hasPivot?: boolean;
-  /** Whether it refused to, because the column dimension was too wide to draw. */
-  pivotTruncated?: boolean;
-  dimensionCount?: number;
-  rowCount?: number;
-  columnCount?: number;
-}
-
-/** Whether a dimension label is a number, which is what a scatter needs of its x axis. */
-function isNumericLabel(label: string): boolean {
-  return /^-?\d+(\.\d+)?$/.test(label.trim());
-}
-
-function nonPositiveNote(marks: Mark[]): string | null {
-  const count = marks.filter(mark => mark.value <= 0).length;
-  if (!count) return null;
-  // Names the BEHAVIOUR, not one chart. This note is pushed whatever kind is drawn, and it used
-  // to say "the ranked view does not draw a bar for those" -- so a reader looking at "Bars in
-  // order", where the two loss-making lines sat flush to the baseline and looked exactly like a
-  // line that broke even, was told to go and look at a different chart. Switching to ranked
-  // found the same rows missing and a sentence that still did not apply.
-  return `${count} ${count === 1 ? 'figure is' : 'figures are'} zero or below. A bar has no `
-    + 'length to draw for those — ranked leaves them out, and "bars in order" draws them flat '
-    + 'against the baseline. They are in the table.';
-}
-
-/**
- * The four kinds with the reason each cannot draw this result.
- *
- * Listed and inert with the reason on them rather than filtered away, which is the treatment an
- * unreadable connection and an undrawable chart kind already get in this feature: the reason a
- * ring is not on offer is a fact about the reader's own analysis, and it teaches more than the
- * option quietly not being there.
- */
-function issuesFor(marks: Mark[], reason: string, additive: boolean | 'unknown',
-    aggregationLabel: string, shape: ResultShape = {}): Record<WidgetVisualization, string> {
-
-  const categorical = marks.length ? '' : reason;
-  /*
-   * Three states, not two, because two different facts arrive at the totalling gate.
-   *
-   * An ANALYSIS names its aggregation, so this screen knows a mean does not add up and can say
-   * so. A saved STATEMENT names nothing -- `select avg(amount)` and `select sum(amount)` return
-   * the identical shape -- so on that path additivity is UNKNOWN. Both must close the gate, and
-   * they must close it with different words: printing "this measure does not add up" over a
-   * statement asserts as fact something no code on that path can see, which is the same class of
-   * quiet overclaim the gate exists to prevent.
-   *
-   * `!additive` cannot express that, because the string 'unknown' is truthy -- which is exactly
-   * how the saved-query path came to pass `true` here and be offered every share chart.
-   */
-  const canTotal = additive === true;
-  const noSum = additive === 'unknown'
-    ? 'a saved query does not say whether its figures add up'
-    : `${aggregationLabel} does not add up`;
-  const noTotal = additive === 'unknown'
-    ? 'a saved query does not say whether its figures add up to one'
-    : `${aggregationLabel} has no total to divide`;
-  const negative = marks.filter(mark => mark.value <= 0).length;
-  const rankOrdered = shape.sortedBy === 'MEASURE';
-  // Sorted by the dimension, but backwards. Not rank order -- the points ARE in the dimension's
-  // own order -- and still not drawable as a line, because that order is reversed. Kept apart
-  // from rankOrdered so each can say the thing the reader actually has to change.
-  const reversed = shape.sortedBy === 'DIMENSION' && shape.sortDirection === 'DESC';
-  // A share needs the whole to divide. A Top-N that threw its tail away has not got one, and
-  // nothing in the result says so -- see ResultShape.topNTrimmed.
-  const NO_WHOLE = 'This is a Top-N with the rest discarded, so these rows are not the whole of '
-    + 'anything. Turn the Other bucket on to show a share.';
-  const BACKWARDS = 'These are ordered newest-first, so a line would run backwards through the '
-    + 'dimension. Sort the dimension ascending to draw one.';
-  const numericDimension = marks.length > 0 && marks.every(mark => isNumericLabel(mark.name));
-  /*
-   * Two dimensions flattened into one list of marks.
-   *
-   * `stacked` and `shareStacked` already read dimensionCount; the line, the area and the trend
-   * summary did not, two lines above them. A 2-D result reaches them as interleaved categories --
-   * Jan/north, Jan/south, Feb/north, Feb/south -- so the line was offered, drawn, and ran as a
-   * sawtooth between two series that have nothing to do with each other, while the trend summary
-   * stated a "change" between the first and last of that interleaving.
-   */
-  const multiDimension = (shape.dimensionCount ?? 1) > 1;
-  const TWO_DIMENSIONS = 'These rows carry two dimensions, so the points interleave two series '
-    + 'and a line would zigzag between them. Use the cross-tab or a stack, or drop a dimension.';
-  return {
-    table: '',
-    /*
-     * A single figure, and only when there IS a single figure. Drawing the first row of forty
-     * as a headline is the most confidently wrong thing this list could do -- it looks like an
-     * answer, it is the right shape for an answer, and it is one group out of forty.
-     */
-    kpi: marks.length === 1 || (shape.rowCount === 1 && shape.columnCount === 1)
-      ? ''
-      : `A single figure needs one row, and this returned ${shape.rowCount ?? marks.length}.`,
-    /*
-     * A line asserts the gaps between its points mean something, so the points have to be in the
-     * dimension's own order. Sorted by measure they are in rank order, and joining them draws a
-     * curve that slopes the same way whatever the data did.
-     */
-    line: categorical
-      || (multiDimension
-        ? TWO_DIMENSIONS
-        : rankOrdered
-        ? 'These are ordered biggest-first, so a line between them would show the sort rather '
-          + 'than a trend. Sort by the dimension to draw one.'
-        : reversed
-          ? BACKWARDS
-          : marks.length < 2 ? 'A line needs at least two points.' : ''),
-    area: categorical
-      || (multiDimension
-        ? TWO_DIMENSIONS
-        : rankOrdered
-        ? 'These are ordered biggest-first, so a filled area would show the sort rather than a '
-          + 'trend. Sort by the dimension to draw one.'
-        : reversed
-          ? BACKWARDS
-          : marks.length < 2
-          ? 'A line needs at least two points.'
-          : negative
-            // A fill reads as accumulated magnitude from a baseline; below it the reading inverts.
-            ? `${negative} of these figures is zero or below, and a filled area measures up from `
-              + 'a baseline.'
-            : ''),
-    /*
-     * A stack claims its parts add up to the whole. That needs a second dimension to be the
-     * parts, and a measure that has a total at all -- an average of averages is not one.
-     */
-    stacked: categorical
-      || (!canTotal
-        ? `A stack adds its parts into a whole, and ${noSum}.`
-        : (shape.dimensionCount ?? 1) < 2
-          ? 'A stack needs a second dimension to divide each bar by.'
-          : negative
-            ? `${negative} of these figures is zero or below, and a stack cannot show one.`
-            : ''),
-    /*
-     * A histogram bins the MEASURE values to show their shape. With a handful of groups there is
-     * no shape -- it is a bar chart that has thrown its labels away.
-     */
-    /*
-     * The same shape as a stack, and one refusal fewer plus one more.
-     *
-     * Fewer: a NEGATIVE part is refused by the plain stack because it cannot be drawn upwards
-     * from a baseline, and that refusal applies here for the same reason -- so it is kept.
-     * More: normalising divides by each bar's own total, so a group summing to zero has no share
-     * to show and would divide by nothing. The plain stack draws that group as a flat bar
-     * honestly; this one cannot.
-     */
-    shareStacked: categorical
-      || (!canTotal
-        ? `A share within a group divides that group's total, and ${noTotal}.`
-        : (shape.dimensionCount ?? 1) < 2
-          ? 'Showing the mix inside each bar needs a second dimension to be the mix.'
-          : negative
-            ? `${negative} of these figures is zero or below, and a share of a group cannot `
-              + 'include one.'
-            : ''),
-    /*
-     * The grid the server composed, or the reason there is none.
-     *
-     * Gated on the GRID rather than on the dimension count, because its presence is the server's
-     * own answer to "is this two-dimensional" -- and because the server refuses to build one that
-     * is too wide to read, which is a judgement this screen should not second-guess. A result
-     * whose columns were truncated arrives with rows null and says so in its own words.
-     */
-    pivot: !shape.hasPivot
-      ? 'A cross-tab needs exactly two dimensions — one for the rows and one for the columns.'
-      : shape.pivotTruncated
-        ? 'That second dimension has more values than a grid can carry across the page.'
-        : '',
-    /*
-     * Gated on the grid exactly as the cross-tab is, and DELIBERATELY NOT on canTotal.
-     *
-     * That is the whole reason this kind exists. A stack and a share both refuse a measure that
-     * does not add up -- an average, a minimum, a distinct count -- because stacking claims the
-     * parts compose the whole. Clustered bars claim nothing of the sort: each bar is measured
-     * from the same zero on a shared scale, so they compare without totalling. Before this,
-     * "average order value by region and category" could be drawn as no chart at all and fell
-     * through to a grid of numbers.
-     *
-     * Negatives ARE refused, for the reason the plain bars refuse them: length is measured from
-     * zero here and there is no axis for a bar running the other way.
-     */
-    groupedBar: !shape.hasPivot
-      ? 'Bars side by side need exactly two dimensions — one for the groups, one for the bars.'
-      : shape.pivotTruncated
-        ? 'That second dimension has more values than a row of bars can carry.'
-        : negative
-          ? `${negative} of these figures is zero or below, and a bar is measured up from zero.`
-          : '',
-    histogram: categorical
-      || (marks.length < HISTOGRAM_FLOOR
-        ? `A distribution of ${marks.length} figures says less than the bars themselves do.`
-        : ''),
-    /*
-     * Both axes have to be quantities. The measure supplies one; the dimension only supplies the
-     * other if it is itself a number.
-     */
-    scatter: categorical
-      || (!numericDimension
-        ? 'A scatter puts two numbers against each other, and this dimension is a category.'
-        : marks.length < 2 ? 'A scatter needs at least two points.' : ''),
-    /*
-     * Describing the groups needs groups. It states a top SHARE, so like the ring it is only
-     * offered where the measure has a total to divide -- and the component withholds that one
-     * fact rather than the whole tile when it does not.
-     */
-    dimensionSummary: categorical
-      || (marks.length < 2
-        ? 'Describing a set of groups needs more than one of them.' : ''),
-    /*
-     * A trend summary states first, last and the change between them, which only means anything
-     * if the points are in the dimension's own order. The same rule the line keeps, for the same
-     * reason: against a rank-ordered result "first" is just the biggest.
-     */
-    trendSummary: categorical
-      || (multiDimension
-        ? 'These rows carry two dimensions, so "first" and "last" would be two points of an '
-          + 'interleaving rather than the ends of a series.'
-        : rankOrdered
-        ? 'These are ordered biggest-first, so "first" and "last" would describe the sort rather '
-          + 'than the series. Sort by the dimension to summarise a trend.'
-        : reversed
-          // The worst of the three to get wrong, because it states a NUMBER. Over a year that
-          // rose 67% it printed "First: December ... Last: January ... Change -40.0%, down".
-          ? 'These are ordered newest-first, so "first" and "last" are the wrong way round. '
-            + 'Sort the dimension ascending to summarise a trend.'
-          : marks.length < 2 ? 'A trend needs at least two points.' : ''),
-    /* A spread of one figure has no spread. */
-    distributionSummary: categorical
-      || (marks.length < 3
-        ? `A spread of ${marks.length} needs more figures to describe.` : ''),
-    /* Two figures, compared. Not three, and not one. */
-    comparison: categorical
-      || (marks.length !== 2
-        ? `Comparing two figures needs exactly two rows, and this returned ${marks.length}.`
-        : ''),
-    ranked: categorical,
-    /*
-     * Ranked bars that also state each row's share of the total.
-     *
-     * The ring is the only share chart this board had, and it refuses past the colours the
-     * palette can tell apart -- so "what share of revenue does each of these forty customers
-     * carry" had no chart at all. Bars carry their own labels, so the colour limit is not a limit
-     * here; what IS required is that the parts genuinely make a whole, which is the same set of
-     * conditions the ring already tests, minus the slice count.
-     */
-    rankedShare: categorical
-      || (shape.topNTrimmed
-        ? NO_WHOLE
-        : !canTotal
-        ? `A share divides a total, and ${noTotal}.`
-        : negative
-          ? `${negative} of these figures is zero or below, and a share of a total cannot `
-            + 'include one.'
-          : ''),
-    /*
-     * A running total along the dimension.
-     *
-     * Same ordering rule as the line and for the same reason -- a cumulative curve over rank
-     * order climbs steeply then flattens whatever the data did, which looks like a finding and is
-     * an artefact of the sort. It also has to be a measure that adds up: accumulating an average
-     * produces a number that is not a quantity of anything.
-     */
-    cumulative: categorical
-      || (multiDimension
-        ? TWO_DIMENSIONS
-        : !canTotal
-        ? `A running total accumulates its rows, and ${noSum}.`
-        : rankOrdered
-          ? 'These are ordered biggest-first, so a running total would climb steeply and then '
-            + 'flatten because of the sort rather than because of the data. Sort by the dimension.'
-          : reversed
-            ? BACKWARDS
-            : marks.length < 2 ? 'A running total needs at least two points.' : ''),
-    /*
-     * A negative is NOT refused here, unlike the area and the stack, and the difference is the
-     * baseline. A filled area measures up from one, so below it the reading inverts; a stack
-     * claims its parts make a whole, which a negative part cannot. A plain bar makes neither
-     * claim -- it is a length against a shared axis, and a zero-length bar for a negative figure
-     * is not a wrong statement, only an incomplete one. The note above says so in words, which is
-     * the part that was missing: the figure was flush to the baseline and the footnote blamed a
-     * different chart.
-     */
-    bar: categorical || (marks.length > ORDERED_BARS
-      ? `${marks.length} bars is past what this chart can label.` : ''),
-    donut: categorical
-      || (shape.topNTrimmed
-        ? NO_WHOLE
-        : !canTotal
-        ? `A ring divides a total, and ${noTotal}.`
-        : negative
-          // A ring asserts that its parts make the whole. A negative part is a share of nothing,
-          // and a zero one draws as invisible while still being counted into the total.
-          ? `${negative} of these figures is zero or below, and a share of a total cannot include one.`
-          : marks.length > DONUT_SLICES
-            ? `${marks.length} slices is past the ${DONUT_SLICES} colours this palette can tell apart.` : ''),
-  };
-}
-
-/**
- * Whether a dimension's drawn values can be compared to its column with `=`.
- *
- * The one that cannot is a GRAINED date, and it is the reason this function exists rather than a
- * `!!` somewhere. A month bucket renders as the first of that month, so an `=` against the column
- * would ask for the 1st and get a thirtieth of the bar that was clicked -- a chart that answers
- * the wrong question while looking exactly right. AnalysisResult carries `grains` index-aligned
- * with `dimensions` precisely so a screen can tell those apart, and this is a screen telling them
- * apart.
- *
- * A dimension the response did not list is refused too: without a name in `dimensions` there is
- * no grain slot to read, and "absent" is not the same as "not grained".
- */
-function narrowableDimension(result: AnalysisResult, field: string): boolean {
-  const at = (result.dimensions ?? []).indexOf(field);
-  if (at < 0) return false;
-  return !(result.grains ?? [])[at];
-}
-
-/**
- * The raw values behind one drawn mark, or null when they cannot stand as operands.
- *
- * Null on a null value, and that is not fussiness: `field = null` is never true in SQL, so an
- * `EQ` clause built from a null would narrow every tile on the board to nothing while looking
- * like an ordinary filter. `IS NULL` is the operator that means it, and the board filter's
- * builder has one -- but a null-valued mark is drawn as "(null)" alongside real values, and the
- * distinction is worth more than the click.
- */
-function markOperands(columns: AnalysisColumn[], dimensionAt: number[],
-    row: (string | null)[], otherLabel: string): MarkOperand[] | null {
-
-  const operands: MarkOperand[] = [];
-  for (const index of dimensionAt) {
-    const value = row[index];
-    if (value === null || value === undefined || value === '') return null;
-    // The rolled-up row is not a category and must not behave like one. "Other" is not a value in
-    // the data -- it is this many values the reader has not been shown -- so `sub_category =
-    // 'Other'` narrows the whole board to nothing while looking like an ordinary filter. The
-    // server refuses to DRILL into it for the same reason, in the same words.
-    //
-    // The LABEL is the fallback and not the test: AnalysisResult.rollupRows names these rows by
-    // index, and this branch only runs against a response that did not send it. A dataset is
-    // entitled to hold a value genuinely spelled "Other", and matching the label makes such a row
-    // inert -- wrong, but wrong in the harmless direction.
-    if (otherLabel && value === otherLabel) return null;
-    operands.push({ field: columns[index].name, value });
-  }
-  return operands.length ? operands : null;
-}
-
-/**
- * A tile's view of an analysis result.
- *
- * The aggregation comes from the SAVED CONFIGURATION rather than from the response, because the
- * response carries the numbers and not the question: whether a ring may divide them is a fact
- * about what was asked for, and it has to be known even when the result has no rows at all.
- */
-export function analysisView(result: AnalysisResult, aggregation: Aggregation | null,
-    shape: ResultShape = {}): WidgetView {
-  const columns = result.columns ?? [];
-  const allRows = result.rows ?? [];
-  const named = result.measure ? columns.find(column => column.name === result.measure) : undefined;
-  // The response names the measure outright, so the role scan is only the fallback for one that
-  // did not: "the last MEASURE column" is a guess where `measure` is an answer.
-  const measure = named
-    ?? [...columns].reverse().find(column => column.role === 'MEASURE');
-  const measureAt = measure ? columns.indexOf(measure) : -1;
-  const dimensionAt = columns
-    .map((column, index) => ({ column, index }))
-    .filter(entry => entry.column.role === 'DIMENSION')
-    .map(entry => entry.index);
-
-  const pairs: Mark[] = [];
-  if (measureAt >= 0 && dimensionAt.length) {
-    const narrowable = dimensionAt.every(index => narrowableDimension(result, columns[index].name));
-    // By index when the server said which rows they are, by label only when it did not. See
-    // markOperands, and AnalysisResult.rollupRows for why the difference is worth a field.
-    const rolled = result.rollupRows ? new Set(result.rollupRows) : null;
-    const otherLabel = rolled ? '' : (result.other?.label ?? '');
-    for (const [at, row] of allRows.entries()) {
-      const value = asNumber(row[measureAt]);
-      // Rows whose measure does not read as a number are LEFT OUT and counted, never coerced to
-      // zero: a bar shortened by an amount nobody measured is worse than a bar that is not there.
-      if (value === null) continue;
-      const name = dimensionAt
-        .map(index => renderCell(columns[index], row[index]) || '(null)')
-        .join(' · ');
-      const operands = narrowable && !rolled?.has(at)
-        ? markOperands(columns, dimensionAt, row, otherLabel) : null;
-      pairs.push(operands ? { name, value, operands } : { name, value });
-    }
-  }
-  const { marks, merged } = mergeMarks(pairs);
-
-  const notes: string[] = [];
-  if (result.truncated) {
-    notes.push('This result stopped at the server\'s row ceiling. Groups that match it are '
-      + 'missing, and nothing here can say how many or which way they would move a figure.');
-  }
-  const unparsed = allRows.length - pairs.length;
-  if (measureAt >= 0 && dimensionAt.length && unparsed > 0) {
-    notes.push(`${unparsed} ${unparsed === 1 ? 'row is' : 'rows are'} not drawn: the measure does `
-      + 'not read as a number there. They are left out rather than counted as zero.');
-  }
-  if (merged > 0) {
-    notes.push(`${merged} ${merged === 1 ? 'row shares' : 'rows share'} a label with another and `
-      + 'was added into it.');
-  }
-  if (shape.topNTrimmed) {
-    // Said on the tile because nothing in the RESULT says it. With the Other bucket off the
-    // server emits no roll-up row, so five rows of a forty-region dataset look exactly like a
-    // dataset with five regions -- and every figure here is correct while the set is not the
-    // whole set.
-    notes.push('This is a Top-N with the rest discarded, so these are the top rows and not the '
-      + 'whole of anything. Percentages of them are not shares of the dataset.');
-  }
-  const dropped = nonPositiveNote(marks);
-  if (dropped) notes.push(dropped);
-  const other = result.other;
-  if (other) {
-    // valueCount, never values.length: the list is a sample on a high-cardinality dimension and
-    // the server says so, and reporting the sample size as the bucket size would turn its own
-    // honesty into a smaller, wrong number.
-    notes.push(`${other.valueCount} ${other.valueCount === 1 ? 'value was' : 'values were'} `
-      + `rolled into "${other.label}".`);
-  }
-  for (const [window, range] of Object.entries(result.resolvedWindows ?? {})) {
-    // What "last 7 days" actually meant, in dates. It is the only thing that explains why two
-    // copies of one tile taken either side of midnight legitimately differ.
-    notes.push(`"${window}" resolved to ${range}.`);
-  }
-
-  const reason = !allRows.length ? 'This analysis returned no rows.'
-    : !dimensionAt.length ? 'This analysis groups by nothing, so there is one figure and nothing to label it with.'
-    : measureAt < 0 ? 'The result has no measure column to draw a length from.'
-    : 'No row in this result has a measure that reads as a number.';
-
-  return {
-    columns: columns.map(column => column.name),
-    measureColumn: columns.map(column => column.role === 'MEASURE'),
-    topNTrimmed: !!shape.topNTrimmed,
-    pivot: result.pivot ?? null,
-    // EVERY row, not the handful the tile draws. They already crossed the wire and were already
-    // parsed; slicing here threw away rows 9..N on the same tick they arrived, and the only way
-    // left to read row 9 was to leave the board, re-open the dataset by hand and spend a second
-    // permit re-running the identical query. tileRows() does the cutting for the tile now, so
-    // the expanded view can read what the run actually returned.
-    rows: allRows
-      .map(row => columns.map((column, index) => renderCell(column, row[index] ?? null))),
-    rowCount: result.rowCount ?? allRows.length,
-    truncated: !!result.truncated,
-    additive: !aggregation || ADDITIVE.includes(aggregation),
-    marks,
-    notes,
-    issues: issuesFor(marks, reason, !aggregation || ADDITIVE.includes(aggregation),
-      (aggregation ?? '').toLowerCase().replace(/_/g, ' ') || 'this measure',
-      { ...shape, rowCount: result.rowCount ?? allRows.length, columnCount: columns.length }),
-    ranAt: Date.now(),
-  };
-}
-
-/**
- * A tile's view of a saved query's result.
- *
- * A query result has no types and no roles on its columns -- the server renders every value to
- * text before it leaves -- so which column is a label and which is a length has to be READ out
- * of the values. That is the same rule the SQL console applies and it is applied here for the
- * same reason: a VARCHAR column of "1200", "980" is drawable, and a column typed DOUBLE whose
- * every row is null is not, so a type name would be the worse test even if one had travelled.
- *
- * EVERY totalling kind is refused outright on this path, not only the ring. Whether a saved
- * statement's figures add up to a total is not knowable from here -- `select avg(amount)` and
- * `select sum(amount)` return the same shape -- and that one unknown disqualifies the stack, the
- * share within a group, the ranked share and the running total exactly as much as it disqualifies
- * the ring. This used to say "a ring", and the code matched the sentence rather than the reason:
- * it told issuesFor the figures were additive and then took the ring back out afterwards, so a
- * column of averages was still offered "share of the total" as ranked bars carrying percentages.
- */
-export function queryView(result: QueryResult): WidgetView {
-  const columns = result.columns ?? [];
-  const allRows = result.rows ?? [];
-  const readings = columns.map((name, index) => {
-    let numbers = 0;
-    let negative = 0;
-    for (const row of allRows) {
-      const value = asNumber(row[index]);
-      if (value === null) continue;
-      numbers++;
-      if (value < 0) negative++;
-    }
-    return { name, index, numbers, negative };
-  });
-
-  // A column with no numbers in it is a name. Where every column parses, the first is taken --
-  // `select region, sum(amount)` puts what a row IS before what it measures. A one-column result
-  // has nothing to label its values with, which is a real state and not a failure.
-  const label = columns.length < 2 ? null
-    : readings.find(reading => !reading.numbers) ?? readings[0];
-  // The LAST numeric column rather than the first, the other half of the same observation: an
-  // aggregate lands at the end of a select list and an id at the front, and a chart of an id is
-  // a chart of nothing at all.
-  const usable = readings.filter(reading => reading.numbers > 0 && reading.name !== label?.name);
-  const value = usable[usable.length - 1] ?? null;
-
-  const pairs: Mark[] = [];
-  let noNumber = 0;
-  let noLabel = 0;
-  if (label && value) {
-    for (const row of allRows) {
-      const amount = asNumber(row[value.index]);
-      if (amount === null) { noNumber++; continue; }
-      const name = (row[label.index] ?? '').trim();
-      // A row with no label is a measurement of nothing nameable, and a row with no number is a
-      // measurement nobody has. Neither becomes a zero and neither becomes a bar.
-      if (!name) { noLabel++; continue; }
-      pairs.push({ name, value: amount });
-    }
-  }
-  const { marks, merged } = mergeMarks(pairs);
-
-  const notes: string[] = [];
-  if (result.truncated) {
-    notes.push('This result stopped at the server\'s row ceiling, so there may be more rows '
-      + 'behind it. Every figure on this tile is over the rows that arrived.');
-  }
-  if (noNumber > 0) {
-    notes.push(`${noNumber} ${noNumber === 1 ? 'row has' : 'rows have'} nothing that reads as a `
-      + `number in "${value?.name}" and ${noNumber === 1 ? 'is' : 'are'} not drawn.`);
-  }
-  if (noLabel > 0) {
-    notes.push(`${noLabel} ${noLabel === 1 ? 'row has' : 'rows have'} no value in `
-      + `"${label?.name}" to be named by.`);
-  }
-  if (merged > 0) {
-    notes.push(`${merged} ${merged === 1 ? 'row shares' : 'rows share'} a label with another and `
-      + 'was added into it. Adding is right for a count or a total and wrong for an average.');
-  }
-  const dropped = nonPositiveNote(marks);
-  if (dropped) notes.push(dropped);
-
-  const reason = !allRows.length ? 'This query returned no rows.'
-    : !value ? 'No column in this result has numbers in it.'
-    : !label ? 'This result has one column, so there is nothing to label its values with.'
-    : value.negative
-      ? `"${value.name}" holds ${value.negative} negative `
-        + `${value.negative === 1 ? 'value' : 'values'}, and a length cannot be negative.`
-      : 'No row has both a label and a number.';
-  // 'unknown', which is the same thing the view declares below as `additive: false` -- and the
-  // argument here used to be a flat `true`. That told issuesFor the figures add up, so every kind
-  // gated on additivity was offered over a statement that may return averages: ranked share drew
-  // percentages of a "total" that was a sum of means, and the stack, the share within a group and
-  // the running total were offered on the same false premise. Only the ring was taken back out,
-  // one line below, which is why the hole was invisible -- the kind the comments talk about was
-  // the one kind that was actually closed.
-  const issues = issuesFor(
-    value && value.negative ? [] : marks, reason, 'unknown', 'this measure');
-
-  return {
-    columns,
-    // All true: this path has no roles to read. The server renders every value to text before a
-    // query result leaves, so a column of digits here is as likely to be a figure as a label and
-    // there is nothing to tell them apart with. That is the behaviour this path already had.
-    measureColumn: columns.map(() => true),
-    // A saved statement has no Top-N this screen knows about; whatever it discards it discards
-    // in SQL, where nothing here can see it. The share charts are withheld anyway, by the
-    // 'unknown' additivity passed to issuesFor above -- which is what this comment claimed all
-    // along while the argument said `true`.
-    topNTrimmed: false,
-    // A saved statement returns rows and nothing about their shape, so there is no grid to carry.
-    pivot: null,
-    rows: allRows.map(row => row.map(cell => cell ?? null)),
-    rowCount: result.rowCount ?? allRows.length,
-    truncated: !!result.truncated,
-    // A saved query does not say whether its figures add up, which is why every totalling kind is
-    // refused above. The dimension summary withholds its top-share fact on the same grounds, and
-    // reads this flag to do it -- so the two must agree, and this is the value issuesFor is given.
-    additive: false,
-    marks,
-    notes,
-    issues,
-    ranAt: Date.now(),
-  };
-}
-
-/**
- * Where one tile has got to.
- *
- * `queued` is a real state and not a loading spinner waiting to happen: a board runs its tiles
- * ONE AT A TIME, so most of them spend most of an open genuinely waiting for their turn, and
- * saying "waiting" where nothing is happening yet is the honest word for it.
- */
-export type WidgetState = 'queued' | 'running' | 'done' | 'failed' | 'stopped';
-
-export interface WidgetRun {
-  state: WidgetState;
-  /** The server's own sentence when it refused. Never paraphrased. */
-  error: string;
-  view: WidgetView | null;
-  /** Minted here so the run can be stopped; the server keys its registry on (tenant, user, id). */
-  queryId: string;
-}
-
-/** What a saved analysis's one JSON column holds. Written by the Canvas, read here. */
-interface SavedAnalysisConfig {
-  dimensions?: string[];
-  /**
-   * The calendar grain each dimension was bucketed at, index-aligned with `dimensions`.
-   *
-   * A board tile that does not send these runs a DIFFERENT analysis from the one that was saved:
-   * the server groups by the raw TIMESTAMP, so "revenue by month" comes back as one row per
-   * distinct instant. Usually with no banner either -- truncation needs 50,000 rows and a year of
-   * orders is often fewer -- so the tile simply shows eight timestamps under a title that says
-   * "Monthly revenue", and the bar and donut kinds go inert on the cardinality.
-   */
-  grains?: (Grain | null)[];
-  measure?: { aggregation?: Aggregation; field?: string };
-  filters?: FilterGroup;
-  topN?: TopN | null;
-  sort?: AnalysisSort | null;
-}
-
-/** Below this many groups a histogram is a bar chart with the labels taken off. */
-const HISTOGRAM_FLOOR = 8;
-
-/**
- * A minted run id, scoped to the caller by the server's own registry key.
- *
- * The client names the run because the endpoints are synchronous: an id minted server-side would
- * arrive with the rows, which is after there is anything left to stop.
- */
-function mintQueryId(widgetId: number): string {
-  return `widget-${widgetId}-${Date.now()}-${Math.floor(Math.random() * 1e6)}`;
-}
-
-/**
- * How many rows a table tile shows before "Show all". Five keeps a table a glance on a board of
- * several; the rest arrived with the run and are one click away.
- */
-export const TILE_ROWS = 5;
-
-/** A widget's width in a board's twelve columns: a single figure, a chart, or a table. */
-export type WidgetSpan = 3 | 6 | 12;
-
-/**
- * Widths within a row of twelve, in board order: the last tile of a row stretches to the row's end
- * whenever the next tile cannot fit beside it, and the last row is filled too. A figure (3) beside
- * a chart (6) with a table after them left a quarter of the row empty.
- */
-export function fillRows(spans: readonly number[]): number[] {
-  const out = [...spans];
-  let used = 0;
-  for (let i = 0; i < out.length; i++) {
-    if (used > 0 && used + out[i] > 12) {
-      out[i - 1] += 12 - used;
-      used = 0;
-    }
-    used += out[i];
-    if (used >= 12) used = 0;
-  }
-  if (used > 0 && out.length) out[out.length - 1] += 12 - used;
-  return out;
-}
-
-/**
- * The column classes, written out whole so Tailwind finds them in this file. One column on a phone;
- * from sm up a figure takes half and anything else the row; from lg up a figure is a quarter, a
- * chart a half and a table the whole row -- each row then filled by fillRows.
- */
-const SM_SPAN: Record<number, string> = { 6: 'sm:col-span-6', 12: 'sm:col-span-12' };
-const LG_SPAN: Record<number, string> = {
-  3: 'lg:col-span-3', 6: 'lg:col-span-6', 9: 'lg:col-span-9', 12: 'lg:col-span-12',
-};
-
-/** The kinds that are a grid of rows, and so need the whole width to be read. */
-const ROW_KINDS: ReadonlySet<string> = new Set(['table', 'pivot']);
-
-/** Past this many boards the landing page offers a search box above the cards. */
-const SEARCH_FROM = 6;
-
-/** The file name at the end of a path: what a person calls a file when they are not reading a URL. */
-function fileName(path: string | null | undefined): string {
-  const parts = (path ?? '').split('/').filter(Boolean);
-  return parts.length ? parts[parts.length - 1] : (path ?? '');
-}
+// The pure view-model (widget-view.ts) and the dataset registry (dataset-registry.ts) live in files of their own, so a
+// screen that needs only them (Analytics) does not load the Dashboards component with them.
+export * from './widget-view';
+export { DatasetRegistry } from './dataset-registry';
 
 /**
  * Dashboards: pages of saved work, re-run every time they are opened.
@@ -1113,12 +85,15 @@ function fileName(path: string | null | undefined): string {
  * ceiling and queue everyone else behind it, and a board of a hundred tiles would be a denial of
  * service written in a UI.
  *
- * So the tiles run STRICTLY ONE AT A TIME, in display order, and the queue is visible while it
- * drains. A board therefore holds at most ONE of the four permits no matter how many tiles are
- * on it: it takes longer to draw, and it can never be the reason somebody else's query waits.
- * The exchange is stated on the board itself rather than left to be discovered, and there are
- * three ways out of the wait -- Stop abandons the rest and cancels the one in flight, each tile
- * re-runs on its own, and adding a tile runs only that tile rather than the board again.
+ * So the tiles run AT MOST THREE AT ONCE (BOARD_PARALLEL; owner 2026-10-12: tiles load in parallel,
+ * with skeletons), the board's figures first and then in display order (figuresFirst, MIG-344), and the queue is
+ * visible while it drains. A table's first page counts against the three as well. A board therefore
+ * holds at most three of the four permits no matter how many tiles are on it, and always leaves
+ * one for somebody else; a tile the governor turns away for being busy retries once. The exchange
+ * is stated on the board itself, and there are three ways out of the wait -- Stop abandons the rest
+ * and cancels what is in flight, each tile re-runs on its own, and adding a tile runs only that
+ * tile rather than the board again. A table widget pages itself (board/board-table.ts) and is not
+ * queued, but while its first page loads it holds one of the three slots (the queue always keeps one). The filter bar (board/board-filters.ts) travels with every run; the server applies it.
  *
  * Changing a tile's chart kind runs NOTHING. It draws the result already in hand a different
  * way, which is the whole reason a widget is a reference plus a visualization choice and not a
@@ -1128,12 +103,51 @@ function fileName(path: string | null | undefined): string {
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe],
+  imports: [PageHeader, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
   templateUrl: './dashboard.html',
+  styleUrls: ['./dashboard.css', './board/board.css'],
 })
 export class Dashboards implements OnInit, OnDestroy {
 
   private readonly analytics = inject(AnalyticsService);
+  private readonly auth = inject(AuthService);
+  /**
+   * UX review 2026-10-12: whether the reader may change the boards -- a new board, a tile added, re-charted, re-set or
+   * removed, the board's theme, a board deleted. A viewer's profile holds Saved Analyses only: they read the boards, run
+   * and filter them, and the gateway refuses every write with a 403 besides.
+   */
+  readonly canEdit = computed(() => this.auth.canEditDashboards());
+
+  // ---- the filter bar (board/board-filters.ts) ----------------------------------------------------------------------
+  //
+  // A board's editor defines its filters (a date range, and dimensions with their values); a reader sets them. They
+  // travel with every tile's run and the SERVER applies them -- before the tile's own statement, its values bound, under
+  // masking -- and says per tile what each did. The state is in the URL (a filtered board is a link) and kept per viewer.
+
+  /** The board's settings, read once per change of the board. */
+  private readonly boardSettings = computed(() => parseBoardSettings(this.board()?.dashboardConfig));
+  readonly filterDefs = computed<BoardFilterDef[]>(() => parseFilterDefs(this.boardSettings().filters));
+  readonly filterState = signal<BoardFilterState>(emptyFilterState());
+  /** What every tile's run carries: the filters that are on. */
+  readonly filterWire = computed(() => wireFilters(this.filterDefs(), this.filterState()));
+  /** The board's section headings, by the widget each stands before. */
+  readonly sections = computed(() => parseSections(this.boardSettings().sections));
+  private readonly sectionMap = computed(() => sectionsByWidget(this.sections()));
+  /** One colour per value across the board's tiles, from its filters' saved value order (charts/board-colors.ts). */
+  readonly colorKeys = computed<ReadonlyMap<string, number> | null>(() => {
+    if (this.boardSettings().colorByValue === false) return null;
+    const keys = colorKeysOf(this.filterDefs().map(def => def.colorOrder ?? []), CHART_SLOTS);
+    return keys.size ? keys : null;
+  });
+  /** Bumped to read every table widget again; one entry per table to read just that one. */
+  private readonly tableEpoch = signal(0);
+  private readonly tableBumps = signal<Record<number, number>>({});
+  /** What each table widget last said: running, done (with what the filters did), failed. */
+  readonly tableReads = signal<Record<number, TableRead>>({});
+  /** When the board's run started, for the facts line's load time. */
+  private runStartedAt = 0;
+  readonly loadMs = signal<number | null>(null);
+  private readonly viewerId = computed(() => this.auth.user()?.appUserId ?? null);
   /** Server times, read and written as the rest of the console does. */
   private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
   /** A time in the given format, or the text as it came when it is not a time at all. */
@@ -1143,10 +157,11 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  /** The board's breadcrumb: See results › Dashboards (the cards, on this same address without a board). */
+  readonly boardTrail: Crumb[] = [{ label: 'See results' }, { label: 'Dashboards', link: this.router.url.split(/[?#]/)[0] || '/' }];
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly kinds = KINDS;
   readonly heightMin = WIDGET_HEIGHT_MIN;
   readonly heightMax = WIDGET_HEIGHT_MAX;
   readonly searchFrom = SEARCH_FROM;
@@ -1245,8 +260,74 @@ export class Dashboards implements OnInit, OnDestroy {
    * exists to prevent. It reuses runAll() rather than growing a second queue.
    */
   applyBoardFilter(): void {
+    this.holdTileHeights();
     this.runAll();
   }
+
+  // ---- tile heights held while the board is narrowed -----------------------------------------
+
+  /**
+   * Each tile's height, in px, held while a board filter re-runs and stays on. Without it a click
+   * on a mark moved the board: the narrowed results are shorter (six horizontal bars become one,
+   * a ranked list of ten becomes one row) and every tile below a shorter row moved up -- and back
+   * down on Clear. Held, a narrowed tile keeps its size and its chart sits in the same box (a
+   * longer result scrolls inside it). Let go once the filter is off and the board has re-run, when
+   * the tiles are back at the sizes that were held; and per tile when its reader changes its
+   * layout (another kind, its chart settings, Show all).
+   */
+  readonly heldHeights = signal<ReadonlyMap<number, number>>(new Map());
+  /** Each tile's width, held with its height (spanOf). */
+  private readonly heldSpans = signal<ReadonlyMap<number, WidgetSpan>>(new Map());
+
+  heldHeight(widget: DashboardWidget): number | null {
+    return this.heldHeights().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
+  }
+
+  /** Reads each tile's height off the page and holds it; a height already held is kept. */
+  private holdTileHeights(): void {
+    if (typeof document === 'undefined') return;
+    const held = new Map(this.heldHeights());
+    document.querySelectorAll<HTMLElement>('app-analytics-widget[data-widget]').forEach(tile => {
+      const id = Number(tile.dataset['widget']);
+      const height = tile.getBoundingClientRect().height;
+      if (Number.isFinite(id) && height > 0 && !held.has(id)) held.set(id, height);
+    });
+    const spans = new Map(this.heldSpans());
+    for (const widget of this.widgets()) {
+      const id = widget.analyticsDashboardWidgetId;
+      if (id !== undefined && !spans.has(id)) spans.set(id, this.spanOf(widget));
+    }
+    this.heldSpans.set(spans);
+    this.heldHeights.set(held);
+  }
+
+  private letGoOf(widget: DashboardWidget): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (id === undefined || !this.heldHeights().has(id)) return;
+    const held = new Map(this.heldHeights());
+    held.delete(id);
+    this.heldHeights.set(held);
+    const spans = new Map(this.heldSpans());
+    spans.delete(id);
+    this.heldSpans.set(spans);
+  }
+
+  /** The filter off and the board re-run: the tiles are back at their own sizes, so nothing is held. */
+  /** The board's load time: from the start of its run to the last tile and table landing (the facts line says it). */
+  protected readonly measureLoad = effect(() => {
+    const busy = this.running() || Object.values(this.tableReads()).some(read => read.state === 'running');
+    if (!busy && this.runStartedAt && this.board()) {
+      this.loadMs.set(Math.round(performance.now() - this.runStartedAt));
+      this.runStartedAt = 0;
+    }
+  });
+
+  protected readonly releaseHeights = effect(() => {
+    if (!this.running() && !this.boardFilterCount() && (this.heldHeights().size || this.heldSpans().size)) {
+      this.heldHeights.set(new Map());
+      this.heldSpans.set(new Map());
+    }
+  });
 
   /**
    * What this tile has to say about the board filter, or '' when there is nothing to say.
@@ -1301,6 +382,9 @@ export class Dashboards implements OnInit, OnDestroy {
    * bar will not click.
    */
   narrows(widget: DashboardWidget, view: WidgetView): boolean {
+    // The filter bar's cross-filter: a mark whose column is one of the board's filters sets that filter.
+    const defs = this.filterDefs();
+    if (defs.length && view.marks.some(mark => !!crossFilterOf(defs, mark))) return true;
     if (!this.datasetKeyFor(widget)) return false;
     return view.marks.some(mark => !!mark.operands?.length);
   }
@@ -1313,9 +397,9 @@ export class Dashboards implements OnInit, OnDestroy {
    * keystroke; one deliberate click is one apply, which is the same cost as pressing the button
    * next to it.
    *
-   * It fills the bar rather than filtering behind it, and opens the bar to show it did: the reader
-   * ends up looking at an ordinary board filter they can read, edit, extend or clear, instead of a
-   * hidden narrowing whose only trace is that the numbers moved. Every tile on another dataset
+   * It fills the bar rather than filtering behind it, and says so in the facts line, which opens
+   * the bar: the reader ends up with an ordinary board filter they can read, edit, extend or
+   * clear, instead of a hidden narrowing whose only trace is that the numbers moved. Every tile on another dataset
    * then says on its face that it was NOT narrowed, which is the same promise the bar already
    * makes.
    *
@@ -1324,6 +408,12 @@ export class Dashboards implements OnInit, OnDestroy {
    * reader has not finished asking.
    */
   narrowTo(widget: DashboardWidget, mark: Mark): void {
+    // A board with a filter bar: the click toggles that value in the bar's filter (a second click takes it off).
+    const hit = crossFilterOf(this.filterDefs(), mark);
+    if (hit) {
+      this.setFilterState(toggleValue(this.filterState(), hit.key, hit.value));
+      return;
+    }
     const operands = mark.operands;
     // Defensive rather than expected -- `narrows` above already un-buttons these -- but the Other
     // row a chart rolls up on its own has no operands and reaches here if a max is ever set.
@@ -1342,13 +432,228 @@ export class Dashboards implements OnInit, OnDestroy {
         value: operand.value ?? '',
       })),
     });
-    this.filterOpen.set(true);
+    // The editor is NOT opened here (owner, 2026-10-06, "the panel dances"): a card appearing
+    // above the board on a click pushed every tile down mid-click. The facts line says "1 filter
+    // on" -- a button that opens the editor -- with a Clear beside it, and each tile's foot says
+    // what narrowed it; all three sit in lines that are already there.
+    this.holdTileHeights();
     this.runAll();
+  }
+
+  /** Takes the board filter off and runs the board again: the undo of a click on a mark. */
+  clearBoardFilter(): void {
+    this.holdTileHeights();
+    this.boardFilter.set(emptyFilterGroup());
+    this.runAll();
+  }
+
+  // ---- the filter bar: open, change, edit ----------------------------------------------------------------------------
+
+  /** The state a board opens on: the link's, else this viewer's last on this board, else the board's defaults. */
+  private openFilters(board: Dashboard): void {
+    const defs = parseFilterDefs(parseBoardSettings(board.dashboardConfig).filters);
+    const id = board.analyticsDashboardId;
+    if (!defs.length || id === undefined) {
+      this.filterState.set(emptyFilterState());
+      return;
+    }
+    const fromUrl = stateFromParams(defs, this.route.snapshot.queryParamMap);
+    const state = fromUrl ?? restoreState(stateKey(id, this.viewerId()), defs) ?? { values: {}, range: defaultRange(defs) };
+    this.filterState.set(state);
+    if (!fromUrl) this.writeFilterUrl(defs, state);
+  }
+
+  /** A link to the same board with other filters (pasted, or Back): the board follows it. */
+  private followFilters(params: ParamMap): void {
+    const defs = this.filterDefs();
+    if (!defs.length || !this.board()) return;
+    const fromUrl = stateFromParams(defs, params);
+    if (!fromUrl || JSON.stringify(wireFilters(defs, fromUrl)) === JSON.stringify(this.filterWire())) return;
+    this.filterState.set(fromUrl);
+    this.runAll();
+  }
+
+  /** The reader changed the bar (or clicked a mark): kept, put in the URL, and the board runs again under it. */
+  setFilterState(next: BoardFilterState): void {
+    const board = this.board();
+    if (!board?.analyticsDashboardId) return;
+    this.filterState.set(next);
+    saveState(stateKey(board.analyticsDashboardId, this.viewerId()), next);
+    this.writeFilterUrl(this.filterDefs(), next);
+    this.holdTileHeights();
+    this.runAll();
+  }
+
+  private writeFilterUrl(defs: BoardFilterDef[], state: BoardFilterState): void {
+    if (!defs.length) return;
+    this.router.navigate([], { relativeTo: this.route, queryParams: stateToParams(defs, state), queryParamsHandling: 'merge', replaceUrl: true })
+      .catch(() => {});
+  }
+
+  /** The datasets the board's tiles read: where a filter's values may come from. */
+  filterSources(): FilterSourceOption[] {
+    const seen = new Map<string, FilterSourceOption>();
+    const add = (connection?: string | null, path?: string | null) => {
+      if (!connection || !path) return;
+      const key = connection + '\u0000' + path;
+      if (!seen.has(key)) seen.set(key, { connection, path, label: `${fileName(path)} · ${connection}` });
+    };
+    for (const widget of this.widgets()) {
+      if (widget.analyticsAnalysisId) {
+        const saved = this.analyses().find(a => a.analyticsAnalysisId === widget.analyticsAnalysisId);
+        add(saved?.connectionAlias, saved?.datasetPath);
+      } else {
+        const saved = this.queries().find(q => q.analyticsQueryId === widget.analyticsQueryId);
+        add(saved?.connectionAlias, saved?.datasetPath);
+        add(saved?.secondConnectionAlias, saved?.secondDatasetPath);
+      }
+    }
+    return [...seen.values()];
+  }
+
+  /** "Edit filters": what the bar offers every reader, saved on the board. */
+  openFilterEditor(): void {
+    const ref = this.dialog.open<BoardFilterDef[], BoardFilterEditorData>(BoardFilterEditor,
+      sidePanelConfig({ defs: this.filterDefs(), sources: this.filterSources() }, 'wide', 'right'));
+    ref.closed.subscribe(defs => {
+      if (defs) this.saveBoardSettings({ filters: defs.length ? defs : undefined }, 'The filters could not be saved.', true);
+    });
+  }
+
+  /**
+   * One part of the board's settings changed and saved, the rest kept as they are -- a theme change never drops the
+   * filters or the sections. `rerun` when the change alters what the tiles are asked.
+   */
+  saveBoardSettings(change: Partial<BoardSettings>, failure: string, rerun = false): void {
+    const board = this.board();
+    if (!board?.analyticsDashboardId) return;
+    const previous = board.dashboardConfig ?? null;
+    // '{}' rather than null when nothing is left: the server keeps a stored value a save leaves out.
+    const config = boardSettingsString({ ...parseBoardSettings(previous), ...change }) ?? '{}';
+    this.board.update(open => open ? { ...open, dashboardConfig: config } : open);
+    if (rerun) {
+      this.openFilters({ ...board, dashboardConfig: config });
+      this.runAll();
+    }
+    this.analytics.saveDashboard({ ...board, dashboardConfig: config }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) {
+          this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+          this.widgetError.set(response.message || failure);
+        }
+      },
+      error: err => {
+        this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+        this.widgetError.set(err?.error?.message || failure);
+      },
+    });
+  }
+
+  // ---- sections ------------------------------------------------------------------------------------------------------
+
+  /** The heading that opens a section at this widget, if one does. */
+  sectionBefore(widget: DashboardWidget): BoardSection | null {
+    return this.sectionMap().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
+  }
+
+  /** The widget whose heading is being edited (a new heading starts in this state). */
+  readonly editingSection = signal<number | null>(null);
+
+  editSection(widget: DashboardWidget): void {
+    this.editingSection.set(widget.analyticsDashboardWidgetId ?? null);
+  }
+
+  /** Saves a heading's words; an empty title removes it. */
+  saveSection(widget: DashboardWidget, title: string, subtitle: string): void {
+    const before = widget.analyticsDashboardWidgetId;
+    this.editingSection.set(null);
+    if (before === undefined) return;
+    const next = withSection(this.sections(), { before, title, subtitle: subtitle.trim() || undefined });
+    this.saveBoardSettings({ sections: next.length ? next : undefined }, 'The heading could not be saved.');
+  }
+
+  // ---- table widgets: paged by the server -----------------------------------------------------------------------------
+
+  /**
+   * The statement a table widget pages through, or null when the widget is not one. A saved query drawn as a table is
+   * paged, sorted and filtered by the server (board/board-table.ts) instead of being run whole into the browser.
+   */
+  private readonly tableSources = computed(() => {
+    const sources = new Map<number, TableSource>();
+    for (const widget of this.widgets()) {
+      if (widget.visualizationType !== 'table' || !widget.analyticsQueryId || widget.analyticsDashboardWidgetId === undefined) continue;
+      const saved = this.queries().find(q => q.analyticsQueryId === widget.analyticsQueryId);
+      if (!saved) continue;
+      sources.set(widget.analyticsDashboardWidgetId, {
+        connection: saved.connectionAlias, path: saved.datasetPath, sql: saved.queryText,
+        connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : null, path2: saved.secondDatasetPath || null,
+      });
+    }
+    return sources;
+  });
+
+  pagedTable(widget: DashboardWidget): TableSource | null {
+    return this.tableSources().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
+  }
+
+  tableReload(widget: DashboardWidget): number {
+    return this.tableEpoch() + (this.tableBumps()[widget.analyticsDashboardWidgetId ?? -1] ?? 0);
+  }
+
+  tableKey(widget: DashboardWidget): string {
+    return `etl.board-table.${this.openId() ?? 0}.${widget.analyticsDashboardWidgetId}.${this.viewerId() ?? 'anon'}`;
+  }
+
+  onTableRead(widget: DashboardWidget, read: TableRead): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (id === undefined) return;
+    this.tableReads.update(all => ({ ...all, [id]: read }));
+    // A table's first page shares the board's slots (next()): one landing frees one for the queue.
+    if (read.state !== 'running') this.next(this.epoch);
+  }
+
+  /** What the board's filters did to this tile: its "Filtered" marker and the filters that could not land. */
+  tileNote(widget: DashboardWidget): { filtered: boolean; label: string; notApplied: string[]; notAppliedLabels: string[] } | null {
+    if (!this.filterWire().length) return null;
+    const id = widget.analyticsDashboardWidgetId ?? -1;
+    const outcomes = this.pagedTable(widget) ? this.tableReads()[id]?.outcomes : this.runs()[id]?.outcomes;
+    return outcomes ? tileFilterNote(this.filterDefs(), outcomes) : null;
+  }
+
+  /** A tile's width in the board's twelve columns, or back to the width its kind takes (null). */
+  setWidth(widget: DashboardWidget, span: number | null): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (!id) return;
+    const config = widgetConfigOf(widget);
+    const next = widgetConfigString({ ...config, span: span ?? undefined });
+    this.letGoOf(widget);
+    this.analytics.saveWidget({ ...widget, widgetConfig: next }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.widgetError.set(response.message || 'That width could not be saved.');
+          return;
+        }
+        const saved = response.data;
+        this.board.update(board => board ? {
+          ...board, widgets: (board.widgets ?? []).map(item => item.analyticsDashboardWidgetId === id ? { ...item, ...saved } : item),
+        } : board);
+      },
+      error: err => this.widgetError.set(err?.error?.message || 'That width could not be saved.'),
+    });
+  }
+
+  /** The widths a tile's menu offers. */
+  readonly widths = SPANS.map(span => ({ span, label: ({ 3: 'A quarter', 4: 'A third', 6: 'Half', 8: 'Two thirds', 9: 'Three quarters', 12: 'The whole row' } as Record<number, string>)[span] }));
+
+  ownWidth(widget: DashboardWidget): number | null {
+    return widgetConfigOf(widget).span ?? null;
   }
 
   readonly dashboards = signal<Dashboard[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
+  /** The list read was refused (403). */
+  readonly refused = signal(false);
 
   /** Narrows the cards by name or description. Only offered past SEARCH_FROM boards. */
   readonly listFilter = signal('');
@@ -1396,6 +701,49 @@ export class Dashboards implements OnInit, OnDestroy {
     pruneFilters(this.boardFilter()).clauses
       .map(node => (node as any).clauses ? '(a group)' : describeClause(node as any)));
 
+  // ---- favourites and groups (UX review B5, SA1) ------------------------------------------------
+  /** Each viewer's starred boards, kept in this browser under their own key. */
+  private readonly favouritesKey = `etl.dashboards.favourites.${typeof this.auth.user === 'function' ? this.auth.user()?.appUserId ?? 'anon' : 'anon'}`;
+  readonly favourites = signal<ReadonlySet<number>>(readFavourites(this.favouritesKey));
+  /** The pipelines each board's files come from (dashboard id -> pipeline names), as the server says. */
+  readonly boardPipelines = computed<ReadonlyMap<number, string[]>>(() => new Map(this.dashboards()
+    .filter(d => d.analyticsDashboardId != null && d.pipelines?.length)
+    .map(d => [d.analyticsDashboardId!, d.pipelines!.map(p => p.name || `Schedule #${p.jobId}`)])));
+
+  /** "Made by": the open board's newest feeding pipeline and its run, linked to the run page (B5, B1). */
+  readonly madeBy = computed(() => {
+    const pipelines = this.board()?.pipelines ?? [];
+    const first = pipelines[0];
+    if (!first) return null;
+    return {
+      name: first.name || `Schedule #${first.jobId}`,
+      run: first.lastRunId,
+      link: first.lastRunId ? ['/pipelines/schedules', first.jobId, 'runs', first.lastRunId] : ['/pipelines/schedules', first.jobId, 'executions'],
+      more: pipelines.length - 1,
+      all: pipelines.map(p => (p.name || `Schedule #${p.jobId}`) + (p.lastRunId ? ` · run #${p.lastRunId}` : '')).join('\n'),
+    };
+  });
+
+  isFavourite(item: Dashboard): boolean { return item.analyticsDashboardId != null && this.favourites().has(item.analyticsDashboardId); }
+
+  toggleFavourite(item: Dashboard, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const id = item.analyticsDashboardId;
+    if (id == null) return;
+    const next = new Set(this.favourites());
+    if (next.has(id)) next.delete(id); else next.add(id);
+    this.favourites.set(next);
+    try { localStorage.setItem(this.favouritesKey, JSON.stringify([...next])); } catch { /* not remembered */ }
+  }
+
+  /**
+   * The cards in groups: the viewer's favourites first, then by the pipeline whose output each board reads (a board
+   * reading two pipelines' files sits under the first), then the boards no pipeline feeds. Without the pipelines known
+   * it is one group. A search narrows every group.
+   */
+  readonly dashboardGroups = computed(() => groupDashboards(this.visibleDashboards(), this.favourites(), this.boardPipelines()));
+
   readonly visibleDashboards = computed(() => {
     const needle = this.listFilter().trim().toLowerCase();
     if (!needle) return this.dashboards();
@@ -1419,6 +767,8 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly board = signal<Dashboard | null>(null);
   readonly boardLoading = signal(false);
   readonly boardError = signal('');
+  /** UX review 2026-10-12: the board read was refused (403): the page says so, with whom to ask, and offers no retry. */
+  readonly boardRefused = signal(false);
   readonly widgetError = signal('');
 
   /**
@@ -1446,9 +796,12 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly addError = signal('');
 
   readonly runs = signal<Record<number, WidgetRun>>({});
-  /** Widget ids still waiting. The head of it is what runs next, and only when nothing is. */
+  /** Widget ids still waiting. The head of it is what runs next, when fewer than BOARD_PARALLEL are running. */
   readonly queue = signal<number[]>([]);
-  readonly runningId = signal<number | null>(null);
+  /** The widgets running now, at most BOARD_PARALLEL of them. */
+  readonly runningIds = signal<number[]>([]);
+  /** The first of them: what the progress line names. */
+  readonly runningId = computed(() => this.runningIds()[0] ?? null);
   /**
    * How many widgets THIS pass set out to run.
    *
@@ -1469,7 +822,9 @@ export class Dashboards implements OnInit, OnDestroy {
   private epoch = 0;
   /** The board read that is allowed to land. See loadBoard. */
   private boardToken = 0;
-  private inFlight: Subscription | null = null;
+  private readonly inFlight = new Map<number, Subscription>();
+  /** The tiles retried once after the governor turned them away for being busy, in this pass. */
+  private readonly retried = new Set<number>();
   /** Set once the board is loaded and waiting for the sources it needs to run its widgets. */
   private pending: 'all' | number[] | null = null;
 
@@ -1500,18 +855,23 @@ export class Dashboards implements OnInit, OnDestroy {
   /** How the last pass went, for the board's facts line: "6 of 7 drew, 1 failed". */
   readonly lastRun = computed(() => {
     if (this.running()) return this.progress();
-    if (!this.ranCount() && !this.failedCount()) return '';
-    return `${this.ranCount()} of ${this.widgets().length} drew`
-      + (this.failedCount() ? `, ${this.failedCount()} failed` : '');
+    // A table widget reads its own pages (board-table): it counts as drawn once its page is in.
+    const reads = Object.values(this.tableReads());
+    const drew = this.ranCount() + reads.filter(read => read.state === 'done').length;
+    const failed = this.failedCount() + reads.filter(read => read.state === 'failed').length;
+    if (!drew && !failed) return '';
+    return `${drew} of ${this.widgets().length} drew` + (failed ? `, ${failed} failed` : '');
   });
 
   /** A run's state as the shared tile chrome names it; a result with no rows is 'empty'. */
   stateOf(run: WidgetRun | undefined): TileState {
     if (!run) return 'idle';
+    // Re-running over a result it has: the result stays, busy (see WidgetRun.previous).
+    if (this.updating(run)) return run.previous!.rowCount ? 'ready' : 'empty';
     if (run.state === 'done') return run.view && !run.view.rowCount ? 'empty' : 'ready';
     return run.state;
   }
-  readonly running = computed(() => this.runningId() !== null || this.queue().length > 0);
+  readonly running = computed(() => this.runningIds().length > 0 || this.queue().length > 0);
 
   readonly canCreate = computed(() => !!this.newName().trim() && !this.creating());
 
@@ -1539,14 +899,14 @@ export class Dashboards implements OnInit, OnDestroy {
     const count = this.widgets().length;
     if (!count) return 'An empty board costs nothing to open.';
     return `${count} ${count === 1 ? 'widget' : 'widgets'}, and opening this board runs `
-      + `${count === 1 ? 'it' : 'each of them'} again — nothing here is stored from last time. `
-      + 'They run one at a time, in order, so this board never holds more than one of the '
-      + 'server\'s query permits however many widgets are on it.';
+      + `${count === 1 ? 'it' : 'each of them'} again — the server answers at once what it already read for the same data. `
+      + 'They run three at a time, in order, so this board never holds more than three of the '
+      + 'server\'s four query permits however many widgets are on it.';
   });
 
   readonly progress = computed(() => {
     const total = this.batch();
-    const left = this.queue().length + (this.runningId() === null ? 0 : 1);
+    const left = this.queue().length + this.runningIds().length;
     const at = Math.min(Math.max(total - left + 1, 1), total);
     const current = this.widgets().find(
       widget => widget.analyticsDashboardWidgetId === this.runningId());
@@ -1561,7 +921,11 @@ export class Dashboards implements OnInit, OnDestroy {
     // between a board and the cards. A change this page made itself is already in openId, so it
     // is not loaded twice.
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(params => this.followUrl(params.get('board')));
+      .subscribe(params => {
+        const before = this.openId();
+        this.followUrl(params.get('board'));
+        if (before !== null && before === this.openId()) this.followFilters(params);
+      });
   }
 
   /** Opens or leaves a board to match the URL's ?board=. Anything but a whole number is none. */
@@ -1598,6 +962,7 @@ export class Dashboards implements OnInit, OnDestroy {
       },
       error: err => {
         this.loading.set(false);
+        this.refused.set(err?.status === 403);
         this.error.set(err?.error?.message || 'The dashboards could not be read.');
       },
     });
@@ -1614,12 +979,14 @@ export class Dashboards implements OnInit, OnDestroy {
       .filter((id): id is number => typeof id === 'number' && !(id in known));
     if (!ids.length) return;
     from(ids).pipe(
-      mergeMap(id => this.analytics.fetchDashboardById(id), 3),
+      // UX review 2026-10-12: one board that cannot be read (a refusal, a dropped connection) leaves its card without
+      // counts; it no longer ends the reading of every card after it, as an error in mergeMap did.
+      mergeMap(id => this.analytics.fetchDashboardById(id).pipe(catchError(() => of(null))), 3),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: response => {
-        const id = response.data?.analyticsDashboardId;
-        if (response.status !== API_SUCCESS || !id) return;
+        const id = response?.data?.analyticsDashboardId;
+        if (!response || response.status !== API_SUCCESS || !id) return;
         this.cardWidgets.update(all => ({ ...all, [id]: response.data!.widgets ?? [] }));
       },
       error: () => {},
@@ -1774,12 +1141,19 @@ export class Dashboards implements OnInit, OnDestroy {
   /** What belongs to one open board and must not follow the reader to the next. */
   private resetBoardState(): void {
     this.runs.set({});
+    this.heldHeights.set(new Map());
+    this.heldSpans.set(new Map());
     this.expanded.set(new Set());
     this.addOpen.set(false);
     this.filterOpen.set(false);
     this.boardFilterOn.set('');
     this.boardFilter.set(emptyFilterGroup());
     this.boardColumns.set([]);
+    this.filterState.set(emptyFilterState());
+    this.tableReads.set({});
+    this.tableBumps.set({});
+    this.editingSection.set(null);
+    this.loadMs.set(null);
   }
 
   private setUrl(id: number | null): void {
@@ -1798,6 +1172,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.abandon();
     this.boardLoading.set(true);
     this.boardError.set('');
+    this.boardRefused.set(false);
     this.widgetError.set('');
     // Two boards asked for in quick succession answer in whatever order the server manages, and
     // the one that answers last is not necessarily the one the reader is waiting for. Only the
@@ -1813,6 +1188,8 @@ export class Dashboards implements OnInit, OnDestroy {
         }
         this.board.set(response.data);
         this.cardWidgets.update(all => ({ ...all, [analyticsDashboardId]: response.data!.widgets ?? [] }));
+        // The filters before the run: every tile's first run carries them.
+        if (run === 'all') this.openFilters(response.data);
         if (run === null) return;
         this.pending = run;
         this.start();
@@ -1820,6 +1197,8 @@ export class Dashboards implements OnInit, OnDestroy {
       error: err => {
         if (token !== this.boardToken) return;
         this.boardLoading.set(false);
+        // UX review 2026-10-12: a refusal is said as one, not as a failure to retry.
+        this.boardRefused.set(err?.status === 403);
         this.boardError.set(err?.error?.message || 'The dashboard could not be read.');
       },
     });
@@ -1896,9 +1275,11 @@ export class Dashboards implements OnInit, OnDestroy {
       ? this.analyses().find(item => item.analyticsAnalysisId === widget.analyticsAnalysisId)
       : this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
     if (!saved) return widget.analyticsAnalysisId ? 'Saved analysis' : 'Saved query';
-    const name = 'analysisName' in saved ? saved.analysisName : saved.queryName;
     const file = fileName(saved.datasetPath);
-    return name === widget.widgetTitle ? file : `${name} · ${file}`;
+    const name = withoutBoardName('analysisName' in saved ? saved.analysisName : saved.queryName, this.board()?.dashboardName);
+    // UX review B5 (B1, L11): "Riverside — Patient 360 — Patients in the cohort · cohort.csv" under a tile titled
+    // "Patients in the cohort" on the board "Riverside — Patient 360" said the board's name and the title again.
+    return !name || name === widget.widgetTitle ? file : `${name} · ${file}`;
   }
 
   /**
@@ -1907,9 +1288,17 @@ export class Dashboards implements OnInit, OnDestroy {
    * one before, so a tile does not jump when its result lands.
    */
   spanOf(widget: DashboardWidget): WidgetSpan {
+    // Held while the board is narrowed, with the height: a narrowed answer a kind cannot draw (a
+    // rose of one row) falls back to a table, a table takes the whole row, and the tiles round it
+    // were reflowed into new rows (layout shift 0.11, 2026-10-06).
+    const held = this.heldSpans().get(widget.analyticsDashboardWidgetId ?? -1);
+    if (held !== undefined) return held;
+    // The width its editor chose, when one did.
+    const own = widgetConfigOf(widget).span;
+    if (own && SPANS.includes(own)) return own as WidgetSpan;
     const view = this.runs()[widget.analyticsDashboardWidgetId!]?.view;
     const kind = view ? this.drawn(widget, view) : (widget.visualizationType ?? 'table');
-    if (kind === 'kpi') return 3;
+    if (kind === 'kpi' || kind === 'kpiTrend') return 3;
     return ROW_KINDS.has(kind) || !KINDS.some(known => known.id === kind) ? 12 : 6;
   }
 
@@ -1917,14 +1306,21 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly filledSpans = computed(() => {
     const widgets = this.widgets();
     const natural = widgets.map(widget => this.spanOf(widget));
-    const sm = fillRows(natural.map(span => (span === 3 ? 6 : 12)));
-    const lg = fillRows(natural);
+    // A section heading starts a new row, so each run of widgets between two headings fills its own rows.
+    const sm: number[] = [];
+    const lg: number[] = [];
+    for (const segment of segmentsOf(widgets.map(widget => widget.analyticsDashboardWidgetId), this.sections())) {
+      const spans = segment.map(i => natural[i]);
+      const smFilled = fillRows(spans.map(span => (span <= 4 ? 6 : 12)));
+      const lgFilled = fillRows(spans);
+      segment.forEach((at, j) => { sm[at] = smFilled[j]; lg[at] = lgFilled[j]; });
+    }
     return new Map(widgets.map((widget, i) => [widget, { sm: sm[i], lg: lg[i] }]));
   });
 
   spanClass(widget: DashboardWidget): string {
     const filled = this.filledSpans().get(widget);
-    const sm = filled?.sm ?? (this.spanOf(widget) === 3 ? 6 : 12);
+    const sm = filled?.sm ?? (this.spanOf(widget) <= 4 ? 6 : 12);
     const lg = filled?.lg ?? this.spanOf(widget);
     return `min-w-0 ${SM_SPAN[sm] ?? 'sm:col-span-12'} ${LG_SPAN[lg] ?? 'lg:col-span-12'}`;
   }
@@ -1952,6 +1348,7 @@ export class Dashboards implements OnInit, OnDestroy {
   toggleRows(widget: DashboardWidget): void {
     const id = widget.analyticsDashboardWidgetId;
     if (id === undefined) return;
+    this.letGoOf(widget);
     this.expanded.update(open => {
       const next = new Set(open);
       if (next.has(id)) next.delete(id); else next.add(id);
@@ -1967,6 +1364,8 @@ export class Dashboards implements OnInit, OnDestroy {
     this.addTitle.set('');
     this.addSourceId.set('');
     this.addVisualization.set('table');
+    this.previewRun?.unsubscribe();
+    this.addPreview.set(null);
     this.addHeight.set('');
     this.addCaption.set('');
   }
@@ -1975,7 +1374,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.addKindOfSource.set(kind === 'query' ? 'query' : 'analysis');
     // The id belongs to the list it came from. Carrying it across would point the widget at
     // whatever saved query happens to share a number with the analysis that was chosen.
-    this.addSourceId.set('');
+    this.chooseAddSource('');
   }
 
   addWidget(): void {
@@ -2065,6 +1464,7 @@ export class Dashboards implements OnInit, OnDestroy {
     const id = widget.analyticsDashboardWidgetId;
     if (!id || kind === widget.visualizationType) return;
     this.widgetError.set('');
+    this.letGoOf(widget);
     // Chosen from the tile's menu, whose tick follows the saved kind: a refusal changes nothing
     // on the widget, so the tick stays where it was without being put back by hand.
     this.analytics.saveWidget({ ...widget, visualizationType: kind }).subscribe({
@@ -2083,6 +1483,253 @@ export class Dashboards implements OnInit, OnDestroy {
       error: err => {
         this.widgetError.set(err?.error?.message || 'That choice could not be saved.');
       },
+    });
+  }
+
+  // ---- chart settings, themes, and choosing with a preview -------------------------------
+
+  /**
+   * Each widget's chart settings, parsed once per change to the board rather than per change
+   * detection: a fresh object on every pass would hand every tile a "new" input and rebuild every
+   * chart's option each time anything on the page moved.
+   */
+  private readonly widgetSettings = computed(() => new Map(this.widgets().map(widget =>
+    [widget.analyticsDashboardWidgetId, parseSettings(widgetConfigOf(widget).chart)] as const)));
+
+  private static readonly NO_SETTINGS: ChartSettings = {};
+
+  settingsOf(widget: DashboardWidget): ChartSettings {
+    return this.widgetSettings().get(widget.analyticsDashboardWidgetId) ?? Dashboards.NO_SETTINGS;
+  }
+
+  /** The board's theme, from its dashboard_config; null is the console's own. */
+  readonly boardTheme = computed(() => parseBoardSettings(this.board()?.dashboardConfig).theme ?? null);
+  readonly boardThemeLabel = computed(() => themeLabel(this.boardTheme()));
+
+  // ---- the tile menu's "Show as" grid ------------------------------------------------------
+
+  /** What the open tile menu's search box holds. One menu is open at a time, so one is enough. */
+  readonly kindQuery = signal('');
+  /** Whether the open menu shows the categories in which nothing fits this result. */
+  readonly kindShowMisfits = signal(false);
+  private readonly injector = inject(Injector);
+
+  /** The menu for one tile's result: suggestions, then every kind by category (charts/kind-menu.ts). */
+  kindMenuOf(widget: DashboardWidget, view: WidgetView): KindMenu {
+    return kindMenu(view, this.drawn(widget, view), this.kindQuery(), this.kindShowMisfits());
+  }
+
+  kindIcon(id: string): string {
+    return KIND_ICONS[id as WidgetVisualization] ?? '';
+  }
+
+  lowerFirst(text: string): string {
+    return text.charAt(0).toLowerCase() + text.slice(1);
+  }
+
+  /**
+   * A tile menu opened: an empty search, the folded groups folded, and -- when it was opened with
+   * the pointer, which leaves the focus on the trigger outside the overlay -- the focus on the
+   * panel, so that typing goes to the search at once.
+   */
+  kindMenuOpened(): void {
+    this.kindQuery.set('');
+    this.kindShowMisfits.set(false);
+    afterNextRender(() => {
+      const panel = document.querySelector<HTMLElement>('.dash-menu-panel');
+      if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+    }, { injector: this.injector });
+  }
+
+  /**
+   * The keyboard inside a tile menu. The CDK menu moves up and down a list; the kinds are a grid,
+   * with a search box among them, so this takes the arrows, Home and End before the menu sees
+   * them. Escape and Tab still reach the menu, which closes; Enter and Space reach the item under
+   * the focus, which applies it.
+   *
+   *   - a printable key anywhere but the search box goes to the search box;
+   *   - in the search box, every key stays there, except Down/Enter/Tab (to the first tile) and
+   *     Up/Shift+Tab (to the item above);
+   *   - on a tile, Left/Right step through the tiles in reading order, Up/Down move a row by
+   *     position (the suggestions are three across, the rest four), Home/End go to the ends;
+   *     past the first row Up goes to the search box, past the last Down to the actions below;
+   *   - on any other item, Up/Down step through the panel's stops in order.
+   */
+  kindMenuKey(event: KeyboardEvent): void {
+    const panel = event.currentTarget as HTMLElement;
+    const target = event.target as HTMLElement;
+    const search = panel.querySelector<HTMLInputElement>('.dash-kind-search');
+    if (event.key === 'Escape') return;
+    // Everything rendered is on offer: a folded group is not rendered at all, rather than hidden.
+    const stops = [...panel.querySelectorAll<HTMLElement>('.menu-item, .dash-kind-search, .dash-tile, .dash-misfits')];
+    const tiles = stops.filter(el => el.classList.contains('dash-tile'));
+    const go = (el: HTMLElement | undefined) => {
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.scrollIntoView?.({ block: 'nearest' });
+    };
+    const done = () => { event.preventDefault(); event.stopPropagation(); };
+    const after = (el: HTMLElement) => stops[stops.indexOf(el) + 1];
+    const before = (el: HTMLElement) => stops[stops.indexOf(el) - 1];
+
+    if (search && target === search) {
+      if (event.key === 'ArrowDown' || event.key === 'Enter' || (event.key === 'Tab' && !event.shiftKey)) {
+        go(tiles[0] ?? after(search)); done();
+      } else if (event.key === 'ArrowUp' || (event.key === 'Tab' && event.shiftKey)) {
+        go(before(search)); done();
+      } else {
+        // Typing stays in the box: the menu's typeahead would otherwise move the focus to an item.
+        event.stopPropagation();
+      }
+      return;
+    }
+    if (search && event.key.length === 1 && event.key !== ' ' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+      // Written into the box at once, not left to the next change detection: a fast typist's
+      // second key would otherwise land in a box still empty and replace the first.
+      search.value = this.kindQuery() + event.key;
+      search.focus({ preventScroll: true });
+      search.setSelectionRange(search.value.length, search.value.length);
+      this.kindQuery.set(search.value);
+      done();
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+    const tile = target.closest<HTMLElement>('.dash-tile');
+    if (!tile || !tiles.includes(tile)) {
+      // The panel itself (opened with the pointer), an action, or the toggle: a list.
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') return;
+      const at = stops.indexOf(target);
+      go(event.key === 'Home' ? stops[0] : event.key === 'End' ? stops[stops.length - 1]
+        : at < 0 ? stops[0]
+        : event.key === 'ArrowDown' ? stops[(at + 1) % stops.length] : stops[(at - 1 + stops.length) % stops.length]);
+      done();
+      return;
+    }
+    const index = tiles.indexOf(tile);
+    if (event.key === 'ArrowRight') go(tiles[index + 1] ?? tile);
+    else if (event.key === 'ArrowLeft') go(tiles[index - 1] ?? tile);
+    else if (event.key === 'Home') go(tiles[0]);
+    else if (event.key === 'End') go(tiles[tiles.length - 1]);
+    else {
+      // Rows from each grid's own column count (data-cols, the same number its CSS lays out), not
+      // from where the tiles are on screen: the part of "All charts" scrolled out of sight is still
+      // laid out above or below, and a position read off it would jump into the suggestions.
+      const rows: { cells: HTMLElement[]; cols: number }[] = [];
+      for (const grid of panel.querySelectorAll<HTMLElement>('.dash-kind-grid')) {
+        const cells = [...grid.querySelectorAll<HTMLElement>('.dash-tile')].filter(el => tiles.includes(el));
+        const cols = Math.max(1, Number(grid.dataset['cols']) || 1);
+        for (let i = 0; i < cells.length; i += cols) rows.push({ cells: cells.slice(i, i + cols), cols });
+      }
+      const r = rows.findIndex(row => row.cells.includes(tile));
+      const next = rows[r + (event.key === 'ArrowDown' ? 1 : -1)];
+      if (r < 0 || !next) {
+        go(event.key === 'ArrowDown' ? after(tiles[tiles.length - 1]) : before(tiles[0]));
+      } else {
+        // The same place across the row, as a fraction of it: three across above four still lines up.
+        const across = (rows[r].cells.indexOf(tile) + 0.5) / rows[r].cols;
+        go(next.cells[Math.min(next.cells.length - 1, Math.floor(across * next.cols))]);
+      }
+    }
+    done();
+  }
+
+  /**
+   * Sets the theme every tile on the board draws in. RUNS NOTHING: the results in hand are
+   * redrawn in the new colours. Stored on the board (dashboard_config), so everybody who opens it
+   * sees the same board.
+   */
+  setBoardTheme(theme: string | null): void {
+    const board = this.board();
+    if (!board?.analyticsDashboardId || (theme ?? null) === this.boardTheme()) return;
+    const config = boardSettingsString({ ...parseBoardSettings(board.dashboardConfig), theme: theme ?? undefined }) ?? '{}';
+    const previous = board.dashboardConfig ?? null;
+    this.board.update(open => open ? { ...open, dashboardConfig: config } : open);
+    this.analytics.saveDashboard({ ...board, dashboardConfig: config }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) {
+          this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+          this.widgetError.set(response.message || 'The board\'s theme could not be saved.');
+        }
+      },
+      error: err => {
+        this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+        this.widgetError.set(err?.error?.message || 'The board\'s theme could not be saved.');
+      },
+    });
+  }
+
+  /** Opens "Chart settings" for a tile, over the result it already shows. Saving runs nothing. */
+  openChartSettings(widget: DashboardWidget, view: WidgetView): void {
+    const data: ChartSettingsData = {
+      title: widget.widgetTitle, view, kind: this.drawn(widget, view),
+      settings: this.settingsOf(widget), boardTheme: this.boardTheme(),
+    };
+    this.dialog.open<ChartSettings | undefined, ChartSettingsData>(ChartSettingsPanel, sidePanelConfig(data, 'wide'))
+      .closed.subscribe(settings => { if (settings) this.saveChartSettings(widget, settings); });
+  }
+
+  /** Opens "Choose a chart" for a tile: every kind, drawn from the tile's own result as it is hovered. */
+  openKindPicker(widget: DashboardWidget, view: WidgetView): void {
+    const data: KindPickerData = {
+      title: widget.widgetTitle, view, kind: this.drawn(widget, view),
+      settings: this.settingsOf(widget), boardTheme: this.boardTheme(),
+    };
+    this.dialog.open<string | undefined, KindPickerData>(KindPickerPanel, sidePanelConfig(data, 'wide'))
+      .closed.subscribe(kind => { if (kind) this.setVisualization(widget, kind); });
+  }
+
+  private saveChartSettings(widget: DashboardWidget, settings: ChartSettings): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (!id) return;
+    this.letGoOf(widget);
+    const widgetConfig = widgetConfigString({ ...widgetConfigOf(widget), chart: settings });
+    if (widgetConfig === (widget.widgetConfig ?? null)) return;
+    this.widgetError.set('');
+    this.analytics.saveWidget({ ...widget, widgetConfig }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.widgetError.set(response.message || 'Those chart settings could not be saved.');
+          return;
+        }
+        const saved = response.data;
+        this.board.update(board => board ? {
+          ...board,
+          widgets: (board.widgets ?? []).map(item =>
+            item.analyticsDashboardWidgetId === id ? { ...item, ...saved } : item),
+        } : board);
+      },
+      error: err => this.widgetError.set(err?.error?.message || 'Those chart settings could not be saved.'),
+    });
+  }
+
+  // ---- the add form's preview ---------------------------------------------------------------
+
+  /** The chosen source, run once so the picker can say what fits and draw what is hovered. */
+  readonly addPreview = signal<WidgetRun | null>(null);
+  private previewRun: Subscription | null = null;
+
+  /**
+   * Picks the source a new widget points at, and runs it ONCE for the picker's preview. One
+   * query, the same one the tile will run when it is added -- and not run at all until a source
+   * is chosen.
+   */
+  chooseAddSource(id: string): void {
+    this.addSourceId.set(id);
+    this.previewRun?.unsubscribe();
+    this.previewRun = null;
+    const sourceId = Number(id);
+    if (!id || !Number.isFinite(sourceId) || sourceId <= 0) { this.addPreview.set(null); return; }
+    const probe: DashboardWidget = {
+      analyticsDashboardId: this.board()?.analyticsDashboardId ?? 0, widgetTitle: 'Preview',
+      analyticsAnalysisId: this.addKindOfSource() === 'analysis' ? sourceId : null,
+      analyticsQueryId: this.addKindOfSource() === 'query' ? sourceId : null,
+    };
+    this.addPreview.set({ state: 'running', error: '', view: null, queryId: '' });
+    this.previewRun = this.runSource(probe, mintQueryId(0), run => {
+      this.addPreview.set(run);
+      this.previewRun = null;
+      // A kind the new result cannot carry is not left chosen: the form falls back to the table.
+      if (run.view?.issues[this.addVisualization()]) this.addVisualization.set('table');
     });
   }
 
@@ -2158,14 +1805,41 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   heightOf(widget: DashboardWidget): number {
     const asked = widgetConfigOf(widget).height;
-    if (typeof asked !== 'number' || !Number.isFinite(asked)) return WIDGET_HEIGHT;
+    if (typeof asked !== 'number' || !Number.isFinite(asked)) {
+      return kindInfo(widget.visualizationType)?.engine === 'echarts' ? ECHART_HEIGHT : WIDGET_HEIGHT;
+    }
     return Math.min(WIDGET_HEIGHT_MAX, Math.max(WIDGET_HEIGHT_MIN, Math.round(asked)));
+  }
+
+  /** Whether the author set this tile's height; when not, horizontal bars may grow to fit theirs. */
+  hasOwnHeight(widget: DashboardWidget): boolean {
+    const asked = widgetConfigOf(widget).height;
+    return typeof asked === 'number' && Number.isFinite(asked);
   }
 
   /** The author's own sentence under a tile, or '' when they wrote none. Never invented. */
   captionOf(widget: DashboardWidget): string {
     const caption = widgetConfigOf(widget).caption;
     return typeof caption === 'string' ? caption.trim() : '';
+  }
+
+  /**
+   * Why a tile draws a table rather than the kind it was saved as, or '' (MIG-367).
+   *
+   * drawn() falls back to the table whenever the saved kind cannot draw this result, and said nothing: a saved query
+   * chosen as a ring, a pareto, a treemap or a stack came up as a table with no word why. A saved statement cannot say
+   * whether its figures add up -- `select avg(x)` and `select sum(x)` look the same -- so every part-of-a-whole kind is
+   * refused there, honestly; the tile now says so, and what would draw it.
+   */
+  fallbackNote(widget: DashboardWidget, view: WidgetView): string {
+    const asked = (widget.visualizationType ?? 'table') as WidgetVisualization;
+    if (asked === 'table' || !KINDS.some(kind => kind.id === asked)) return '';
+    const why = (view.issues[asked] ?? '').trim();
+    if (!why) return '';
+    const label = (kindInfo(asked)?.label ?? asked).toLowerCase();
+    const fix = /saved query does not say/.test(why)
+      ? ' Save it as an analysis that sums or counts to draw it this way.' : '';
+    return `Shown as a table, not as ${label}: ${this.lowerFirst(why).replace(/\.?$/, '.')}${fix}`;
   }
 
   drawn(widget: DashboardWidget, view: WidgetView): WidgetVisualization {
@@ -2184,7 +1858,7 @@ export class Dashboards implements OnInit, OnDestroy {
    * they are looking at a third of the data while they are looking at all of it. The opposite
    * mistake is worse, so this counts what the drawn kind actually renders.
    */
-  counted(view: WidgetView, kind: WidgetVisualization, limit = TILE_ROWS): string {
+  counted(view: WidgetView, kind: WidgetVisualization, limit = TILE_ROWS, settings: ChartSettings = {}): string {
     if (!view.rowCount) return 'No rows.';
     // A single figure renders the whole result and has no marks at all -- an analysis with no
     // dimension produces none. Counting marks there printed "0 of 1 rows shown" under a tile
@@ -2207,8 +1881,12 @@ export class Dashboards implements OnInit, OnDestroy {
         ? `${drawnGroups.toLocaleString()} of ${groups.toLocaleString()} groups shown`
         : `${groups.toLocaleString()} ${groups === 1 ? 'group' : 'groups'}`;
     }
+    // An ECharts kind draws the rows themselves, not the marks: the marks merge every row sharing a label into one, so a
+    // line of five cities over fourteen days counted fifteen of its seventy points (MIG-367). rowsDrawn says how many.
+    const echarts = kindInfo(kind)?.engine === 'echarts';
     const shown = kind === 'table' ? Math.min(view.rows.length, limit)
       : kind === 'kpi' ? Math.min(1, view.rowCount)
+      : echarts ? rowsDrawn(view.chart ?? tableOf(view, { additive: view.additive }), kind as EChartKind, settings)
       : view.marks.length;
     return shown < view.rowCount
       ? `${shown.toLocaleString()} of ${view.rowCount.toLocaleString()} rows shown`
@@ -2221,20 +1899,26 @@ export class Dashboards implements OnInit, OnDestroy {
     if (!this.board()) return;
     this.abandon();
     this.pending = 'all';
+    // Every table widget reads its first page again too: it pages itself (board/board-table.ts), outside the queue.
+    this.tableEpoch.update(n => n + 1);
     this.start();
   }
 
   runOne(widget: DashboardWidget): void {
     const id = widget.analyticsDashboardWidgetId;
     if (!id) return;
-    if (this.queue().includes(id)) return;
-    const idle = this.runningId() === null && !this.queue().length;
+    if (this.pagedTable(widget)) {
+      this.tableBumps.update(all => ({ ...all, [id]: (all[id] ?? 0) + 1 }));
+      return;
+    }
+    if (this.queue().includes(id) || this.runningIds().includes(id)) return;
+    const idle = !this.runningIds().length && !this.queue().length;
     // Appended rather than jumped in front of: a queue that reordered itself under a click would
     // make "run this one" mean "and stop that one", which is a second action nobody asked for.
     this.queue.update(queue => [...queue, id]);
     this.batch.update(size => idle ? 1 : size + 1);
     this.mark(id, { state: 'queued', error: '', view: null, queryId: '' });
-    if (idle) this.next(this.epoch);
+    this.next(this.epoch);
   }
 
   /**
@@ -2246,18 +1930,14 @@ export class Dashboards implements OnInit, OnDestroy {
    * nothing here to interpret: the screen stops waiting either way.
    */
   stopRun(): void {
-    const queryId = this.runningId() === null ? ''
-      : this.runs()[this.runningId()!]?.queryId ?? '';
+    const current = [...this.runningIds()];
+    const queryIds = current.map(id => this.runs()[id]?.queryId ?? '').filter(Boolean);
     const waiting = [...this.queue()];
-    const current = this.runningId();
     this.abandon();
-    for (const id of waiting) {
+    for (const id of [...waiting, ...current]) {
       this.mark(id, { state: 'stopped', error: '', view: null, queryId: '' });
     }
-    if (current !== null) {
-      this.mark(current, { state: 'stopped', error: '', view: null, queryId: '' });
-    }
-    if (queryId) {
+    for (const queryId of queryIds) {
       this.analytics.cancel(queryId).subscribe({ next: () => {}, error: () => {} });
     }
   }
@@ -2267,10 +1947,11 @@ export class Dashboards implements OnInit, OnDestroy {
     this.epoch++;
     this.queue.set([]);
     this.batch.set(0);
-    this.runningId.set(null);
+    this.runningIds.set([]);
     this.pending = null;
-    this.inFlight?.unsubscribe();
-    this.inFlight = null;
+    this.inFlight.forEach(subscription => subscription.unsubscribe());
+    this.inFlight.clear();
+    this.retried.clear();
   }
 
   /**
@@ -2285,13 +1966,20 @@ export class Dashboards implements OnInit, OnDestroy {
     const pending = this.pending;
     if (pending === null || !this.sourcesReady()) return;
     this.pending = null;
-    const ids = pending === 'all'
+    // A table widget pages itself and is not queued (pagedTable).
+    const ids = (pending === 'all'
       ? this.widgets().map(widget => widget.analyticsDashboardWidgetId).filter(
           (id): id is number => typeof id === 'number')
-      : pending;
+      : pending).filter(id => !this.tableSources().has(id));
+    this.runStartedAt = performance.now();
+    this.loadMs.set(null);
+    if (pending === 'all') {
+      // Each table is reading its first page again: counted as running until it says otherwise.
+      this.tableReads.set(Object.fromEntries([...this.tableSources().keys()].map(id => [id, { state: 'running' as const }])));
+    }
     if (!ids.length) return;
     this.epoch++;
-    this.queue.set(ids);
+    this.queue.set(figuresFirst(ids, this.widgets()));
     this.batch.set(ids.length);
     for (const id of ids) {
       this.mark(id, { state: 'queued', error: '', view: null, queryId: '' });
@@ -2300,67 +1988,75 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /**
-   * Takes the next widget off the queue and runs it. ONE AT A TIME, and that is the whole point.
+   * Starts widgets off the queue until BOARD_PARALLEL are running (owner 2026-10-12: tiles load in parallel).
    *
-   * Every analytics query in this application passes one JVM-wide fair semaphore that admits
-   * four at once, shared with every other user and with the ETL work on the same box. A board
-   * that fired its tiles together would hold that ceiling for as long as it took to draw itself;
-   * serially it holds one permit, and takes longer instead.
+   * Three at once, not all: every analytics query passes one fair semaphore of four permits shared with every other
+   * reader and the ETL work, so a board holds at most three of them and leaves one free however many tiles it has. A
+   * tile the governor turns away for being busy is put back at the head of the queue once, a moment later, rather
+   * than shown as an error for a wait of a second.
    */
   private next(epoch: number): void {
     if (epoch !== this.epoch) return;
-    const queue = this.queue();
-    if (!queue.length) {
-      this.runningId.set(null);
-      return;
-    }
-    const id = queue[0];
-    this.queue.set(queue.slice(1));
-    const widget = this.widgets().find(item => item.analyticsDashboardWidgetId === id);
-    if (!widget) {
-      // The board changed under the queue. Nothing to run and nothing to report on a tile that
-      // is not there any more.
-      this.next(epoch);
-      return;
-    }
-    this.runningId.set(id);
-    /*
-     * A tile that throws must fail alone.
-     *
-     * run() marks the tile running and only then builds the request, so anything that throws
-     * between those two points -- a saved configuration in a shape a reader here did not expect,
-     * a column that has since been renamed -- unwound out of the queue with the tile still
-     * marked running and next() never reached. The board stopped dead: one tile on "Running…"
-     * for ever and every tile behind it on "Waiting its turn", with nothing on screen saying
-     * anything had gone wrong. That is exactly what dashboard "15 Regional analysis" did.
-     *
-     * The JSON.parse inside run() was already guarded this carefully; everything after it was
-     * not. This makes the guarantee structural rather than a list of the failures somebody
-     * happened to think of: whatever one tile does, the other tiles still run.
-     */
-    try {
-      this.run(widget, id, epoch);
-    } catch (thrown) {
-      // The exception goes to the console and never onto the tile: its message is minified code
-      // ("n.value.trim is not a function"), which tells a reader nothing they can act on.
-      console.error(`Dashboard widget ${id} could not be prepared`, thrown);
-      this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
-        error: `"${widget.widgetTitle}" could not be run: something in its saved setup is not in a `
-          + 'shape this page can read. Open it in the Analytics Studio and save it again.' });
+    // MIG-344: a table's first page is a read like any tile's, so it counts against the three; the queue still always
+    // has one slot of its own, so a table that never reports cannot stop the board.
+    const tables = Object.values(this.tableReads()).filter(read => read.state === 'running').length;
+    const slots = BOARD_PARALLEL - Math.min(tables, BOARD_PARALLEL - 1);
+    while (this.runningIds().length < slots && this.queue().length) {
+      const [id, ...rest] = this.queue();
+      this.queue.set(rest);
+      const widget = this.widgets().find(item => item.analyticsDashboardWidgetId === id);
+      // The board changed under the queue: nothing to run and nothing to report on a tile that is not there any more.
+      if (!widget) continue;
+      this.runningIds.update(ids => [...ids, id]);
+      /*
+       * A tile that throws must fail alone: whatever one tile's saved setup does, the other tiles still run (dashboard
+       * "15 Regional analysis" once stopped dead on one tile marked running for ever).
+       */
+      try {
+        this.run(widget, id, epoch);
+      } catch (thrown) {
+        // The exception goes to the console and never onto the tile: its message is minified code.
+        console.error(`Dashboard widget ${id} could not be prepared`, thrown);
+        this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+          error: `"${widget.widgetTitle}" could not be run: something in its saved setup is not in a `
+            + 'shape this page can read. Open it in the Analytics Studio and save it again.' });
+      }
     }
   }
 
   private run(widget: DashboardWidget, id: number, epoch: number): void {
     const queryId = mintQueryId(id);
+    const started = performance.now();
     this.mark(id, { state: 'running', error: '', view: null, queryId });
+    const subscription = this.runSource(widget, queryId,
+      run => this.settle(id, epoch, this.decorate({ ...run, ms: Math.round(performance.now() - started) })));
+    if (subscription && this.runningIds().includes(id)) this.inFlight.set(id, subscription);
+  }
 
+  /**
+   * A saved query's marks given the operands a click on them sets, where their label column is one of the board's
+   * filters (withCrossFilterOperands): its bar or slice can then narrow the board. An analysis's marks carry their own.
+   */
+  private decorate(run: WidgetRun): WidgetRun {
+    const defs = this.filterDefs();
+    if (!run.view || !defs.length) return run;
+    const marks = withCrossFilterOperands(run.view.marks, run.view.columns[0], defs);
+    return marks === run.view.marks ? run : { ...run, view: { ...run.view, marks } };
+  }
+
+  /**
+   * Runs what a widget points at and hands the outcome to `done`: a view, or the reason there is
+   * none. The board's queue and the add form's preview both run a source through here, so a
+   * preview is the same question, with the same filters, as the tile it would become.
+   */
+  private runSource(widget: DashboardWidget, queryId: string, done: (run: WidgetRun) => void): Subscription | null {
     if (widget.analyticsAnalysisId) {
       const saved = this.analyses().find(
         item => item.analyticsAnalysisId === widget.analyticsAnalysisId);
       if (!saved) {
-        this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+        done({ state: 'failed', view: null, queryId: '',
           error: 'The saved analysis this widget points at is not in this workspace.' });
-        return;
+        return null;
       }
       let config: SavedAnalysisConfig;
       try {
@@ -2369,9 +2065,9 @@ export class Dashboards implements OnInit, OnDestroy {
         // Nothing is sent. A configuration that will not parse cannot be half-applied into a
         // request: a tile running the dimensions without the filters would answer a different
         // question under the same title.
-        this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+        done({ state: 'failed', view: null, queryId: '',
           error: `"${saved.analysisName}" cannot be run: its saved configuration is not readable.` });
-        return;
+        return null;
       }
       const aggregation = config.measure?.aggregation ?? 'COUNT_ROWS';
       const request: AnalysisRequest = {
@@ -2395,14 +2091,17 @@ export class Dashboards implements OnInit, OnDestroy {
       if (config.grains && config.grains.some(grain => !!grain)) {
         request.grains = config.grains;
       }
-      this.inFlight = this.analytics.analyze(request).subscribe({
+      // The board's filter bar, applied by the server to the dataset before the analysis reads it.
+      const boardFilters = this.filterWire();
+      if (boardFilters.length) request.boardFilters = boardFilters;
+      return this.analytics.analyze(request).subscribe({
         next: response => {
           if (response.status !== API_SUCCESS || !response.data) {
-            this.settle(id, epoch, { state: 'failed', view: null, queryId,
+            done({ state: 'failed', view: null, queryId,
               error: response.message || 'That analysis could not be run.' });
             return;
           }
-          this.settle(id, epoch, { state: 'done', error: '', queryId,
+          done({ state: 'done', error: '', queryId, outcomes: response.data.boardFilters,
             view: analysisView(response.data, aggregation, {
               sortedBy: config.sort?.by ?? 'MEASURE',
               // The direction travels with the axis. Without it a dimension sorted Z-A looked
@@ -2416,20 +2115,20 @@ export class Dashboards implements OnInit, OnDestroy {
             }) });
         },
         error: err => {
-          this.settle(id, epoch, { state: 'failed', view: null, queryId,
+          done({ state: 'failed', view: null, queryId,
             error: err?.error?.message || 'That analysis could not be run.' });
         },
       });
-      return;
+      return null;
     }
 
     const saved = this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
     if (!saved) {
-      this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+      done({ state: 'failed', view: null, queryId: '',
         error: 'The saved query this widget points at is not in this workspace.' });
-      return;
+      return null;
     }
-    this.inFlight = this.analytics.query({
+    return this.analytics.query({
       connection: saved.connectionAlias,
       path: saved.datasetPath,
       sql: saved.queryText,
@@ -2443,18 +2142,19 @@ export class Dashboards implements OnInit, OnDestroy {
       connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : undefined,
       path2: saved.secondDatasetPath || undefined,
       queryId,
+      boardFilters: this.filterWire(),
     }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
-          this.settle(id, epoch, { state: 'failed', view: null, queryId,
+          done({ state: 'failed', view: null, queryId,
             error: response.message || 'That query could not be run.' });
           return;
         }
-        this.settle(id, epoch, { state: 'done', error: '', queryId,
-          view: queryView(response.data) });
+        done({ state: 'done', error: '', queryId, outcomes: response.data.boardFilters,
+          view: queryView(response.data, widgetConfigOf(widget).additive) });
       },
       error: err => {
-        this.settle(id, epoch, { state: 'failed', view: null, queryId,
+        done({ state: 'failed', view: null, queryId,
           error: err?.error?.message || 'That query could not be run.' });
       },
     });
@@ -2469,14 +2169,41 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   private settle(id: number, epoch: number, run: WidgetRun): void {
     if (epoch !== this.epoch) return;
+    this.inFlight.delete(id);
+    if (run.state === 'failed' && BUSY.test(run.error) && !this.retried.has(id)) {
+      // The governor was full for a moment: once more, at the head of the queue, after a breath. The tile keeps its
+      // place among the running meanwhile, so the board does not read as finished while it waits.
+      this.retried.add(id);
+      setTimeout(() => {
+        if (epoch !== this.epoch) return;
+        this.runningIds.update(ids => ids.filter(running => running !== id));
+        this.queue.update(queue => [id, ...queue]);
+        this.next(epoch);
+      }, 700);
+      return;
+    }
+    this.runningIds.update(ids => ids.filter(running => running !== id));
     this.mark(id, run);
-    this.inFlight = null;
-    this.runningId.set(null);
     this.next(epoch);
   }
 
   private mark(id: number, run: WidgetRun): void {
-    this.runs.update(runs => ({ ...runs, [id]: run }));
+    this.runs.update(runs => {
+      const old = runs[id];
+      const waiting = run.state === 'queued' || run.state === 'running';
+      const previous = waiting && !run.view ? (old?.view ?? old?.previous ?? null) : null;
+      return { ...runs, [id]: previous ? { ...run, previous } : run };
+    });
+  }
+
+  /** What a tile draws: the run's result, or -- while it re-runs -- the one it had. */
+  shownView(run: WidgetRun | undefined): WidgetView | null {
+    return run?.view ?? run?.previous ?? null;
+  }
+
+  /** Whether a tile is re-running over a result it still shows. */
+  updating(run: WidgetRun | undefined): boolean {
+    return !!run && !run.view && !!run.previous && (run.state === 'queued' || run.state === 'running');
   }
 
   // ---- small renderings -------------------------------------------------------------------
@@ -2498,232 +2225,46 @@ export class Dashboards implements OnInit, OnDestroy {
 }
 
 /**
- * The dataset registry: naming a location once, and finding it again.
- *
- * The master index's golden workflow names dataset registration as a step, and until now the
- * endpoints behind it had no caller at all -- the table, the entity and four endpoints existed
- * and nothing in the product could reach them. This is the surface that reaches them.
- *
- * <b>REGISTERING READS NOTHING.</b> It takes no governor permit, opens no DuckDB session and
- * scans no rows: the server asks its resolver one question -- may this caller read this alias
- * and this path, and what format is it -- and keeps the answer. That is worth saying on screen,
- * because a control that looked like it might read a gigabyte is a control people do not press.
- *
- * The connection and path INPUTS are the seam this was built for. A tab inside the Studio hands
- * it the file that is open, so "name the dataset you are looking at" is one field and a button;
- * used on its own, both are typed. `opened` is the way back -- a registered dataset picked from
- * the list is a request to go and open it, which belongs to whatever screen owns the browser
- * rather than to a registry.
- *
- * @author Nabeel Ahmed
+ * A saved work's name without the board's own name in front of it ("Riverside — Patient 360 — Risk level" on that
+ * board is "Risk level"): the board says it once, in its header.
  */
-@Component({
-  selector: 'app-dataset-registry',
-  imports: [Icon],
-  template: `
-    <div class="card p-4 space-y-3 min-w-0">
-      <div class="flex items-baseline gap-2 flex-wrap">
-        <h2 class="text-sm font-semibold">Registered datasets</h2>
-        <span class="text-xs text-[color:var(--text-muted)]">
-          A name for a location, so it can be found again.
-        </span>
-        <button type="button" class="btn btn-default btn-sm ml-auto"
-                [disabled]="loading()" (click)="load()">
-          <app-icon name="refresh" [class.spin]="loading()" />
-          Refresh
-        </button>
-      </div>
+export function withoutBoardName(name: string | null | undefined, board: string | null | undefined): string {
+  const n = (name ?? '').trim();
+  const b = (board ?? '').trim();
+  if (!b || !n.startsWith(b)) return n;
+  const rest = n.slice(b.length).replace(/^\s*[—–:\-·|]\s*/, '').trim();
+  return rest || n;
+}
 
-      <div class="flex gap-2 flex-wrap items-start">
-        <input class="input input-sm w-48" placeholder="Name this dataset"
-               aria-label="Dataset name"
-               [value]="datasetName()" (input)="datasetName.set($any($event.target).value)" />
-        <input class="input input-sm w-40" placeholder="Connection"
-               aria-label="Connection alias"
-               [value]="alias()" (input)="setAlias($any($event.target).value)" />
-        <input class="input input-sm flex-1 min-w-48 mono" placeholder="Path inside it"
-               aria-label="Dataset path"
-               [value]="location()" (input)="setPath($any($event.target).value)" />
-        <button type="button" class="btn btn-primary btn-sm"
-                [disabled]="!canRegister()" (click)="register()">
-          <app-icon name="plus" />
-          Register
-        </button>
-      </div>
+/** A viewer's starred board ids; anything unreadable is none. */
+export function readFavourites(key: string): ReadonlySet<number> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? '[]');
+    return new Set(Array.isArray(saved) ? saved.filter((id: unknown) => typeof id === 'number') : []);
+  } catch { return new Set(); }
+}
 
-      @if (suggestion() && !datasetName()) {
-        <button type="button" class="btn btn-ghost btn-xs" (click)="datasetName.set(suggestion())">
-          Call it "{{ suggestion() }}"
-        </button>
-      }
+export interface DashboardGroup { key: string; label: string; items: Dashboard[]; }
 
-      <p class="field-note text-[color:var(--text-muted)]">
-        Registering names a location and proves you can read it. It does not open the file: no
-        rows are scanned and no query permit is spent. The format is decided by the server when
-        it checks the path, so it is not something to choose here.
-      </p>
-
-      @if (registerError()) {
-        <p class="text-xs text-crit-500">{{ registerError() }}</p>
-      }
-
-      @if (loading()) {
-        <p class="text-xs text-[color:var(--text-muted)] py-2">Reading the registry…</p>
-      } @else if (error()) {
-        <p class="text-xs text-crit-500 py-2">{{ error() }}</p>
-      } @else if (!datasets().length) {
-        <p class="text-xs text-[color:var(--text-muted)] py-2">
-          Nothing registered yet. A registered dataset is a name for a connection and a path —
-          it holds no data of its own, and removing one never touches a file.
-        </p>
-      } @else {
-        <ul class="space-y-1">
-          @for (item of datasets(); track item.analyticsDatasetId) {
-            <li class="flex items-center gap-2 min-w-0 border-t border-subtle pt-1">
-              <button type="button" class="btn btn-ghost btn-sm min-w-0 flex-1 justify-start"
-                      [title]="item.connectionAlias + '/' + item.datasetPath"
-                      (click)="opened.emit(item)">
-                <span class="truncate">{{ item.datasetName }}</span>
-              </button>
-              @if (item.datasetFormat) {
-                <span class="pill shrink-0">{{ item.datasetFormat }}</span>
-              }
-              <span class="text-[11px] mono text-[color:var(--text-muted)] truncate max-w-72">
-                {{ item.connectionAlias }}/{{ item.datasetPath }}
-              </span>
-              <button type="button" class="btn btn-ghost btn-icon btn-xs btn-intent-crit shrink-0"
-                      title="Remove from the registry"
-                      [attr.aria-label]="'Remove ' + item.datasetName + ' from the registry'"
-                      (click)="forget(item)">
-                <app-icon name="trash" />
-              </button>
-            </li>
-          }
-        </ul>
-      }
-    </div>
-  `,
-})
-export class DatasetRegistry implements OnInit {
-
-  private readonly analytics = inject(AnalyticsService);
-  private readonly dialog = inject(Dialog);
-  private readonly toast = inject(ToastService);
-
-  /** The connection and path a host screen is already looking at. Both are editable here. */
-  readonly connection = input('');
-  readonly path = input('');
-
-  /** A registered dataset the reader wants to open. Whoever owns the browser answers this. */
-  readonly opened = output<RegisteredDataset>();
-
-  readonly datasets = signal<RegisteredDataset[]>([]);
-  readonly loading = signal(false);
-  readonly error = signal('');
-  readonly registering = signal(false);
-  readonly registerError = signal('');
-
-  readonly datasetName = signal('');
-  /**
-   * The two location fields, held apart from the inputs on purpose.
-   *
-   * A host screen's file is the STARTING POINT and not a binding: a reader who types a different
-   * path here and then clicks another file in the rail should not have their typing replaced.
-   * `alias()` and `location()` fall back to the inputs only while nothing has been typed.
-   */
-  private readonly typedAlias = signal<string | null>(null);
-  private readonly typedPath = signal<string | null>(null);
-
-  readonly alias = computed(() => this.typedAlias() ?? this.connection());
-  readonly location = computed(() => this.typedPath() ?? this.path());
-
-  /** The file's own name, which is what a person calls a dataset before they call it anything. */
-  readonly suggestion = computed(() => {
-    const parts = this.location().split('/').filter(Boolean);
-    return parts.length ? parts[parts.length - 1] : '';
-  });
-
-  readonly canRegister = computed(() =>
-    !!this.datasetName().trim() && !!this.alias().trim() && !!this.location().trim()
-    && !this.registering());
-
-  ngOnInit(): void {
-    this.load();
+/** Favourites first, then one group per feeding pipeline (by name), then the rest -- each in the list's own order. */
+export function groupDashboards(items: Dashboard[], favourites: ReadonlySet<number>, pipelines: ReadonlyMap<number, string[]>): DashboardGroup[] {
+  const groups: DashboardGroup[] = [];
+  const favs = items.filter(i => i.analyticsDashboardId != null && favourites.has(i.analyticsDashboardId));
+  if (favs.length) groups.push({ key: 'favourites', label: 'Favourites', items: favs });
+  const rest = items.filter(i => !favs.includes(i));
+  if (!pipelines.size) {
+    if (rest.length) groups.push({ key: 'all', label: favs.length ? 'All dashboards' : '', items: rest });
+    return groups;
   }
-
-  load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    this.analytics.fetchAllDatasets().subscribe({
-      next: response => {
-        this.loading.set(false);
-        if (response.status !== API_SUCCESS || !response.data) {
-          this.error.set(response.message || 'The registry could not be read.');
-          return;
-        }
-        this.datasets.set(response.data);
-      },
-      error: err => {
-        this.loading.set(false);
-        this.error.set(err?.error?.message || 'The registry could not be read.');
-      },
-    });
+  const byPipeline = new Map<string, Dashboard[]>();
+  const none: Dashboard[] = [];
+  for (const item of rest) {
+    const first = pipelines.get(item.analyticsDashboardId ?? -1)?.[0];
+    if (first) byPipeline.set(first, [...(byPipeline.get(first) ?? []), item]); else none.push(item);
   }
-
-  register(): void {
-    if (!this.canRegister()) return;
-    this.registering.set(true);
-    this.registerError.set('');
-    this.analytics.registerDataset({
-      datasetName: this.datasetName().trim(),
-      connectionAlias: this.alias().trim(),
-      datasetPath: this.location().trim(),
-    }).subscribe({
-      next: response => {
-        this.registering.set(false);
-        if (response.status !== API_SUCCESS || !response.data) {
-          // The resolver's own sentence, verbatim. It says the same thing for "no such
-          // connection" and "not yours" so that registration cannot be walked to learn which
-          // aliases other workspaces hold, and paraphrasing it here would invent the distinction
-          // the server spent effort refusing to make.
-          this.registerError.set(response.message || 'That dataset could not be registered.');
-          return;
-        }
-        this.datasetName.set('');
-        this.load();
-      },
-      error: err => {
-        this.registering.set(false);
-        this.registerError.set(err?.error?.message || 'That dataset could not be registered.');
-      },
-    });
+  for (const name of [...byPipeline.keys()].sort((a, b) => a.localeCompare(b))) {
+    groups.push({ key: 'pipeline:' + name, label: name, items: byPipeline.get(name)! });
   }
-
-  async forget(item: RegisteredDataset): Promise<void> {
-    const id = item.analyticsDatasetId;
-    if (!id) return;
-    const confirmed = await confirmWith(this.dialog, {
-      title: 'Remove this dataset from the registry?',
-      body: `"${item.datasetName}" will be removed from the registry. The file it names is not `
-        + 'touched — this registry holds names, never data.',
-      confirmLabel: 'Remove',
-      danger: true,
-    });
-    if (!confirmed) return;
-    this.analytics.deleteDataset(id).subscribe({
-      next: response => {
-        if (response.status !== API_SUCCESS) {
-          this.toast.error(response.message || 'That dataset could not be removed.');
-          return;
-        }
-        this.load();
-      },
-      error: err => {
-        this.toast.error(err?.error?.message || 'That dataset could not be removed.');
-      },
-    });
-  }
-
-  setAlias(value: string): void { this.typedAlias.set(value); }
-  setPath(value: string): void { this.typedPath.set(value); }
+  if (none.length) groups.push({ key: 'none', label: byPipeline.size ? 'Not fed by a pipeline' : 'All dashboards', items: none });
+  return groups;
 }

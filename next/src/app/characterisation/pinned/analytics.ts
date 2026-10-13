@@ -28,6 +28,7 @@ export const PINNED: Record<string, unknown> = {
       "Quality issues: 0, nothing to look at",
       "Refresh the saved analysis list",
       "SQL",
+      "Visualise",
       "all *.csv",
       "customers.csv 1.4 KB",
       "root"
@@ -38,7 +39,14 @@ export const PINNED: Record<string, unknown> = {
       "Filter the files and folders listed here",
       "Filter this folder"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   },
   "Analytics Studio, as a tenant user with every page": {
     "url": "/data/analytics",
@@ -68,7 +76,14 @@ export const PINNED: Record<string, unknown> = {
       "Filter the files and folders listed here",
       "Filter this folder"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/analytics/dashboards",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   },
   "Analytics Studio, as a workspace administrator": {
     "url": "/data/analytics",
@@ -99,7 +114,15 @@ export const PINNED: Record<string, unknown> = {
       "Filter the files and folders listed here",
       "Filter this folder"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/analytics/dashboards",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   },
   "a dashboard, opened": {
     "url": "/data/analytics/dashboards?board=1378",
@@ -116,6 +139,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [],
     "buttons": [
       "Add a widget",
+      "Chart theme: Console",
       "More actions"
     ],
     "columns": [],
@@ -137,9 +161,11 @@ export const PINNED: Record<string, unknown> = {
       "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
     ],
     "headings": [
-      "Saved Analyses"
+      "Dashboards"
     ],
     "buttons": [
+      "Add to favourites: UI-REVIEW Empty dashboard with a very long name to check how the header, the picker and the list cope with it — Zürich – 東京 ✓",
+      "Add to favourites: UI-REVIEW Finance overview",
       "New dashboard"
     ],
     "columns": [],
@@ -151,13 +177,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "saved analyses, as a tenant user without the page": {
-    "url": "/unauthorized?page=analytics-dashboards",
+    "url": "/unauthorized?page=analytics-dashboards&title=Dashboards",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Saved Analyses isn't part of your access"
+      "Dashboards isn't part of your access"
     ],
     "buttons": [
       "Request access"

@@ -1,24 +1,24 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Task Registry</h1>
-      <p class="page-subtitle">
-        Every task a pipeline's steps can run — what it reads and writes, its settings, how it retries and who may
-        add it — and every existing pipeline as a Legacy task, still edited in its own dialog: its topic, payload
-        fields and AI steps.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Task Registry</h1>
+        <p class="page-subtitle">
+          Every task a pipeline's steps can run — what it reads and writes, its settings, how it retries and who may
+          add it — and every existing pipeline as a Legacy task, still edited in its own dialog: its topic, payload
+          fields and AI steps.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <app-refresh-button [loading]="loading() || tasksLoading()" (refresh)="load()" />
+        @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New registry task
+        </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2 ml-auto">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || tasksLoading()">
-        <app-icon name="refresh" [class.spin]="loading() || tasksLoading()" />Refresh
-      </button>
-      @if (!locked()) {
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New pipeline
-      </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="pipelines and tasks" />
 
   @if (isPlatformAdmin()) {
@@ -32,9 +32,9 @@
     </div>
   }
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
-      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on here', icon: 'layers', tone: 'info' },
+      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' switched on', icon: 'layers', tone: 'info' },
       { label: 'Unavailable', value: taskTiles().unavailable, foot: taskTiles().unavailable ? 'the platform cannot run yet' : 'every task can run', icon: 'alert', tone: taskTiles().unavailable ? 'warn' : 'muted' },
       { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active', icon: 'send', tone: 'info' },
       { label: 'No topic', value: summary().untopped, foot: summary().untopped ? 'assign one to use them' : 'every pipeline has one', icon: 'alert', tone: summary().untopped ? 'warn' : 'muted' }
@@ -54,7 +54,7 @@
   @if (truncated()) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="status">
       <app-icon name="info" class="text-[color:var(--text-muted)]" />
-      <span>Showing the first {{ forms().length }} pipelines. Narrow by topic to see the rest.</span>
+      <span>Showing the first {{ forms().length }} registry tasks. Narrow by topic to see the rest.</span>
     </div>
   }
 
@@ -62,7 +62,7 @@
                    [isEmpty]="!filtered().length" [shown]="shown().length" [total]="filtered().length"
                    [emptyMessage]="hasFilters()
                       ? 'No task matches the current filters.'
-                      : 'No tasks yet. Create a pipeline to let Source Task offer it, and let a task on it be filled in rather than hand-written.'"
+                      : 'No registry tasks yet. Add one so a pipeline step can run it, filled in field by field rather than hand-written.'"
                    emptyIcon="template"
                    (retry)="load()">
     <ng-container toolbar>
@@ -109,8 +109,8 @@
           <th>Kind</th>
           <th>Service</th>
           <th>Input → output</th>
-          <th>State</th>
-          <th class="w-12"><span class="sr-only">Actions</span></th>
+          <th>{{ canSwitch() ? 'In this workspace' : 'State' }}</th>
+          <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -133,17 +133,27 @@
               @if (row.pipeline; as p) {
                 <div class="mt-0.5">
                   @if (p.topicName) {
-                    <a class="link-inline" [routerLink]="['/configuration/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
+                    <a class="link-inline" [routerLink]="['/settings/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
                        [title]="'Publishes on ' + (p.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ p.topicName }}</a>
                   } @else {
-                    <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">No topic</span>
+                    <span class="pill pill-warn" title="Assign a topic; a pipeline cannot pick this task until then">No topic</span>
                   }
                 </div>
               }
             </td>
             <td class="text-xs whitespace-nowrap">{{ row.input }} <span class="text-[color:var(--text-muted)]">→</span> {{ row.output }}</td>
             <td class="text-xs max-w-72">
-              <app-task-state [state]="row.state" [reason]="row.reason" [overridden]="row.overridden" />
+              @if (canSwitch() && !row.legacy) {
+                <!-- B2 (P7, P8): the switch is the state's control -- one thing that says On or Off, not a pill and a box. -->
+                <div class="flex items-center gap-2" [attr.data-switch]="row.code">
+                  <app-task-switch [task]="row.task" [busy]="!!switching()" (switched)="switchTask(row.task, $event)" />
+                  <span class="font-medium">{{ row.state }}</span>
+                  @if (row.overridden) { <span class="pill pill-neutral" title="This workspace switched it; Default puts it back">Switched here</span> }
+                </div>
+                @if (row.reason) { <p class="mt-1 text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">{{ row.reason }}</p> }
+              } @else {
+                <app-task-state [state]="row.state" [reason]="row.reason" [overridden]="row.overridden" />
+              }
             </td>
             <td>
               @if (row.pipeline; as p) {

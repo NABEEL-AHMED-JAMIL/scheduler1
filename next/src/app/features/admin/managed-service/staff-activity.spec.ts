@@ -65,7 +65,8 @@ describe('MIG-254: Our team\'s activity (a workspace administrator)', () => {
     const { page, api, get, text } = setup('workspace', [{ data: [row(9)], next: null }]);
     expect(api.actions).toHaveBeenCalledWith({ tenantId: null, appUserId: null, beforeId: null, limit: 50 });
     expect(api.users).not.toHaveBeenCalled();
-    expect(get).not.toHaveBeenCalled();
+    // Nothing but the people's pictures (app-avatar asks for those itself).
+    expect(get.mock.calls.filter(c => !String((c as unknown[])[0]).includes('/appUser.json/avatar'))).toEqual([]);
     expect(page.showWorkspace()).toBe(false);
     expect(text()).toContain("Our team's activity");
     // The staff to filter by are the people seen in the log.

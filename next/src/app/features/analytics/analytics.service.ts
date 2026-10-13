@@ -1,7 +1,16 @@
+import type { BoardFilterOutcome, BoardFilterWire } from './board/board-filters';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import type { PinChartRequest } from './charts/chart-answer';
+
+/** What pinChart answers: the board (made or chosen), the saved query and the widget. */
+export interface PinnedChart {
+  dashboard: { analyticsDashboardId: number; dashboardName: string; created: boolean };
+  analyticsQueryId: number;
+  widget: DashboardWidget;
+}
 
 export interface DatasetColumn {
   name: string;
@@ -204,6 +213,8 @@ export interface QueryRequest {
   sql: string;
   connection2?: string;
   path2?: string;
+  /** A dashboard tile's board filters (board/board-filters.ts): the server narrows the dataset before the statement. */
+  boardFilters?: BoardFilterWire[];
 }
 
 /**
@@ -223,6 +234,8 @@ export interface QueryRequest {
  * short one, and will go and act on it.
  */
 export interface QueryResult {
+  /** What each board filter did to this run, when it carried any. */
+  boardFilters?: BoardFilterOutcome[];
   columns: string[];
   /** A null cell is a real null, not an empty string -- the same distinction a preview draws. */
   rows: (string | null)[][];
@@ -493,6 +506,8 @@ export interface AnalysisRequest {
   sort?: AnalysisSort;
   /** Minted by the client, for the same reason query() mints one: so a run can be stopped. */
   queryId?: string;
+  /** A dashboard tile's board filters: the dataset is narrowed by them before the analysis reads it. */
+  boardFilters?: BoardFilterWire[];
   /**
    * The drill steps already taken, oldest first, echoed back exactly as the server sent them.
    *
@@ -599,6 +614,8 @@ export interface PivotGrid {
 }
 
 export interface AnalysisResult {
+  /** What each board filter did to this run, when it carried any. */
+  boardFilters?: BoardFilterOutcome[];
   columns: AnalysisColumn[];
   /** Strings on the wire, rendered faithfully on screen. See plainDecimal/dateOnly in analytics.ts. */
   rows: (string | null)[][];
@@ -698,12 +715,26 @@ export interface Dashboard {
   analyticsDashboardId?: number;
   dashboardName: string;
   dashboardDescription?: string | null;
+  /**
+   * The board's presentation settings as JSON -- today only the chart theme every tile draws in
+   * (charts/chart-settings.ts, BoardSettings). The server keeps the row's value when this is
+   * absent from a save, so a client that never heard of it cannot clear it by renaming the board.
+   */
+  dashboardConfig?: string | null;
   dateCreated?: string;
   dateUpdated?: string;
   createdByName?: string;
   /** Present on fetchDashboardById, in display order. Absent on the listing. */
   widgets?: DashboardWidget[];
+  /**
+   * UX review B5: the pipelines whose output this board reads, the newest run first, from the catalog's lineage
+   * (analytics-service DashboardSources). Read-only; absent from an older server.
+   */
+  pipelines?: DashboardPipeline[];
 }
+
+/** A pipeline (by its schedule) that feeds a board, and its last run that did. */
+export interface DashboardPipeline { jobId: number; name: string | null; lastRunId: number | null; lastRunAt: string | null; }
 
 /**
  * What a widget draws, and the whole of what this client will store in visualization_type.
@@ -720,9 +751,29 @@ export interface Dashboard {
  */
 export type WidgetVisualization =
   | 'table' | 'ranked' | 'rankedShare' | 'bar' | 'donut'
-  | 'kpi' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
+  | 'kpi' | 'kpiTrend' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
   | 'comparison' | 'pivot' | 'groupedBar'
-  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary';
+  | 'dimensionSummary' | 'trendSummary' | 'distributionSummary'
+  | EChartKind;
+
+/**
+ * The kinds app-echart draws (widget-kinds.ts lists them with their categories). Each id is well
+ * under the column's 32 characters, and analytics-service stores any string that fits, so adding
+ * one needs no server change.
+ */
+export type EChartKind =
+  | 'barH' | 'waterfall' | 'pareto' | 'barLine' | 'polarBar' | 'pictorialBar'
+  | 'lineSmooth' | 'lineStep' | 'lineMarkers' | 'areaStacked' | 'areaShare'
+  | 'rose' | 'halfDonut' | 'nestedPie'
+  | 'scatterTrend' | 'bubble' | 'effectScatter'
+  | 'boxplot' | 'density'
+  | 'treemap' | 'sunburst' | 'tree'
+  | 'sankey' | 'chord'
+  | 'heatmap' | 'calendar'
+  | 'funnel' | 'gauge' | 'radar' | 'parallel' | 'themeRiver' | 'candlestick';
+
+/** The kinds drawn by the console's own SVG components: every kind that existed before ECharts. */
+export type ClassicKind = Exclude<WidgetVisualization, EChartKind>;
 
 /**
  * One tile: a REFERENCE to a saved analysis or a saved query, and how to draw it.
@@ -815,6 +866,7 @@ function analysisBody(request: AnalysisRequest): Record<string, unknown> {
   if (request.topN) body['topN'] = { ...request.topN };
   if (request.sort) body['sort'] = { ...request.sort };
   if (request.queryId) body['queryId'] = request.queryId;
+  if (request.boardFilters?.length) body['boardFilters'] = request.boardFilters;
   // Echoed, not rebuilt. Sent even on a plain /analyze, because a re-run of a drilled analysis
   // is still the drilled analysis -- dropping the trail there would climb back out of it while
   // the breadcrumb bar went on saying otherwise.
@@ -962,9 +1014,11 @@ export class AnalyticsService {
    * either half being present as "there is a join here", and an empty string is present.
    */
   query(request: QueryRequest & { queryId?: string }): Observable<ApiResponse<QueryResult>> {
-    const body: Record<string, string> = {
+    const body: Record<string, unknown> = {
       connection: request.connection, path: request.path, sql: request.sql,
     };
+    // Only on a filtered board: a tile with none posts exactly the body it always did.
+    if (request.boardFilters?.length) body['boardFilters'] = request.boardFilters;
     // The CLIENT names the run, forced by this endpoint being synchronous: a server-minted id
     // would arrive with the rows, which is after there is anything left to stop. The server keys
     // its registry on (tenant, user, id), so a chosen id is scoped to the caller and can neither
@@ -1098,6 +1152,8 @@ export class AnalyticsService {
       body['dashboardDescription'] = dashboard.dashboardDescription;
     }
     if (dashboard.analyticsDashboardId) body['analyticsDashboardId'] = dashboard.analyticsDashboardId;
+    // Absent means "leave it as stored"; null or an empty string clears it.
+    if (dashboard.dashboardConfig !== undefined) body['dashboardConfig'] = dashboard.dashboardConfig ?? '';
     return this.http.post<ApiResponse<Dashboard>>(`${this.workspace}/saveDashboard`, body);
   }
 
@@ -1147,6 +1203,14 @@ export class AnalyticsService {
   }
 
   /** Takes one tile off a board. The analysis or query it showed is untouched. */
+  /**
+   * MIG-357: a chart answer kept as a tile -- its query saved and a widget on the board (or a new one), both or neither,
+   * in one transaction on the server (analyticsWorkspace.json/pinChart).
+   */
+  pinChart(request: PinChartRequest): Observable<ApiResponse<PinnedChart>> {
+    return this.http.post<ApiResponse<PinnedChart>>(`${this.workspace}/pinChart`, request);
+  }
+
   deleteWidget(analyticsDashboardWidgetId: number): Observable<ApiResponse<void>> {
     return this.http.delete<ApiResponse<void>>(`${this.workspace}/deleteWidget`, {
       params: { analyticsDashboardWidgetId: String(analyticsDashboardWidgetId) },

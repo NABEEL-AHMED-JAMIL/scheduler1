@@ -5,10 +5,10 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
-import { TaskInbox, INBOX_LIST_LIMIT } from './task-inbox';
+import { TaskInbox } from './task-inbox';
 import { TaskCountService } from './task-count.service';
 import { InboxTask, TaskDetail, WorkflowsApi } from './workflows.api';
-import { historyLines, shortTime } from './history';
+import { compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 
 /**
  * The Task inbox (MIG-276): what waits for the reader, the request and its history in words, and the decisions --
@@ -28,7 +28,7 @@ const DETAIL = {
   ],
 } as unknown as TaskDetail;
 
-function screenWith(detail: TaskDetail = DETAIL) {
+function screenWith(detail: TaskDetail = DETAIL, tenantId: number | null = 2924) {
   const api = {
     mine: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [TASK] })),
     groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
@@ -48,8 +48,8 @@ function screenWith(detail: TaskDetail = DETAIL) {
       provideRouter([]),
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537 }) } },
+      { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(1), overdue: signal(0), mine: signal(0), groups: signal(0), done: signal(0), requests: signal(0) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4537, tenantId }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);
@@ -65,7 +65,9 @@ describe('Task inbox', () => {
     expect(detail).toContain('Vendor name');
     expect(detail).toContain('Acme');
     expect(detail).toContain('Requested by Alex');
-    expect(detail).toContain('Manager approves: waiting for you · due ' + shortTime('2026-10-02T16:00:00'));
+    // The task's own lines drop its name: the heading already says it.
+    expect(detail).toContain('Waiting for you · due ' + shortTime('2026-10-02T16:00:00'));
+    expect(detail).not.toContain('Manager approves: waiting');
     expect(el.querySelector('[data-test="decisions"]')!.textContent).toContain('Approve');
   });
 
@@ -113,6 +115,8 @@ describe('Task history in words', () => {
       ['Manager approves: approved by Nabeel (for Alex)', 'ok', 'ok'],
       ['Request approved', 'ok', undefined],
     ]);
+    // A byline only where a person acted; the request's end is the workflow's.
+    expect(lines.map(l => l.actor)).toEqual(['Nabeel (for Alex)', undefined]);
     // Naive times are Chicago wall-clock; offset times are taken at their word.
     expect(shortTime('2026-10-01T08:05:00', 'America/Chicago')).toBe('1 Oct, 08:05');
     expect(shortTime('2026-09-30T22:20:57.914+00:00', 'America/Chicago')).toBe('30 Sep, 17:20');
@@ -120,12 +124,45 @@ describe('Task history in words', () => {
   });
 });
 
+describe('The task\'s own history lines', () => {
+  it('drops the task\'s name and its colon from the start of a line, and only there', () => {
+    const lines = [
+      { id: 1, at: '', tone: 'now', text: 'Alex approves the visit: went to the administrators' },
+      { id: 2, at: '', tone: 'ok', text: 'Requested by Sam' },
+      { id: 3, at: '', tone: 'plain', text: 'Nurse checks: Alex approves the visit: no' },
+      { id: 4, at: '', tone: 'plain', text: 'Alex approves the visit again' },
+    ] as never;
+    expect(dropOwnStep(lines, 'Alex approves the visit').map(l => l.text)).toEqual([
+      'Went to the administrators', 'Requested by Sam', 'Nurse checks: Alex approves the visit: no', 'Alex approves the visit again']);
+    expect(dropOwnStep(lines, null)).toBe(lines);
+  });
+
+  it('says when relative to now, 24-hour, with the exact time for the tooltip', () => {
+    const now = Date.parse('2026-10-06T19:00:00Z'); // 14:00 in Chicago, a Tuesday
+    const tz = 'America/Chicago';
+    expect(relativeTime('2026-10-06T13:59:40', now, tz)).toBe('just now');
+    expect(relativeTime('2026-10-06T13:35:00', now, tz)).toBe('25 min ago');
+    expect(relativeTime('2026-10-06T09:10:00', now, tz)).toBe('4 h ago');
+    expect(relativeTime('2026-10-05T21:34:00', now, tz)).toBe('Yesterday, 21:34');
+    expect(relativeTime('2026-10-07T08:00:00', now, tz)).toBe('Tomorrow, 08:00');
+    expect(relativeTime('2026-09-30T08:05:00', now, tz)).toBe('30 Sep, 08:05');
+    expect(exactTime('2026-10-06T14:05:00', tz)).toBe('Tue 6 Oct 2026, 14:05');
+    expect(exactTime('2026-10-06T19:05:00+00:00', tz)).toBe('Tue 6 Oct 2026, 14:05');
+    expect(compactTime('2026-10-06T08:00:00', now, tz)).toBe('08:00');
+    expect(compactTime('2026-10-05T08:00:00', now, tz)).toBe('Yesterday');
+    expect(compactTime('2026-10-05T08:00:00', now, tz, true)).toBe('08:00');
+    expect(compactTime('2026-10-07T08:00:00', now, tz)).toBe('Tomorrow');
+    expect(compactTime('2026-10-02T08:00:00', now, tz)).toBe('Fri');
+    expect(compactTime('2026-09-20T08:00:00', now, tz)).toBe('20 Sep');
+  });
+});
+
 describe('P2 #31 and #36: the inbox at the edges', () => {
-  it('reads a full tab from the count service, or "200+", never a silent 200', () => {
+  it('reads a tab with more to load from the count service, or "100+", never a page size as the total', () => {
     const { screen } = screenWith();
-    expect(screen.tabCount(12, 0)).toBe('12');
-    expect(screen.tabCount(INBOX_LIST_LIMIT, 0)).toBe('200+');
-    expect(screen.tabCount(INBOX_LIST_LIMIT, 1240)).toBe('1,240');
+    expect(screen.tabCount(12, 0, true)).toBe('12');
+    expect(screen.tabCount(100, 0, false)).toBe('100+');
+    expect(screen.tabCount(100, 1240, false)).toBe('1,240');
   });
 
   it('explains a request of one\'s own in a workspace with no one else to approve it', () => {
@@ -133,5 +170,18 @@ describe('P2 #31 and #36: the inbox at the edges', () => {
     expect(screen.aloneInWorkspace()).toBe(false);
     screen.colleagues.set([{ userId: 4537, fullName: 'Me', username: 'me@x.io' } as never]);
     expect(screen.aloneInWorkspace()).toBe(true);
+  });
+});
+
+/** Review 2026-10-07: a platform administrator's own sign-in has no workspace; the inbox said "could not be read". */
+describe('Task inbox -- a sign-in with no workspace', () => {
+  it('reads nothing and points to Work in a workspace', () => {
+    const { api, el, screen } = screenWith(DETAIL, null);
+    expect(api.mine).not.toHaveBeenCalled();
+    expect(screen.error()).toBe('');
+    expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
+    expect(el.querySelector('[data-test="tab-mine"]')).toBeNull();
+    screen.load();
+    expect(api.mine).not.toHaveBeenCalled();
   });
 });

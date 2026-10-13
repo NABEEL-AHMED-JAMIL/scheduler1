@@ -32,13 +32,14 @@ describe('Run history layout', () => {
     expect(tag).not.toContain('lgCols');
   });
 
-  it('pins the Status and Logs cell to the right edge', async () => {
+  /** Owner 2026-10-12: the status by the message it explains; the pinned cell keeps the run's actions, which cannot scroll away. */
+  it('pins the actions cell to the right edge, the status in its own column before the message', async () => {
     const html = await read('history/job-history.html');
-    expect(classesOf(html, '>Status</th>', 'th')).toContain('col-pin-right');
-    expect(classesOf(html, '<app-status [label]="run.jobStatus"')).toContain('col-pin-right');
-    // The Logs link shares the pinned cell, so the row's one action cannot scroll away either.
-    const cell = html.slice(html.indexOf('<app-status [label]="run.jobStatus"'));
-    expect(cell.slice(0, cell.indexOf('</td>'))).toContain("'runs', run.jobQueueId, 'logs'");
+    expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, 'data-test="run-logs"', 'td')).toContain('col-pin-right');
+    expect(classesOf(html, '<app-status [label]="run.jobStatus"')).not.toContain('col-pin-right');
+    const cell = html.slice(html.indexOf('data-test="run-logs"'));
+    expect(cell.slice(0, cell.indexOf('</td>'))).toContain("'runs', run.jobQueueId]");
   });
 
   it('waits for a wide screen before showing Queued', async () => {
@@ -49,11 +50,11 @@ describe('Run history layout', () => {
 });
 
 describe('Jobs table layout', () => {
-  it('waits for a wide screen before showing Task, Execution and Created', async () => {
+  it('waits for a wide screen before showing Pipeline, Mode and Created', async () => {
     const html = await read('jobs.html');
     const cells: Array<[string, string]> = [
-      ['>Task</th>', '@if (job.taskDetail?.taskName)'],
-      ['>Execution</th>', "@if (job.execution === 'Auto')"],
+      ['>Pipeline</th>', '@if (job.taskDetail?.taskName)'],
+      ['>Mode</th>', "@if (job.execution === 'Auto')"],
       ['>Created</th>', '{{ job.dateCreated ?'],
     ];
     for (const [head, cell] of cells) {
@@ -62,9 +63,15 @@ describe('Jobs table layout', () => {
     }
   });
 
+  it('puts Run status and State side by side at the right (S1)', async () => {
+    const html = await read('jobs.html');
+    const heads = [...html.matchAll(/<th[^>]*>([^<]+)<\/th>/g)].map(m => m[1].trim()).filter(Boolean);
+    expect(heads.slice(-4)).toEqual(['Next / last run', 'Run status', 'State', 'Actions']);
+  });
+
   it('keeps the actions pinned to the right edge', async () => {
     const html = await read('jobs.html');
-    expect(classesOf(html, '<span class="sr-only">Actions</span>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
     expect(classesOf(html, '[cdkMenuTriggerFor]="menu"')).toContain('col-pin-right');
   });
 });
@@ -101,5 +108,25 @@ describe('Job editor weekday toggles', () => {
     expect(block).toContain('name="check"');
     const ts = await read('edit/job-edit.ts');
     expect(ts).toMatch(/\.seg-multi \.seg-btn\[aria-pressed="true"\]\s*\{[^}]*var\(--btn-primary-bg\)/);
+  });
+});
+
+/** UX review 2026-10-12 (S2): the schedule's form keeps the one-of choice apart from the starts that add to it. */
+describe('Schedule form -- When it runs (S2)', () => {
+  it('puts "Also starts when" under its own label, after the one-of choice, and numbers AI models', async () => {
+    const html = await read('edit/job-edit.html');
+    const when = html.slice(html.indexOf('When it runs</h2>'));
+    const radios = when.indexOf('role="radiogroup"');
+    const also = when.indexOf('Also starts when</h3>');
+    expect(radios).toBeGreaterThanOrEqual(0);
+    expect(also).toBeGreaterThan(radios);
+    expect(when.slice(radios, also)).not.toContain('id="onArrival"');
+    expect(when.slice(also)).toContain('id="onArrival"');
+    expect(html).toContain('<span class="step-no">4</span>AI models');
+  });
+
+  it('links back to the pipeline it runs', async () => {
+    const html = await read('edit/job-edit.html');
+    expect(html).toContain(`data-test="open-pipeline" [routerLink]="['/pipelines', pid, 'edit']"`);
   });
 });

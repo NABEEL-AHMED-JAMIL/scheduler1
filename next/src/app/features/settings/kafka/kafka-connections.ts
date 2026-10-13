@@ -11,6 +11,7 @@ import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
 import { StatusPill } from '../../../shared/ui/status-pill';
+import { ONE_PANE_BELOW_1024 } from '../../../shared/ui/one-pane';
 import { Icon } from '../../../shared/ui/icon';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { CopyButton } from '../../../shared/ui/copy-button';
@@ -26,6 +27,8 @@ import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpParams } from '@angular/common/http';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { profileLabel } from './platform-default';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** As much of a tenant.json/listTenants row as this screen reads. */
 export interface TenantName {
@@ -99,7 +102,7 @@ export interface TopicHealth {
   lag: number;
   readers: number;
   consumers: TopicReader[];
-  /** Healthy, Under-replicated, Offline, No consumer, Missing. */
+  /** Healthy, Under-replicated, Offline, No consumer, Idle, Missing. */
   state: string;
 }
 
@@ -140,13 +143,16 @@ export function healthTone(state: string | null | undefined): 'ok' | 'warn' | 'c
     case 'Healthy': case 'Stable': return 'ok';
     case 'Under-replicated': case 'No consumer': case 'Empty': case 'Preparing rebalance': case 'Completing rebalance': return 'warn';
     case 'Offline': case 'Missing': case 'Dead': return 'crit';
+    // Idle: nothing kept and nothing reading, as a step pipeline's topic is (MIG-321) -- nothing for anyone to fix.
+    case 'Idle': return 'neutral';
     default: return 'neutral';
   }
 }
 
 @Component({
   selector: 'app-kafka-connections',
-  imports: [MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, StatStrip, ServerTimePipe, StatusPill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton, RouterLink, BlurLoader, ManagedBanner],
+  styles: [ONE_PANE_BELOW_1024],
   templateUrl: './kafka-connections.html',
 })
 export class KafkaConnections implements OnInit {
@@ -161,11 +167,14 @@ export class KafkaConnections implements OnInit {
    * Task Types links to, so arriving from there lands on that profile rather than on a banner.
    */
   readonly selectedId = signal<number | null>(null);
+  /** Review 2026-10-07 (M17): below 1024 px the list, or the profile opened from it ("Back to list"); a ?profileId= link opens it. */
+  readonly pane = signal<'list' | 'detail'>(this.route.snapshot.queryParamMap.get('profileId') ? 'detail' : 'list');
   readonly selected = computed(() =>
     this.profiles().find(p => p.kafkaConnectionProfileId === this.selectedId()) ?? null);
 
   select(profile: KafkaProfile): void {
     this.selectedId.set(profile.kafkaConnectionProfileId);
+    this.pane.set('detail');
     this.topicSearch.set('');
     this.topicPage.set(0);
     this.topicTests.set({});
@@ -354,7 +363,7 @@ export class KafkaConnections implements OnInit {
       topicName: type.serviceName,
       kafkaTopic: parseTopicPartition(type.queueTopicPartition).topic,
       pipelines: this.pipelinesOf(type),
-    }));
+    }, 'narrow', 'right'));
   }
 
   /**
@@ -409,7 +418,7 @@ export class KafkaConnections implements OnInit {
     const ok = await confirmWith(this.dialog, {
       title: `Delete ${type.serviceName}?`,
       body: linked
-        ? `${linked} task${linked === 1 ? '' : 's'} use this topic. Deleting it also marks their jobs deleted — they will stop running.`
+        ? `${linked} pipeline${linked === 1 ? '' : 's'} use this topic. Deleting it also marks their schedules deleted — they will stop running.`
         : 'No task uses this topic.',
       confirmLabel: 'Delete topic',
       danger: true,

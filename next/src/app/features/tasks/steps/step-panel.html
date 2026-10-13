@@ -7,50 +7,31 @@
         </div>
       }
 
-      <div class="form-grid">
-        <app-field label="Key" for="stepKey" [required]="true" [error]="keyError()"
+      <!-- UX review 2026-10-12 (A4, A9, P9): what the step is (key, name, what it reads), then its task's own settings --
+           what the step is for -- and only then how it runs; related numbers share a row instead of each taking the width. -->
+      <app-form-row>
+        <app-field class="fr-4" label="Key" for="stepKey" [required]="true" [error]="keyError()"
                    hint="Lower case letters, digits and _. Names the step's rows and datasets, and what a later step reads.">
           <input id="stepKey" class="input mono" [value]="s.key" [disabled]="readOnly" autocomplete="off"
                  (input)="patch({ key: $any($event.target).value.trim() })" />
         </app-field>
-        <app-field label="Name" for="stepName" [error]="problemsAt('name')" hint="What the timeline calls it. Blank: its key.">
+        <app-field class="fr-8" label="Name" for="stepName" [error]="problemsAt('name')" hint="What the timeline calls it. Blank: its key.">
           <input id="stepName" class="input" [value]="s.name ?? ''" [disabled]="readOnly" placeholder="What this step does"
                  (input)="patch({ name: $any($event.target).value })" />
         </app-field>
-      </div>
-
-      <app-field label="Reads" for="stepInput" [error]="problemsAt('input')"
-                 hint="Another step's output, from earlier in the pipeline. The first step reads the pipeline's source.">
-        <select id="stepInput" class="input" [value]="s.input ?? ''" [disabled]="readOnly" (change)="patch({ input: $any($event.target).value })">
-          <option value="">The latest output before this step</option>
-          @for (key of data.earlierKeys; track key) { <option [value]="key" [selected]="s.input === key">{{ key }}</option> }
-        </select>
-      </app-field>
-
-      <div class="form-grid">
-        <app-field label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" [hint]="triesHint">
-          <input id="stepTries" class="input" type="number" min="1" [max]="limits.maxTries" step="1" [value]="s.retry?.maxAttempts ?? ''"
-                 [disabled]="readOnly" (input)="setRetry('maxAttempts', $any($event.target).value)" />
-        </app-field>
-        <app-field label="Seconds between tries" for="stepDelay" [error]="problemsAt('retry.delaySeconds')" [hint]="delayHint">
-          <input id="stepDelay" class="input" type="number" min="0" [max]="limits.maxDelaySeconds" step="1" [value]="s.retry?.delaySeconds ?? ''"
-                 [disabled]="readOnly" (input)="setRetry('delaySeconds', $any($event.target).value)" />
-        </app-field>
-        <app-field label="Timeout (seconds)" for="stepTimeout" [error]="problemsAt('timeoutSeconds')" [hint]="timeoutHint">
-          <input id="stepTimeout" class="input" type="number" min="1" [max]="limits.maxTimeoutSeconds" step="1" [value]="s.timeoutSeconds ?? ''"
-                 [disabled]="readOnly" (input)="patch({ timeoutSeconds: whole($any($event.target).value) })" />
-        </app-field>
-        <app-field label="If it fails" for="stepOnError" [error]="problemsAt('onError')">
-          <select id="stepOnError" class="input" [value]="s.onError ?? ''" [disabled]="readOnly" (change)="patch({ onError: $any($event.target).value })">
-            <option value="">{{ defaultOnErrorText() }}</option>
-            @for (o of onErrors; track o) { <option [value]="o" [selected]="s.onError === o">{{ onErrorText(o) }}</option> }
+      </app-form-row>
+      <app-form-row>
+        <app-field class="fr-12" label="Reads" for="stepInput" [error]="problemsAt('input')"
+                   hint="Another step's output, from earlier in the pipeline. The first step reads the pipeline's source.">
+          <select id="stepInput" class="input" [value]="s.input ?? ''" [disabled]="readOnly" (change)="patch({ input: $any($event.target).value })">
+            <option value="">The latest output before this step</option>
+            @for (key of data.earlierKeys; track key) { <option [value]="key" [selected]="s.input === key">{{ key }}</option> }
           </select>
         </app-field>
-      </div>
-
+      </app-form-row>
       <section class="flex flex-col gap-2 min-w-0" aria-labelledby="stepConfigHeading">
         <div class="flex items-center gap-2">
-          <h3 id="stepConfigHeading" class="text-sm font-semibold">Task settings</h3>
+          <h3 id="stepConfigHeading" class="section-title">Task settings</h3>
           @if (hasForm) {
             <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="configMode() === 'json' && !!configError()" (click)="toggleMode()">
               <app-icon [name]="configMode() === 'form' ? 'code' : 'list'" />{{ configMode() === 'form' ? 'Edit as JSON' : 'Edit as form' }}
@@ -59,8 +40,8 @@
         </div>
         @if (configMode() === 'form' && data.task?.configSchema; as schema) {
           <app-schema-form [schema]="schema" [value]="s.config" [problems]="formProblems()" idPrefix="cfg" [disabled]="readOnly"
-                           [columns]="columns" [steps]="data.earlierKeys" [prompts]="data.prompts ?? []"
-                           (valueChange)="setConfig($event)" />
+                           [columns]="columns" [steps]="data.earlierKeys" [prompts]="data.prompts ?? []" [buckets]="data.buckets ?? []"
+                           [webhooks]="data.webhooks ?? []" [documentTypes]="data.documentTypes ?? []" (valueChange)="setConfig($event)" />
         } @else {
           <app-field label="Settings as JSON" for="stepConfig" [error]="configError() || configProblems().join(' · ')"
                      [hint]="hasForm ? 'The same settings as the form.' : 'This task has no settings form yet: its settings are edited as JSON.'">
@@ -69,6 +50,29 @@
           </app-field>
         }
       </section>
+      <!-- How it runs: the related numbers on one row (A4). -->
+      <app-section title="How it runs" sub="Retries, the time limit, and what happens when it fails." [level]="3">
+        <app-form-row>
+          <app-field class="fr-3" label="Tries" for="stepTries" [error]="problemsAt('retry.maxAttempts')" [hint]="triesHint">
+            <input id="stepTries" class="input" type="number" min="1" [max]="limits.maxTries" step="1" [value]="s.retry?.maxAttempts ?? ''"
+                   [disabled]="readOnly" (input)="setRetry('maxAttempts', $any($event.target).value)" />
+          </app-field>
+          <app-field class="fr-3" label="Seconds between tries" for="stepDelay" [error]="problemsAt('retry.delaySeconds')" [hint]="delayHint">
+            <input id="stepDelay" class="input" type="number" min="0" [max]="limits.maxDelaySeconds" step="1" [value]="s.retry?.delaySeconds ?? ''"
+                   [disabled]="readOnly" (input)="setRetry('delaySeconds', $any($event.target).value)" />
+          </app-field>
+          <app-field class="fr-3" label="Timeout (seconds)" for="stepTimeout" [error]="problemsAt('timeoutSeconds')" [hint]="timeoutHint">
+            <input id="stepTimeout" class="input" type="number" min="1" [max]="limits.maxTimeoutSeconds" step="1" [value]="s.timeoutSeconds ?? ''"
+                   [disabled]="readOnly" (input)="patch({ timeoutSeconds: whole($any($event.target).value) })" />
+          </app-field>
+          <app-field class="fr-3" label="If it fails" for="stepOnError" [error]="problemsAt('onError')">
+            <select id="stepOnError" class="input" [value]="s.onError ?? ''" [disabled]="readOnly" (change)="patch({ onError: $any($event.target).value })">
+              <option value="">{{ defaultOnErrorText() }}</option>
+              @for (o of onErrors; track o) { <option [value]="o" [selected]="s.onError === o">{{ onErrorText(o) }}</option> }
+            </select>
+          </app-field>
+        </app-form-row>
+      </app-section>
     </div>
   }
 

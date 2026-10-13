@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -30,9 +30,16 @@ import { TemplateDialog, TemplateDialogData } from './template-dialog';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { PipelineRead, PipelineReads, readsSentence } from './pipeline-reads';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
+/** Tab hubs (2026-10-12): each view is a tab of Connections, at its own address. */
+export const SOURCES_VIEW_PATHS: Record<SourcesTab, string> = {
+  sources: '/connections/sources', connections: '/connections/databases', contracts: '/connections/contracts',
+};
 
 /**
  * Sources (MIG-248, Integration menu, page key sources): where a pipeline's data comes from -- an API from the
@@ -47,7 +54,7 @@ const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
  */
 @Component({
   selector: 'app-sources',
-  imports: [SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [RouterLink, RefreshButton, PipelineReads, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {
@@ -63,7 +70,14 @@ export class Sources implements OnInit {
   readonly tabs: { id: SourcesTab; label: string }[] = [
     { id: 'sources', label: 'Sources' }, { id: 'connections', label: 'Database connections' }, { id: 'contracts', label: 'Data contracts' },
   ];
-  readonly tab = signal<SourcesTab>(this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
+  /**
+   * Tab hubs (2026-10-12): the address names the view -- Connections › Sources, Databases or Data contracts -- and the
+   * hub's strip is the way between them, so the page's own tab strip is not shown. Without a view in the route (a unit
+   * test mounting the page alone) the page keeps its own tabs, read from ?tab=.
+   */
+  readonly hubView = (this.route.snapshot?.data?.['view'] as SourcesTab | undefined) ?? null;
+  readonly tab = signal<SourcesTab>(this.hubView ?? this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
+  readonly heading = computed(() => ({ sources: 'Sources', connections: 'Database connections', contracts: 'Data contracts' })[this.tab()]);
   readonly canManage = computed(() => this.auth.canBuild());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   private readonly tenants = signal<ComboboxOption[]>([]);
@@ -86,8 +100,20 @@ export class Sources implements OnInit {
     .map(r => this.named(r)));
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.kindFilter());
   readonly emptyMessage = computed(() => this.hasFilters() ? 'No source matches the current filters.'
-    : this.canManage() ? 'No sources yet. Add one: an API from API Collections, a file or folder in your storage, or a database query.'
-      : 'No sources yet. A workspace administrator adds them.');
+    // UX review 2026-10-13 (I1): never "nothing" while the pipelines read data directly.
+    : this.pipelineReads().length ? readsSentence(this.pipelineReads())
+      : this.canManage() ? 'No sources yet. Add one: an API from API Collections, a file or folder in your storage, or a database query.'
+        : 'No sources yet. A workspace administrator adds them.');
+  readonly emptyHint = computed(() => this.hasFilters() || this.pipelineReads().length ? ''
+    : 'Pipelines also read API Collections and storage directly, without a source; add one here to test and preview it.');
+
+  // -------------------------------------------------------------------------------------------- what pipelines read
+
+  /** UX review 2026-10-13 (I1): what the workspace's pipelines read (Core); a platform administrator has no workspace. */
+  readonly showPipelineReads = computed(() => !this.isPlatformAdmin());
+  readonly pipelineReads = signal<PipelineRead[]>([]);
+  readonly pipelineReadsLoading = signal(false);
+  readonly pipelineReadsError = signal('');
 
   readonly kpis = computed((): StatStripItem[] => {
     const rows = this.rows();
@@ -130,6 +156,12 @@ export class Sources implements OnInit {
   }
 
   ngOnInit(): void {
+    // An old link to a view by ?tab= (Sources' Database connections) opens that view's own tab.
+    const asked = this.route.snapshot?.queryParamMap?.get('tab');
+    if (this.hubView && asked && (TABS as string[]).includes(asked) && asked !== this.hubView) {
+      void this.router.navigate([SOURCES_VIEW_PATHS[asked as SourcesTab]], { replaceUrl: true });
+      return;
+    }
     this.readTab(this.tab());
     if (this.isPlatformAdmin()) {
       this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
@@ -149,6 +181,7 @@ export class Sources implements OnInit {
   }
 
   setTab(tab: SourcesTab): void {
+    if (this.hubView) { void this.router.navigateByUrl(SOURCES_VIEW_PATHS[tab]); return; }
     this.tab.set(tab);
     this.readTab(tab);
     this.router.navigate([], { relativeTo: this.route, queryParams: { tab: tab === 'sources' ? null : tab }, queryParamsHandling: 'merge', replaceUrl: true });
@@ -156,7 +189,7 @@ export class Sources implements OnInit {
 
   /** A tab's list is read the first time it is opened, and again on Refresh. */
   private readTab(tab: SourcesTab): void {
-    if (tab === 'sources' && !this.sourcesRead) this.load();
+    if (tab === 'sources' && !this.sourcesRead) { this.load(); this.loadPipelineReads(); }
     if (tab === 'connections' && !this.connectionsRead) this.loadConnections();
     if (tab === 'contracts' && !this.contractsRead) this.loadContracts();
   }
@@ -164,7 +197,25 @@ export class Sources implements OnInit {
   refresh(): void {
     if (this.tab() === 'connections') this.loadConnections();
     else if (this.tab() === 'contracts') this.loadContracts();
-    else this.load();
+    else { this.load(); this.loadPipelineReads(); }
+  }
+
+  /** What the pipelines read: once with the Sources tab, and again on Refresh. */
+  loadPipelineReads(): void {
+    if (!this.showPipelineReads()) return;
+    this.pipelineReadsLoading.set(true);
+    this.pipelineReadsError.set('');
+    this.api.pipelineReads().subscribe({
+      next: r => {
+        this.pipelineReadsLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.pipelineReadsError.set(r.message); return; }
+        this.pipelineReads.set(r.data ?? []);
+      },
+      error: err => {
+        this.pipelineReadsLoading.set(false);
+        this.pipelineReadsError.set(err?.error?.message || 'Could not load what the pipelines read.');
+      },
+    });
   }
 
   load(): void {
@@ -239,7 +290,7 @@ export class Sources implements OnInit {
     const data: SourcePanelData = {
       sourceId, canManage: this.canManage(), tenants: this.isPlatformAdmin() ? this.tenants() : undefined,
     };
-    this.dialog.open<boolean>(SourcePanel, sidePanelConfig(data, 'wide')).closed.subscribe(changed => {
+    this.dialog.open<boolean>(SourcePanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(changed => {
       if (changed) { this.load(); if (this.connectionsRead) this.loadConnections(); }
     });
   }
@@ -299,7 +350,7 @@ export class Sources implements OnInit {
 
   openContract(c: ContractRow): void {
     const data: ContractPanelData = { contract: c, canManage: this.canManage() };
-    this.dialog.open<boolean>(ContractPanel, sidePanelConfig(data, 'wide')).closed.subscribe(changed => { if (changed) this.loadContracts(); });
+    this.dialog.open<boolean>(ContractPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(changed => { if (changed) this.loadContracts(); });
   }
 
   installTemplate(): void {

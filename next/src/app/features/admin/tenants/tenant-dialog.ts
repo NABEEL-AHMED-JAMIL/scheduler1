@@ -13,7 +13,7 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
   template: `
     <app-form-dialog
         [heading]="isEdit() ? 'Edit tenant' : 'New tenant'"
-        subtitle="Every job, bucket, task and agent belongs to a tenant."
+        subtitle="Every schedule, pipeline, bucket and agent belongs to a workspace."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
         [saving]="saving()"
         (cancelled)="ref.close(false)" (confirmed)="save()">

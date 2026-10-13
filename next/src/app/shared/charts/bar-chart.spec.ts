@@ -405,7 +405,7 @@ describe('a chart of how long runs took', () => {
 
   it('draws the short label above the bar', () => {
     const { el } = durationChart(runs, 600);
-    const labels = [...el.querySelectorAll('span.text-\\[11px\\].tabular')].map(s => s.textContent!.trim());
+    const labels = [...el.querySelectorAll('span.bar-value')].map(s => s.textContent!.trim());
     expect(labels).toContain('25s');
     expect(labels).not.toContain('0');
   });

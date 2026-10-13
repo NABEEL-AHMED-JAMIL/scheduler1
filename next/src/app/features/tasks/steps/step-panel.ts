@@ -1,11 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormRow } from '../../../shared/ui/form-row';
+import { Section } from '../../../shared/ui/section';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
 import {
-  LIMITS, ON_ERRORS, PromptChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
+  LIMITS, ON_ERRORS, BucketChoice, DocumentTypeChoice, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
   validKey,
 } from './steps.model';
 
@@ -20,6 +22,12 @@ export interface StepPanelData {
   columns?: string[] | null;
   /** MIG-245: the workspace's active prompts, for a task whose settings name one. */
   prompts?: PromptChoice[];
+  /** MIG-321: the workspace's buckets, for a task whose settings name one. */
+  buckets?: BucketChoice[];
+  /** MIG-346: the workspace's webhooks, for a task whose settings name one. */
+  webhooks?: WebhookChoice[];
+  /** MIG-364: the workspace's document types, for a task whose settings name one. */
+  documentTypes?: DocumentTypeChoice[];
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */
@@ -37,7 +45,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {

@@ -56,25 +56,45 @@ function screenWith(opts: { admin?: boolean; locked?: boolean } = {}) {
 const labels = (el: HTMLElement) => Array.from(el.querySelectorAll('button, a'))
   .map(b => (b.getAttribute('aria-label') || b.textContent || '').replace(/\s+/g, ' ').trim());
 
+/**
+ * UX review 2026-10-12 (A6, G8): a row's actions are in its ⋮ menu. Every row's menu is opened in turn and what it
+ * offers is read, with the page's own buttons and links.
+ */
+function offered(el: HTMLElement, fixture: { detectChanges(): void }): string[] {
+  const found = labels(el);
+  for (const trigger of Array.from(el.querySelectorAll<HTMLElement>('button[aria-label^="Actions for "]'))) {
+    trigger.click();
+    fixture.detectChanges();
+    const menu = document.querySelector('.cdk-overlay-container [cdkmenu], .cdk-overlay-container .cdk-menu');
+    found.push(...Array.from(menu?.querySelectorAll('button, a') ?? [])
+      .map(b => (b.getAttribute('aria-label') || b.textContent || '').replace(/\s+/g, ' ').trim()));
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    document.querySelector('.cdk-overlay-container')?.replaceChildren();
+    fixture.detectChanges();
+  }
+  return found;
+}
+
 describe('Form builder -- the list', () => {
   it('shows an administrator every form with its job and the actions that build it', () => {
-    const { api, el } = screenWith();
+    const { api, el, fixture } = screenWith();
     expect(api.list).toHaveBeenCalledWith(false);
     expect(api.linkableJobs).toHaveBeenCalled();
     expect(el.textContent).toContain('Wound triage');
-    expect(labels(el)).toEqual(expect.arrayContaining(['New form', 'Fill in Wound intake', 'Edit Wound intake', 'Archive Wound intake',
+    const names = offered(el, fixture);
+    expect(names).toEqual(expect.arrayContaining(['New form', 'Fill in Wound intake', 'Edit Wound intake', 'Archive Wound intake',
       'Activate Discharge checklist', 'Submissions of Wound intake']));
-    expect(labels(el)).not.toContain('Fill in Discharge checklist');
+    expect(names).not.toContain('Fill in Discharge checklist');
   });
 
   it('shows a member the Active forms to fill in, and nothing that builds or names the job', () => {
-    const { api, el } = screenWith({ admin: false });
+    const { api, el, fixture } = screenWith({ admin: false });
     expect(api.linkableJobs).not.toHaveBeenCalled();
-    const names = labels(el);
+    const names = offered(el, fixture);
     expect(names).toContain('Fill in Wound intake');
     expect(names.some(n => n === 'New form' || n.startsWith('Edit') || n.startsWith('Archive'))).toBe(false);
     const heads = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent!.trim());
-    expect(heads).toEqual(['Form', 'Status', 'Fields', 'Actions']);
+    expect(heads).toEqual(['Form', 'Status', 'Fields', 'Actions']); // Actions as a screen reader's heading over the ⋮
   });
 
   it('archives a form and reads the list again', () => {

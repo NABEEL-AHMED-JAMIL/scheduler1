@@ -11,6 +11,8 @@ import { FormsApi } from './forms.service';
 import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
 import { DocumentsApi } from '../documents/documents.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
  * Forms › Submissions (Wave 5 Forms lite; page 'form-submissions'): what a form collected, newest first -- who sent it
@@ -37,7 +39,7 @@ export function defaultForm(forms: FormSummary[]): FormSummary | undefined {
 
 @Component({
   selector: 'app-form-submissions',
-  imports: [StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, StatStrip, Icon, TableShell, LoadError, ServerTimePipe, RouterLink],
   templateUrl: './form-submissions.html',
 })
 export class FormSubmissions implements OnInit {

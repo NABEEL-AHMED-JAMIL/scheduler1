@@ -1,23 +1,42 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Data Catalog</h1>
-      <p class="page-subtitle">
-        Every dataset, file and document type in this workspace: what it holds, who owns it, how fresh it is, and which fields are sensitive.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Data Catalog</h1>
+        <p class="page-subtitle">
+          Every dataset, file and document type in this workspace: what it holds, who owns it, how fresh it is, and which fields are sensitive.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
+      </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
-    </div>
-  </div>
+  </app-page-header>
 
   @if (kpis().length) {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance" />
   }
 
+  <!-- UX review B5 (CT1): sensitive data, said once at the top -- how much is marked, the way to it, and how to mark more. -->
+  @if (summary(); as s) {
+    <section class="step-notice step-notice-warn" role="note" data-phi-callout aria-label="Sensitive data">
+      <app-icon name="shield" class="icon-warn shrink-0 mt-0.5" />
+      <div class="text-sm flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        @if (s.sensitive) {
+          <span><b>{{ s.sensitive }} {{ s.sensitive === 1 ? 'asset holds' : 'assets hold' }} fields marked sensitive</b> (patient or personal data);
+            their values are masked for anyone without access.</span>
+          <a class="link-inline" routerLink="/data/catalog" [queryParams]="{ flag: 'sensitive' }">Show them</a>
+        } @else {
+          <span><b>No field is marked sensitive yet.</b> Open a dataset or file and choose Scan for sensitive data: patient identifiers,
+            names and contact details are then marked and masked for anyone without access.</span>
+        }
+      </div>
+    </section>
+  }
+
   <app-table-shell heading="Assets" columnsKey="data-catalog" [loading]="loading()" [error]="error()" [isEmpty]="!shown().length"
-                   [shown]="shown().length" [total]="total()" [scrollRows]="false" emptyIcon="database" (retry)="load()"
-                   [emptyMessage]="search() || flag() || kind() || withDeleted() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
+                   [shown]="shown().length" [total]="total()" emptyIcon="database" (retry)="load()"
+                   [emptyMessage]="search() || flag() || kind() || withDeleted() || withSystem() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
     <ng-container toolbar>
       <app-segmented [value]="kind()" (valueChange)="setKind($event)" [options]="kinds" ariaLabel="Kind of asset" />
       <label class="sr-only" for="catalogFlag">Show</label>
@@ -30,24 +49,34 @@
       <label class="flex items-center gap-1 text-xs">
         <input type="checkbox" [checked]="withDeleted()" (change)="showDeleted($any($event.target).checked)" /> Deleted too
       </label>
+      @if (canSeeSystem()) {
+        <label class="flex items-center gap-1 text-xs" title="OCR page images and other files the platform keeps for itself">
+          <input type="checkbox" [checked]="withSystem()" (change)="showSystem($any($event.target).checked)" data-system-files />
+          Show system files@if (summary()?.systemAssets) { ({{ summary()?.systemAssets }}) }
+        </label>
+      }
     </ng-container>
     <table class="table-modern">
       <thead>
-        <tr><th>Asset</th><th class="hidden xl:table-cell">Type</th><th>Owner</th><th>Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell">Sensitivity</th><th class="text-right">Quality</th></tr>
+        <tr><th>Asset</th><th class="hidden xl:table-cell">Type</th><th>Owner</th><th class="num">Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell">Sensitivity</th><th class="text-right">Quality</th></tr>
       </thead>
       <tbody>
         @for (a of shown(); track a.assetId) {
           <tr class="cursor-pointer" [attr.data-asset]="a.assetId" (click)="open(a.assetId, a.name)" tabindex="0" (keydown.enter)="open(a.assetId, a.name)">
             <td class="min-w-0">
-              <div class="font-medium truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="a.name">{{ a.name }}</div>
+              <div class="font-medium truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md flex items-center gap-1.5" [title]="a.name">
+                @if ((a.tags ?? []).length) { <app-icon name="shield" size="0.9em" class="icon-warn shrink-0" data-sensitive-asset aria-label="Holds sensitive fields" /> }
+                <span class="truncate">{{ a.name }}</span>
+              </div>
               <!-- Below 1280px the type rides on this line and its column goes: seven columns did not fit 1024 (UI review U4). -->
               <div class="text-xs text-[color:var(--text-muted)] truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="where(a)"><span class="xl:hidden">{{ kindText(a.kind) }} · </span>{{ where(a) }}</div>
               @if (a.status === 'Deleted') { <span class="pill pill-crit xl:hidden">Deleted</span> }
+              @if (a.system) { <span class="pill pill-neutral" title="A file the platform keeps for itself, such as an OCR page image">System file</span> }
             </td>
             <td class="whitespace-nowrap hidden xl:table-cell">{{ kindText(a.kind) }}
               @if (a.status === 'Deleted') { <span class="pill pill-crit">Deleted</span> }</td>
             <td><div class="truncate max-w-[8rem] lg:max-w-[10rem] xl:max-w-[14rem]" [title]="a.ownerName || ''">{{ a.ownerName || '—' }}</div></td>
-            <td class="whitespace-nowrap" [class.is-stale]="a.stale">{{ fresh(a.lastChangedAt) }}</td>
+            <td class="num whitespace-nowrap" [class.is-stale]="a.stale">{{ fresh(a.lastChangedAt) }}</td>
             <td>
               <!-- Two tags and a count: a file with eight tagged columns stacked eight pills and stood a row 100px tall. -->
               <div class="flex flex-wrap items-center gap-1">

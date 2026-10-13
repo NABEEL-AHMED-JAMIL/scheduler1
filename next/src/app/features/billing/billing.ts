@@ -1,25 +1,27 @@
 import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
+import { PipelineCosts } from './pipeline-costs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { Combobox } from '../../shared/ui/combobox';
 import { TableShell } from '../../shared/ui/data-table';
-import { Bar, BarChart } from '../../shared/charts/bar-chart';
-import { chartColor } from '../../shared/charts/status-color';
-import { BillingApi, DayRow, MeterLine, PricedWith, RunRow, SERVICES, SubjectRow, UsageQuery } from './billing.service';
-import { HOURS_PER_DAY, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, pluralUnit } from './billing-format';
+import { instantOf } from '../../core/instant';
+import { BillingApi, DayRow, DayTotal, MeterLine, PricedWith, RunRow, SubjectRow, UsageQuery } from './billing.service';
+import { HOURS_PER_DAY, dayHeading, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, groupByDay, moneyDigits, pluralUnit, shiftDay, zonedDay, zonedTime } from './billing-format';
+import { CostByDay } from './cost-by-day';
+import { CostDay, CostView, forecastAtMonthEnd, forecastPace, orderServices, serviceCssColor } from './cost-by-day-model';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
 const SUBJECTS_SHOWN = 25;
 /** How many runs the Cost per run table reads at a time. */
 const RUNS_PAGE = 25;
-/** The forecast paces the rest of the month at the last week's daily average. */
-const FORECAST_WINDOW_DAYS = 7;
 
 /** Under half a cent: rounds to $0.00, so it reads "< $0.01" and waits behind the toggle. */
 function isTiny(amount: number): boolean {
@@ -36,8 +38,9 @@ function isTiny(amount: number): boolean {
  */
 @Component({
   selector: 'app-billing',
-  imports: [Icon, StatTile, Combobox, TableShell, BarChart, DecimalPipe, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, Combobox, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts],
   templateUrl: './billing.html',
+  styleUrl: './day-table.css',
 })
 export class Billing implements OnInit {
   private readonly api = inject(BillingApi);
@@ -52,7 +55,16 @@ export class Billing implements OnInit {
   private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
   /** "September 2026". It went through toLocaleDateString, so it followed the browser's language, not the console's. */
   readonly monthLabel = computed(() => this.clock.transform(this.month(), 'month') ?? '');
-  readonly isCurrentMonth = computed(() => this.month() === firstOfMonth(new Date()));
+  /**
+   * H9: the workspace's billing calendar, as Billing answered it -- its zone, today there and the month under way there. The
+   * days on this page are those, never the browser's or UTC's: an evening's run in Chicago is that evening's usage.
+   */
+  readonly timeZone = signal<string | null>(null);
+  readonly today = signal<string | null>(null);
+  private readonly billingMonth = signal<string | null>(null);
+  /** The month first shown is the browser's guess; the workspace's own month (its zone) replaces it once, on the first answer. */
+  private followBillingMonth = true;
+  readonly isCurrentMonth = computed(() => this.month().slice(0, 7) === (this.billingMonth() ?? firstOfMonth(new Date()).slice(0, 7)));
 
   readonly loading = signal(false);
   readonly error = signal('');
@@ -65,12 +77,50 @@ export class Billing implements OnInit {
    */
   readonly lineDigits = computed(() => 2);
   readonly showTinyLines = signal(false);
-  readonly tinyLines = computed(() => this.lines().filter(l => isTiny(l.amount)));
+  /**
+   * Owner review 2026-10-12: a day picked on Cost by day shows that day's lines -- each meter's use and flat amount that day,
+   * before the month's allowances and tiers (which apply to the month, never to a day). Null: the month's lines.
+   */
+  readonly selectedDay = signal<string | null>(null);
+  readonly costView = signal<CostView>('daily');
+  readonly pickedDay = computed(() => { const day = this.selectedDay(); return day ? this.days().find(d => d.day === day) ?? null : null; });
+  readonly dayLines = computed<MeterLine[] | null>(() => {
+    const day = this.selectedDay();
+    if (!day) return null;
+    const byMeter = this.pickedDay()?.byMeter ?? {};
+    const month = new Map(this.lines().map(l => [l.meter, l]));
+    return Object.entries(byMeter).map(([meter, use]) => {
+      const line = month.get(meter);
+      return {
+        ...(line ?? { meter, label: meter, service: 'Other', unit: '', per: 1, unitPrice: 0, days: 1, tiers: [] } as unknown as MeterLine),
+        quantity: use.quantity, amount: use.amount, includedQuantity: 0, billableQuantity: use.quantity, tiers: [], days: 1,
+      };
+    }).sort((a, b) => b.amount - a.amount);
+  });
+  /** The table's lines: the picked day's, or the month's. */
+  readonly tableLines = computed(() => this.dayLines() ?? this.lines());
+  readonly tableTotal = computed(() => this.dayLines() ? this.dayLines()!.reduce((n, l) => n + l.amount, 0) : this.total());
+  readonly tinyLines = computed(() => this.tableLines().filter(l => isTiny(l.amount)));
   readonly tinyTotal = computed(() => this.tinyLines().reduce((n, l) => n + l.amount, 0));
-  readonly shownLines = computed(() => this.showTinyLines() ? this.lines() : this.lines().filter(l => !isTiny(l.amount)));
+  readonly shownLines = computed(() => this.showTinyLines() ? this.tableLines() : this.tableLines().filter(l => !isTiny(l.amount)));
   readonly days = signal<DayRow[]>([]);
+  /** Last month's days, for the cumulative view's comparison line. */
+  readonly previousDays = signal<DayRow[] | null>(null);
   readonly currency = signal('USD');
+  /** UX review B9: the month on screen for the cost by pipeline and run, and a run opened from its run page (?run=). */
+  readonly usageQuery = computed(() => this.query());
+  readonly runParam = signal<number | null>(Number(inject(ActivatedRoute, { optional: true })?.snapshot?.queryParamMap?.get('run')) || null);
   readonly rateCard = signal<PricedWith | null>(null);
+  /** Lines used and priced by no card -- neither this workspace's own nor the default: billed at 0, and said above the table. */
+  readonly unpricedLines = computed(() => this.lines().filter(l => l.unpriced && Number(l.quantity) !== 0));
+  /** Which cards the unpriced lines are missing from: the workspace's own and the default, or the one card that prices it. */
+  readonly unpricedWhere = computed(() => {
+    const card = this.rateCard();
+    if (card?.tenantSpecific) return `neither this workspace's card nor ${card.fallback?.name || 'the default card'}`;
+    return `no rate card (not on ${card?.name || 'the rate card in effect'})`;
+  });
+  /** Lines this workspace's own card does not name, priced from the default card (rate card fallback). */
+  readonly fallbackLines = computed(() => this.lines().filter(l => !!l.pricedFrom));
   /** The month before, priced as a whole -- the comparison the forecast is read against. */
   readonly previousTotal = signal<number | null>(null);
 
@@ -78,9 +128,10 @@ export class Billing implements OnInit {
   readonly total = computed(() => this.lines().reduce((n, l) => n + l.amount, 0));
   readonly daysElapsed = computed(() => {
     const first = new Date(this.month() + 'T00:00:00');
-    const today = new Date();
     if (!this.isCurrentMonth()) return daysInMonth(first);
-    return Math.max(1, today.getDate());
+    // Today in the workspace's zone (yyyy-MM-dd from Billing); the browser's day only until Billing has answered.
+    const today = this.today();
+    return Math.max(1, today ? Number(today.split('-')[2]) : new Date().getDate());
   });
   readonly daysInMonth = computed(() => daysInMonth(new Date(this.month() + 'T00:00:00')));
   /** The sum of a day's amount by date, so a day with no usage counts as zero, not as absent. */
@@ -88,27 +139,25 @@ export class Billing implements OnInit {
   private isoDay(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
   /**
-   * At the last seven calendar days' pace -- a guess, labelled as one. Calendar days, not the
-   * last seven days that had usage: one burst of $5 on a quiet month is a $5/7 pace, not $5/day.
+   * The forecast's daily pace: the last seven calendar days' -- a guess, labelled as one. Calendar days, not the last seven
+   * days that had usage: one burst of $5 on a quiet month is a $5/7 pace, not $5/day. One pace for the tile and the chart.
    */
-  readonly forecast = computed(() => {
-    if (!this.isCurrentMonth() || !this.days().length) return null;
-    const today = new Date();
-    let spent = 0, counted = 0;
-    for (let back = 1; back <= FORECAST_WINDOW_DAYS; back++) {
-      const d = new Date(today); d.setDate(today.getDate() - back);
-      if (this.isoDay(d) < this.month()) break;            // the window does not reach into last month
-      spent += this.amountOn(this.isoDay(d)); counted++;
-    }
-    if (!counted) return null;
-    const perDay = spent / counted;
-    return this.total() + perDay * Math.max(0, this.daysInMonth() - this.daysElapsed());
+  readonly pace = computed(() => this.isCurrentMonth() && this.days().length ? forecastPace(this.days(), this.todayInWorkspace(), this.month()) : null);
+  /** The Month to date tile's forecast: the month so far (after allowances) and the pace for each day to come. */
+  readonly forecast = computed(() => this.pace() === null ? null : forecastAtMonthEnd(this.total(), this.pace(), this.todayInWorkspace(), this.month()));
+  /** The day bars added up: the month's use before its allowances and tiers. */
+  readonly barsTotal = computed(() => this.days().reduce((n, d) => n + d.amount, 0));
+  /** What the month's allowances and tiers took off the day bars (Month to date = bars - this). */
+  readonly allowanceCredit = computed(() => this.barsTotal() - this.total());
+  /** The allowances' effect as By service's foot says it: "−$1.20" off the bars, "$0.00" when none applied. */
+  readonly allowanceLabel = computed(() => {
+    const credit = this.allowanceCredit();
+    return isTiny(credit) && Math.abs(credit) < 0.00005 ? this.fmtMoney(0) : (credit > 0 ? '−' : '+') + this.fmtMoney(Math.abs(credit));
   });
-  /** What yesterday cost -- the date, not the last row but one. */
-  readonly yesterday = computed(() => {
-    const d = new Date(); d.setDate(d.getDate() - 1);
-    return this.amountOn(this.isoDay(d));
-  });
+  /** What yesterday cost -- the date, not the last row but one: the day before today in the workspace's zone (H9). */
+  readonly yesterday = computed(() => this.amountOn(shiftDay(this.todayInWorkspace(), -1)));
+  /** Today as the workspace's bill names it; the browser's day only until Billing has answered. */
+  private todayInWorkspace(): string { return this.today() ?? this.isoDay(new Date()); }
   /** Bytes deleted this month; the meter carries bytes, the screen says KB/MB/GB. */
   readonly deletedBytes = computed(() => this.lines().find(l => l.meter === 'storage.bytes.deleted')?.quantity ?? 0);
   readonly deleteOps = computed(() => this.lines().find(l => l.meter === 'storage.ops.delete')?.quantity ?? 0);
@@ -130,18 +179,16 @@ export class Billing implements OnInit {
     const totals = new Map<string, number>();
     for (const l of this.lines()) totals.set(l.service, (totals.get(l.service) ?? 0) + l.amount);
     const total = this.total() || 1;
-    return SERVICES.filter(s => totals.has(s)).map((s, i) => ({ service: s, amount: totals.get(s)!, share: Math.round((totals.get(s)! / total) * 100), color: chartColor(i) }));
+    // Every service the lines name (API included: it was missing from the list, so its lines were left out here) in one
+    // fixed colour each -- the chart's.
+    return orderServices(totals.keys()).map(s => ({ service: s, amount: totals.get(s)!, share: Math.round((totals.get(s)! / total) * 100), color: serviceCssColor(s) }));
   });
-  readonly serviceColor = computed(() => new Map(this.byService().map(s => [s.service, s.color])));
-
-  // ---- by day, stacked by service ----
-  readonly dayBars = computed<Bar[]>(() => this.days().map(d => ({
-    // "16 Sep", not the raw "09-16" cut from the ISO day, which read as a US month-first date.
-    name: this.clock.transform(d.day, 'day') ?? d.day,
-    value: Math.round(d.amount * 100) / 100,
-    segments: Object.entries(d.byService).map(([service, amount]) => ({ label: service, value: Math.round(amount * 100) / 100, color: this.serviceColor().get(service) ?? chartColor(5) })),
-  })));
-  readonly money = (v: number) => this.fmtMoney(v);
+  /** "Mon 12 Oct 2026" for the picked day; "12 Oct" for its chip. */
+  dayTitle(day: string): string { return dayHeading(day); }
+  dayChip(day: string): string { return this.clock.transform(day, 'day') ?? day; }
+  pickDay(day: string | null): void {
+    this.selectedDay.set(day); this.openLine.set(null);
+  }
 
   // ---- drill-down ----
   readonly openLine = signal<MeterLine | null>(null);
@@ -159,13 +206,41 @@ export class Billing implements OnInit {
   /** The precision the run Cost column shares, as the lines' Amount does. */
   readonly runDigits = computed(() => moneyDigits(this.runs().map(r => r.amount)));
   readonly moreRuns = computed(() => this.runs().length < this.runsTotal());
+  /** Each billing day's count and total over the whole month (Billing's, every page), for the day headers. */
+  readonly runDays = signal<DayTotal[]>([]);
+  /**
+   * Owner review 2026-10-12 ("date repeat in the cost"): the runs cut into billing days -- a header per day saying its calls
+   * and its cost, and only the time on each row, in the workspace's billing zone.
+   */
+  readonly runGroups = computed(() => {
+    const zone = this.timeZone();
+    const totals = new Map(this.runDays().map(d => [d.day, d]));
+    return groupByDay(this.runs(), r => { const at = instantOf(r.last); return at ? zonedDay(at, zone) : null; }).map(g => {
+      const total = g.day ? totals.get(g.day) : undefined;
+      return { ...g, count: total?.runs ?? g.rows.length, amount: Number(total?.amount ?? g.rows.reduce((n, r) => n + r.amount, 0)) };
+    });
+  });
+  /**
+   * The rates the runs were priced at, said once above the table rather than on every row: per model, "in $0.05 / out $0.15
+   * per 1,000 tokens (qwen3:8b)". A model priced at two rates in the range (a card changed) is listed at each.
+   */
+  readonly runRateNote = computed(() => {
+    const notes = new Set<string>();
+    for (const r of this.runs()) notes.add(this.runRateSentence(r));
+    return [...notes].filter(Boolean);
+  });
+  /** Everyone the runs on screen were by; the By column is shown only when it says something. */
+  readonly runActors = computed(() => [...new Set(this.runs().map(r => this.runActor(r)))]);
 
   ngOnInit(): void {
     this.workspaces.ready(() => this.load());
   }
 
-  pickTenant(id: string): void { this.workspaces.tenantId.set(id); this.load(); }
+  pickTenant(id: string): void { this.workspaces.tenantId.set(id); this.followBillingMonth = true; this.load(); }
+  /** The previous month's first day. */
+  private previousMonth(): string { const d = new Date(this.month() + 'T00:00:00'); d.setMonth(d.getMonth() - 1); return firstOfMonth(d); }
   shiftMonth(delta: number): void {
+    this.followBillingMonth = false;
     const d = new Date(this.month() + 'T00:00:00');
     d.setMonth(d.getMonth() + delta);
     this.month.set(firstOfMonth(d));
@@ -182,17 +257,34 @@ export class Billing implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null);
-    this.runs.set([]); this.runsTotal.set(0); this.runsPage = 0; this.loadRuns();
-    const before = new Date(this.month() + 'T00:00:00'); before.setMonth(before.getMonth() - 1);
-    this.api.usageByMeter(this.query(firstOfMonth(before))).subscribe({
+    this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null); this.previousDays.set(null);
+    this.selectedDay.set(null);
+    this.runs.set([]); this.runsTotal.set(0); this.runDays.set([]); this.runsPage = 0; this.loadRuns();
+    const before = this.previousMonth();
+    this.api.usageByMeter(this.query(before)).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.previousTotal.set((r.data?.rows ?? []).reduce((n, l) => n + Number(l.amount), 0)); },
+      error: () => {},
+    });
+    // Last month by day, for the cumulative view's comparison line.
+    this.api.usageByDay(this.query(before)).subscribe({
+      next: r => { if (r.status === API_SUCCESS) this.previousDays.set(dayRows(r.data?.rows)); },
       error: () => {},
     });
     this.api.usageByMeter(this.query()).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS) { this.loading.set(false); this.failed(r.message); return; }
-        if (r.data?.rateCard) { this.rateCard.set(r.data.rateCard); this.currency.set(r.data.rateCard.currency || 'USD'); }
+        // H9: the workspace's billing calendar. On the first answer, show the workspace's own month (its zone may already
+        // be in the next, or still in the last, while the browser's is not).
+        this.timeZone.set(r.data?.timeZone ?? null);
+        this.today.set(r.data?.today ?? null);
+        this.billingMonth.set(r.data?.currentMonth ?? null);
+        const own = r.data?.currentMonth;
+        if (this.followBillingMonth) {
+          this.followBillingMonth = false;
+          if (own && own !== this.month().slice(0, 7)) { this.month.set(`${own}-01`); this.load(); return; }
+        }
+        this.rateCard.set(r.data?.rateCard ?? null);
+        if (r.data?.rateCard) this.currency.set(r.data.rateCard.currency || 'USD');
         this.lines.set((r.data?.rows ?? []).map(l => ({
           ...l, quantity: Number(l.quantity), amount: Number(l.amount), unitPrice: Number(l.unitPrice),
           includedQuantity: Number(l.includedQuantity ?? 0), billableQuantity: Number(l.billableQuantity ?? l.quantity),
@@ -202,7 +294,7 @@ export class Billing implements OnInit {
           next: d => {
             this.loading.set(false);
             if (d.status !== API_SUCCESS) { this.failed(d.message); return; }
-            this.days.set((d.data?.rows ?? []).map(x => ({ day: String(x.day), amount: Number(x.amount), byService: Object.fromEntries(Object.entries(x.byService ?? {}).map(([k, v]) => [k, Number(v)])) })));
+            this.days.set(dayRows(d.data?.rows));
           },
           error: err => { this.loading.set(false); this.failed(err?.error?.message); },
         });
@@ -221,6 +313,7 @@ export class Billing implements OnInit {
         if (r.status !== API_SUCCESS) { this.runsError.set(r.message || 'The runs could not be read.'); return; }
         this.runsPage = page;
         this.runsTotal.set(Number(r.data?.total ?? 0));
+        if (r.data?.days) this.runDays.set(r.data.days.map(d => ({ day: d.day, runs: Number(d.runs), amount: Number(d.amount ?? 0) })));
         this.runs.update(list => [...list, ...(r.data?.rows ?? []).map(x => ({
           ...x, tokens_in: Number(x.tokens_in), tokens_out: Number(x.tokens_out), amount: Number(x.amount),
           lines: (x.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), per: Number(l.per), unit_price: Number(l.unit_price), amount: Number(l.amount) })),
@@ -244,10 +337,25 @@ export class Billing implements OnInit {
       default: return r.subject_type || 'Model call';
     }
   }
-  /** Each priced line of a run as "2,000 tokens in at $0.40 / 1,000". */
+  /** Each priced line of a run as "2,000 tokens in at $0.40 / 1,000" -- a row's tooltip. */
   runRates(r: RunRow): string {
     return r.lines.map(l => `${Math.round(l.quantity).toLocaleString()} ${l.meter.startsWith('ai.tokens.in') ? 'in' : 'out'} at ${this.fmtUnitPrice(l.unit_price, l.per, l.unit)}`).join(' · ');
   }
+  /** A run's rates as the note above the table says them: "in $0.05 / out $0.15 per 1,000 tokens (qwen3:8b)". */
+  runRateSentence(r: RunRow): string {
+    const side = (inSide: boolean) => r.lines.find(l => l.meter.startsWith('ai.tokens.in') === inSide);
+    const a = side(true), b = side(false);
+    const model = r.model ? ` (${r.model})` : '';
+    const price = (p: number) => formatMoney(p, this.currency(), moneyDigits([p]));
+    if (a && b && a.per === b.per && a.unit === b.unit) {
+      const per = a.per > 1 ? `${a.per.toLocaleString()} ${pluralUnit(a.unit ?? '')}` : a.unit ?? '';
+      return `in ${price(a.unit_price)} / out ${price(b.unit_price)} per ${per}${model}`;
+    }
+    return [a ? `in ${this.fmtUnitPrice(a.unit_price, a.per, a.unit)}` : '', b ? `out ${this.fmtUnitPrice(b.unit_price, b.per, b.unit)}` : '']
+      .filter(Boolean).join(' / ') + model;
+  }
+  /** A run's time of day in the workspace's billing zone, 24-hour. */
+  runTime(r: RunRow): string { const at = instantOf(r.last); return at ? zonedTime(at, this.timeZone()) : ''; }
   fmtRunAmount(value: number): string { return formatMoney(value, this.currency(), this.runDigits()); }
   runActor(r: RunRow): string { return r.actor_name || (r.actor_user_id ? `User #${r.actor_user_id}` : 'Pipeline'); }
 
@@ -260,7 +368,8 @@ export class Billing implements OnInit {
   exportCsv(): void {
     const esc = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const rows = [['meter', 'label', 'service', 'quantity', 'unit', 'included_quantity', 'billable_quantity', 'unit_price', 'per', 'amount', 'currency', 'rate_card']];
-    for (const l of this.lines()) rows.push([l.meter, l.label, l.service, String(l.quantity), l.unit, String(l.includedQuantity), String(l.billableQuantity), String(l.unitPrice), String(l.per), l.amount.toFixed(5), this.currency(), this.rateCard() ? `${this.rateCard()!.name} v${this.rateCard()!.version}` : '']);
+    const cardOf = (l: MeterLine) => l.pricedFrom ? `${l.pricedFrom.name} v${l.pricedFrom.version}` : l.unpriced ? 'none' : this.rateCard() ? `${this.rateCard()!.name} v${this.rateCard()!.version}` : '';
+    for (const l of this.lines()) rows.push([l.meter, l.label, l.service, String(l.quantity), l.unit, String(l.includedQuantity), String(l.billableQuantity), String(l.unitPrice), String(l.per), l.amount.toFixed(5), this.currency(), cardOf(l)]);
     rows.push(['', 'Month to date', '', '', '', '', '', '', '', this.total().toFixed(5), this.currency(), '']);
     const blob = new Blob([rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv' });
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `cost-usage-${this.month().slice(0, 7)}.csv`; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
@@ -279,7 +388,10 @@ export class Billing implements OnInit {
   toggleLine(line: MeterLine): void {
     if (this.openLine()?.meter === line.meter) { this.openLine.set(null); return; }
     this.openLine.set(line); this.subjects.set([]); this.subjectsError.set(''); this.subjectsLoading.set(true);
-    this.api.subjects(this.query(), line.meter, SUBJECTS_SHOWN).subscribe({
+    // A picked day's line opens to that day's subjects.
+    const day = this.selectedDay();
+    const range = day ? { ...this.query(), from: day, to: day } : this.query();
+    this.api.subjects(range, line.meter, SUBJECTS_SHOWN).subscribe({
       next: r => {
         this.subjectsLoading.set(false);
         if (r.status !== API_SUCCESS) { this.subjectsError.set(r.message || 'The events behind this line could not be read.'); return; }
@@ -312,7 +424,7 @@ export class Billing implements OnInit {
   }
   /** The unit price with enough digits to be a price, not "$0.0000". */
   fmtRate(line: MeterLine): string {
-    if (line.unpriced) return 'Not on the card';
+    if (line.unpriced) return 'Not on any card';
     if (line.hasTiers) return 'Tiered';
     return this.fmtUnitPrice(line.unitPrice, line.per, line.unit);
   }
@@ -323,4 +435,13 @@ export class Billing implements OnInit {
   actorLabel(s: SubjectRow): string { return s.actor_name || (s.actor_user_id ? `User #${s.actor_user_id}` : 'Pipeline'); }
   subjectLabel(s: SubjectRow): string { return s.subject_id || (s.subject_type ? `(${s.subject_type})` : '(no subject)'); }
 
+}
+
+/** Billing's day rows as numbers (its amounts arrive as decimals in JSON, sometimes as text). */
+export function dayRows(rows: DayRow[] | null | undefined): CostDay[] {
+  return (rows ?? []).map(x => ({
+    day: String(x.day), amount: Number(x.amount),
+    byService: Object.fromEntries(Object.entries(x.byService ?? {}).map(([k, v]) => [k, Number(v)])),
+    byMeter: Object.fromEntries(Object.entries(x.byMeter ?? {}).map(([k, v]) => [k, { quantity: Number(v.quantity), amount: Number(v.amount) }])),
+  }));
 }

@@ -1,47 +1,37 @@
 <div class="page">
-  <div>
-    <a routerLink="/pipelines/schedules" class="text-sm text-accent hover:underline">← Back to schedules</a>
-    <!-- The screen people watch while a job runs: it follows the job-status feed (Live), and
-         the header Refresh, laid out as Run logs has it, stays for when the feed is down. -->
-    <div class="flex items-start gap-3">
-      <h1 class="page-title mt-1 mr-auto">
-        Executions
-        @if (jobName()) {
-          <span class="text-[color:var(--text-secondary)] font-normal">— {{ jobName() }}</span>
-        }
-      </h1>
-      <div class="flex items-center gap-2 mt-1 shrink-0">
-        @if (live()) {
-          <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
-                title="Connected — new runs appear as the pipeline reports them">
-            <span class="live-dot live-on"></span>Live
-          </span>
-        }
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-      </div>
-    </div>
-    <p class="page-subtitle">
+  <!-- UX review 2026-10-12 (A2, G1, E1): one header -- the breadcrumb leads back to the schedules from a schedule's runs;
+       the title names the schedule. The screen people watch while a job runs: it follows the job-status feed (the Live dot
+       in Refresh), and Refresh stays for when the feed is down. -->
+  <app-page-header [title]="jobId() ? (jobName() ? jobName() + ' · runs' : 'Schedule runs') : 'Runs'">
+    <!-- MIG-347: the schedule's own page offers its backfill, as its row's menu does. -->
+    @if (jobId() && !isDrillDown() && canBackfill()) {
+      <button type="button" class="btn btn-default btn-sm" (click)="backfill()" data-test="backfill-open"><app-icon name="layers" />Backfill…</button>
+    }
+    <app-refresh-button [loading]="loading()" [live]="live()" (refresh)="load()" />
+    <p subtitle class="page-subtitle">
       @if (isDrillDown()) {
         {{ jobStatus() || 'All' }} runs
-        @if (isAllJobs()) { across every job } @else { of job <span class="mono">#{{ jobId() }}</span> }
+        @if (isAllJobs()) { across every schedule } @else { of schedule <span class="mono">#{{ jobId() }}</span> }
         on {{ dayLabel(targetDate()) }}, {{ hourRange(targetHr()) }}.
       } @else if (jobId()) {
-        Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
+        Every recorded run of schedule <span class="mono">#{{ jobId() }}</span>.
       } @else {
-        <!-- Reached without a job (Executions in the menu): the last day's runs of every job. -->
-        The newest runs of every job in the last day@if (recentCut()) { (the latest {{ runs().length }})}. Open a run's job for its
-        whole history, or choose an hour on the dashboard.
+        <!-- Reached without a schedule (Runs in the menu): the explorer -- facets, a histogram and the list (B3). -->
+        Every schedule's runs: narrow them on the left; the bars show when they ran@if (recentCut()) { (the list holds the latest {{ runs().length }})}.
       }
     </p>
-  </div>
+  </app-page-header>
+
+  <!-- UX review B3 (E1): Latest and By date, the two views of the one Runs page. -->
+  @if (!jobId() && !isDrillDown()) {
+    <app-review-waiting />
+  }
 
   @if (isDrillDown()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2 text-sm">
       <span class="text-[color:var(--text-secondary)]">Filtered to</span>
       @if (jobStatus()) { <span class="pill pill-brand">{{ jobStatus() }}</span> }
-      @if (isAllJobs()) { <span class="pill pill-neutral">Every job</span> }
+      @if (isAllJobs()) { <span class="pill pill-neutral">Every schedule</span> }
       <span class="text-[color:var(--text-secondary)]">
         on {{ dayLabel(targetDate()) }}, {{ hourRange(targetHr()) }}
       </span>
@@ -59,9 +49,12 @@
         <button type="button" class="flex flex-1 min-w-0 items-center gap-2 text-left"
                 [attr.aria-expanded]="showDetail()"
                 (click)="showDetail.set(!showDetail())">
-          <app-icon name="briefcase" class="icon-info shrink-0" />
-          <span class="text-sm font-semibold truncate">Job &amp; task detail</span>
+          <app-icon name="calendar" class="icon-info shrink-0" />
+          <span class="text-sm font-semibold whitespace-nowrap">Schedule details</span>
           <span class="pill pill-neutral shrink-0">#{{ job.jobId }}</span>
+          @if (!showDetail()) {
+            <span class="text-xs text-[color:var(--text-muted)] truncate min-w-0" data-test="schedule-detail-summary">{{ detailSummary(job) }}</span>
+          }
         </button>
 
         @if (!isAllJobs()) {
@@ -69,16 +62,16 @@
                about what is on screen, and leaving the page to ask them lost that context. -->
           <!-- "Ask" alone below sm: the full label left the card heading cut to "Job &…" at
                phone width. The accessible name stays whole. -->
-          <button type="button" class="btn btn-default btn-sm shrink-0" aria-label="Ask about this job"
+          <button type="button" class="btn btn-default btn-sm shrink-0" aria-label="Ask about this schedule"
                   [class.btn-intent-ok]="assistantOpen()" [attr.aria-expanded]="assistantOpen()"
                   (click)="assistantOpen.set(!assistantOpen())">
-            <app-icon name="chat" /><span class="hidden sm:inline">Ask about this job</span><span class="sm:hidden">Ask</span>
+            <app-icon name="chat" /><span class="hidden sm:inline">Ask about this schedule</span><span class="sm:hidden">Ask</span>
           </button>
         }
 
         <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0"
                 [attr.aria-expanded]="showDetail()"
-                [attr.aria-label]="showDetail() ? 'Collapse job detail' : 'Expand job detail'"
+                [attr.aria-label]="showDetail() ? 'Collapse the schedule details' : 'Expand the schedule details'"
                 (click)="showDetail.set(!showDetail())">
           <app-icon [name]="showDetail() ? 'chevronDown' : 'chevronRight'" class="icon-muted" />
         </button>
@@ -89,7 +82,7 @@
             >
 
           <div>
-            <div class="detail-head">Job</div>
+            <div class="detail-head">Schedule</div>
             <dl class="detail-list">
               <dt>Name</dt><dd>{{ job.jobName }}</dd>
               <dt>State</dt><dd><app-status [label]="job.jobStatus" [quiet]="true" /></dd>
@@ -102,7 +95,7 @@
           </div>
 
           <div>
-            <div class="detail-head">Schedule</div>
+            <div class="detail-head">Timetable</div>
             @if (job.scheduler; as s) {
               <!--
                 A job switched from Auto to Manual keeps this row -- the editor posts no schedulers
@@ -113,7 +106,7 @@
               -->
               @if (job.execution === 'Manual') {
                 <p class="text-xs text-[color:var(--text-muted)]">
-                  Runs on demand only. Its timetable is held, and resumes if this job is set back to Auto.
+                  Runs on demand only. Its timetable is held, and resumes if this schedule is set back to Auto.
                 </p>
               } @else {
                 <dl class="detail-list">
@@ -131,7 +124,7 @@
                          dispatcher records each passed slot as Missed. A time here never arrives. -->
                     @if (job.jobStatus !== 'Active') {
                       <span class="text-[color:var(--text-muted)]"
-                            title="Passed slots are recorded as Missed; the timetable resumes when the job is activated">Paused while inactive</span>
+                            title="Passed slots are recorded as Missed; the timetable resumes when the schedule is activated">Paused while inactive</span>
                     }
                     @else if (s.expired) { <span class="text-warn-500">Expired</span> }
                     @else { {{ s.nextRunAt ? (s.nextRunAt | serverTime:'recent') : '—' }} }
@@ -147,6 +140,9 @@
               <div class="inbox-trigger">
                 <div class="detail-head mt-3">Inbox trigger</div>
                 <p class="text-sm">{{ triggerSentence(trigger()) }}</p>
+                @if (waitingSentence(trigger()); as waiting) {
+                  <p class="text-xs text-[color:var(--text-muted)] mt-0.5" data-test="inbox-waiting">{{ waiting }}</p>
+                }
                 @if (recentArrivals().length) {
                   <ul class="mt-1.5 space-y-1 text-xs" aria-label="Recent inbox files">
                     @for (a of recentArrivals(); track a.arrivalId) {
@@ -155,7 +151,11 @@
                         <span class="mono truncate min-w-0" [title]="a.fileName">{{ a.fileName }}</span>
                         @if (a.outcome === 'Started' && a.jobQueueId) {
                           <a class="link-inline shrink-0 whitespace-nowrap"
-                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId, 'logs']">run #{{ a.jobQueueId }}</a>
+                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId]">run #{{ a.jobQueueId }}</a>
+                        } @else if (a.outcome === 'Waiting') {
+                          <!-- MIG-360: not dropped -- its turn comes when the run in flight ends. -->
+                          <span class="text-[color:var(--text-muted)] shrink-0 whitespace-nowrap" [title]="a.reason || ''"
+                                data-test="arrival-waiting">Waiting{{ a.place ? ' · #' + a.place + ' in line' : '' }}</span>
                         } @else {
                           <span class="text-warn-500 shrink-0" [title]="a.reason || ''">{{ a.outcome }}</span>
                         }
@@ -163,7 +163,45 @@
                           {{ a.dateCreated ? (a.dateCreated | serverTime:'recent') : '' }}
                         </span>
                       </li>
-                      @if (a.outcome !== 'Started' && a.reason) {
+                      @if (a.outcome === 'Skipped' && a.reason) {
+                        <li class="pl-5 text-[11px] text-[color:var(--text-muted)] log-message">{{ a.reason }}</li>
+                      }
+                    }
+                  </ul>
+                }
+              </div>
+            }
+
+            @if (showDocuments()) {
+              <!-- MIG-364: the second Event start -- a document of one type being approved. -->
+              <div class="document-trigger">
+                <div class="detail-head mt-3">Document trigger</div>
+                <p class="text-sm">{{ documentTriggerSentence(documentTrigger(), documentTypeNames()) }}</p>
+                @if (documentWaitingSentence(documentTrigger()); as waiting) {
+                  <p class="text-xs text-[color:var(--text-muted)] mt-0.5" data-test="documents-waiting">{{ waiting }}</p>
+                }
+                @if (recentApprovals().length) {
+                  <ul class="mt-1.5 space-y-1 text-xs" aria-label="Recently approved documents">
+                    @for (a of recentApprovals(); track a.extractionId + '-' + (a.typeVersion ?? '') + '-' + (a.dateCreated ?? '')) {
+                      <li class="flex items-baseline gap-1.5 min-w-0">
+                        <app-icon name="file" size="0.85em" class="icon-muted shrink-0" />
+                        <a class="link-inline mono truncate min-w-0" [routerLink]="['/review/documents', a.extractionId]"
+                           [title]="'Document #' + a.extractionId + ', ' + approvalWord(a.approval)">Document #{{ a.extractionId }}</a>
+                        @if (a.outcome === 'Started' && a.jobQueueId) {
+                          <a class="link-inline shrink-0 whitespace-nowrap"
+                             [routerLink]="['/pipelines/schedules', job.jobId, 'runs', a.jobQueueId]">run #{{ a.jobQueueId }}</a>
+                        } @else if (a.outcome === 'Waiting') {
+                          <!-- Not dropped: its turn comes when the run in flight ends. -->
+                          <span class="text-[color:var(--text-muted)] shrink-0 whitespace-nowrap" [title]="a.reason || ''"
+                                data-test="approval-waiting">Waiting{{ a.place ? ' · #' + a.place + ' in line' : '' }}</span>
+                        } @else {
+                          <span class="text-warn-500 shrink-0" [title]="a.reason || ''">{{ a.outcome }}</span>
+                        }
+                        <span class="text-[color:var(--text-muted)] whitespace-nowrap ml-auto shrink-0">
+                          {{ a.dateCreated ? (a.dateCreated | serverTime:'recent') : '' }}
+                        </span>
+                      </li>
+                      @if (a.outcome === 'Skipped' && a.reason) {
                         <li class="pl-5 text-[11px] text-[color:var(--text-muted)] log-message">{{ a.reason }}</li>
                       }
                     }
@@ -178,8 +216,8 @@
               @for (chip of notifyChips(job); track chip.label) {
                 <span [class]="chip.on ? 'pill pill-brand' : 'pill pill-neutral opacity-70'"
                       [title]="chip.on
-                        ? 'An email is sent when this job ' + chip.label
-                        : 'No email is sent when this job ' + chip.label">
+                        ? 'An email is sent when this schedule ' + chip.label
+                        : 'No email is sent when this schedule ' + chip.label">
                   <app-icon [name]="chip.on ? 'check' : 'minus'" size="0.85em" />{{ chip.label }}
                 </span>
               }
@@ -197,10 +235,10 @@
           </div>
 
           <div class="min-w-0">
-            <div class="detail-head">Linked task</div>
+            <div class="detail-head">Pipeline</div>
             @if (job.taskDetail; as task) {
               <dl class="detail-list">
-                <dt>Task</dt>
+                <dt>Name</dt>
                 <dd class="truncate">
                   @if (canManageTasks()) {
                     <a class="text-accent hover:underline"
@@ -213,13 +251,13 @@
                 </dd>
                 <dt>Type</dt><dd class="truncate">{{ task.sourceTaskType?.serviceName || '—' }}</dd>
                 <dt>Topic</dt><dd class="mono truncate">{{ topicOf(task.sourceTaskType?.queueTopicPartition) }}</dd>
-                <dt>Pipeline</dt><dd class="truncate">{{ task.pipelineId || '—' }}</dd>
+                <dt>Pipeline id</dt><dd class="truncate">{{ task.pipelineId || '—' }}</dd>
                 <dt>Home page</dt><dd class="truncate">{{ task.homePageId || '—' }}</dd>
               </dl>
 
               @if (task.taskPayload) {
                 <div class="flex items-center gap-2 mt-3 mb-1">
-                  <span class="detail-head mb-0">Task payload</span>
+                  <span class="detail-head mb-0">Payload</span>
                   <button type="button" class="btn btn-default btn-sm ml-auto" (click)="copyPayload()">
                     <app-icon [name]="payloadCopied() ? 'check' : 'copy'"
                               [class.icon-ok]="payloadCopied()" size="0.85em" />
@@ -230,7 +268,7 @@
                     >{{ task.taskPayload }}</pre>
               }
             } @else {
-              <p class="text-xs text-[color:var(--text-muted)]">No task linked.</p>
+              <p class="text-xs text-[color:var(--text-muted)]">No pipeline linked.</p>
             }
           </div>
         </div>
@@ -238,26 +276,26 @@
     </div>
   }
 
-  @if (summary().length) {
-    <div class="flex flex-wrap gap-2">
-      @for (item of summary(); track item.status) {
-        <app-status-filter-chip [status]="item.status" [count]="item.count"
-                                 [selected]="statusFilter() === item.status"
-                                 (toggle)="setStatusFilter(statusFilter() === item.status ? '' : item.status)" />
-      }
-    </div>
+  <!-- UX review 2026-10-12 (B3, E1): opened from the menu, Runs is an explorer -- facets on the left with the server's
+       counts, a time histogram above the list. A schedule's own runs and a dashboard drill-down keep one column. -->
+  <div [class.runs-explorer]="explorer()">
+  @if (explorer()) {
+    <aside class="card p-4 runs-explorer-rail" data-test="run-facets">
+      <app-run-facets-rail [facets]="facets()" [filter]="explorerFilter()" [unavailable]="facetsUnavailable()" [loading]="facetsLoading()"
+                           (filterChange)="setExplorerFilter($event)" />
+    </aside>
   }
-
-  @if (hasInsights()) {
-    <div class="flex">
-      <button type="button" class="btn btn-ghost btn-sm -ml-2"
-              [class.text-accent]="showInsights()"
-              (click)="showInsights.set(!showInsights())">
-        <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
-      </button>
-    </div>
+  <div class="min-w-0 flex flex-col gap-4">
+  @if (explorer()) {
+    <section class="card chart-card" data-test="run-histogram" aria-labelledby="run-histogram-title">
+      <div class="flex flex-wrap items-baseline gap-2">
+        <h3 class="chart-title" id="run-histogram-title">Runs over time</h3>
+        <span class="chart-sub">{{ histogramSub() }}</span>
+      </div>
+      <app-bar-chart [data]="histogram()" [height]="96" [clickable]="false" [hideValues]="true"
+                     [emptyMessage]="facetsUnavailable() ? 'The counts could not be read.' : 'No runs in this window.'" />
+    </section>
   }
-
   @if (showInsights() && hasInsights()) {
     <!-- Spans must tile the 3-column grid or every row is left part-empty: the donut (1) and
          the duration card (2) fill one row, the full-width flag split takes the next. -->
@@ -271,7 +309,7 @@
         <h3 class="chart-title">How long each run took</h3>
         <p class="chart-sub">
           Most recent {{ durationTrend().length }} runs, oldest first. A rising slope means the
-          job is getting slower.
+          schedule's runs are getting slower.
         </p>
         @if (durationTrend().length) {
           <app-bar-chart [data]="durationTrend()" [height]="104" unit="duration" />
@@ -311,6 +349,20 @@
         <input class="input" placeholder="Search run id or message" aria-label="Search runs"
                [value]="search()" (input)="setSearch($any($event.target).value)" />
       </div>
+      <!-- Owner 2026-10-12: the outcome chips and the Charts toggle are filters of this list, in its toolbar after the
+           search -- one height -- rather than floating between the review box and the table. -->
+      @for (item of explorer() ? [] : summary(); track item.status) {
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="statusFilter() === item.status"
+                                 (toggle)="setStatusFilter(statusFilter() === item.status ? '' : item.status)" />
+      }
+      @if (hasInsights()) {
+        <button type="button" class="btn btn-ghost btn-sm" data-test="runs-charts"
+                [class.text-accent]="showInsights()" [attr.aria-pressed]="showInsights()"
+                (click)="showInsights.set(!showInsights())">
+          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
+        </button>
+      }
       @if (statusFilter() || search()) {
         <button type="button" class="btn btn-ghost btn-sm"
                 (click)="clearFilters()">
@@ -323,17 +375,18 @@
       <thead>
         <tr>
           <th>Run</th>
-          @if (isAllJobs()) { <th>Job</th> }
+          @if (isAllJobs()) { <th>Schedule</th> }
           <!-- Queued waits for xl: at 1024 it pushed Status and Logs past the card edge, and
                Started is the time that matters. -->
           <th class="hidden xl:table-cell">Queued</th>
           <th>Started</th>
           <th>Ended</th>
-          <th>Duration</th>
+          <th class="text-right">Duration</th>
+          <!-- Owner 2026-10-12: the status sits right before the message it explains, a fixed width so the badges line
+               up; the pinned column keeps only the actions. -->
+          <th class="w-32">Status</th>
           <th>Message</th>
-          <!-- Status and the Logs link share one cell pinned to the right edge, as Failed runs on
-               Reports does, so a narrow screen scrolls the times away rather than the outcome. -->
-          <th class="text-right col-pin-right">Status</th>
+          <th class="text-right col-pin-right th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -351,10 +404,16 @@
                    is. A job the list does not have keeps just its number. -->
               <td class="whitespace-nowrap">
                 <a class="link-inline mono" [routerLink]="['/pipelines/schedules', run.jobId, 'executions']"
-                   title="Open this job's own history">#{{ run.jobId }}</a>
+                   title="Open this schedule's own runs">#{{ run.jobId }}</a>
                 @if (jobNames().get(run.jobId); as name) {
                   <span class="ml-1.5 inline-block max-w-[16rem] truncate align-bottom text-[color:var(--text-secondary)]"
                         [title]="name">{{ name }}</span>
+                }
+                <!-- B3: the pipeline the schedule runs, and what started this run (Core's fetchLogs names both). -->
+                @if (run.taskName || run.trigger) {
+                  <div class="text-xs text-[color:var(--text-muted)] max-w-[20rem] truncate" [title]="run.taskName || ''">
+                    {{ run.taskName }}@if (run.taskName && run.trigger) { · }@if (run.trigger) { {{ triggerWord(run.trigger) }} }
+                  </div>
                 }
               </td>
             }
@@ -377,32 +436,43 @@
                   <span class="truncate max-w-48">{{ arrival.fileName }}</span>
                 </div>
               }
+              <!-- MIG-364: a run an approved document started links to the document's review screen (a batch: its first). -->
+              @if (startedByDocument().get(run.jobQueueId); as documents) {
+                <a class="flex items-center gap-1 mt-0.5 text-[11px] link-inline w-fit" data-test="started-by-document"
+                   [routerLink]="['/review/documents', documents[0].extractionId]" [title]="startedChip(documents).title">
+                  <app-icon name="file" size="0.9em" class="shrink-0" />
+                  <span class="truncate max-w-48">{{ startedChip(documents).text }}</span>
+                </a>
+              }
             </td>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ run.endTime ? (run.endTime | serverTime:'recentSec') : '—' }}
             </td>
-            <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="text-right tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ duration(run) || '—' }}
             </td>
+            <td class="w-32 whitespace-nowrap" data-test="run-status"><app-status [label]="run.jobStatus" /></td>
             <td class="max-w-72 xl:max-w-96">
               @if (run.jobStatusMessage) {
                 <!-- A truncated line with a tooltip is unreadable for the messages that matter:
                      a failure reason runs to a paragraph and a tooltip cannot be selected or
                      copied. Long ones open into the same box the task payload uses. -->
                 @if (isLongMessage(run.jobStatusMessage)) {
-                  <!-- A chevron, like the Jobs row toggle: the underlined text alone read as a
-                       plain message that happened to be cut off. -->
+                  <!-- A chevron, like the Schedules row toggle: the underlined text alone read as a
+                       plain message that happened to be cut off. UX review E2: two lines and an ellipsis in
+                       the cell, the whole message on hover, and the row's expand below for copying. -->
                   <button type="button"
-                          class="flex items-center gap-1 w-full text-left link-inline"
+                          class="flex items-start gap-1 w-full text-left link-inline"
                           [attr.aria-expanded]="isMessageOpen(run.jobQueueId)"
                           [attr.aria-label]="(isMessageOpen(run.jobQueueId) ? 'Hide' : 'Show') + ' the full message for run #' + run.jobQueueId"
-                          [title]="isMessageOpen(run.jobQueueId) ? 'Hide the full message' : 'Show the full message'"
+                          [title]="run.jobStatusMessage"
+                          data-test="run-message"
                           (click)="toggleMessage(run.jobQueueId)">
-                    <span class="truncate min-w-0">{{ run.jobStatusMessage }}</span>
-                    <app-icon [name]="isMessageOpen(run.jobQueueId) ? 'chevronDown' : 'chevronRight'" class="icon-muted shrink-0" />
+                    <span class="line-clamp-2 min-w-0 break-words">{{ run.jobStatusMessage }}</span>
+                    <app-icon [name]="isMessageOpen(run.jobQueueId) ? 'chevronDown' : 'chevronRight'" class="icon-muted shrink-0 mt-0.5" />
                   </button>
                 } @else {
-                  <span class="truncate block">{{ run.jobStatusMessage }}</span>
+                  <span class="line-clamp-2 break-words" [title]="run.jobStatusMessage" data-test="run-message">{{ run.jobStatusMessage }}</span>
                 }
               } @else {
                 <span class="text-[color:var(--text-muted)]">—</span>
@@ -410,7 +480,6 @@
             </td>
             <td class="text-right col-pin-right">
               <div class="flex items-center justify-end gap-1">
-                <app-status [label]="run.jobStatus" />
                 <!-- run.jobId, not jobId(). This screen serves TWO routes: jobs/:jobId/history for
                      one job, and jobs/history for the dashboard's TOTAL row, which drills into an
                      hour ACROSS EVERY JOB and therefore has no id in the path. On that view every
@@ -420,9 +489,17 @@
                      Job column has always linked by run.jobId; this one did not.
                      Withheld entirely on the row where the run does not name its job, because a
                      Logs button that cannot say whose logs is worse than no button. -->
+                <!-- MIG-345: a failed run is retried as its next attempt, from its failed step or from the start. -->
+                @if (run.jobStatus === 'Failed') {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" data-test="run-retry"
+                          [attr.aria-label]="'Retry run #' + run.jobQueueId"
+                          title="Retry from the step that failed, or run again from the start"
+                          (click)="retry(run)"><app-icon name="play" /></button>
+                }
                 @if (run.jobId) {
-                  <a class="btn btn-ghost btn-sm"
-                     [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
+                  <a class="btn btn-ghost btn-icon btn-sm" data-test="run-logs" title="Open the run: its steps, outputs and logs"
+                     [attr.aria-label]="'Open run #' + run.jobQueueId"
+                     [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId]"><app-icon name="file" /></a>
                 }
               </div>
             </td>
@@ -430,7 +507,7 @@
 
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
-              <td [attr.colspan]="isAllJobs() ? 8 : 7" class="!p-0">
+              <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
                 <div class="detail-panel">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider
@@ -464,6 +541,8 @@
     <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
+  </div>
+  </div>
 </div>
 
 @if (assistantOpen() && !isAllJobs()) {

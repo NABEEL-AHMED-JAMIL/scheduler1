@@ -5,10 +5,12 @@ import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { NEVER, of } from 'rxjs';
 import { InvoicePane } from './invoice-detail';
+import { PaymentPanel } from './payment-panel';
 import { BillingApi } from './billing.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 
 /** One invoice in the pane: what is paid, what is open, the story in order, and who may do what. */
 const DETAIL = {
@@ -29,23 +31,53 @@ const DETAIL = {
 @Component({ imports: [InvoicePane], template: `<app-invoice-pane [number]="number" (changed)="changes = changes + 1" />` })
 class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) pane!: InvoicePane; }
 
-function page(platformAdmin: boolean, detail: object = DETAIL) {
+function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [] })) }) {
   // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
-  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))) };
+  const opened: { component: any; config: any }[] = [];
+  const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))),
+    payLink: vi.fn(() => of({ status: API_SUCCESS, data: { invoiceId: 7, number: 'INV-2026-08-0006', url: 'https://checkout.stripe.com/c/pay/cs_test_1', sessionId: 'cs_test_1', amount: 202.75, currency: 'USD', provider: 'stripe', testMode: true } })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
     // Every dialog answers yes: verify and void are asked first now, in the app's own dialog.
-    { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+    // The payment panel closes with what Billing answered.
+    { provide: Dialog, useValue: { open: (component: unknown, config: unknown) => { opened.push({ component, config }); return { closed: of(
+      component === PaymentPanel ? { message: 'Payment slip sent.', payment: null } : true) }; } } },
+    { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+    { provide: ApiClientsApi, useValue: clients },
   ] });
   const fixture = TestBed.createComponent(Host);
   fixture.detectChanges();
   const component = fixture.componentInstance.pane;
-  return { component, api, host: fixture.componentInstance, fixture };
+  return { component, api, host: fixture.componentInstance, fixture, opened };
 }
 
 describe('InvoicePane', () => {
+  it('MIG-337: an API line says which client made the calls, by name, and the others by id', () => {
+    const lines = [{ invoiceLineId: 9, sort: 0, meter: 'api.calls', description: 'API calls', quantity: '852', unit: 'call', per: 1000, unitPrice: '0.1',
+      amount: '0.0852', manual: false, breakdown: '[{"subjectType":"api_client","subjectId":"cl_portal","quantity":"812"},'
+        + '{"subjectType":"api_client","subjectId":"cl_gone","quantity":"40"}]' }];
+    const clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [{ clientId: 'cl_portal', name: 'Order portal' }] })) };
+    const { component, fixture } = page(true, { ...DETAIL, lines }, clients as any);
+    expect(clients.listOf).toHaveBeenCalledWith(2905);
+    fixture.detectChanges();
+    const said = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-line-subject]')).map(e => e.textContent!.trim());
+    expect(said).toEqual(['Order portal: 812', 'API client cl_gone: 40']);
+    expect(component.subjects(component.invoice()!.lines[0])[0].quantity).toBe(812);
+  });
+
+  it('a line the default card priced says so; a line its own card priced does not', () => {
+    const lines = [{ invoiceLineId: 9, sort: 0, meter: 'api.calls', description: 'API calls', quantity: '127', unit: 'call', per: 1000, unitPrice: '0.1',
+      amount: '0.0127', manual: false, pricedFromVersion: 34, pricedFromName: 'Standard 2026' },
+      { invoiceLineId: 10, sort: 1, meter: 'webhook.deliveries', description: 'Webhook deliveries', quantity: '9', unit: 'delivery', per: 1000, unitPrice: '0',
+        amount: '0', manual: false }];
+    const { fixture } = page(true, { ...DETAIL, lines });
+    fixture.detectChanges();
+    const said = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('[data-priced-from]')).map(e => e.textContent!.trim());
+    expect(said).toEqual(["Priced from the Standard 2026 card (v34): not on this workspace's card"]);
+  });
+
   it('reads the invoice, sums verified payments only, and tells the story in order', () => {
     const { component, api } = page(false);
     expect(api.invoice).toHaveBeenCalledWith('INV-2026-08-0006');
@@ -53,7 +85,7 @@ describe('InvoicePane', () => {
     expect(component.paid()).toBe(200);
     expect(component.pending()).toHaveLength(1);
     expect(component.isOpen()).toBe(true);
-    expect(component.payAmount()).toBe('202.75');
+    expect(component.pendingAmount()).toBe(166.75);
     expect(component.quantity(component.invoice()!.lines[0])).toBe('122 GB');
     expect(component.rate(component.invoice()!.lines[0])).toBe('$0.01 per GB');
     // A frozen line keeps the calculation it was priced with: the tier bands come back as numbers.
@@ -66,12 +98,15 @@ describe('InvoicePane', () => {
     expect(story[story.length - 1]).toContain('166.75');
   });
 
-  it('a tenant administrator can submit a slip; verifying and voiding are the platform\'s', async () => {
+  it('a tenant administrator uploads a slip in the side panel; verifying and voiding are the platform\'s', async () => {
     const tenant = page(false);
     expect(tenant.component.canVoid()).toBe(false);
-    tenant.component.payAmount.set('50');
-    tenant.component.submitPayment();
-    expect(tenant.api.submitPayment).toHaveBeenCalledWith(7, 50, 'bank', '', '', null);
+    tenant.component.openPayment();
+    expect(tenant.opened[0].component).toBe(PaymentPanel);
+    expect(tenant.opened[0].config.panelClass).toContain('side-panel-right');
+    expect(tenant.opened[0].config.data).toMatchObject({ paid: 200, pending: 166.75, platformAdmin: false });
+    expect(tenant.api.invoice).toHaveBeenCalledTimes(2);           // saved: the invoice is read again
+    expect(tenant.host.changes).toBe(1);
     const admin = page(true);
     admin.component.verify(DETAIL.payments[1] as any, true);
     await new Promise(r => setTimeout(r));                // the confirm dialog answers on the microtask queue
@@ -88,7 +123,7 @@ describe('InvoicePane', () => {
     expect(text).toContain('Bank transfer');
     expect(text).not.toMatch(/\bbank\b/);
     expect(text).toContain('Verified');
-    expect(text).toContain('Pending verification');
+    expect(text).toContain('Awaiting verification');
     expect(text).toMatch(/Issued \d{1,2} Sep 2026/);
     expect(text).toMatch(/Due 30 Sep 2026 \(net 30\)/);
     expect(text).toMatch(/Paid \$200\.00 · balance \$202\.75/);
@@ -177,5 +212,80 @@ describe('InvoicePane with an answer that is not a whole invoice', () => {
     expect(component.invoice()?.documents).toEqual([]);
     expect(component.invoice()?.payments).toEqual([]);
     expect(component.pdfDocument()).toBeNull();
+  });
+
+  // ---- MIG-359: paying by card through Stripe's hosted page ----
+  const el = (fixture: { nativeElement: unknown }) => fixture.nativeElement as HTMLElement;
+
+  it('MIG-359: a workspace admin pays an open invoice by card on Stripe\'s page: Pay now opens the link Billing hands out', () => {
+    const { component, api, fixture } = page(false, { ...DETAIL, cardPayable: true });
+    const leave = vi.spyOn(component, 'leaveFor').mockImplementation(() => {});
+    fixture.detectChanges();
+    const button = el(fixture).querySelector('[data-pay-now]') as HTMLButtonElement;
+    expect(button?.textContent?.trim()).toBe('Pay now');
+    button.click();
+    expect(api.payLink).toHaveBeenCalledWith(7);
+    expect(leave).toHaveBeenCalledWith('https://checkout.stripe.com/c/pay/cs_test_1');
+  });
+
+  it('MIG-359: no Pay now where card payment is not set up, nor for the platform administrator, who copies the link instead', () => {
+    const off = page(false, { ...DETAIL, cardPayable: false });
+    off.fixture.detectChanges();
+    expect(el(off.fixture).querySelector('[data-pay-now]')).toBeNull();
+    const platform = page(true, { ...DETAIL, cardPayable: true });
+    platform.fixture.detectChanges();
+    expect(el(platform.fixture).querySelector('[data-pay-now]')).toBeNull();
+    expect(platform.component.canPayByCard()).toBe(true);
+  });
+
+  it('MIG-359: a paid-by-card invoice says so, with the day, and offers no payment', () => {
+    const paid = { ...DETAIL, status: 'paid', balance: '0', paidVia: 'card', paidAt: '2026-10-06T21:40:00', cardPayable: false,
+      payments: [{ paymentId: 9, amount: '402.75', method: 'card', reference: 'pi_test_1', status: 'verified', receiptNumber: 'RCP-2026-10-0001',
+        receivedAt: '2026-10-06T21:40:00', verifiedAt: '2026-10-06T21:40:00', dateCreated: '2026-10-06T21:40:00', hasSlip: false, provider: 'stripe', providerPaymentId: 'pi_test_1' }] };
+    const { component, fixture } = page(false, paid);
+    fixture.detectChanges();
+    expect(el(fixture).querySelector('[data-card-chip]')?.textContent?.trim()).toBe('Paid by card');
+    expect(el(fixture).querySelector('[data-paid-by-card]')?.textContent?.trim()).toMatch(/^Paid by card on /);
+    expect(el(fixture).querySelector('[data-pay-now]')).toBeNull();
+    expect(component.history().map(h => h.text)).toContain('Paid $402.75 by card through Stripe · receipt RCP-2026-10-0001');
+  });
+
+  it('MIG-359: a declined card leaves the invoice open with the reason, and Pay now to try another card', () => {
+    const declined = { ...DETAIL, status: 'issued', balance: '402.75', cardPayable: true, paymentError: 'Your card was declined. (card_declined: generic_decline)',
+      paymentErrorAt: '2026-10-06T21:41:00',
+      payments: [{ paymentId: 9, amount: '402.75', method: 'card', reference: 'pi_test_2', status: 'rejected', note: 'Your card was declined. (card_declined: generic_decline)',
+        verifiedAt: '2026-10-06T21:41:00', dateCreated: '2026-10-06T21:41:00', hasSlip: false, provider: 'stripe' }] };
+    const { component, fixture } = page(false, declined);
+    fixture.detectChanges();
+    expect(el(fixture).querySelector('[data-card-chip]')?.textContent?.trim()).toBe('Card declined');
+    expect(el(fixture).querySelector('[data-card-declined]')?.textContent).toContain('Your card was declined.');
+    expect(el(fixture).querySelector('[data-pay-now]')).not.toBeNull();
+    expect(component.paid()).toBe(0);
+    expect(component.history().map(h => h.text)).toContain('Card payment of $402.75 declined · Your card was declined. (card_declined: generic_decline)');
+  });
+});
+
+describe('InvoicePane header and lines (UX final BL2)', () => {
+  it('puts the status pills beside the number, on one line, and the dates under it', () => {
+    const { fixture } = page(false);
+    const el = fixture.nativeElement as HTMLElement;
+    const title = el.querySelector('[data-test="invoice-title"]')!;
+    expect(title.querySelector('h2')!.textContent!.trim()).toBe('INV-2026-08-0006');
+    const status = title.querySelector('[data-test="invoice-status"]')!;
+    expect(status.textContent).toContain('open');
+    expect(title.querySelector('h2')!.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.nextElementSibling!.textContent).toContain('issued');
+  });
+
+  it('shows every line whole, in no fixed-height scroll box', () => {
+    const many = { ...DETAIL, lines: Array.from({ length: 15 }, (_, n) => ({ ...DETAIL.lines[0], invoiceLineId: n + 1, sort: n,
+      description: n === 14 ? 'Webhook deliveries' : `Line ${n + 1}` })) };
+    const { fixture } = page(false, many);
+    const el = fixture.nativeElement as HTMLElement;
+    const lines = el.querySelector('[data-test="invoice-lines"]')!;
+    expect(lines.closest('.lookup-entries-scroll')).toBeNull();
+    expect(lines.querySelector('.lookup-entries-scroll')).toBeNull();
+    expect(lines.querySelectorAll('tbody tr').length).toBe(15);
+    expect(lines.textContent).toContain('Webhook deliveries');
   });
 });

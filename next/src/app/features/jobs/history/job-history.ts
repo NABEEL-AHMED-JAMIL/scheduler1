@@ -1,12 +1,15 @@
-import { localIsoDaysAgo } from '../../../shared/ui/local-day';
 import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Dialog } from '@angular/cdk/dialog';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription, auditTime, filter } from 'rxjs';
 
 import { Router, RouterLink } from '@angular/router';
+import { ReviewWaiting } from './review-waiting';
+import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { openBackfill } from '../../runs/backfills/backfill-open';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { isMissingRecord } from '../../../core/api/missing-record';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -27,7 +30,16 @@ import { clockTime } from '../schedule-labels';
 import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { StatStrip, StatStripItem, StatStripSummary } from '../../../shared/ui/stat-strip';
-import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence } from '../inbox/inbox-trigger';
+import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, triggerSentence, waitingSentence } from '../inbox/inbox-trigger';
+import {
+  DocumentApproval, DocumentTrigger, approvalWord, approvalsOf, runsStartedByDocument, startedChip,
+  triggerOf as documentTriggerOf, triggerSentence as documentTriggerSentence, waitingSentence as documentWaitingSentence,
+} from '../documents/document-trigger';
+import { DocumentsApi } from '../../documents/documents.service';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { RunFacetsRail } from './run-facets-rail';
+import { ExplorerFilter, NO_FILTER, RUN_WINDOWS, RunExplorerApi, RunFacets, activeCount, explorerBody, histogramBars } from './run-explorer';
 
 /**
  * How many runs one read brings: the newest window first, and older ones a window at a time on request.
@@ -35,6 +47,8 @@ import { InboxArrival, InboxTrigger, arrivalsOf, runsStartedByFile, triggerOf, t
  * again on each status push.
  */
 const HISTORY_WINDOW = 500;
+/** MIG-364: the approved documents read with the runs -- enough to name the documents behind the runs on screen. */
+const APPROVALS_WINDOW = '200';
 /** Runs Executions shows when it is opened without a job: the newest of the last day. */
 export const RECENT_WINDOW = 200;
 
@@ -50,12 +64,28 @@ interface JobQueue {
   runManual?: boolean | null;
   skipManual?: boolean | null;
   skipTime?: string;
+  /** B3: the schedule's pipeline and what started the run, from Core's fetchLogs (absent from an older Core). */
+  taskDetailId?: number;
+  taskName?: string;
+  trigger?: string;
 }
+
+const TRIGGER_WORDS: Record<string, string> = {
+  schedule: 'on its timetable', manual: 'Run now', file: 'a file arrived', document: 'a document approved', retry: 'a retry', api: 'the API',
+};
 
 @Component({
   selector: 'app-job-history',
-  imports: [AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip],
+  imports: [PageHeader, RefreshButton, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
+    ReviewWaiting, RunFacetsRail],
   templateUrl: './job-history.html',
+  // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
+  styles: `
+/* UX review 2026-10-12 (B3): Runs as an explorer -- the facets rail at the left, the histogram and the list beside it. */
+.runs-explorer { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+.runs-explorer-rail { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+@media (max-width: 1023px) { .runs-explorer { grid-template-columns: minmax(0, 1fr); } .runs-explorer-rail { position: static; max-height: none; } }
+  `,
 })
 export class JobHistory {
   /** Runs whose full message is open. Short ones never need it. */
@@ -109,6 +139,7 @@ export class JobHistory {
   protected readonly canManageTasks = computed(() => this.auth.canManageTasks());
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
   private readonly jobEvents = inject(JobEventsService);
 
   /** Shown as "Live" beside Refresh: while the feed is up, new runs arrive without a click. */
@@ -118,6 +149,63 @@ export class JobHistory {
   private missedEvents = false;
 
   readonly runs = signal<JobQueue[]>([]);
+
+  // ------------------------------------------------------------------------------------------ B3: the explorer
+  private readonly explorerApi = inject(RunExplorerApi);
+  /** Runs opened from the menu: no schedule, no dashboard drill-down. */
+  readonly explorer = computed(() => !this.jobId() && !this.isDrillDown());
+
+  /** MIG-347: Backfill… is running the schedule: whoever holds Schedules. */
+  readonly canBackfill = computed(() => this.auth.canOpen?.('jobs') ?? false);
+
+  /** MIG-347: this schedule run for each day of a past range; a started one opens in Runs › Backfills. */
+  backfill(): void {
+    const jobId = Number(this.jobId());
+    if (!jobId) return;
+    const name = this.jobName() || `Schedule #${jobId}`;
+    openBackfill(this.dialog, { jobId, jobName: name, readsCosts: this.auth.isTenantAdmin() }).then(started => {
+      if (!started) return;
+      this.toast.success(`Backfill #${started.backfillId} of ${name} started: ${started.total} period(s).`);
+      this.router.navigate(['/runs/backfills'], { queryParams: { backfill: started.backfillId } });
+    });
+  }
+  readonly explorerFilter = signal<ExplorerFilter>(NO_FILTER);
+  readonly facets = signal<RunFacets | null>(null);
+  readonly facetsLoading = signal(false);
+  readonly facetsUnavailable = signal(false);
+  private facetsRequest?: Subscription;
+  readonly histogram = computed(() => histogramBars(this.facets()));
+  readonly histogramSub = computed(() => {
+    const f = this.facets();
+    const window = RUN_WINDOWS.find(w => w.id === this.explorerFilter().window)?.label ?? '';
+    if (!f) return window;
+    return `${window} · ${f.total} run${f.total === 1 ? '' : 's'} · by ${f.histogram?.bucket === 'hour' ? 'hour' : 'day'}, stacked by status`;
+  });
+
+  /** A facet picked: the counts and the list are read again with it. */
+  setExplorerFilter(filter: ExplorerFilter): void {
+    this.explorerFilter.set(filter);
+    this.pager.reset();
+    this.load();
+  }
+
+  triggerWord(trigger: string): string { return TRIGGER_WORDS[trigger] ? `started by ${TRIGGER_WORDS[trigger]}` : trigger; }
+
+  private loadFacets(): void {
+    this.facetsRequest?.unsubscribe();
+    // The counts are Runs by date's (page queue): a reader holding Schedules alone gets the list without them, not a 403.
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); return; }
+    this.facetsLoading.set(true);
+    this.facetsRequest = this.explorerApi.facets(explorerBody(this.explorerFilter(), RECENT_WINDOW)).subscribe({
+      next: r => {
+        this.facetsLoading.set(false);
+        const ok = r.status === API_SUCCESS && !!r.data && typeof r.data === 'object';
+        this.facets.set(ok ? (r.data as RunFacets) : null);
+        this.facetsUnavailable.set(!ok);
+      },
+      error: () => { this.facetsLoading.set(false); this.facets.set(null); this.facetsUnavailable.set(true); },
+    });
+  }
   /** The server has runs older than the ones loaded; Load older reads the next window. */
   readonly hasMore = signal(false);
   /** Executions without a job: more ran in the last day than RECENT_WINDOW shows. */
@@ -187,8 +275,8 @@ export class JobHistory {
   readonly emptyMessage = computed(() =>
     this.statusFilter() || this.search().trim() ? 'No runs match the current filters.'
       : this.isDrillDown() ? 'No runs in this hour.'
-      : !this.jobId() ? 'No job ran in the last day. Open a schedule to see its whole history.'
-      : 'This job has never run.');
+      : !this.jobId() ? (activeCount(this.explorerFilter()) ? 'No run matches these filters.' : 'No schedule ran in this window. Widen it on the left, or open a schedule to see its whole history.')
+      : 'This schedule has never run.');
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
   readonly summary = computed(() => {
@@ -203,7 +291,20 @@ export class JobHistory {
   readonly showInsights = signal(false);
   /** The job and its task, so the run list has the context the old screen showed beside it. */
   readonly detail = signal<any | null>(null);
-  readonly showDetail = signal(true);
+  /**
+   * UX review E3 (2026-10-13): the schedule's details start folded -- the runs are what the page is for, and the details
+   * (timetable, triggers, the pipeline and its payload) sat above them at y≈850. The folded line says the pipeline and when.
+   */
+  readonly showDetail = signal(false);
+  /** The folded line: "Pipeline: Daily readmissions · Daily at 06:00". */
+  detailSummary(job: any): string {
+    const parts: string[] = [];
+    if (job?.taskDetail?.taskName) parts.push(`Pipeline: ${job.taskDetail.taskName}`);
+    if (job?.execution === 'Manual' || !job?.scheduler) parts.push('On demand');
+    else if (job.scheduler.frequency === 'Cron') parts.push(`Cron ${job.scheduler.cronExpression ?? ''}`.trim());
+    else parts.push([job.scheduler.frequency, job.scheduler.startTime ? `at ${clockTime(job.scheduler.startTime)}` : ''].filter(Boolean).join(' '));
+    return parts.filter(Boolean).join(' · ');
+  }
   readonly payloadCopied = signal(false);
   readonly search = signal('');
 
@@ -252,8 +353,63 @@ export class JobHistory {
   readonly recentArrivals = computed(() => this.arrivals().slice(0, 5));
   readonly showInbox = computed(() => !!this.trigger()?.configured || this.arrivals().length > 0);
   readonly triggerSentence = triggerSentence;
+  readonly waitingSentence = waitingSentence;
+
+  /**
+   * MIG-364: the job's document trigger -- the second Event start, a document of one type being approved -- and what the
+   * approved documents did to it. A run a document started links to the document's review screen.
+   */
+  readonly documentTrigger = signal<DocumentTrigger | null>(null);
+  readonly approvals = signal<DocumentApproval[]>([]);
+  /** The workspace's document types by id, for the trigger's sentence; read only for a job that has the trigger. */
+  readonly documentTypeNames = signal<ReadonlyMap<number, string> | null>(null);
+  private readonly documentsApi = inject(DocumentsApi);
+  /** The documents each run started, by run id, oldest first: its Started cell links to the first. */
+  readonly startedByDocument = computed(() => runsStartedByDocument(this.approvals()));
+  readonly recentApprovals = computed(() => this.approvals().slice(0, 5));
+  readonly showDocuments = computed(() => !!this.documentTrigger()?.configured || this.approvals().length > 0);
+  readonly documentTriggerSentence = documentTriggerSentence;
+  readonly documentWaitingSentence = documentWaitingSentence;
+  readonly startedChip = startedChip;
+  readonly approvalWord = approvalWord;
+
+  private loadDocumentTrigger(): void {
+    if (!this.jobId()) { this.documentTrigger.set(null); return; }
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentTrigger`, { params: { jobId: this.jobId() } }).subscribe({
+      next: response => {
+        const trigger = response.status === API_SUCCESS ? documentTriggerOf(response.data) : null;
+        this.documentTrigger.set(trigger);
+        if (trigger?.configured && this.documentTypeNames() === null) this.loadDocumentTypeNames();
+      },
+      error: () => this.documentTrigger.set(null),
+    });
+  }
+
+  /** Once, and only to name the type: without the list the sentence names it by its id. */
+  private loadDocumentTypeNames(): void {
+    this.documentTypeNames.set(new Map());
+    this.documentsApi.types().subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !Array.isArray(response.data)) return;
+        this.documentTypeNames.set(new Map(response.data.map(t => [Number(t.documentTypeId), t.name])));
+      },
+      error: () => {},
+    });
+  }
+
+  /** Re-read with the runs: an approved document that starts a run is how a new row arrives on this screen. */
+  private loadApprovals(): void {
+    if (!this.jobId()) { this.approvals.set([]); return; }
+    this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/documentApprovals`,
+      { params: { jobId: this.jobId(), limit: APPROVALS_WINDOW } }).subscribe({
+      next: response => { if (response.status === API_SUCCESS) this.approvals.set(approvalsOf(response.data)); },
+      // The runs are the point of the screen; losing the documents must not break it.
+      error: () => {},
+    });
+  }
 
   private loadTrigger(): void {
+    this.loadDocumentTrigger();
     if (!this.jobId()) { this.trigger.set(null); return; }
     this.http.get<ApiResponse<unknown>>(`${API_BASE}/sourceJob.json/inboxTrigger`, { params: { jobId: this.jobId() } }).subscribe({
       next: response => this.trigger.set(response.status === API_SUCCESS ? triggerOf(response.data) : null),
@@ -383,7 +539,10 @@ export class JobHistory {
 
     // The list endpoint is the only place the job's name is available. Every name is kept, not
     // only this job's: an hour across every job lists runs of many jobs, and bare numbers there
-    // said nothing about which job each run belonged to.
+    // said nothing about which job each run belonged to. It is the Schedules page's list (page jobs): a reader holding
+    // Runs by date alone -- the Reviewer profile, on Runs › Latest -- was refused it on every open, a 403 in the console;
+    // their rows keep the schedule's number, as Runs › By date's do.
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('jobs')) return;
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) return;
@@ -439,6 +598,7 @@ export class JobHistory {
     if (this.jobId()) drillParams['jobId'] = this.jobId();
 
     this.loadArrivals();
+    this.loadApprovals();
 
     const request = this.isDrillDown()
       ? this.http.get<ApiResponse<any>>(
@@ -459,7 +619,7 @@ export class JobHistory {
           if (!this.isDrillDown() && isMissingRecord(response)) {
             this.missing.set(true);
             this.runs.set([]);
-            this.error.set(`Job #${String(this.jobId()).trim()} does not exist or was deleted.`);
+            this.error.set(`Schedule #${String(this.jobId()).trim()} does not exist or was deleted.`);
           } else if (!silent) {
             this.error.set(response.message);
           }
@@ -490,7 +650,8 @@ export class JobHistory {
   /** The newest runs of every job in the last day (at most RECENT_WINDOW), for Executions opened without a job. */
   private loadRecent(silent: boolean): void {
     this.request?.unsubscribe();
-    const body = { fromDate: localIsoDaysAgo(1), toDate: localIsoDaysAgo(0), limit: RECENT_WINDOW };
+    this.loadFacets();
+    const body = explorerBody(this.explorerFilter(), RECENT_WINDOW);
     this.request = this.http.post<ApiResponse<any>>(`${API_BASE}/message.json/fetchLogs`, body).subscribe({
       next: response => {
         this.loading.set(false);
@@ -508,6 +669,19 @@ export class JobHistory {
   }
 
   /** The next window of older runs, below the ones on screen. */
+  /**
+   * MIG-345: a failed run's Retry -- the dialog offers "Retry from <step>" (the steps before it are reused, not run or
+   * billed again) and "Run again from the start", each with Core's word on whether it can. The list re-reads once the run
+   * is queued again.
+   */
+  retry(run: JobQueue): void {
+    if (run.jobStatus !== 'Failed') return;
+    const data: RetryDialogData = { jobQueueId: run.jobQueueId };
+    this.dialog.open<boolean>(RetryDialog, { data }).closed.subscribe(queued => {
+      if (queued) this.load({ silent: true });
+    });
+  }
+
   loadOlder(): void {
     const loaded = this.runs();
     if (!this.jobId() || !loaded.length || this.loadingOlder()) return;

@@ -6,40 +6,33 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /kafkaConnectionProfile.json/fetchAllProfiles",
-      "GET /setting.json/taskReferences?kind=TASK_GROUP",
-      "GET /setting.json/taskReferences?kind=HOME_PAGE",
-      "GET /setting.json/topics?kafkaConnectionProfileId=1009"
+      "GET /setting.json/topics?limit=50&q=",
+      "POST /sourceTask.json/listSourceTask?limit=1000&page=1 {}"
     ],
     "headings": [
       "New pipeline",
-      "Basics",
-      "Payload"
+      "Describe it to the AI Assistant",
+      "Add steps yourself",
+      "Copy an existing pipeline"
     ],
     "buttons": [
-      "Clear",
-      "Create pipeline"
+      "Copy it",
+      "Create and add steps",
+      "Open the AI Assistant"
     ],
     "columns": [],
     "fields": [
-      "<pipeline>...</pipeline>",
-      "Daily orders import",
-      "Group",
-      "Home page",
-      "Kafka connection",
-      "Pick a topic first",
-      "Pipeline name *(required)",
-      "Registry task",
-      "Search connections…",
-      "Search groups…",
-      "Search home pages…",
-      "Search this connection’s topics…",
-      "Status *(required)",
-      "Topic *(required)",
-      "XML configuration *(required)"
+      "Name *",
+      "Name of the copy",
+      "Pipeline to copyChoose…Reference: CSV check and summariseUI-REVIEW Clean customers CSV check",
+      "Read the daily admissions file, flag readmissions within 30 days, and keep a dataset for the dashboard.",
+      "Readmission risk (daily)",
+      "Topic (optional)",
+      "What should it do?"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/new/form"
     ]
   },
   "a task's XML payload, opened in the list": {
@@ -48,7 +41,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Pipelines",
-      "Tasks (2 of 2)"
+      "Pipelines (2 of 2)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
@@ -56,20 +49,20 @@ export const PINNED: Record<string, unknown> = {
       "Cards",
       "Columns",
       "Copy",
-      "Hide payload",
+      "Hide details",
       "Only mine",
       "Refresh",
-      "Show payload",
+      "Show schedules and details",
       "Table"
     ],
     "columns": [
       [
         "",
         "Pipeline",
-        "Type",
-        "Topic",
-        "Pipeline",
-        "Storage",
+        "Steps",
+        "Schedules",
+        "Last run",
+        "Data",
         "Created by",
         "Updated by",
         "Status",
@@ -82,14 +75,25 @@ export const PINNED: Record<string, unknown> = {
       "Filter by pipeline",
       "Filter by topic",
       "Search id, name, topic or pipeline",
-      "Search tasks"
+      "Search pipelines"
     ],
     "links": [
+      "/pipelines",
+      "/pipelines/1854/edit",
+      "/pipelines/1855/edit",
       "/pipelines/bulk",
-      "/pipelines/new"
+      "/pipelines/list",
+      "/pipelines/new",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
     ],
     "details": {
-      "terms": [],
+      "terms": [
+        "Type: service-1 reference worker",
+        "Topic: etl.reference",
+        "Registry task: REF_CSV_CHECK_V1",
+        "Storage: etl-bucket"
+      ],
       "code": [
         "<csvCheck><inputKey>reference/input/sample.csv</inputKey><outputPrefix>reference/output</outputPrefix><maxRejectPercent>50</maxRejectPercent><requiredColumns>id,name</requiredColumns><numericColumns>amount</numericColumns><deleteInput>false</deleteInput><bucket>etl-bucket</bucket></csvCheck>"
       ]
@@ -116,7 +120,7 @@ export const PINNED: Record<string, unknown> = {
       "Choose a file"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines/list"
     ]
   },
   "editing a task": {
@@ -127,6 +131,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1854",
+      "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1854 {}",
       "GET /setting.json/taskReferences?kind=TASK_GROUP&tenantId=2924",
       "GET /setting.json/taskReferences?kind=HOME_PAGE&tenantId=2924",
       "GET /setting.json/topics?ids=11831",
@@ -136,13 +141,22 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/steps/definition?pipelineKey=100167"
     ],
     "headings": [
-      "Edit pipeline",
+      "Reference: CSV check and summarise",
       "Basics",
       "Reference: CSV check and summarise"
     ],
     "buttons": [
+      "1. Source: Missing. Add a Read step: a file, an API, a database or documents",
+      "2. Steps: Missing. None yet",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Missing. Not scheduled: add one to run it",
       "Clear",
-      "Save changes"
+      "Details",
+      "Run now",
+      "Save",
+      "Schedule",
+      "Schedules"
     ],
     "columns": [],
     "fields": [
@@ -197,13 +211,22 @@ export const PINNED: Record<string, unknown> = {
   ],
   "the editor: the raw XML payload, for a pipeline without a definition": {
     "headings": [
-      "Edit pipeline",
+      "Reference: CSV check and summarise",
       "Basics",
       "Payload"
     ],
     "buttons": [
+      "1. Source: Missing. Add a Read step: a file, an API, a database or documents",
+      "2. Steps: Missing. None yet",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Missing. Not scheduled: add one to run it",
       "Clear",
-      "Save changes"
+      "Details",
+      "Run now",
+      "Save",
+      "Schedule",
+      "Schedules"
     ],
     "columns": [],
     "fields": [
@@ -238,7 +261,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a tenant user with five pages": {
-    "url": "/pipelines",
+    "url": "/pipelines/list",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -246,24 +269,24 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Pipelines",
-      "Tasks (2 of 2)"
+      "Pipelines (2 of 2)"
     ],
     "buttons": [
       "Cards",
       "Columns",
       "Only mine",
       "Refresh",
-      "Show payload",
+      "Show schedules and details",
       "Table"
     ],
     "columns": [
       [
         "",
         "Pipeline",
-        "Type",
-        "Topic",
-        "Pipeline",
-        "Storage",
+        "Steps",
+        "Schedules",
+        "Last run",
+        "Data",
         "Created by",
         "Updated by",
         "Status",
@@ -276,12 +299,18 @@ export const PINNED: Record<string, unknown> = {
       "Filter by pipeline",
       "Filter by topic",
       "Search id, name, topic or pipeline",
-      "Search tasks"
+      "Search pipelines"
     ],
-    "links": []
+    "links": [
+      "/pipelines",
+      "/pipelines/1854/edit",
+      "/pipelines/1855/edit",
+      "/pipelines/list",
+      "/pipelines/schedules"
+    ]
   },
   "the list, as a workspace administrator": {
-    "url": "/pipelines",
+    "url": "/pipelines/list",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -290,7 +319,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Pipelines",
-      "Tasks (2 of 2)"
+      "Pipelines (2 of 2)"
     ],
     "buttons": [
       "Actions for Reference: CSV check and summarise",
@@ -299,17 +328,17 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Only mine",
       "Refresh",
-      "Show payload",
+      "Show schedules and details",
       "Table"
     ],
     "columns": [
       [
         "",
         "Pipeline",
-        "Type",
-        "Topic",
-        "Pipeline",
-        "Storage",
+        "Steps",
+        "Schedules",
+        "Last run",
+        "Data",
         "Created by",
         "Updated by",
         "Status",
@@ -322,11 +351,17 @@ export const PINNED: Record<string, unknown> = {
       "Filter by pipeline",
       "Filter by topic",
       "Search id, name, topic or pipeline",
-      "Search tasks"
+      "Search pipelines"
     ],
     "links": [
+      "/pipelines",
+      "/pipelines/1854/edit",
+      "/pipelines/1855/edit",
       "/pipelines/bulk",
-      "/pipelines/new"
+      "/pipelines/list",
+      "/pipelines/new",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
     ]
   },
   "the row menu, as a workspace administrator": {

@@ -17,6 +17,7 @@ import {
 } from './job-assistant.answers';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 interface Turn {
   /** Monotonic, so two turns in the same millisecond cannot collide as @for track keys. */
@@ -39,7 +40,7 @@ const ASSISTANT_RUNS = 500;
  */
 @Component({
   selector: 'app-job-assistant',
-  imports: [Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip],
+  imports: [PageHeader, Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip],
   templateUrl: './job-assistant.html',
   /*
    * In a panel the host has to be a flex item that can shrink, or the layout chain breaks
@@ -221,13 +222,13 @@ export class JobAssistant {
         if (response.status === API_SUCCESS && response.data) this.detail.set(response.data);
         // A success with no body is still nothing to show. Left as-is it rendered neither the
         // assistant nor an error -- an empty page with no Try again on it.
-        else this.error.set(response.message || 'This job could not be read.');
+        else this.error.set(response.message || 'This schedule could not be read.');
         this.loading.set(false);
       },
       error: err => {
         if (ticket !== this.loadTicket) return;
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not read this job.');
+        this.error.set(err?.error?.message || 'Could not read this schedule.');
       },
     });
 
@@ -241,6 +242,13 @@ export class JobAssistant {
       },
       error: () => { /* the assistant still answers what it can without run history */ },
     });
+  }
+
+  /** The shared composer's keys (UX final SAS1): Enter asks, Shift+Enter is a new line. */
+  onComposerKey(event: KeyboardEvent): void {
+    if (event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    this.ask(this.question());
   }
 
   ask(text: string): void {

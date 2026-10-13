@@ -1,12 +1,16 @@
-import { Component, computed, inject, input, signal, viewChild } from '@angular/core';
+import { Component, Injector, computed, inject, input, signal, viewChild } from '@angular/core';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
+import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { AuthService } from '../../core/auth/auth.service';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { localIsoDay } from '../../shared/ui/local-day';
+import { PageHeader } from '../../shared/ui/page-header';
+import { Crumb } from '../../core/nav/nav-tree';
 
 /** How many of a rejected sheet's row reasons the card lists before "and N more". */
 const ROWS_SHOWN = 20;
@@ -31,6 +35,8 @@ interface Endpoints {
   upload: string;
   noun: string;
   backTo: string;
+  /** The breadcrumb before "Bulk …": the menu's group and the list it imports into (UX review 2026-10-12, A2). */
+  trail: Crumb[];
   /** What the template cannot say for itself, under the template button. */
   templateNote?: string;
 }
@@ -42,6 +48,7 @@ const ROUTES: Record<Kind, Endpoints> = {
     upload: '/sourceJob.json/uploadSourceJob',
     noun: 'schedules',
     backTo: '/pipelines/schedules',
+    trail: [{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' }],
     // Wave 4 (Core 6f9261e): the sheet keeps its eleven columns; JobDetailValidation reads a Cron row's Recurrence.
     templateNote: 'For a Cron row, put the cron expression in the Recurrence cell, e.g. 0 3 * * * for 03:00 daily '
       + '(server time). Five fields, or six with seconds 0.',
@@ -51,17 +58,19 @@ const ROUTES: Record<Kind, Endpoints> = {
     exportAll: '/sourceTask.json/downloadListSourceTask',
     upload: '/sourceTask.json/uploadSourceTask',
     noun: 'pipelines',
-    backTo: '/pipelines',
+    backTo: '/pipelines/list',
+    trail: [{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines/list' }],
   },
 };
 
 @Component({
   selector: 'app-bulk-transfer',
-  imports: [Icon, RouterLink, FileDropzone],
+  imports: [PageHeader, Icon, RouterLink, FileDropzone, ManagedBanner],
   templateUrl: './bulk-transfer.html',
 })
 export class BulkTransfer {
   private readonly http = inject(HttpClient);
+  private readonly injector = inject(Injector);
   private readonly toast = inject(ToastService);
   private readonly dropzone = viewChild(FileDropzone);
 
@@ -72,6 +81,8 @@ export class BulkTransfer {
 
   readonly file = signal<File | null>(null);
   readonly uploading = signal(false);
+  /** MIG-320: a MANAGED workspace imports through our team; the server refuses the upload (BuilderAction) as well. */
+  readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
   readonly progress = signal(0);
   readonly downloading = signal('');
   readonly result = signal<{ ok: boolean; message: string; rows: string[] } | null>(null);
@@ -104,7 +115,7 @@ export class BulkTransfer {
 
   upload(): void {
     const file = this.file();
-    if (!file) return;
+    if (!file || this.locked()) return;
     const body = new FormData();
     body.append('file', file);
 

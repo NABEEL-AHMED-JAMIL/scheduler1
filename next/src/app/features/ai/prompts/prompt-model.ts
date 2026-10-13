@@ -57,7 +57,8 @@ export interface PromptRun {
   tokensOut?: number | null;
   latencyMs?: number | null;
   attempts?: number;
-  status: 'ok' | 'failed';
+  /** 'review': the answer never fit the output schema (MIG-349) -- held for review, the reason in error, the answer kept in output. */
+  status: 'ok' | 'failed' | 'review';
   error?: string | null;
   dateCreated: string;
 }

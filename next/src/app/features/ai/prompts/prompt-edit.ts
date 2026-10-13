@@ -17,6 +17,10 @@ import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-mode
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SENSITIVITY_LEVELS, SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { Section } from '../../../shared/ui/section';
+import { FormRow } from '../../../shared/ui/form-row';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -25,7 +29,7 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
  */
 @Component({
   selector: 'app-prompt-edit',
-  imports: [ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner],
+  imports: [ActionsBar, Section, FormRow, PageHeader, ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner],
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {
@@ -212,7 +216,7 @@ export class PromptEdit implements OnInit {
     this.http.get<ApiResponse<Prompt>>(`${API_BASE}/aiPrompt.json/get`, { params: { promptId: this.promptId()! } }).subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); this.router.navigate(['/ai/prompts']); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); this.router.navigate(['/pipelines/prompts']); return; }
         const p = r.data;
         this.loaded.set(p);
         this.form.patchValue({
@@ -301,7 +305,7 @@ export class PromptEdit implements OnInit {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; }
         this.toast.success(r.message);
-        this.router.navigate(['/ai/prompts']);
+        this.router.navigate(['/pipelines/prompts']);
       },
       error: err => { this.saving.set(false); this.toast.error(err?.error?.message || 'The prompt could not be saved.'); },
     });
@@ -322,6 +326,16 @@ export class PromptEdit implements OnInit {
       },
       error: err => { this.trying.set(false); this.toast.error(err?.error?.message || 'The try could not run.'); },
     });
+  }
+
+  /** The run's pill: answered, held for review (MIG-349: the answer never fit the schema), or failed. */
+  runPill(status: PromptRun['status']): string {
+    return status === 'ok' ? 'pill-ok' : status === 'review' ? 'pill-warn' : 'pill-crit';
+  }
+
+  /** What the try's pill says. */
+  runLabel(status: PromptRun['status']): string {
+    return status === 'ok' ? 'Answered' : status === 'review' ? 'Held for review' : 'Failed';
   }
 
   prettyOutput(run: PromptRun): string {

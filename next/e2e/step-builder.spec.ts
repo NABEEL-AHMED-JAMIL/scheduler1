@@ -1,30 +1,30 @@
-import { test, expect, APIRequestContext, Browser, Page, Response } from '@playwright/test';
+import { test, expect, APIRequestContext, Page, Response } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs, Session, sessionFor } from './support/session';
+import { makeJob, makePipeline, makeTask, removeMade } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
 /**
- * MIG-249: the step builder end to end, as a workspace administrator, on the UI-CHECK pipeline 100175
- * (UI_CHECK_STEPS_0928), its task 1864 and the manual job 2848 that runs it: add a step from the Task Registry and
- * fill it in the side panel, reorder by button and by drag, delete, see a validation error land on its step, edit the
- * YAML and save it, save a builder edit, prove the YAML and the builder store the same definition, then Run now and
- * watch every step complete. A Filter step is built with the registry's widgets (a repeatable group, a column picked
- * from the rows before it).
+ * MIG-249: the step builder end to end, as Riverside Health's administrator, on the spec's own pipeline: a registry
+ * pipeline "E2E steps <stamp>" on the workspace's topic, a task on it and a manual job that runs it, all made in
+ * beforeAll and deleted in afterAll (support/workspace.ts). Add a step from the Task Registry and fill it in the side
+ * panel, reorder by button and by drag, delete, see a validation error land on its step, edit the YAML and save it, save
+ * a builder edit, prove the YAML and the builder store the same definition, then Run now and watch every step complete.
+ * A Filter step is built with the registry's widgets (a repeatable group, a column picked from the rows before it).
  *
- * Every save writes a new version of 100175 -- a UI-CHECK pipeline, left in place for the owner to clear. The shared
- * legacy pipeline 100167 (REF_CSV_CHECK_V1, used by 15 jobs) is never saved to: this spec refuses to run if 1864 has
- * been moved onto another pipeline.
+ * A legacy task (one on a pipeline with no steps) keeps its form: the spec makes a second pipeline without steps and a
+ * task on it for that, and deletes them too. The rebuilt pipelines are never opened here.
  *
- * Needs Core (MIG-230) behind :9098 and a console at E2E_BASE_URL that has MIG-249 (e.g. `ng serve --port 4415`).
- * Sign-in, either:
- *   E2E_TENANT_ADMIN_TOKEN                          a TENANT_ADMIN access token (e.g. from
- *                                                   etl-platform/scripts/mint-test-token.sh 4537 900), or
- *   E2E_TENANT_ADMIN / E2E_TENANT_ADMIN_PASSWORD    a TENANT_ADMIN's credentials
+ * Needs Core (MIG-230) behind :9098 and a console at E2E_BASE_URL that has MIG-249.
+ * Sign-in through support/session.ts (role admin).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const admin = { username: process.env['E2E_TENANT_ADMIN'], password: process.env['E2E_TENANT_ADMIN_PASSWORD'] };
-const TASK = Number(process.env['E2E_STEPS_TASK'] ?? 1864);
-const PIPELINE_KEY = Number(process.env['E2E_STEPS_PIPELINE_KEY'] ?? 100175);
-const PIPELINE_ID = process.env['E2E_STEPS_PIPELINE_ID'] ?? 'UI_CHECK_STEPS_0928';
 const STAMP = Date.now().toString(36);
+const PIPELINE_ID = `E2E_STEPS_${STAMP.toUpperCase()}`;
+const LEGACY_ID = `E2E_FORM_${STAMP.toUpperCase()}`;
+/** Made in beforeAll: the step pipeline's key, the task on it, its job; and the legacy task. */
+let TASK = 0;
+let PIPELINE_KEY = 0;
+let LEGACY_TASK = 0;
+const made: { jobs: number[]; tasks: number[]; pipelines: number[] } = { jobs: [], tasks: [], pipelines: [] };
 
 /** The two steps the pipeline is put back to before the run: a sample, then a select that renames name. */
 const BASELINE = {
@@ -35,28 +35,6 @@ const BASELINE = {
   ],
 };
 
-interface Session { data: Record<string, unknown>; token: string; }
-
-async function session(request: APIRequestContext): Promise<Session> {
-  if (token) {
-    const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-    return { token, data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-      tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-  }
-  const answer = await request.post(`${api}/auth.json/login`, { data: admin, failOnStatusCode: false });
-  const body = await answer.json();
-  expect(body.status, `sign-in for ${admin.username}`).toBe('SUCCESS');
-  return { data: body.data, token: body.data.accessToken };
-}
-
-async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
-}
 
 /** The save's own answer, not its CORS preflight (which has no body). */
 const saveAnswer = (r: Response) => r.url().includes('/pipeline.json/steps/save') && r.request().method() === 'POST';
@@ -79,25 +57,37 @@ const cards = (page: Page) => page.locator('.step-card').evaluateAll(els => els.
 
 async function stored(request: APIRequestContext, s: Session): Promise<{ definition: unknown; version: number }> {
   const body = await (await request.get(`${api}/pipeline.json/steps/definition?pipelineKey=${PIPELINE_KEY}`,
-    { headers: { Authorization: `Bearer ${s.token}` } })).json();
+    { headers: authOf(s) })).json();
   expect(body.status).toBe('SUCCESS');
   return { definition: body.data.definition, version: body.data.version };
 }
 
 test.describe('Step builder', () => {
-  test.skip(!token && (!admin.username || !admin.password), 'Set E2E_TENANT_ADMIN_TOKEN, or E2E_TENANT_ADMIN(_PASSWORD), to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
 
   let s: Session;
   test.beforeAll(async ({ request }) => {
-    s = await session(request);
-    const headers = { Authorization: `Bearer ${s.token}` };
-    // Never the shared legacy pipeline: 1864 must still be on the UI-CHECK one.
-    const task = await (await request.get(`${api}/sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=${TASK}`, { headers })).json();
-    expect(task.data?.pipelineId, `task ${TASK} is on ${PIPELINE_ID}`).toBe(PIPELINE_ID);
-    // A known start: the two baseline steps (no new version when they are already the latest).
+    s = await sessionFor(request, 'admin');
+    const headers = authOf(s);
+    const topic = riverside().topicId;
+    PIPELINE_KEY = await makePipeline(request, s, PIPELINE_ID, `E2E steps ${STAMP}`, topic);
+    made.pipelines.push(PIPELINE_KEY);
+    // A known start: the two baseline steps.
     const reset = await (await request.post(`${api}/pipeline.json/steps/save`, { headers,
       data: { pipelineKey: PIPELINE_KEY, format: 'json', text: JSON.stringify(BASELINE) } })).json();
     expect(reset.status, reset.message).toBe('SUCCESS');
+    TASK = await makeTask(request, s, `E2E steps task ${STAMP}`, PIPELINE_ID, topic);
+    made.tasks.push(TASK);
+    made.jobs.push(await makeJob(request, s, `E2E steps job ${STAMP}`, TASK));
+    // A pipeline with no steps, and a task on it: a legacy task.
+    made.pipelines.push(await makePipeline(request, s, LEGACY_ID, `E2E form pipeline ${STAMP}`, topic));
+    LEGACY_TASK = await makeTask(request, s, `E2E form task ${STAMP}`, LEGACY_ID, topic);
+    made.tasks.push(LEGACY_TASK);
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (s) await removeMade(request, s, made);
   });
 
   test('build, validate, edit YAML, save, run', async ({ browser, request }) => {
@@ -256,15 +246,14 @@ test.describe('Step builder', () => {
     await page.getByRole('tab', { name: 'Settings' }).click();
     await row.getByRole('button', { name: 'Put Aggregate back to its default' }).click();
     await expect(row).not.toContainText('Switched here');
-    const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: { Authorization: `Bearer ${s.token}` } })).json())
+    const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: authOf(s) })).json())
       .data.find((t: { code: string }) => t.code === 'aggregate');
     expect(line).toMatchObject({ enabled: true, overridden: false });
   });
 
   test('a legacy task keeps its form', async ({ browser }) => {
     const page = await pageAs(browser, s);
-    // 1854 is on the shared legacy pipeline: only read here.
-    await page.goto('/pipelines/1854/edit');
+    await page.goto(`/pipelines/${LEGACY_TASK}/edit`);
     await expect(page.locator('#payload, #taskName').first()).toBeVisible();
     await expect(page.getByRole('tab', { name: 'Steps' })).toHaveCount(0);
     await expect(page.locator('app-step-builder')).toHaveCount(0);

@@ -1,23 +1,23 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Kafka &amp; Topics</h1>
-      <p class="page-subtitle">
-        The brokers your pipelines publish through, live: are they up, do your topics exist, who reads them and how far
-        behind. Pick a connection on the left. Secrets are encrypted and never sent back to the browser.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Kafka &amp; Topics</h1>
+        <p class="page-subtitle">
+          The brokers your pipelines publish through, live: are they up, do your topics exist, who reads them and how far
+          behind. Pick a connection on the left. Secrets are encrypted and never sent back to the browser.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load(); loadHealth(true)" />
+        @if (!locked()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New connection
+        </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadHealth(true)" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (!locked()) {
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New connection
-      </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="Kafka connections and topics" still="You can still test them." />
 
   @if (!loading() && !error() && profiles().length && !defaultProfile()) {
@@ -34,7 +34,7 @@
   }
 
   <!-- ── Master / detail ─────────────────────────────────────────────────────────────── -->
-  <div class="card lookup-split kafka-split">
+  <div class="card lookup-split kafka-split" [attr.data-pane]="pane()">
 
     <aside class="lookup-rail">
       <div class="lookup-rail-tools">
@@ -114,6 +114,9 @@
 
     <section class="lookup-detail" aria-live="polite">
       @if (selected(); as p) {
+        <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="pane.set('list')" data-test="back-to-list">
+          <app-icon name="arrowLeft" />Back to list
+        </button>
         <header class="lookup-detail-head">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
@@ -384,7 +387,7 @@
                     <th class="kc-lag text-right">Lag</th>
                     <th class="kc-pipes hidden xl:table-cell">Pipelines</th>
                     <th class="kc-state">State</th>
-                    <th class="kc-act"><span class="sr-only">Actions</span></th>
+                    <th class="kc-act th-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -429,7 +432,7 @@
                           @if (!list.length) {
                             <span class="text-xs text-[color:var(--text-muted)]">none yet</span>
                           } @else if (list.length === 1) {
-                            <a class="link-inline kafka-cell-clip" [routerLink]="['/configuration/task-registry']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                            <a class="link-inline kafka-cell-clip" [routerLink]="['/settings/task-registry']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
                                [title]="list[0].pipelineId + ' · ' + list[0].fields + ' field(s)'">{{ list[0].pipelineName }}</a>
                           } @else {
                             <button type="button" class="pill pill-brand hover-brand" (click)="showPipelines(row.type)"

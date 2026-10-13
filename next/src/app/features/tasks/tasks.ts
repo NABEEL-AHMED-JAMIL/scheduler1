@@ -19,9 +19,12 @@ import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { createPager } from '../../shared/ui/pager';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { sensitivityText } from '../../shared/ui/sensitivity';
 import { parseTopicPartition } from '../../shared/ui/topic';
 import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export interface LinkedJob {
   jobId: number;
@@ -57,11 +60,21 @@ interface SourceTask {
   sourceTaskType?: { sourceTaskTypeId?: number; serviceName?: string; queueTopicPartition?: string };
   taskPayload?: string;
   totalLinksJobs?: number;
+  /**
+   * UX review 2026-10-12 (B2, P1): what a user needs from the list, from Core's listSourceTask -- the steps in the
+   * latest definition (0: it runs as its legacy step), its outputs, the data's sensitivity, whether its results wait
+   * for a review, and its newest run. Absent from an older Core: the columns read "—".
+   */
+  stepCount?: number | null;
+  outputCount?: number | null;
+  sensitivity?: string | null;
+  reviewRequired?: boolean | null;
+  lastRun?: { jobQueueId: number; jobId: number; jobStatus?: string | null; at?: string | null } | null;
 }
 
 @Component({
   selector: 'app-tasks',
-  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -129,6 +142,12 @@ export class Tasks implements OnInit {
   workspaceName(task: SourceTask): string { return workspaceName(task); }
 
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
+  /** MIG-324: the list's own word is the menu's (pipelines), and an empty one says how the first is made. */
+  readonly emptyMessage = computed(() => this.hasFilters()
+    ? 'No pipelines match the filters.'
+    : this.auth.canManageTasks()
+      ? 'No pipelines yet. New pipeline makes one: pick a topic and its registry task, then build its steps.'
+      : 'No pipelines yet. A workspace administrator makes them.');
   readonly hasFilters = computed(() =>
     !!(this.search() || this.topicFilter() || this.pipelineFilter() || this.workspaceFilter() || this.onlyMine()));
 
@@ -229,7 +248,7 @@ export class Tasks implements OnInit {
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
           this.busyTask.set(null);
-          this.toast.error(response.message || 'That task could not be read.');
+          this.toast.error(response.message || 'That pipeline could not be read.');
           return;
         }
         const source = response.data;
@@ -259,7 +278,7 @@ export class Tasks implements OnInit {
       },
       error: err => {
         this.busyTask.set(null);
-        this.toast.error(err?.error?.message || 'That task could not be read.');
+        this.toast.error(err?.error?.message || 'That pipeline could not be read.');
       },
     });
   }
@@ -298,13 +317,13 @@ export class Tasks implements OnInit {
       // Offering a confirm here would be offering a choice that does not exist -- the server
       // refuses it. Better to say why, and point at the thing that has to happen first.
       this.toast.error(
-        `"${task.taskName}" is used by ${linked} job${linked > 1 ? 's' : ''}. ` +
-        `Point those jobs at another task, or delete them, before deleting this one.`);
+        `"${task.taskName}" is used by ${linked} schedule${linked > 1 ? 's' : ''}. ` +
+        `Point those schedules at another pipeline, or delete them, before deleting this one.`);
       return;
     }
     const ok = await confirmWith(this.dialog, {
-      title: 'Delete task',
-      body: `"${task.taskName}" will be deleted. No jobs are bound to it.`,
+      title: 'Delete pipeline',
+      body: `"${task.taskName}" will be deleted. No schedule runs it.`,
       confirmLabel: 'Delete',
       danger: true,
     });
@@ -346,13 +365,13 @@ export class Tasks implements OnInit {
           const rows = response.data ?? [];
           this.tasks.set(rows);
           if (isProbablyTruncated(rows.length)) {
-            this.toast.info(`Showing the first ${LIST_LIMIT} tasks. Narrow the search to see the rest.`);
+            this.toast.info(`Showing the first ${LIST_LIMIT} pipelines. Narrow the search to see the rest.`);
           }
         } else this.error.set(response.message);
       },
       error: err => {
         this.loading.set(false);
-        this.error.set(err?.error?.message || 'Could not load tasks.');
+        this.error.set(err?.error?.message || 'Could not load pipelines.');
       },
     });
   }
@@ -407,6 +426,17 @@ export class Tasks implements OnInit {
   }
 
   /** "topic=scrapping-topic&partitions=[*]" -> "scrapping-topic", read as the editor reads it. */
+  /** The data's sensitivity in words (Public, Internal, Sensitive). */
+  sensitivityText(level: string): string { return sensitivityText(level); }
+
+  /** "8 steps, 3 outputs", "Runs as its legacy step", or "—" from a Core that does not say. */
+  stepsText(task: SourceTask): string {
+    if (task.stepCount == null) return '—';
+    if (task.stepCount === 0) return 'Runs as its legacy step';
+    const outputs = task.outputCount ? `, ${task.outputCount} output${task.outputCount === 1 ? '' : 's'}` : '';
+    return `${task.stepCount} step${task.stepCount === 1 ? '' : 's'}${outputs}`;
+  }
+
   topicOf(raw?: string): string {
     return parseTopicPartition(raw).topic;
   }

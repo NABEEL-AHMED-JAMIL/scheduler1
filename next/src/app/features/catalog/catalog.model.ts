@@ -5,12 +5,27 @@ export type AssetKind = 'file' | 'dataset' | 'document_type' | 'connector';
 export type Sensitivity = 'Unclassified' | 'Public' | 'Internal' | 'Confidential' | 'Restricted';
 export const SENSITIVITIES: readonly Sensitivity[] = ['Unclassified', 'Public', 'Internal', 'Confidential', 'Restricted'];
 
-/** What the scanner (MIG-286) finds a column holds, and what a person may say it holds. */
-export const TAGS: readonly { id: string; label: string }[] = [
-  { id: 'email', label: 'email' }, { id: 'phone', label: 'phone' }, { id: 'national_id', label: 'national id' },
-  { id: 'card_number', label: 'card number' }, { id: 'bank_account', label: 'bank account' },
-  { id: 'person_name', label: 'person name' }, { id: 'address', label: 'address' },
+/**
+ * What the scanner (MIG-286) finds a column holds, and what a person may say it holds, with the level a tagged column raises
+ * its asset to (platform-commons SensitiveValues.Kind). Since UX review CT1 the health identifiers too: date of birth,
+ * medical record number, health plan number and ZIP code.
+ */
+export const TAGS: readonly { id: string; label: string; level: 'Confidential' | 'Restricted' }[] = [
+  { id: 'email', label: 'email', level: 'Confidential' }, { id: 'phone', label: 'phone', level: 'Confidential' },
+  { id: 'national_id', label: 'national id', level: 'Restricted' },
+  { id: 'card_number', label: 'card number', level: 'Restricted' }, { id: 'bank_account', label: 'bank account', level: 'Restricted' },
+  { id: 'person_name', label: 'person name', level: 'Confidential' }, { id: 'address', label: 'address', level: 'Confidential' },
+  { id: 'date_of_birth', label: 'date of birth', level: 'Restricted' },
+  { id: 'medical_record_number', label: 'medical record number', level: 'Restricted' },
+  { id: 'health_plan_number', label: 'health plan number', level: 'Restricted' },
+  { id: 'zip_code', label: 'ZIP code', level: 'Confidential' },
 ];
+
+/** The highest level these tags raise an asset to, as the service decides it; Unclassified for none. */
+export function tagsLevel(tags: readonly string[]): Sensitivity {
+  if (tags.some(t => TAGS.find(k => k.id === t)?.level === 'Restricted')) return 'Restricted';
+  return tags.length ? 'Confidential' : 'Unclassified';
+}
 
 export interface CatalogAsset {
   assetId: number;
@@ -39,6 +54,8 @@ export interface CatalogAsset {
   deletedAt: string | null;
   stale: boolean;
   noOwner: boolean;
+  /** A platform-internal file (an OCR page image or intermediate), shown only when an administrator asks (review M13). */
+  system?: boolean;
   /** In the list: the tags across its columns. */
   tags?: string[];
 }
@@ -88,6 +105,8 @@ export interface CatalogSummary {
   datasets: number;
   files: number;
   staleDays: number;
+  /** For an administrator: how many of the platform's own files the catalog leaves out unless asked (review M13). */
+  systemAssets?: number;
 }
 
 export interface LineageNode { ref: string; kind: string; name: string | null; }
@@ -105,6 +124,32 @@ export function sourceText(source: string): string {
 
 export function tagText(tag: string): string {
   return TAGS.find(t => t.id === tag)?.label ?? tag.replace(/_/g, ' ');
+}
+
+/**
+ * UX review B5 (CT1): a column whose NAME reads like a patient identifier or health detail -- the HIPAA identifiers
+ * (names, dates of birth, record and plan numbers, contact details, addresses) and clinical fields. A hint only, for a
+ * column nobody has tagged: the scanner reads values, and a person decides. Generic names, nothing workspace-specific.
+ */
+const PHI_NAMES: readonly [RegExp, string][] = [
+  [/(^|_)(mrn|medical_?record|patient_?(id|number|no))($|_)/, 'patient identifier'],
+  [/(^|_)(dob|date_?of_?birth|birth_?date|birthdate)($|_)/, 'date of birth'],
+  [/(^|_)(ssn|social_?security|national_?id|nhs_?(number|no))($|_)/, 'national id'],
+  [/(^|_)(member_?id|policy_?(id|number)|insurance_?(id|number)|beneficiary|health_?plan)($|_)/, 'health plan number'],
+  [/(^|_)(first_?name|last_?name|full_?name|surname|patient_?name|given_?name)($|_)/, 'person name'],
+  [/(^|_)(email|e_?mail)($|_)/, 'email'],
+  [/(^|_)(phone|mobile|telephone|fax)($|_)/, 'phone'],
+  [/(^|_)(zip|zip_?code|zip5|postcode|postal_?code)($|_)/, 'ZIP code'],
+  [/(^|_)(address|street)($|_)/, 'address'],
+  [/(^|_)(diagnos[ie]s|icd(_?10)?|condition|medication|prescription|allergy|procedure|lab_?result)($|_)/, 'health detail'],
+  [/(^|_)(admission|admit|discharge|death)_?(date|time|at)($|_)/, 'care date'],
+];
+
+export function phiHint(column: string | null | undefined): string | null {
+  const name = (column ?? '').trim().replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/[\s.-]+/g, '_');
+  if (!name) return null;
+  for (const [pattern, label] of PHI_NAMES) if (pattern.test(name)) return label;
+  return null;
 }
 
 export function isSensitive(level: string | null | undefined): boolean {

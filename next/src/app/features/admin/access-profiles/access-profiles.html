@@ -1,32 +1,32 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Access profiles</h1>
-      <p class="page-subtitle">
-        A named bundle of pages for your tenant users. Everyone holds one; anyone without their own
-        gets the default. Admins always open everything.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Page access</h1>
+        <p class="page-subtitle">
+          A named bundle of pages for your workspace members. Everyone holds one; anyone without their own
+          gets the default. Admins always open everything.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (canPickTenant()) {
+          <!-- [selected] on the options, not [value] on the select: the select's value is applied
+               before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
+               above a grid that had already loaded that tenant's people. -->
+          <div class="w-56" data-testid="tenant-picker">
+            <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
+                          placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
+          </div>
+        }
+        <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile" [disabled]="needsWorkspace()">
+          <app-icon name="plus" />New profile
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (canPickTenant()) {
-        <!-- [selected] on the options, not [value] on the select: the select's value is applied
-             before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
-             above a grid that had already loaded that tenant's people. -->
-        <div class="w-56" data-testid="tenant-picker">
-          <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
-                        placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
-        </div>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || needsWorkspace()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile" [disabled]="needsWorkspace()">
-        <app-icon name="plus" />New profile
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     <app-stat-tile label="Profiles" [value]="stats().profiles" icon="layers" tone="info"
                    [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'" />
     <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info"
@@ -35,6 +35,54 @@
                    [foot]="stats().defaultName ? 'for anyone without their own' : 'no default: unassigned users see everything'" />
     <app-stat-tile label="Pages" [value]="stats().pages" icon="template" tone="info" foot="can be granted or withheld" />
   </div>
+
+  <!-- UX review B8 (AP1): how a role and Page access combine, said once, with a way to check one person. -->
+  @if (!needsWorkspace()) {
+    <section class="card p-4 flex flex-col gap-3" data-access-explainer aria-labelledby="access-how">
+      <div>
+        <h2 id="access-how" class="section-title">Who can open what</h2>
+        <p class="text-xs text-[color:var(--text-muted)]">A person's role decides whether Page access applies to them; their profile decides which pages a member opens.</p>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="table-modern text-sm" data-access-rules>
+          <thead><tr><th>Role</th><th>Opens</th><th>Can change</th></tr></thead>
+          <tbody>
+            <tr><td class="font-medium whitespace-nowrap">Workspace administrator</td><td>Every page of this workspace. Page access does not apply.</td>
+              <td>Users, connections, pipelines, policies and settings</td></tr>
+            <tr><td class="font-medium whitespace-nowrap">Workspace member</td>
+              <td>The pages on their Page access profile@if (stats().defaultName; as d) {, or on the default "{{ d }}" when they have none} @else {; with no profile and no default, every page}, plus any page opened for them alone.</td>
+              <td>Only what those pages allow: running, reviewing, reading</td></tr>
+            <tr><td class="font-medium whitespace-nowrap">Platform administrator</td><td>Every workspace (the platform's own team).</td><td>Everything</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="flex flex-wrap items-center gap-2" data-access-preview>
+        @if (!previewOpen()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="openPreview()" data-testid="check-person"><app-icon name="eye" />Check a person</button>
+        } @else {
+          <label for="access-preview-person" class="text-sm font-medium">Check a person</label>
+          <select id="access-preview-person" class="input input-sm w-auto max-w-72" [disabled]="peopleLoading()" (change)="previewId.set(+$any($event.target).value || null)">
+            <option value="">{{ peopleLoading() ? 'Reading the people…' : 'Choose a member' }}</option>
+            @for (p of people(); track p.appUserId) { <option [value]="p.appUserId" [selected]="previewId() === p.appUserId">{{ p.fullName || p.username }}</option> }
+          </select>
+        }
+      </div>
+      @if (preview(); as v) {
+        <div class="rounded-md border border-[color:var(--border-subtle)] p-3 flex flex-col gap-2 text-sm" data-testid="access-preview">
+          <p><b>{{ v.name }}</b> is a workspace member on <b>{{ v.profile }}</b>, and opens {{ v.pages.length }} {{ v.pages.length === 1 ? 'page' : 'pages' }}.</p>
+          @for (g of v.sections; track g.section) {
+            <div class="flex flex-wrap items-baseline gap-1.5">
+              <span class="text-xs text-[color:var(--text-muted)] w-28 shrink-0">{{ g.section }}</span>
+              @for (page of g.pages; track page.key) {
+                <span class="pill" [class]="page.extra ? 'pill pill-info' : 'pill pill-neutral'" [title]="page.extra ? 'Opened for this person alone' : ''">{{ page.label }}</span>
+              }
+            </div>
+          }
+          @if (v.withheld.length) { <p class="text-xs text-[color:var(--text-muted)]">Withheld for them alone: {{ v.withheld.join(', ') }}.</p> }
+        </div>
+      }
+    </section>
+  }
 
   @if (needsWorkspace()) {
     <div class="card p-10 text-center">
@@ -59,7 +107,7 @@
       <app-icon name="shield" size="2rem" class="block mx-auto mb-3 text-[color:var(--text-muted)]" />
       <h2 class="text-base font-semibold">No access profiles yet</h2>
       <p class="text-sm text-[color:var(--text-secondary)] mt-1 max-w-md mx-auto">
-        Every tenant user currently opens every page. Create the first profile — it becomes the
+        Every workspace member currently opens every page. Create the first profile — it becomes the
         default — and people without one of their own move onto it.
       </p>
       <button type="button" class="btn btn-primary btn-sm mt-4" (click)="add()">

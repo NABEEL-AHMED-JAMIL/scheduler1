@@ -123,7 +123,7 @@ describe('the exported grid says what the screen says', () => {
 
     const ri = pivot.pivot().rowLabels.indexOf('report-history');
     expect(lastExport!.rows[ri][1]).toBe(40);       // Completed: the shorter of 40 and 60
-    expect(lastExport!.columns).toEqual(['Task', 'Completed', 'Failed', 'Running', 'All']);
+    expect(lastExport!.columns).toEqual(['Pipeline', 'Completed', 'Failed', 'Running', 'All']);
   });
 
   it('empties a duration total the screen dashes out, and keeps a count of zero', () => {
@@ -315,7 +315,7 @@ describe('ReportPivot with many rows', () => {
     expect(pivot.dayAxis()).toBe('col');
     expect(pivot.labelOf(rows[1], 3)).toBe('2 Aug 2026');
     pivot.export('csv');
-    expect(lastExport!.columns).toEqual(['Task', '2026-08-01', '2026-08-02', 'All']);
+    expect(lastExport!.columns).toEqual(['Pipeline', '2026-08-01', '2026-08-02', 'All']);
     expect(lastExport!.title).toContain('(2026-08-01 to 2026-08-31)');
     expect(JSON.stringify(lastExport)).not.toContain('Aug 2026');
   });
@@ -374,5 +374,34 @@ describe('Build your own view export buttons', () => {
     expect(html).toContain('saveToBucket(');
     expect(html).not.toContain('submit(');
     expect(html).not.toMatch(/>\s*Submit\s*</);
+  });
+});
+
+/** Owner, 2026-10-07: "Days active by task and outcome -- click on a count and it shows the wrong list." */
+describe('the drawer lists what the clicked number counts', () => {
+  const twoDays: RunData = {
+    task: ['ingest'], status: ['Completed'], owner: ['Ada'], day: ['2026-08-01', '2026-08-02'],
+    rows: [
+      [0, 0, 0, 0, 10, 'job', 1, 0, 1], [0, 0, 0, 0, 10, 'job', 2, 0, 1],
+      [0, 0, 0, 0, 10, 'job', 3, 0, 1], [0, 0, 0, 1, 10, 'job', 4, 0, 1],
+    ] as RunRow[],
+  };
+
+  it('says how many days a "Days active" cell is, beside the runs behind it', () => {
+    const pivot = pivotFor(twoDays);
+    pivot.setMeasure('distinct');
+    expect(pivot.pivot().matrix[0][0]).toBe(2);
+    pivot.drill(0, 0);
+    expect(pivot.drillDays()).toBe(2);
+    expect(pivot.drillRows().length).toBe(4);
+  });
+
+  it('opens only the matching rows from a column total while a row search is on', () => {
+    const pivot = pivotFor(manyTasks(40));
+    pivot.setRowSearch('task-3');
+    pivot.drillColumn(0);
+    // The total above it reads 355 (task-30 .. task-39); the list used to hold all 820 runs.
+    expect(pivot.drillRows().length).toBe(355);
+    expect(pivot.drillRows().length).toBe(pivot.pivot().colTotals[0]);
   });
 });

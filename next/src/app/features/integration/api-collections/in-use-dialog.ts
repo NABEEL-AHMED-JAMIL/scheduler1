@@ -28,7 +28,7 @@ const KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', 
               <td class="max-w-64"><app-data-text [value]="u.userName || u.userRef" label="Used by" /></td>
               <td class="max-w-56"><app-data-text [value]="u.requestName || '—'" label="API" /></td>
               <td class="text-right tabular whitespace-nowrap">
-                v{{ u.pinnedVersion ?? '—' }}@if (u.behind) {<span class="text-xs text-[color:var(--text-muted)]"> · now v{{ u.currentVersion }}</span>}
+                @if (u.pinnedVersion == null) { Latest } @else { v{{ u.pinnedVersion }} }@if (u.behind) {<span class="text-xs text-[color:var(--text-muted)]"> · now v{{ u.currentVersion }}</span>}
               </td>
             </tr>
           }

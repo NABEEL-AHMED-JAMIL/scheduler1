@@ -46,8 +46,8 @@ function render(setup: Setup = {}) {
 describe('Ask your data -- the search index (MIG-281)', () => {
   it('splits a source link into its route and query, so a form link opens its form', () => {
     expect(linkParts('/forms/submissions?formId=3')).toEqual({ path: '/forms/submissions', query: { formId: '3' } });
-    expect(linkParts('/documents/files?bucket=acme-files&prefix=policies%2F')).toEqual({
-      path: '/documents/files', query: { bucket: 'acme-files', prefix: 'policies/' } });
+    expect(linkParts('/data/files?bucket=acme-files&prefix=policies%2F')).toEqual({
+      path: '/data/files', query: { bucket: 'acme-files', prefix: 'policies/' } });
     expect(linkParts('/documents/review/77')).toEqual({ path: '/documents/review/77', query: {} });
     expect(searchedText({ documents: 8, runOutputs: 0, forms: 2, files: 3, index: true })).toBe('8 documents, 0 pipeline results, 2 forms and 3 files');
   });
@@ -117,7 +117,7 @@ describe('Ask your data -- the index panel is a workspace administrator\'s', () 
     TestBed.configureTestingModule({
       imports: [AskData],
       providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AskDataApi, useValue: api },
-        { provide: AuthService, useValue: { isTenantAdmin: () => admin, user: () => null } }],
+        { provide: AuthService, useValue: { isTenantAdmin: () => admin, user: () => ({ appUserId: 4640, tenantId: 2960 }) } }],
     });
     const fixture = TestBed.createComponent(AskData);
     fixture.detectChanges();

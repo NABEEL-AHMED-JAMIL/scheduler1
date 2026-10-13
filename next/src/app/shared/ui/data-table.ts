@@ -3,6 +3,51 @@ import { Icon } from './icon';
 import { BlurLoader } from './blur-loader';
 import { LoadError } from './load-error';
 import { RowSnap } from './row-snap';
+import { EmptyState } from './empty-state';
+
+/**
+ * A cell that reads as a quantity: a count (1,204), an amount ($12.50, €3), a percentage (82%), a size (3.4 MB), a
+ * duration (1s, 35m 35s, 120 ms) or a row count (12 rows). Dates, ids with letters, names and pills do not.
+ */
+const QUANTITY = /^[-+−]?[$€£]?\s?\d[\d,]*(\.\d+)?\s?(%|[kKMGT]?B|ms|rows?|tokens?|calls?)?$/;
+const DURATION = /^(\d+(\.\d+)?\s?(ms|s|m|min|h|d)\s*){1,3}$/;
+
+export function isQuantity(text: string): boolean {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return QUANTITY.test(t) || DURATION.test(t);
+}
+
+/**
+ * UX review 2026-10-12 (A6, G4): numbers, durations, percentages and money right-aligned in tabular figures, the
+ * heading too. A column is a number column when every filled cell in it is a quantity (an empty cell or a dash does
+ * not count either way) and its heading is not an id. A heading the template marks itself (`.num`, or `.text-col` to
+ * keep a column as text) is left as written.
+ */
+export function markNumberColumns(table: HTMLTableElement, labels: string[]): void {
+  const heads = Array.from(table.querySelectorAll<HTMLElement>(':scope > thead > tr:first-child > th'));
+  const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr'))
+    .filter(row => row.children.length === labels.length);
+  labels.forEach((label, i) => {
+    const head = heads[i];
+    if (!head || !label || /^(id|actions)$/i.test(label) || head.classList.contains('text-col')) return;
+    if (head.classList.contains('num') && !head.hasAttribute('data-auto-num')) return;
+    let numbers = 0;
+    let other = 0;
+    for (const row of rows) {
+      const cell = row.children[i] as HTMLElement;
+      if (cell.querySelector('input, select, textarea, button')) { other++; break; }
+      const text = (cell.textContent ?? '').trim();
+      if (!text || /^[—–-]$/.test(text)) continue;
+      if (isQuantity(text)) numbers++; else { other++; break; }
+    }
+    const numeric = numbers > 0 && other === 0;
+    for (const el of [head, ...rows.map(row => row.children[i] as HTMLElement)]) {
+      if (el.classList.contains('num') === numeric) continue;
+      el.classList.toggle('num', numeric);
+      el.toggleAttribute('data-auto-num', numeric);
+    }
+  });
+}
 
 /**
  * Shared chrome for the list screens: a titled card with a filter slot, plus consistent
@@ -12,7 +57,21 @@ import { RowSnap } from './row-snap';
  */
 @Component({
   selector: 'app-table-shell',
-  imports: [Icon, BlurLoader, LoadError, RowSnap],
+  imports: [Icon, BlurLoader, LoadError, RowSnap, EmptyState],
+  styles: `
+    /* UX review 2026-10-12 (A6, G7): the filters start straight after the heading (or at the left edge when the heading
+       takes its own line), and Columns keeps the far right. Pushed right, they left 50-95px of nothing on the left. */
+    .table-toolbar-controls {
+      display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-start;
+      gap: 0.5rem; min-width: 0;
+    }
+    .table-toolbar-columns { margin-left: auto; }
+    /* The search box grows into the line's free room and shrinks before anything wraps; pages' own max-w-* caps
+       made it the first thing cut ("Search name, code, service or t"). */
+    .table-toolbar-controls ::ng-deep .search-field { flex: 1 1 15rem; min-width: 12rem; max-width: 24rem; }
+    /* Set when the controls would wrap beside the heading: the heading takes its own line and the controls the next. */
+    .table-toolbar.is-stacked > h2 { flex-basis: 100%; }
+  `,
   template: `
     <div class="card overflow-hidden">
       <div class="table-toolbar flex flex-wrap items-center justify-end gap-2 px-4 py-3 border-b border-subtle"
@@ -25,11 +84,16 @@ import { RowSnap } from './row-snap';
             </span>
           }
         </h2>
+        <!-- Review 2026-10-07 (M16): the controls are one group. When the heading and the group fit on one line they
+             share it; when the group would wrap beside the heading, the heading takes a line of its own (is-stacked,
+             set by stackToolbar) and the group the next, the search box taking the room that is left -- never Columns
+             alone on a second line, never a cut placeholder. -->
+        <div class="table-toolbar-controls">
         <ng-content select="[toolbar]" />
         @if (columns().length >= 5) {
           <!-- Owner, 2026-09-24: choose which columns to see. Read from the table's own headings, so every
                list gets it; remembered per table. Blank and Actions columns always stay. -->
-          <div class="relative">
+          <div class="relative table-toolbar-columns">
             <button type="button" class="btn btn-default btn-sm" [attr.aria-expanded]="columnsOpen()"
                     (click)="columnsOpen.set(!columnsOpen())" (keydown.escape)="columnsOpen.set(false)">
               <app-icon name="eye" />Columns
@@ -54,6 +118,7 @@ import { RowSnap } from './row-snap';
             }
           </div>
         }
+        </div>
       </div>
 
       <!-- A second row for controls that come and go -- bulk selection above all. Putting them
@@ -82,12 +147,12 @@ import { RowSnap } from './row-snap';
           <ng-content select="[error-action]" />
         </app-load-error>
       } @else if (isEmpty() && !loading()) {
-        <div class="px-6 py-14 text-center">
-          <app-icon [name]="emptyIcon()" size="1.75rem"
-                    class="icon-muted block mx-auto mb-3" />
-          <p class="text-sm text-[color:var(--text-secondary)]">{{ emptyMessage() }}</p>
-          <div class="mt-4"><ng-content select="[empty-action]" /></div>
-        </div>
+        <!-- A8: what the list holds, why it is empty, and the next step ([empty-action]: the primary, then a link to
+             the step before). -->
+        <app-empty-state class="px-6 py-14" [icon]="emptyIcon()" [message]="emptyMessage()">
+          @if (emptyHint()) { <p hint class="empty-state-hint">{{ emptyHint() }}</p> }
+          <ng-content select="[empty-action]" />
+        </app-empty-state>
       } @else {
         <!-- The rows scroll inside their own box so the toolbar above and the pager below
              stay put. Without it a 369-entry log ran the page to 15,000px and the view
@@ -116,6 +181,8 @@ export class TableShell implements AfterViewInit {
   readonly errorRetryable = input(true);
   readonly isEmpty = input(false);
   readonly emptyMessage = input('Nothing here yet.');
+  /** Why the list is empty and what fills it, under the message (A8). */
+  readonly emptyHint = input('');
   /** Something that suggests what is missing beats a generic box on every screen. */
   readonly emptyIcon = input('inbox');
   /**
@@ -142,17 +209,40 @@ export class TableShell implements AfterViewInit {
   protected readonly visibleCount = computed(() => this.columns().length - this.hiddenCount());
   private restoredKey = '';
   private observer?: MutationObserver;
+  private resized?: ResizeObserver;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => this.observer?.disconnect());
+    inject(DestroyRef).onDestroy(() => { this.observer?.disconnect(); this.resized?.disconnect(); });
   }
 
   ngAfterViewInit(): void {
     this.refreshColumns();
+    // M16: re-decided whenever the toolbar's width or its controls change (a filter that comes and goes).
+    const toolbar = this.host.querySelector<HTMLElement>('.table-toolbar');
+    if (toolbar && typeof ResizeObserver !== 'undefined') {
+      // In the next frame, not inside the observer's own delivery: stacking changes the toolbar's height, which the
+      // observer would otherwise report again in the same frame ("ResizeObserver loop completed ...").
+      this.resized = new ResizeObserver(() => requestAnimationFrame(() => this.stackToolbar(toolbar)));
+      this.resized.observe(toolbar);
+    }
     // Rows re-render (paging, filters, a reload), so the choice is re-applied whenever the table's children
     // change. Only childList: the display changes made here must not wake it again.
-    this.observer = new MutationObserver(() => this.refreshColumns());
+    this.observer = new MutationObserver(() => { this.refreshColumns(); if (toolbar) this.stackToolbar(toolbar); });
     this.observer.observe(this.host, { childList: true, subtree: true });
+  }
+
+  /**
+   * Review 2026-10-07 (M16): whether the controls wrap when they share the heading's line. Measured with the heading
+   * inline; when any control sits below the first, the heading takes its own line (is-stacked). Toggled within one
+   * callback, so the size the observer sees settles at once.
+   */
+  stackToolbar(toolbar: HTMLElement): void {
+    const group = toolbar.querySelector<HTMLElement>('.table-toolbar-controls');
+    if (!group) return;
+    toolbar.classList.remove('is-stacked');
+    const tops = Array.from(group.children).map(c => (c as HTMLElement).getBoundingClientRect())
+      .filter(r => r.width > 0).map(r => Math.round(r.top));
+    if (tops.some(top => top > tops[0] + 4)) toolbar.classList.add('is-stacked');
   }
 
   protected isHidden(column: string): boolean {
@@ -194,6 +284,7 @@ export class TableShell implements AfterViewInit {
       } catch { this.hidden.set([]); }
     }
     if (!table) return;
+    markNumberColumns(table, labels);
     const hide = labels.map(label => !!label && label.toLowerCase() !== 'actions' && this.hidden().includes(label));
     // The footer too: without it a total row kept every cell and each figure sat under the wrong heading.
     table.querySelectorAll<HTMLTableRowElement>(':scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr').forEach(row => {

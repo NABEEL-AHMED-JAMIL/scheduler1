@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -15,6 +15,8 @@ interface MapRow { key: string; value: unknown; }
  * list of objects, rows with Add and Remove), a map (rows of name and value) -- and a raw-JSON box for a setting the
  * schema says in a way a form cannot. Nested objects and each group row are this same form, one level down; a schema
  * with no properties and an additionalProperties schema is drawn as a map.
+ *
+ * A document-type setting (MIG-364) is a choice of the workspace's document types, stored as the type's id.
  *
  * The registry's other widget hints -- api-request, api-environment, data-contract, db-connection, bucket, pipeline,
  * user -- are text boxes for now (TODO(MIG-249): their pickers).
@@ -86,6 +88,19 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('multi') {
+            <!-- UX review 2026-10-12: a list of fixed choices, one checkbox each, in the schema's order. -->
+            <app-field [label]="f.label" [for]="idOf(f) + '-0'" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
+              <div class="flex flex-wrap gap-x-4 gap-y-1.5" role="group" [attr.aria-label]="f.label" [attr.data-multi]="f.name">
+                @for (option of f.options; track $index) {
+                  <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" class="checkbox" [id]="idOf(f) + '-' + $index" [checked]="multiHas(f, option)" [disabled]="disabled()"
+                           (change)="toggleMulti(f, option, $any($event.target).checked)" />{{ optionText(option) }}
+                  </label>
+                }
+              </div>
+            </app-field>
+          }
           @case ('step') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
               <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" (change)="set(f.name, $any($event.target).value || undefined)">
@@ -109,6 +124,35 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('webhook') {
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || webhookHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a webhook…' : 'None' }}</option>
+                @for (w of webhooks(); track w.id) {
+                  <option [value]="'' + w.id" [selected]="textOf(f) === '' + w.id" [disabled]="!w.ready && textOf(f) !== '' + w.id">{{ w.label }}</option>
+                }
+                @if (textOf(f) && !webhookListed(f)) {
+                  <option [value]="textOf(f)" selected>Webhook {{ textOf(f) }} (not one of this workspace's webhooks)</option>
+                }
+              </select>
+            </app-field>
+          }
+          @case ('document-type') {
+            <!-- MIG-364: one of the workspace's document types, stored as its id; empty is the documents that started the run. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || documentTypeHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose a document type…' : 'The documents that started the run' }}</option>
+                @for (t of documentTypes(); track t.id) { <option [value]="'' + t.id" [selected]="textOf(f) === '' + t.id">{{ t.label }}</option> }
+                @if (textOf(f) && !documentTypeListed(f)) {
+                  <option [value]="textOf(f)" selected>Document type {{ textOf(f) }} (not in this workspace)</option>
+                }
+              </select>
+            </app-field>
+          }
           @case ('column') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
                        [hint]="f.description || (columns().length ? 'A column of the rows this step reads: pick one, or type it.' : '')">
@@ -117,6 +161,17 @@ interface MapRow { key: string; value: unknown; }
                      (input)="set(f.name, coerceText(f, $any($event.target).value))" />
               <datalist [id]="idOf(f) + '-columns'">
                 @for (c of columns(); track c) { <option [value]="c"></option> }
+              </datalist>
+            </app-field>
+          }
+          @case ('bucket') {
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || (buckets().length ? 'A bucket of this workspace: pick one, or type its alias.' : '')">
+              <input [id]="idOf(f)" class="input mono" [value]="textOf(f)" [disabled]="disabled()" autocomplete="off"
+                     [attr.list]="idOf(f) + '-buckets'" [attr.maxlength]="f.schema.maxLength ?? null"
+                     (input)="set(f.name, coerceText(f, $any($event.target).value))" />
+              <datalist [id]="idOf(f) + '-buckets'">
+                @for (b of buckets(); track b.alias) { <option [value]="b.alias">{{ b.label }}</option> }
               </datalist>
             </app-field>
           }
@@ -155,7 +210,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -179,7 +234,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -235,6 +290,16 @@ export class SchemaForm {
   readonly steps = input<string[]>([]);
   /** MIG-245: the workspace's active prompts, what a prompt setting offers. */
   readonly prompts = input<PromptChoice[]>([]);
+  /** MIG-346: what a webhook setting says when its schema says nothing. */
+  readonly webhookHint = 'One of this workspace’s webhooks (Integration › API Clients).';
+  /** MIG-346: the workspace's webhooks, what a webhook setting offers (those that cannot take a step's delivery disabled). */
+  readonly webhooks = input<WebhookChoice[]>([]);
+  /** MIG-321: the workspace's buckets, what a bucket setting offers. */
+  readonly buckets = input<BucketChoice[]>([]);
+  /** MIG-364: the workspace's document types, what a document-type setting offers. */
+  readonly documentTypes = input<DocumentTypeChoice[]>([]);
+  /** MIG-364: what a document-type setting says when its schema says nothing. */
+  readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document Intelligence).';
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 
@@ -264,6 +329,29 @@ export class SchemaForm {
     this.valueChange.emit(next);
   }
 
+  /** UX review 2026-10-12: whether a list of fixed choices holds this one. */
+  multiHas(f: FieldSpec, option: unknown): boolean {
+    const value = this.current()[f.name];
+    return Array.isArray(value) && value.includes(option);
+  }
+
+  /** A choice ticked or cleared: the list keeps the schema's order, and an empty list leaves the setting out (its default). */
+  toggleMulti(f: FieldSpec, option: unknown, on: boolean): void {
+    const value = this.current()[f.name];
+    const held = new Set(Array.isArray(value) ? value : []);
+    if (on) held.add(option); else held.delete(option);
+    const next = f.options.filter(o => held.has(o));
+    this.set(f.name, next.length ? next : undefined);
+  }
+
+  webhookListed(f: FieldSpec): boolean {
+    return this.webhooks().some(w => '' + w.id === this.textOf(f));
+  }
+
+  documentTypeListed(f: FieldSpec): boolean {
+    return this.documentTypes().some(t => '' + t.id === this.textOf(f));
+  }
+
   promptListed(f: FieldSpec): boolean {
     return this.prompts().some(p => '' + p.id === this.textOf(f));
   }
@@ -277,7 +365,7 @@ export class SchemaForm {
     return value === undefined ? '' : value === null ? 'null' : String(value);
   }
 
-  coerceText(f: FieldSpec, raw: string): unknown { return coerce(f.kind === 'column' ? 'text' : f.kind, raw); }
+  coerceText(f: FieldSpec, raw: string): unknown { return coerce(f.kind === 'column' || f.kind === 'bucket' ? 'text' : f.kind, raw); }
 
   optionText(option: unknown): string { return typeof option === 'string' ? option : JSON.stringify(option); }
 
@@ -384,7 +472,7 @@ export class SchemaForm {
 
   mapCoerce(raw: string): unknown {
     const kind = this.mapKind();
-    return kind === 'text' || kind === 'textarea' || kind === 'column' ? raw : coerce(kind, raw);
+    return kind === 'text' || kind === 'textarea' || kind === 'column' || kind === 'bucket' ? raw : coerce(kind, raw);
   }
 
   mapJson(row: MapRow): string { return row.value === undefined ? '' : JSON.stringify(row.value); }

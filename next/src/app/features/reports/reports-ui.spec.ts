@@ -21,13 +21,14 @@ const DATA: RunData = {
 };
 const failure = (id: number, task: string, message: string) => ({ jobQueueId: id, jobId: 1, job: 'job', task, status: 'Failed', message, when: '2026-08-01 10:00:00', seconds: 3 });
 
-function page(http: { get?: (url: string) => Observable<unknown>; post?: (url: string) => Observable<unknown> } = {}) {
+function page(http: { get?: (url: string) => Observable<unknown>; post?: (url: string) => Observable<unknown> } = {},
+    canOpen: (page: string) => boolean = () => true) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     provideRouter([]),
     { provide: HttpClient, useValue: { get: vi.fn(http.get ?? (() => of({ status: 'ERROR', message: '' }))), post: vi.fn(http.post ?? (() => of({ status: 'ERROR', message: '' }))) } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
-    { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false } },
+    { provide: AuthService, useValue: { isTenantAdmin: () => false, isPlatformAdmin: () => false, canOpen } },
     { provide: BillingApi, useValue: { usageByMeter: () => of({ status: 'ERROR', message: '' }) } },
   ] });
   const fixture = TestBed.createComponent(Reports);
@@ -72,11 +73,25 @@ describe('Reports, rendered', () => {
     expect(clear).toBeTruthy();
   });
 
-  it('labels the filters with the shared .label', () => {
+  // UX review 2026-10-12 (RA1): one date-range control in the header and one filter bar whose controls share a line --
+  // each named for a screen reader, none with a label stacked above it; Pipeline and Schedule, not Task and Job.
+  it('puts the range in the header and names every filter, Pipeline and Schedule among them', () => {
     const { el } = page();
-    for (const id of ['r-from', 'r-to', 'r-f-task', 'r-f-job', 'r-f-status', 'r-f-owner']) {
-      expect(el.querySelector(`label[for="${id}"]`)!.classList, id).toContain('label');
+    expect(el.querySelector('.page-head app-date-range')).not.toBeNull();
+    const bar = el.querySelector('[data-test="analytics-filters"]')!;
+    for (const name of ['Pipeline', 'Schedule', 'Outcome', 'Owner']) {
+      expect(bar.querySelector(`[aria-label="${name}"]`), name).not.toBeNull();
     }
+    expect(bar.querySelectorAll('label')).toHaveLength(0);
+    expect(bar.textContent).not.toMatch(/\bTask\b|\bJob\b/);
+  });
+
+  it('applies a range picked in the header, and folds the rare outcomes into Other below 2xl (RA1)', () => {
+    const { reports } = page();
+    reports.applyRange({ from: '2026-10-01', to: '2026-10-07', preset: 'custom' });
+    expect([reports.startDate(), reports.endDate(), reports.range().preset]).toEqual(['2026-10-01', '2026-10-07', 'custom']);
+    expect(reports.rareOutcomes({ outcomes: { Completed: 9, Failed: 1, Interrupt: 1, Skip: 2, Missed: 3 } })).toBe(6);
+    expect(reports.rareOutcomes({ outcomes: { Completed: 9 } })).toBe(0);
   });
 
   it('pairs Try again with the refresh icon', () => {
@@ -96,6 +111,17 @@ describe('Reports, rendered', () => {
     fixture.detectChanges();
     expect(text()).toContain('Model calls');
     expect(text()).toContain('Usage is unavailable.');
+  });
+
+  it('does not ask for model calls without a page that opens them, and draws no section (review 2026-10-07)', () => {
+    const asked: string[] = [];
+    const { reports, fixture, text } = page({ get: (url: string) => { asked.push(url); return of({ status: 'ERROR', message: 'refused' }); } },
+      key => key === 'reports');
+    reports.loadAiUsage();
+    fixture.detectChanges();
+    expect(asked.some(url => url.includes('aiPrompt.json/usage'))).toBe(false);
+    expect(reports.aiUsageError()).toBe('');
+    expect(text()).not.toContain('Model calls');
   });
 
   it('drops a failure-detail answer for a range the page has left', () => {

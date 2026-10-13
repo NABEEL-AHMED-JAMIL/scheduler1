@@ -8,6 +8,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { DataPolicyApi } from './data-policy.api';
 import { DataPolicy, PolicyLevel, defaultLevel } from './data-policy.model';
 import { DataPolicies } from './data-policies';
+import { RetentionApi } from './retention.api';
+import { RETENTION_VIEW } from './retention.fixtures';
 
 const RULE = 'A call\'s data is the highest level known of it.';
 const DEFAULTS: DataPolicy = { tenantId: 2924, levels: (['public', 'internal', 'sensitive'] as const).map(defaultLevel), rule: RULE };
@@ -29,6 +31,9 @@ function render(role: Role, policy: DataPolicy | { error: string } = DEFAULTS) {
     tenants: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }] })),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
+  // MIG-354: Core's retention section, read for the workspace a platform administrator picks (a workspace administrator's own
+  // needs the session's workspace, which this screen test has not).
+  const retention = { view: vi.fn(() => of({ status: 'SUCCESS', message: 'Retention policy.', data: RETENTION_VIEW })) };
   const admin = role !== 'TENANT_USER';
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -37,6 +42,7 @@ function render(role: Role, policy: DataPolicy | { error: string } = DEFAULTS) {
       provideZonelessChangeDetection(),
       provideRouter([]),
       { provide: DataPolicyApi, useValue: api },
+      { provide: RetentionApi, useValue: retention },
       { provide: ToastService, useValue: toast },
       { provide: AuthService, useValue: { isTenantAdmin: () => admin, isPlatformAdmin: () => role === 'PLATFORM_ADMIN', role: () => role } },
     ],
@@ -44,10 +50,18 @@ function render(role: Role, policy: DataPolicy | { error: string } = DEFAULTS) {
   const fixture = TestBed.createComponent(DataPolicies);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
-  const card = (level: string) => el.querySelector(`[data-level="${level}"]`) as HTMLElement;
+  // UX review B8: a level is a column of the comparison table -- its cells, read together, are what a card was.
+  const card = (level: string) => {
+    const cells = () => Array.from(el.querySelectorAll(`[data-level="${level}"]`));
+    return {
+      querySelector: (sel: string) => cells().map(c => c.querySelector(sel)).find(Boolean) ?? null,
+      querySelectorAll: <T extends Element>(sel: string) => cells().flatMap(c => Array.from(c.querySelectorAll<T>(sel))),
+      get textContent() { return cells().map(c => c.textContent).join(' '); },
+    } as unknown as HTMLElement;
+  };
   const text = (node: Element | null) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
   const refresh = () => { fixture.detectChanges(); };
-  return { fixture, el, api, toast, card, text, refresh, page: fixture.componentInstance };
+  return { fixture, el, api, retention, toast, card, text, refresh, page: fixture.componentInstance };
 }
 
 const type = (input: HTMLInputElement, value: string) => { input.value = value; input.dispatchEvent(new Event('input')); };
@@ -101,6 +115,15 @@ describe('Administration › Data policies -- as a workspace administrator', () 
     expect(text(el.querySelector('[data-save-error]'))).toBe('Model connection 1050 is not one this workspace can use.');
     expect(toast.error).toHaveBeenCalled();
     expect((card('public').querySelector('input[role="switch"][name="aiWriteTools"]') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('compares the levels in one table, Sensitive (PHI) first, a setting a row (UX review B8, DP1)', () => {
+    const { el, text } = render('TENANT_ADMIN');
+    const table = el.querySelector('[data-policy-table] table')!;
+    expect(Array.from(table.querySelectorAll('thead th[data-level]')).map(th => th.getAttribute('data-level'))).toEqual(['sensitive', 'internal', 'public']);
+    expect(Array.from(table.querySelectorAll('tbody th[scope="row"] > span:first-child')).slice(0, 5).map(t => text(t)))
+      .toEqual(['Model rule', 'Allowed models', 'Keep run files', 'AI write tools', 'Minimum-fields warning']);
+    expect(el.querySelectorAll('section[data-level]').length).toBe(0);
   });
 
   it('offers the workspace\'s models, and rules out the ones the level\'s rule would never use', () => {
@@ -159,5 +182,15 @@ describe('Administration › Data policies -- as a platform administrator', () =
     page.setRetention(1, '7');
     page.save();
     expect(api.save).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 2924 }));
+  });
+
+  it('shows that workspace\'s retention below the levels (MIG-354)', () => {
+    const { el, retention, refresh, page } = render('PLATFORM_ADMIN');
+    expect(retention.view).not.toHaveBeenCalled();
+    page.pickWorkspace('2924');
+    refresh();
+    expect(retention.view).toHaveBeenCalledWith(2924);
+    expect(el.querySelector('[data-retention]')).not.toBeNull();
+    expect(el.querySelectorAll('[data-retention-table] tbody tr').length).toBe(RETENTION_VIEW.classes.length);
   });
 });

@@ -23,7 +23,13 @@ export type PageKey =
   | 'connector-hub' | 'document-intelligence' | 'document-review'
   | 'ask-data' | 'data-catalog'
   | 'forms' | 'form-submissions'
-  | 'task-inbox' | 'workflow-designer';
+  | 'task-inbox' | 'workflow-designer'
+  // MIG-336: Integration > Developer portal. Unlike every other key, a tenant user without an access profile does not
+  // hold it: the owner keeps the API docs to administrators and developers (EXPLICIT_PAGES in auth.service.ts).
+  | 'developer-portal'
+  // UX review 2026-10-12: Saved Analyses reads the boards; saving, pinning and deleting are Edit dashboards' (or the
+  // Studio's). Identity's PageKey has the same split, and the gateway refuses the writes with a 403.
+  | 'dashboards-edit';
 
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
@@ -37,30 +43,34 @@ export interface PageCatalogueEntry {
  * The label a key is shown under when the catalogue has not been fetched (the 403 page).
  *
  * MIG-218 renamed the screens, not the keys: 'jobs' is Schedules, 'tasks' is Pipelines and 'reports' is
- * Run analytics, and an existing grant keeps opening the same screen under its new name.
+ * Run analytics, and an existing grant keeps opening the same screen under its new name. The UX review of 2026-10-12
+ * renamed more (one name per thing, nav-tree.ts): 'task-inbox' is the Review inbox, 'connector-hub' Connections; DR2 (2026-10-13)
+ * made the Review inbox the Review hub's Approvals tab.
  */
 export const PAGE_LABELS: Record<PageKey, string> = {
   'jobs': 'Schedules',
   'tasks': 'Pipelines',
-  'queue': 'Queue',
+  'queue': 'Runs by date',
   'reports': 'Run analytics',
   'objects': 'Browse files',
   'analytics': 'Analytics Studio',
-  'analytics-dashboards': 'Saved Analyses',
+  'analytics-dashboards': 'Dashboards',
   'tools-converter': 'Document Converter',
   'tools-transcript': 'Audio Transcript',
   'ai-prompts': 'Prompts',
   'api-collections': 'API Collections',
   'sources': 'Sources',
-  'connector-hub': 'Connector Hub',
-  'document-intelligence': 'Document Intelligence',
-  'document-review': 'Review queue',
+  'connector-hub': 'Connections',
+  'document-intelligence': 'Documents in',
+  'document-review': 'Document review',
   'ask-data': 'Ask your data',
   'data-catalog': 'Data Catalog',
-  'forms': 'All forms',
-  'form-submissions': 'Submissions',
-  'task-inbox': 'Task inbox',
-  'workflow-designer': 'Workflow designer',
+  'forms': 'Forms',
+  'form-submissions': 'Form submissions',
+  'task-inbox': 'Approvals',
+  'workflow-designer': 'Approval workflows',
+  'developer-portal': 'Developer portal',
+  'dashboards-edit': 'Edit dashboards',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

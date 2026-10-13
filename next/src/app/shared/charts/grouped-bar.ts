@@ -52,7 +52,7 @@ export interface GroupedSeries {
         @for (group of groups(); track group.name; let g = $index) {
           <div class="flex flex-col gap-0.5">
             <div class="flex items-baseline justify-between gap-2">
-              <span class="text-xs truncate text-[color:var(--text-secondary)]"
+              <span class="text-[11px] truncate text-[color:var(--text-secondary)]"
                     [title]="group.title">{{ group.short }}</span>
             </div>
             <div class="flex flex-col gap-0.5">
@@ -74,8 +74,8 @@ export interface GroupedSeries {
                            [attr.title]="bar.title + ': ' + bar.display"></div>
                     }
                   </div>
-                  <span class="text-[11px] tabular shrink-0 w-16 text-right
-                               text-[color:var(--text-muted)]">
+                  <span class="text-xs tabular shrink-0 w-16 text-right truncate
+                               text-[color:var(--text-muted)]" [title]="bar.value === null ? 'no rows' : bar.display">
                     {{ bar.value === null ? '—' : bar.display }}
                   </span>
                 </div>

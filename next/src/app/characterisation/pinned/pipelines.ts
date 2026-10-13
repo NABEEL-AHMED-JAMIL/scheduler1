@@ -4,14 +4,14 @@ export const PINNED: Record<string, unknown> = {
     "dialogFields": [
       "Default value",
       "Description",
-      "F768926",
-      "First season",
       "Help text",
-      "Hurricane season collection",
       "Label *(required)",
       "Name *(required)",
       "Nested under",
+      "ORDERS_IMPORT",
+      "Orders import",
       "Pipeline ID *(required)",
+      "Region",
       "Required",
       "Search topics…",
       "Shown under the field",
@@ -20,13 +20,13 @@ export const PINNED: Record<string, unknown> = {
       "Type",
       "What a task on this pipeline collects",
       "XML tag *(required)",
-      "start_year"
+      "region"
     ],
     "requests": [
       "GET /aiPrompt.json/list"
     ],
     "headings": [
-      "Edit pipeline",
+      "Edit registry task",
       "Fields",
       "Payload preview",
       "AI step · <summary>"
@@ -47,15 +47,15 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Default value",
       "Description",
-      "F768926",
-      "First season",
       "Help text",
-      "Hurricane season collection",
       "Label *(required)",
       "Name *(required)",
       "Nested under",
+      "ORDERS_IMPORT",
+      "Orders import",
       "Pipeline ID *(required)",
       "Prompt",
+      "Region",
       "Required",
       "Search active prompts…",
       "Search topics…",
@@ -65,7 +65,7 @@ export const PINNED: Record<string, unknown> = {
       "Type",
       "What a task on this pipeline collects",
       "XML tag *(required)",
-      "start_year"
+      "region"
     ],
     "links": [],
     "items": []
@@ -75,7 +75,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/fields?pipelineKey=100167"
     ],
     "headings": [
-      "Edit pipeline",
+      "Edit registry task",
       "Fields",
       "Payload preview"
     ],
@@ -92,14 +92,14 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Default value",
       "Description",
-      "F768926",
-      "First season",
       "Help text",
-      "Hurricane season collection",
       "Label *(required)",
       "Name *(required)",
       "Nested under",
+      "ORDERS_IMPORT",
+      "Orders import",
       "Pipeline ID *(required)",
+      "Region",
       "Required",
       "Search topics…",
       "Shown under the field",
@@ -108,15 +108,17 @@ export const PINNED: Record<string, unknown> = {
       "Type",
       "What a task on this pipeline collects",
       "XML tag *(required)",
-      "start_year"
+      "region"
     ],
     "links": [],
     "items": []
   },
   "the dialog, for a new pipeline": {
-    "requests": [],
+    "requests": [
+      "GET /setting.json/topics?limit=1&q="
+    ],
     "headings": [
-      "New pipeline",
+      "New registry task",
       "Fields"
     ],
     "buttons": [
@@ -127,9 +129,9 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [
       "Description",
-      "F768926",
-      "Hurricane season collection",
       "Name *(required)",
+      "ORDERS_IMPORT",
+      "Orders import",
       "Pipeline ID *(required)",
       "Search topics…",
       "Status",
@@ -140,7 +142,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the list, as a platform administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -155,7 +157,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
       "Refresh"
@@ -166,7 +168,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -180,7 +182,15 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "the list, as a tenant user (admin-only)": {
@@ -202,7 +212,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a workspace administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -217,7 +227,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
       "Refresh"
@@ -228,7 +238,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -240,14 +250,22 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "the old Configuration › Pipelines address": {
-    "url": "/configuration/task-registry"
+    "url": "/settings/task-registry"
   },
   "the old forms address": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -262,7 +280,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Reference: CSV check and summarise",
       "Refresh"
@@ -273,7 +291,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -285,7 +303,15 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "the row menu": {

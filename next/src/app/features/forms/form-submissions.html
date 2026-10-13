@@ -1,28 +1,28 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Submissions</h1>
-      <p class="page-subtitle">
-        What each form collected, who sent it and when, and whether it started the form's pipeline.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Form submissions</h1>
+        <p class="page-subtitle">
+          What each form collected, who sent it and when, and whether it started the form's pipeline.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        @if (forms().length) {
+          <label class="sr-only" for="submissionsForm">Form</label>
+          <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
+            @for (f of forms(); track f.formId) {
+              <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
+            }
+          </select>
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+          <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
+            <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}
+          </button>
+        }
+      </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      @if (forms().length) {
-        <label class="sr-only" for="submissionsForm">Form</label>
-        <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
-          @for (f of forms(); track f.formId) {
-            <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
-          }
-        </select>
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-        <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
-          <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}
-        </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
 
   @if (formsLoading()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the forms…</div>
@@ -82,21 +82,21 @@
               <td class="text-xs whitespace-nowrap">@if (s.submittedAt) { {{ s.submittedAt | serverTime: 'dateTime' }} }</td>
               <td class="whitespace-nowrap">
                 @if (s.status === 'RunStarted' && s.jobId && s.jobQueueId) {
-                  <a class="pill pill-ok" [routerLink]="['/pipelines/schedules', s.jobId, 'runs', s.jobQueueId, 'logs']"
+                  <a class="pill pill-ok" [routerLink]="['/pipelines/schedules', s.jobId, 'runs', s.jobQueueId]"
                      [title]="'Open the run log for #' + s.jobQueueId">{{ statusText(s) }}</a>
                 } @else {
                   <span class="pill" [class]="'pill-' + tone(s.status)">{{ statusText(s) }}</span>
                 }
               </td>
               @if (hasApproval()) {
-                <td class="text-sm" data-stage>{{ s.workflowStage || '—' }}</td>
+                <td data-stage>{{ s.workflowStage || '—' }}</td>
                 <td class="whitespace-nowrap" [attr.data-approval]="s.workflowStatus">
                   @if (s.workflowStatus) {
                     <span class="pill" [class]="'pill-' + approvalTone(s.workflowStatus)"
                           [title]="s.workflowReason || (s.workflowInstanceId ? 'Request #' + s.workflowInstanceId : '')">{{ approvalText(s.workflowStatus) }}</span>
                   } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                   @if (s.workflowInstanceId && canOpenRequests()) {
-                    <a class="text-xs text-accent hover:underline ml-2" routerLink="/workflows/requests" [queryParams]="{ id: s.workflowInstanceId }"
+                    <a class="text-xs text-accent hover:underline ml-2" routerLink="/review/requests" [queryParams]="{ id: s.workflowInstanceId }"
                        data-open-request>Open request</a>
                   }
                 </td>
@@ -138,7 +138,7 @@
                                 @switch (reads()[file.key ?? '']) {
                                   @case ('reading') { <span class="text-xs text-[color:var(--text-muted)]">Sending…</span> }
                                   @case ('sent') {
-                                    <a class="text-xs text-accent hover:underline" routerLink="/documents/intelligence" [queryParams]="{ tab: 'documents' }">
+                                    <a class="text-xs text-accent hover:underline" routerLink="/documents/in" [queryParams]="{ tab: 'documents' }">
                                       Being read — open Document Intelligence</a>
                                   }
                                   @case (undefined) {

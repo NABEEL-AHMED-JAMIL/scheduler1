@@ -10,11 +10,10 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { AppUser, Users } from './users';
 
 /**
- * The users grid drew an app-avatar per row, and an app-avatar given an appUserId asks the server for
- * that person's picture. Most people have none, so every load of the screen sent one request per
- * person -- 175 on the dev platform -- and ~140 of them came back 404. The list already says who has
- * a picture (avatarKey, omitted when there is none), so only they are asked for; the rest show their
- * initials straight away.
+ * The users grid draws an app-avatar per row, and an app-avatar asks the server for a picture unless it is told there is
+ * none. Most people have none, so asking for everyone sent one request per person per load -- 175 on the dev platform --
+ * and ~140 of them came back 404. The list says who has a picture (avatarVersion, null when there is none), so only they
+ * are asked for, by version; the rest show their initials straight away.
  */
 function users(): Users {
   TestBed.resetTestingModule();
@@ -35,14 +34,14 @@ const person = (extra: Partial<AppUser>): AppUser =>
   ({ appUserId: 4414, username: 'someone@example.com', userRole: 'TENANT_USER', status: 'Active', tenantId: 2900, ...extra });
 
 describe('the users grid asks for a picture only when there is one', () => {
-  it('asks for the person who has an avatar', () => {
-    expect(users().avatarOwner(person({ avatarKey: '4414/profile/avatar.jpg' }))).toBe(4414);
+  it('asks for the picture the list names, by its version', () => {
+    expect(users().avatarVersionOf(person({ avatarVersion: '0a1b2c3d4e5f60718293' }))).toBe('0a1b2c3d4e5f60718293');
   });
 
-  it('asks for nobody when the list says there is no avatar', () => {
+  it('says "none" -- so nothing is asked -- when the list says there is no picture', () => {
     const screen = users();
-    expect(screen.avatarOwner(person({}))).toBeNull();
-    expect(screen.avatarOwner(person({ avatarKey: null }))).toBeNull();
-    expect(screen.avatarOwner(person({ avatarKey: '' }))).toBeNull();
+    expect(screen.avatarVersionOf(person({}))).toBeNull();
+    expect(screen.avatarVersionOf(person({ avatarVersion: null }))).toBeNull();
+    expect(screen.avatarVersionOf(person({ avatarVersion: '' }))).toBeNull();
   });
 });

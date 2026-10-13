@@ -49,7 +49,7 @@ describe("MIG-266 (Wave 5): Storage connections, the bell and the notifications 
 
   it("the new storage connection form", async () => {
     const v = await visit('/configuration/storage-connections', 'TENANT_ADMIN', null);
-    const requests = await click(v, 'New connection');
+    const requests = await click(v, 'New storage connection');
     pin(FILE, "the new storage connection form", { requests, ...overlay() }, PINNED);
   });
 

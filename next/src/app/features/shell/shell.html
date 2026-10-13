@@ -2,20 +2,23 @@
   <!-- The header holds a dozen tab stops before the page starts; a keyboard user skips them here. -->
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-default btn-sm">Skip to content</a>
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
-    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
+    <div class="shell-bar mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
 
-      <a routerLink="/" class="mr-4 shrink-0">
+      <!-- From 1440px the mark stands over the sidebar: the "E" on the nav icons' centre line, the wordmark on their
+           labels' left edge, expanded or collapsed (owner, 2026-10-12; styles.css .brand-slot). Below, it lines up with
+           the page, as the bar's padding is the page's. -->
+      <a routerLink="/" class="brand-slot mr-4 shrink-0" [class.is-collapsed]="collapsed()">
         <app-brand-mark [hideOnMobile]="true" [hideBesideNav]="true" />
       </a>
 
-      <!-- Primary navigation -->
-      <nav class="hidden xl:flex items-center gap-0.5 flex-1">
-        @for (item of nav(); track item.label) {
+      <!-- Primary navigation: the same groups as the sidebar, on the bar from 1180px (nav) up to 1440px (wide), where
+           the sidebar takes over (UX review 2026-10-12, N2). -->
+      <nav class="hidden nav:flex wide:hidden items-center gap-0.5 flex-1" aria-label="Main menu">
+        @for (item of nav(); track item.label; let i = $index, count = $count) {
           @if (item.path) {
-            <a [routerLink]="item.path"
-               routerLinkActive="!text-accent !bg-accent-soft"
-               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
-               class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
+            <a [routerLink]="item.path" [class.nav-top-active]="isActive(item)"
+               [attr.aria-current]="isActive(item) ? 'page' : null"
+               class="px-1 xl:px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium whitespace-nowrap
                       text-[color:var(--text-secondary)]
                       hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]">
               {{ item.label }}
@@ -25,7 +28,7 @@
               <button type="button" (click)="toggleMenu(item.label)"
                       [attr.aria-expanded]="openMenu() === item.label"
                       [attr.aria-controls]="menuId(item.label)"
-                      class="px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
+                      class="px-1 xl:px-2 2xl:px-2.5 py-1.5 rounded-md text-sm font-medium inline-flex items-center gap-1
                              whitespace-nowrap text-[color:var(--text-secondary)]
                              hover:text-[color:var(--text-primary)]
                              hover:bg-[color:var(--surface-sunken)]"
@@ -37,23 +40,16 @@
                           [class.rotate-180]="openMenu() === item.label" />
               </button>
               @if (openMenu() === item.label) {
-                <div [id]="menuId(item.label)"
-                     class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle">
-                  @for (child of item.children; track child.path) {
-                    <a [routerLink]="child.path" (click)="openMenu.set(null)"
-                       routerLinkActive="nav-child-active"
-                       [routerLinkActiveOptions]="{ exact: !!child.exact }"
-                       class="nav-child">
-                      <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
-                      <span class="min-w-0">
-                        <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
-                        @if (child.hint) {
-                          <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
-                            {{ child.hint }}
-                          </span>
-                        }
-                      </span>
-                    </a>
+                <!-- The last two groups open leftwards so a wide panel stays on the screen. -->
+                <div [id]="menuId(item.label)" class="nav-panel" [class.nav-panel-end]="i >= count - 2"
+                     [class.nav-panel-columns]="item.blocks.length > 2">
+                  @for (block of item.blocks; track $index) {
+                    <div class="nav-block">
+                      @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
+                      @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
+                        <ng-container *ngTemplateOutlet="entry; context: { $implicit: child }" />
+                      }
+                    </div>
                   }
                 </div>
               }
@@ -62,43 +58,43 @@
         }
       </nav>
 
-      <div class="flex-1 xl:hidden"></div>
+      <div class="flex-1 nav:hidden wide:block"></div>
 
       <!-- Right side -->
       <div class="flex items-center gap-1 shrink-0">
         <app-notification-bell />
-        <button type="button" class="btn btn-ghost btn-icon" (click)="theme.toggle()"
-                [title]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'">
-          @if (theme.theme() === 'dark') {
-            <app-icon name="sun" size="1.05em" label="Switch to light theme" />
-          } @else {
-            <app-icon name="moon" size="1.05em" label="Switch to dark theme" />
-          }
-        </button>
+        <!-- The app themes (owner 2026-10-13): a menu, where this was a light/dark switch. Its own chunk, loaded after the
+             first paint (as the avatar is), so the first download does not carry it; until then the same button, inert. -->
+        <ng-container #themeMenu />
+        @if (!themeMenuLoaded()) {
+          <button type="button" class="btn btn-ghost btn-icon" aria-label="Theme" aria-disabled="true">
+            <app-icon [name]="theme.theme() === 'dark' ? 'moon' : 'sun'" size="1.05em" />
+          </button>
+        }
 
         <div class="relative" data-nav-menu="__user" (focusout)="onMenuFocusOut($event, '__user')">
           <button type="button" (click)="toggleMenu('__user')"
                   aria-label="Account menu" [attr.aria-expanded]="openMenu() === '__user'"
                   aria-controls="user-menu"
                   class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
-            @if (auth.avatarUrl()) {
-              <img [src]="auth.avatarUrl()" alt="" class="avatar-img size-7" />
-            } @else {
-              <span class="avatar-initials size-7 text-[11px]">{{ auth.initials() }}</span>
-            }
-            <!-- Between xl and 2xl the full nav and a name do not both fit, so only the avatar shows;
-                 the name is in the panel's header. The cap stops a long name or an email
-                 fallback pushing the page wider than the screen. -->
-            <span class="text-sm font-medium hidden sm:block xl:hidden 2xl:block max-w-36 truncate"
+            <!-- app-avatar, through ShellAvatar: its own chunk after the first paint; an empty circle until then. -->
+            <ng-container #topAvatar />
+            @if (!avatarType()) { <span class="avatar-initials size-7" aria-hidden="true"></span> }
+            <!-- Beside the top bar's menus (1180-1440px) only the avatar shows; the name is in the panel's header.
+                 The cap stops a long name or an email fallback pushing the page wider than the screen. -->
+            <span class="text-sm font-medium hidden sm:block nav:hidden wide:block max-w-36 truncate"
                   [title]="auth.displayName()">{{ auth.displayName() }}</span>
           </button>
           @if (openMenu() === '__user') {
             <div id="user-menu"
                  class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50 bg-raised border-subtle">
-              <div class="px-3 py-2 border-b border-subtle">
-                <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
-                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
-                  {{ roleText() }}
+              <div class="px-3 py-2 border-b border-subtle flex items-center gap-2.5">
+                <ng-container #menuAvatar />
+                <div class="min-w-0">
+                  <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
+                  <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                    {{ roleText() }}
+                  </div>
                 </div>
               </div>
               <!-- MIG-254: a staff session belongs to no workspace's people: no profile to read there (appUser.json/me
@@ -111,6 +107,12 @@
                 <a routerLink="/profile" (click)="openMenu.set(null)"
                    class="menu-item text-sm">
                   <app-icon name="user" size="0.95em" />Your profile
+                </a>
+                <!-- MIG-353: password, two-factor, sessions and sign-in history. "My security", so it is not mistaken
+                     for the workspace's Sign-in security (G12, AC1). -->
+                <a routerLink="/account/security" (click)="openMenu.set(null)"
+                   class="menu-item text-sm">
+                  <app-icon name="lock" size="0.95em" />My security
                 </a>
               }
               <a routerLink="/notifications" (click)="openMenu.set(null)"
@@ -129,7 +131,7 @@
           }
         </div>
 
-        <button type="button" class="btn btn-ghost btn-icon xl:hidden" (click)="toggleMobile()"
+        <button type="button" class="btn btn-ghost btn-icon nav:hidden" (click)="toggleMobile()"
                 aria-label="Menu" [attr.aria-expanded]="mobileOpen()">
           <app-icon [name]="mobileOpen() ? 'close' : 'menu'" size="1.15em" />
         </button>
@@ -153,12 +155,11 @@
     }
 
     @if (mobileOpen()) {
-      <nav class="mobile-nav xl:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">
+      <nav class="mobile-nav nav:hidden border-t px-3 py-2 space-y-0.5 border-subtle max-h-[calc(100dvh-3.5rem-1px)] overflow-y-auto overscroll-contain">
         @for (item of nav(); track item.label) {
           @if (item.path) {
             <a [routerLink]="item.path" (click)="mobileOpen.set(false)"
-               routerLinkActive="nav-child-active"
-               [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+               [class.nav-child-active]="isActive(item)" [attr.aria-current]="isActive(item) ? 'page' : null"
                class="nav-child font-medium">
               @if (item.icon) { <app-icon [name]="item.icon" size="1em" class="nav-child-icon" /> }
               <span class="text-sm">{{ item.label }}</span>
@@ -168,20 +169,11 @@
               <div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
                 {{ item.label }}
               </div>
-              @for (child of item.children; track child.path) {
-                <a [routerLink]="child.path" (click)="mobileOpen.set(false)"
-                   routerLinkActive="nav-child-active"
-                   [routerLinkActiveOptions]="{ exact: !!child.exact }" class="nav-child">
-                  <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
-                  <span class="min-w-0">
-                    <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
-                    @if (child.hint) {
-                      <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
-                        {{ child.hint }}
-                      </span>
-                    }
-                  </span>
-                </a>
+              @for (block of item.blocks; track $index) {
+                @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
+                @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
+                  <ng-container *ngTemplateOutlet="entry; context: { $implicit: child }" />
+                }
               }
             </div>
           }
@@ -190,7 +182,35 @@
     }
   </header>
 
-  <main id="main" tabindex="-1" class="outline-none flex-1 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
-    <router-outlet />
-  </main>
+  <div class="flex flex-1 min-w-0">
+    <!-- UX review 2026-10-12 (N2): from 1440px the menu is a sidebar, as in the reference screens. Collapsed, it shows
+         each group's icon, which opens the group beside it. -->
+    <aside class="app-sidebar" [class.is-collapsed]="collapsed()" aria-label="Main menu">
+      <!-- The sidebar's links load after the first paint (their own chunk: side-nav.ts); the aside holds its width
+           from the start, so nothing moves when they arrive. -->
+      <ng-container #sideNav />
+    </aside>
+
+    <main id="main" tabindex="-1" class="outline-none flex-1 min-w-0 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
+      <router-outlet />
+    </main>
+  </div>
 </div>
+
+<!-- One menu entry: the label, the Review badge (what waits for the reader) and the one-line hint, for the bar's panels, the collapsed
+     sidebar's flyouts and the phone panel. -->
+<ng-template #entry let-child>
+  <a [routerLink]="child.path" [queryParams]="child.query ?? null" (click)="openMenu.set(null); mobileOpen.set(false)"
+     [class.nav-child-active]="isActive(child)" [attr.aria-current]="isActive(child) ? 'page' : null"
+     class="nav-child">
+    <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+    <span class="min-w-0">
+      <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'review' && tasks.review()?.total) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.review()?.overdue" [class.pill-neutral]="!tasks.review()?.overdue" data-test="task-badge">{{ tasks.review()?.total }}{{ tasks.review()?.more ? '+' : '' }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+      @if (child.hint) {
+        <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
+          {{ child.hint }}
+        </span>
+      }
+    </span>
+  </a>
+</ng-template>

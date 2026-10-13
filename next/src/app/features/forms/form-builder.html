@@ -1,25 +1,25 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Forms</h1>
-      <p class="page-subtitle">
-        Forms your workspace fills in. Each submission is kept, and a form can start a pipeline with the submission as
-        its input file. Forms are shared inside this workspace only.
-      </p>
-    </div>
-    <div class="flex items-center gap-2">
-      @if (!draft()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-        @if (canBuild()) {
-          <button type="button" class="btn btn-primary btn-sm" (click)="newForm()" data-new-form><app-icon name="plus" />New form</button>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Forms</h1>
+        <p class="page-subtitle">
+          Forms your workspace fills in. Each submission is kept, and a form can start a pipeline with the submission as
+          its input file. Forms are shared inside this workspace only.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (!draft()) {
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+          @if (canBuild()) {
+            <button type="button" class="btn btn-primary btn-sm" (click)="newForm()" data-new-form><app-icon name="plus" />New form</button>
+          }
+        } @else {
+          <button type="button" class="btn btn-default btn-sm" (click)="close()"><app-icon name="arrowLeft" />All forms</button>
         }
-      } @else {
-        <button type="button" class="btn btn-default btn-sm" (click)="close()"><app-icon name="arrowLeft" />All forms</button>
-      }
+      </div>
     </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="forms" still="You can still fill them in and read their submissions." />
 
   @if (draft(); as d) {
@@ -423,52 +423,65 @@
               <th class="text-right">Submissions</th>
               <th class="hidden xl:table-cell">Updated</th>
             }
-            <th class="text-right">Actions</th>
+            <th class="text-right w-12 th-actions">Actions</th>
           </tr>
         </thead>
         <tbody>
           @for (f of forms(); track f.formId) {
             <tr [attr.data-form]="f.formId">
               <td class="min-w-48 max-w-96">
-                <span class="block font-medium">{{ f.name }}</span>
+                <!-- UX review 2026-10-12 (A6, G8): the name is the row's way in -- fill in an Active form -- and every other
+                     action is in the row's ⋮ menu, as on every other list. -->
+                @if (f.status === 'Active') {
+                  <a class="block font-medium link-inline" [routerLink]="['/forms', f.formId, 'fill']" [attr.aria-label]="'Fill in ' + f.name">{{ f.name }}</a>
+                } @else {
+                  <span class="block font-medium">{{ f.name }}</span>
+                }
                 @if (f.description) { <span class="block text-xs text-[color:var(--text-muted)] truncate">{{ f.description }}</span> }
               </td>
               <td><span class="pill" [class]="'pill-' + tone(f.status)">{{ f.status }}</span></td>
               <td class="hidden xl:table-cell text-right tabular">{{ f.fieldCount }}</td>
               @if (isAdmin()) {
-                <td class="text-sm">
-                  @if (f.startsJob) { {{ f.jobName || 'Job #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                <td>
+                  @if (f.startsJob) { {{ f.jobName || 'Schedule #' + f.jobId }} } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                 </td>
                 <td class="text-right tabular">{{ f.submissions ?? 0 }}</td>
                 <td class="hidden xl:table-cell text-xs whitespace-nowrap">@if (f.dateUpdated) { {{ f.dateUpdated | serverTime: 'dateTime' }} }</td>
               }
               <td class="text-right whitespace-nowrap">
-                @if (f.status === 'Active') {
-                  <a class="btn btn-ghost btn-sm" [routerLink]="['/forms', f.formId, 'fill']" [attr.aria-label]="'Fill in ' + f.name">
-                    <app-icon name="send" />Fill in
-                  </a>
-                }
-                @if (canSeeSubmissions()) {
-                  <a class="btn btn-ghost btn-sm" routerLink="/forms/submissions" [queryParams]="{ formId: f.formId }"
-                     [attr.aria-label]="'Submissions of ' + f.name"><app-icon name="table" />Submissions</a>
-                }
-                @if (isAdmin()) {
-                  <button type="button" class="btn btn-ghost btn-sm" (click)="edit(f)" [attr.aria-label]="(canBuild() ? 'Edit ' : 'View ') + f.name">
-                    <app-icon [name]="canBuild() ? 'edit' : 'eye'" />{{ canBuild() ? 'Edit' : 'View' }}
-                  </button>
-                }
-                @if (canBuild()) {
-                  @if (f.status !== 'Active') {
-                    <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(f, 'Active')" [attr.aria-label]="'Activate ' + f.name">
-                      <app-icon name="play" />Activate
-                    </button>
-                  }
-                  @if (f.status !== 'Archived') {
-                    <button type="button" class="btn btn-ghost btn-sm" (click)="setStatus(f, 'Archived')" [attr.aria-label]="'Archive ' + f.name">
-                      <app-icon name="history" />Archive
-                    </button>
-                  }
-                }
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + f.name">
+                  <app-icon name="dots" size="1.05em" />
+                </button>
+                <ng-template #rowMenu>
+                  <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                    @if (f.status === 'Active') {
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/forms', f.formId, 'fill']" [attr.aria-label]="'Fill in ' + f.name">
+                        <app-icon name="send" />Fill in
+                      </a>
+                    }
+                    @if (canSeeSubmissions()) {
+                      <a cdkMenuItem class="menu-item" routerLink="/forms/submissions" [queryParams]="{ formId: f.formId }"
+                         [attr.aria-label]="'Submissions of ' + f.name"><app-icon name="table" />Submissions</a>
+                    }
+                    @if (isAdmin()) {
+                      <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="edit(f)" [attr.aria-label]="(canBuild() ? 'Edit ' : 'View ') + f.name">
+                        <app-icon [name]="canBuild() ? 'edit' : 'eye'" />{{ canBuild() ? 'Edit' : 'View' }}
+                      </button>
+                    }
+                    @if (canBuild()) {
+                      @if (f.status !== 'Active') {
+                        <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="setStatus(f, 'Active')" [attr.aria-label]="'Activate ' + f.name">
+                          <app-icon name="play" />Activate
+                        </button>
+                      }
+                      @if (f.status !== 'Archived') {
+                        <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="setStatus(f, 'Archived')" [attr.aria-label]="'Archive ' + f.name">
+                          <app-icon name="history" />Archive
+                        </button>
+                      }
+                    }
+                  </div>
+                </ng-template>
               </td>
             </tr>
           }

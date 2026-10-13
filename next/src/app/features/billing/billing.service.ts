@@ -12,15 +12,29 @@ export interface InvoiceRow {
   periodStart: string; periodEnd: string; status: 'draft' | 'issued' | 'partially_paid' | 'paid' | 'overdue' | 'void'; currency: string;
   subtotal: number; taxRatePercent: number; tax: number; total: number; balance: number; note?: string;
   issuedAt?: string; dueAt?: string; paidAt?: string; voidedAt?: string; rateCardVersion?: number; rateCardName?: string; dateCreated?: string;
+  /** H9: the billing time zone the period's days were counted in, and the period as the PDF states it ("1–31 Oct 2026, America/Chicago"). */
+  timeZone?: string | null; periodLabel?: string | null;
   /** The kinds of document the invoice has (invoice, payment_slip, receipt, credit_note) and slips awaiting verification. */
   documentKinds?: string[]; pendingPayments?: number;
+  /**
+   * MIG-359, paying by card (Stripe, test mode first): whether Pay now is offered, the open hosted checkout, the last card
+   * decline (until a payment arrives) and 'card' once a card payment settled it.
+   */
+  cardPayable?: boolean; payLinkOpen?: boolean; payLinkUrl?: string | null; payLinkExpiresAt?: string | null;
+  paymentError?: string | null; paymentErrorAt?: string | null; paidVia?: string | null;
 }
 export interface InvoiceLine {
   invoiceLineId: number; sort: number; meter?: string; description: string; quantity: number; unit?: string; per: number;
   unitPrice: number; amount: number; periodLabel?: string; manual: boolean;
   /** What the calculation applied when the line was frozen: the allowance and, as JSON, the tier bands. */
   includedQuantity?: number | null; billableQuantity?: number | null; pricingDetail?: string | null;
+  /** MIG-337: who used the line's meter, as JSON [{subjectType, subjectId, quantity}] -- an API client's calls, a webhook's deliveries. */
+  breakdown?: string | null;
+  /** Rate card fallback: the default card that priced the line, when the workspace's own card does not name its meter. */
+  pricedFromVersion?: number | null; pricedFromName?: string | null;
 }
+/** One subject of a line's breakdown (MIG-337). */
+export interface LineSubject { subjectType: string; subjectId: string | null; quantity: number }
 /** One band of a graduated price: units from `from` (to the next band's `from`) cost `unit_price` per `per`. */
 export interface RateTier { from: number; unit_price: number; }
 /** A tier band as it was applied to a period's quantity. */
@@ -47,6 +61,21 @@ export interface RateCardDraft {
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
   receiptNumber?: string; submittedBy?: string; verifiedBy?: string; verifiedAt?: string; receivedAt?: string; dateCreated: string; hasSlip: boolean;
+  /** The day the money was received, YYYY-MM-DD in the workspace's billing time zone (payment review 2026-10-12). */
+  receivedOn?: string | null;
+  /** Answered by payment/submit and payment/verify: the invoice after the payment. */
+  invoiceStatus?: string; invoiceBalance?: number;
+  /** MIG-359: a card payment's provider and ids -- never card data, which Billing never sees. */
+  currency?: string | null; provider?: string | null; providerPaymentId?: string | null; providerChargeId?: string | null;
+  providerSessionId?: string | null; refundedAmount?: number | null;
+}
+/** billing.json/payments: the latest payments, a workspace's or (the platform's) every workspace's (MIG-359). */
+export interface PaymentListRow extends PaymentRow {
+  tenantId: number; tenantName?: string | null; invoiceId: number; invoiceNumber: string;
+}
+/** billing.json/invoice/payLink: the provider's hosted checkout for the invoice's balance. */
+export interface PayLink {
+  invoiceId: number; number: string; url: string; sessionId: string; expiresAt: string; amount: number; currency: string; provider: string; testMode: boolean;
 }
 export interface DocumentRow {
   documentId: number; kind: 'invoice' | 'credit_note' | 'receipt' | 'statement' | 'payment_slip'; number?: string; fileName: string;
@@ -63,11 +92,37 @@ export interface MeterLine {
   meter: string; label: string; service: string; unit: string; per: number;
   unitPrice: number; quantity: number; amount: number; days: number;
   /** The calculation applied to the period: allowance first, then tier bands if the card has them. */
-  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean; unpriced?: boolean;
+  includedQuantity: number; billableQuantity: number; tiers: AppliedTier[]; hasTiers: boolean;
+  /** Used, and no card prices it -- neither the workspace's own nor the default: billed at 0. */
+  unpriced?: boolean;
+  /** Not on the workspace's own card: priced from the default card in effect (rate card fallback). */
+  pricedFrom?: { version: number; name: string } | null;
 }
 /** The card a period is priced with, as the meter names it. */
-export interface PricedWith { version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string; }
-export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
+export interface PricedWith {
+  version: number; name: string; currency: string; tenantSpecific: boolean; effectiveFrom: string;
+  /** A workspace's own card: the default card the meters it does not name are priced from. */
+  fallback?: { version: number; name: string; effectiveFrom: string } | null;
+}
+export interface DayRow {
+  day: string; amount: number; byService: Record<string, number>;
+  /** Each meter's quantity and flat amount that day, before the month's allowances and tiers (a day picked on Cost by day). */
+  byMeter?: Record<string, { quantity: number; amount: number }>;
+}
+/** A billing day's count and total over a whole range, every page included: a day header of Cost per model call or By run. */
+export interface DayTotal { day: string | null; runs: number; amount?: number; cost?: number; }
+/**
+ * H9: the billing calendar a usage answer was counted in -- the workspace's billing time zone, today there, the month under
+ * way there, and the instants the range covers. Days are the workspace's, never the browser's or UTC's.
+ */
+export interface UsageCalendar { timeZone?: string | null; endTimeZone?: string; today?: string; currentMonth?: string; periodStart?: string; periodEnd?: string; }
+/** H9: a workspace's billing time zone, as Billing keeps it (Administration › Tenants). */
+export interface BillingTimeZone {
+  tenantId: number; month: string; zone: string; monthStart: string; monthEnd: string; today: string; defaultZone: string;
+  nextMonth: string; nextMonthZone: string; changeTakesEffect: string;
+  scheduled: { effectiveMonth: string; zone: string }[];
+  history: { id: number; effectiveMonth: string; zone: string; reason: string | null; setBy: number | null; setAt: string | null }[];
+}
 export interface SubjectRow { subject_type: string; subject_id: string; quantity: number; events: number; last: string | null; actor_user_id: number | null; actor_name?: string | null; }
 /** One priced line of a run: what its tokens were priced as (a model's own item, or the meter's). */
 export interface RunLine { meter: string; label: string; quantity: number; unit: string; per: number; unit_price: number; amount: number; }
@@ -83,6 +138,19 @@ export interface RunRow {
 /** What every usage read names: a range, a workspace for a platform administrator, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
+/** UX review B9 (BL1): one run's share of the priced lines (billing.json/pipelineCosts, runCost). */
+export interface RunCostMeter { meter: string; label: string; quantity: number; unit: string; cost: number; }
+export interface RunCostRow {
+  jobQueueId: number; jobId: number | null; schedule: string | null; taskDetailId: number | null; pipeline: string | null;
+  status?: string | null; startedAt: string | null; lastUsageAt?: string | null; cost: number; meters: RunCostMeter[];
+}
+export interface PipelineCostRow { taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null; }
+export interface PipelineCosts {
+  from: string; to: string; zone: string | null; currency: string | null; total: number; attributed: number; notTiedToRun: number;
+  namesResolved?: boolean; pipelines: PipelineCostRow[]; runs: { total: number; page: number; limit: number; rows: RunCostRow[]; days?: DayTotal[] };
+}
+export interface RunCost extends RunCostRow { from: string | null; to: string | null; currency: string | null; namesResolved?: boolean; }
+
 /** billing.json/summary: the bill in one glance, for a profile card or a dashboard row. */
 export interface BillingSummary {
   currency: string; monthToDate: number; periodStart: string; rateCardName?: string; rateCardVersion?: number; meterDown?: boolean;
@@ -95,7 +163,8 @@ export interface BillingAnalytics {
   invoiced: number; collected: number; open: number; overdue: number; overdueCount: number; drafts: number; medianDaysToPay: number; pendingPayments: number;
   months: { month: string; invoiced?: number; collected?: number; open?: number; drafts?: number }[];
   tenants: { tenantId: number; tenantName: string; invoiced: number; collected: number; open: number; overdue: number; status: string }[];
-  usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number> }[] | null;
+  /** unpricedMeters: meters the workspace used that no card prices -- neither its own nor the default (billed at 0). */
+  usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number>; unpricedMeters?: string[] }[] | null;
 }
 
 /** The billing.json calls: invoices, payments, documents, the account, the platform's view. */
@@ -120,17 +189,31 @@ export class BillingApi {
   creditNote(invoiceId: number, amount: number, reason: string): Observable<ApiResponse<InvoiceRow>> {
     return this.http.post<ApiResponse<InvoiceRow>>(`${this.base}/invoice/creditNote`, null, { params: { invoiceId: String(invoiceId), amount: String(amount), reason } });
   }
-  submitPayment(invoiceId: number, amount: number, method: string, reference: string, note: string, slip: File | null): Observable<ApiResponse<PaymentRow>> {
+  /**
+   * A payment against an invoice: a workspace's slip, or the platform's record of money received (`verified`: counted at
+   * once, with its receipt). `idempotencyKey` is sent as the Idempotency-Key header: the same key for every try of one
+   * form, so a double click or a retry records it once. Refusals come back as 4xx with the sentence (payment review 2026-10-12).
+   */
+  submitPayment(invoiceId: number, amount: number | string, method: string, reference: string, note: string, slip: File | null,
+                extra: { currency?: string; receivedOn?: string; verified?: boolean; idempotencyKey?: string } = {}): Observable<ApiResponse<PaymentRow>> {
     const form = new FormData();
     form.append('invoiceId', String(invoiceId)); form.append('amount', String(amount)); form.append('method', method);
     if (reference) form.append('reference', reference);
     if (note) form.append('note', note);
     if (slip) form.append('slip', slip, slip.name);
-    return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/submit`, form);
+    if (extra.currency) form.append('currency', extra.currency);
+    if (extra.receivedOn) form.append('receivedOn', extra.receivedOn);
+    if (extra.verified) form.append('verified', 'true');
+    const headers: Record<string, string> = extra.idempotencyKey ? { 'Idempotency-Key': extra.idempotencyKey } : {};
+    return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/submit`, form, { headers });
   }
   verifyPayment(paymentId: number, accept: boolean, note: string): Observable<ApiResponse<PaymentRow>> {
     return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/verify`, null, { params: { paymentId: String(paymentId), accept: String(accept), note } });
   }
+  /** MIG-359: the invoice's card pay link -- the open checkout reused, else a new one. */
+  payLink(invoiceId: number): Observable<ApiResponse<PayLink>> { return this.http.post<ApiResponse<PayLink>>(`${this.base}/invoice/payLink`, null, { params: { invoiceId: String(invoiceId) } }); }
+  /** MIG-359: the latest payments -- slips, cards (paid and declined), credit notes applied. */
+  payments(tenantId?: string | null): Observable<ApiResponse<PaymentListRow[]>> { return this.http.get<ApiResponse<PaymentListRow[]>>(`${this.base}/payments`, { params: this.tenantParam(tenantId) }); }
   documents(tenantId?: string | null): Observable<ApiResponse<DocumentRow[]>> { return this.http.get<ApiResponse<DocumentRow[]>>(`${this.base}/documents`, { params: this.tenantParam(tenantId) }); }
   /** The invoice number as a QR code (PNG); the PDF carries the same one. */
   qrBlob(number: string, size = 160): Observable<Blob> { return this.http.get(`${this.base}/invoice/qr`, { params: { number, size: String(size) }, responseType: 'blob' }); }
@@ -139,21 +222,40 @@ export class BillingApi {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
   }
   summary(tenantId?: string | null): Observable<ApiResponse<BillingSummary>> { return this.http.get<ApiResponse<BillingSummary>>(`${this.base}/summary`, { params: this.tenantParam(tenantId) }); }
-  usageByMeter(q: UsageQuery): Observable<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>> {
-    return this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith }>>(`${this.base}/usage`, { params: this.usageParams(q, 'meter') });
+  usageByMeter(q: UsageQuery): Observable<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith } & UsageCalendar>> {
+    return this.http.get<ApiResponse<{ rows: MeterLine[]; rateCard?: PricedWith } & UsageCalendar>>(`${this.base}/usage`, { params: this.usageParams(q, 'meter') });
   }
-  usageByDay(q: UsageQuery): Observable<ApiResponse<{ rows: DayRow[] }>> {
-    return this.http.get<ApiResponse<{ rows: DayRow[] }>>(`${this.base}/usage`, { params: this.usageParams(q, 'day') });
+  usageByDay(q: UsageQuery): Observable<ApiResponse<{ rows: DayRow[] } & UsageCalendar>> {
+    return this.http.get<ApiResponse<{ rows: DayRow[] } & UsageCalendar>>(`${this.base}/usage`, { params: this.usageParams(q, 'day') });
+  }
+  /** H9: a workspace's billing time zone, its months and every change recorded (a workspace administrator reads their own). */
+  timeZone(tenantId?: string | number | null): Observable<ApiResponse<BillingTimeZone>> {
+    return this.http.get<ApiResponse<BillingTimeZone>>(`${this.base}/timeZone`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) });
+  }
+  /** H9: the IANA zones a platform administrator may pick. */
+  timeZones(): Observable<ApiResponse<string[]>> { return this.http.get<ApiResponse<string[]>>(`${this.base}/timeZones`); }
+  /** H9: sets a workspace's billing time zone from the first month it may take effect (the platform administrator). */
+  setTimeZone(tenantId: number, zone: string, reason: string): Observable<ApiResponse<{ zone: string; effectiveMonth: string; previousZone: string }>> {
+    return this.http.post<ApiResponse<{ zone: string; effectiveMonth: string; previousZone: string }>>(`${this.base}/timeZone`, null,
+      { params: { tenantId: String(tenantId), zone, reason } });
   }
   subjects(q: UsageQuery, meter: string, limit: number): Observable<ApiResponse<{ rows: SubjectRow[] }>> {
     return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });
   }
   /** Cost per run (MIG-308): the month's model-call runs, newest first, a page at a time. */
-  runs(q: UsageQuery, page: number, limit: number): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[] }>> {
-    return this.http.get<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[] }>>(`${this.base}/runs`, {
+  runs(q: UsageQuery, page: number, limit: number): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>> {
+    return this.http.get<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>>(`${this.base}/runs`, {
       params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
   }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
+  /** UX review B9: what each pipeline and run cost, shared out of the same priced lines (adds up to the range's total). */
+  pipelineCosts(q: UsageQuery, page = 1, limit = 25): Observable<ApiResponse<PipelineCosts>> {
+    return this.http.get<ApiResponse<PipelineCosts>>(`${this.base}/pipelineCosts`, {
+      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
+  }
+  runCost(jobQueueId: number, tenantId?: string | null): Observable<ApiResponse<RunCost>> {
+    return this.http.get<ApiResponse<RunCost>>(`${this.base}/runCost`, { params: { jobQueueId: String(jobQueueId), ...this.tenantParam(tenantId) } });
+  }
   refreshUsage(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refresh`, null); }
   /** Rolls the signed-in workspace's today and yesterday again: a workspace administrator's refresh. */
   refreshWorkspace(): Observable<ApiResponse<unknown>> { return this.http.post<ApiResponse<unknown>>(`${this.base}/refreshWorkspace`, null); }
@@ -193,13 +295,27 @@ export function paymentMethodLabel(method: string): string {
   return PAYMENT_METHODS.find(m => m.value === method)?.label ?? (method ? method[0].toUpperCase() + method.slice(1) : '');
 }
 /** The services a meter rolls up under, in the order the screens list them. */
-export const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & tools', 'Other'];
+export { SERVICES } from './cost-by-day-model';
 /** The meters a card may price per model, as `<meter>@<model>` items (MIG-308). */
 export const MODEL_PRICED_METERS = ['ai.tokens.in', 'ai.tokens.out'];
 /** The model a per-model item names; null for a meter's own item. */
 export function modelOfMeter(meter: string): string | null {
   const at = meter.indexOf('@');
   return at > 0 && MODEL_PRICED_METERS.includes(meter.slice(0, at)) ? meter.slice(at + 1) : null;
+}
+
+/**
+ * MIG-359: the card payment chip beside an invoice's status -- Paid by card, a card that was declined, or a pay link
+ * that is open -- or null when card payment says nothing about the invoice.
+ */
+export function cardPaymentChip(i: Pick<InvoiceRow, 'status' | 'paidVia' | 'paymentError' | 'payLinkOpen' | 'cardPayable'>):
+  { label: string; tone: string; title: string } | null {
+  if (i.status === 'paid' && i.paidVia === 'card') return { label: 'Paid by card', tone: 'pill-ok', title: 'Paid online by card through Stripe' };
+  const open = i.status === 'issued' || i.status === 'partially_paid' || i.status === 'overdue';
+  if (!open) return null;
+  if (i.paymentError) return { label: 'Card declined', tone: 'pill-crit', title: i.paymentError };
+  if (i.payLinkOpen) return { label: 'Pay link open', tone: 'pill-neutral', title: 'A Stripe checkout is open for this invoice' };
+  return null;
 }
 
 export const INVOICE_STATUS_LABEL: Record<string, string> = {

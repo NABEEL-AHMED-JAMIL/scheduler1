@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { ActivatedRoute, Router } from '@angular/router';
-import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
+import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
 import { of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -51,32 +51,26 @@ describe('Users -- reset password is checked inside its dialog', () => {
     expect(opened[0].component).toBe(ResetPasswordDialog);
   });
 
-  function dialog() {
-    const close = vi.fn();
-    TestBed.resetTestingModule();
-    TestBed.configureTestingModule({
-      providers: [
-        { provide: DIALOG_DATA, useValue: { name: 'b@acme.test' } },
-        { provide: DialogRef, useValue: { close } },
-      ],
-    });
-    return { dialog: TestBed.runInInjectionContext(() => new ResetPasswordDialog()), close };
-  }
-
-  it('keeps a short password in the dialog with the field marked, rather than closing', () => {
-    const { dialog: d, close } = dialog();
-    d.form.setValue({ password: 'short' });
-    d.submit();
-    expect(close).not.toHaveBeenCalled();
-    expect(d.submitted()).toBe(true);
-    expect(d.form.get('password')!.hasError('minlength')).toBe(true);
+  it('hands the dialog whom it resets, and whether that is the administrator themself', () => {
+    const opened: any[] = [];
+    const screen = usersScreen(opened);
+    screen.resetPassword(ROWS[1]);
+    expect(opened[0].config.data).toEqual({ appUserId: 2, name: 'b@acme.test', tenantId: 10, own: false });
   });
 
-  it('hands back a long enough password', () => {
-    const { dialog: d, close } = dialog();
-    d.form.setValue({ password: 'long enough' });
-    d.submit();
-    expect(close).toHaveBeenCalledWith('long enough');
+  it('keeps the reset that happened for its notice, and drops it when the next reset opens', () => {
+    const opened: any[] = [];
+    const screen = usersScreen(opened);
+    const done = { name: 'b@acme.test', own: false, password: 'kept-for-copy-only' };
+    (TestBed.inject(Dialog) as any).open = (component: unknown, config: any) => {
+      opened.push({ component, config });
+      return { closed: of(done) };
+    };
+    screen.resetPassword(ROWS[1]);
+    expect(screen.resetDone()).toEqual(done);
+    (TestBed.inject(Dialog) as any).open = () => ({ closed: of(undefined) });
+    screen.resetPassword(ROWS[2]);
+    expect(screen.resetDone()).toBeNull();
   });
 });
 

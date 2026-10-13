@@ -67,22 +67,22 @@ describe('MIG-292: Connector Hub', () => {
   afterEach(() => restoreClock());
 
   it('the gallery and connections, as a workspace administrator', async () => {
-    const v = await visit('/integration/connectors', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/connectors', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the gallery and connections, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the gallery and connections, as a tenant user with the page', async () => {
-    const v = await visit('/integration/connectors', 'TENANT_USER', PAGES, ANSWERS);
+    const v = await visit('/connections/connectors', 'TENANT_USER', PAGES, ANSWERS);
     pin(FILE, 'the gallery and connections, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('the page, as a tenant user without it', async () => {
-    const v = await visit('/integration/connectors', 'TENANT_USER', TU_PAGES, ANSWERS);
+    const v = await visit('/connections/connectors', 'TENANT_USER', TU_PAGES, ANSWERS);
     pin(FILE, 'the page, as a tenant user without it', v.surface, PINNED);
   });
 
   it('a connection, as a workspace administrator', async () => {
-    const v = await visit('/integration/connectors', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/connectors', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, /Shop DB \(demo\)/);
     pin(FILE, 'a connection, as a workspace administrator', { ...v.surface, panel: overlay() }, PINNED);
   });

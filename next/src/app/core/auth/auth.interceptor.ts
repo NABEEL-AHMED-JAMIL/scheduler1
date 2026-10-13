@@ -1,7 +1,7 @@
 import { HttpErrorResponse, HttpEvent, HttpInterceptorFn, HttpRequest, HttpResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Observable, Subject, catchError, finalize, map, switchMap, take, throwError } from 'rxjs';
-import { AuthService } from './auth.service';
+import { AuthService, IDLE_REASON, isIdleRefusal } from './auth.service';
 import { AuthUser, isManagedRefusal } from './auth.models';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../api/api.config';
@@ -182,6 +182,8 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     let settled = false;
     /** Whether the token was replaced, which decides what a later failure means. */
     let refreshed = false;
+    /** Whether the refused refresh already signed out (with its reason). */
+    let signedOut = false;
 
     /**
      * Ends the cycle, one way or the other. The queue is handed its outcome and then
@@ -207,7 +209,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       switchMap(response => {
         if (response.status !== API_SUCCESS) {
           settle(null, error);
-          auth.logout();
+          // MIG-353: the server's idle sign-out says so on the login page. Signed out here, so the catchError below
+          // (which sees this error too) must not sign out a second time, without the reason.
+          signedOut = true;
+          auth.logout(isIdleRefusal(response.message) ? IDLE_REASON : undefined);
           return throwError(() => error);
         }
         const token = auth.accessToken;
@@ -228,7 +233,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           return throwError(() => failure);
         }
         settle(null, failure);
-        auth.logout();
+        if (!signedOut) auth.logout();
         return throwError(() => failure);
       }),
       // The third way this cycle can end. The refresh is subscribed as part of an ordinary

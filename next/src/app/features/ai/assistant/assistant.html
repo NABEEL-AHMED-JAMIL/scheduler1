@@ -1,34 +1,59 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">AI Assistant</h1>
-      <p class="page-subtitle">
-        Ask in plain language. The assistant only uses tools from the Tool Registry, acts as you, and asks
-        before it runs, saves or deletes anything.
-      </p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      @if (canPickModel() && connectionOptions().length) {
-        <select class="input max-w-72" aria-label="Model connection" [disabled]="!!working()"
-                (change)="connectionId.set($any($event.target).value ? +$any($event.target).value : null)">
-          <option value="" [selected]="connectionId() === null">Workspace default</option>
-          @for (c of connectionOptions(); track c.connectionId) {
-            <option [value]="c.connectionId" [selected]="connectionId() === c.connectionId">{{ c.name }}{{ c.isDefault ? ' (default)' : '' }}</option>
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <h1 class="page-title">AI Assistant</h1>
+        <p class="page-subtitle">
+          Describe a pipeline and it is drawn, step by step; ask about runs, sources and files. It uses only the Tool Registry, acts
+          as you, and asks before it runs, saves or deletes anything.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="ai-model flex items-center gap-2 rounded-md border border-subtle px-2.5 py-0.5 min-h-7 min-w-0" data-model-status
+             [title]="modelStatus().facts || 'The model the assistant runs on'">
+          <span class="ai-dot shrink-0" aria-hidden="true" [class.ok]="modelStatus().tone === 'ok'" [class.warn]="modelStatus().tone === 'warn'"></span>
+          <app-icon name="server" size="0.9em" class="text-[color:var(--text-muted)] shrink-0" />
+          @if (canPickModel() && connectionOptions().length) {
+            <select class="bg-transparent text-xs font-medium min-w-0 max-w-44 truncate" aria-label="Model connection" [disabled]="!!working()"
+                    (change)="connectionId.set($any($event.target).value ? +$any($event.target).value : null)">
+              <option value="" [selected]="connectionId() === null">Workspace default</option>
+              @for (c of connectionOptions(); track c.connectionId) {
+                <option [value]="c.connectionId" [selected]="connectionId() === c.connectionId">{{ c.name }}{{ c.isDefault ? ' (default)' : '' }}</option>
+              }
+            </select>
+          } @else {
+            <span class="text-xs font-medium truncate">{{ modelStatus().name }}</span>
           }
-        </select>
-      } @else {
-        <span class="pill pill-neutral"><app-icon name="server" size="0.85em" />{{ modelLabel() }}</span>
-      }
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!!working()" (click)="newChat()">
-        <app-icon name="plus" />New chat
-      </button>
+          @if (modelStatus().model) { <span class="pill pill-neutral mono shrink-0">{{ modelStatus().model }}</span> }
+          @if (modelStatus().facts) { <span class="ai-facts text-xs text-[color:var(--text-muted)] truncate">{{ modelStatus().facts }}</span> }
+        </div>
+        <button type="button" class="btn btn-default btn-sm xl:hidden" [attr.aria-expanded]="historyOpen()" (click)="historyOpen.set(!historyOpen())">
+          <app-icon name="history" />History
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!!working()" (click)="newChat()">
+          <app-icon name="plus" />New chat
+        </button>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   <app-model-setup-banner what="The assistant" />
+  <!-- UX final MG1: Create pipeline is a build action, so a MANAGED workspace sees the same notice the build screens
+       show (and no Create pipeline); asking, and drawing a flow, still work. -->
+  <app-managed-banner what="pipelines" still="You can still ask about runs, sources and files, and draw a pipeline here." />
 
-  <div class="grid gap-4 items-start lg:grid-cols-[minmax(0,1fr)_20rem]">
-    <section class="card p-0 flex flex-col h-[min(76vh,54rem)] min-h-[26rem]" aria-label="Conversation">
+  <div class="ai-grid">
+
+    <!-- History: beside the thread on wide screens; over it, on asking, below -- with a backdrop that closes it. -->
+    @if (historyOpen()) { <div class="ai-history-backdrop" data-test="history-backdrop" (click)="historyOpen.set(false)"></div> }
+    <aside class="ai-history card p-0" aria-labelledby="assistant-recent" [class.open]="historyOpen()" [class.shadow-xl]="historyOpen()">
+      <app-conversation-list [recent]="conversations()" [activeId]="conversation()?.conversationId ?? null" [disabled]="!!working()"
+                             (opened)="open($event)" (remove)="remove($event)" (closed)="historyOpen.set(false)"
+                             (renamed)="conversation()?.conversationId === $event.conversationId && conversation.set($event)" />
+    </aside>
+
+    <!-- The conversation. -->
+    <section class="ai-pane ai-thread card p-0 flex flex-col" aria-label="Conversation">
       <header class="flex items-center gap-2 px-4 py-2.5 border-b border-subtle shrink-0 min-w-0">
         @if (renaming()) {
           <input class="input flex-1 min-w-0" aria-label="Conversation title" maxlength="200" [value]="renameText()"
@@ -37,7 +62,8 @@
           <button type="button" class="btn btn-ghost btn-sm" (click)="renaming.set(false)">Cancel</button>
         } @else {
           <app-icon name="chat" class="shrink-0 text-[color:var(--text-muted)]" />
-          <h2 class="font-semibold truncate flex-1 min-w-0" [title]="tip(conversation()?.title)">{{ conversation()?.title || 'New conversation' }}</h2>
+          <!-- Coordinator 2026-10-12: the conversation's short title (a renamed one wins), the first question in full beneath it. -->
+          <h2 class="font-semibold truncate flex-1 min-w-0" data-test="thread-title" [title]="tip(threadTip())">{{ threadTitle() }}</h2>
           @if (conversation(); as c) {
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="!!working()" aria-label="Rename this conversation" (click)="startRename()">
               <app-icon name="edit" />
@@ -48,7 +74,7 @@
           }
         }
       </header>
-      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3" [appStickToBottom]="messages().length + (working() ? 1 : 0) + elapsed()">
+      <div class="flex-1 min-h-0 overflow-y-auto px-4 py-4 flex flex-col gap-3" [appStickToBottom]="messages().length + (working() ? 1 : 0) + liveCalls().length">
         @if (threadLoading()) {
           <p class="text-sm text-[color:var(--text-muted)]">Opening the conversation…</p>
         } @else if (threadError()) {
@@ -56,17 +82,24 @@
             <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" />{{ threadError() }}
           </div>
         } @else if (!messages().length && !working()) {
-          <div class="m-auto max-w-md text-center flex flex-col items-center gap-3 py-6">
-            <span class="grid place-items-center rounded-full size-10 bg-accent-soft text-accent" aria-hidden="true"><app-icon name="sparkle" /></span>
-            <p class="text-sm text-[color:var(--text-secondary)]">
-              Ask about your pipelines, sources, runs or files. Reading is immediate; anything that runs, saves or
-              deletes waits for your confirmation first.
-            </p>
-            <div class="flex flex-wrap justify-center gap-1.5">
-              @for (s of suggestions; track s) {
-                <button type="button" class="pill pill-neutral hover-brand" (click)="useSuggestion(s)">{{ s }}</button>
-              }
+          <div class="m-auto flex flex-col gap-4 py-4" data-suggestions>
+            <div class="flex items-center gap-3">
+              <span class="grid place-items-center rounded-full size-9 bg-accent-soft text-accent shrink-0" aria-hidden="true"><app-icon name="sparkle" /></span>
+              <p class="text-sm text-[color:var(--text-secondary)]">
+                Say what should happen to your data, in plain words: the assistant draws the pipeline beside the chat for you to check,
+                fill and create. Reading is immediate; anything that runs, saves or deletes waits for you.
+              </p>
             </div>
+            @for (g of suggestions; track g.group) {
+              <div class="flex flex-col gap-1.5">
+                <p class="text-xs font-medium text-[color:var(--text-secondary)] flex items-center gap-1.5"><app-icon [name]="g.icon" size="0.9em" />{{ g.group }}</p>
+                <div class="flex flex-col gap-1">
+                  @for (s of g.prompts; track s) {
+                    <button type="button" class="text-left text-sm rounded-md border border-subtle px-2.5 py-1.5 hover:bg-sunken hover-brand" (click)="useSuggestion(s)">{{ s }}</button>
+                  }
+                </div>
+              </div>
+            }
           </div>
         }
 
@@ -147,24 +180,20 @@
                       @for (l of m.links; track $index) {
                         @switch (l.kind) {
                           @case ('execution') {
-                            <div class="flex flex-col gap-1.5" data-link="execution">
-                              <div class="flex flex-wrap items-center gap-2 min-w-0">
+                            @if (l.jobId != null) {
+                              <!-- Followed live to its end (owner bug 2026-10-12: it said Running forever). -->
+                              <app-run-follow [jobId]="l.jobId" [jobQueueId]="l.jobQueueId" [jobName]="l.jobName" [initialStatus]="l.status" />
+                            } @else {
+                              <div class="flex flex-wrap items-center gap-2 min-w-0" data-link="execution">
                                 <app-status [label]="l.status || 'Queue'" />
-                                <span class="font-medium truncate min-w-0" [title]="tip(l.jobName)">{{ l.jobName || 'Job ' + l.jobId }}</span>
-                                @if (l.jobQueueId != null) { <span class="pill pill-neutral mono">run #{{ l.jobQueueId }}</span> }
+                                <span class="font-medium truncate min-w-0">{{ l.jobName || 'A run' }}</span>
                               </div>
-                              @if (l.startTime) {
-                                <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1"><app-icon name="clock" size="0.9em" />Started {{ l.startTime | serverTime: 'recent' }}</p>
-                              }
-                              @if (runRoute(l); as route) {
-                                <div><a class="btn btn-default btn-sm" [routerLink]="route"><app-icon name="zap" />Open execution</a></div>
-                              }
-                            </div>
+                            }
                           }
                           @case ('output') {
                             @if (filesQuery(l); as q) {
                               <div class="flex flex-wrap items-center gap-2 min-w-0" data-link="output">
-                                <a class="btn btn-default btn-sm" routerLink="/documents/files" [queryParams]="q"><app-icon name="folder" />Open report files</a>
+                                <a class="btn btn-default btn-sm" routerLink="/data/files" [queryParams]="q"><app-icon name="folder" />Open report files</a>
                                 <span class="mono text-xs text-[color:var(--text-muted)] break-all">{{ q.bucket }}/{{ q.prefix }}</span>
                                 @if (l.note) { <span class="text-xs text-[color:var(--text-secondary)] basis-full">{{ l.note }}</span> }
                               </div>
@@ -173,7 +202,7 @@
                           @case ('file') {
                             <div class="flex flex-wrap items-center gap-2 min-w-0" data-link="file">
                               @if (filesQuery(l); as q) {
-                                <a class="btn btn-default btn-sm" routerLink="/documents/files" [queryParams]="q"><app-icon name="file" />Open file</a>
+                                <a class="btn btn-default btn-sm" routerLink="/data/files" [queryParams]="q"><app-icon name="file" />Open file</a>
                               }
                               <span class="mono text-xs break-all">{{ l.fileName || l.key }}</span>
                               <span class="text-xs text-[color:var(--text-muted)]">{{ l.format ? l.format.toUpperCase() + ' · ' : '' }}{{ size(l.size) }}</span>
@@ -189,77 +218,48 @@
                       }
                     </div>
                   }
-                  @if (m.artifact; as a) {
+                  @if (flowOf(m); as f) {
+                    @let v = verdictOf(f);
+                    <button type="button" class="rounded-lg border px-3 py-2 flex flex-wrap items-center gap-2 max-w-xl text-left hover:bg-sunken"
+                            [class]="flowMessageId() === m.messageId ? 'border-[color:var(--accent-mark)]' : 'border-subtle'"
+                            data-artifact="pipeline-flow" (click)="showFlow(m.messageId)">
+                      <app-icon name="layers" class="text-[color:var(--text-muted)]" />
+                      <span class="font-medium truncate min-w-0" [title]="tip(f.name)">{{ f.name }}</span>
+                      <span class="pill pill-neutral">{{ f.definition.steps.length }} steps</span>
+                      <span class="pill" [class]="'pill pill-' + v.tone">{{ v.label }}</span>
+                      <span class="text-xs text-[color:var(--text-muted)] ml-auto flex items-center gap-1">{{ flowMessageId() === m.messageId ? 'Shown' : 'Show flow' }}<app-icon name="chevronRight" size="0.85em" /></span>
+                    </button>
+                  } @else if (chartOf(m); as c) {
+                    <button type="button" class="rounded-lg border px-3 py-2 flex flex-wrap items-center gap-2 max-w-xl text-left hover:bg-sunken"
+                            [class]="chartMessageId() === m.messageId && tab() === 'chart' ? 'border-[color:var(--accent-mark)]' : 'border-subtle'"
+                            data-artifact="chart" (click)="showChart(m.messageId)">
+                      <app-icon name="chart" class="text-[color:var(--text-muted)]" />
+                      <span class="font-medium truncate min-w-0" [title]="tip(c.query.chart?.title || c.query.dataset.name)">{{ c.query.chart?.title || c.query.dataset.name }}</span>
+                      <span class="pill pill-neutral">{{ c.query.rows.length }} rows</span>
+                      <span class="text-xs text-[color:var(--text-muted)] ml-auto flex items-center gap-1">{{ chartMessageId() === m.messageId && tab() === 'chart' ? 'Shown' : 'Show chart' }}<app-icon name="chevronRight" size="0.85em" /></span>
+                    </button>
+                  } @else if (draftOf(m); as a) {
                     <div class="rounded-lg border border-subtle px-3.5 py-3 flex flex-col gap-2 max-w-2xl" data-artifact="pipeline-draft">
                       <div class="flex flex-wrap items-center gap-2 min-w-0">
                         <app-icon name="layers" class="text-[color:var(--text-muted)]" />
                         <span class="font-medium truncate min-w-0" [title]="tip(a.name)">{{ a.name || 'Drafted pipeline' }}</span>
                         <span class="pill pill-neutral mono">{{ (a.format || 'yaml').toUpperCase() }}</span>
-                        @if (a.valid === true) { <span class="pill pill-ok">Valid</span> }
-                        @if (a.valid === false) { <span class="pill pill-warn">Has problems</span> }
                         <span class="pill pill-neutral">Not saved</span>
                       </div>
-                      @if (a.problems?.length) {
-                        <ul class="text-xs text-[color:var(--text-secondary)] list-disc pl-5">
-                          @for (p of a.problems; track $index) { <li class="break-words">{{ problemText(p) }}</li> }
-                        </ul>
-                      }
                       <pre class="mono text-xs whitespace-pre overflow-auto max-h-72 rounded-md border border-subtle bg-sunken px-2.5 py-2">{{ a.text }}</pre>
                       <div class="flex flex-wrap items-center gap-2">
                         <button type="button" class="btn btn-default btn-sm" (click)="copy(a.text)"><app-icon name="copy" />Copy</button>
                         @if (canEditPipelines() && a.pipelineKey != null) {
                           <button type="button" class="btn btn-default btn-sm" (click)="openDraft(a)"><app-icon name="external" />Open in step builder</button>
                         }
-                        <span class="text-xs text-[color:var(--text-muted)]">The assistant never saves a pipeline; the step builder does, when you do.</span>
                       </div>
                     </div>
                   }
                   @if (m.toolRunId != null && owners().has(m.messageId)) {
-                    @let runId = m.toolRunId;
-                    @let shown = openTraces().has(runId);
                     <div>
-                      <button type="button" class="btn btn-ghost btn-sm -ml-2" [attr.aria-expanded]="shown" (click)="toggleTrace(runId)">
-                        <app-icon name="plug" />{{ shown ? 'Hide tool calls' : 'Show tool calls' }}
+                      <button type="button" class="btn btn-ghost btn-sm -ml-2" [attr.data-trace-open]="m.toolRunId" (click)="openTrace(m.toolRunId)">
+                        <app-icon name="plug" />Tool calls
                       </button>
-                      @if (shown) {
-                        @let t = traceOf(runId);
-                        <div class="mt-1 rounded-lg border border-subtle px-3 py-2 max-w-2xl" [attr.data-trace]="runId">
-                          @if (!t || t.loading) {
-                            <p class="text-xs text-[color:var(--text-muted)]">Reading the tool calls…</p>
-                          } @else if (t.error) {
-                            <p class="text-xs text-crit-500">{{ t.error }}</p>
-                          } @else if (t?.trace; as trace) {
-                            <p class="text-xs text-[color:var(--text-muted)] mb-1.5">
-                              Run #{{ trace.run.toolRunId }}{{ trace.run.model ? ' · ' + trace.run.model : '' }} · {{ trace.calls.length }} call{{ trace.calls.length === 1 ? '' : 's' }}
-                            </p>
-                            @if (!trace.calls.length) {
-                              <p class="text-xs text-[color:var(--text-muted)]">No tool was called: the answer is the model's own.</p>
-                            }
-                            <ol class="flex flex-col divide-y divide-[color:var(--border-subtle)]">
-                              @for (c of trace.calls; track c.callId) {
-                                @let o = outcome(c.outcome);
-                                <li class="py-1.5 flex flex-col gap-0.5 min-w-0" [attr.data-call]="c.toolName" [attr.data-outcome]="c.outcome">
-                                  <div class="flex flex-wrap items-center gap-2 min-w-0">
-                                    <app-icon [name]="outcomeIcon(o.tone)" size="0.9em" [class]="'icon-' + (o.tone === 'neutral' ? 'muted' : o.tone)" />
-                                    <span class="mono text-xs font-medium">{{ c.toolName }}</span>
-                                    <span class="pill" [class]="'pill pill-' + o.tone">{{ o.label }}</span>
-                                    <span class="text-[11px] text-[color:var(--text-muted)]">{{ callFacts(c) }}</span>
-                                  </div>
-                                  @if (c.arguments && c.arguments !== '{}') {
-                                    <code class="mono text-[11px] text-[color:var(--text-secondary)] break-all line-clamp-2 pl-5" [title]="tip(c.arguments)">{{ c.arguments }}</code>
-                                  }
-                                  @if (c.reason) {
-                                    <p class="text-xs pl-5 break-words" [class]="o.tone === 'crit' ? 'text-crit-500' : 'text-[color:var(--text-muted)]'">{{ c.reason }}</p>
-                                  }
-                                </li>
-                              }
-                            </ol>
-                            @if (trace.run.error) {
-                              <p class="text-xs text-crit-500 mt-1.5 break-words">{{ trace.run.error }}</p>
-                            }
-                          }
-                        </div>
-                      }
                     </div>
                   }
                 </div>
@@ -269,24 +269,47 @@
         }
 
         @if (working()) {
-          @if (waitingFor()) {
+          @if (waitingFor() && !messages().length) {
             <div class="flex justify-end" data-role="user" data-waiting>
               <div class="max-w-[85%] rounded-lg rounded-br-sm px-3 py-2 text-sm whitespace-pre-wrap break-words bg-[color:var(--btn-primary-bg)] text-[color:var(--btn-primary-fg)]">{{ waitingFor() }}</div>
             </div>
           }
-          <div class="flex flex-wrap items-center gap-2 text-sm text-[color:var(--text-muted)] pl-8" role="status" data-working>
-            <span class="typing"><span></span><span></span><span></span></span>
-            <span>{{ working() === 'decide' ? 'Carrying out your decision…' : 'Working with approved tools…' }} {{ elapsedText() }}</span>
-            <button type="button" class="btn btn-ghost btn-sm" (click)="stopWaiting()"><app-icon name="stop" size="0.85em" />Stop waiting</button>
-            @if (elapsed() >= 15) {
-              <span class="basis-full text-xs">A local model can take a minute or two. Stop waiting leaves the run to finish on the server.</span>
+          <div class="ai-indent flex flex-col gap-1.5 rounded-lg border border-subtle px-3 py-2.5" role="status" data-working>
+            <div class="flex flex-wrap items-center gap-2 text-sm">
+              <span class="typing"><span></span><span></span><span></span></span>
+              <span class="text-[color:var(--text-secondary)]">{{ live()?.run?.phase || (working() === 'decide' ? 'Carrying out your decision…' : 'Starting…') }}</span>
+              <span class="text-xs text-[color:var(--text-muted)] tabular-nums">{{ elapsedText() }}</span>
+              <button type="button" class="btn btn-ghost btn-sm ml-auto" [disabled]="stopping()" (click)="stop()" data-stop>
+                <app-icon name="stop" size="0.85em" [busy]="stopping()" />{{ stopping() ? 'Stopping…' : 'Stop' }}
+              </button>
+            </div>
+            @if (liveCalls().length) {
+              <ol class="flex flex-col gap-0.5 list-none m-0 p-0 text-xs" aria-label="Tools called so far">
+                @for (c of liveCalls(); track c.callId) {
+                  @let o = outcome(c.outcome);
+                  <li class="flex items-center gap-2 min-w-0" [attr.data-live-call]="c.toolName">
+                    <span class="mono truncate">{{ c.toolName }}</span>
+                    <span class="pill" [class]="'pill pill-' + o.tone">{{ o.label }}</span>
+                    @if (c.durationMs != null) { <span class="text-[color:var(--text-muted)] tabular-nums">{{ c.durationMs }} ms</span> }
+                  </li>
+                }
+              </ol>
+            }
+            @if (elapsed() >= 20 && !liveCalls().length) {
+              <p class="text-xs text-[color:var(--text-muted)]">A local model can take a minute to plan. Stop ends the run on the server.</p>
             }
           </div>
         }
-        @if (stopped()) {
+        @if (retryable() && !working()) {
+          <div class="ai-indent flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm bg-sunken" data-retry>
+            <app-icon name="info" class="shrink-0" size="0.9em" />
+            <span class="flex-1 min-w-0">{{ stopped() ? 'Stopped. ' : '' }}Ask the same question again?</span>
+            <button type="button" class="btn btn-default btn-sm" (click)="retry()"><app-icon name="refresh" />Retry</button>
+          </div>
+        } @else if (stopped() && !working()) {
           <div class="flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-sm bg-sunken" data-stopped>
             <app-icon name="info" class="shrink-0" size="0.9em" />
-            <span class="flex-1 min-w-0">Stopped waiting. The assistant may still finish; its answer shows when the conversation is read again.</span>
+            <span class="flex-1 min-w-0">Stopped. Whatever the run said before it stopped is in the conversation.</span>
             <button type="button" class="btn btn-default btn-sm" (click)="checkAgain()"><app-icon name="refresh" />Check again</button>
           </div>
         }
@@ -297,99 +320,121 @@
           </div>
         }
       </div>
-      <div class="flex gap-2 px-3.5 py-2.5 border-t border-subtle shrink-0">
-        <textarea class="input resize-none text-sm flex-1" rows="2" placeholder="Ask about pipelines, sources, runs or files…"
+      <!-- UX review B6 (AI1): one composer for the three chats (.chat-composer): the box, then Send at its foot, right. -->
+      <div class="chat-composer px-3.5 py-2.5 border-t border-subtle shrink-0" data-test="chat-composer">
+        <textarea class="input text-sm" rows="2" placeholder="Describe a pipeline, or ask about runs, sources or files…"
                   aria-label="Message the assistant" maxlength="4000" [value]="draft()"
                   (input)="draft.set($any($event.target).value)" (keydown)="onKeydown($event)"></textarea>
-        <button type="button" class="btn btn-primary btn-sm self-end" [disabled]="!!working() || !draft().trim()" (click)="send()">
-          <app-icon name="send" />Send
-        </button>
+        @if (working()) {
+          <button type="button" class="btn btn-default btn-sm" [disabled]="stopping()" (click)="stop()"><app-icon name="stop" />Stop</button>
+        } @else {
+          <button type="button" class="btn btn-primary btn-sm" data-test="chat-send" [disabled]="!draft().trim()" (click)="send()">
+            <app-icon name="send" />Send
+          </button>
+        }
       </div>
     </section>
 
-    <aside class="flex flex-col gap-4 min-w-0">
-      <section class="card p-4 flex flex-col gap-3" aria-labelledby="assistant-context">
-        <div>
-          <h2 id="assistant-context" class="font-semibold">Context</h2>
-          <p class="text-xs text-[color:var(--text-muted)]">What the assistant can use here</p>
-        </div>
-        <dl class="text-sm grid gap-2" data-context>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Workspace</dt><dd class="text-right truncate min-w-0" [title]="tip(workspace())">{{ workspace() || '—' }}</dd></div>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Acting as</dt><dd class="text-right min-w-0"><span class="block truncate">{{ actingAs() || '—' }}</span><span class="block text-xs text-[color:var(--text-muted)]">{{ roleText() }}</span></dd></div>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Model</dt><dd class="text-right truncate min-w-0" [title]="tip(modelLabel())">{{ modelLabel() }}</dd></div>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right min-w-0"><a class="link-inline" routerLink="/administration/data-policies" [title]="policyError() || 'The workspace\'s data policy'">{{ policyHeadline() }}</a></dd></div>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Tools allowed</dt>
-            <dd class="text-right"><a class="link-inline" routerLink="/ai/tools">{{ allowed().length }} of {{ tools().length }}</a></dd></div>
-          <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Asks first for</dt>
-            <dd class="text-right mono text-xs break-words min-w-0">{{ askFirst().length ? askFirst().join(', ') : '—' }}</dd></div>
-        </dl>
-        @if (policyLevels().length && !policyError()) {
-          <ul class="flex flex-col gap-1 text-xs" data-policy aria-label="Data policy by level">
-            @for (l of policyLevels(); track l.sensitivity) {
-              <li class="flex items-baseline gap-2 min-w-0">
-                <span class="font-medium w-16 shrink-0">{{ policyLevelText(l.sensitivity) }}</span>
-                <span class="text-[color:var(--text-muted)] min-w-0 break-words">{{ policyLevelSummary(l) }}</span>
-              </li>
-            }
-          </ul>
+    <!-- The result: the flow drawn, each run's tool calls, and what the assistant works under. -->
+    <section class="ai-pane ai-result card p-0 flex flex-col" aria-label="Result">
+      <div class="tabs px-3 shrink-0" role="tablist" aria-label="Result">
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'flow'" [attr.aria-selected]="tab() === 'flow'" (click)="tab.set('flow')">
+          <app-icon name="layers" />Flow
+          @if (flow(); as f) { <span class="pill" [class]="'pill pill-' + verdictOf(f).tone">{{ f.definition.steps.length }}</span> }
+        </button>
+        @if (chart()) {
+          <button type="button" role="tab" class="tab" data-tab="chart" [class.tab-active]="tab() === 'chart'" [attr.aria-selected]="tab() === 'chart'" (click)="tab.set('chart')">
+            <app-icon name="chart" />Chart
+          </button>
         }
-        @if (toolsError()) {
-          <p class="text-xs text-crit-500">{{ toolsError() }}</p>
-        } @else if (tools().length) {
-          <div class="flex flex-col gap-1.5">
-            <p class="text-xs font-medium text-[color:var(--text-secondary)]">Allowed tools</p>
-            <div class="flex flex-wrap gap-1" data-allowed>
-              @for (t of allowed(); track t.name) {
-                <span class="pill pill-neutral mono" [title]="tip(t.title + (t.requiresConfirmation ? ' (asks first)' : ''))">{{ t.name }}</span>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'trace'" [attr.aria-selected]="tab() === 'trace'" (click)="tab.set('trace')">
+          <app-icon name="plug" />Tool calls
+          @if (traceView().live) { <span class="size-1.5 rounded-full bg-[color:var(--accent-mark)]" aria-label="live"></span> }
+        </button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'context'" [attr.aria-selected]="tab() === 'context'" (click)="tab.set('context')">
+          <app-icon name="shield" />Context
+        </button>
+      </div>
+      <div class="flex-1 min-h-0 overflow-y-auto p-3.5">
+        @switch (tab()) {
+          @case ('flow') {
+            <app-flow-panel class="block h-full" [flow]="flow()" [canCreate]="canCreatePipelines()" />
+          }
+          @case ('chart') {
+            <!-- MIG-357: the chart_data tool's answer, drawn with the dashboards' chart engine; loaded only when shown. -->
+            @if (chartAnswer(); as answer) {
+              <app-chart-answer-slot [answer]="answer" [canPin]="canPinCharts()" [height]="300" />
+            } @else {
+              <p class="text-sm text-[color:var(--text-muted)]">Ask about numbers in your datasets, and the chart appears here.</p>
+            }
+          }
+          @case ('trace') {
+            <div class="flex flex-col gap-3">
+              @if (traceRuns().length > 1 && !traceView().live) {
+                <label class="flex items-center gap-2 text-xs text-[color:var(--text-muted)]">Run
+                  <select class="input input-sm max-w-48" aria-label="Which run's tool calls" (change)="pickTrace($any($event.target).value)">
+                    @for (id of traceRuns(); track id) { <option [value]="id" [selected]="id === traceRunId()">#{{ id }}</option> }
+                  </select>
+                </label>
+              }
+              @if (traceRunId() != null && traceOf(traceRunId()!)?.error; as e) { <p class="text-xs text-crit-500">{{ e }}</p> }
+              <app-trace-panel [run]="traceView().run" [calls]="traceView().calls" [live]="traceView().live" />
+            </div>
+          }
+          @case ('context') {
+            <div class="flex flex-col gap-3" aria-labelledby="assistant-context">
+              <div>
+                <h2 id="assistant-context" class="font-semibold">Context</h2>
+                <p class="text-xs text-[color:var(--text-muted)]">What the assistant can use here</p>
+              </div>
+              <dl class="text-sm grid gap-2" data-context>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Workspace</dt><dd class="text-right truncate min-w-0" [title]="tip(workspace())">{{ workspace() || '—' }}</dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Acting as</dt><dd class="text-right min-w-0"><span class="block truncate">{{ actingAs() || '—' }}</span><span class="block text-xs text-[color:var(--text-muted)]">{{ roleText() }}</span></dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Model</dt><dd class="text-right truncate min-w-0" [title]="tip(modelLabel())">{{ modelLabel() }}</dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right min-w-0"><a class="link-inline" routerLink="/administration/data-policies" [title]="policyError() || 'The workspace\'s data policy'">{{ policyHeadline() }}</a></dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Tools allowed</dt>
+                  <dd class="text-right"><a class="link-inline" routerLink="/settings/tools">{{ allowed().length }} of {{ tools().length }}</a></dd></div>
+                <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Asks first for</dt>
+                  <dd class="text-right mono text-xs break-words min-w-0">{{ askFirst().length ? askFirst().join(', ') : '—' }}</dd></div>
+              </dl>
+              @if (policyLevels().length && !policyError()) {
+                <ul class="flex flex-col gap-1 text-xs" data-policy aria-label="Data policy by level">
+                  @for (l of policyLevels(); track l.sensitivity) {
+                    <li class="flex items-baseline gap-2 min-w-0">
+                      <span class="font-medium w-16 shrink-0">{{ policyLevelText(l.sensitivity) }}</span>
+                      <span class="text-[color:var(--text-muted)] min-w-0 break-words">{{ policyLevelSummary(l) }}</span>
+                    </li>
+                  }
+                </ul>
+              }
+              @if (toolsError()) {
+                <p class="text-xs text-crit-500">{{ toolsError() }}</p>
+              } @else if (tools().length) {
+                <div class="flex flex-col gap-1.5">
+                  <p class="text-xs font-medium text-[color:var(--text-secondary)]">Allowed tools</p>
+                  <div class="flex flex-wrap gap-1" data-allowed>
+                    @for (t of allowed(); track t.name) {
+                      <span class="pill pill-neutral mono" [title]="tip(t.title + (t.requiresConfirmation ? ' (asks first)' : ''))">{{ t.name }}</span>
+                    }
+                  </div>
+                  @if (blocked().length) {
+                    <p class="text-xs font-medium text-[color:var(--text-secondary)] mt-1">Blocked</p>
+                    <ul class="flex flex-col gap-1" data-blocked>
+                      @for (t of blocked(); track t.name) {
+                        <li class="flex items-center gap-1.5 text-xs min-w-0" [title]="tip(toolLook(t).reason)">
+                          <app-icon name="lock" size="0.9em" class="icon-crit shrink-0" />
+                          <span class="mono truncate">{{ t.name }}</span>
+                          <span class="pill pill-crit ml-auto shrink-0">Blocked</span>
+                        </li>
+                      }
+                    </ul>
+                  }
+                </div>
               }
             </div>
-            @if (blocked().length) {
-              <p class="text-xs font-medium text-[color:var(--text-secondary)] mt-1">Blocked</p>
-              <ul class="flex flex-col gap-1" data-blocked>
-                @for (t of blocked(); track t.name) {
-                  <li class="flex items-center gap-1.5 text-xs min-w-0" [title]="tip(toolLook(t).reason)">
-                    <app-icon name="lock" size="0.9em" class="icon-crit shrink-0" />
-                    <span class="mono truncate">{{ t.name }}</span>
-                    <span class="pill pill-crit ml-auto shrink-0">Blocked</span>
-                  </li>
-                }
-              </ul>
-            }
-          </div>
-        }
-      </section>
-      <section class="card p-4 flex flex-col gap-2" aria-labelledby="assistant-recent">
-        <div class="flex items-center justify-between gap-2">
-          <h2 id="assistant-recent" class="font-semibold">Recent conversations</h2>
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Refresh the conversations" [disabled]="conversationsLoading()" (click)="loadConversations()">
-            <app-icon name="refresh" [class.spin]="conversationsLoading()" />
-          </button>
-        </div>
-        @if (!conversations().length) {
-          <p class="text-xs text-[color:var(--text-muted)]">{{ conversationsLoading() ? 'Loading…' : 'None yet. A question starts one.' }}</p>
-        }
-        <ul class="flex flex-col -mx-2" data-conversations>
-          @for (c of conversations(); track c.conversationId) {
-            @let active = conversation()?.conversationId === c.conversationId;
-            <li class="flex items-center gap-1 min-w-0" [attr.data-conversation]="c.conversationId">
-              <button type="button" class="flex-1 min-w-0 text-left rounded-md px-2 py-1.5 hover:bg-sunken" [class.bg-sunken]="active"
-                      [attr.aria-current]="active ? 'true' : null" [disabled]="!!working()" (click)="open(c.conversationId)">
-                <span class="block text-sm truncate" [class.font-medium]="active" [title]="tip(c.title)">{{ c.title }}</span>
-                @if (c.dateUpdated) { <span class="block text-xs text-[color:var(--text-muted)]">{{ c.dateUpdated | serverTime: 'recent' }}</span> }
-              </button>
-              <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="convMenu" [attr.aria-label]="'Actions for ' + c.title">
-                <app-icon name="dots" size="1.05em" />
-              </button>
-              <ng-template #convMenu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="open(c.conversationId)"><app-icon name="chat" />Open</button>
-                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
-                </div>
-              </ng-template>
-            </li>
           }
-        </ul>
-      </section>
-    </aside>
+        }
+      </div>
+    </section>
   </div>
 </div>

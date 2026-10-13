@@ -1,12 +1,19 @@
 <div class="page-tool">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Document Converter</h1>
-      <p class="page-subtitle">
-        Convert between Office, OpenDocument, PDF, Markdown and image formats, or render a dataset as a document.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Document Converter</h1>
+        <p class="page-subtitle">
+          Convert between Office, OpenDocument, PDF, Markdown and image formats, or make a PDF from a dataset.
+        </p>
+      </div>
+      <!-- UX final CV1: the standard header's actions; what a PDF from a dataset (or a run) makes is listed in
+           Generated reports, whose "PDF from a dataset" opens this page on that source. -->
+      <div class="flex items-center gap-2">
+        <a class="btn btn-default btn-sm" routerLink="/data/reports" data-test="to-generated-reports"><app-icon name="file" />Generated reports</a>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   <div class="card p-4 space-y-4">
     <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
@@ -19,7 +26,7 @@
     } @else {
     @if (mode() === 'upload') {
       <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
-                         prompt="Drop a document here" />
+                         prompt="Drop a document here" [hint]="limitsHint()" />
     } @else {
       <!-- The console's one file picker: buckets, folders, a filter, paging, and a read that
            fails says so with Try again. -->
@@ -98,14 +105,40 @@
         </div>
       }
 
+      @if (overLimit()) {
+        <p class="text-sm text-warn-500 flex items-center gap-2" role="alert"><app-icon name="alert" class="shrink-0" />{{ overLimit() }}</p>
+      }
+
       <div class="flex gap-2">
         <button type="button" class="btn btn-primary"
-                [disabled]="converting() || fetchingSource() || !canConvert()" (click)="convert()">
+                [disabled]="converting() || fetchingSource() || !canConvert() || !!overLimit()" (click)="convert()">
           <app-icon name="refresh" [class.spin]="converting() || fetchingSource()" />
           {{ fetchingSource() ? 'Reading the file…' : converting() ? 'Converting…' : 'Convert' }}
         </button>
         <button type="button" class="btn btn-ghost" (click)="reset()"><app-icon name="close" />Clear</button>
       </div>
+
+      @if (converting()) {
+        @if (progress() !== null) {
+          <div class="progress" role="progressbar" aria-label="Upload progress"
+               aria-valuemin="0" aria-valuemax="100" [attr.aria-valuenow]="progress()">
+            <div class="progress-bar" [style.width.%]="progress()"></div>
+          </div>
+          <p class="text-xs text-[color:var(--text-muted)]" aria-live="polite">Uploading: {{ progress() }}%</p>
+        } @else {
+          <p class="text-xs text-[color:var(--text-muted)]" aria-live="polite">Uploaded. Converting on the server…</p>
+        }
+      }
+
+      @if (convertError(); as why) {
+        <div class="text-sm flex items-start gap-2" [class.text-crit-500]="!busy()" [class.text-warn-500]="busy()" role="alert">
+          <app-icon [name]="busy() ? 'clock' : 'alert'" class="shrink-0 mt-0.5" />
+          <span class="flex-1">{{ why }}</span>
+          @if (busy()) {
+            <button type="button" class="btn btn-default btn-xs" (click)="convert()"><app-icon name="refresh" />Try again</button>
+          }
+        </div>
+      }
     }
 
     @if (result(); as done) {
@@ -113,7 +146,14 @@
           >
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium truncate">{{ done.outputFileName }}</div>
-          <div class="text-xs text-[color:var(--text-muted)]">Ready to download</div>
+          <div class="text-xs text-[color:var(--text-muted)]">
+            Ready to download
+            @if (done.outputFileSize) { · {{ size(done.outputFileSize) }} }
+            @if (done.pageCount) { · {{ done.pageCount }} {{ done.pageCount === 1 ? 'page' : 'pages' }} }
+          </div>
+          @if (rowsNote(done); as note) {
+            <div [class]="done.truncated ? 'text-xs text-warn-500' : 'text-xs text-[color:var(--text-muted)]'">{{ note }}</div>
+          }
         </div>
         <button type="button" class="btn btn-primary btn-sm" (click)="download()"><app-icon name="download" />Download</button>
       </div>
@@ -177,7 +217,7 @@
               <th>Size</th>
               <th>Location</th>
               <th>Created</th>
-              <th class="w-28"><span class="sr-only">Actions</span></th>
+              <th class="w-28 th-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -199,7 +239,7 @@
                 </td>
                 <td class="max-w-56">
                   @if (task.bucketName) {
-                    <a class="link-inline truncate" routerLink="/documents/files"
+                    <a class="link-inline truncate" routerLink="/data/files"
                        [queryParams]="{ bucket: task.bucketName, prefix: outputFolderOf(task) }"
                        [title]="task.bucketName + '/' + outputFolderOf(task)">
                       <app-icon name="folder" size="0.85em" class="icon-info" />{{ task.bucketName }}

@@ -1,7 +1,7 @@
 <div class="min-h-screen grid lg:grid-cols-2">
   <!-- Left: the sign-in panel itself, kept narrow and calm. -->
   <div class="flex items-center justify-center px-6 py-12">
-    <div class="w-full max-w-sm">
+    <div class="w-full max-w-sm" [class.max-w-lg]="stage() === 'enrol'">
       <!-- The mark leads back to the front page and the toggle matches the other public pages;
            without them this page was a dead end. -->
       <div class="mb-8 flex items-center justify-between gap-3">
@@ -15,51 +15,157 @@
         </button>
       </div>
 
-      <h1 class="text-2xl font-semibold tracking-tight mb-1">Sign in</h1>
-      <p class="text-sm text-[color:var(--text-secondary)] mb-7">
-        Use your platform account to continue.
-      </p>
-
-      @if (notice) {
-        <div class="card p-4 mb-5 flex items-start gap-2.5 border-[color:var(--accent-mark)]" role="status">
-          <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
-          <p class="text-sm">{{ notice }}</p>
-        </div>
-      }
-
-      <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="form-stack">
-        <app-field label="Username" for="username" [control]="form.controls.username">
-          <input id="username" class="input" formControlName="username"
-                 autocomplete="username" placeholder="you@company.com"
-                 [attr.aria-invalid]="form.controls.username.touched && form.controls.username.invalid" />
-        </app-field>
-
-        <app-field label="Password" for="password" [control]="form.controls.password">
-          <input id="password" class="input" type="password" formControlName="password"
-                 autocomplete="current-password"
-                 [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid" />
-        </app-field>
-
-        <!-- The same error line request-workspace uses. bg-crit-100 is not remapped in dark, so
-             the old box was light pink under dark-mode pink text; and it had no live region. -->
-        @if (error()) {
-          <p class="field-note text-crit-500 flex items-start gap-1.5 text-sm" role="alert">
-            <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
-            <span>{{ error() }}</span>
+      @switch (stage()) {
+        @case ('code') {
+          <!-- MIG-353: the second step -- a code from the authenticator app, or a recovery code. -->
+          <h1 class="text-2xl font-semibold tracking-tight mb-1">Two-factor login</h1>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-7">
+            @if (useRecovery()) {
+              Type one of the recovery codes you saved when you set up two-factor login. Each works once.
+            } @else {
+              Open your authenticator app and type the 6-digit code it shows for {{ signedInName() }}.
+            }
           </p>
+          <form (submit)="$event.preventDefault(); submitCode()" novalidate class="form-stack">
+            <div class="field">
+              <label class="label" for="mfa-code">{{ useRecovery() ? 'Recovery code' : 'Code' }}</label>
+              <input id="mfa-code" class="input mono" [class.tracking-widest]="!useRecovery()"
+                     [attr.inputmode]="useRecovery() ? 'text' : 'numeric'" autocomplete="one-time-code" autofocus
+                     [placeholder]="useRecovery() ? 'abcde-fghjk' : '123456'"
+                     [value]="code()" (input)="code.set($any($event.target).value)" />
+            </div>
+            @if (error()) {
+              <p class="field-note text-crit-500 flex items-start gap-1.5 text-sm" role="alert">
+                <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+                <span>{{ error() }}</span>
+              </p>
+            }
+            <button type="submit" class="btn btn-primary w-full" [disabled]="submitting() || !code().trim()">
+              @if (submitting()) { <app-icon name="refresh" class="spin" /> }
+              {{ submitting() ? 'Checking…' : 'Sign in' }}
+            </button>
+          </form>
+          <div class="mt-6 space-y-2 text-sm text-[color:var(--text-secondary)]">
+            <p>
+              <button type="button" class="link-inline" (click)="toggleRecovery()" data-test="use-recovery">
+                {{ useRecovery() ? 'Use a code from the app instead' : 'Use a recovery code instead' }}
+              </button>
+            </p>
+            <p><button type="button" class="link-inline" (click)="restart()">Back to sign in</button></p>
+            <p>Lost your phone and your recovery codes? Ask your workspace administrator to reset your two-factor login.</p>
+          </div>
         }
+        @case ('enrol') {
+          <h1 class="text-2xl font-semibold tracking-tight mb-1">Set up two-factor login</h1>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-6">
+            Your workspace requires a code from an authenticator app after your password. Set it up once, now.
+          </p>
+          @if (enrolment(); as e) {
+            <app-mfa-enrolment [enrolment]="e" [busy]="submitting()" [error]="error()" (confirmed)="confirmEnrolment($event)" />
+          } @else {
+            <div class="spinner mx-auto" role="status" aria-label="Loading"></div>
+          }
+          <p class="mt-6 text-sm"><button type="button" class="link-inline" (click)="restart()">Back to sign in</button></p>
+        }
+        @case ('codes') {
+          <h1 class="text-2xl font-semibold tracking-tight mb-1">Two-factor login is on</h1>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-6">
+            Save these before you continue: if your phone is not at hand, each signs you in once.
+          </p>
+          <app-recovery-codes [codes]="recoveryCodes()" [account]="signedInName()" />
+          <button type="button" class="btn btn-primary w-full mt-6" (click)="continueAfterCodes()" data-test="codes-saved">
+            I've saved them — continue
+          </button>
+        }
+        @case ('company') {
+          <!-- MIG-353 part 5: single sign-on through the workspace's identity provider (Microsoft Entra ID, Google, Okta...). -->
+          <h1 class="text-2xl font-semibold tracking-tight mb-1">Sign in with your company</h1>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-7">
+            Type your work email address. If your workspace signs in through your company's account, you'll go there.
+          </p>
+          <form (submit)="$event.preventDefault(); startSso(false)" novalidate class="form-stack">
+            <div class="field">
+              <label class="label" for="company-email">Work email</label>
+              <input id="company-email" class="input" type="email" autocomplete="username" placeholder="you@company.com"
+                     [value]="companyEmail()" (input)="companyEmail.set($any($event.target).value)" />
+            </div>
+            @if (error()) {
+              <p class="field-note text-crit-500 flex items-start gap-1.5 text-sm" role="alert">
+                <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+                <span>{{ error() }}</span>
+              </p>
+            }
+            <button type="submit" class="btn btn-primary w-full" [disabled]="submitting()">
+              @if (submitting()) { <app-icon name="refresh" class="spin" /> }
+              Continue
+            </button>
+          </form>
+          <p class="mt-6 text-sm"><button type="button" class="link-inline" (click)="restart()">Sign in with a password instead</button></p>
+        }
+        @default {
+          <h1 class="text-2xl font-semibold tracking-tight mb-1">Sign in</h1>
+          <p class="text-sm text-[color:var(--text-secondary)] mb-7">
+            Use your platform account to continue.
+          </p>
 
-        <button type="submit" class="btn btn-primary w-full" [disabled]="submitting()">
-          @if (submitting()) { <app-icon name="refresh" class="spin" /> }
-          {{ submitting() ? 'Signing in…' : 'Sign in' }}
-        </button>
-      </form>
+          @if (notice) {
+            <div class="card p-4 mb-5 flex items-start gap-2.5 border-[color:var(--accent-mark)]" role="status">
+              <app-icon name="key" class="icon-info mt-0.5 shrink-0" />
+              <p class="text-sm">{{ notice }}</p>
+            </div>
+          }
 
-      <div class="mt-6 space-y-2 text-sm text-[color:var(--text-secondary)]">
-        <p>No account yet? <a routerLink="/request-workspace" class="link-inline">Request a workspace</a>.</p>
-        <p>Forgot your password? Ask your workspace administrator to reset it.</p>
-        <p><a routerLink="/docs" class="link-inline">Setup guide</a></p>
-      </div>
+          @if (ssoName()) {
+            <button type="button" class="btn btn-primary w-full mb-5" (click)="startSso(true)" [disabled]="submitting()"
+                    data-test="sso-continue">
+              <app-icon name="building" />Continue with {{ ssoName() }}
+            </button>
+          }
+
+          <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="form-stack">
+            <app-field label="Username" for="username" [control]="form.controls.username">
+              <input id="username" class="input" formControlName="username"
+                     autocomplete="username" placeholder="you@company.com"
+                     [attr.aria-invalid]="form.controls.username.touched && form.controls.username.invalid" />
+            </app-field>
+
+            <app-field label="Password" for="password" [control]="form.controls.password">
+              <input id="password" class="input" type="password" formControlName="password"
+                     autocomplete="current-password"
+                     placeholder="Your password"
+                     [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid" />
+            </app-field>
+
+            <!-- The same error line request-workspace uses. bg-crit-100 is not remapped in dark, so
+                 the old box was light pink under dark-mode pink text; and it had no live region. -->
+            @if (error()) {
+              <p class="field-note text-crit-500 flex items-start gap-1.5 text-sm" role="alert">
+                <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+                <span>{{ error() }}</span>
+              </p>
+            }
+
+            <button type="submit" class="btn w-full" [class.btn-primary]="!ssoName()" [class.btn-default]="!!ssoName()"
+                    [disabled]="submitting()">
+              @if (submitting()) { <app-icon name="refresh" class="spin" /> }
+              {{ submitting() ? 'Signing in…' : 'Sign in' }}
+            </button>
+          </form>
+
+          <div class="flex items-center gap-3 my-5 text-xs text-[color:var(--text-muted)]" aria-hidden="true">
+            <span class="h-px flex-1 bg-[color:var(--border-subtle)]"></span>or<span class="h-px flex-1 bg-[color:var(--border-subtle)]"></span>
+          </div>
+          <button type="button" class="btn btn-default w-full" (click)="showCompany()" data-test="sso-company">
+            <app-icon name="building" />Sign in with your company
+          </button>
+
+          <div class="mt-6 space-y-2 text-sm text-[color:var(--text-secondary)]">
+            <p>No account yet? <a routerLink="/request-workspace" class="link-inline">Request a workspace</a>.</p>
+            <p>Forgot your password? Ask your workspace administrator to reset it.</p>
+            <p><a routerLink="/docs" class="link-inline">Setup guide</a></p>
+          </div>
+        }
+      }
     </div>
   </div>
 

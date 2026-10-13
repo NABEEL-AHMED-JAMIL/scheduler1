@@ -1,45 +1,4 @@
 <div class="flex flex-col gap-4 min-w-0">
-  <!-- What is saved, and what can be done with the draft. -->
-  <div class="card px-4 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-    <div class="min-w-0 flex flex-wrap items-center gap-2">
-      <span class="text-sm font-medium">{{ versionText() }}</span>
-      @if (latestVersion(); as v) {
-        <span class="text-xs text-[color:var(--text-muted)]">saved {{ v.dateCreated | serverTime:'dateTime' }}</span>
-      }
-      @if (dirty()) { <span class="pill pill-warn">Unsaved changes</span> }
-    </div>
-    <div class="ml-auto flex flex-wrap items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="validate()">
-        <app-icon name="checkCircle" [class.spin]="busy() === 'validate'" />Validate
-      </button>
-      @if (canManage()) {
-        <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="testWithSample()">
-          <app-icon name="table" />Test with sample
-        </button>
-        @if (jobs().length > 1) {
-          <select class="input input-sm w-auto max-w-56" aria-label="Schedule Run now runs" [value]="jobId() ?? ''" (change)="pickJob($any($event.target).value)">
-            @for (j of jobOptions(); track j.value) { <option [value]="j.value" [selected]="j.value === '' + jobId()">{{ j.label }}</option> }
-          </select>
-        }
-        <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy() || !jobId()" [attr.title]="runHint() || null" (click)="runNow()">
-          <app-icon name="play" [class.spin]="busy() === 'run'" />{{ runLabel() }}
-        </button>
-        <button type="button" class="btn btn-default btn-sm" [disabled]="!taskDetailId()" (click)="schedule()">
-          <app-icon name="calendar" />Schedule
-        </button>
-        @if (dirty()) {
-          <button type="button" class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="discard()">Discard</button>
-        }
-        <button type="button" class="btn btn-primary btn-sm" [disabled]="!!busy() || !dirty()" (click)="save()">
-          <app-icon name="save" [class.spin]="busy() === 'save'" />Save
-        </button>
-      }
-    </div>
-    @if (canManage() && runHint()) {
-      <p class="basis-full text-xs text-[color:var(--text-muted)]">{{ runHint() }}</p>
-    }
-  </div>
-
   @if (result(); as r) {
     <div class="step-notice" [class.step-notice-ok]="r.tone === 'ok'" [class.step-notice-warn]="r.tone === 'warn'"
          [class.step-notice-crit]="r.tone === 'crit'" [attr.role]="r.tone === 'crit' ? 'alert' : 'status'">
@@ -58,17 +17,25 @@
 
   @switch (tab()) {
     @case ('settings') {
-      <div class="card p-4 flex flex-col gap-5">
-        <div class="form-section">
-          <h2 class="form-section-title">Pipeline settings</h2>
+      <div class="card p-4 flex flex-col">
+        <app-section title="Source" sub="Where the first step's input comes from when no Read step says." id="pipeline-source">
           <div class="form-grid">
             <app-field label="Source" for="defSource" [error]="settingProblem('source.type')"
-                       hint="Where the first step's input comes from.">
+                       hint="Most pipelines read with their first step (a file, an API, a database, documents) and leave this as it is.">
               <select id="defSource" class="input" [value]="draft().source?.type ?? ''" [disabled]="!canManage()" (change)="setSource($any($event.target).value)">
                 <option value="">Default ({{ sourceText('none').toLowerCase() }})</option>
                 @for (t of sourceTypes; track t) { <option [value]="t" [selected]="draft().source?.type === t">{{ sourceText(t) }}</option> }
               </select>
             </app-field>
+          </div>
+        </app-section>
+        <!-- MIG-347: the run parameters every step may read. -->
+        <app-section title="Run parameters" [sub]="parameterHint" id="pipeline-parameters">
+          <app-parameter-editor [parameters]="draft().parameters ?? []" [disabled]="!canManage()" [problems]="problems()"
+                                (changed)="setParameters($event)" />
+        </app-section>
+        <app-section title="Run defaults" sub="What every step inherits unless its own panel says otherwise.">
+          <div class="form-grid">
             <app-field label="Keep datasets (hours)" for="defRetention" [error]="settingProblem('settings.datasetRetentionHours')"
                        hint="How long a run's step outputs are kept, 1 to 720. Blank: 24.">
               <input id="defRetention" class="input" type="number" min="1" [max]="limits.maxRetentionHours" step="1"
@@ -89,81 +56,96 @@
                 @for (o of onErrors; track o) { <option [value]="o" [selected]="draft().settings?.defaultOnError === o">{{ onErrorText(o) }}</option> }
               </select>
             </app-field>
+          </div>
+        </app-section>
+        <app-section title="Data sensitivity" sub="The workspace's data policy for this level decides the models its steps may use and how long a run keeps its files.">
+          <div class="form-grid">
             <app-field label="Data sensitivity" for="defSensitivity" [error]="settingProblem('settings.sensitivity')"
-                       hint="The level of the data this pipeline handles. The workspace's data policy for it decides the models its steps may use and how long a run keeps its files.">
+                       hint="Patient data (PHI) is Sensitive.">
               <select id="defSensitivity" class="input" [value]="draft().settings?.sensitivity ?? ''" [disabled]="!canManage()"
                       (change)="setSetting('sensitivity', $any($event.target).value)">
                 <option value="">Not set</option>
                 @for (s of sensitivities; track s) { <option [value]="s" [selected]="draft().settings?.sensitivity === s">{{ sensitivityText(s) }}</option> }
               </select>
             </app-field>
-            <!-- MIG-237: whose review a run's results wait for. The customer's review needs customer integration (later). -->
+          </div>
+        </app-section>
+        <!-- MIG-237, MIG-334: whose review a run's results wait for. The customer decides through the API
+             (POST /v1/runs/{id}/review), from the organisation's own portal. UX review 2026-10-12 (W2): the three ways a
+             person approves a pipeline's work, named and linked to each other here. -->
+        <app-section title="Review" id="pipeline-review" sub="Whether a person approves this pipeline's results before they count.">
+          <div class="form-grid">
             <app-field label="Results need review by" for="reviewInternal" [error]="settingProblem('settings.review')"
-                       hint="A run's results start as waiting for review and are approved or rejected on the run's page.">
+                       hint="A run's results start as waiting for review. Our team approves or rejects them on the run's page or in Review; the customer does it through the API, from its own portal.">
               <div class="flex flex-wrap gap-4 pt-1">
                 <label class="flex items-center gap-2 text-sm">
                   <input id="reviewInternal" type="checkbox" class="checkbox" [checked]="reviewRequires('internal')" [disabled]="!canManage()"
                          (change)="setReviewRequired('internal', $any($event.target).checked)" />
                   Our team
                 </label>
-                <label class="flex items-center gap-2 text-sm text-[color:var(--text-muted)]" title="Needs customer integration, coming later">
-                  <input id="reviewCustomer" type="checkbox" class="checkbox" [checked]="reviewRequires('customer')" disabled />
-                  The customer (later)
+                <label class="flex items-center gap-2 text-sm">
+                  <input id="reviewCustomer" type="checkbox" class="checkbox" [checked]="reviewRequires('customer')" [disabled]="!canManage()"
+                         (change)="setReviewRequired('customer', $any($event.target).checked)" />
+                  The customer (through the API)
                 </label>
               </div>
             </app-field>
+            <!-- Bulk review (2026-10-12): a pipeline whose every result must be looked at on its own. -->
+            <app-field label="Individual review" for="reviewIndividual"
+                       hint="Each run's review, and each request of this pipeline's Approval steps, is decided on its own: bulk approve and bulk reject skip them.">
+              <label class="flex items-center gap-2 text-sm pt-1">
+                <input id="reviewIndividual" type="checkbox" class="checkbox" [checked]="reviewIndividual()" [disabled]="!canManage()"
+                       (change)="setReviewIndividual($any($event.target).checked)" />
+                Requires individual review (never approved or rejected in bulk)
+              </label>
+            </app-field>
           </div>
-        </div>
-        @if (isAdmin() && canManage() && switchable().length) {
-          <div class="form-section">
-            <h2 class="form-section-title">Tasks in this workspace</h2>
-            <p class="field-note text-[color:var(--text-muted)] -mt-3 mb-3">What Add step offers in every pipeline of this workspace. A task that is not available cannot be switched on.</p>
-            <div class="overflow-x-auto relative">
-              <table class="table-modern">
-                <thead><tr><th>Task</th><th>Kind</th><th>In this workspace</th><th class="text-right"><span class="sr-only">Switch</span></th></tr></thead>
-                <tbody>
-                  @for (s of switchable(); track s.task.code) {
-                    <tr [attr.data-task]="s.task.code">
-                      <td class="min-w-40">
-                        <span class="font-medium">{{ s.task.name || s.task.code }}</span>
-                        <span class="block mono text-xs text-[color:var(--text-muted)]">{{ s.task.code }}</span>
-                      </td>
-                      <td class="text-xs">{{ s.task.kind }}</td>
-                      <td class="text-xs max-w-80">
-                        <app-task-state [state]="s.state" [reason]="s.reason" [overridden]="!!s.task.overridden" />
-                      </td>
-                      <td class="text-right whitespace-nowrap">
-                        <app-task-switch [task]="s.task" [busy]="!!switching()" (switched)="switchTask(s.task, $event)" />
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          </div>
-        }
-        <div class="form-section">
-          <h2 class="form-section-title">Versions</h2>
-          @if (meta().versions.length) {
-            <div class="overflow-x-auto">
-              <table class="table-modern">
-                <thead><tr><th>Version</th><th>Saved</th><th>By</th></tr></thead>
-                <tbody>
-                  @for (v of meta().versions; track v.pipelineDefinitionId) {
-                    <tr>
-                      <td class="mono text-xs">v{{ v.version }}@if (v.version === meta().version) { <span class="pill pill-brand ml-1.5">Current</span> }</td>
-                      <td class="text-xs whitespace-nowrap">{{ v.dateCreated | serverTime:'dateTime' }}</td>
-                      <td class="text-xs">{{ v.createdByName || (v.createdBy ? 'User #' + v.createdBy : '—') }}</td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            </div>
-          } @else {
-            <p class="text-sm text-[color:var(--text-muted)]">None yet: the pipeline runs as its legacy step until steps are saved.</p>
-          }
-        </div>
+          <ul class="review-ways" data-test="review-ways">
+            <li>
+              <span class="font-medium">The run's review</span> (above): the whole run's results wait until they are approved.
+              Who is asked, and the reminders, are set in
+              <a class="link-inline" routerLink="/workflows/designer" [queryParams]="{ key: 'pipeline-run-review' }">Approval workflows › Pipeline run review</a>.
+            </li>
+            <li>
+              <span class="font-medium">An Approval step</span>: the run pauses at that step until its reviewers approve.
+              @if (approvalSteps().length; as n) {
+                This pipeline has {{ n }} ({{ approvalNames() }}), on the Steps tab.
+              } @else {
+                This pipeline has none; add one from Add step on the Steps tab.
+              }
+              Their workflow is
+              <a class="link-inline" routerLink="/workflows/designer" [queryParams]="{ key: 'pipeline-step-approval' }">Approval workflows › Pipeline step approval</a>.
+            </li>
+          </ul>
+        </app-section>
+        <!-- UX review 2026-10-12 (B2, P7): the workspace-wide task switches are Task Registry's, not one pipeline's. -->
+        <p class="field-note text-[color:var(--text-muted)] mt-6" data-test="task-switches-moved">
+          Which tasks Add step offers is set for the whole workspace in
+          <a class="link-inline" routerLink="/settings/task-registry">Settings › Task Registry</a>.
+        </p>
       </div>
+    }
+    @case ('history') {
+      <app-section title="Versions" [card]="true" sub="Each save of the steps is a version; a run runs the version that was current when it started.">
+        @if (meta().versions.length) {
+          <div class="overflow-x-auto">
+            <table class="table-modern">
+              <thead><tr><th>Version</th><th>Saved</th><th>By</th></tr></thead>
+              <tbody>
+                @for (v of meta().versions; track v.pipelineDefinitionId) {
+                  <tr>
+                    <td class="mono text-xs">v{{ v.version }}@if (v.version === meta().version) { <span class="pill pill-brand ml-1.5">Current</span> }</td>
+                    <td class="text-xs whitespace-nowrap">{{ v.dateCreated | serverTime:'dateTime' }}</td>
+                    <td class="text-xs">{{ v.createdByName || (v.createdBy ? 'User #' + v.createdBy : '—') }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)]">None yet: the pipeline runs as its legacy step until steps are saved.</p>
+        }
+      </app-section>
     }
     @case ('yaml') {
       <div class="card p-4 flex flex-col gap-2">
@@ -197,64 +179,96 @@
         <div class="flex flex-wrap items-end gap-2">
           <div class="min-w-0">
             <h2 class="text-sm font-semibold">Steps</h2>
-            <p class="field-note text-[color:var(--text-muted)]">They run in this order, each on the output before it unless it reads another.</p>
+            <p class="field-note text-[color:var(--text-muted)]">They run in this order, grouped by stage, each on the output before it unless it reads another.</p>
           </div>
-          @if (canManage()) {
-            <div class="ml-auto w-full sm:w-72">
-              <app-combobox id="addStep" ariaLabel="Add step" placeholder="Add step from the Task Registry…" [allowClear]="false"
-                            [options]="taskOptions()" [selected]="addPick()" (selectedChange)="add($event)" />
-            </div>
-          }
+          <div class="ml-auto flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <app-segmented [value]="layout()" (valueChange)="setLayout($event)" [options]="layouts" ariaLabel="Show the steps as" data-test="steps-layout" />
+            @if (canManage()) {
+              <button type="button" class="btn btn-default btn-sm" [disabled]="!!busy()" (click)="testWithSample()">
+                <app-icon name="table" />Test with sample
+              </button>
+              <div class="w-full sm:w-72">
+                <app-combobox id="addStep" ariaLabel="Add step" placeholder="Add step from the Task Registry…" [allowClear]="false"
+                              [options]="taskOptions()" [selected]="addPick()" (selectedChange)="add($event)" />
+              </div>
+            }
+          </div>
         </div>
 
-        <ol class="step-list" aria-label="Steps, in order">
-          @for (step of draft().steps; track $index; let i = $index; let last = $last) {
-            <li class="step-card" [attr.data-step]="step.key"
-                [class.is-selected]="selected() === step.key" [class.has-problems]="!!stepProblems(i).length"
-                [class.is-dragging]="dragFrom() === i" [class.is-drop-target]="dropAt() === i && dragFrom() !== i"
-                (dragover)="dragOver(i, $event)" (drop)="drop(i, $event)">
-              @if (canManage() && !legacy()) {
-                <button type="button" class="btn btn-ghost btn-icon btn-sm step-handle" draggable="true" [attr.aria-label]="'Reorder ' + step.key + ': drag, or use the arrow keys'"
-                        (dragstart)="dragStart(i, $event)" (dragend)="dragEnd()" (keydown)="handleKey(i, $event)">
-                  <app-icon name="grip" />
-                </button>
-              }
-              <span class="step-index">{{ i + 1 }}</span>
-              <button type="button" class="step-open" [attr.aria-label]="'Open step ' + step.key" (click)="open(i)">
-                <span class="block text-sm font-medium truncate">{{ step.name || step.key }}
-                  @if (step.name) { <span class="mono text-xs text-[color:var(--text-muted)] ml-1">{{ step.key }}</span> }
-                </span>
-                <span class="block text-xs text-[color:var(--text-secondary)] truncate">
-                  <span class="mono">{{ step.task }}</span>@if (taskName(step) !== step.task) { · {{ taskName(step) }} }@if (summary(step); as sum) { · {{ sum }} }
-                </span>
-                @for (p of stepProblems(i); track $index) {
-                  <span class="block text-xs text-crit-500 mt-0.5"><span class="mono">{{ p.field || 'step' }}</span>: {{ p.message }}</span>
-                }
-              </button>
-              @if (stepProblems(i).length; as count) {
-                <span class="pill pill-crit shrink-0">{{ count }} {{ count === 1 ? 'Problem' : 'Problems' }}</span>
-              }
-              @if (canManage() && !legacy()) {
-                <span class="step-controls flex items-center gap-0.5 shrink-0">
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Move ' + step.key + ' up'" [disabled]="i === 0" (click)="move(i, -1)">
-                    <app-icon name="arrowUp" />
-                  </button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Move ' + step.key + ' down'" [disabled]="last" (click)="move(i, 1)">
-                    <app-icon name="arrowDown" />
-                  </button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Edit step ' + step.key" (click)="open(i)">
-                    <app-icon name="edit" />
-                  </button>
-                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Delete step ' + step.key" (click)="remove(i)">
-                    <app-icon name="trash" class="icon-crit" />
-                  </button>
-                </span>
-              }
-            </li>
-          } @empty {
-            <li class="text-sm text-[color:var(--text-muted)] py-4 text-center">No steps. Add one from the Task Registry: a pipeline has at least one.</li>
-          }
-        </ol>
+        @if (layout() === 'flow') {
+          <div data-test="step-flow">
+            <ng-container #flowHost />
+            @if (!flowView()) {
+              <div class="h-96 grid place-items-center text-sm text-[color:var(--text-muted)]" data-test="flow-loading">Drawing the flow…</div>
+            }
+          </div>
+        } @else {
+        @if (draft().steps.length) {
+          <div class="step-stages" aria-label="Steps, in order, by stage">
+            @for (g of groups(); track g.start) {
+              <section class="step-stage" [attr.data-stage]="g.stage.id" [attr.id]="'stage-' + g.stage.id + (g.start === firstStart(g.stage.id) ? '' : '-' + g.start)"
+                       [attr.aria-label]="g.stage.label + ' stage'">
+                <header class="step-stage-head">
+                  <app-icon [name]="g.stage.icon" size="0.95em" class="shrink-0" />
+                  <span class="font-semibold">{{ g.stage.label }}</span>
+                  <span class="text-[color:var(--text-muted)]">· {{ g.steps.length }} {{ g.steps.length === 1 ? 'step' : 'steps' }} · {{ g.stage.hint }}</span>
+                </header>
+                <ol class="step-list" [attr.start]="g.start + 1">
+                  @for (item of g.steps; track item.index) {
+                    @let step = item.step;
+                    @let i = item.index;
+                    @let last = i === draft().steps.length - 1;
+                    <li class="step-card" [attr.data-step]="step.key"
+                        [class.is-selected]="selected() === step.key" [class.has-problems]="!!stepProblems(i).length"
+                        [class.is-dragging]="dragFrom() === i" [class.is-drop-target]="dropAt() === i && dragFrom() !== i"
+                        (dragover)="dragOver(i, $event)" (drop)="drop(i, $event)">
+                      @if (canManage() && !legacy()) {
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm step-handle" draggable="true" [attr.aria-label]="'Reorder ' + step.key + ': drag, or use the arrow keys'"
+                                (dragstart)="dragStart(i, $event)" (dragend)="dragEnd()" (keydown)="handleKey(i, $event)">
+                          <app-icon name="grip" />
+                        </button>
+                      }
+                      <span class="step-index">{{ i + 1 }}</span>
+                      <button type="button" class="step-open" [attr.aria-label]="'Open step ' + step.key" (click)="open(i)">
+                        <span class="block text-sm font-medium truncate">{{ step.name || step.key }}
+                          @if (step.name) { <span class="mono text-xs text-[color:var(--text-muted)] ml-1">{{ step.key }}</span> }
+                        </span>
+                        <span class="block text-xs text-[color:var(--text-secondary)] truncate">
+                          <span class="mono">{{ step.task }}</span>@if (taskName(step) !== step.task) { · {{ taskName(step) }} }@if (summary(step); as sum) { · {{ sum }} }
+                        </span>
+                        @for (p of stepProblems(i); track $index) {
+                          <span class="block text-xs text-crit-500 mt-0.5"><span class="mono">{{ p.field || 'step' }}</span>: {{ p.message }}</span>
+                        }
+                      </button>
+                      @if (stepProblems(i).length; as count) {
+                        <span class="pill pill-crit shrink-0">{{ count }} {{ count === 1 ? 'Problem' : 'Problems' }}</span>
+                      }
+                      @if (canManage() && !legacy()) {
+                        <span class="step-controls flex items-center gap-0.5 shrink-0">
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Move ' + step.key + ' up'" [disabled]="i === 0" (click)="move(i, -1)">
+                            <app-icon name="arrowUp" />
+                          </button>
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Move ' + step.key + ' down'" [disabled]="last" (click)="move(i, 1)">
+                            <app-icon name="arrowDown" />
+                          </button>
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Edit step ' + step.key" (click)="open(i)">
+                            <app-icon name="edit" />
+                          </button>
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Delete step ' + step.key" (click)="remove(i)">
+                            <app-icon name="trash" class="icon-crit" />
+                          </button>
+                        </span>
+                      }
+                    </li>
+                  }
+                </ol>
+              </section>
+            }
+          </div>
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)] py-4 text-center">No steps. Add one from the Task Registry: a pipeline has at least one.</p>
+        }
+        }
       </div>
     }
   }

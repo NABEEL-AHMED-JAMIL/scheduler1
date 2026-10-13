@@ -26,27 +26,27 @@ describe('notification chips', () => {
 describe('notification sentence', () => {
   it('names the recipient, which the chips never did', () => {
     const text = notifySentence({ failJob: true, assignedUsername: WHO });
-    expect(text).toBe(`Emails ${WHO} when this job fails.`);
+    expect(text).toBe(`Emails ${WHO} when this schedule fails.`);
   });
 
   it('says plainly when nothing is sent', () => {
     expect(notifySentence({ assignedUsername: WHO }))
-      .toBe(`No email is sent to ${WHO} about this job.`);
+      .toBe(`No email is sent to ${WHO} about this schedule.`);
   });
 
   it('joins two events with or', () => {
     expect(notifySentence({ completeJob: true, failJob: true, assignedUsername: WHO }))
-      .toBe(`Emails ${WHO} when this job completes or fails.`);
+      .toBe(`Emails ${WHO} when this schedule completes or fails.`);
   });
 
   it('joins three as a list', () => {
     expect(notifySentence({ completeJob: true, failJob: true, skipJob: true, assignedUsername: WHO }))
-      .toBe(`Emails ${WHO} when this job completes, fails or is skipped.`);
+      .toBe(`Emails ${WHO} when this schedule completes, fails or is skipped.`);
   });
 
   it('falls back when no one is assigned, rather than saying "Emails  when"', () => {
-    expect(notifySentence({ failJob: true })).toBe('Emails the assigned user when this job fails.');
+    expect(notifySentence({ failJob: true })).toBe('Emails the assigned user when this schedule fails.');
     expect(notifySentence({ failJob: true, assignedUsername: '   ' }))
-      .toBe('Emails the assigned user when this job fails.');
+      .toBe('Emails the assigned user when this schedule fails.');
   });
 });

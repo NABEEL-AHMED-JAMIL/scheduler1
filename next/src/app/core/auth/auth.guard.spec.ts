@@ -133,12 +133,12 @@ describe('route table', () => {
   it('keeps the admin-only routes matching the legacy app', () => {
     const byPath: Record<string, string> = {};
     walk(routes, r => { if (r.data?.minRole) byPath[r.path] = r.data.minRole; });
-    expect(byPath['administration/tenants']).toBe('PLATFORM_ADMIN');
-    expect(byPath['administration/tenant-requests']).toBe('PLATFORM_ADMIN');
-    expect(byPath['configuration/engine']).toBe('PLATFORM_ADMIN');
-    for (const p of ['administration/users', 'integration/storage-connections', 'configuration/kafka',
-                     'configuration/values', 'configuration/home-pages', 'configuration/task-groups',
-                     'ai/connections', 'ai/prompts/new', 'ai/prompts/:promptId/edit']) {
+    expect(byPath['platform/workspaces']).toBe('PLATFORM_ADMIN');
+    expect(byPath['platform/requests']).toBe('PLATFORM_ADMIN');
+    expect(byPath['platform/engine']).toBe('PLATFORM_ADMIN');
+    for (const p of ['administration/users', 'connections/storage', 'settings/kafka',
+                     'settings/values', 'settings/home-pages', 'settings/task-groups',
+                     'settings/model-connections', 'pipelines/prompts/new', 'pipelines/prompts/:promptId/edit']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');
     }
   });

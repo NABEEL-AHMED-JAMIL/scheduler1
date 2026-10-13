@@ -1,4 +1,16 @@
 @import "tailwindcss";
+/* MIG-336: the developer portal's copied contract (prose, JSON, YAML) is content, not markup. Scanned, its words
+   ("table", "hidden", "italic") would be read as utilities and grow every page's stylesheet. */
+@source not "./app/features/developer/content";
+@source not "../public/developer";
+/* Code review 2026-10-07: tests, their fixtures and the repository's scripts and docs are not the app; their class-like
+   words ("hidden", "table", "flex-1" in a spec's selector or a doc's prose) must not become utilities in every page's CSS. */
+@source not "./**/*.spec.ts";
+@source not "./app/characterisation";
+@source not "./app/shared/testing";
+@source not "../e2e";
+@source not "../docs";
+@source not "../scripts";
 
 /* ---------------------------------------------------------------------------
    Design tokens -- the Compass palette.
@@ -34,6 +46,12 @@
    colour carries meaning that weight cannot.
    --------------------------------------------------------------------------- */
 @theme {
+  /* The width from which the shell's whole menu is on the bar (nav:), between lg and xl: the owner's 1187px window
+     had it behind the menu button at xl (review 2026-10-07). A named breakpoint, not min-[1180px]: Tailwind writes
+     arbitrary ones before sm/md/lg, so sm:block outranked them. */
+  --breakpoint-nav: 73.75rem;
+  /* UX review 2026-10-12 (N2): from 1440px the menu is a sidebar on the left; below it the top bar's groups. */
+  --breakpoint-wide: 90rem;
   --color-ink-50:  #f9fafb;
   --color-ink-100: #f3f4f6;
   --color-ink-200: #e5e7eb;
@@ -180,6 +198,11 @@
     --surface-inverse: var(--color-ink-900);
     --border-subtle:   var(--color-ink-200);
     --border-strong:   var(--color-ink-300);
+    /* A control's edge -- an input, a select, a text area -- is the one thing that says "type here" (WCAG 1.4.11:
+       3:1 against what it sits on). --border-subtle measured 1.13-1.24:1. Between ink-500 and ink-400, a calm grey:
+       3.40:1 on the sunken surface, 3.58 on the page, 3.74 on a card (contrast.spec.ts holds it to 3:1 in every theme;
+       Ocean's re-tinted ramp gives 3.28 / 3.41 / 3.80). Cards and dividers keep their quieter tokens. */
+    --border-control:  color-mix(in oklab, var(--color-ink-500) 60%, var(--color-ink-400));
     --text-primary:    var(--color-ink-900);
     /* Measured against the surface each is used on: ink-500 (Tailwind's own slate-500) is
        4.76:1 on white -- ink-600 at 7.58:1 is used anyway, for headroom this system has kept
@@ -310,6 +333,8 @@
     --surface-inverse: var(--color-ink-100);
     --border-subtle:   var(--color-ink-800);
     --border-strong:   var(--color-ink-700);
+    /* A control's edge, 3:1 and more (WCAG 1.4.11): 3.29:1 on a card, 3.73 on the page; Midnight's ramp 3.31 / 3.51. */
+    --border-control:  color-mix(in oklab, var(--color-ink-500) 75%, var(--color-ink-600));
     --text-primary:    var(--color-ink-50);
     /* ink-300 is 12.02:1 and ink-400 is 6.96:1 on the raised surface; the old muted step
        (ink-500) was 3.75:1. */
@@ -452,7 +477,10 @@
    overlays, toasts -- is a real component built on the CDK.
    --------------------------------------------------------------------------- */
 @layer components {
+  /* UX review 2026-10-12 (A1, G2): every button carries a 1px border, transparent where the variant has none, so a
+     primary sits at exactly the height of the bordered default button beside it (it was 2px shorter on 61 screens). */
   .btn {
+    border: 1px solid transparent;
     @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
            text-sm font-medium transition-colors select-none
            disabled:pointer-events-none;
@@ -509,7 +537,8 @@
     color: var(--btn-danger-fg);
     @apply hover:brightness-110;
   }
-  .btn-sm { @apply px-2.5 py-1 text-xs; }
+  /* One control height for a header, a toolbar and a panel: 28px (A1). */
+  .btn-sm { min-height: 1.75rem; @apply px-2.5 py-1 text-xs; }
   /* For a panel toolbar, where btn-sm still wraps onto a second row. */
   .btn-xs { @apply px-2 py-0.5 text-[11px] gap-1; }
   /* A round, bordered icon button for row-level add/remove. The ghost variant carried almost
@@ -529,6 +558,8 @@
   }
   .btn-circle:disabled { @apply opacity-40 cursor-not-allowed; }
   .btn-icon { @apply px-2 py-1.5; }
+  /* An icon button among -sm buttons (Refresh, ⋮, a month stepper) is their 28px, not 30px (A1). */
+  .btn-sm.btn-icon { @apply py-1; }
 
   /* KPI tiles were p-3.5 while every other card was p-4 -- a 2px difference that reads as
      sloppiness rather than intent. One class so they cannot drift apart again. */
@@ -623,6 +654,21 @@
     color: var(--text-secondary);
     @apply inline-flex items-center justify-center rounded-full font-semibold shrink-0 select-none;
   }
+  /* app-avatar's initials on the person's own colour: a chart slot (5:1 or better on the raised surface in both
+     themes), the letters in the surface colour -- white on a mid tone in light, navy on the lifted tone in dark. */
+  .avatar-tone-0, .avatar-tone-1, .avatar-tone-2, .avatar-tone-3,
+  .avatar-tone-4, .avatar-tone-5, .avatar-tone-6, .avatar-tone-7 { color: var(--surface-raised); }
+  .avatar-initials[data-initials]::before { content: attr(data-initials); }
+  .avatar-tone-0 { background: var(--chart-0); }
+  .avatar-tone-1 { background: var(--chart-1); }
+  .avatar-tone-2 { background: var(--chart-2); }
+  .avatar-tone-3 { background: var(--chart-3); }
+  .avatar-tone-4 { background: var(--chart-4); }
+  .avatar-tone-5 { background: var(--chart-5); }
+  .avatar-tone-6 { background: var(--chart-6); }
+  .avatar-tone-7 { background: var(--chart-7); }
+  /* Profile: a picture dragged over the portrait. */
+  .avatar-drop-active { outline: 2px dashed var(--accent-mark-strong); outline-offset: 4px; }
 
   /* A listing that can run to hundreds of rows scrolls inside its own box rather than
      growing the page, so the toolbar, breadcrumb and column headers stay put. Without this
@@ -887,7 +933,7 @@
 
   .input {
     background: var(--surface-raised);
-    border-color: var(--border-subtle);
+    border-color: var(--border-control);
     /* min-height rather than a fixed height: a native date field sizes itself from its
        internal spin fields and came out 34px next to a 26.5px select, so a filter bar mixing
        the two stepped up and down. This makes every control agree without clipping one whose
@@ -911,8 +957,10 @@
   .input:focus-visible {
     outline: none;
     /* --focus-ring, not the brand: brand-500 equals the resting dark border exactly, so in dark
-       a focused field showed no change at all (WCAG 2.4.7). */
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus-ring) 28%, transparent);
+       a focused field showed no change at all (WCAG 2.4.7). Now that the resting edge is itself 3:1,
+       the focused one is two pixels of the ring (border + 1px) with the soft halo outside it, so focus
+       still reads as a change and not as the same grey line. */
+    box-shadow: 0 0 0 1px var(--focus-ring), 0 0 0 4px color-mix(in oklab, var(--focus-ring) 22%, transparent);
     border-color: var(--focus-ring);
   }
 
@@ -1179,8 +1227,17 @@
   }
   .table-modern tbody td {
     border-color: var(--border-subtle);
+    font-variant-numeric: tabular-nums;
     @apply border-b px-4 py-2.5 align-middle;
   }
+  /* UX review 2026-10-12 (A6, G4): a number, a duration, a percentage or an amount reads right-aligned in tabular
+     figures, its heading too, so a column of them lines up by place value. app-table-shell marks such columns on its
+     own; a table outside it writes .num on the th and the td. */
+  .num, .table-modern :is(th, td).num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-modern th.num .th-sort { flex-direction: row-reverse; }
+  /* A value drawn as data text keeps to the right of its number cell. */
+  .num > .data-text { justify-content: flex-end; margin-left: auto; }
+  .num .data-text-value { text-align: right; }
   .table-modern tbody tr:last-child td { @apply border-b-0; }
 
   /* tfoot had no rule at all, so total rows rendered with zero padding and their
@@ -1323,6 +1380,8 @@ html:not(.dark) .text-warn-500 { color: var(--color-warn-600); }
 
 html.dark .text-ok-500    { color: var(--color-ok-400); }
 html.dark .text-warn-500  { color: var(--color-warn-400); }
+/* MIG-320: -600 too -- Ask your data's warning measured 2.32:1 on the dark card in warn-600. */
+html.dark .text-warn-600  { color: var(--color-warn-400); }
 html.dark .text-crit-500  { color: var(--color-crit-400); }
 
 html.dark .icon-warn { color: var(--color-warn-400); }
@@ -1399,6 +1458,37 @@ html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
     color: var(--accent-text);
   }
   .nav-child-active .nav-child-icon { color: var(--accent-text); }
+
+  /* A group's panel under its top-bar menu, or beside the collapsed sidebar's icon. A group with sub-headings
+     (Administration & billing) lays them out in columns rather than one list taller than the screen. */
+  .nav-panel {
+    @apply absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle;
+    max-height: calc(100dvh - 4.5rem);
+    overflow-y: auto;
+  }
+  .nav-panel-end { left: auto; right: 0; }
+  .nav-panel-columns { display: grid; grid-template-columns: repeat(2, minmax(16rem, 1fr)); column-gap: 0.25rem; width: max-content; }
+  .nav-panel-columns > .nav-section { grid-column: 1 / -1; }
+  .nav-section {
+    @apply px-2.5 pt-2 pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)];
+  }
+
+  .app-sidebar {
+    display: none;
+    position: sticky;
+    top: 3.5rem;
+    height: calc(100dvh - 3.5rem);
+    width: 15rem;
+    flex: none;
+    flex-direction: column;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface-raised);
+    /* Sticky makes its own stacking context: without a z-index a collapsed group's panel opened under the page. */
+    z-index: 30;
+  }
+  @media (min-width: 90rem) { .app-sidebar { display: flex; } }
+  /* The collapsed width is here (the aside is the shell's, in the first load); its links' rules are side-nav.ts's. */
+  .app-sidebar.is-collapsed { width: 3.5rem; }
 
   /* Compact key/value pairs for the context panels. */
   .detail-head {
@@ -1574,6 +1664,171 @@ html.dark {
   --chart-7: #a5b4fc;   /* indigo  8.90 */
 }
 
+/* ---------------------------------------------------------------------------
+   App themes (owner 2026-10-13): each person picks one in the top bar's theme menu or Profile ›
+   Appearance; a workspace administrator sets the workspace's default (Administration › Appearance).
+
+     light     :root above                        dark      html.dark above
+     ocean     light + html[data-theme=ocean]     midnight  html.dark + [data-theme=midnight]
+     contrast  light + html[data-theme=contrast]
+     system    light or dark, as the OS says
+
+   A theme is only token values. Ocean and High contrast sit on the light theme and Midnight on the
+   dark one, so every html.dark / html:not(.dark) component rule keeps applying to its own family
+   and no component knows the theme exists. The ink (and for Ocean the brand) ramp is re-tinted
+   rather than each role restated: the roles above read the ramp, so retinting it carries every
+   surface, border and text step at once. ThemeService puts the class and attribute on <html>;
+   index.html does the same before the first paint. Unlayered and more specific than :root and
+   html.dark, so a block here always wins. A light theme's block is :not(.dark) so a page that
+   forces dark (the embedded run view's ?theme=dark) is not repainted light under it.
+
+   contrast.spec.ts measures every theme: text 4.5:1 on each surface, UI marks and status fills 3:1.
+   --------------------------------------------------------------------------- */
+
+/* Ocean: a calm clinical blue and teal on a cool paper ground. Slate-tinted ink, a teal-blue
+   brand (the primary button is brand-500, white on it 6.41:1). */
+html[data-theme="ocean"]:not(.dark) {
+  --color-ink-50:  #eef3f8;
+  --color-ink-100: #e8eff5;
+  --color-ink-200: #dbe4ec;
+  --color-ink-300: #c3d1dd;
+  --color-ink-400: #8fa3b5;
+  --color-ink-450: #536779;
+  --color-ink-500: #5d7286;
+  --color-ink-600: #3d5367;
+  --color-ink-700: #2b3f52;
+  --color-ink-800: #1a2c3e;
+  --color-ink-900: #0e1f30;
+  --color-ink-950: #06121f;
+
+  --color-brand-50:  #e8f5f8;
+  --color-brand-100: #cdeaf1;
+  --color-brand-300: #5fb3cb;
+  --color-brand-500: #0b6782;
+  --color-brand-600: #08546b;
+  --color-brand-700: #064257;
+
+  --surface-inset: #f4f8fb;
+  /* The blue of information, a step deeper: info-600 is 4.4:1 on this theme's bluer sunken surface. */
+  --info-text: var(--color-info-700);
+  --scrollbar-thumb: #c3d1dd;
+  --scrollbar-thumb-hover: #8fa3b5;
+  --focus-ring: var(--color-brand-500);
+  --pill-brand-bg:     var(--color-brand-100);
+  --pill-brand-fg:     var(--color-brand-700);
+  --pill-brand-border: var(--color-brand-300);
+
+  /* The categorical slots lead with the theme's own cool hues; the same eight, each 4.5:1 on white. */
+  --heat: #0e7490;
+  --chart-0: #0e7490;   /* cyan    5.36 */
+  --chart-1: #c2410c;   /* orange  5.18 */
+  --chart-2: #1d4ed8;   /* blue    6.70 */
+  --chart-3: #be1d63;   /* rose    5.92 */
+  --chart-4: #0f766e;   /* teal    5.47 */
+  --chart-5: #7e22ce;   /* violet  6.98 */
+  --chart-6: #4d7c0f;   /* lime    4.99 */
+  --chart-7: #4338ca;   /* indigo  7.90 */
+}
+
+/* Midnight: a deep navy dark with teal accents. Navy-tinted ink; the accent is the teal the dark
+   theme does not have (it is monochrome), so the roles that carry it are restated here. */
+html.dark[data-theme="midnight"] {
+  --color-ink-50:  #f2f6fb;
+  --color-ink-100: #e3eaf3;
+  --color-ink-200: #cdd8e6;
+  --color-ink-300: #b6c5d8;
+  --color-ink-400: #8fa5c0;
+  --color-ink-450: #7389a6;
+  --color-ink-500: #5a7395;
+  --color-ink-600: #3c5577;
+  --color-ink-700: #263e60;
+  --color-ink-800: #18304d;
+  --color-ink-900: #0a1729;
+  --color-ink-950: #06101f;
+
+  --surface-code: #030a14;
+  --scrollbar-thumb: #263e60;
+  --scrollbar-thumb-hover: #3c5577;
+
+  --accent-text:        #5fd4c4;
+  --accent-soft:        color-mix(in oklab, #2dd4bf 14%, var(--surface-raised));
+  --hover-brand-bg:     color-mix(in oklab, #2dd4bf 18%, var(--surface-raised));
+  --hover-brand-fg:     #7fe3d6;
+  --btn-primary-bg:     #2bb8a8;
+  --btn-primary-fg:     #03201d;
+  --btn-primary-hover:  #4fd1c1;
+  --btn-primary-active: #7fe0d3;
+  --focus-ring:         #5eead4;
+  --accent-mark:        #2dd4bf;
+  --accent-mark-strong: #5eead4;
+  --pill-brand-bg:      color-mix(in oklab, #2dd4bf 22%, transparent);
+  --pill-brand-fg:      #7fe3d6;
+  --pill-brand-border:  #2a9d90;
+  --pill-solid-brand-bg: var(--btn-primary-bg);
+  --pill-solid-brand-fg: var(--btn-primary-fg);
+
+  --heat: #2dd4bf;
+  --chart-0: #2dd4bf;   /* teal    9.38 on the raised surface */
+  --chart-1: #60a5fa;   /* blue    6.87 */
+  --chart-2: #fb923c;   /* orange */
+  --chart-3: #f472b6;   /* rose    6.59 */
+  --chart-4: #c084fc;   /* violet  6.61 */
+  --chart-5: #a3e635;   /* lime */
+  --chart-6: #22d3ee;   /* cyan */
+  --chart-7: #a5b4fc;   /* indigo  8.76 */
+}
+
+/* High contrast: the light theme pushed to its strongest -- black text, borders a control can be
+   seen by (3:1 and more), darker status text and a blue focus ring that no surface hides. */
+html[data-theme="contrast"]:not(.dark) {
+  --surface-page:   #ffffff;
+  --surface-sunken: #eeeeee;
+  --surface-inset:  #f5f5f5;
+  --surface-code:   #e6e6e6;
+  --border-subtle:  #767676;
+  --border-strong:  #3d3d3d;
+  --border-control: #767676;
+  --text-primary:   #000000;
+  --text-secondary: #1f1f1f;
+  --text-muted:     #3d3d3d;
+  --accent-text:    #000000;
+  --accent-soft:    #e6e6e6;
+  --btn-primary-bg:     #000000;
+  --btn-primary-hover:  #262626;
+  --btn-primary-active: #3d3d3d;
+  --focus-ring:         #0040c1;
+  --accent-mark:        #000000;
+  --accent-mark-strong: #000000;
+  --ok-text:   #0c5a2e;
+  --warn-text: #6b2f05;
+  --crit-text: #8f1530;
+  --info-text: #1d3fae;
+  --pill-neutral-bg: #e6e6e6;
+  --pill-neutral-fg: #1f1f1f;
+  --pill-brand-bg:   #d4d4d4;
+  --pill-brand-fg:   #000000;
+  --pill-brand-border: #000000;
+  --pill-ok-fg:   #0c5a2e;
+  --pill-warn-fg: #6b2f05;
+  --pill-crit-fg: #8f1530;
+  --pill-info-fg: #1d3fae;
+  --scrollbar-thumb: #767676;
+  --scrollbar-thumb-hover: #3d3d3d;
+}
+
+/* The theme pickers' previews: page, card, accent and text of each theme, as plain values so a
+   preview shows that theme whichever one is on (core/theme-options.ts, SWATCH_CSS, maps them for an
+   element with data-swatch). contrast.spec.ts holds each to the theme's own resolved tokens, so
+   they cannot drift. */
+:root {
+  --swatch-light-page: #f9fafb;    --swatch-light-card: #ffffff;    --swatch-light-accent: #1e2939;    --swatch-light-text: #101828;
+  --swatch-dark-page: #030712;     --swatch-dark-card: #101828;     --swatch-dark-accent: #f9fafb;     --swatch-dark-text: #f9fafb;
+  --swatch-ocean-page: #eef3f8;    --swatch-ocean-card: #ffffff;    --swatch-ocean-accent: #0b6782;    --swatch-ocean-text: #0e1f30;
+  --swatch-midnight-page: #06101f; --swatch-midnight-card: #0a1729; --swatch-midnight-accent: #2bb8a8; --swatch-midnight-text: #f2f6fb;
+  --swatch-contrast-page: #ffffff; --swatch-contrast-card: #ffffff; --swatch-contrast-accent: #000000; --swatch-contrast-text: #000000;
+}
+
+
 @layer components {
   .input-invalid,
   .field-invalid :is(input, select, textarea).input {
@@ -1596,22 +1851,6 @@ html.dark {
      column is full width again. A viewport breakpoint would have to guess which. An element
      cannot query itself, so the column owns the container and the split reads it. */
   .dataset-column { container-type: inline-size; }
-  /*
-   * Profile cards, in a container query rather than a viewport one.
-   *
-   * The reason is the 260px storage rail: it makes the WINDOW a bad proxy for how wide this
-   * column actually is. lg:grid-cols-2 was not merely inconsistent here, it was inverted -- at
-   * 1023px the rail stacks and this column is full width, giving ONE card across; at 1024px the
-   * rail takes its 260px back and it gives TWO. Fewest columns at the widest space.
-   *
-   * This paragraph used to sit on .dataset-split, which laid the Data tab's rows beside a
-   * read-only schema rail. The rail is gone -- it listed each column and its type, which is the
-   * first two cells of every Compact row -- so the rule went with it and its reasoning moved here.
-   */
-  .profile-grid { @apply grid gap-3; }
-  @container (min-width: 700px) {
-    .profile-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
 
   /* Form rhythm, defined once.
 
@@ -1647,6 +1886,8 @@ html.dark {
     border-color: var(--border-subtle);
   }
   .form-section-title { @apply text-sm font-semibold mb-4; }
+  /* A group of fields under a legend reads as a section, never as one more field label (UX review 2026-10-12, G11). */
+  .form-legend { @apply text-sm font-semibold mb-3; color: var(--text-primary); }
   /* MIG-254: a MANAGED workspace's editors disable everything through one fieldset, an unstyled block. Chromium
      sometimes never lays out the inside of a size container within a fieldset (on a cold load the task form's
      Basics had a 0-high section and an unresolved grid, about half the time), so nothing in the lock is a
@@ -1688,7 +1929,11 @@ html.dark {
      took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
      line and border as .btn-sm, so the row lines up by construction (vertical only: horizontal
      padding stays the field's, so a search box's icon inset survives). */
-  .page-head:has(.btn-sm) .input { min-height: 0; @apply py-1 text-xs; }
+  .page-head:has(.btn-sm) .input { min-height: 1.75rem; @apply py-1 text-xs; }
+  /* A select or a segmented control among a header's or a toolbar's buttons takes their height too (A1: the
+     assistant's model select stood 19px beside 26px buttons). */
+  :is(.page-head, .table-toolbar) .seg-btn { padding-block: 0.1875rem; }
+  :is(.page-head, .table-toolbar) select.input { min-height: 1.75rem; }
   /* A list's toolbar (app-table-shell) held a 30px view toggle, 36px filters and 26px buttons in one
      row. Every control there is the view toggle's height, and the filters take the compact type. */
   /* Height and type only: horizontal padding is the field's own (a search box keeps pl-8 for its
@@ -1696,8 +1941,7 @@ html.dark {
   /* When the toolbar wraps (tablet), what wraps lines up under the controls on the right instead of stranding one
      or two of them flush left; the heading keeps the left with its mr-auto. */
   .table-toolbar > div[toolbar] { justify-content: flex-end; }
-  .table-toolbar .input { min-height: 1.875rem; @apply py-1 text-xs; }
-  .table-toolbar .btn-sm { min-height: 1.875rem; }
+  .table-toolbar .input { min-height: 1.75rem; @apply py-1 text-xs; }
   /* A toolbar combobox's list follows its compact 12px box, as a form's follows its 14px one. */
   .table-toolbar [role="listbox"] { @apply text-xs; }
   /* Joined controls: a stepper such as "< September 2026 >" built from .btn-sm pieces, one box. */
@@ -1707,6 +1951,9 @@ html.dark {
   .btn-join > .btn:last-child { @apply rounded-r-md; }
   .btn-join > .btn + .btn { margin-left: -1px; }
   .btn-join > .btn-label { @apply cursor-default font-medium; pointer-events: none; }
+  /* UX review 2026-10-12, Batch A: the page header, section, form row, actions bar and empty state carry their own
+     styles (shared/ui/*.ts), so they load with the pages rather than in the first paint. */
+
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
 
@@ -1776,12 +2023,6 @@ html.dark {
   .data-text-more-icon { @apply no-underline text-[color:var(--text-muted)] hover:text-[color:var(--accent-text)]; }
   /* The whole value in the panel: its own line breaks kept, and a 20,000-character token wrapped. */
   .data-text-full { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
-  /* A heading that does not sort, set exactly like a table-modern <th> -- for a header built
-     outside a <thead> (a grid list's header row) or a label beside .th-sort buttons. */
-  .th-static {
-    @apply text-left text-[11px] font-semibold uppercase tracking-wider whitespace-nowrap
-           text-[color:var(--text-muted)];
-  }
 }
 
 /*
@@ -1981,7 +2222,9 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 /* The topics table fits the pane: fixed layout, the name column takes what is left and clips, the narrow columns
    keep their width, and the actions column never leaves the screen (it was cut off at 1024 and 768). */
 .kafka-table-wrap { overflow-x: auto; }
-.kafka-table { table-layout: fixed; width: 100%; }
+/* A floor under the fixed columns: on a tablet the auto-width name column was left 0px wide, so the topic's name
+   vanished and its header sat on top of "Read by" (review 2026-10-07). Narrower, the box scrolls sideways. */
+.kafka-table { table-layout: fixed; width: 100%; min-width: 52rem; }
 .kafka-table th:first-child, .kafka-table td.kafka-cell-name { width: auto; }
 .kafka-table .kafka-cell-name { min-width: 0; }
 .kafka-cell-clip { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
@@ -2179,9 +2422,14 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .dash-grid > app-analytics-widget > .widget > .widget-body { flex: 1 1 auto; }
 /* A single figure sits in the middle of a tile its row has stretched, not at the top of it. */
 .dash-grid > app-analytics-widget[data-span="3"] > .widget > .widget-body { display: flex; flex-direction: column; justify-content: center; }
+/* UX review B5 (B1, M18): a single figure keeps its own height, top-aligned, rather than stretching to the gauge or
+   chart beside it in the row (a "100" floated in the middle of a 360px card). */
+.dash-grid > app-analytics-widget[data-span="3"] { align-self: start; }
 /* A table opened with "Show all" scrolls inside its tile rather than making the board a page long. */
 .dash-rows-open { max-height: 28rem; overflow: auto; }
 /* The board's facts, "7 widgets · 3 files · owner · last run", dotted between the parts. */
+/* The board page's scrollbar gutter, the facts line's reserved height and the filter's Clear are in
+   the dashboard component's own styles (dashboard.css), so they load with the board, not every page. */
 .dash-facts { display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.375rem; row-gap: 0.25rem; }
 .dash-facts > * + *::before { content: '·'; margin-right: 0.375rem; color: var(--text-muted); }
 .widget-foot { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; min-width: 0; padding-top: 0.25rem; border-top: 1px solid var(--border-subtle); }
@@ -2256,51 +2504,182 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
   button.link-inline { cursor: pointer; }
 }
 
-/* ---- Workflows (MIG-276): the task inbox, as the design preview draws it ---------------------------------------- */
-/* The list beside the task; one column on a tablet in portrait. */
-.inbox-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1024px) { .inbox-grid { grid-template-columns: 380px minmax(0, 1fr); } }
-.inbox-row { display: flex; align-items: flex-start; gap: 0.75rem; width: 100%; text-align: left; padding: 0.8rem 1rem;
+/* ---- Workflows (MIG-276): the task inbox, laid out as a mail client (owner, 2026-10-06) ------------------------- */
+/* The page fills the screen under the console's header (3.5rem and its rule) and main's 2rem top padding, leaving 1rem
+   at the foot; the negative margin hands back the rest of main's 3rem bottom padding, so the page itself never scrolls
+   and the list and the task scroll on their own. A short window keeps a usable minimum and scrolls the page instead. */
+.inbox-page { display: flex; flex-direction: column; height: calc(100dvh - 3.5rem - 1px - 3rem); min-height: 34rem; margin-bottom: -2rem; }
+.inbox-tabs { flex: none; }
+.inbox-tabs .tab .pill { padding-block: 0; }
+.inbox-split { flex: 1 1 auto; min-height: 0; display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1024px) { .inbox-split { grid-template-columns: 380px minmax(0, 1fr); } }
+@media (min-width: 1600px) { .inbox-split { grid-template-columns: 420px minmax(0, 1fr); } }
+/* Below 1024 px one pane at a time: the list, or the task opened from it with a way back. */
+@media (max-width: 1023.98px) {
+  .inbox-split[data-pane="list"] > .inbox-detail { display: none; }
+  .inbox-split[data-pane="detail"] > .inbox-list { display: none; }
+}
+@media (min-width: 1024px) { .inbox-back { display: none; } }
+
+/* The list: tools pinned on top, rows scrolling under sticky day headers. */
+.inbox-list { display: flex; flex-direction: column; min-height: 0; overflow: clip; }
+.inbox-tools { flex: none; display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border-bottom: 1px solid var(--border-subtle); }
+.inbox-filters { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; }
+.inbox-count { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.75rem; color: var(--text-muted); }
+.inbox-count-line { display: flex; gap: 0.3em; min-width: 0; white-space: nowrap; }
+.inbox-common { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+/* A search over a list not all loaded says so (and offers Search all). */
+.inbox-partial { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem 0.5rem; font-size: 0.75rem; color: var(--text-secondary); }
+.inbox-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.inbox-day { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 0.5rem; padding: 0.3rem 1rem;
+  background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); font-size: 0.6875rem; font-weight: 600;
+  letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-secondary); }
+.inbox-day-count { margin-left: auto; font-weight: 500; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+/* A row is two lines, about 60px: the request's title and its time, then step · workflow and the status. */
+.inbox-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; column-gap: 0.75rem; row-gap: 0.15rem;
+  width: 100%; min-height: 3.75rem; padding: 0.6rem 1rem; text-align: left; color: var(--text-primary);
   border-bottom: 1px solid var(--border-subtle); background: transparent; }
-.inbox-row:last-child { border-bottom: 0; }
-.inbox-row:hover { background: var(--surface-sunken); }
-.inbox-row.is-on { background: var(--surface-sunken); box-shadow: inset 3px 0 0 var(--accent-text); }
+.inbox-row:hover { background: var(--surface-inset); }
+.inbox-row.is-crit { box-shadow: inset 3px 0 0 var(--crit-text); }
+.inbox-row.is-on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent-mark-strong); }
 .inbox-row:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-/* The request's fields: label above value, as many columns as fit. */
-.inbox-fields { display: grid; gap: 0.75rem 1.25rem; grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr)); margin: 0; }
-.inbox-fields dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; }
-.inbox-fields dd { margin: 0.15rem 0 0; font-size: 0.875rem; overflow-wrap: anywhere; }
-/* History: a line and a dot per event, coloured by what it was. */
-.inbox-timeline { list-style: none; margin: 0; padding: 0 0 0 1rem; border-left: 2px solid var(--border-subtle); display: flex; flex-direction: column; gap: 0.55rem; }
+/* The title's name is cut; its trailing reference (#1016) never is. */
+.inbox-row-title { display: flex; align-items: baseline; gap: 0.3em; min-width: 0; white-space: nowrap; font-size: 0.875rem; font-weight: 600; }
+.inbox-title-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.inbox-title-ref { flex: none; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.inbox-row-time { white-space: nowrap; font-size: 0.75rem; color: var(--text-muted); font-variant-numeric: tabular-nums; justify-self: end; }
+.inbox-row.is-crit .inbox-row-time { color: var(--crit-text); font-weight: 600; }
+.inbox-row-sub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 0.75rem; color: var(--text-muted); }
+.inbox-row-status { display: inline-flex; align-items: center; gap: 0.375rem; justify-self: end; white-space: nowrap; font-size: 0.75rem; color: var(--text-secondary); }
+.inbox-dot { width: 0.5rem; height: 0.5rem; flex: none; border-radius: 999px; background: var(--text-muted); }
+.inbox-dot.is-ok { background: var(--ok-text); }
+.inbox-dot.is-crit { background: var(--crit-text); }
+.inbox-dot.is-warn { background: var(--warn-text); }
+.inbox-dot.is-brand { background: var(--accent-mark); }
+.inbox-capped { padding: 0.75rem 1rem; font-size: 0.75rem; color: var(--text-muted); }
+/* Load more, under the rows loaded. */
+.inbox-more { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.75rem 1rem; }
+.inbox-more .inbox-capped { padding: 0; }
+
+/* The task: its title, the decisions straight under it, then the request and its history; scrolls on its own. */
+.inbox-detail { display: flex; flex-direction: column; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.inbox-detail-head { display: flex; flex-direction: column; gap: 0.3rem; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid var(--border-subtle); }
+.inbox-back { align-self: flex-start; margin: -0.25rem 0 0.25rem -0.5rem; }
+.inbox-detail-title { font-size: 1.25rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.inbox-detail-sub { font-size: 0.875rem; color: var(--text-muted); }
+.inbox-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; }
+.inbox-detail-head .inbox-chips { margin-top: 0.4rem; }
+.inbox-actions { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; gap: 0.5rem 0.75rem;
+  padding: 0.875rem 1.5rem; background: var(--surface-inset); border-bottom: 1px solid var(--border-subtle); }
+.inbox-comment .input { min-height: 2.25rem; }
+.inbox-buttons { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.inbox-rule { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.375rem; font-size: 0.75rem; color: var(--text-muted); }
+@media (max-width: 1279.98px) { .inbox-actions { grid-template-columns: minmax(0, 1fr); } }
+.inbox-note { display: flex; align-items: flex-start; gap: 0.5rem; margin: 1rem 1.5rem 0; padding: 0.5rem 0.75rem;
+  border-radius: var(--radius-md); background: var(--surface-sunken); font-size: 0.875rem; color: var(--text-secondary); }
+.inbox-detail-body { display: flex; flex-direction: column; gap: 1.75rem; padding: 1.25rem 1.5rem 1.5rem; }
+/* A wide screen puts the history beside the details instead of under them. */
+@media (min-width: 1600px) { .inbox-detail-body { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(20rem, 1fr); align-items: start; gap: 2.5rem; } }
+.inbox-empty { margin: auto; padding: 4rem 1rem; text-align: center; font-size: 0.875rem; color: var(--text-muted); }
+
+/* The request's details: label above value, as many columns as fit; a table or a long text takes the row. */
+.inbox-fields { display: grid; gap: 1rem 1.5rem; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); margin: 0; }
+.inbox-fields > .is-wide { grid-column: 1 / -1; }
+.inbox-fields dt { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-muted); font-weight: 600; }
+.inbox-fields dd { margin: 0.25rem 0 0; font-size: 0.875rem; overflow-wrap: anywhere; }
+.inbox-id { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); }
+.inbox-long { white-space: pre-line; }
+.inbox-file { display: inline-flex; align-items: center; gap: 0.375rem; max-width: 100%; padding: 0.2rem 0.55rem; font-size: 0.8125rem;
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-inset); color: var(--text-primary); }
+a.inbox-file:hover { border-color: var(--accent-mark); color: var(--accent-text); }
+.inbox-table-wrap { max-width: 100%; width: max-content; overflow-x: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.inbox-table { border-collapse: collapse; font-size: 0.8125rem; }
+.inbox-table th { padding: 0.35rem 0.75rem; text-align: left; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--text-muted); background: var(--surface-inset); }
+.inbox-table td { padding: 0.35rem 0.75rem; border-top: 1px solid var(--border-subtle); }
+
+/* History: a rail and a dot per event, coloured by what it was; who and when under it; a comment as a quote. */
+.inbox-timeline { position: relative; list-style: none; margin: 0; padding: 0 0 0 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
+.inbox-timeline::before { content: ''; position: absolute; left: 0.4rem; top: 0.45rem; bottom: 0.45rem; width: 2px; background: var(--border-subtle); }
 .inbox-timeline > li { position: relative; font-size: 0.875rem; line-height: 1.4; }
-.inbox-timeline > li::before { content: ''; position: absolute; left: -1.4rem; top: 0.35rem; width: 0.6rem; height: 0.6rem; border-radius: 999px;
+.inbox-timeline > li::before { content: ''; position: absolute; left: -1.4rem; top: 0.3rem; width: 0.625rem; height: 0.625rem; border-radius: 999px;
   background: var(--border-strong); box-shadow: 0 0 0 3px var(--surface-raised); }
 .inbox-timeline > li.is-ok::before { background: var(--series-ok); }
 .inbox-timeline > li.is-bad::before { background: var(--series-crit); }
 .inbox-timeline > li.is-warn::before { background: var(--series-warn); }
 .inbox-timeline > li.is-now::before { background: var(--accent-text); }
+.inbox-timeline-text { display: block; color: var(--text-primary); }
+.inbox-timeline-meta { display: flex; flex-wrap: wrap; gap: 0.375rem; margin-top: 0.1rem; font-size: 0.75rem; color: var(--text-muted); }
+.inbox-quote { margin: 0.4rem 0 0; padding: 0.4rem 0.75rem; border-left: 3px solid var(--border-strong); border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--surface-inset); font-size: 0.8125rem; color: var(--text-secondary); white-space: pre-line; }
 
-/* Workflow designer (MIG-276): the workflows, then the chain of steps with the step's panel beside it. */
-.designer-grid { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1024px) { .designer-grid { grid-template-columns: 300px minmax(0, 1fr); } }
-.designer-body { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
-@media (min-width: 1280px) { .designer-body { grid-template-columns: minmax(0, 1fr) 380px; } }
-@media (min-width: 1280px) { .designer-panel { position: sticky; top: 1rem; } }
-.designer-end { align-self: center; display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.85rem; border-radius: 999px;
-  font-size: 0.78rem; color: var(--text-secondary); background: var(--surface-sunken); border: 1px solid var(--border-subtle); }
-.designer-link { align-self: center; width: 2px; height: 1.1rem; background: var(--border-strong); }
-.designer-step { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.5rem; padding: 0.75rem 0.85rem; width: 100%; max-width: 40rem;
-  align-self: center; border-left: 3px solid transparent; }
-.designer-step.is-on { border-left-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text); }
-.designer-step.has-problem { border-left-color: var(--series-crit); }
-.designer-step-main { display: flex; align-items: flex-start; gap: 0.75rem; flex: 1; min-width: 0; background: transparent; text-align: left; }
-.designer-step-main:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: var(--radius-sm); }
-.designer-step-icon { display: inline-flex; align-items: center; justify-content: center; width: 2rem; height: 2rem; flex-shrink: 0;
-  border-radius: var(--radius-md); background: var(--surface-sunken); color: var(--accent-text); }
-.designer-problem { flex-basis: 100%; display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.78rem; color: var(--series-crit); margin: 0; }
-.designer-add { display: grid; gap: 0.25rem; grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); width: 100%; max-width: 40rem; align-self: center; }
-.designer-add-item { display: flex; align-items: flex-start; gap: 0.6rem; padding: 0.55rem 0.65rem; border-radius: var(--radius-md); background: transparent; }
+/* Workflow designer (MIG-276), on the Task inbox's layout (owner, 2026-10-06: "redesign the page"): the workflows and the
+   workflow opened from them as two panes that scroll on their own (.inbox-page, .inbox-split, .inbox-list, .inbox-row).
+   The workflow's pane is a column: its header and tabs, the view, the publish bar pinned at the foot. */
+@media (min-width: 1024px) { .designer-split { grid-template-columns: 320px minmax(0, 1fr); } }
+@media (min-width: 1600px) { .designer-split { grid-template-columns: 360px minmax(0, 1fr); } }
+.designer-status { display: flex; width: 100%; }
+.designer-status .seg-btn { flex: 1 1 0; justify-content: center; }
+.designer-seg-count { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.designer-row { min-height: 3.25rem; }
+
+.designer-detail { overflow: hidden; }
+.designer-head { flex: none; display: flex; flex-direction: column; gap: 0.4rem; padding: 1rem 1.5rem 0; border-bottom: 1px solid var(--border-subtle); }
+.designer-head-top { display: flex; align-items: flex-start; gap: 0.75rem; }
+.designer-head-actions { flex: none; display: flex; align-items: center; gap: 0.5rem; }
+.designer-desc { font-size: 0.875rem; color: var(--text-secondary); max-width: 72ch; }
+.designer-tabs { border-bottom: 0; margin-top: 0.35rem; }
+.designer-tabs .tab .pill { padding-block: 0; }
+.designer-tabs .tab:disabled { opacity: 0.45; cursor: not-allowed; }
+.designer-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Steps: the flow on the shared graph canvas takes the width (zoom, fit, full screen, minimap), the step's properties
+   sit in a column beside it, each scrolling on its own. Add a step floats over the canvas's top left. */
+.designer-body { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) clamp(17rem, 28%, 22.5rem); }
+.designer-canvas { position: relative; min-height: 24rem; display: flex; flex-direction: column; }
+.designer-canvas > app-flow-graph { flex: 1 1 0; min-height: 0; }
+.designer-tools { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 2; display: flex; max-width: calc(100% - 3.75rem); }
+.designer-problem { display: flex; align-items: flex-start; gap: 0.4rem; font-size: 0.78rem; color: var(--crit-text); margin: 0; }
+.designer-add { display: grid; gap: 0.25rem; grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr)); width: min(30rem, 100%); padding: 0.5rem;
+  box-shadow: 0 4px 16px var(--shadow-color); }
+.designer-add-where { grid-column: 1 / -1; padding: 0.25rem 0.6rem 0; font-size: 0.75rem; font-weight: 600; color: var(--text-secondary); }
+.designer-add-item { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.6rem; border-radius: var(--radius-md); background: transparent; }
 .designer-add-item:hover, .designer-add-item:focus-visible { background: var(--surface-sunken); }
+
+/* The step's properties. */
+.designer-props { min-height: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--surface-raised); border-left: 1px solid var(--border-subtle); }
+.designer-props-head { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 0.6rem; padding: 0.75rem 1rem;
+  background: var(--surface-raised); border-bottom: 1px solid var(--border-subtle); }
+.designer-props-icon { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 2rem; height: 2rem; border-radius: var(--radius-md); }
+.designer-props-body { padding: 1rem; }
+.designer-props-close, .designer-props-head-empty, .designer-scrim { display: none; }
+
+/* Below 1024 px the properties slide over from the right, over a scrim, with a close button. */
+@media (max-width: 1023.98px) {
+  .designer-body { grid-template-columns: minmax(0, 1fr); }
+  .designer-props { position: fixed; top: 0; right: 0; bottom: 0; z-index: 45; width: min(26rem, calc(100vw - 2.5rem));
+    border-left: 1px solid var(--border-strong); box-shadow: -12px 0 32px var(--shadow-color);
+    transform: translateX(100%); visibility: hidden; transition: transform 200ms ease, visibility 0s linear 200ms; }
+  .designer-props.is-open { transform: none; visibility: visible; transition: transform 200ms ease; }
+  .designer-props-close { display: inline-flex; }
+  .designer-props-head-empty { display: flex; justify-content: flex-end; }
+  .designer-scrim { display: block; position: fixed; inset: 0; z-index: 44; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
+  .designer-body[data-sheet="open"] .designer-scrim { opacity: 1; pointer-events: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .designer-props, .designer-props.is-open, .designer-scrim { transition: none; } }
+
+/* Publishing: pinned at the pane's foot, marked once something is unpublished. */
+.designer-foot { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem; padding: 0.625rem 1.5rem;
+  background: var(--surface-inset); border-top: 1px solid var(--border-subtle); }
+.designer-foot.is-dirty { box-shadow: inset 3px 0 0 var(--warn-text); }
+.designer-foot-problems { flex-basis: 100%; display: flex; flex-direction: column; gap: 0.25rem; }
+.designer-foot-note { flex: 1 1 14rem; min-width: 0; }
+.designer-foot > [data-test="publish"] { margin-left: auto; }
+.designer-foot-quiet { flex: 1 1 16rem; font-size: 0.75rem; color: var(--text-muted); }
+
+/* Versions. */
+.designer-versions { list-style: none; margin: 0; padding: 0; }
+.designer-version { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1.5rem; border-bottom: 1px solid var(--border-subtle); }
 /* Forms (MIG-277): a table field's rows, and the box a signature is drawn in -- paper-white in either theme, so the
    ink shows and the PNG is what was seen. */
 .form-table { overflow-x: auto; }
@@ -2381,4 +2760,52 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 @media (min-width: 1280px) {
   .ask-split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(20rem, 34rem); column-gap: 1.5rem; align-items: start; }
   .ask-split > .ask-sources { border-top: 0; padding-top: 0; border-left: 1px solid var(--border-subtle); padding-left: 1rem; }
+}
+
+/* The top bar's active link (Home): unlayered, so it outranks the link's own colour utilities. */
+.nav-top-active { color: var(--accent-text); background: var(--accent-soft); }
+
+/* The mark over the sidebar (≥1440px, owner 2026-10-12): the bar loses its page padding and the 24px "E" sits on
+   the sidebar icons' centre line -- 26px from the left expanded (8px rail padding + 10px link padding + half a 16px
+   icon), 27.5px on the 56px collapsed rail -- and "ETL Console" starts where the labels do (44px). Unlayered, so it
+   outranks the bar's px-* utilities at 2xl. Pinned by e2e/brand-alignment.spec.ts. */
+@media (min-width: 90rem) {
+  .shell-bar { max-width: none; padding-left: 0; }
+  .brand-slot { padding-left: 0.875rem; }
+  .brand-slot.is-collapsed { padding-left: 0.96875rem; }
+  .brand-slot app-brand-mark { gap: 0.375rem; }
+  .brand-slot .brand-e { width: 1.5rem; height: 1.5rem; }
+}
+
+/* UX review B6 (AI1): one chat composer -- the AI Assistant, Ask your data and the file chat. The box takes the row, its
+   actions sit at its foot on the right, one height, so Send lines up with the box's bottom edge in all three. */
+.chat-composer { display: flex; align-items: flex-end; gap: 0.5rem; min-width: 0; }
+.chat-composer > textarea { flex: 1 1 auto; min-width: 0; min-height: 3.75rem; max-height: 12rem; resize: vertical; }
+.chat-composer > .btn { flex: none; min-height: 1.75rem; }
+
+/* Owner 10-12: the password rules as one small info chip under the field; a click opens them all. */
+@layer components {
+  .rules-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 1.5rem;
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .rules-chip:hover { border-color: var(--accent-mark); color: var(--text-primary); }
+  .rules-chip:focus-visible { outline: 2px solid var(--accent-mark); outline-offset: 2px; }
+  .rules-chip-ok { color: var(--ok-text); border-color: color-mix(in srgb, var(--ok-text) 45%, transparent); }
+}
+
+/* Owner 10-13: a table's actions column says "Actions" -- a blank last header read as a missing label. Right-aligned over
+   the icon buttons, and never wrapped or cut, whatever width the column was given. */
+@layer components {
+  th.th-actions { text-align: right; white-space: nowrap; }
 }

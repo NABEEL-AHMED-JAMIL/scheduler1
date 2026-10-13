@@ -1,55 +1,49 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
+import { api, authOf, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { bestEffort, deleteObject, getJson, keptRun as keptRunOf, outputsOf, Output, tasks } from './support/workspace';
+import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
  * MIG-253: Documents -- the converter's Dataset → PDF and From an execution, Reports as generated outputs, and
- * Storage's file details, as workspace 2924's administrator (4537), against the live media-service render (MIG-232)
- * and Core's run outputs.
+ * Storage's file details, as Riverside Health's administrator, against the live media-service render (MIG-232) and
+ * Core's run outputs.
  *
- * Live data it reads: schedule 2849 "UI-CHECK registry chain job 0929" and its latest run that still keeps
- * customers-clean.json (found at start through the API, or E2E_FILES_RUN), which kept a 3-row dataset (3 rows,
- * customers-clean.json) and uploaded ui-review-s3/registry-live-check/customers-clean.json. What it writes, and leaves:
- * one PDF, ui-review-s3/reports/UI-CHECK run 7405 e2e.pdf (overwritten on each run). Nothing else is saved.
+ * Live data it reads (support/fixtures.ts, the rebuilt platform's, never changed): the "readmission" pipeline's schedule
+ * and its latest run that still keeps readmission-statistics.csv (found at start through the API, or E2E_FILES_RUN;
+ * when none does any more, the schedule is run once to make one), which kept that dataset and uploaded a copy to the
+ * workspace's bucket. What it writes: one PDF, <bucket>/reports/E2E run report.pdf, deleted again when the describe ends.
  *
- * Needs media-service and Core behind :9098 and a console at E2E_BASE_URL with MIG-253 (`ng serve --port 4422`). Sign-in:
- *   E2E_TENANT_ADMIN_TOKEN   a TENANT_ADMIN access token (etl-platform/scripts/mint-test-token.sh 4537 900)
- *   E2E_SHOTS                optional: a folder the screenshots are also written to
+ * Needs media-service and Core behind :9098 and a console at E2E_BASE_URL with MIG-253. Sign-in through
+ * support/session.ts (role admin); E2E_SHOTS optional: a folder the screenshots are also written to.
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const SCHEDULE = 'UI-CHECK registry chain job 0929';
-const SAVED = 'UI-CHECK run 7405 e2e';
+const KEPT = 'readmission-statistics.csv';
+const SAVED = 'E2E run report';
+let s: Session;
+/** The workspace's storage connection (alias), its label as the bucket picker shows it, and the schedule's name. */
+let BUCKET = '';
+let BUCKET_LABEL = '';
+let SCHEDULE = '';
+let TASK = '';
 
-interface Session { data: Record<string, unknown>; }
-
-/** The schedule's latest completed run that still keeps customers-clean.json, and that dataset's id. */
+/** The schedule's latest completed run that still keeps the statistics csv, that dataset's id, rows and upload. */
 let RUN = 0;
 let DATASET = 0;
+let ROWS = 0;
+let UPLOAD: Output;
 
 async function keptRun(request: APIRequestContext): Promise<{ run: number; dataset: number }> {
-  const headers = { Authorization: `Bearer ${token}` };
   const pinned = Number(process.env['E2E_FILES_RUN'] ?? 0);
-  const runs = pinned ? [{ jobQueueId: pinned, jobStatus: 'Completed' }]
-    : (await (await request.get(`${api}/sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849`, { headers })).json())?.data?.jobQueues ?? [];
-  for (const run of runs.filter((r: { jobStatus: string }) => r.jobStatus === 'Completed').slice(0, 3)) {
-    const outputs = (await (await request.get(`${api}/sourceJob.json/runOutputs?jobQueueId=${run.jobQueueId}`, { headers })).json())?.data?.outputs ?? [];
-    const kept = outputs.find((o: { kind: string; name: string; expired?: boolean }) => o.kind === 'file' && o.name === 'customers-clean.json' && !o.expired);
-    if (kept) return { run: run.jobQueueId, dataset: kept.runDatasetId };
+  if (pinned) {
+    const outputs = await outputsOf(request, s, pinned);
+    return { run: pinned, dataset: outputs.find(o => o.name === KEPT)?.runDatasetId ?? 0 };
   }
-  throw new Error('Schedule 2849 has no recent run that still keeps customers-clean.json: run it once (Run now), then run this spec.');
-}
-
-async function session(request: APIRequestContext): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
+  return keptRunOf(request, s, pipeline('readmission').jobId, KEPT);
 }
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width, height: width < 600 ? 844 : 900 }, acceptDownloads: true });
-  const page = await context.newPage();
+  const page = await signedIn(browser, s, { viewport: { width, height: width < 600 ? 844 : 900 }, acceptDownloads: true });
   // A worktree's node_modules is a symlink out of the project, so `ng serve` answers pdf.js's worker at its /@fs/
   // path with 403 and every preview says "could not be opened". The same worker is served as an asset
   // (angular.json copies it to /pdfjs-dist/build/); hand that over. A built console never asks for /@fs/.
@@ -57,8 +51,6 @@ async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page>
     const worker = await page.request.get('/pdfjs-dist/build/pdf.worker.mjs');
     await route.fulfill({ status: 200, contentType: 'text/javascript', body: await worker.body() });
   });
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
   return page;
 }
 
@@ -89,10 +81,10 @@ async function nextRender(seen: RenderAnswer[], before: number): Promise<RenderA
   return seen[before];
 }
 
-/** Whether ui-review-s3 can be listed right now (LocalStack is not persistent and is sometimes down). */
+/** Whether the workspace's bucket can be listed right now (LocalStack is not persistent and is sometimes down). */
 async function bucketReadable(request: APIRequestContext): Promise<boolean> {
-  const r = await request.get(`${api}/storage.json/listObjects?bucket=ui-review-s3&prefix=&maxKeys=1`,
-    { headers: { Authorization: `Bearer ${token}` } });
+  const r = await request.get(`${api}/storage.json/listObjects?bucket=${encodeURIComponent(BUCKET)}&prefix=&maxKeys=1`,
+    { headers: authOf(s) });
   return (await r.json().catch(() => ({})))?.status === 'SUCCESS';
 }
 
@@ -106,25 +98,43 @@ async function expectPdfPreview(page: Page): Promise<void> {
 }
 
 test.describe('Documents: converter, Reports and file details (live)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
-  let s: Session;
+  test.skip(!canSignIn('admin'), NEEDS.admin);
+  test.skip(!hasFixtures(), NEEDS_FIXTURES);
   test.beforeAll(async ({ request }) => {
-    s = await session(request);
+    test.setTimeout(240_000);   // a fresh run of the schedule, when no recent one keeps its file
+    s = await sessionFor(request, 'admin');
+    BUCKET = riverside().storageAlias;
+    const buckets: { bucket: string; label?: string }[] = (await getJson(request, s, '/storage.json/buckets')).data ?? [];
+    BUCKET_LABEL = buckets.find(b => b.bucket === BUCKET)?.label ?? BUCKET;
+    const readmission = pipeline('readmission');
+    SCHEDULE = ((await getJson(request, s, '/sourceJob.json/listSourceJob?page=1&limit=1000')).data ?? [])
+      .find((j: { jobId: number }) => j.jobId === readmission.jobId)?.jobName;
+    TASK = (await tasks(request, s)).find(t => t.taskDetailId === readmission.taskId)?.taskName ?? '';
+    expect(SCHEDULE && TASK, 'the readmission schedule and its pipeline').toBeTruthy();
     // The run is found, not pinned: Reports reads each schedule's latest runs, so a pinned run drops out of it as soon
-    // as the schedule runs a few more times (run 7405 did on 2026-09-29).
+    // as the schedule runs a few more times.
     const kept = await keptRun(request);
     RUN = kept.run;
     DATASET = kept.dataset;
+    const steps = (await getJson(request, s, `/sourceJob.json/stepExecutions?jobQueueId=${RUN}`)).data?.steps ?? [];
+    ROWS = steps.flatMap((st: { datasets?: { name: string; rowCount: number }[] }) => st.datasets ?? [])
+      .find((d: { name: string }) => d.name === KEPT)?.rowCount ?? 0;
+    UPLOAD = (await outputsOf(request, s, RUN)).find(o => o.kind === 'bucket')!;
+    expect(UPLOAD, `run ${RUN} uploaded its statistics to the bucket`).toBeTruthy();
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (s && BUCKET) await bestEffort(`delete ${BUCKET}/reports/${SAVED}.pdf`, () => deleteObject(request, s, BUCKET, `reports/${SAVED}.pdf`));
   });
 
   test('Dataset → PDF: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
-    await page.goto('/documents/converter');
+    await page.goto('/tools/converter');
     await page.getByRole('button', { name: 'Dataset → PDF' }).click();
     await page.locator('#render-rows').fill('[{"region":"North","revenue":1234.5},{"region":"South","revenue":980}]');
     await expect(page.getByText('2 rows · 2 columns: region, revenue')).toBeVisible();
-    await page.locator('#render-title').fill('UI-CHECK regions');
+    await page.locator('#render-title').fill('E2E regions');
 
     await page.getByRole('button', { name: 'Preview', exact: true }).click();
     const preview = await nextRender(renders, 0);
@@ -133,26 +143,28 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expectPdfPreview(page);
     await shot(page, info, 'documents-dataset-preview');
 
-    await page.locator('#render-name').fill('UI-CHECK regions e2e');
+    await page.locator('#render-name').fill('E2E regions');
     await page.getByRole('button', { name: 'Make PDF' }).click();
     expect((await nextRender(renders, 1)).status).toBe('SUCCESS');
     const download = page.waitForEvent('download');
     await page.locator('[data-render-result]').getByRole('button', { name: 'Download' }).click();
     const file = await download;
-    expect(file.suggestedFilename()).toBe('UI-CHECK regions e2e.pdf');
+    expect(file.suggestedFilename()).toBe('E2E regions.pdf');
     expect(readFileSync((await file.path())!).subarray(0, 5).toString()).toBe('%PDF-');
   });
 
-  /** Schedule 2849 → its latest kept run → that run's one kept dataset, picked in the converter. */
+  /** The schedule → its latest kept run → that run's kept statistics, picked in the converter. */
   async function pickKeptRun(page: Page): Promise<void> {
-    await page.goto('/documents/converter');
+    await page.goto('/tools/converter');
     await page.getByRole('button', { name: 'From an execution' }).click();
-    await page.locator('#render-schedule').fill('registry chain');
-    await page.getByRole('option', { name: new RegExp(`^${SCHEDULE}`) }).click();
+    await page.locator('#render-schedule').fill(SCHEDULE.split(' ').slice(0, 2).join(' '));
+    await page.getByRole('option', { name: new RegExp(`^${SCHEDULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click();
     await page.locator('#render-run').selectOption(String(RUN));
-    // The run kept one dataset, so it is picked without asking.
-    await expect(page.locator('#render-dataset')).toHaveValue(String(DATASET));
-    await expect(page.getByText(`3 rows from run #${RUN}, ready to render.`)).toBeVisible();
+    // A run that kept one dataset has it picked without asking; this one also kept its PDF, so the csv is picked here.
+    const dataset = page.locator('#render-dataset');
+    if ((await dataset.inputValue()) !== String(DATASET)) await dataset.selectOption(String(DATASET));
+    await expect(dataset).toHaveValue(String(DATASET));
+    await expect(page.getByText(`${ROWS} rows from run #${RUN}, ready to render.`)).toBeVisible();
   }
 
   test('From an execution: the kept run\'s dataset previewed as a PDF', async ({ browser }, info) => {
@@ -167,19 +179,19 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await shot(page, info, 'documents-execution-preview');
   });
 
-  test('From an execution: the kept run\'s PDF saved to ui-review-s3/reports/', async ({ browser }) => {
+  test('From an execution: the kept run\'s PDF saved to the workspace\'s bucket, under reports/', async ({ browser }) => {
     const page = await pageAs(browser, s);
-    test.skip(!(await bucketReadable(page.request)), 'ui-review-s3 cannot be listed (LocalStack down): saving is not checked.');
+    test.skip(!(await bucketReadable(page.request)), `${BUCKET} cannot be listed (LocalStack down): saving is not checked.`);
     const renders = await recordRenders(page);
     await pickKeptRun(page);
     await page.locator('#render-name').fill(SAVED);
     await page.getByText('Save the file to a bucket').click();
-    await page.locator('#render-bucket').fill('ui-review');
-    await page.getByRole('option', { name: /UI-REVIEW LocalStack S3/ }).click();
+    await page.locator('#render-bucket').fill(BUCKET_LABEL.split(' ')[0]);
+    await page.getByRole('option', { name: new RegExp(BUCKET_LABEL) }).click();
     await expect(page.locator('#render-folder')).toHaveValue('reports/');
     await page.getByRole('button', { name: 'Make PDF' }).click();
     expect((await nextRender(renders, 0)).status).toBe('SUCCESS');
-    await expect(page.locator('[data-render-result]')).toContainText('saved to ui-review-s3');
+    await expect(page.locator('[data-render-result]')).toContainText(`saved to ${BUCKET}`);
     await expect(page.locator('[data-render-result]').getByRole('link', { name: 'Open in storage' })).toBeVisible();
   });
 
@@ -187,36 +199,39 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     const bucket = await bucketReadable(page.request);
-    await page.goto('/documents/reports');
+    await page.goto('/data/reports');
     const rows = page.locator('table tbody tr');
     const run = rows.filter({ has: page.getByRole('link', { name: `Run #${RUN}` }) });
     await expect(run.first()).toBeVisible();
     expect(await run.count()).toBeGreaterThanOrEqual(2);
-    await expect(run.filter({ hasText: `Kept by run #${RUN}` })).toContainText('Ready');
-    await expect(run.filter({ hasText: `Kept by run #${RUN}` })).toContainText('UI-CHECK registry chain task 0929');
-    await expect(run.filter({ hasText: 'ui-review-s3/registry-live-check/customers-clean.json' })).toContainText('In storage');
+    await expect(run.filter({ hasText: `Kept by run #${RUN}` }).first()).toContainText('Ready');
+    await expect(run.filter({ hasText: `Kept by run #${RUN}` }).first()).toContainText(TASK);
+    await expect(run.filter({ hasText: `${UPLOAD.bucket}/${UPLOAD.key}` })).toContainText('In storage');
     if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
-    else await expect(page.getByRole('alert')).toContainText('ui-review-s3/reports/ could not be read');
+    else await expect(page.getByRole('alert')).toContainText(`${BUCKET}/reports/ could not be read`);
     await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
     await shot(page, info, 'documents-reports');
 
-    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: 'Preview customers-clean.json' }).click();
+    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: `Preview ${KEPT}` }).click();
     expect((await nextRender(renders, 0)).status).toBe('SUCCESS');
-    const dialog = page.getByRole('dialog', { name: 'Preview of customers-clean.json' });
+    const dialog = page.getByRole('dialog', { name: `Preview of ${KEPT}` });
     await expect(dialog.locator('canvas').first()).toBeVisible();
   });
 
   test('Storage: the details of a file the kept run uploaded name the run and pipeline', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
-    test.skip(!(await bucketReadable(page.request)), 'ui-review-s3 cannot be listed (LocalStack down).');
-    await page.goto('/documents/files?bucket=ui-review-s3&prefix=registry-live-check/');
-    await page.getByRole('button', { name: 'Actions for customers-clean.json' }).click();
+    test.skip(!(await bucketReadable(page.request)), `${BUCKET} cannot be listed (LocalStack down).`);
+    const folder = UPLOAD.key!.slice(0, UPLOAD.key!.lastIndexOf('/') + 1);
+    const size = Number((await getJson(page.request, s, `/storage.json/objectMetadata?bucket=${encodeURIComponent(BUCKET)}&key=${encodeURIComponent(UPLOAD.key!)}`)).data?.size);
+    await page.goto(`/data/files?bucket=${encodeURIComponent(BUCKET)}&prefix=${encodeURIComponent(folder)}`);
+    await page.getByRole('button', { name: `Actions for ${UPLOAD.name}` }).click();
     await page.getByRole('menuitem', { name: 'Details' }).click();
-    const panel = page.getByRole('dialog', { name: 'customers-clean.json' });
+    const panel = page.getByRole('dialog', { name: UPLOAD.name });
     await expect(panel.getByRole('link', { name: `Run #${RUN}` })).toBeVisible();
-    await expect(panel).toContainText('UI-CHECK registry chain task 0929');
+    await expect(panel).toContainText(TASK);
     await expect(panel).toContainText('No policy');
-    await expect(panel).toContainText('169 B');
+    if (size < 1024) await expect(panel).toContainText(`${size} B`);
+    else await expect(panel).toContainText(/\d+(\.\d+)? KB/);
     await shot(page, info, 'documents-file-details');
   });
 });

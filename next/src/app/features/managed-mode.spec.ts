@@ -15,16 +15,16 @@ const hasBanner = (v: Visit) => !!v.main.querySelector('[data-managed-banner]');
 
 /** The screens that build, with the controls that write there and must be gone when MANAGED. */
 const SCREENS: { url: string; writes: string[] }[] = [
-  { url: '/pipelines', writes: ['New pipeline', 'Bulk import'] },
+  { url: '/pipelines/list', writes: ['New pipeline', 'Bulk import'] },
   { url: '/pipelines/schedules', writes: ['New schedule', 'Bulk import'] },
-  { url: '/integration/api-collections', writes: ['New collection'] },
-  { url: '/integration/sources', writes: ['New source'] },
-  { url: '/ai/prompts', writes: ['New prompt'] },
-  { url: '/ai/connections', writes: ['New connection'] },
-  { url: '/integration/storage-connections', writes: ['New connection'] },
+  { url: '/connections/api-collections', writes: ['New collection'] },
+  { url: '/connections/sources', writes: ['New source'] },
+  { url: '/pipelines/prompts', writes: ['New prompt'] },
+  { url: '/settings/model-connections', writes: ['New connection'] },
+  { url: '/connections/storage', writes: ['New storage connection'] },
   // Owner 2026-09-29: the Kafka and Task Registry screens are build screens too.
-  { url: '/configuration/kafka', writes: ['New connection'] },
-  { url: '/configuration/task-registry', writes: ['New pipeline'] },
+  { url: '/settings/kafka', writes: ['New connection'] },
+  { url: '/settings/task-registry', writes: ['New registry task'] },
 ];
 
 /** A button or link in the page (not the menu) that says this. */
@@ -57,11 +57,14 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
 
   // Owner 2026-09-29: running an existing schedule is not building it -- Run now and Run with stay for the customer.
   it('a schedule\'s menu keeps what reads and runs, and loses what builds', async () => {
-    const v = await visit('/pipelines/schedules', 'TENANT_ADMIN', null, {}, MANAGED);
+    const v = await visit('/pipelines/schedules', 'TENANT_ADMIN', null, {
+      // A pipeline with an AI step: the AI-model run is offered only there (review 2026-10-07).
+      'GET /sourceJob.json/aiModelChoice': { status: 'SUCCESS', message: '1 AI step(s).', data: { steps: [{ stepKey: 'summary' }] } },
+    }, MANAGED);
     await click(v, /^Actions for /);
     const items = overlay().items.join(' | ');
     expect(v.main.querySelector('[data-managed-banner]')?.textContent).toContain('You can still run them.');
-    for (const kept of ['Run now', 'Run with', 'Edit', 'Executions', 'Ask about this job']) expect(items).toContain(kept);
+    for (const kept of ['Run now', 'Run with a different AI model…', 'Edit', 'Executions', 'Ask about this schedule']) expect(items).toContain(kept);
     for (const gone of ['Skip next run', 'Duplicate', 'Email notifications', 'Deactivate', 'Delete']) {
       expect(items, gone).not.toContain(gone);
     }
@@ -70,7 +73,7 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
   const editors: [string, string][] = [
     [`/pipelines/${LIVE_IDS.taskId}/edit`, 'Save'],
     [`/pipelines/schedules/${LIVE_IDS.jobId}/edit`, 'Save'],
-    [`/ai/prompts/${LIVE_IDS.promptId}/edit`, 'Save'],
+    [`/pipelines/prompts/${LIVE_IDS.promptId}/edit`, 'Save'],
   ];
   for (const [url, save] of editors) {
     it(`${url}: the banner, and saving is off`, async () => {
@@ -95,13 +98,13 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
     { jobQueueId: 9101, jobId: LIVE_IDS.jobId, jobStatus: 'Running', startTime: '2026-09-29T09:00:00', dateCreated: '2026-09-29T09:00:00' },
   ] } };
   it('the queue shows the banner and offers no Mark as failed / interrupted', async () => {
-    const v = await visit('/pipelines/queue', 'TENANT_ADMIN', null, RUNNING, MANAGED);
+    const v = await visit('/runs/by-date', 'TENANT_ADMIN', null, RUNNING, MANAGED);
     expect(hasBanner(v)).toBe(true);
     expect(v.main.querySelectorAll('[aria-label^="Actions for run #"]').length).toBe(0);
   });
 
   it('a SELF workspace\'s queue keeps its run actions, with no banner', async () => {
-    const v = await visit('/pipelines/queue', 'TENANT_ADMIN', null, RUNNING);
+    const v = await visit('/runs/by-date', 'TENANT_ADMIN', null, RUNNING);
     expect(hasBanner(v)).toBe(false);
     expect(v.main.querySelectorAll('[aria-label^="Actions for run #"]').length).toBeGreaterThan(0);
   });
@@ -114,8 +117,20 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
     expect(staff.surface.requests).not.toContain('GET /appUser.json/me');
   });
 
+  // UX final MG1: Create pipeline is a build action -- Core refuses its saves in a MANAGED workspace with the same
+  // sentence -- so the assistant carries the build screens' banner, and offers Create pipeline only where one may build.
+  it('the AI Assistant shows the managed banner in a MANAGED workspace, and none in a SELF one or a staff session', async () => {
+    const managed = await visit('/ai/assistant', 'TENANT_ADMIN', null, {}, MANAGED);
+    expect(hasBanner(managed)).toBe(true);
+    expect(managed.main.querySelector('[data-managed-banner]')!.textContent).toContain('pipelines');
+    restoreClock();
+    expect(hasBanner(await visit('/ai/assistant', 'TENANT_ADMIN', null))).toBe(false);
+    restoreClock();
+    expect(hasBanner(await visit('/ai/assistant', 'TENANT_ADMIN', null, {}, STAFF))).toBe(false);
+  });
+
   it('the inbox keeps its uploads and loses its settings', async () => {
-    const v = await visit('/documents/inbox', 'TENANT_ADMIN', null, {}, MANAGED);
+    const v = await visit('/documents/file-drop', 'TENANT_ADMIN', null, {}, MANAGED);
     expect(hasBanner(v)).toBe(true);
     expect(offered(v, 'Set up the inbox')).toBe(false);
     expect(offered(v, 'Inbox settings')).toBe(false);

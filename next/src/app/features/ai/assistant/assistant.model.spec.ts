@@ -98,7 +98,7 @@ describe('assistant model -- the confirmation card', () => {
 
 describe('assistant model -- links', () => {
   it('opens an execution on its run page', () => {
-    expect(runLink({ kind: 'execution', jobId: 2848, jobQueueId: 7404 })).toEqual(['/pipelines/schedules', 2848, 'runs', 7404, 'logs']);
+    expect(runLink({ kind: 'execution', jobId: 2848, jobQueueId: 7404 })).toEqual(['/pipelines/schedules', 2848, 'runs', 7404]);
     expect(runLink({ kind: 'execution', jobId: 2848 })).toEqual(['/pipelines/schedules', 2848, 'executions']);
   });
 
@@ -130,7 +130,7 @@ describe('assistant model -- the registry', () => {
     expect(toolState(tool({ available: false, unavailableReason: 'No endpoint.' }))).toEqual({ label: 'Blocked', tone: 'crit', reason: 'No endpoint.' });
     expect(toolState(tool({ enabledInWorkspace: false }))).toEqual({ label: 'Off', tone: 'neutral', reason: 'Switched off in this workspace.' });
     expect(toolState(tool({ youMayUse: false, requiredRole: 'TENANT_ADMIN' })))
-      .toEqual({ label: 'Blocked', tone: 'crit', reason: 'Needs the Tenant administrator role.' });
+      .toEqual({ label: 'Blocked', tone: 'crit', reason: 'Needs the Workspace administrator role.' });
   });
 
   it('allows a tool that is available, on, and yours to use', () => {

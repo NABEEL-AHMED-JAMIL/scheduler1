@@ -74,7 +74,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "a document in review": {
-    "url": "/documents/review/1005",
+    "url": "/review/documents/1005",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -108,11 +108,12 @@ export const PINNED: Record<string, unknown> = {
       "Vendor"
     ],
     "links": [
-      "/documents/review"
+      "/review",
+      "/review/documents"
     ]
   },
   "a document in review, as a tenant user with the page": {
-    "url": "/documents/review/1005",
+    "url": "/review/documents/1005",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -145,11 +146,12 @@ export const PINNED: Record<string, unknown> = {
       "Vendor"
     ],
     "links": [
-      "/documents/review"
+      "/review",
+      "/review/documents"
     ]
   },
   "an approved document, read-only": {
-    "url": "/documents/review/1000",
+    "url": "/review/documents/1000",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -184,7 +186,8 @@ export const PINNED: Record<string, unknown> = {
       "Supplier"
     ],
     "links": [
-      "/documents/review"
+      "/review",
+      "/review/documents"
     ]
   },
   "read a document": {
@@ -209,7 +212,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the dataset, as a workspace administrator": {
-    "url": "/documents/intelligence?tab=dataset",
+    "url": "/documents/datasets",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -219,19 +222,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/dataset?documentTypeId=1001&page=0&size=50"
     ],
     "headings": [
-      "Document Intelligence",
+      "Datasets",
       "Dataset (1 of 1)"
     ],
     "buttons": [
       "CSV",
       "Columns",
-      "Dataset",
-      "Document types",
-      "Intake",
       "JSON Lines",
-      "New document type",
-      "Overview",
-      "Read a stored file",
+      "More actions",
       "Refresh",
       "Upload documents"
     ],
@@ -250,11 +248,17 @@ export const PINNED: Record<string, unknown> = {
       "Document type"
     ],
     "links": [
-      "/documents/review/1000"
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types",
+      "/review/documents/1000"
     ]
   },
   "the document types, as a workspace administrator": {
-    "url": "/documents/intelligence?tab=types",
+    "url": "/documents/types",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -263,19 +267,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentType.json/fetchAll"
     ],
     "headings": [
-      "Document Intelligence",
+      "Document types",
       "Document types"
     ],
     "buttons": [
       "Columns",
-      "Dataset",
-      "Document types",
-      "Intake",
       "Invoice",
-      "New document type",
-      "Overview",
+      "More actions",
       "Purchase order",
-      "Read a stored file",
       "Refresh",
       "Upload documents"
     ],
@@ -292,32 +291,37 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": []
+    "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types"
+    ]
   },
   "the overview, as a tenant user with the page": {
-    "url": "/documents/intelligence",
+    "url": "/documents/in",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentExtraction.json/stats?days=30",
       "GET /documentType.json/fetchAll",
       "GET /documentOcr.json/fetchAll",
+      "GET /sourceJob.json/documentTrigger",
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
-      "Document Intelligence",
+      "Documents in",
+      "What approved documents start",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
-      "Dataset",
-      "Document types",
-      "Intake",
-      "Invoice: 4 fields, 0 documents",
-      "Overview",
-      "Purchase order: 4 fields, 1 document",
-      "Read a stored file",
+      "Invoice",
+      "More actions",
+      "Purchase order",
       "Refresh",
       "Upload documents"
     ],
@@ -338,19 +342,25 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/documents/review",
-      "/documents/review/1000",
-      "/documents/review/1005"
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types",
+      "/review/documents",
+      "/review/documents/1000",
+      "/review/documents/1005"
     ]
   },
   "the overview, as a tenant user without the page": {
-    "url": "/unauthorized?page=document-intelligence",
+    "url": "/unauthorized?page=document-intelligence&title=Documents%20in",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Document Intelligence isn't part of your access"
+      "Documents in isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -362,7 +372,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the overview, as a workspace administrator": {
-    "url": "/documents/intelligence",
+    "url": "/documents/in",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -370,24 +380,21 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/stats?days=30",
       "GET /documentType.json/fetchAll",
       "GET /documentOcr.json/fetchAll",
+      "GET /sourceJob.json/documentTrigger",
       "GET /documentExtraction.json/fetchAll"
     ],
     "headings": [
-      "Document Intelligence",
+      "Documents in",
+      "What approved documents start",
       "Recent documents (2 of 2)"
     ],
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
       "Custom type",
-      "Dataset",
-      "Document types",
-      "Intake",
-      "Invoice: 4 fields, 0 documents",
-      "New document type",
-      "Overview",
-      "Purchase order: 4 fields, 1 document",
-      "Read a stored file",
+      "Invoice",
+      "More actions",
+      "Purchase order",
       "Refresh",
       "Upload documents"
     ],
@@ -408,19 +415,25 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/documents/review",
-      "/documents/review/1000",
-      "/documents/review/1005"
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types",
+      "/review/documents",
+      "/review/documents/1000",
+      "/review/documents/1005"
     ]
   },
   "the review queue, as a tenant user without the page": {
-    "url": "/unauthorized?page=document-review",
+    "url": "/unauthorized?page=document-review&title=Document%20review",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Review queue isn't part of your access"
+      "Document review isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -432,7 +445,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the review queue, as a workspace administrator": {
-    "url": "/documents/review",
+    "url": "/review/documents",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -442,7 +455,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentOcr.json/fetchAll"
     ],
     "headings": [
-      "Review queue",
+      "Document review",
       "Documents (1 of 1)"
     ],
     "buttons": [
@@ -452,6 +465,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [
       [
+        "",
         "Document",
         "Type",
         "To check",
@@ -465,11 +479,18 @@ export const PINNED: Record<string, unknown> = {
       "Claimed",
       "Confidence",
       "Document type",
+      "Select all documents on this page that can be decided",
+      "Select ocr-live-check.png",
       "State",
       "Waiting"
     ],
     "links": [
-      "/documents/review/1005"
+      "/review",
+      "/review/all",
+      "/review/approvals",
+      "/review/documents",
+      "/review/documents/1005",
+      "/review/runs"
     ]
   }
 };

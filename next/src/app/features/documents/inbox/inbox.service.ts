@@ -50,8 +50,13 @@ export class InboxApi {
     return this.http.get<ApiResponse<BucketSummary[]>>(`${this.base}/buckets`);
   }
 
-  /** The workspace's members, for "uploaded by" -- an administrator's read; a member is refused and sees numbers. */
+  /** The workspace's members, for "uploaded by" -- an administrator's read; a member is refused it. */
   users(): Observable<ApiResponse<{ appUserId: number; fullName?: string; username?: string }[]>> {
     return this.http.get<ApiResponse<{ appUserId: number; fullName?: string; username?: string }[]>>(`${API_BASE}/appUser.json/listUsers`);
+  }
+
+  /** The names a member may read (MIG-321): the colleagues the task inbox offers; without that page, numbers stay. */
+  colleagues(): Observable<ApiResponse<{ userId: number; fullName?: string; username?: string }[]>> {
+    return this.http.get<ApiResponse<{ userId: number; fullName?: string; username?: string }[]>>(`${API_BASE}/taskInbox.json/colleagues`);
   }
 }

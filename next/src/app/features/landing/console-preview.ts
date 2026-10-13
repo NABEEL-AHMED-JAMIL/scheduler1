@@ -112,8 +112,8 @@ type View = 'dashboard' | 'jobs' | 'reports';
         @case ('jobs') {
           <div class="view">
             <div class="px-4 py-2.5 flex items-center gap-3 text-[11px] dim uppercase tracking-wider">
-              <span class="flex-1">Job</span>
-              <span class="w-24 hidden sm:block">Schedule</span>
+              <span class="flex-1">Schedule</span>
+              <span class="w-24 hidden sm:block">When</span>
               <span class="w-20 text-right">Status</span>
             </div>
             @for (row of jobRows; track row.name) {
@@ -194,12 +194,12 @@ export class ConsolePreview {
 
   readonly tabs: { id: View; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'jobs', label: 'Jobs' },
+    { id: 'jobs', label: 'Schedules' },
     { id: 'reports', label: 'Reports' },
   ];
 
   readonly tiles = [
-    { label: 'Total jobs', value: 40 },
+    { label: 'Total schedules', value: 40 },
     { label: 'Active', value: 30 },
     { label: 'Running', value: 2 },
     { label: 'Completed', value: 914 },
@@ -209,15 +209,15 @@ export class ConsolePreview {
   readonly weekBars = [38, 62, 45, 88, 54, 0, 0, 71, 96, 60, 42, 78];
 
   readonly jobRows = [
-    { name: 'Port disruption — nightly load', task: 'Hurricane Data Task',
+    { name: 'Sales orders — nightly load', task: 'Orders Import',
       schedule: 'Daily 03:00', status: 'Completed', chip: 'chip-ok' },
-    { name: 'Claims baseline — hourly refresh', task: 'Catastrophe Claims',
+    { name: 'Customer records — hourly refresh', task: 'Customer Sync',
       schedule: 'Hourly', status: 'Running', chip: 'chip-run' },
-    { name: 'Cat bond loss — Mon and Thu', task: 'Loss History',
+    { name: 'Inventory snapshot — Mon and Thu', task: 'Inventory Snapshot',
       schedule: 'Mon, Thu', status: 'Queued', chip: 'chip-wait' },
-    { name: 'Story archive — fortnightly', task: 'Weather Story Archive',
+    { name: 'Web log archive — fortnightly', task: 'Log Archive',
       schedule: 'Every 2 wks', status: 'Failed', chip: 'chip-fail' },
-    { name: 'Crop origin risk — month end', task: 'Weather Risk',
+    { name: 'Ledger export — month end', task: 'Ledger Export',
       schedule: 'Last day', status: 'Completed', chip: 'chip-ok' },
   ];
 
@@ -233,9 +233,9 @@ export class ConsolePreview {
 
   /** Every way a run can end, so the mock shows the same columns as the real table. */
   readonly reportRows = [
-    { task: 'Port disruption history', done: 96, failed: 2, stopped: 1, skipped: 3, missed: 0 },
-    { task: 'Catastrophe claims', done: 74, failed: 5, stopped: 0, skipped: 1, missed: 2 },
-    { task: 'Cat bond loss history', done: 61, failed: 0, stopped: 0, skipped: 0, missed: 0 },
-    { task: 'Crop origin weather', done: 48, failed: 3, stopped: 2, skipped: 4, missed: 1 },
+    { task: 'Orders import', done: 96, failed: 2, stopped: 1, skipped: 3, missed: 0 },
+    { task: 'Customer sync', done: 74, failed: 5, stopped: 0, skipped: 1, missed: 2 },
+    { task: 'Inventory snapshot', done: 61, failed: 0, stopped: 0, skipped: 0, missed: 0 },
+    { task: 'Ledger export', done: 48, failed: 3, stopped: 2, skipped: 4, missed: 1 },
   ];
 }

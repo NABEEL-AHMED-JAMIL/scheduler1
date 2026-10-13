@@ -1,0 +1,149 @@
+{
+  "source": "Palettes from the theme files that ship in the echarts npm package (node_modules/echarts/theme/*.js), Apache License 2.0, copyright The Apache Software Foundation. The first eight colours of each; the console draws chrome (text, axes, tooltips) from its own tokens.",
+  "themes": [
+    {
+      "id": "classic",
+      "label": "Classic",
+      "file": "echarts/theme/v5.js",
+      "designedFor": "light",
+      "colors": [
+        "#5470c6",
+        "#91cc75",
+        "#fac858",
+        "#ee6666",
+        "#73c0de",
+        "#3ba272",
+        "#fc8452",
+        "#9a60b4"
+      ]
+    },
+    {
+      "id": "vintage",
+      "label": "Vintage",
+      "file": "echarts/theme/vintage.js",
+      "designedFor": "light",
+      "colors": [
+        "#d87c7c",
+        "#919e8b",
+        "#d7ab82",
+        "#6e7074",
+        "#61a0a8",
+        "#efa18d",
+        "#787464",
+        "#cc7e63"
+      ]
+    },
+    {
+      "id": "macarons",
+      "label": "Macarons",
+      "file": "echarts/theme/macarons.js",
+      "designedFor": "light",
+      "colors": [
+        "#2ec7c9",
+        "#b6a2de",
+        "#5ab1ef",
+        "#ffb980",
+        "#d87a80",
+        "#8d98b3",
+        "#e5cf0d",
+        "#97b552"
+      ]
+    },
+    {
+      "id": "infographic",
+      "label": "Infographic",
+      "file": "echarts/theme/infographic.js",
+      "designedFor": "light",
+      "colors": [
+        "#c1232b",
+        "#27727b",
+        "#fcce10",
+        "#e87c25",
+        "#b5c334",
+        "#fe8463",
+        "#9bca63",
+        "#fad860"
+      ]
+    },
+    {
+      "id": "shine",
+      "label": "Shine",
+      "file": "echarts/theme/shine.js",
+      "designedFor": "light",
+      "colors": [
+        "#c12e34",
+        "#e6b600",
+        "#0098d9",
+        "#2b821d",
+        "#005eaa",
+        "#339ca8",
+        "#cda819",
+        "#32a487"
+      ]
+    },
+    {
+      "id": "roma",
+      "label": "Roma",
+      "file": "echarts/theme/roma.js",
+      "designedFor": "light",
+      "colors": [
+        "#e01f54",
+        "#001852",
+        "#f5e8c8",
+        "#b8d2c7",
+        "#c6b38e",
+        "#a4d8c2",
+        "#f3d999",
+        "#d3758f"
+      ]
+    },
+    {
+      "id": "royal",
+      "label": "Royal",
+      "file": "echarts/theme/royal.js",
+      "designedFor": "light",
+      "colors": [
+        "#3f7ea6",
+        "#993366",
+        "#408000",
+        "#8c6f56",
+        "#a65149",
+        "#731f17",
+        "#adc2eb",
+        "#d9c3b0"
+      ]
+    },
+    {
+      "id": "helianthus",
+      "label": "Helianthus",
+      "file": "echarts/theme/helianthus.js",
+      "designedFor": "light",
+      "colors": [
+        "#44b7d3",
+        "#e42b6d",
+        "#f4e24e",
+        "#fe9616",
+        "#8aed35",
+        "#ff69b4",
+        "#ba55d3",
+        "#cd5c5c"
+      ]
+    },
+    {
+      "id": "midnight",
+      "label": "Midnight",
+      "file": "echarts/theme/dark.js",
+      "designedFor": "dark",
+      "colors": [
+        "#4992ff",
+        "#7cffb2",
+        "#fddd60",
+        "#ff6e76",
+        "#58d9f9",
+        "#05c091",
+        "#ff8a45",
+        "#8d48e3"
+      ]
+    }
+  ]
+}

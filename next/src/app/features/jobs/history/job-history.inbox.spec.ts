@@ -9,7 +9,7 @@ import { JobHistory } from './job-history';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { useMemoryStorage } from '../../../shared/testing/memory-storage';
-import { arrivalsOf, patternProblem, runsStartedByFile, triggerOf, triggerSentence } from '../inbox/inbox-trigger';
+import { arrivalsOf, batchProblem, patternProblem, runsStartedByFile, triggerOf, triggerSentence, waitingSentence } from '../inbox/inbox-trigger';
 
 /**
  * MIG-251 on MIG-239: a job started by a file arriving in the inbox (the "Event" start) says so on its Executions --
@@ -35,6 +35,8 @@ function open(answers: { trigger?: unknown; arrivals?: unknown } = {}) {
     { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
   const fixture = TestBed.createComponent(JobHistory);
   fixture.componentRef.setInput('jobId', '2848');
+  // UX review E3: the schedule's details start folded; these read the triggers inside them.
+  fixture.componentInstance.showDetail.set(true);
   fixture.detectChanges();
   const http = TestBed.inject(HttpTestingController);
   const reply = (path: string, data: unknown) =>
@@ -70,12 +72,24 @@ describe('Executions: runs a file started', () => {
   it('says what the trigger takes, and what the last files did', () => {
     const { el } = open();
     const inbox = el.querySelector<HTMLElement>('.inbox-trigger')!;
-    expect(inbox.textContent).toContain('Every file named like *.csv that arrives in the inbox starts this job.');
+    expect(inbox.textContent).toContain('Every file named like *.csv that arrives in the inbox starts this schedule.');
     expect(inbox.textContent).toContain('live-customers.csv');
     expect(inbox.textContent).toContain('late.csv');
     expect(inbox.textContent).toContain('still in flight');
-    const link = inbox.querySelector<HTMLAnchorElement>('a[href*="/runs/7387/logs"]');
+    const link = inbox.querySelector<HTMLAnchorElement>('a[href*="/runs/7387"]');
     expect(link).not.toBeNull();
+  });
+
+  // MIG-360: a file that lands while a run is going is not dropped: it waits its turn, and says which.
+  it('shows a waiting file with its place in line, and how many wait', () => {
+    const waiting = { arrivalId: 'a3', bucket: 'b', key: 'intake/z-next.csv', fileName: 'next.csv', bytes: 9, outcome: 'Waiting',
+      reason: 'A run of this job was in flight when this file arrived; it waits, and the job\'s next run takes it.', jobQueueId: null,
+      place: 2, dateCreated: '2026-09-29T04:43:00Z' };
+    const { el } = open({ trigger: { ...TRIGGER, waiting: 2, batchSize: 1 }, arrivals: [waiting, ...ARRIVALS] });
+    const inbox = el.querySelector<HTMLElement>('.inbox-trigger')!;
+    expect(inbox.querySelector('[data-test="arrival-waiting"]')!.textContent!.trim()).toBe('Waiting · #2 in line');
+    expect(inbox.querySelector('[data-test="inbox-waiting"]')!.textContent).toContain('2 files wait for the run in flight to end');
+    expect(inbox.textContent).not.toContain('next run takes it');
   });
 
   it('shows nothing new for a job with no trigger and no arrivals', () => {
@@ -99,10 +113,21 @@ describe('Executions: runs a file started', () => {
 
 describe('inbox trigger wording', () => {
   it('says what the trigger does in Core\'s words', () => {
-    expect(triggerSentence(TRIGGER as any)).toBe('Every file named like *.csv that arrives in the inbox starts this job.');
-    expect(triggerSentence({ ...TRIGGER, filePattern: null } as any)).toBe('Every file that arrives in the inbox starts this job.');
+    expect(triggerSentence(TRIGGER as any)).toBe('Every file named like *.csv that arrives in the inbox starts this schedule.');
+    expect(triggerSentence({ ...TRIGGER, filePattern: null } as any)).toBe('Every file that arrives in the inbox starts this schedule.');
     expect(triggerSentence({ ...TRIGGER, enabled: false } as any)).toContain('off');
-    expect(triggerSentence({ jobId: 1, configured: false })).toBe('No file in the inbox starts this job.');
+    expect(triggerSentence({ jobId: 1, configured: false })).toBe('No file in the inbox starts this schedule.');
+    expect(triggerSentence({ ...TRIGGER, batchSize: 10 } as any)).toContain('the next run takes up to 10 of them');
+    expect(waitingSentence({ ...TRIGGER, waiting: 0 } as any)).toBe('');
+    expect(waitingSentence({ ...TRIGGER, waiting: 1 } as any)).toBe('1 file waits for the run in flight to end.');
+  });
+
+  it('holds files per run to 1..50', () => {
+    expect(batchProblem(1)).toBe('');
+    expect(batchProblem('50')).toBe('');
+    expect(batchProblem(0)).toContain('1 to 50');
+    expect(batchProblem(51)).toContain('1 to 50');
+    expect(batchProblem('2.5')).toContain('whole number');
   });
 
   it('reads only real answers', () => {

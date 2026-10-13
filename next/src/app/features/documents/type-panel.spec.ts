@@ -90,6 +90,46 @@ describe('TypePanel', () => {
       definition: expect.objectContaining({ autoApproveThreshold: 0.85 }) }));
   });
 
+  /** MIG-319: a lookup names its list -- a file in one of the workspace's buckets (asked for once) -- and saves it. */
+  it('adds a lookup on a bucket file, offering the workspace\'s buckets', async () => {
+    const buckets = vi.fn(() => of([{ alias: 'demo-northwind-s3', label: 'Demo Northwind storage' }]));
+    const { fixture, panel, api, el } = panelWith({}, OWN, { buckets });
+    await fixture.whenStable();
+    panel.startEdit();
+    expect(buckets).not.toHaveBeenCalled();
+    panel.addRule();
+    const i = panel.def().rules.length - 1;
+    panel.patchRule(i, { rule: 'lookup', field: 'po_number', fields: null, tolerance: null });
+    panel.patchList(i, { name: 'Open purchase orders', bucket: 'demo-northwind-s3', key: 'reference/purchase_orders.csv', column: 'po_number' });
+    panel.patchRule(i, { rule: 'lookup' });
+    await fixture.whenStable();
+    expect(buckets).toHaveBeenCalledTimes(1);
+    expect(el.querySelector(`[aria-label="Rule ${i + 1} list file"]`)).not.toBeNull();
+    expect(el.querySelector('datalist option')?.getAttribute('value')).toBe('demo-northwind-s3');
+    panel.save();
+    expect(api.saveType).toHaveBeenCalledWith(expect.objectContaining({ definition: expect.objectContaining({ rules: expect.arrayContaining([
+      { rule: 'lookup', field: 'po_number', list: { name: 'Open purchase orders', bucket: 'demo-northwind-s3', key: 'reference/purchase_orders.csv',
+        column: 'po_number' } }]) }) }));
+  });
+
+  it('adds a duplicate and an unusual rule with their own settings', async () => {
+    const { fixture, panel, api, el } = panelWith({}, OWN);
+    await fixture.whenStable();
+    panel.startEdit();
+    panel.addRule();
+    panel.addRule();
+    const n = panel.def().rules.length;
+    panel.patchRule(n - 2, { rule: 'duplicate', fields: ['supplier_name', 'total'], withinDays: 90, tolerance: null });
+    panel.patchRule(n - 1, { rule: 'unusual', field: 'total', groupBy: 'supplier_name', ratio: 3, fields: null, tolerance: null });
+    await fixture.whenStable();
+    expect(el.querySelector(`[aria-label="Rule ${n - 1} fields a duplicate has the same"]`)).not.toBeNull();
+    expect(el.querySelector(`[aria-label="Rule ${n} ratio"]`)).not.toBeNull();
+    panel.save();
+    const rules = (api.saveType.mock.calls[0] as unknown as [{ definition: { rules: unknown[] } }])[0].definition.rules;
+    expect(rules.slice(-2)).toEqual([{ rule: 'duplicate', fields: ['supplier_name', 'total'], withinDays: 90 },
+      { rule: 'unusual', field: 'total', groupBy: 'supplier_name', ratio: 3 }]);
+  });
+
   it('says to open it again when the type moved on since', async () => {
     const conflict = new HttpErrorResponse({ status: 409, error: { status: 'ERROR',
       message: 'This document type has changed since v3 was opened. Open it again to see v4, then save your change on it.' } });

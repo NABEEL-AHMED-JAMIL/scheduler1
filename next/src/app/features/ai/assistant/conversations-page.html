@@ -1,0 +1,195 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <!-- The breadcrumb leads back: Build › AI Assistant › All conversations (UX review 2026-10-12, A2). -->
+        <h1 class="page-title">All conversations</h1>
+        <p class="page-subtitle">
+          Everything you asked the assistant: what each conversation was, what it came to (a pipeline created or still a draft, a run
+          and how it went, an answer) and when. Only yours; the search looks in titles and every message.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
+      </div>
+    </div>
+  </app-page-header>
+
+  <div class="cp-grid" [class.cp-open]="!!selected()">
+    <!-- Facets: the server's counts; a facet's own choice is left out of its counts. -->
+    <aside class="cp-facets card p-3" aria-label="Filters" data-facets>
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-sm">Filters</h2>
+        @if (filtered()) { <button type="button" class="link-inline text-xs" (click)="clearAll()">Clear all</button> }
+      </div>
+      <fieldset class="cp-facet">
+        <legend>Kind</legend>
+        @for (k of kinds; track k) {
+          <label class="cp-opt">
+            <input type="checkbox" class="checkbox" [checked]="kind().includes(k)" (change)="toggleKind(k)" [attr.data-facet-kind]="k" />
+            <span>{{ kindLabel[k] }}</span><span class="cp-count">{{ count('kind', k) }}</span>
+          </label>
+        }
+      </fieldset>
+      <fieldset class="cp-facet">
+        <legend>Status</legend>
+        @for (o of outcomes; track o) {
+          @if (count('outcome', o) || outcome().includes(o)) {
+            <label class="cp-opt">
+              <input type="checkbox" class="checkbox" [checked]="outcome().includes(o)" (change)="toggleOutcome(o)" [attr.data-facet-outcome]="o" />
+              <span>{{ outcomeLabel[o] }}</span><span class="cp-count">{{ count('outcome', o) }}</span>
+            </label>
+          }
+        }
+      </fieldset>
+      <fieldset class="cp-facet">
+        <legend>Last used</legend>
+        <label class="cp-opt">
+          <input type="radio" name="cp-day" class="checkbox" [checked]="updated() === null" (change)="pickDay(null)" />
+          <span>Any time</span><span class="cp-count">{{ dayTotal() }}</span>
+        </label>
+        @for (d of days; track d) {
+          <label class="cp-opt">
+            <input type="radio" name="cp-day" class="checkbox" [checked]="updated() === d" (change)="pickDay(d)" [attr.data-facet-day]="d" />
+            <span>{{ dayLabel[d] }}</span><span class="cp-count">{{ count('updated', d) }}</span>
+          </label>
+        }
+      </fieldset>
+      <fieldset class="cp-facet">
+        <legend>Pinned</legend>
+        <label class="cp-opt">
+          <input type="checkbox" class="checkbox" [checked]="pinnedOnly()" (change)="togglePinned()" />
+          <span>Pinned only</span><span class="cp-count">{{ pinnedCount() }}</span>
+        </label>
+      </fieldset>
+    </aside>
+
+    <!-- The list. -->
+    <section class="card p-0 min-w-0" aria-label="Conversations">
+      <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-subtle">
+        <label class="search-field max-w-md flex-1 min-w-48">
+          <app-icon name="search" size="0.9em" />
+          <input type="search" class="input input-sm" placeholder="Search titles and messages" aria-label="Search titles and messages"
+                 maxlength="200" [value]="q()" (input)="search($any($event.target).value)" />
+        </label>
+        <span class="text-xs text-[color:var(--text-muted)] ml-auto" aria-live="polite" data-total>
+          {{ loading() ? 'Reading…' : total() + ' conversation' + (total() === 1 ? '' : 's') }}
+        </span>
+      </div>
+      @if (error()) {
+        <div class="mt-4 mx-1 rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2" role="alert">
+          <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" /><span class="flex-1">{{ error() }}</span>
+          <button type="button" class="link-inline" (click)="load()">Retry</button>
+        </div>
+      }
+      <div class="scroll-table">
+        <table class="table-modern" data-table>
+          <thead>
+            <tr>
+              <th scope="col">Conversation</th>
+              <th scope="col" class="cp-wide">Kind</th>
+              <th scope="col">Status</th>
+              <th scope="col" class="cp-wide">Pipeline</th>
+              <th scope="col" class="cp-wide text-right">Messages</th>
+              <th scope="col" class="text-right">Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of rows(); track c.conversationId) {
+              @let b = badge(c);
+              <tr class="cp-row" tabindex="0" [class.row-selected]="selectedId() === c.conversationId" [attr.aria-selected]="selectedId() === c.conversationId"
+                  [attr.data-conversation]="c.conversationId" (click)="select(c)" (keydown)="key($event, c)">
+                <td>
+                  <div class="flex items-center gap-2.5 min-w-0 cp-title">
+                    <app-icon [name]="icon(c)" class="shrink-0 text-[color:var(--text-muted)]" />
+                    <div class="min-w-0">
+                      <div class="text-sm font-medium truncate flex items-center gap-1.5">
+                        @if (c.pinned) { <span class="text-[color:var(--accent-text)]" title="Pinned" aria-label="Pinned">•</span> }
+                        <span class="truncate">{{ title(c) }}</span>
+                      </div>
+                      @if (c.firstQuestion && c.firstQuestion !== title(c)) { <div class="cp-q">{{ c.firstQuestion }}</div> }
+                    </div>
+                  </div>
+                </td>
+                <td class="cp-wide whitespace-nowrap">{{ kindLabel[kindOf(c)] }}</td>
+                <td>@if (b) { <span class="pill" [class]="'pill-' + b.tone" data-badge>{{ b.label }}</span> }</td>
+                <td class="cp-wide">
+                  @if (c.pipelineKey && c.taskDetailId) {
+                    <a class="link-inline" [routerLink]="['/pipelines', c.taskDetailId, 'edit']" (click)="$event.stopPropagation()">{{ c.pipelineId || c.pipelineName }}</a>
+                  } @else if (c.pipelineName) {
+                    <span class="text-[color:var(--text-secondary)]">{{ c.pipelineName }}</span>
+                  } @else { <span class="text-[color:var(--text-muted)]">—</span> }
+                </td>
+                <td class="cp-wide text-right tabular-nums">{{ c.messageCount ?? 0 }}</td>
+                <td class="text-right whitespace-nowrap" [title]="c.dateUpdated | serverTime: 'dateTime'">{{ time(c) }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="text-center py-10 text-sm text-[color:var(--text-muted)]">
+                  @if (loading()) { Reading the conversations… }
+                  @else if (filtered()) { Nothing matches these filters. <button type="button" class="link-inline" (click)="clearAll()">Clear them</button> }
+                  @else { No conversations yet. <a class="link-inline" routerLink="/ai/assistant">Ask the assistant</a> }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      @if (more()) {
+        <div class="px-4 py-3 border-t border-subtle flex items-center gap-3">
+          <button type="button" class="btn btn-default btn-sm" [disabled]="loadingMore()" (click)="loadMore()">
+            {{ loadingMore() ? 'Loading…' : 'Load more' }}
+          </button>
+          <span class="text-xs text-[color:var(--text-muted)]">{{ rows().length }} of {{ total() }} shown</span>
+        </div>
+      }
+    </section>
+
+    <!-- The picked conversation. -->
+    @if (selected(); as c) {
+      @let b = badge(c);
+      <aside class="cp-detail card p-0" aria-label="Conversation detail" data-detail>
+        <header class="flex items-start gap-3 px-4 py-3 border-b border-subtle">
+          <span class="grid place-items-center rounded-lg size-7 bg-[color:var(--surface-inset)] shrink-0"><app-icon [name]="icon(c)" /></span>
+          <div class="min-w-0 flex-1">
+            <h2 class="font-semibold text-sm break-words">{{ title(c) }}</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">{{ kindLabel[kindOf(c)] }} · {{ c.dateUpdated | serverTime: 'dateTime' }}</p>
+          </div>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close the detail" (click)="selectedId.set(null)"><app-icon name="close" /></button>
+        </header>
+        <div class="px-4 py-3 flex flex-col gap-4 text-sm">
+          <section>
+            <h3 class="label">First question</h3>
+            <p class="whitespace-pre-wrap break-words text-[color:var(--text-secondary)]">{{ c.firstQuestion || '—' }}</p>
+          </section>
+          <section>
+            <h3 class="label">Outcome</h3>
+            <div class="flex flex-col gap-1.5">
+              @if (b) {
+                <div class="flex items-center gap-2">
+                  <span class="pill" [class]="'pill-' + b.tone">{{ b.label }}</span>
+                  @if (b.link) { <a class="link-inline text-xs" [routerLink]="b.link">{{ c.outcome === 'pipeline_saved' ? 'Open the pipeline' : 'Open the run' }}</a> }
+                </div>
+              } @else { <p class="text-[color:var(--text-muted)]">Still being worked on.</p> }
+              @if (c.pipelineName) { <p class="text-xs"><span class="text-[color:var(--text-muted)]">Pipeline:</span> {{ c.pipelineName }}{{ c.pipelineId ? ' (' + c.pipelineId + ')' : '' }}</p> }
+              @if (c.outcome === 'pipeline_draft' && c.pipelineErrors) {
+                <p class="text-xs text-[color:var(--text-secondary)]">The design has {{ c.pipelineErrors }} error{{ c.pipelineErrors === 1 ? '' : 's' }} to fix before it can be created; open the conversation to see them on the flow.</p>
+              }
+              @if (c.runStatus) { <p class="text-xs"><span class="text-[color:var(--text-muted)]">Last run:</span> {{ c.runStatus }}{{ c.runJobQueueId ? ' (run ' + c.runJobQueueId + ')' : '' }}</p> }
+            </div>
+          </section>
+          <dl class="grid grid-cols-2 gap-2 text-xs">
+            <div><dt class="text-[color:var(--text-muted)]">Messages</dt><dd>{{ c.messageCount ?? 0 }}</dd></div>
+            <div><dt class="text-[color:var(--text-muted)]">Started</dt><dd>{{ c.dateCreated | serverTime: 'dateTime' }}</dd></div>
+          </dl>
+        </div>
+        <footer class="flex flex-wrap items-center gap-2 px-4 py-3 border-t border-subtle">
+          <button type="button" class="btn btn-primary btn-sm" (click)="openInAssistant(c)" data-open><app-icon name="chat" />Open</button>
+          <button type="button" class="btn btn-default btn-sm" (click)="togglePin(c)" data-pin>{{ c.pinned ? 'Unpin' : 'Pin' }}</button>
+          <button type="button" class="btn btn-ghost btn-sm ml-auto text-crit-500" (click)="remove(c)" data-delete><app-icon name="trash" class="icon-crit" />Delete</button>
+        </footer>
+      </aside>
+    }
+  </div>
+</div>

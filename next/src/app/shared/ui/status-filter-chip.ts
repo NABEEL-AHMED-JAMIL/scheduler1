@@ -10,16 +10,15 @@ import { StatusPill } from './status-pill';
   selector: 'app-status-filter-chip',
   imports: [StatusPill],
   template: `
-    <!-- The ring COLOUR is static and only its width toggles: an Angular [class.x] binding
-         cannot carry a bracketed arbitrary-value class name. It was ring-brand-500, which the
-         monochrome rebrand made near-black -- 1.37:1 on the dark page, so the selected filter
-         looked exactly like an unselected one. -->
-    <button type="button" class="card px-3.5 py-2 flex items-center gap-2 hover:shadow-md
-                                 transition-shadow ring-[color:var(--focus-ring)]"
+    <!-- Owner 2026-10-12: a filter of the list, in its toolbar -- the toolbar's one 28 px height, not a card standing
+         twice as tall beside the search. The ring colour is static and only its width toggles (a bracketed arbitrary
+         value cannot ride a [class.x] binding); --focus-ring keeps the selected chip visible in dark mode. -->
+    <button type="button" class="btn btn-default btn-sm gap-2 ring-[color:var(--focus-ring)]"
             [class.ring-2]="selected()"
             [attr.aria-pressed]="selected()"
+            [attr.data-status]="status()"
             (click)="toggle.emit()">
-      <app-status [label]="status()" />
+      <app-status [label]="status()" [quiet]="true" />
       <span class="tabular font-semibold">{{ count() }}</span>
     </button>
   `,

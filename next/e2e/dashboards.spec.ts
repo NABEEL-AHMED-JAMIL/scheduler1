@@ -1,14 +1,15 @@
-import { test, expect, Page } from '@playwright/test';
-import { readFileSync } from 'fs';
+import { expect as expectNow, Page } from '@playwright/test';
+import { defaultSession, NO_SESSION, signedIn, test } from './support/session';
+import { analyticsFixtures, boardName, ordersTotalRevenue } from './support/analytics-fixtures';
 import { KIND_IDS } from '../src/app/features/analytics/widget-kinds';
 
 /**
  * The five seeded reports, opened the way a person opens them.
  *
- * <b>These reports are real rows, not fixtures this file creates.</b> They were written by
- * process/src/test/java/process/e2e/AnalyticsReportsE2EIT#seedTheFiveReports against the live
- * database, and every one of their twenty-seven widgets was proved to RUN against the real
- * 150,000-row object in MinIO before being saved. What is left to check is the half that Java
+ * <b>These reports are real rows, made by the suite.</b> support/analytics-fixtures.ts saves them
+ * (named "E2E ...") in the signed-in workspace the first time they are missing, with the widgets
+ * analytics-service's AnalyticsReportsE2EIT and OrdersReportsE2EIT prove runnable, over datasets it
+ * uploads itself -- no longer the platform administrator's rows, which a tenant cannot see. What is left to check is the half that Java
  * suite structurally cannot see: whether opening the page draws them.
  *
  * <b>Dashboards cache nothing.</b> The page says so in as many words, and it is the reason these
@@ -27,18 +28,16 @@ const REPORTS = [
   { name: 'Executive summary',    widgets: 6, tell: 'Distinct customers' },
 ];
 
-function signedIn(): boolean {
-  try {
-    const state = JSON.parse(readFileSync('e2e/.auth/state.json', 'utf8'));
-    return (state.origins ?? []).length > 0;
-  } catch {
-    return false;
-  }
-}
+test.skip(!signedIn(), NO_SESSION);
+// Opening a dataset reads it from S3 (a 38 MB CSV for orders); a slow read is not a failure, so each test has two minutes.
+test.describe.configure({ timeout: 120_000 });
+// ...and an analysis or a scan over it may answer after the usual fifteen seconds.
+const expect = expectNow.configure({ timeout: 45_000 });
 
-test.beforeEach(async () => {
-  test.skip(!signedIn(),
-    'No session. Start the stack and run with E2E_PASSWORD=… npx playwright test');
+// The fixtures are found, or made once, in the signed-in workspace (support/analytics-fixtures.ts, MIG-330).
+test.beforeAll(async ({ request }) => {
+  test.setTimeout(600_000);   // the first run of all uploads 45 MB and saves ten boards; every later one only reads
+  await analyticsFixtures(request, await defaultSession(request));
 });
 
 async function openLibrary(page: Page) {
@@ -51,7 +50,7 @@ async function openLibrary(page: Page) {
  * is enough: nothing here is named as a prefix of anything else.
  */
 function boardCard(page: Page, name: string) {
-  return page.locator('a.dash-card', { hasText: name });
+  return page.locator('a.dash-card', { hasText: boardName(name) });
 }
 
 async function openBoard(page: Page, name: string) {
@@ -61,11 +60,21 @@ async function openBoard(page: Page, name: string) {
 }
 
 /**
- * The chart kinds of one tile: they live in its menu, under "Show as", one item per kind with
- * the kind id in data-kind. Opens the menu and hands back the items.
+ * The chart kinds of one tile: they live in its menu, under "All charts", one item per kind with
+ * the kind id in data-kind (the suggestions above them are .dash-suggested). Opens the menu,
+ * unfolds the categories in which nothing fits, and hands back the items. A kind that cannot draw
+ * the result is aria-disabled -- focusable, so its reason can be read -- not disabled.
  */
 async function kindsOf(page: Page, title: string) {
   await page.getByRole('button', { name: `Actions for ${title}` }).click();
+  // The menu first: counted before it is drawn, the toggle reads as absent.
+  await expect(page.locator('.dash-tile-menu .dash-kind').first()).toBeVisible();
+  const misfits = page.locator('button.dash-misfits');
+  if (await misfits.count() && await misfits.getAttribute('aria-checked') === 'false') {
+    await misfits.click();
+    // Unfolded only once the menu has drawn it: read straight after the click, the list was the folded one (2026-10-07).
+    await expect(misfits).toHaveAttribute('aria-checked', 'true');
+  }
   return page.locator('button.dash-kind');
 }
 
@@ -139,17 +148,20 @@ test('the picker offers every kind, and disables the ones this result cannot hon
     const items = await kindsOf(page, 'Total revenue');
     const kinds = await items.evaluateAll(buttons => buttons.map(button => ({
       value: (button as HTMLButtonElement).dataset['kind']!,
-      disabled: (button as HTMLButtonElement).disabled,
+      disabled: button.getAttribute('aria-disabled') === 'true',
     })));
 
     // Against the list the picker is built from, not a number written here. This said
     // "Fourteen: the original four, seven chart kinds, and three summaries" and was already wrong
     // by two -- shareStacked and pivot had been added and the sentence was not -- so the spec
     // failed on whatever change happened to run next and read as that change's regression.
-    expect(kinds.map(kind => kind.value)).toEqual(KIND_IDS);
+    // Sorted: the menu lists what fits first in each category (2026-10-06), so its order is the
+    // result's, not the catalogue's. Every kind, once.
+    expect(kinds.map(kind => kind.value).sort()).toEqual([...KIND_IDS].sort());
     const enabled = kinds.filter(kind => !kind.disabled).map(kind => kind.value);
-    // One row, one column, no dimension: a single figure and a table, and nothing else honestly.
-    expect(enabled.sort()).toEqual(['kpi', 'table']);
+    // One row, one column, no dimension: a single figure, a table, and a gauge (one figure against
+    // a target, ECharts, 2026-10-06) -- and nothing else honestly.
+    expect(enabled.sort()).toEqual(['gauge', 'kpi', 'table']);
   });
 
 test('a single-figure tile draws the figure, and says it showed one row', async ({ page }) => {
@@ -160,8 +172,9 @@ test('a single-figure tile draws the figure, and says it showed one row', async 
 
   await (await kindsOf(page, 'Total revenue')).and(page.locator('[data-kind="kpi"]')).click();
 
-  // Grouped, not raw: the engine returns 103909527.57999787 over the CSV.
-  await expect(page.getByText('103,909,527.58')).toBeVisible();
+  // Grouped, not raw: the engine returns a long float over the CSV; the tile prints it to the cent, which is the sum
+  // the fixture computes independently.
+  await expect(page.getByText(ordersTotalRevenue())).toBeVisible();
   // "0 of 1 rows shown" was the first version of this: a no-dimension analysis has no marks.
   await expect(page.getByText('0 of 1 rows shown')).toHaveCount(0);
 });
@@ -175,10 +188,11 @@ test('a dimension-ordered series offers a line; a rank-ordered one refuses with 
     await expect(page.getByText('Revenue by month', { exact: true })).toBeVisible();
     await page.waitForTimeout(6000);
 
-    // The DOM property: the menu disables the button itself, and says why in its title.
+    // aria-disabled, not the DOM property: a kind that does not fit stays focusable so its reason
+    // can be read, and says why in its title.
     const kinds = await kindsOf(page, 'Revenue by month');
-    await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveJSProperty('disabled', false);
-    await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveJSProperty('disabled', true);
+    await expect(kinds.and(page.locator('[data-kind="line"]'))).not.toHaveAttribute('aria-disabled', 'true');
+    await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveAttribute('aria-disabled', 'true');
     await expect(kinds.and(page.locator('[data-kind="stacked"]')))
       .toHaveAttribute('title', /second dimension/);
   });
@@ -190,9 +204,9 @@ test('a two-dimension cross-tab is the one that may be stacked', async ({ page }
   await page.waitForTimeout(6000);
 
   const kinds = await kindsOf(page, 'Revenue by category and region');
-  await expect(kinds.and(page.locator('[data-kind="stacked"]'))).toHaveJSProperty('disabled', false);
+  await expect(kinds.and(page.locator('[data-kind="stacked"]'))).not.toHaveAttribute('aria-disabled', 'true');
   // Sorted biggest-first, so a line through them would draw the sort.
-  await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveJSProperty('disabled', true);
+  await expect(kinds.and(page.locator('[data-kind="line"]'))).toHaveAttribute('aria-disabled', 'true');
 });
 
 /**
@@ -337,8 +351,11 @@ test('clicking a bar narrows the board, and the rolled-up bar is not a button',
 
     await bars.first().click();
 
-    // The bar opened and carries the clicked value as an ordinary, editable condition -- not a
-    // hidden narrowing whose only trace is that the numbers moved.
+    // The facts line says a filter is on (owner 2026-10-06: the bar no longer opens on a click, which
+    // pushed the board down mid-click), and its pill opens the bar: the clicked value is an
+    // ordinary, editable condition -- not a hidden narrowing whose only trace is that the numbers moved.
+    await expect(page.locator('.dash-filter-pill')).toHaveText(/1 filter on/);
+    await page.locator('.dash-filter-pill').click();
     const builder = page.locator('app-filter-builder');
     await expect(builder).toBeVisible();
     await expect(builder.getByLabel('Column for condition 1')).toHaveValue('sub_category');

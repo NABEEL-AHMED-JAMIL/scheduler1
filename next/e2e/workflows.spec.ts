@@ -1,37 +1,25 @@
-import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { test, expect, Browser, Page } from '@playwright/test';
+import { hasToken, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
+import { cancelRunning, inactivateWorkflow } from './support/forms';
 
 /**
- * Workflows (MIG-276), live, in workspace 2924: the administrator (4537) designs a workflow in the designer -- an
- * approval by Alex (4597), then a notice to the requester -- publishes it, and starts two test requests; Alex decides
- * them in his Task inbox (a rejection asks for a reason first); the administrator follows both in My requests. Escalation
- * is the SLA sweep's, hours later: WorkflowEnginePostgresTest and the MIG-274 live check cover it.
+ * Workflows (MIG-276), live, in Riverside Health: the administrator (role admin) designs a workflow in the designer --
+ * an approval by the workspace's reviewer (role user), then a notice to the requester -- publishes it, and starts two
+ * test requests; the reviewer decides them in their Task inbox (a rejection asks for a reason first); the administrator
+ * follows both in My requests. Escalation is the SLA sweep's, hours later: WorkflowEnginePostgresTest and the MIG-274
+ * live check cover it.
  *
- * It CREATES a workflow ("E2E purchase <time>") and two requests, and leaves them (the owner deletes test data). Alex
- * must hold the task-inbox page. Sign-in: E2E_TENANT_ADMIN_TOKEN (mint-test-token.sh 4537 900) and
- * E2E_TENANT_USER_TOKEN (mint-test-token.sh 4597 900).
+ * It CREATES a workflow ("E2E purchase <time>") and two requests. The workflow service deletes neither, so the workflow
+ * is switched to Inactive when the describe ends and the two decided requests stay with it. The reviewer must hold the
+ * task-inbox page (the rebuilt Reviewer profile does); the rebuild's own open tasks in their inbox are never touched.
+ * Sign-in through support/session.ts (roles admin and user).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const adminToken = process.env['E2E_TENANT_ADMIN_TOKEN'];
-const userToken = process.env['E2E_TENANT_USER_TOKEN'];
 const stamp = new Date().toISOString().slice(5, 19).replace(/[-:T]/g, '');
 const NAME = `E2E purchase ${stamp}`;
 const KEY = `e2e-purchase-${stamp}`;
 
-interface Session { data: Record<string, unknown>; }
-
-async function session(request: APIRequestContext, token: string): Promise<Session> {
-  const claims = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  return { data: { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
-    tenantId: claims.tenantId, accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys } };
-}
-
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  return signedIn(browser, s, { viewport: { width: 1440, height: 900 } });
 }
 
 async function startTest(page: Page, reference: string, amount: number): Promise<number> {
@@ -46,15 +34,27 @@ async function startTest(page: Page, reference: string, amount: number): Promise
 }
 
 test.describe.serial('Workflows: design, publish, submit, approve, reject (live)', () => {
-  test.skip(!adminToken || !userToken, 'Set E2E_TENANT_ADMIN_TOKEN and E2E_TENANT_USER_TOKEN to run this.');
+  test.skip(!hasToken('admin') || !hasToken('user'), `${NEEDS.admin}; ${NEEDS.user}`);
   let admin: Session;
   let user: Session;
+  /** The reviewer's name as the people picker and the request history print it, and the step named after them. */
+  let person = '';
+  let step = '';
   let approved = 0;
   let rejected = 0;
 
   test.beforeAll(async ({ request }) => {
-    admin = await session(request, adminToken!);
-    user = await session(request, userToken!);
+    admin = await sessionFor(request, 'admin');
+    user = await sessionFor(request, 'user');
+    person = user.fullName ?? user.username;
+    step = `${person} approves`;
+  });
+
+  test.afterAll(async ({ request }) => {
+    if (!admin) return;
+    const s = await sessionFor(request, 'admin');
+    await cancelRunning(request, s, KEY);
+    await inactivateWorkflow(request, s, KEY);
   });
 
   test('the administrator designs and publishes a workflow, then starts two requests', async ({ browser }) => {
@@ -70,14 +70,14 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await form.getByRole('button', { name: 'Create and design' }).click();
     await expect(page.locator(`[data-workflow="${KEY}"]`)).toHaveClass(/is-on/);
 
-    // The first step: an approval, by Alex.
+    // The first step: an approval, by the reviewer.
     const panel = page.locator('[data-test="step-panel"]');
     await expect(panel.getByRole('heading', { name: 'Approval' })).toBeVisible();
-    await panel.getByLabel('Name', { exact: true }).fill('Alex approves');
+    await panel.getByLabel('Name', { exact: true }).fill(step);
     await panel.getByLabel('Who approves', { exact: true }).selectOption('user');
-    await panel.getByRole('combobox', { name: 'Who approves: person' }).fill('Alex');
-    await panel.getByRole('option', { name: /Alex/ }).first().click();
-    await expect(page.locator('[data-step="approval"]')).toContainText('Alex');
+    await panel.getByRole('combobox', { name: 'Who approves: person' }).fill(person);
+    await panel.getByRole('option', { name: new RegExp(person) }).first().click();
+    await expect(page.locator('[data-step="approval"]')).toContainText(person);
 
     // Then: tell the requester.
     await page.locator('[data-test="add-step"]').click();
@@ -85,10 +85,10 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await panel.getByLabel('Message').fill('Your purchase request was approved.');
     await expect(page.locator('[data-step]')).toHaveCount(2);
 
-    await page.getByLabel('What changed').fill('E2E: Alex approves, then the requester is told');
+    await page.getByLabel('What changed').fill(`E2E: ${step}, then the requester is told`);
     await page.locator('[data-test="publish"]').click();
     await expect(page.getByText('Published as version 1.')).toBeVisible();
-    await expect(page.locator('[data-workflow="' + KEY + '"]')).toContainText('Version 1');
+    await expect(page.locator('[data-workflow="' + KEY + '"]')).toContainText('v1');
 
     approved = await startTest(page, `po-${stamp}-a`, 1200);
     await page.getByRole('tab', { name: 'Steps' }).click();
@@ -96,7 +96,7 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     expect(rejected).toBeGreaterThan(approved);
   });
 
-  test('Alex approves one and rejects the other, with a reason', async ({ browser }) => {
+  test('the reviewer approves one and rejects the other, with a reason', async ({ browser }) => {
     const page = await pageAs(browser, user);
     await page.goto('/workflows/inbox');
     await expect(page.getByRole('heading', { level: 1, name: 'Task inbox' })).toBeVisible();
@@ -107,9 +107,13 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     // The first request: approve.
     await row('a').click();
     await expect(detail).toContainText('1200');
-    await expect(detail).toContainText('Alex approves: waiting for');
+    // The task names its step and that it waits for the reader ("Pending … With you", "Waiting for you").
+    await expect(detail).toContainText(step);
+    await expect(detail).toContainText(/Waiting for you|With you/);
     await detail.getByRole('button', { name: 'Approve', exact: true }).click();
-    await expect(detail).toContainText('approved by you');
+    // A decision moves the inbox on to the next task, as a mail client does: the approved one leaves My tasks.
+    await expect(page.locator('[data-test="tab-mine"]')).toBeVisible();
+    await expect(row('a')).toHaveCount(0);
 
     // The second: a rejection with no reason is refused here, then sent with one.
     await page.locator('[data-test="tab-mine"]').click();
@@ -119,10 +123,17 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await expect(page.getByText('Say why you are rejecting this: a reason is required.')).toBeVisible();
     await detail.getByLabel('Comment').fill('Over the quarter\'s budget');
     await detail.getByRole('button', { name: 'Reject', exact: true }).click();
-    await expect(detail).toContainText('rejected by you');
+    await expect(row('b')).toHaveCount(0);
+
+    // Both decisions, as Done shows them.
+    await page.locator('[data-test="tab-done"]').click();
+    await row('a').click();
+    await expect(detail).toContainText(/approved by you/i);
+    await row('b').click();
+    await expect(detail).toContainText(/rejected by you/i);
     await expect(detail).toContainText('Over the quarter\'s budget');
 
-    // The designer is not Alex's page.
+    // The designer is not the reviewer's page.
     await page.goto('/workflows/designer');
     await expect(page.getByRole('heading', { name: 'Workflow designer isn\'t part of your access' })).toBeVisible();
   });
@@ -132,7 +143,8 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await page.goto(`/workflows/requests?id=${approved}`);
     const request = page.locator('[data-test="request-detail"]');
     await expect(request).toContainText('Approved');
-    await expect(request).toContainText('Alex approves: approved by Alex');
+    await expect(request).toContainText(step);
+    await expect(request).toContainText(new RegExp(`approved by ${person}`, 'i'));
     await expect(request).toContainText('Request approved');
 
     await page.goto(`/workflows/requests?id=${rejected}`);

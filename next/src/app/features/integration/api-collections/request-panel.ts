@@ -6,8 +6,8 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import {
-  AUTH_MODES, BODY_TYPES, CollectionRow, EnvironmentRow, FolderRow, METHODS, PAGING_TYPES, PairRow, RequestEdit, RunResult,
-  authLabel, authSettingsFor, blankRequest, bodyLabel, effectiveAuthMode, referenceName, requestEditOf, requestSaveOf,
+  AUTH_MODES, BODY_TYPES, CollectionRow, EnvironmentRow, FolderRow, METHODS, PAGING_LABELS, PAGING_TYPES, PairRow, RequestEdit, RunResult,
+  authLabel, authSettingsFor, blankRequest, bodyLabel, effectiveAuthMode, pagingProblem, referenceName, requestEditOf, requestSaveOf,
 } from './api-collections.model';
 import { ApiCollectionsApi } from './api-collections.service';
 import { PairsEditor } from './pairs-editor';
@@ -54,12 +54,15 @@ export class RequestPanel {
   readonly bodyTypes = BODY_TYPES;
   readonly authModes = AUTH_MODES;
   readonly pagingTypes = PAGING_TYPES;
+  readonly pagingLabels = PAGING_LABELS;
+  /** What is wrong with the paging as it stands, said under its fields before Save is pressed. */
+  readonly pagingProblem = pagingProblem;
   readonly folders = folderOptions(this.data.folders);
   readonly tabs: { id: Tab; label: string }[] = [
     { id: 'params', label: 'Params' }, { id: 'headers', label: 'Headers' }, { id: 'auth', label: 'Auth' },
     { id: 'body', label: 'Body' }, { id: 'schemas', label: 'Schemas' }, { id: 'settings', label: 'Settings' },
   ];
-  readonly urlPlaceholder = '{{baseUrl}}/v1/patients';
+  readonly urlPlaceholder = '{{baseUrl}}/v1/orders';
   readonly envHint = 'Where its {{variables}} come from.';
   readonly variableHint = 'Write {{name}} to take a value from the environment; a credential is always a {{variable}}.';
   /** MIG-306: a multipart or binary body names its files in the workspace's storage -- a connection's alias and a key. */
@@ -67,12 +70,12 @@ export class RequestPanel {
     MULTIPART: {
       hint: 'Parts, each a text value or a file from one of this workspace\'s storage connections (bucket = the connection\'s alias). '
         + 'Values, buckets and keys may use {{variables}}.',
-      example: '{"parts": [{"name": "note", "value": "{{note}}"}, {"name": "scan", "file": {"bucket": "claims", "key": "in/scan.pdf"}, '
+      example: '{"parts": [{"name": "note", "value": "{{note}}"}, {"name": "scan", "file": {"bucket": "intake", "key": "in/scan.pdf"}, '
         + '"contentType": "application/pdf"}]}',
     },
     BINARY: {
       hint: 'One file from this workspace\'s storage, sent as the whole body (bucket = the storage connection\'s alias).',
-      example: '{"file": {"bucket": "claims", "key": "in/{{claimId}}.bin"}, "contentType": "application/octet-stream"}',
+      example: '{"file": {"bucket": "intake", "key": "in/{{recordId}}.bin"}, "contentType": "application/octet-stream"}',
     },
   };
 

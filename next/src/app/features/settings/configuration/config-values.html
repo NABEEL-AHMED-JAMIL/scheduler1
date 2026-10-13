@@ -1,21 +1,21 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Configuration values</h1>
-      <p class="page-subtitle">
-        Values and secrets a task's payload reads at run time, per workspace — a bucket name, a
-        database password — kept here once instead of written into every task.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Configuration values</h1>
+        <p class="page-subtitle">
+          Values and secrets a pipeline's payload reads at run time, per workspace — a bucket name, a
+          database password — kept here once instead of written into every pipeline.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 ml-auto">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New value
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2 ml-auto">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New value
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <div class="card p-4 flex items-start gap-3 text-sm">
     <app-icon name="info" class="text-[color:var(--text-muted)] mt-0.5 shrink-0" />
@@ -35,7 +35,7 @@
     </div>
   </div>
 
-  <div class="grid grid-cols-3 gap-3">
+  <div class="grid grid-cols-3 stat-strip stat-row is-md is-start" role="list">
     <app-stat-tile label="Values" [value]="stats().values" icon="settings" tone="info" foot="readable here" />
     <app-stat-tile label="Secrets" [value]="stats().secrets" icon="lock" tone="info" foot="write-only" />
     <app-stat-tile label="In use" [value]="stats().inUse" icon="list" tone="muted" foot="referenced by a live task" />
@@ -45,7 +45,7 @@
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="rows().length"
                    [emptyMessage]="search().trim()
                       ? 'No entry matches the search.'
-                      : 'No configuration values yet. Add one, then reference it from a task.'"
+                      : 'No configuration values yet. Add one, then reference it from a pipeline.'"
                    emptyIcon="settings"
                    (retry)="load()">
     <ng-container toolbar>
@@ -61,6 +61,12 @@
                [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
     </ng-container>
+    <!-- UX review 2026-10-12 (A8, G10): the empty list's next step is in the box. -->
+    <ng-container empty-action>
+      @if (!search().trim()) {
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New value</button>
+      }
+    </ng-container>
 
     <table class="table-modern">
       <thead>
@@ -70,7 +76,7 @@
           <th>Kind</th>
           <th>Value</th>
           <th>Used by</th>
-          <th class="w-32"><span class="sr-only">Actions</span></th>
+          <th class="w-32 th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -78,7 +84,7 @@
           <tr [attr.data-key]="row.key">
             <td class="max-w-72">
               <div class="mono font-medium truncate" [title]="row.key">{{ row.key }}</div>
-              <div class="mono text-xs text-[color:var(--text-muted)] truncate" title="How a task references it">{{ reference(row) }}</div>
+              <div class="mono text-xs text-[color:var(--text-muted)] truncate" title="How a pipeline references it">{{ reference(row) }}</div>
               @if (row.description) {
                 <div class="text-xs text-[color:var(--text-secondary)] line-clamp-1" [title]="row.description">{{ row.description }}</div>
               }

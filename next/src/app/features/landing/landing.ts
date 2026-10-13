@@ -179,7 +179,7 @@ import { ThemeService } from '../../core/theme.service';
           <div class="min-w-0">
             <h2 class="text-xl font-semibold tracking-tight">Ready when you are</h2>
             <p class="mt-1.5 text-sm text-[color:var(--text-secondary)]">
-              Sign in to see your jobs, their history and what they wrote.
+              Sign in to see your schedules, their runs and what they wrote.
             </p>
           </div>
           <a routerLink="/login" class="btn btn-primary ml-auto">
@@ -219,7 +219,7 @@ export class Landing {
       body: 'By the minute, hour, day, chosen weekdays, or a date each month — including the '
           + 'last day. Give a schedule an end date and it stops on its own.' },
     { icon: 'play', title: 'Run on demand, or skip one',
-      body: 'Start any job by hand without disturbing its timetable, or skip the next run and '
+      body: 'Start any schedule by hand without disturbing its timetable, or skip the next run and '
           + 'leave the rest in place.' },
     { icon: 'history', title: 'Every run accounted for',
       body: 'Queued, running, completed, failed, interrupted and skipped are all recorded, and a '
@@ -229,7 +229,7 @@ export class Landing {
           + 'failure can be read rather than guessed at.' },
     { icon: 'cloud', title: 'Storage where you keep it',
       body: 'S3, Azure, MinIO and FTP connections. Browse buckets, upload, preview a file and '
-          + 'send a job’s output straight to one.' },
+          + 'send a run’s output straight to one.' },
     { icon: 'chart', title: 'Reports you can take away',
       body: 'Every task with its completed, failed, interrupted, skipped and missed runs side by '
           + 'side. Group by task, outcome or day, measure how you like, and export as CSV or '
@@ -245,7 +245,7 @@ export class Landing {
           + 'pipeline: it runs before each dispatch and its answer arrives as a tag — with every '
           + 'call’s tokens and time on record.' },
     { icon: 'shield', title: 'Separated by tenant',
-      body: 'Every job, task, bucket and user belongs to a tenant. Roles decide how much a '
+      body: 'Every schedule, pipeline, bucket and user belongs to a workspace. Roles decide how much a '
           + 'person may do, and access profiles decide which pages they see — with a per-person '
           + 'exception when one is needed.' },
     { icon: 'key', title: 'Workers prove themselves per run',
@@ -257,8 +257,8 @@ export class Landing {
   readonly steps = [
     { title: 'Describe the task',
       body: 'What to fetch or process, where it reads from and where it writes.' },
-    { title: 'Bind it to a job',
-      body: 'A job gives the task a timetable, a priority and someone responsible for it.' },
+    { title: 'Give it a schedule',
+      body: 'A schedule gives the pipeline a timetable, a priority and someone responsible for it.' },
     { title: 'Let it run',
       body: 'The scheduler queues it when due; workers pick it up and report as they go.' },
     { title: 'Read the outcome',

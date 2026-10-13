@@ -29,7 +29,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pageAccess.json/pages"
     ],
     "headings": [
-      "Access profiles",
+      "Page access",
       "Choose a workspace"
     ],
     "buttons": [
@@ -41,7 +41,14 @@ export const PINNED: Record<string, unknown> = {
       "Choose a workspace…",
       "Workspace"
     ],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/appearance",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ]
   },
   "access profiles, as a workspace administrator": {
     "url": "/administration/access-profiles",
@@ -50,40 +57,63 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pageAccess.json/pages",
-      "GET /pageAccess.json/listProfiles"
+      "GET /pageAccess.json/listProfiles",
+      "GET /managedService.json/actions?limit=1"
     ],
     "headings": [
-      "Access profiles",
+      "Page access",
+      "Who can open what",
       "UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "UI-REVIEW No pages"
     ],
     "buttons": [
       "Actions for UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "Actions for UI-REVIEW No pages",
+      "Check a person",
       "New profile",
       "People × pages",
       "Profiles",
       "Refresh",
       "See in grid ›"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Role",
+        "Opens",
+        "Can change"
+      ]
+    ],
     "fields": [],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/appearance",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ]
   },
   "access profiles: the people x pages grid": {
     "requests": [
       "GET /pageAccess.json/listPeople"
     ],
     "headings": [
-      "Access profiles"
+      "Page access",
+      "Who can open what"
     ],
     "buttons": [
+      "Check a person",
       "New profile",
       "People × pages",
       "Profiles",
       "Refresh"
     ],
     "columns": [
+      [
+        "Role",
+        "Opens",
+        "Can change"
+      ],
       [
         "",
         "",
@@ -101,7 +131,14 @@ export const PINNED: Record<string, unknown> = {
       "Source Jobs for Casey Baseline",
       "Source Tasks for Casey Baseline"
     ],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/appearance",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ]
   },
   "an access profile's row menu": {
     "headings": [],
@@ -120,43 +157,72 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "tenants, as a platform administrator": {
-    "url": "/administration/tenants",
+    "url": "/platform/workspaces",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants"
+      "GET /tenant.json/listTenants",
+      "GET /managedService.json/myWorkspaces"
     ],
     "headings": [
-      "Tenants",
-      "Tenants (2 of 2)",
-      "Claude Demo 75a611b4",
-      "Default"
+      "Workspaces",
+      "Workspaces (2 of 2)"
     ],
     "buttons": [
-      "Access",
+      "Actions for Claude Demo 75a611b4",
+      "Actions for Default",
+      "Buckets",
       "Cards",
+      "Columns",
       "Copy claude-demo-75a611b4",
       "Copy default",
-      "Delete Claude Demo 75a611b4",
-      "Delete Default",
-      "Edit",
-      "Make managed",
-      "New tenant",
+      "Created",
+      "Kafka",
+      "New workspace",
       "Only mine",
+      "Pipelines",
       "Refresh",
-      "Sorted ascending; sort descending",
-      "Suspend",
+      "Schedules",
       "Table",
-      "Users"
+      "Topics",
+      "Users",
+      "Workspace"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Workspace",
+        "Admin",
+        "Users",
+        "Schedules",
+        "Pipelines",
+        "Topics",
+        "Buckets",
+        "Kafka",
+        "Created",
+        "Created by",
+        "Updated by",
+        "Mode",
+        "State",
+        "Actions"
+      ]
+    ],
     "fields": [
       "Filter by state",
       "Search name or code",
-      "Search tenants",
-      "Sort by"
+      "Search workspaces"
     ],
-    "links": []
+    "links": [
+      "/platform",
+      "/platform/billing-analytics",
+      "/platform/engine",
+      "/platform/managed-service",
+      "/platform/rate-cards",
+      "/platform/reliability",
+      "/platform/requests",
+      "/platform/staff-activity",
+      "/platform/work-in-workspace",
+      "/platform/workspaces"
+    ]
   },
   "tenants, as a workspace administrator": {
     "url": "/unauthorized",
@@ -178,7 +244,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the gate, as a tenant user asking for Analytics Studio": {
-    "url": "/unauthorized?page=analytics",
+    "url": "/unauthorized?page=analytics&title=Analytics%20Studio",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"

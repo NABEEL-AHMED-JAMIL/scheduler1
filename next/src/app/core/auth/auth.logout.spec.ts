@@ -50,6 +50,15 @@ describe('Sign out', () => {
     expect(auth.isLoggedIn()).toBe(false);
   });
 
+  // MIG-353: the idle sign-out names its reason; a request failing a moment later must not navigate again without it.
+  it('keeps the first sign-out\'s reason: a second sign-out once signed out does not navigate', () => {
+    const { auth, navigated } = signedIn(() => of({ status: 'SUCCESS' }));
+    auth.logout('idle');
+    auth.logout();
+    expect(navigated).toHaveLength(1);
+    expect(navigated[0]).toEqual([['/login'], { queryParams: { reason: 'idle' } }]);
+  });
+
   it('follows another tab that signed out', () => {
     const { auth, navigated } = signedIn(() => of({}));
     localStorage.removeItem(STORAGE_KEY);

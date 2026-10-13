@@ -26,6 +26,7 @@ import { Icon } from '../../shared/ui/icon';
 import { formatSize } from '../../shared/ui/format-size';
 import { BlurLoader } from '../../shared/ui/blur-loader';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
 
 interface Crumb { name: string; prefix: string; }
 
@@ -34,7 +35,7 @@ const SLOW_PROVIDERS = ['FTP', 'FTPS'];
 
 @Component({
   selector: 'app-objects',
-  imports: [DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
+  imports: [PageHeader, DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, FileChat, Donut, RankedBar, Combobox, BlurLoader],
   templateUrl: './objects.html',
 })
 export class Objects implements OnInit {
@@ -59,6 +60,14 @@ export class Objects implements OnInit {
    */
   readonly unknownLink = signal<{ bucket: string; prefix: string } | null>(null);
   readonly bucketOptions = computed(() => this.buckets().map(b => ({ value: b.bucket, label: b.label || b.bucket, hint: b.provider })));
+  /** The connection cards' search (UX final BF1): name, bucket, provider, region or description. */
+  readonly connectionQuery = signal('');
+  readonly shownBuckets = computed(() => {
+    const q = this.connectionQuery().trim().toLowerCase();
+    if (!q) return this.buckets();
+    return this.buckets().filter(b => [b.label, b.bucket, b.bucketName, b.provider, b.region, b.description]
+      .some(v => (v ?? '').toLowerCase().includes(q)));
+  });
 
   /** FTP is a different kind of thing from an object store, and the card should say so. */
   /** A connection's last test, in words for its card. */
@@ -588,7 +597,7 @@ export class Objects implements OnInit {
     this.dialog.open(FileDetails, sidePanelConfig<FileDetailsData>({
       bucket: this.bucket(), key: entry.key, name: entry.name,
       size: entry.size, lastModified: entry.lastModified, contentType: entry.contentType,
-    }));
+    }, 'narrow', 'right'));
   }
 
   /** The FileChat instance currently rendered behind `@if (chatFile(); ...)`, if any. */

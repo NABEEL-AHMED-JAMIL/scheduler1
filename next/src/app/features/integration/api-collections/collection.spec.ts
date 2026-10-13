@@ -168,3 +168,26 @@ describe('Collection -- the page', () => {
     expect(n).toContain('Get status');
   });
 });
+
+describe('Collection -- the overview stays short, every version under History (UX final I3)', () => {
+  it('opens on the overview: APIs, environments and who uses them, no version list', () => {
+    const { el } = setup();
+    const tabs = Array.from(el.querySelectorAll('[data-test="collection-tabs"] [role="tab"]'));
+    expect(tabs.map(t => t.textContent!.replace(/\s+/g, ' ').trim())).toEqual(['Overview', 'History 2']);
+    expect(tabs[0].getAttribute('aria-selected')).toBe('true');
+    expect(el.querySelector('[data-test="apis"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="environments"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="versions"]')).toBeNull();
+    expect(tabs[1].getAttribute('href')).toBe('/?tab=history');
+  });
+
+  it('lists every version on History, the current one marked', () => {
+    const { el, fixture } = setup();
+    fixture.componentRef.setInput('tab', 'history');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="apis"]')).toBeNull();
+    const rows = Array.from(el.querySelectorAll('[data-test="versions"] tbody tr')).map(r => r.textContent!.replace(/\s+/g, ' ').trim());
+    expect(rows.length).toBe(2);
+    expect(rows[0]).toMatch(/^v3\s*current/);
+  });
+});

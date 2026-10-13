@@ -1,13 +1,13 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "Reports, as a tenant user without the page": {
-    "url": "/unauthorized?page=tools-converter",
+    "url": "/unauthorized?page=tools-converter&title=Generated%20reports",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Document Converter isn't part of your access"
+      "Generated reports isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "Reports, as a workspace administrator": {
-    "url": "/documents/reports",
+    "url": "/data/reports",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -31,19 +31,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/runOutputs?jobQueueId=7405"
     ],
     "headings": [
-      "Reports",
+      "Generated reports",
       "Generated outputs (3 of 3)"
     ],
     "buttons": [
+      "Actions for UI-CHECK Q3.pdf",
+      "Actions for customers-clean.json",
       "Clear",
       "Columns",
-      "Download UI-CHECK Q3.pdf",
-      "Download customers-clean.json",
-      "Email UI-CHECK Q3.pdf",
-      "Email customers-clean.json",
-      "Open customers-clean.json in storage",
-      "Preview UI-CHECK Q3.pdf",
-      "Preview customers-clean.json",
       "Refresh"
     ],
     "columns": [
@@ -67,10 +62,14 @@ export const PINNED: Record<string, unknown> = {
       "reports/"
     ],
     "links": [
-      "/documents/converter",
-      "/documents/files?bucket=ui-review-s3&prefix=registry-live-check%2F",
-      "/documents/files?bucket=ui-review-s3&prefix=reports%2F",
-      "/pipelines/schedules/2849/runs/7405/logs"
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports",
+      "/pipelines/schedules/2849/runs/7405",
+      "/tools/converter?mode=dataset"
     ]
   },
   "a file's details, written by a recent run": {
@@ -92,7 +91,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/pipelines/schedules/2849/runs/7405/logs"
+      "/pipelines/schedules/2849/runs/7405"
     ],
     "items": []
   },
@@ -108,11 +107,11 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "A table in a bucket",
       "Columns",
-      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
-      "From an execution",
       "Make PDF",
+      "PDF from a dataset",
+      "PDF from a run",
       "Paste rows",
       "Preview",
       "Refresh",
@@ -149,7 +148,11 @@ export const PINNED: Record<string, unknown> = {
       "[{\"region\": \"North\", \"revenue\": 1234.50}, {\"region\": \"South\", \"revenue\": 980}]"
     ],
     "links": [
-      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
     ]
   },
   "the converter, From an execution": {
@@ -164,11 +167,11 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
-      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
-      "From an execution",
       "Make PDF",
+      "PDF from a dataset",
+      "PDF from a run",
       "Preview",
       "Refresh",
       "Supported formats",
@@ -206,7 +209,11 @@ export const PINNED: Record<string, unknown> = {
       "Watermark"
     ],
     "links": [
-      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
     ]
   }
 };

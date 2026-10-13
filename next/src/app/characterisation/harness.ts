@@ -9,6 +9,7 @@ import { EMPTY } from 'rxjs';
 import { routes } from '../app.routes';
 import { JobEventsService } from '../core/socket/job-events.service';
 import { fixtureFor } from './fixtures';
+import { BADGE_READ } from '../features/review/review-sources';
 
 /**
  * The characterisation harness (MIG-222 Wave 4, MIG-266 Wave 5).
@@ -44,6 +45,9 @@ function restoreZone(): void {
   if (machineZone === undefined) delete env['TZ'];
   else env['TZ'] = machineZone;
 }
+
+/** The signed-in person's own picture in the top bar (shell chrome, asked for on its own timing). */
+const SHELL_PICTURE = /^GET \/appUser\.json\/avatar\?/;
 
 export type Role = 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'TENANT_USER';
 
@@ -202,8 +206,14 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
       quiet = pending.length ? 0 : quiet + 1;
       for (const req of pending) {
         const described = describeRequest(req);
-        if (!seen.includes(described)) seen.push(described);
-        made.push(described);
+        // The top bar's picture is the shell's, not the screen's, and when it is asked for depends on the image's own
+        // timing: recorded, it moved about the list between runs (2026-10-12). It is answered and left out of the pin.
+        // So are the reads behind the menu's Review badge (DR2, 2026-10-13): the shell's, made when their lazily loaded
+        // file arrives, so they too moved about the list.
+        if (!SHELL_PICTURE.test(described) && !req.request.context.get(BADGE_READ)) {
+          if (!seen.includes(described)) seen.push(described);
+          made.push(described);
+        }
         const reply = fixtureFor(req, answers);
         if (req.cancelled) continue;
         if (reply.error) req.flush(reply.body as any, { status: reply.error, statusText: 'Error' });
@@ -273,12 +283,15 @@ export async function menuOf(v: Visit): Promise<string[]> {
   for (const link of Array.from(nav.querySelectorAll(':scope > a[href]'))) {
     out.push(`${text(link)} -> ${link.getAttribute('href')}`);
   }
-  const sections = Array.from(nav.querySelectorAll('[data-nav-menu]')).map(s => s.getAttribute('data-nav-menu') ?? '');
-  for (const label of sections) {
-    const button = nav.querySelector(`[data-nav-menu="${label}"] > button`) as HTMLElement;
+  // Found by walking rather than by a [data-nav-menu="..."] selector: jsdom's selector engine trips on the "&" of
+  // "Run & review" (UX review 2026-10-12 groups).
+  const sections = Array.from(nav.querySelectorAll<HTMLElement>('[data-nav-menu]'));
+  for (const section of sections) {
+    const label = section.getAttribute('data-nav-menu') ?? '';
+    const button = section.querySelector(':scope > button') as HTMLElement;
     button.click();
     await v.settle();
-    const panel = nav.querySelector(`[data-nav-menu="${label}"] [id^="nav-menu-"]`);
+    const panel = section.querySelector('[id^="nav-menu-"]');
     for (const entry of Array.from(panel?.querySelectorAll('a[href]') ?? [])) {
       const parts = Array.from(entry.querySelectorAll('span.block')).map(el => text(el));
       out.push(`${label} › ${parts.join(' — ')} -> ${entry.getAttribute('href')}`);
@@ -287,6 +300,12 @@ export async function menuOf(v: Visit): Promise<string[]> {
     await v.settle();
   }
   return out;
+}
+
+/** A hub's tab strip as the reader sees it: "Storage -> /connections/storage", the open tab marked "(open)". */
+export function hubTabsOf(v: Visit): string[] {
+  return Array.from(v.root.querySelectorAll('[data-test="tab-hub"] a[href]')).map(a =>
+    `${text(a)} -> ${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? ' (open)' : ''}`);
 }
 
 function buttonNamed(scope: ParentNode, name: string | RegExp): HTMLElement | null {

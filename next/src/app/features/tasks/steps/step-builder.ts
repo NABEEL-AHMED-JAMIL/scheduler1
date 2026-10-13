@@ -1,6 +1,6 @@
-import { Component, computed, effect, inject, input, linkedSignal, output, signal, untracked } from '@angular/core';
+import { Component, ComponentRef, OnInit, ViewContainerRef, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { Router } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
@@ -11,56 +11,85 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { DefinitionFormat, StepsApi } from './steps.service';
 import { StepPanel, StepPanelData } from './step-panel';
-import { RunDrawer, RunDrawerData } from './run-drawer';
 import { SampleDialog, SampleDialogData } from './sample-dialog';
-import { TaskStatePill, TaskSwitch } from './task-switch';
 import {
-  Definition, DefinitionView, LIMITS, LinkedJob, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
+  Definition, DefinitionView, LIMITS, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
-  sameDefinition, sampleRowsOf, sourceLabel, stateOf, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesPrompt,
-  withSample, withSwitchedLine, PromptChoice,
+  sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
+  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
 } from './steps.model';
+import { ParameterEditor } from './parameter-editor';
+import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
+import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
+import { Section } from '../../../shared/ui/section';
+import type { StepFlow } from './step-flow';
+import { stageGroups } from './overview';
 
-export type BuilderTab = 'steps' | 'settings' | 'yaml' | 'json';
+export type BuilderTab = 'steps' | 'settings' | 'history' | 'yaml' | 'json';
+
+/** The Steps tab as a list of cards, or as a flow (the shared flow-graph, loaded only when shown). */
+export type StepsLayout = 'list' | 'flow';
+const LAYOUT_KEY = 'etl.view.pipeline-steps';
+
+/** The layout this viewer last chose (in this browser): the list until they pick the flow. */
+export function savedStepsLayout(): StepsLayout {
+  try { return localStorage.getItem(LAYOUT_KEY) === 'flow' ? 'flow' : 'list'; } catch { return 'list'; }
+}
+
+function saveStepsLayout(layout: StepsLayout): void {
+  try { localStorage.setItem(LAYOUT_KEY, layout); } catch { /* the choice is simply not remembered */ }
+}
 
 type Tone = 'ok' | 'warn' | 'crit';
 
 /**
  * The step builder (MIG-249): a pipeline's definition as ordered steps (MIG-230), edited on the pipeline's page.
  *
- * Four views of one draft, the tab the page's `?tab=` names: Steps (the ordered cards -- drag by the handle, move up
- * and down, delete, open one in the side panel -- and Add step from the Task Registry), Settings (the source and the
- * defaults every step inherits, and the saved versions), YAML and JSON. The builder and Settings edit the draft
+ * Views of one draft, the tab the page's `?tab=` names: Steps (the ordered cards, grouped by stage -- drag by the handle,
+ * move up and down, delete, open one in the side panel -- and Add step from the Task Registry), Settings (the source,
+ * the defaults every step inherits, the data's sensitivity and its review), History (the saved versions), YAML and JSON. The builder and Settings edit the draft
  * directly; the YAML and JSON tabs are text, applied to the draft when the person leaves the tab (JSON parsed here,
  * YAML read by the server -- the console has no YAML parser) and saved as typed while the tab is open. The server
  * stores canonical JSON either way, so a YAML edit and a builder edit of the same thing save the same definition.
  *
- * Validate, Test with sample (rows put in front of the steps), Run now (the task's schedule; unsaved changes are
- * saved first, as the runner runs what is saved) with its result in a drawer, Schedule and Save. The server's
- * problems come back at paths (`steps[2].retry.maxAttempts`) and are shown on the step they name.
+ * Test with sample (rows put in front of the steps) is the Steps tab's. Validate, Save and Discard are the page's one
+ * save bar's (UX review 2026-10-12, B2: one save place), which calls them here; Run now and Schedule are the page
+ * header's. The server's problems come back at paths (`steps[2].retry.maxAttempts`) and are shown on the step they name.
  */
 @Component({
   selector: 'app-step-builder',
-  imports: [Icon, Field, Combobox, ServerTimePipe, TaskSwitch, TaskStatePill],
+  imports: [Icon, Field, Combobox, ServerTimePipe, Segmented, RouterLink, Section, ParameterEditor],
   templateUrl: './step-builder.html',
+  // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
+  styles: `
+/* UX review 2026-10-12 (B2, P5): the steps grouped by stage -- a run of one stage under its own small heading, a rule
+   in the stage's tone at the left so read, check, AI, review and write are told apart at a glance. */
+.step-stages { display: flex; flex-direction: column; gap: 0.875rem; }
+.step-stage { --stage-tone: var(--border-strong); border-left: 3px solid var(--stage-tone); padding-left: 0.75rem; scroll-margin-top: 1rem; }
+.step-stage[data-stage="read"] { --stage-tone: var(--color-info-500); }
+.step-stage[data-stage="check"] { --stage-tone: var(--color-warn-500); }
+.step-stage[data-stage="ai"] { --stage-tone: var(--color-brand-500); }
+.step-stage[data-stage="review"] { --stage-tone: var(--color-crit-500); }
+.step-stage[data-stage="write"] { --stage-tone: var(--color-ok-500); }
+.step-stage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; margin-bottom: 0.5rem; font-size: 12px; line-height: 1rem; color: var(--text-secondary); }
+.step-stage-head > app-icon { color: var(--stage-tone); }
+.review-ways { margin: 1rem 0 0; padding: 0.75rem 0.875rem; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; line-height: 1.45; color: var(--text-secondary); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+  `,
 })
-export class StepBuilder {
+export class StepBuilder implements OnInit {
   /** What the page read: pipeline.json/steps/definition. */
   readonly view = input.required<DefinitionView>();
   readonly tab = input<BuilderTab>('steps');
-  /** The task the page edits: whose schedules Run now runs and Schedule adds to. */
-  readonly taskDetailId = input<number | null>(null);
   readonly canManage = input(true);
-  /** A workspace administrator: may add a task that needs one, and switches the workspace's tasks. */
+  /** A workspace administrator: may add a task that needs one. The workspace's task switches are Task Registry's. */
   readonly isAdmin = input(true);
   /** A save made a new version (or found none to make): the page's copy is stale. */
   readonly saved = output<DefinitionView>();
 
   private readonly api = inject(StepsApi);
   private readonly dialog = inject(Dialog);
-  private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
   private readonly handoff = inject(PipelineDraftHandoff);
 
@@ -76,11 +105,9 @@ export class StepBuilder {
   readonly meta = linkedSignal(() => this.view());
   readonly draft = linkedSignal<Definition>(() => structuredClone(this.meta().definition));
   readonly tasks = signal<StepTaskEntry[]>([]);
-  readonly jobs = signal<LinkedJob[]>([]);
-  readonly jobId = signal<number | null>(null);
   readonly problems = signal<Problem[]>([]);
   readonly result = signal<{ tone: Tone; text: string } | null>(null);
-  readonly busy = signal<'' | 'validate' | 'save' | 'run' | 'yaml'>('');
+  readonly busy = signal<'' | 'validate' | 'save' | 'yaml'>('');
   /** The step last opened, by key: it stays marked wherever it moves. */
   readonly selected = signal<string | null>(null);
 
@@ -91,6 +118,18 @@ export class StepBuilder {
 
   readonly dragFrom = signal<number | null>(null);
   readonly dropAt = signal<number | null>(null);
+  /** List or Flow, remembered per viewer. */
+  readonly layout = signal<StepsLayout>(savedStepsLayout());
+  readonly layouts: SegmentOption<StepsLayout>[] = [{ id: 'list', label: 'List', icon: 'list' }, { id: 'flow', label: 'Flow', icon: 'layers' }];
+  /** The saved steps the Flow view marks unsaved ones against; none while the pipeline runs as its legacy step. */
+  readonly savedSteps = computed(() => (this.meta().stored && !this.meta().legacy ? this.meta().definition.steps : null));
+  /**
+   * Where the Flow view goes, and the view once its code has loaded. It is imported when first shown (a dynamic import,
+   * not @defer: the defer runtime would land in the console's first download), so the list never loads the graph.
+   */
+  private readonly flowHost = viewChild('flowHost', { read: ViewContainerRef });
+  readonly flowView = signal<ComponentRef<StepFlow> | null>(null);
+
   /** Add step's box: flipped between '' and null to clear it after a pick. */
   readonly addPick = signal<string | null>('');
 
@@ -100,16 +139,16 @@ export class StepBuilder {
   readonly savedLegacy = computed(() => !this.meta().stored || this.meta().legacy);
   readonly dirty = computed(() => this.yamlTyped() || this.jsonTyped() || !sameDefinition(this.draft(), this.meta().definition));
   readonly taskOptions = computed(() => taskOptions(this.tasks(), this.isAdmin()));
-  /** The tasks a workspace administrator can switch: every task but the legacy lines (never switchable). */
-  readonly switchable = computed(() => this.tasks().filter(t => t.code !== 'legacy' && t.kind !== 'Legacy').map(task => ({ task, ...stateOf(task) })));
-  readonly switching = signal<string | null>(null);
-  readonly jobOptions = computed(() => this.jobs().map(j => ({ value: String(j.jobId), label: `${j.jobName} (#${j.jobId})` })));
-  readonly runLabel = computed(() => (this.dirty() ? 'Save & run now' : 'Run now'));
-  readonly runHint = computed(() => {
-    if (!this.taskDetailId()) return 'Save the task first: Run now runs its schedule.';
-    if (!this.jobs().length) return 'No schedule runs this pipeline yet. Schedule one, then Run now runs it.';
-    return this.dirty() ? 'Unsaved changes are saved first: a run runs the saved steps.' : '';
-  });
+  /** UX review 2026-10-12 (B2, P5): the steps as runs of one stage -- read, check, transform, AI, review, write. */
+  readonly groups = computed(() => stageGroups(this.draft().steps ?? [], this.tasks()));
+  /** The pipeline's Approval steps: the Settings tab's review section names them (W2). */
+  readonly approvalSteps = computed(() => (this.draft().steps ?? []).filter(s => s.task === 'approval'));
+  readonly approvalNames = computed(() => this.approvalSteps().map(s => s.name?.trim() || s.key).join(', '));
+
+  /** The first group of a stage keeps the plain anchor (#stage-read) the page's overview links to. */
+  firstStart(stage: string): number {
+    return this.groups().find(g => g.stage.id === stage)?.start ?? -1;
+  }
   readonly versionText = computed(() => {
     const m = this.meta();
     return m.stored && !m.legacy ? `Version ${m.version}` : 'Runs as its legacy step: no steps saved';
@@ -118,12 +157,15 @@ export class StepBuilder {
 
   private shownTab: BuilderTab = 'steps';
 
+  /**
+   * Its inputs are set: the page reads the draft and the save state through it only then (B2). A signal query hands the
+   * page this component as it is created, before its required `view` has a value.
+   */
+  readonly ready = signal(false);
+  ngOnInit(): void { this.ready.set(true); }
+
   constructor() {
     this.reloadTasks();
-    effect(() => {
-      const task = this.taskDetailId();
-      untracked(() => this.loadJobs(task));
-    });
     // A draft handed over for this pipeline (the AI Assistant's, MIG-252) shows on its text tab as typed text, unsaved.
     effect(() => {
       const key = this.meta().pipelineKey;
@@ -134,22 +176,24 @@ export class StepBuilder {
         else { this.yamlText.set(handed.text); this.yamlTyped.set(true); }
       });
     });
+    // The Flow view: loaded and placed when its slot appears, handed the draft as it changes.
+    effect(() => {
+      const host = this.flowHost();
+      untracked(() => (host ? void this.mountFlow(host) : this.flowView.set(null)));
+    });
+    effect(() => {
+      const view = this.flowView();
+      if (!view) return;
+      view.setInput('definition', this.draft());
+      view.setInput('saved', this.savedSteps());
+      view.setInput('tasks', this.tasks());
+      view.setInput('problems', this.grouped().steps);
+      view.setInput('selected', this.selected());
+    });
     // Leaving a text tab applies what was typed to the draft; entering one shows the draft as that text.
     effect(() => {
       const next = this.tab();
       untracked(() => this.switchTab(next));
-    });
-  }
-
-  private loadJobs(task: number | null): void {
-    if (!task) { this.jobs.set([]); return; }
-    this.api.jobsOf(task).subscribe({
-      next: r => {
-        const jobs = r.status === API_SUCCESS ? r.data ?? [] : [];
-        this.jobs.set(jobs);
-        if (!jobs.some(j => j.jobId === this.jobId())) this.jobId.set(jobs[0]?.jobId ?? null);
-      },
-      error: () => this.jobs.set([]),
     });
   }
 
@@ -241,6 +285,21 @@ export class StepBuilder {
     this.open(this.draft().steps.length - 1);
   }
 
+  setLayout(layout: StepsLayout): void {
+    this.layout.set(layout);
+    saveStepsLayout(layout);
+  }
+
+  private async mountFlow(host: ViewContainerRef): Promise<void> {
+    const { StepFlow } = await import('./step-flow');
+    // Back on the list (or the tab left) while it loaded: nothing to place.
+    if (this.flowHost() !== host) return;
+    host.clear();
+    const view = host.createComponent(StepFlow);
+    view.instance.open.subscribe(index => this.open(index));
+    this.flowView.set(view);
+  }
+
   move(index: number, delta: number): void {
     this.draft.update(d => moveStep(d, index, delta));
     this.shiftProblems();
@@ -255,15 +314,49 @@ export class StepBuilder {
   /** MIG-245: the workspace's active prompts, read the first time a step that names one is opened. */
   private readonly promptChoices = signal<PromptChoice[] | null>(null);
 
+  /** MIG-321: the workspace's buckets, read the first time a step that names one is opened. */
+  private readonly bucketChoices = signal<BucketChoice[] | null>(null);
+
+  /** MIG-346: the workspace's webhooks, read the first time a step that names one is opened. */
+  private readonly webhookChoices = signal<WebhookChoice[] | null>(null);
+
+  /** MIG-364: the workspace's document types, read the first time a step that names one is opened. */
+  private readonly documentTypeChoices = signal<DocumentTypeChoice[] | null>(null);
+
   open(index: number): void {
     const step = this.draft().steps[index];
     if (!step) return;
     this.selected.set(step.key);
-    if (this.promptChoices() === null && usesPrompt(this.taskOf(step)?.configSchema)) {
+    const schema = this.taskOf(step)?.configSchema;
+    if (this.promptChoices() === null && usesPrompt(schema)) {
       // A list that cannot be read leaves the choice empty: a saved prompt still shows by its id.
       this.api.prompts().subscribe({
-        next: prompts => { this.promptChoices.set(prompts); this.openPanel(index); },
-        error: () => { this.promptChoices.set([]); this.openPanel(index); },
+        next: prompts => { this.promptChoices.set(prompts); this.open(index); },
+        error: () => { this.promptChoices.set([]); this.open(index); },
+      });
+      return;
+    }
+    if (this.bucketChoices() === null && usesBucket(schema)) {
+      // Likewise: without the list the box still takes an alias typed by hand.
+      this.api.buckets().subscribe({
+        next: buckets => { this.bucketChoices.set(buckets); this.open(index); },
+        error: () => { this.bucketChoices.set([]); this.open(index); },
+      });
+      return;
+    }
+    if (this.webhookChoices() === null && usesWebhook(schema)) {
+      // Likewise: without the list a saved webhook still shows by its id.
+      this.api.webhooks().subscribe({
+        next: webhooks => { this.webhookChoices.set(webhooks); this.open(index); },
+        error: () => { this.webhookChoices.set([]); this.open(index); },
+      });
+      return;
+    }
+    if (this.documentTypeChoices() === null && usesDocumentType(schema)) {
+      // Likewise: without the list a saved type still shows by its id.
+      this.api.documentTypes().subscribe({
+        next: types => { this.documentTypeChoices.set(types); this.open(index); },
+        error: () => { this.documentTypeChoices.set([]); this.open(index); },
       });
       return;
     }
@@ -279,10 +372,14 @@ export class StepBuilder {
       problems: this.stepProblems(index), defaultOnError: this.draft().settings?.defaultOnError,
       canManage: this.canManage() && step.task !== 'legacy',
       prompts: this.promptChoices() ?? [],
+      buckets: this.bucketChoices() ?? [],
+      webhooks: this.webhookChoices() ?? [],
+      documentTypes: this.documentTypeChoices() ?? [],
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.
-    const config = { ...sidePanelConfig(data, 'wide'), restoreFocus: `.step-list > li:nth-child(${index + 1}) .step-open` };
+    const restoreFocus = this.layout() === 'flow' ? `[data-node][data-id="${step.key}"]` : `.step-card[data-step="${step.key}"] .step-open`;
+    const config = { ...sidePanelConfig(data, 'wide', 'right'), restoreFocus };
     this.dialog.open<Step>(StepPanel, config).closed.subscribe(edited => {
       if (!edited) return;
       this.draft.update(d => replaceStep(d, index, edited));
@@ -340,6 +437,12 @@ export class StepBuilder {
 
   setSource(type: string): void { this.draft.update(d => updateSource(d, type)); }
 
+  /** MIG-347: the pipeline's run parameters, as the editor leaves them. */
+  setParameters(parameters: RunParameter[]): void { this.draft.update(d => updateParameters(d, parameters)); }
+
+  /** The braces a step names a parameter with, said in the section's line (Angular would read them as its own). */
+  readonly parameterHint = 'What a run is given (by Run with…, a backfill or the API); a scheduled run takes the defaults. A step reads one as {{param.name}}, and any run its day as {{run.date}}.';
+
   setSetting(field: keyof Settings, raw: string): void {
     let value: string | number | null = raw;
     if (field !== 'defaultOnError' && field !== 'sensitivity') {
@@ -354,35 +457,33 @@ export class StepBuilder {
     return !!this.draft().settings?.review?.required?.includes(party);
   }
 
-  /** MIG-237: tick or untick a party; nobody ticked drops the setting (no review). */
+  /**
+   * MIG-237: tick or untick a party; nobody ticked drops `required`. The review's other keys -- its reviewers, individual
+   * review -- stay as they are; nothing left drops the setting (no review).
+   */
   setReviewRequired(party: 'internal' | 'customer', on: boolean): void {
     const now = (this.draft().settings?.review?.required ?? []).filter(p => p !== party);
     const required = on ? [...now, party].sort() as ('internal' | 'customer')[] : now;
-    this.draft.update(d => updateSettings(d, { review: required.length ? { required } : undefined }));
+    this.setReview({ required: required.length ? required : undefined });
+  }
+
+  /** Whether the pipeline requires individual review (settings.review.individual). */
+  readonly reviewIndividual = computed(() => this.draft().settings?.review?.individual === true);
+
+  /** Bulk review (2026-10-12): never approved or rejected in bulk -- written as true, dropped when false. */
+  setReviewIndividual(on: boolean): void {
+    this.setReview({ individual: on ? true : undefined });
+  }
+
+  /** Changes keys of settings.review and keeps the others; a key set to undefined goes, and an empty review goes with it. */
+  private setReview(change: Partial<NonNullable<Settings['review']>>): void {
+    const next: Record<string, unknown> = { ...(this.draft().settings?.review ?? {}), ...change };
+    for (const key of Object.keys(next)) if (next[key] === undefined) delete next[key];
+    this.draft.update(d => updateSettings(d, { review: Object.keys(next).length ? next as Settings['review'] : undefined }));
   }
 
   settingProblem(path: string): string {
     return this.grouped().other.filter(p => p.path === path).map(p => p.message).join(' · ');
-  }
-
-  /**
-   * Switches a task on or off in this workspace, or (null) back to its default. The answer is the task's line as the
-   * workspace now sees it; a task Add step then offers or not.
-   */
-  switchTask(task: StepTaskEntry, enabled: boolean | null): void {
-    if (!this.isAdmin() || this.switching()) return;
-    this.switching.set(task.code);
-    this.api.switchTask(task.code, enabled).subscribe({
-      next: r => {
-        this.switching.set(null);
-        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The task could not be switched.'); this.reloadTasks(); return; }
-        this.toast.success(r.message || 'Switched.');
-        const line = r.data;
-        if (line?.code) this.tasks.update(list => withSwitchedLine(list, line));
-        else this.reloadTasks();
-      },
-      error: err => { this.switching.set(null); this.toast.error(err?.error?.message || 'The task could not be switched.'); this.reloadTasks(); },
-    });
   }
 
   private reloadTasks(): void {
@@ -429,6 +530,12 @@ export class StepBuilder {
   save(): void {
     if (!this.canManage()) return;
     this.persist(() => {});
+  }
+
+  /** The page's save bar: saves the draft (asking first, as Save does) and says whether it saved. */
+  saveNow(): Promise<boolean> {
+    if (!this.canManage() || !this.dirty()) return Promise.resolve(!this.dirty());
+    return new Promise(resolve => this.persist(resolve));
   }
 
   /** Saves, asking first when the pipeline still runs as its legacy step; `then` hears whether it saved. */
@@ -503,48 +610,10 @@ export class StepBuilder {
       this.draft.update(d => withSample(d, rows));
       this.yamlTyped.set(false);
       this.enter(this.tab());
-      this.say('ok', `${rows.length} sample row${rows.length === 1 ? '' : 's'} put first. Save & run now runs the steps on them.`);
+      this.say('ok', `${rows.length} sample row${rows.length === 1 ? '' : 's'} put first. Save, then Run now runs the steps on them.`);
       this.validate();
     });
   }
-
-  runNow(): void {
-    const jobId = this.jobId();
-    if (!jobId || !this.canManage()) return;
-    if (this.dirty()) {
-      this.persist(ok => { if (ok) this.start(jobId); });
-      return;
-    }
-    this.start(jobId);
-  }
-
-  private start(jobId: number): void {
-    const job = this.jobs().find(j => j.jobId === jobId);
-    this.busy.set('run');
-    this.api.run(jobId).subscribe({
-      next: r => {
-        if (r.status !== API_SUCCESS) { this.busy.set(''); this.toast.error(r.message || 'The run could not be started.'); return; }
-        // Run now's answer does not name the run it queued: the newest of the job's runs is it.
-        this.api.runs(jobId).subscribe({
-          next: q => {
-            this.busy.set('');
-            const newest = (q.data?.jobQueues ?? []).reduce<number | null>((max, row) => (max === null || row.jobQueueId > max ? row.jobQueueId : max), null);
-            if (newest === null) { this.toast.success(`${job?.jobName ?? 'The job'} queued to run.`); return; }
-            const data: RunDrawerData = { jobQueueId: newest, jobId, jobName: job?.jobName ?? `Job #${jobId}` };
-            this.dialog.open(RunDrawer, sidePanelConfig(data, 'wide'));
-          },
-          error: () => { this.busy.set(''); this.toast.success(`${job?.jobName ?? 'The job'} queued to run.`); },
-        });
-      },
-      error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The run could not be started.'); },
-    });
-  }
-
-  schedule(): void {
-    this.router.navigate(['/pipelines/schedules/new'], { queryParams: { taskDetailId: this.taskDetailId() } });
-  }
-
-  pickJob(value: string): void { this.jobId.set(value ? Number(value) : null); }
 
   private say(tone: Tone, text: string): void { this.result.set({ tone, text }); }
 }

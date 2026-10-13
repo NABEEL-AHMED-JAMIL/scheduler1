@@ -78,7 +78,7 @@ describe('Run history empty message', () => {
   });
 
   it('says the job never ran only when that is what it means', () => {
-    expect(history().emptyMessage()).toBe('This job has never run.');
+    expect(history().emptyMessage()).toBe('This schedule has never run.');
   });
 });
 
@@ -120,17 +120,20 @@ describe('Run history stat strips', () => {
 
 describe('Run history with no job chosen', () => {
   /** Tenant-user review: with no job picked the page showed a red error with "Try again" -- it only needs a pick. */
-  it('lists the last day\'s runs of every job instead of an empty page (UI review U8)', () => {
+  it('lists the latest runs of every schedule instead of an empty page (UI review U8, B3)', () => {
     posts.length = 0;
     const h = history({});
     h.load();
     expect(h.error()).toBe('');
-    expect(posts[0].url).toContain('/message.json/fetchLogs');
-    expect(posts[0].body.limit).toBe(200);
-    expect(posts[0].body.fromDate <= posts[0].body.toDate).toBe(true);
+    // B3: the explorer asks for the facets' counts with the same body as the list.
+    const list = posts.find(p => p.url.includes('/message.json/fetchLogs'))!;
+    const facets = posts.find(p => p.url.includes('/message.json/runFacets'))!;
+    expect(list.body.limit).toBe(200);
+    expect(list.body.fromDate <= list.body.toDate).toBe(true);
+    expect(facets.body).toEqual(list.body);
     expect(h.runs().map(r => r.jobQueueId)).toEqual([9]);
     expect(h.recentCut()).toBe(true);
-    expect(h.emptyMessage()).toBe('No job ran in the last day. Open a schedule to see its whole history.');
+    expect(h.emptyMessage()).toBe('No schedule ran in this window. Widen it on the left, or open a schedule to see its whole history.');
   });
 });
 
@@ -186,12 +189,12 @@ describe('Run history and assistant dock on a phone', () => {
     expect(tag).toContain('shrink-0');
   });
 
-  it('shortens "Ask about this job" below sm so the card heading is not cut to "Job &…"', async () => {
+  it('shortens "Ask about this schedule" below sm so the card heading is not cut to "Job &…"', async () => {
     const source = await read('history/job-history.html');
     const at = source.indexOf('<app-icon name="chat" />');
     const button = source.slice(source.lastIndexOf('<button', at), source.indexOf('</button>', at));
-    expect(button).toContain('aria-label="Ask about this job"');
-    expect(button).toMatch(/<span class="hidden sm:inline">Ask about this job<\/span>/);
+    expect(button).toContain('aria-label="Ask about this schedule"');
+    expect(button).toMatch(/<span class="hidden sm:inline">Ask about this schedule<\/span>/);
     expect(button).toMatch(/<span class="sm:hidden">Ask<\/span>/);
   });
 });

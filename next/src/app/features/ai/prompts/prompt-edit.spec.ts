@@ -371,3 +371,49 @@ describe('PromptEdit -- data sensitivity', () => {
     expect(post).toHaveBeenLastCalledWith(expect.stringContaining('/aiPrompt.json/save'), expect.objectContaining({ dataSensitivity: '' }));
   });
 });
+
+/**
+ * MIG-349: an answer that never fit the output schema comes back held for review -- the reason, and the answer that was
+ * held, shown apart from a failure and never as the answer.
+ */
+describe('PromptEdit try held for review', () => {
+  function rendered(run: Record<string, unknown>) {
+    const get = vi.fn((url: string) => of({ status: API_SUCCESS, data: url.endsWith('/aiConnection.json/list')
+      ? [{ connectionId: 7, name: 'Ollama', provider: 'Ollama', defaultModel: 'gemma3:4b', isDefault: true }] : {} }));
+    const post = vi.fn(() => of({ status: 'ERROR', message: String(run['error'] ?? ''), data: run }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: HttpClient, useValue: { get, post } },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: () => {} } },
+      provideRouter([]),
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, canManageAgents: () => true, builderLocked: () => false, user: () => ({ appUserId: 1 }) } },
+    ] });
+    const fixture = TestBed.createComponent(PromptEdit);
+    fixture.detectChanges();
+    const component = fixture.componentInstance;
+    component.form.patchValue({ name: 'Triage', userTemplate: 'Label the image.', outputMode: 'json',
+      outputSchema: '{"properties":{"label":{"type":"string","enum":["normal","pneumonia"]}}}' });
+    TestBed.tick();
+    component.tryIt();
+    fixture.detectChanges();
+    return ((fixture.nativeElement as HTMLElement).textContent ?? '').replace(/\s+/g, ' ');
+  }
+
+  it('says held for review with the reason, and shows the held answer as not used', () => {
+    const text = rendered({ runId: 1, kind: 'try', status: 'review', dateCreated: '2026-10-07T09:00:00',
+      error: 'Held for review: the answer is not the JSON the prompt expects: label: "maybe" is not one of the allowed values (normal, pneumonia)',
+      output: '{"label":"maybe"}' });
+    expect(text).toContain('Held for review');
+    expect(text).toContain('is not one of the allowed values (normal, pneumonia)');
+    expect(text).toContain('The answer that was held (not used):');
+    expect(text).toContain('"label": "maybe"');
+    expect(text).not.toContain('Answered');
+  });
+
+  it('still says Failed, with no held answer, for a run that failed', () => {
+    const text = rendered({ runId: 2, kind: 'try', status: 'failed', dateCreated: '2026-10-07T09:00:00', error: 'HTTP 401: bad key' });
+    expect(text).toContain('Failed');
+    expect(text).toContain('HTTP 401: bad key');
+    expect(text).not.toContain('Held for review');
+  });
+});

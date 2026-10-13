@@ -1,9 +1,11 @@
-import { Component, ElementRef, Injector, OnInit, computed, effect, inject, input, linkedSignal, signal, untracked } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, DestroyRef, ElementRef, Injector, OnInit, computed, effect, inject, input, linkedSignal, signal, untracked, viewChild } from '@angular/core';
+import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { Dialog } from '@angular/cdk/dialog';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { parseTopicPartition } from '../../../shared/ui/topic';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormArray, FormBuilder, FormGroup, PristineChangeEvent, ReactiveFormsModule, Validators } from '@angular/forms';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { isMissingRecord, isRecordId } from '../../../core/api/missing-record';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -18,16 +20,31 @@ import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-d
 import { StepBuilder, BuilderTab } from '../steps/step-builder';
 import { StepsApi } from '../steps/steps.service';
 import { AuthService } from '../../../core/auth/auth.service';
-import { DefinitionView } from '../steps/steps.model';
+import { DefinitionView, LinkedJob } from '../steps/steps.model';
+import { OverviewPart, PartState, pipelineOverview } from '../steps/overview';
+import { RunDrawer, RunDrawerData } from '../steps/run-drawer';
+import { sidePanelConfig } from '../../../shared/ui/side-panel';
+import { Section } from '../../../shared/ui/section';
+import { EmptyState } from '../../../shared/ui/empty-state';
+import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { StatusPill } from '../../../shared/ui/status-pill';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
-/** The page's tabs when its pipeline has steps (MIG-249): Details is today's form; the rest are the step builder's. */
-export type PageTab = 'details' | BuilderTab;
-const PAGE_TABS: { id: PageTab; label: string }[] = [
-  { id: 'details', label: 'Details' }, { id: 'steps', label: 'Steps' }, { id: 'settings', label: 'Settings' },
-  { id: 'yaml', label: 'YAML' }, { id: 'json', label: 'JSON' },
+/**
+ * The page's tabs (MIG-249; UX review 2026-10-12, B2): Details is the pipeline's own form; Steps, Settings, History,
+ * YAML and JSON are the step builder's (shown once the pipeline's steps are read); Schedules lists what runs it.
+ */
+export type PageTab = 'details' | 'schedules' | BuilderTab;
+const PAGE_TABS: { id: PageTab; label: string; builder?: boolean }[] = [
+  { id: 'details', label: 'Details' }, { id: 'steps', label: 'Steps', builder: true }, { id: 'settings', label: 'Settings', builder: true },
+  { id: 'schedules', label: 'Schedules' }, { id: 'history', label: 'History', builder: true },
+  { id: 'yaml', label: 'YAML', builder: true }, { id: 'json', label: 'JSON', builder: true },
 ];
-const BUILDER_TABS: string[] = ['steps', 'settings', 'yaml', 'json'];
+const BUILDER_TABS: string[] = ['steps', 'settings', 'history', 'yaml', 'json'];
+
+const STATE_WORDS: Record<PartState, string> = { done: 'Set', missing: 'Missing', optional: 'Optional' };
 
 /**
  * A text field whose default is "true" or "false" is a yes/no answer typed into a box (UI review U15: "Delete the
@@ -40,8 +57,27 @@ export function yesNoAsCheckbox(field: PipelineField): PipelineField {
 
 @Component({
   selector: 'app-task-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner],
+  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner,
+    CdkMenu, CdkMenuItem, CdkMenuTrigger, Section, EmptyState, ServerTimePipe],
   templateUrl: './task-edit.html',
+  // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
+  styles: `
+/* The pipeline's parts, in the order they are set up: Source -> Steps -> Review -> Outputs -> Schedule & triggers. */
+.pipeline-overview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; list-style: none; margin: 0; padding: 0; }
+@media (max-width: 1100px) { .pipeline-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .pipeline-overview { grid-template-columns: minmax(0, 1fr); } }
+.pipeline-overview > li { min-width: 0; display: flex; }
+.pipeline-part { display: flex; align-items: flex-start; gap: 0.625rem; width: 100%; min-width: 0; padding: 0.75rem 0.875rem; text-align: left; background: none; border: 0; border-right: 1px solid var(--border-subtle); color: inherit; font: inherit; cursor: pointer; }
+.pipeline-overview > li:last-child .pipeline-part { border-right: 0; }
+.pipeline-part:hover { background: var(--surface-inset); }
+.pipeline-part:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.pipeline-part-state { flex: none; display: inline-grid; place-items: center; width: 1.375rem; height: 1.375rem; border-radius: 9999px; font-size: 0.75rem; border: 1px solid var(--border-subtle); background: var(--surface-sunken); color: var(--text-muted); }
+.pipeline-part[data-state="done"] .pipeline-part-state { background: color-mix(in oklab, var(--color-ok-500) 14%, transparent); border-color: color-mix(in oklab, var(--color-ok-500) 45%, transparent); color: var(--color-ok-500); }
+.pipeline-part[data-state="missing"] .pipeline-part-state { background: color-mix(in oklab, var(--color-warn-500) 14%, transparent); border-color: color-mix(in oklab, var(--color-warn-500) 45%, transparent); color: var(--color-warn-500); }
+.pipeline-part-label { display: flex; align-items: baseline; gap: 0.375rem; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.pipeline-part-word { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+.pipeline-part-detail { display: block; margin-top: 0.125rem; font-size: 12px; line-height: 1.35; color: var(--text-secondary); overflow-wrap: anywhere; }
+  `,
 })
 export class TaskEdit implements OnInit {
   readonly taskDetailId = input<string>('');
@@ -57,6 +93,8 @@ export class TaskEdit implements OnInit {
   /** Optional so the unit specs, which build the editor without a view, still can. */
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef, { optional: true });
   private readonly injector = inject(Injector);
+  private readonly dialog = inject(Dialog);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly taskTypes = signal<any[]>([]);
   private pendingTopicSeed: { topicId: number; tenantId: number | null } | null = null;
@@ -79,7 +117,7 @@ export class TaskEdit implements OnInit {
    * instead of the form: an empty "Edit task" form would save as an update with no task id.
    */
   readonly loadError = signal('');
-  /** The task does not exist, so Try again is replaced with Back to tasks. */
+  /** The pipeline does not exist, so Try again is replaced with Back to pipelines. */
   readonly loadMissing = signal(false);
   readonly submitted = signal(false);
 
@@ -113,6 +151,10 @@ export class TaskEdit implements OnInit {
   private taskTenantId: number | null = null;
 
   readonly isEdit = computed(() => !!this.taskDetailId());
+  /** UX review 2026-10-12 (P4): the page is titled with the pipeline's name, and its status beside it. */
+  readonly loadedName = signal('');
+  readonly loadedStatus = signal('');
+  readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Pipeline') : 'New pipeline');
 
   readonly form: FormGroup = this.fb.group({
     taskDetailId: [null],
@@ -148,6 +190,21 @@ export class TaskEdit implements OnInit {
   private profilesLoaded = false;
   readonly selectedProfileId = signal<number | null>(null);
   readonly topicsLoading = signal(false);
+  /** The connection whose topics last arrived (null until one has): an empty list is only "none" once it is an answer. */
+  private readonly topicsAnsweredFor = signal<number | null>(null);
+  /**
+   * MIG-324: the picked connection has answered, with no topic. A new workspace starts here, and the box alone only said
+   * "No matches"; the hint now says where a topic is added.
+   */
+  readonly noTopicsHere = computed(() => {
+    const profile = this.selectedProfileId();
+    return profile != null && !this.topicsLoading() && this.topicsAnsweredFor() === profile && this.taskTypes().length === 0;
+  });
+  readonly topicHint = computed(() => this.topicsLoading()
+    ? 'Loading this connection’s topics…'
+    : this.noTopicsHere()
+      ? 'No topic publishes through this connection yet. Add one under Configuration › Kafka & Topics, then pick it here.'
+      : 'Where this pipeline publishes. The registry tasks on it come next.');
   /** The topic the task was opened with, named before its profile's list has arrived. */
   readonly loadedTopicLabel = signal('');
   readonly profileOptions = computed<ComboboxOption[]>(() => this.profiles().map(p => ({
@@ -186,7 +243,7 @@ export class TaskEdit implements OnInit {
       next: response => {
         if (ticket !== this.topicsTicket) return;
         this.topicsLoading.set(false);
-        if (response.status === API_SUCCESS) this.taskTypes.set(response.data ?? []);
+        if (response.status === API_SUCCESS) { this.taskTypes.set(response.data ?? []); this.topicsAnsweredFor.set(profileId); }
         else this.toast.error(response.message || 'Could not load the topics.');
       },
       error: () => { if (ticket === this.topicsTicket) { this.topicsLoading.set(false); this.toast.error('Could not load the topics.'); } },
@@ -231,6 +288,14 @@ export class TaskEdit implements OnInit {
   }
 
   ngOnInit(): void {
+    if (!this.isEdit()) {
+      // UX review 2026-10-12 (P3): a new pipeline's topic and XML payload are optional -- Core uses the workspace's own
+      // topic and the empty payload a step pipeline carries.
+      for (const name of ['sourceTaskTypeId', 'taskPayload']) {
+        this.form.get(name)!.clearValidators();
+        this.form.get(name)!.updateValueAndValidity({ emitEvent: false });
+      }
+    }
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`).subscribe({
       next: response => {
         this.profilesLoaded = true;
@@ -286,7 +351,7 @@ export class TaskEdit implements OnInit {
     // An id that is not a number cannot name a task; asking anyway answered with the server's
     // "not valid" sentence and a Try again that could only fail again.
     if (!isRecordId(this.taskDetailId())) {
-      this.missing('That link does not point to a task.');
+      this.missing('That link does not point to a pipeline.');
       return;
     }
     this.loading.set(true);
@@ -297,11 +362,11 @@ export class TaskEdit implements OnInit {
       next: response => {
         this.loading.set(false);
         if (isMissingRecord(response) || (response.status === API_SUCCESS && !response.data)) {
-          this.missing(`Task #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
+          this.missing(`Pipeline #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
           return;
         }
         if (response.status !== API_SUCCESS) {
-          this.loadError.set(response.message || 'That task could not be loaded.');
+          this.loadError.set(response.message || 'That pipeline could not be loaded.');
           return;
         }
         const task = response.data;
@@ -317,6 +382,8 @@ export class TaskEdit implements OnInit {
           groupId: task.groupId,
           taskPayload: task.taskPayload,
         }, { emitEvent: false });
+        this.loadedName.set(task.taskName ?? '');
+        this.loadedStatus.set(task.taskStatus ?? '');
         this.pipelineChosen.set(task.pipelineId ?? '');
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');
@@ -336,8 +403,8 @@ export class TaskEdit implements OnInit {
       },
       error: err => {
         this.loading.set(false);
-        if (isMissingRecord(err)) this.missing(`Task #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
-        else this.loadError.set(err?.error?.message || 'That task could not be loaded.');
+        if (isMissingRecord(err)) this.missing(`Pipeline #${String(this.taskDetailId()).trim()} does not exist or was deleted.`);
+        else this.loadError.set(err?.error?.message || 'That pipeline could not be loaded.');
       },
     });
   }
@@ -463,6 +530,15 @@ export class TaskEdit implements OnInit {
         });
       });
     });
+    // The schedules that run the pipeline: Run now's, the Schedules tab's and the overview's.
+    effect(() => {
+      const task = this.isEdit() ? this.taskIdNumber() : null;
+      untracked(() => this.loadJobs(task));
+    });
+    // The details form's changes, for the save bar (B2): its pristine events, a save's markAsPristine included.
+    this.form.events.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(event => {
+      if (event instanceof PristineChangeEvent) this.detailsDirty.set(!event.pristine);
+    });
     // Once a legacy pipeline's steps are open, Details stays one tab of several (stepsOpened).
     effect(() => {
       if (this.stepsView() && BUILDER_TABS.includes(this.requested())) untracked(() => this.stepsOpened.set(true));
@@ -544,8 +620,9 @@ export class TaskEdit implements OnInit {
     for (const name of Object.keys(this.formData.controls)) {
       this.formData.removeControl(name, { emitEvent: false });
     }
-    // No form to generate a payload from any more -- back to requiring a hand-written one.
-    this.form.get('taskPayload')!.setValidators(Validators.required);
+    // No form to generate a payload from any more -- back to requiring a hand-written one, for a saved pipeline. A new
+    // one's event source is optional (UX review 2026-10-12, P3): Core gives it the empty payload and the workspace's topic.
+    this.form.get('taskPayload')!.setValidators(this.isEdit() ? Validators.required : []);
     this.form.get('taskPayload')!.updateValueAndValidity({ emitEvent: false });
   }
 
@@ -718,9 +795,19 @@ export class TaskEdit implements OnInit {
   /** Once a legacy pipeline's steps are open, Details is one tab of several rather than the whole page again. */
   private readonly stepsOpened = signal(false);
 
-  readonly pageTabs = PAGE_TABS;
+  /**
+   * MIG-324: Details offers the step builder to a pipeline that has no saved steps. Such a run is handed to whatever
+   * worker reads the topic, and in a new workspace nothing does -- the run sat in Start. The builder was there all
+   * along, but only at ?tab=steps. Not where the builder is locked (a MANAGED workspace) or before the task exists.
+   */
+  readonly offerSteps = computed(() =>
+    this.isEdit() && !this.locked() && !this.stepsMode() && this.stepsView()?.legacy === true);
+
+  /** The tabs: the builder's once the pipeline's steps are read (a pipeline without a pipeline key has Details alone). */
+  readonly pageTabs = computed(() => PAGE_TABS.filter(t => !t.builder || !!this.stepsView()));
 
   readonly activeTab = computed<PageTab>(() => {
+    if (this.requested() === 'schedules' && this.isEdit()) return 'schedules';
     if (!this.stepsMode()) return 'details';
     const asked = this.requested();
     if (asked === 'details' || BUILDER_TABS.includes(asked)) return asked as PageTab;
@@ -730,7 +817,7 @@ export class TaskEdit implements OnInit {
   /** The builder's tab: the one open, or -- while Details is -- the last of its own, so its drafts stay where they were. */
   readonly builderTab = linkedSignal<PageTab, BuilderTab>({
     source: this.activeTab,
-    computation: (tab, previous) => (tab === 'details' ? previous?.value ?? 'steps' : tab),
+    computation: (tab, previous) => (tab === 'details' || tab === 'schedules' ? previous?.value ?? 'steps' : tab),
   });
 
   /** The page is a workspace administrator's (its route says so); a platform administrator passes the same test. */
@@ -739,6 +826,131 @@ export class TaskEdit implements OnInit {
   readonly locked = computed(() => this.injector.get(AuthService).builderLocked());
 
   readonly taskIdNumber = computed(() => (isRecordId(this.taskDetailId()) ? Number(this.taskDetailId()) : null));
+
+  // ------------------------------------------------------------------------------------------ B2: one page, one save
+
+  /** The step builder, while it is on the page: its draft, its dirtiness and its save are the save bar's. */
+  private readonly builderQuery = viewChild(StepBuilder);
+  /** Only once its inputs are set (see StepBuilder.ready). */
+  readonly builder = computed(() => { const b = this.builderQuery(); return b?.ready() ? b : undefined; });
+
+  /** The details form has changes (followed through the form's pristine events, which a save's markAsPristine fires too). */
+  readonly detailsDirty = signal(false);
+  readonly dirty = computed(() => this.detailsDirty() || !!this.builder()?.dirty());
+
+  readonly saveState = computed(() => {
+    const steps = !!this.builder()?.dirty();
+    const details = this.detailsDirty();
+    const change = steps && details ? 'Unsaved changes to the steps and the details'
+      : steps ? 'Unsaved changes to the steps' : details ? 'Unsaved changes' : 'No changes';
+    const b = this.builder();
+    const view = this.stepsView();
+    if (!this.isEdit() || !b || !view || view.legacy || !view.stored) return change;
+    return `${b.versionText()}${b.latestVersion() ? ' · saved ' + savedWhen(b.latestVersion()!.dateCreated) : ''} · ${change}`;
+  });
+
+  /** The version pill beside the title: the saved steps' version. */
+  readonly versionPill = computed(() => {
+    const view = this.stepsView();
+    return view && view.stored && !view.legacy ? view.version : null;
+  });
+
+  /** The schedules that run this pipeline: Run now runs one, the Schedules tab lists them, the overview counts them. */
+  readonly jobs = signal<LinkedJob[]>([]);
+  readonly jobsLoaded = signal(false);
+  readonly running = signal(false);
+  readonly runLabel = computed(() => (this.dirty() && !this.locked() ? 'Save & run now' : 'Run now'));
+  readonly runHint = computed(() => {
+    if (!this.jobsLoaded()) return '';
+    if (!this.jobs().length) return 'No schedule runs this pipeline yet. Schedule one, then Run now runs it.';
+    return this.dirty() && !this.locked() ? 'Unsaved changes are saved first: a run runs the saved steps.' : '';
+  });
+
+  /** Source -> Steps -> Review -> Outputs -> Schedule & triggers, from the draft as it is edited. */
+  readonly overview = computed<OverviewPart[]>(() => {
+    const b = this.builder();
+    return pipelineOverview({
+      definition: b ? b.draft() : this.stepsView()?.definition ?? null,
+      tasks: b ? b.tasks() : [],
+      jobs: this.jobs(),
+      jobsLoaded: this.jobsLoaded(),
+    });
+  });
+
+  stateWord(state: PartState): string { return STATE_WORDS[state]; }
+
+  /** Opens the tab a part is set on, and brings its place on that tab into view. */
+  goTo(part: OverviewPart): void {
+    this.setTab(part.target.tab);
+    const anchor = part.target.anchor;
+    if (!anchor || !this.host) return;
+    setTimeout(() => this.host?.nativeElement.querySelector(`#${anchor}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  }
+
+  private loadJobs(task: number | null): void {
+    this.jobsLoaded.set(false);
+    if (!task) { this.jobs.set([]); return; }
+    this.stepsApi.jobsOf(task).subscribe({
+      next: r => { this.jobs.set(r.status === API_SUCCESS ? r.data ?? [] : []); this.jobsLoaded.set(true); },
+      error: () => { this.jobs.set([]); this.jobsLoaded.set(true); },
+    });
+  }
+
+  /**
+   * The save bar's Save: the details when they changed, then the steps when they did (the steps save asks first when
+   * the pipeline still runs as its legacy step). A new pipeline is created as before. Resolves whether all of it saved.
+   */
+  saveAll(): Promise<boolean> {
+    if (!this.isEdit()) { this.save(); return Promise.resolve(true); }
+    if (this.locked()) return Promise.resolve(false);
+    const steps = () => {
+      const b = this.builder();
+      return b?.dirty() ? b.saveNow() : Promise.resolve(true);
+    };
+    if (!this.detailsDirty()) return steps();
+    return new Promise<boolean>(resolve => this.save(ok => resolve(ok))).then(ok => (ok ? steps() : false));
+  }
+
+  /** Puts both back as saved: the steps' draft, and the details as read (read again). */
+  discardAll(): void {
+    this.builder()?.discard();
+    if (this.detailsDirty()) this.loadTask();
+  }
+
+  /** Run now: the one schedule, or the one picked; unsaved changes are saved first, as the runner runs what is saved. */
+  async runNow(jobId?: number): Promise<void> {
+    const id = jobId ?? this.jobs()[0]?.jobId;
+    if (!id || this.running()) return;
+    if (this.dirty() && !this.locked()) {
+      const saved = await this.saveAll();
+      if (!saved) return;
+    }
+    const job = this.jobs().find(j => j.jobId === id);
+    this.running.set(true);
+    this.stepsApi.run(id).subscribe({
+      next: r => {
+        if (r.status !== API_SUCCESS) { this.running.set(false); this.toast.error(r.message || 'The run could not be started.'); return; }
+        // Run now's answer does not name the run it queued: the newest of the schedule's runs is it.
+        this.stepsApi.runs(id).subscribe({
+          next: q => {
+            this.running.set(false);
+            const newest = (q.data?.jobQueues ?? []).reduce<number | null>((max, row) => (max === null || row.jobQueueId > max ? row.jobQueueId : max), null);
+            if (newest === null) { this.toast.success(`${job?.jobName ?? 'The schedule'} queued to run.`); return; }
+            const data: RunDrawerData = { jobQueueId: newest, jobId: id, jobName: job?.jobName ?? `Schedule #${id}` };
+            this.dialog.open(RunDrawer, sidePanelConfig(data, 'wide', 'right'));
+            this.loadJobs(this.taskIdNumber());
+          },
+          error: () => { this.running.set(false); this.toast.success(`${job?.jobName ?? 'The schedule'} queued to run.`); },
+        });
+      },
+      error: err => { this.running.set(false); this.toast.error(err?.error?.message || 'The run could not be started.'); },
+    });
+  }
+
+  /** A new schedule for this pipeline. */
+  schedule(): void {
+    this.router.navigate(['/pipelines/schedules/new'], { queryParams: { taskDetailId: this.taskIdNumber() } });
+  }
 
   setTab(tab: PageTab): void {
     this.picked.set(tab);
@@ -750,9 +962,9 @@ export class TaskEdit implements OnInit {
     this.stepsView.set(view);
   }
 
-  save(): void {
+  save(done: (ok: boolean) => void = () => {}): void {
     // Nothing was read, so there is nothing to update (the form is not shown either).
-    if (this.loadError() || this.locked()) return;
+    if (this.loadError() || this.locked()) { done(false); return; }
     this.submitted.set(true);
     // Belt and braces: the fields sync as they are typed, but a value restored by the browser
     // or set programmatically would not have fired an input event.
@@ -765,13 +977,15 @@ export class TaskEdit implements OnInit {
           || this.form.get('sourceTaskTypeId')!.invalid || this.form.get('taskStatus')!.invalid) {
         this.form.markAllAsTouched();
         this.toast.error('Check the highlighted fields.');
+        this.showDetails();
         this.focusFirstInvalid();
+        done(false);
         return;
       }
       this.generatePayloadFromTags(xml => {
-        if (xml == null) return; // generatePayloadFromTags already toasted why
+        if (xml == null) { done(false); return; } // generatePayloadFromTags already toasted why
         this.form.get('taskPayload')!.setValue(xml);
-        this.submitTask();
+        this.submitTask(done);
       });
       return;
     }
@@ -779,10 +993,17 @@ export class TaskEdit implements OnInit {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       this.toast.error('Check the highlighted fields.');
+      this.showDetails();
       this.focusFirstInvalid();
+      done(false);
       return;
     }
-    this.submitTask();
+    this.submitTask(done);
+  }
+
+  /** A details field is wrong while another tab is open: Details is opened so the field can be seen. */
+  private showDetails(): void {
+    if (this.activeTab() !== 'details' && this.isEdit()) this.setTab('details');
   }
 
   /**
@@ -828,13 +1049,14 @@ export class TaskEdit implements OnInit {
     });
   }
 
-  private submitTask(): void {
+  private submitTask(done: (ok: boolean) => void = () => {}): void {
     const value = this.form.getRawValue();
     const payload = {
       taskDetailId: value.taskDetailId,
       // Stored without the spaces around it, so the list and search see the name that was meant.
       taskName: (value.taskName ?? '').trim(),
-      sourceTaskType: { sourceTaskTypeId: value.sourceTaskTypeId },
+      // A new pipeline without a topic leaves it out; Core picks the workspace's own (UX review 2026-10-12, P3).
+      ...(value.sourceTaskTypeId != null ? { sourceTaskType: { sourceTaskTypeId: value.sourceTaskTypeId } } : {}),
       taskPayload: value.taskPayload,
       taskStatus: value.taskStatus,
       homePageId: value.homePageId,
@@ -852,18 +1074,39 @@ export class TaskEdit implements OnInit {
       next: response => {
         this.saving.set(false);
         if (response.status === API_SUCCESS) {
-          this.toast.success(this.isEdit() ? 'Task updated.' : 'Task created.');
-          this.router.navigate(['/pipelines']);
+          this.toast.success(this.isEdit() ? 'Pipeline updated.' : 'Pipeline created.');
+          if (this.isEdit()) {
+            // UX review 2026-10-12 (B2): the editor stays open after a save -- the steps may be next, and the save bar
+            // says "No changes" again. The title and pill follow what was saved.
+            this.loadedName.set(payload.taskName);
+            this.loadedStatus.set(payload.taskStatus ?? '');
+            this.form.markAsPristine();
+            done(true);
+            return;
+          }
+          // MIG-324: a new pipeline opens on its own page, where its steps are built next. Core names the new id only
+          // in its message ("... saved with ID 1877."); without one, the list as before.
+          const created = /\bID (\d+)\b/.exec(response.message ?? '');
+          this.router.navigate(created ? ['/pipelines', Number(created[1]), 'edit'] : ['/pipelines/list']);
+          done(true);
         } else {
-          this.toast.error(response.message || 'The task could not be saved.');
+          this.toast.error(response.message || 'The pipeline could not be saved.');
+          done(false);
         }
       },
       error: err => {
         this.saving.set(false);
-        this.toast.error(err?.error?.message || 'The task could not be saved.');
+        this.toast.error(err?.error?.message || 'The pipeline could not be saved.');
+        done(false);
       },
     });
   }
+}
+
+/** "7 Oct 2026, 09:51": when the steps were saved, as the save bar's state says it. */
+const SAVED_WHEN = new ServerTimePipe('en-GB');
+function savedWhen(value: string | null | undefined): string {
+  return SAVED_WHEN.transform(value ?? null, 'dateTime') ?? '';
 }
 
 function toReferenceOption(ref: TaskReference): ComboboxOption {

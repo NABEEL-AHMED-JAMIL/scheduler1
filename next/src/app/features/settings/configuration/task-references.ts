@@ -11,6 +11,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { TaskReferenceDialog, TaskReferenceDialogData } from './task-reference-dialog';
 import { TaskReference, TaskReferenceKind, TenantOption, workspaceLabel } from './configuration.models';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 const ENDPOINT = () => `${API_BASE}/setting.json/taskReferences`;
 
@@ -34,7 +36,7 @@ const COPY: Record<TaskReferenceKind, { title: string; singular: string; subtitl
  */
 @Component({
   selector: 'app-task-references',
-  imports: [TableShell, Icon, Combobox, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, Combobox, ServerTimePipe],
   templateUrl: './task-references.html',
 })
 export class TaskReferences implements OnInit {

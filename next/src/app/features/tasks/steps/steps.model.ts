@@ -1,3 +1,5 @@
+import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
+
 /**
  * MIG-249: the step builder's shapes and the pure rules behind them.
  *
@@ -40,8 +42,12 @@ export interface Settings {
   defaultOnError?: string;
   /** MIG-243: public, internal or sensitive -- the level of the data the pipeline handles; the data policy for it applies. */
   sensitivity?: string;
-  /** MIG-237: whose review the run's results wait for (internal, customer); absent means no review. */
-  review?: { required?: ('internal' | 'customer')[] };
+  /**
+   * MIG-237: whose review the run's results wait for (internal, customer); absent means no review. MIG-361: whose Task
+   * inbox the internal review goes to (reviewers). Bulk review (2026-10-12): individual -- the run's review and the
+   * pipeline's Approval steps are never approved or rejected in bulk.
+   */
+  review?: { required?: ('internal' | 'customer')[]; reviewers?: { kind?: string; value?: string } | null; individual?: boolean };
 }
 
 export interface Source { type?: string; config?: Record<string, unknown>; }
@@ -49,6 +55,8 @@ export interface Source { type?: string; config?: Record<string, unknown>; }
 export interface Definition {
   version?: number;
   source?: Source;
+  /** MIG-347: what a run is given (Run with…, a backfill, the API); every step reads one as {{param.name}}. */
+  parameters?: RunParameter[];
   steps: Step[];
   settings?: Settings;
 }
@@ -212,7 +220,11 @@ export interface StepLogLine { level?: string | null; message?: string | null; l
 export interface StepLog { stepExecutionId: number; stepKey: string; attempt: number; lines: StepLogLine[]; }
 
 /** One of the task's schedules (sourceTask.json/fetchAllLinkJobsWithSourceTaskId). */
-export interface LinkedJob { jobId: number; jobName: string; jobStatus?: string | null; execution?: string | null; }
+export interface LinkedJob {
+  jobId: number; jobName: string; jobStatus?: string | null; execution?: string | null;
+  /** The last run's status and when it ran (fetchAllLinkJobsWithSourceTaskId sends both). */
+  jobRunningStatus?: string | null; lastJobRun?: string | null;
+}
 
 /** One run of a job (sourceJob.json/fetchSourceJobQueueListWithJobId). */
 export interface RunRow { jobQueueId: number; jobStatus?: string | null; startTime?: string | null; endTime?: string | null; jobStatusMessage?: string | null; }
@@ -226,7 +238,8 @@ export function runFinished(status: string | null | undefined): boolean {
 
 // ---------------------------------------------------------------------------------------------- canonical form
 
-const DEFINITION_ORDER = ['version', 'source', 'steps', 'settings'];
+const DEFINITION_ORDER = ['version', 'source', 'parameters', 'steps', 'settings'];
+const PARAMETER_ORDER = ['name', 'type', 'label', 'description', 'required', 'default', 'choices'];
 const STEP_ORDER = ['key', 'name', 'task', 'input', 'config', 'retry', 'timeoutSeconds', 'onError'];
 const RETRY_ORDER = ['maxAttempts', 'delaySeconds'];
 const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'review'];
@@ -272,7 +285,20 @@ export function canonical(definition: Definition): Definition {
     const settings = ordered(out.settings, SETTINGS_ORDER);
     if (emptyObject(settings)) delete out.settings; else out.settings = settings;
   }
+  if (out.parameters) {
+    // A parameter not required says nothing of it; a choice list only on a choice.
+    const params = out.parameters.map(p => ordered(p, PARAMETER_ORDER,
+      (key, v) => !blank(v) && !(key === 'required' && v !== true) && !(key === 'choices' && (p.type !== 'choice' || !Array.isArray(v)))));
+    if (params.length) out.parameters = params; else delete out.parameters;
+  }
   return out;
+}
+
+/** MIG-347: the definition with these run parameters (none drops the key). */
+export function updateParameters(definition: Definition, parameters: RunParameter[]): Definition {
+  const next: Definition = { ...definition, parameters };
+  if (!parameters.length) delete next.parameters;
+  return next;
 }
 
 /** The JSON tab's text, and what a builder save sends. */
@@ -634,19 +660,34 @@ export function inputColumns(definition: Definition, index: number, tasks: StepT
 
 // ---------------------------------------------------------------------------------------------- a config form
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json'
-  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt';
+export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'multi' | 'list' | 'objects' | 'object' | 'json'
+  | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type';
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
 export interface PromptChoice { id: number; label: string; }
 
 /**
- * The registry's widget hints (configSchema `format`). column, step, sql, template, multiline and prompt have widgets here;
- * the rest are text until their pickers exist.
- * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, bucket, pipeline and user.
+ * MIG-346: a workspace webhook a Send webhook step may name: its id, its address as the choice shows it, and whether it can
+ * take a step's delivery now (active, and subscribed to run.step.sent).
+ */
+export interface WebhookChoice { id: number; label: string; ready: boolean; }
+
+/** MIG-346: the event type a webhook must take for a pipeline step to send to it. */
+export const STEP_WEBHOOK_EVENT = 'run.step.sent';
+
+/** MIG-364: a Document Intelligence document type a step may name: its id, and its name as the choice shows it. */
+export interface DocumentTypeChoice { id: number; label: string; }
+
+/** MIG-321: a workspace bucket a step may name: its alias, and the connection's name as the choice shows it. */
+export interface BucketChoice { alias: string; label: string; }
+
+/**
+ * The registry's widget hints (configSchema `format`). column, step, sql, template, multiline, prompt and bucket have widgets
+ * here; the rest are text until their pickers exist.
+ * TODO(MIG-249): pickers for api-request, api-environment, data-contract, db-connection, pipeline and user.
  */
 export const FORMATS = ['column', 'step', 'sql', 'template', 'multiline', 'api-request', 'api-environment', 'data-contract',
-  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression'] as const;
+  'db-connection', 'bucket', 'pipeline', 'user', 'prompt', 'expression', 'webhook', 'document-type'] as const;
 const LONG_TEXT_FORMATS = ['sql', 'template', 'multiline', 'textarea'];
 
 export interface FieldSpec {
@@ -691,12 +732,18 @@ function kindOf(schema: JsonSchema): FieldKind {
     case 'string':
       if (schema.format === 'column') return 'column';
       if (schema.format === 'step') return 'step';
+      if (schema.format === 'bucket') return 'bucket';
       return (schema.maxLength ?? 0) > 200 || LONG_TEXT_FORMATS.includes(schema.format ?? '') ? 'textarea' : 'text';
-    case 'integer': return schema.format === 'prompt' ? 'prompt' : 'integer';
+    case 'integer':
+      return schema.format === 'prompt' ? 'prompt' : schema.format === 'webhook' ? 'webhook'
+        : schema.format === 'document-type' ? 'document-type' : 'integer';
     case 'number': return 'number';
     case 'boolean': return 'boolean';
     case 'array': {
       const items = schema.items;
+      // UX review 2026-10-12 (MIG-364 leftover): a list of fixed choices -- read_documents' statuses -- is a set of
+      // checkboxes, not a raw JSON box.
+      if (items && Array.isArray(items.enum) && items.enum.length && items.enum.every(v => typeof v === 'string')) return 'multi';
       if (!items || items.enum) return 'json';
       if (typeOf(items) === 'string' && items.format === 'column') return 'columns';
       if (['string', 'number', 'integer'].includes(typeOf(items)) || isScalarMix(items)) return 'list';
@@ -718,7 +765,7 @@ export function fieldsOf(schema: JsonSchema | null | undefined): FieldSpec[] {
       label: property.title || name,
       required: required.includes(name),
       description: property.description ?? '',
-      options: kind === 'enum' ? [...(property.enum ?? [])] : [],
+      options: kind === 'enum' ? [...(property.enum ?? [])] : kind === 'multi' ? [...(property.items?.enum ?? [])] : [],
     };
     if (kind === 'list') {
       const item = property.items;
@@ -798,11 +845,31 @@ export function errorText(error: unknown): string {
   return JSON.stringify(error);
 }
 
-/** MIG-245: whether a task's settings name a saved prompt anywhere (so its panel needs the prompts to choose from). */
-export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
+/** Whether a task's settings use a widget format anywhere, nested settings included. */
+function usesFormat(schema: JsonSchema | null | undefined, format: string): boolean {
   if (!schema || typeof schema !== 'object') return false;
-  if (schema.format === 'prompt') return true;
+  if (schema.format === format) return true;
   const nested = [...Object.values(schema.properties ?? {}), schema.items, schema.additionalProperties]
     .filter((s): s is JsonSchema => !!s && typeof s === 'object');
-  return nested.some(usesPrompt);
+  return nested.some(n => usesFormat(n, format));
+}
+
+/** MIG-245: whether a task's settings name a saved prompt anywhere (so its panel needs the prompts to choose from). */
+export function usesPrompt(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'prompt');
+}
+
+/** MIG-346: whether a task's settings name a webhook anywhere (so its panel offers the workspace's webhooks). */
+export function usesWebhook(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'webhook');
+}
+
+/** MIG-364: whether a task's settings name a document type anywhere (so its panel offers the workspace's types). */
+export function usesDocumentType(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'document-type');
+}
+
+/** MIG-321: whether a task's settings name a bucket anywhere (so its panel offers the workspace's buckets). */
+export function usesBucket(schema: JsonSchema | null | undefined): boolean {
+  return usesFormat(schema, 'bucket');
 }

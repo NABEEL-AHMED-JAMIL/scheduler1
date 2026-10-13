@@ -1,27 +1,27 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Model connections</h1>
-      <p class="page-subtitle">
-        Where prompts run: a provider, a key, a default model, and the two caps that keep a
-        scheduled job from running up a bill. One connection is the workspace default; a prompt
-        that names none runs on it. Keys are encrypted and never sent back to the browser.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Model connections</h1>
+        <p class="page-subtitle">
+          Where prompts run: a provider, a key, a default model, and the two caps that keep a
+          schedule from running up a bill. One connection is the workspace default; a prompt
+          that names none runs on it. Keys are encrypted and never sent back to the browser.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (!locked()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+            <app-icon name="plus" />New connection
+          </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (!locked()) {
-        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-          <app-icon name="plus" />New connection
-        </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="model connections" />
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Connections', value: summary().total, foot: summary().active + ' active', icon: 'server', tone: 'info' },
       { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed', icon: 'plug', tone: 'ok' },
@@ -32,7 +32,7 @@
     }
   </div>
 
-  <div class="card lookup-split kafka-split">
+  <div class="card lookup-split kafka-split" [attr.data-pane]="pane()">
     <aside class="lookup-rail">
       <div class="lookup-rail-tools">
         <div class="search-field">
@@ -94,6 +94,9 @@
 
     <section class="lookup-detail" aria-live="polite">
       @if (selected(); as c) {
+        <button type="button" class="btn btn-ghost btn-sm inbox-back" (click)="pane.set('list')" data-test="back-to-list">
+          <app-icon name="arrowLeft" />Back to list
+        </button>
         <header class="lookup-detail-head">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
@@ -180,7 +183,7 @@
               <dt>Tokens out</dt><dd>{{ c.tokensOut30d ?? 0 | number }}</dd>
               <dt>Prompts</dt><dd>
                 @if (c.promptCount) {
-                  <a class="link-inline" [routerLink]="['/ai/prompts']" [queryParams]="{ connection: c.connectionId }">{{ c.promptCount }} run on it</a>
+                  <a class="link-inline" [routerLink]="['/pipelines/prompts']" [queryParams]="{ connection: c.connectionId }">{{ c.promptCount }} run on it</a>
                 } @else { none yet@if (c.isDefault) { — prompts on the workspace default use it } }
               </dd>
             </dl>
@@ -216,11 +219,24 @@
                         @for (r of a.recent; track r.runId) {
                           <tr>
                             <td class="text-xs whitespace-nowrap">{{ r.at | serverTime: 'dateTime' }}</td>
+                            <!-- One line, cut with the whole name as its title: wrapped, a long name made each row four lines (review 2026-10-07). -->
                             <td class="min-w-0">
                               @if (r.promptId) {
-                                <a class="link-inline" [routerLink]="['/ai/prompts', r.promptId, 'edit']">{{ r.promptName || 'Prompt ' + r.promptId }}</a>
+                                <a class="link-inline block truncate max-w-64" [title]="r.promptName || 'Prompt ' + r.promptId" [routerLink]="['/pipelines/prompts', r.promptId, 'edit']">{{ r.promptName || 'Prompt ' + r.promptId }}</a>
                               } @else { <span class="text-[color:var(--text-secondary)]">{{ kindLabel(r.kind) }}</span> }
-                              @if (r.error) { <div class="text-xs text-crit-500 truncate max-w-[28rem]" [title]="r.error">{{ r.error }}</div> }
+                              <!-- UX final MC1: the provider's answer as a sentence (no raw HTTP/JSON), wrapped not cut; the
+                                   stored text in full on hover and under Details. -->
+                              @if (runError(r.error); as e) {
+                                <div class="text-xs text-crit-500 flex items-start gap-1 mt-0.5 max-w-[28rem] [overflow-wrap:anywhere]" data-test="run-error" [title]="e.raw ?? e.text">
+                                  <app-icon name="alert" size="0.9em" class="shrink-0 mt-px" /><span>{{ e.text }}</span>
+                                </div>
+                                @if (e.raw) {
+                                  <details class="text-xs max-w-[28rem]" data-test="run-error-details">
+                                    <summary class="cursor-pointer text-[color:var(--text-muted)]">Details</summary>
+                                    <pre class="mono whitespace-pre-wrap [overflow-wrap:anywhere] text-[11px] text-[color:var(--text-secondary)] mt-1">{{ e.raw }}</pre>
+                                  </details>
+                                }
+                              }
                             </td>
                             <td class="hidden xl:table-cell mono text-xs">{{ r.model || '—' }}</td>
                             <td><app-status [label]="r.status === 'ok' ? 'Completed' : 'Failed'" [quiet]="true" /></td>
@@ -241,7 +257,7 @@
                   <ul class="side-panel-list" data-test="connection-prompts">
                     @for (p of a.prompts; track p.promptId) {
                       <li>
-                        <a class="link-inline truncate text-sm" [routerLink]="['/ai/prompts', p.promptId, 'edit']">{{ p.name }}</a>
+                        <a class="link-inline truncate text-sm" [routerLink]="['/pipelines/prompts', p.promptId, 'edit']">{{ p.name }}</a>
                         <app-status [label]="p.status" [quiet]="true" />
                       </li>
                     }

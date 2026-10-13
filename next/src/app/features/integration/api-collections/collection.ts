@@ -27,6 +27,8 @@ import { folderOptions } from './folders';
 import { LastTests } from './last-tests';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', AI_TOOL: 'AI tool' };
 
@@ -38,7 +40,7 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
  */
 @Component({
   selector: 'app-api-collection',
-  imports: [Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Icon, SensitivityTag, TableShell, StatusPill, StatStrip, ViewToggle, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ManagedBanner],
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
@@ -50,6 +52,9 @@ export class Collection implements OnChanges {
 
   /** From the route, :collectionId. */
   readonly collectionId = input<string>();
+  /** From the address, ?tab= (UX final I3): History, or the overview. */
+  readonly tab = input<string>();
+  readonly activeTab = computed<'overview' | 'history'>(() => this.tab() === 'history' ? 'history' : 'overview');
 
   readonly detail = signal<CollectionDetail | null>(null);
   readonly defaultAuth = signal<unknown>(null);
@@ -162,7 +167,7 @@ export class Collection implements OnChanges {
       defaultAuth: this.defaultAuth(), canManage: this.canManage(),
     };
     // Reloaded whatever the panel says on closing: the X and the backdrop close it without an answer.
-    this.dialog.open<boolean>(RequestPanel, sidePanelConfig(data, 'wide')).closed.subscribe(() => this.load());
+    this.dialog.open<boolean>(RequestPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(() => this.load());
   }
 
   openRequest(r: RequestRow): void { this.panel(r.requestId, r.folderId); }

@@ -4,34 +4,43 @@ import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
 import { ThemeService } from '../../core/theme.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { NAV } from '../../core/nav/nav-tree';
 
 interface Section { id: string; title: string; }
 
 interface StepField { name: string; required: boolean; note: string; }
 
+/** A place in the console: where the menu shows it ("Run & review › Review"), and its address. */
+interface Place { label: string; path: string; }
+
 interface Step {
   id: string;
   title: string;
   intro: string;
-  where?: string;
+  /** Where it is done, as links into the console. */
+  where?: Place[];
+  /** What to do, in order. */
+  todo?: string[];
   fields?: StepField[];
   notes?: string[];
   warn?: string;
-  /** Base name of a screenshot in public/docs; -light.png and -dark.png are expected. */
-  shot?: string;
-  shotCaption?: string;
 }
 
+/** The menu as a map (Reference): every group, its entries and, for a hub, its tabs -- read from the menu's own tree. */
+interface MapRow { group: string; entry: string; path: string; tabs: string; }
+
 /**
- * Setup documentation.
+ * The in-app guide (owner 2026-10-13: rewritten for the current product).
  *
  * Public, like the landing page, so it can be linked to and read before signing in -- it
- * describes the console's own screens and carries nothing tenant-specific.
+ * describes the console's own screens and carries nothing tenant-specific. Task-oriented and
+ * in the menu's order: get data in, build, run and schedule, review (the Review home), results,
+ * monitoring, people and billing, with links into the console. The menu map in the reference is
+ * read from the menu's own tree (core/nav/nav-tree.ts), so it cannot name a menu that is gone.
  *
- * Every value stated here was read out of the server rather than assumed: the frequencies and
- * their allowed intervals come from ProcessTimeUtil, the topic pattern from the task type
- * validation, the roles from the security hierarchy, the field types from the dynamic form
- * service. If one of those changes, this page is wrong and should be changed with it.
+ * Healthcare-safe: every example is synthetic, and the guide never claims the console makes a
+ * workspace compliant with a law or standard. The frequencies and intervals come from
+ * ProcessTimeUtil; if those change, this page is wrong and should be changed with it.
  */
 @Component({
   selector: 'app-docs',
@@ -41,14 +50,6 @@ interface Step {
     .doc h2 { scroll-margin-top: 5rem; }
     .doc-body p { line-height: 1.7; }
     .toc-link.is-current { color: var(--accent-text); font-weight: 600; }
-    /* A screenshot is a picture of a screen, so it is framed like one rather than floated on
-       the page. max-width keeps a wide capture inside the column on a narrow viewport. */
-    .doc-shot {
-      display: block; width: 100%; max-width: 100%; height: auto;
-      border-radius: var(--radius-card); border: 1px solid var(--border-subtle);
-      box-shadow: 0 10px 30px -12px var(--shadow-color);
-      background: var(--surface-raised);
-    }
     .num {
       display: grid; place-items: center; flex: none;
       width: 1.6rem; height: 1.6rem; border-radius: 999px;
@@ -65,7 +66,7 @@ interface Step {
           <a routerLink="/">
             <app-brand-mark />
           </a>
-          <span class="text-sm text-[color:var(--text-muted)] hidden sm:inline">Setup guide</span>
+          <span class="text-sm text-[color:var(--text-muted)] hidden sm:inline">Guide</span>
           <div class="ml-auto flex items-center gap-1.5">
             <button type="button" class="btn btn-ghost btn-icon btn-sm"
                     [attr.aria-label]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'"
@@ -106,11 +107,11 @@ interface Step {
 
         <!-- Body ----------------------------------------------------------------- -->
         <main class="doc min-w-0 flex-1 doc-body">
-          <h1 class="text-3xl font-semibold tracking-tight">Setting up the console</h1>
+          <h1 class="text-3xl font-semibold tracking-tight">Using the console</h1>
           <p class="mt-3 text-[color:var(--text-secondary)] max-w-2xl">
-            Work through these in order. Each step depends on the one before it — a job cannot
-            run before a task exists, and a task cannot write anywhere before a storage
-            connection does.
+            The main flow, in the menu's order: get data in, build a pipeline, run and schedule it, review what
+            it made, and read the results — then the monitoring, the people and the bill around it. Each part
+            says where it is done; the links open that page in the console.
           </p>
 
           <!-- The side contents only fit from lg up; below that the same list folds away here. -->
@@ -129,8 +130,10 @@ interface Step {
           <div class="mt-6 card p-4 flex items-start gap-2.5">
             <app-icon name="info" class="icon-info mt-0.5 shrink-0" />
             <p class="text-sm text-[color:var(--text-secondary)]">
-              Step 1 needs no account at all. Steps 2 to 4 need an administrator, and everything
-              from step 5 onward can be done by any signed-in user in the tenant.
+              Asking for a workspace needs no account. Adding people, connections, settings and pipelines needs a
+              workspace administrator; running, reviewing and reading results is for any member whose page access
+              includes the page. The examples here are made up — use synthetic or de-identified records while you
+              set things up and try them.
             </p>
           </div>
 
@@ -142,11 +145,19 @@ interface Step {
               </h2>
               <p class="mt-3 text-[color:var(--text-secondary)]">{{ step.intro }}</p>
 
-              @if (step.where) {
-                <p class="mt-3 text-sm">
+              @if (step.where?.length) {
+                <p class="mt-3 text-sm flex flex-wrap items-baseline gap-x-3 gap-y-1" data-test="doc-where">
                   <span class="text-[color:var(--text-muted)]">Where:</span>
-                  <span class="mono ml-1.5">{{ step.where }}</span>
+                  @for (w of step.where; track w.path) {
+                    <a class="link-inline" [routerLink]="w.path">{{ w.label }}</a>
+                  }
                 </p>
+              }
+
+              @if (step.todo?.length) {
+                <ol class="mt-4 flex flex-col gap-2 text-sm list-decimal pl-5">
+                  @for (t of step.todo; track t) { <li class="pl-1">{{ t }}</li> }
+                </ol>
               }
 
               @if (step.fields?.length) {
@@ -172,22 +183,6 @@ interface Step {
                 <p class="mt-3 text-sm text-[color:var(--text-secondary)]">{{ note }}</p>
               }
 
-              @if (step.shot) {
-                <!-- Two files per shot, swapped by theme: a light screenshot on a dark page
-                     reads as a hole in it. Lazy so the guide does not fetch eight images
-                     before anyone scrolls. -->
-                <figure class="mt-4">
-                  <img class="doc-shot" loading="lazy" decoding="async"
-                       [src]="shotFor(step.shot)"
-                       [alt]="'The ' + step.title.toLowerCase() + ' screen'" />
-                  @if (step.shotCaption) {
-                    <figcaption class="field-note text-[color:var(--text-muted)] mt-2">
-                      {{ step.shotCaption }}
-                    </figcaption>
-                  }
-                </figure>
-              }
-
               @if (step.warn) {
                 <p class="mt-3 field-note text-warn-500 flex items-start gap-1.5" role="note">
                   <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
@@ -201,7 +196,27 @@ interface Step {
           <section class="mt-14">
             <h2 id="reference" class="text-xl font-semibold tracking-tight">Reference</h2>
 
-            <h3 class="mt-6 text-sm font-semibold">Schedule frequencies</h3>
+            <h3 class="mt-6 text-sm font-semibold">The menu</h3>
+            <p class="mt-1.5 text-sm text-[color:var(--text-secondary)]">
+              Grouped by the work being done. An entry with tabs is one page with a tab per part; you see the
+              entries and tabs your role and page access open, and a tab you may not open is not shown.
+            </p>
+            <div class="mt-3 overflow-x-auto scroll-table">
+              <table class="table-modern" data-test="doc-menu">
+                <thead><tr><th>Group</th><th>Entry</th><th>Tabs</th></tr></thead>
+                <tbody>
+                  @for (m of menu; track m.path) {
+                    <tr>
+                      <td class="text-sm whitespace-nowrap text-[color:var(--text-secondary)]">{{ m.group }}</td>
+                      <td class="text-sm whitespace-nowrap"><a class="link-inline" [routerLink]="m.path">{{ m.entry }}</a></td>
+                      <td class="text-sm">{{ m.tabs || '—' }}</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+
+            <h3 class="mt-8 text-sm font-semibold">Schedule frequencies</h3>
             <p class="mt-1.5 text-sm text-[color:var(--text-secondary)]">
               The interval is how many of that unit to wait. Only these values are offered.
             </p>
@@ -240,9 +255,9 @@ interface Step {
               </table>
             </div>
             <p class="mt-3 text-sm text-[color:var(--text-secondary)]">
-              The roles nest: a platform administrator has everything a tenant administrator has,
-              and a tenant administrator everything a tenant user has. The server enforces this
-              regardless of what the interface shows.
+              The roles nest: a platform administrator has everything a workspace administrator has,
+              and a workspace administrator everything a workspace member has. Page access then narrows a
+              member to the pages their profile names. The server enforces both, whatever the screen shows.
             </p>
 
             <h3 class="mt-8 text-sm font-semibold">Run outcomes</h3>
@@ -263,10 +278,10 @@ interface Step {
 
           <section class="mt-14 card p-6 flex flex-wrap items-center gap-5">
             <div class="min-w-0">
-              <h2 class="text-base font-semibold">That is the whole setup</h2>
+              <h2 class="text-base font-semibold">Ready to start</h2>
               <p class="mt-1 text-sm text-[color:var(--text-secondary)]">
-                {{ auth.isLoggedIn() ? 'Work down the list in the console.' : 'Sign in and work down the list.' }}
-                Each screen names what it needs.
+                {{ auth.isLoggedIn() ? 'Open the console and follow the flow above.' : 'Sign in and follow the flow above.' }}
+                Each screen says what it needs.
               </p>
             </div>
             @if (auth.isLoggedIn()) {
@@ -306,232 +321,162 @@ export class Docs implements AfterViewInit {
 
   readonly steps: Step[] = [
     {
-      id: 'request', title: 'Ask for a workspace',
-      intro: 'If you do not have a workspace yet, request one. A platform administrator reviews '
-           + 'every request; nothing is created until somebody agrees to it.',
-      where: 'Request a workspace, from the front page — no sign-in needed',
-      fields: [
-        { name: 'Organisation', required: true, note: 'The name your workspace will carry.' },
-        { name: 'Your name', required: true, note: 'Who the first administrator will be.' },
-        { name: 'Your email', required: true, note: 'Where the sign-in details are sent, and your username.' },
-        { name: 'Purpose', required: false, note: 'A sentence or two, for whoever reviews the request.' },
+      id: 'start', title: 'Get a workspace and sign in',
+      intro: 'A workspace holds everything else — its people, connections, pipelines, runs and bills — and nothing crosses '
+           + 'between workspaces. A platform administrator reviews each request; nothing is created until someone agrees.',
+      where: [{ label: 'Request a workspace', path: '/request-workspace' }, { label: 'Account › My security', path: '/account/security' }],
+      todo: [
+        'Ask for a workspace from the front page: your organisation, your name and your email. No sign-in is needed.',
+        'When it is granted you receive a username and a password that works once. Sign in, and choose your own password straight away.',
+        'Turn on two-factor sign-in under Account › My security, and pick your theme from the top bar.',
+      ],
+      notes: ['The request form answers the same way whether or not an address is already known, so it cannot be used to find out who has an account.'],
+      warn: 'If a welcome email never arrives, ask a platform administrator to reset the password rather than requesting a second workspace.',
+    },
+    {
+      id: 'people', title: 'Add people and decide what they open',
+      intro: 'A role says how much someone may do; page access says which pages a member sees at all. Both are a workspace '
+           + 'administrator\'s, under Administration.',
+      where: [
+        { label: 'Administration › Users', path: '/administration/users' },
+        { label: 'Administration › Page access', path: '/administration/access-profiles' },
+        { label: 'Administration › Sign-in security', path: '/administration/security' },
+      ],
+      todo: [
+        'Add each person with their name, email and role: Workspace member or Workspace administrator.',
+        'Make page-access profiles for the jobs people do — for example a Reviewer who opens Review and the Runs, and a Viewer who reads Dashboards only — and give each member one.',
+        'Set the workspace\'s sign-in rules: password length, lockout, idle sign-out, two-factor and single sign-on.',
       ],
       notes: [
-        'When a request is granted you are emailed a username and a password that works once. '
-        + 'Sign in with it, and the console asks you to choose your own password straight away — '
-        + 'the emailed one stops working at that moment. You can change it again any time from '
-        + 'your profile.',
-        'The form answers the same way whether or not the address is already known, so it cannot '
-        + 'be used to find out who has an account here. If you already have one, sign in instead.',
+        'Give the workspace at least two administrators, so nobody is locked out when one is away.',
+        'A page a profile leaves out leaves the menu; its address shows a page that says so and offers to ask for access. The server refuses the calls behind it whatever the browser shows.',
       ],
-      warn: 'If a welcome email never arrives, ask a platform administrator to reset the password '
-          + 'rather than requesting a second workspace — the account already exists by then.',
     },
     {
-      id: 'tenant', title: 'Create the tenant and its people',
-      intro: 'A tenant is the boundary everything else sits inside. Jobs, tasks, buckets and '
-           + 'users all belong to one, and nothing crosses between them.',
-      where: 'Administration → Tenants, then Administration → Users',
-      fields: [
-        { name: 'Tenant name', required: true, note: 'How the company appears throughout the console.' },
-        { name: 'Tenant code', required: true, note: 'A short unique key. It cannot clash with another tenant.' },
-        { name: 'Full name', required: true, note: 'The person’s name, shown beside their avatar.' },
-        { name: 'Email', required: true, note: 'Used to sign in, so it has to be unique across the whole install.' },
-        { name: 'Position', required: false, note: 'Their job title. Separate from Role — a lead and an engineer can share a role.' },
-        { name: 'Role', required: true, note: 'What they may reach. See the reference below.' },
+      id: 'data-in', title: 'Get data in',
+      intro: 'Pipelines read from connections, documents and forms. Set up the ones you need before building a pipeline that uses them.',
+      where: [
+        { label: 'Get data in › Connections', path: '/connections' },
+        { label: 'Get data in › Documents', path: '/documents' },
+        { label: 'Get data in › Forms', path: '/forms' },
+      ],
+      todo: [
+        'Connections: add storage (S3, Azure, MinIO, FTP), databases, API collections and connectors. Test each one before you save it.',
+        'Sources and Data contracts: name what a pipeline reads, and the columns and rules it must meet.',
+        'Documents: define a document type (for example a synthetic intake form or a sample invoice) with the fields to read, then upload, mail in (Email-in) or drop files (File drop).',
+        'Forms: build a form whose answers start a pipeline or feed a review.',
+      ],
+      notes: ['Values a document type is unsure of go to Review › Documents for a person to check.'],
+      warn: 'Give each workspace its own bucket. A shared bucket lets one workspace\'s runs write where another reads.',
+    },
+    {
+      id: 'build', title: 'Build a pipeline',
+      intro: 'A pipeline is what a run does: the steps that read, transform, ask a model, check and write. Start from a '
+           + 'description in plain language, from steps, or from a copy of an existing pipeline.',
+      where: [
+        { label: 'Build › Pipelines › New pipeline', path: '/pipelines/new' },
+        { label: 'Build › AI Assistant', path: '/ai/assistant' },
+        { label: 'Build › Pipelines › Prompts', path: '/pipelines/prompts' },
+        { label: 'Build › Approval workflows', path: '/workflows/designer' },
+      ],
+      todo: [
+        'Describe it to the AI Assistant ("read the synthetic claims file each night, flag amounts over 10,000, write a summary"), check the steps it proposes, and save; or add the steps yourself.',
+        'For an AI step, pick a prompt (Prompts) and the model connection it runs on (Settings › Model connections).',
+        'In the pipeline\'s Settings, choose whether its results wait for a review, and whether that review may be decided in bulk or only one by one.',
+        'For a sign-off in the middle of a run, add an Approval step and say who approves it in Approval workflows.',
+      ],
+      notes: ['Data policies (Administration › Data policies) decide which models may see each level of data and how long a run keeps it.'],
+    },
+    {
+      id: 'run', title: 'Run and schedule it',
+      intro: 'A schedule runs a pipeline on a timetable or when something arrives; Run now runs it at once.',
+      where: [
+        { label: 'Build › Pipelines › Schedules & triggers', path: '/pipelines/schedules' },
+        { label: 'Run & review › Runs', path: '/runs' },
+      ],
+      todo: [
+        'Add a schedule: the pipeline, a frequency (see the reference below), a start, and optionally an end, retries and who hears about it.',
+        'Or a trigger: a file dropped, an email in, a document approved, a form submitted.',
+        'Follow runs under Runs: Latest, By date, Analytics, Failed and Backfills. A run\'s page shows its steps, its log and what it produced.',
+        'Retry a failed run from the step that failed (Runs › Failed groups failures by their error), or run a schedule for each period of a past range (Backfills).',
+      ],
+      notes: ['A run missed while the system was down is recorded as Missed, and a run stopped before it finished as Interrupted, so a gap in the history is never silent.'],
+    },
+    {
+      id: 'review', title: 'Review and approve',
+      intro: 'Everything waiting for a person is in one place, Review, with one count on the menu and on Home: approvals, '
+           + 'runs whose results wait for review, and documents with values to check.',
+      where: [
+        { label: 'Run & review › Review', path: '/review' },
+        { label: 'Review › Approvals', path: '/review/approvals' },
+        { label: 'Review › Runs', path: '/review/runs' },
+        { label: 'Review › Documents', path: '/review/documents' },
+      ],
+      todo: [
+        'Open All waiting: overdue items first, then the longest waiting. Narrow it by kind, by who it waits on, or by a search.',
+        'Click a row to read it in the side panel; approve or reject it there, or open its own page.',
+        'To decide several at once, tick them and choose Approve or Reject. You first see what will happen to each, then add a comment (required to reject) and confirm; the answer lists every item.',
+        'Each tab — Approvals, Runs, Documents — is that kind\'s own list with its own filters.',
       ],
       notes: [
-        'Give each tenant at least two administrators, so nobody is locked out when one is away.',
-        'The Tenants screen shows each workspace\'s code under its name — click it to copy, since the code is what '
-          + 'bucket names, IAM policies and scripts are written against — and its first tenant administrator, so you know who to contact.',
-        'Every person has a copyable email and phone on Administration → Users, in the table as well as on the cards. '
-          + 'Pick the country code first when entering a phone; the number is stored in international form.',
+        'A pipeline set to individual review is never decided in bulk, and a document someone has claimed is theirs to decide.',
+        'Whether runs and documents may be approved in bulk at all is the workspace\'s choice, under Administration › Data policies.',
       ],
     },
     {
-      id: 'access', title: 'Decide which pages each person opens',
-      intro: 'Roles say how much somebody may do; an access profile says which pages a tenant '
-           + 'user sees at all. It is a named bundle of pages — "Operator", "Analyst" — and each '
-           + 'person holds one. Optional: a workspace that never makes a profile keeps showing '
-           + 'every page to everyone, exactly as before.',
-      where: 'Administration → Access profiles, then the Access profile field under Administration → Users',
-      fields: [
-        { name: 'Profile name', required: true, note: 'Unique within the workspace. Pick the job it describes, not the person.' },
-        { name: 'Pages', required: false, note: 'Tick what the profile opens. Dashboard, Profile and Notifications are always open; Configuration and Administration stay admin-only regardless.' },
-        { name: 'Default', required: false, note: 'The bundle anyone without a profile of their own gets. The first profile you make becomes it.' },
+      id: 'results', title: 'Read the results',
+      intro: 'What pipelines produce lands in boards, in questions you can ask, and in files.',
+      where: [
+        { label: 'See results › Dashboards', path: '/data/analytics/dashboards' },
+        { label: 'See results › Analysis', path: '/data' },
       ],
-      notes: [
-        'Admins are never restricted: a profile only ever applies to a tenant user.',
-        'A withheld page leaves the menu, a direct link to it lands on a page that says so and offers "Request access", '
-          + 'which notifies every admin of the workspace — and the server refuses the calls behind it whatever the browser shows.',
-        'A profile that people still hold cannot be deleted; move them first. Changing a profile\'s pages notifies everyone on it.',
-        'The People × pages grid on the same screen shows a checkbox per person per page. Tick one to make an exception for that person alone; '
-          + 'it is marked so it is never mistaken for the profile, and "reset to profile" clears it.',
+      todo: [
+        'Dashboards: boards of tiles over your pipelines\' results; each board names the pipelines that feed it.',
+        'Ask your data: ask a question in plain words and read the answer with the rows behind it; pin it to a dashboard.',
+        'Analytics Studio and the Data Catalog: explore datasets, and find what was made from what.',
+        'Generated reports and Files: the documents and files runs wrote.',
       ],
     },
     {
-      id: 'storage', title: 'Connect the storage',
-      intro: 'A connection tells the console where a job may read from and write to. Add one '
-           + 'before creating tasks, because a task names the bucket it writes into.',
-      where: 'Configuration → Storage Connections',
-      fields: [
-        { name: 'Provider', required: true, note: 'MinIO, S3, Azure, FTP or FTPS.' },
-        { name: 'Connection name', required: true, note: 'How it appears when a task picks a destination.' },
-        { name: 'Bucket', required: true, note: 'For the object stores. FTP has no bucket, so it uses a base directory instead.' },
-        { name: 'Endpoint', required: true, note: 'The address of the service. Not needed for AWS S3 itself.' },
-        { name: 'Credentials', required: true, note: 'Access key and secret, or the FTP username and password.' },
+      id: 'monitor', title: 'Monitor and get alerted',
+      intro: 'Be told when something needs attention instead of watching for it.',
+      where: [
+        { label: 'Administration & billing › Settings › Alerts', path: '/settings/alerts' },
+        { label: 'Run & review › Runs › Failed', path: '/runs/failed' },
+        { label: 'Notifications', path: '/notifications' },
       ],
-      notes: ['Use Test connection before saving. A connection that has never been tested still '
-            + 'saves, and the first thing that notices is a failed job.'],
-      warn: 'Give each tenant its own bucket. Sharing one means a job in one tenant writes where '
-          + 'another tenant reads, and the console will refuse to serve those objects across the boundary.',
-    },
-    {
-      id: 'task-type', title: 'Register the topic',
-      intro: 'A topic is the Kafka topic a task publishes to and the consumer behind it. It is '
-           + 'managed next to the Kafka connection it goes out on. Many tasks can share a topic, '
-           + 'and every topic belongs to one workspace — a workspace needs its own before it can '
-           + 'describe any task.',
-      where: 'Configuration → Kafka & Topics, then a profile’s Topics section → Add topic',
-      fields: [
-        { name: 'Name', required: true, note: 'How the topic appears when a task picks it — usually the consumer’s name. For example ETL Scraping Pipeline.' },
-        { name: 'Kafka topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
-        { name: 'Partition', required: false, note: '* for every partition, or one index from 0 to 10. A comma-separated list is not supported.' },
-        { name: 'Workspace', required: true, note: 'Which workspace owns it. A tenant administrator gets their own and is not asked; a platform administrator has to say.' },
-      ],
-      notes: ['A topic publishes through the connection it was added under — there is nothing to pick. To move one, add it under the other connection.',
-              'Topics do not cross workspaces. A platform administrator creating one has to '
-            + 'name the workspace it is for — there is no way to make one that everybody shares, '
-            + 'because a shared topic showed its Kafka topic name to every other workspace.',
-              'A profile’s Topics section lists every topic that publishes through it, with a Test that asks the broker whether the topic exists.'],
-    },
-    {
-      id: 'task', title: 'Describe the task',
-      intro: 'A task is the unit of work: what to fetch or process, where it reads from and '
-           + 'where it writes. It carries no timetable — that comes next.',
-      where: 'Operations → Source Tasks → New task',
-      fields: [
-        { name: 'Task name', required: true, note: 'Name it for the work, not the schedule. One task often feeds several jobs.' },
-        { name: 'Topic', required: true, note: 'Pick it first: where the task publishes. Only this topic’s pipelines are offered next.' },
-        { name: 'Pipeline', required: false, note: 'One of the pipelines on that topic — the id the worker routes on, and the form the task is filled in with. Changing the topic clears a pipeline that is not on it.' },
-        { name: 'Bucket', required: false, note: 'Where output lands. This is the connection added in step 2.' },
-        { name: 'Payload', required: true, note: 'The configuration the worker receives, as XML tags.' },
-      ],
-      notes: ['You do not have to write the XML by hand. Enter the payload as tag rows and use '
-            + '"Show the XML these tags make" on this screen to preview it, or pick a pipeline '
-            + 'and fill in its form (defined under Configuration → Pipelines).',
-              'The Source Tasks list filters the same way: choose a topic, then one of its pipelines.'],
-    },
-    {
-      id: 'job', title: 'Put the task on a timetable',
-      intro: 'A job binds a task to a schedule. The same task can carry several jobs — one '
-           + 'hourly, one at month end — without being described twice.',
-      where: 'Operations → Source Jobs → New job',
-      fields: [
-        { name: 'Job name', required: true, note: 'Name it for when it runs, since that is what distinguishes it from its siblings.' },
-        { name: 'Task', required: true, note: 'The task from step 4.' },
-        { name: 'Execution', required: true, note: 'Auto follows the schedule. Manual runs only when someone starts it.' },
-        { name: 'Priority', required: false, note: '1 to 9, or 99 and 100.' },
-        { name: 'Attempts', required: false, note: '1 by default, which means a failed run is not retried. Up to 10.' },
-        { name: 'Retry after', required: false, note: 'Seconds before the next try, shown only once attempts is above 1. The wait doubles each attempt, up to an hour.' },
-        { name: 'Assigned to', required: false, note: 'Who hears about it. Defaults to whoever created the job.' },
-        { name: 'Frequency and interval', required: true, note: 'See the reference below.' },
-        { name: 'Start date and time', required: true, note: 'When the timetable begins. It does not have to be the first run.' },
-        { name: 'End date', required: false, note: 'The schedule expires after this date and stops on its own.' },
-      ],
-      notes: ['The start date says when a schedule begins, not which days it runs. A Mon/Thu '
-            + 'schedule created on a Tuesday takes its first run that Thursday.',
-              'Attempts above 1 retries a run that failed for a passing reason — a source briefly '
-            + 'unreachable, a broker that would not take the message — before anyone is told it '
-            + 'failed. One failure email is sent, once the attempts are used up, rather than one '
-            + 'per attempt. A job whose backoff outlasts its own interval skips its next slot: it '
-            + 'finishes the slot it is on before starting the next.'],
-    },
-    {
-      id: 'watch', title: 'Watch it run',
-      intro: 'Once a job is due the scheduler queues it, a worker picks it up, and the console '
-           + 'follows it from there.',
-      where: 'Operations → Source Jobs, and Operations → Queue',
-      notes: [
-        'Run now starts a job immediately without disturbing its timetable. Skip next run drops '
-        + 'the next slot and leaves the rest in place.',
-        'Each run keeps its own log. Open a run from the job’s history to read it, live while it '
-        + 'is going and afterwards.',
-        'A run missed while the system was down is recorded as Missed rather than passed over, so '
-        + 'a gap in the history is visible rather than silent. A run stopped before it finished — '
-        + 'cancelled from the screen, or a worker that went away — is Interrupted, kept apart from Failed.',
-        'A worker proves it is allowed to report on a run with a token minted for that run at dispatch '
-        + 'and echoed back as X-Worker-Token. There is nothing to configure or rotate: a retry gets a '
-        + 'fresh token, and a finished run\'s token is refused, whoever ended the run.',
-      ],
-    },
-    {
-      id: 'report', title: 'Report on what happened',
-      intro: 'Runs roll up into a report you can group and measure, then take away.',
-      where: 'Pipelines → Run analytics',
-      notes: [
-        'The task table has a column per outcome — Completed, Failed, Interrupted, Skipped, Missed — '
-        + 'so a task that was skipped six times this week shows six skipped runs, not six fewer.',
-        'Skipped and missed runs count as runs: they were due even though they never started. '
-        + 'The success rate is over settled runs only, so a run still going does not read as a failure.',
-        'Group by task, outcome or day, choose a measure, and the table and chart follow.',
-        'Export as CSV or XLSX — either to your machine or straight into one of the buckets from '
-        + 'step 2.',
-      ],
-    },
-    {
-      id: 'optional', title: 'The optional pieces',
-      intro: 'None of these are needed to run a pipeline, but each removes work once you are '
-           + 'past the basics.',
-      notes: [
-        'Pipelines — describe what a pipeline expects once, and the topic it publishes on, so its '
-        + 'tasks are filled in field by field rather than as raw tags.',
-        'Configuration values — per-workspace values and secrets a task’s payload reads at run '
-        + 'time as ${config:KEY} and ${secret:KEY}. A secret is write-only: it can be replaced, '
-        + 'never shown, and any tag that looks like a credential must use ${secret:KEY}.',
-        'Home pages and Task groups — the addresses and labels a task’s Home page and Group '
-        + 'fields offer, per workspace.',
-        'Engine settings (platform administrators) — how many queued runs one scheduler pass '
-        + 'claims, and the watermarks each cron writes for itself.',
-      ],
-    },
-    {
-      id: 'ai', title: 'Let a model do part of the work',
-      intro: 'A pipeline can carry an AI step: a prompt that runs before each task is dispatched, '
-           + 'reads the task’s other fields, and writes its answer into a tag the worker receives '
-           + 'like any other. Three pieces, in order.',
-      where: 'Assistants → Model connections, Assistants → Prompts, then Configuration → Pipelines',
-      fields: [
-        { name: 'Model connection', required: true, note: 'Where prompts run: a provider (OpenAI, Anthropic, a local Ollama, Azure, or anything OpenAI-compatible), its key, a default model, and two caps — calls in flight and a daily token budget. Test it to list the provider’s models. One connection is the workspace default.' },
-        { name: 'Prompt', required: true, note: 'What is said: system instructions, a message template with {{variables}}, the variables with sample values, and the answer’s shape (text, or a JSON object with the keys named). Try it runs the page as it is — and any variable can take its value from a file in a bucket (the folder button beside the sample): a PDF, a spreadsheet, an image described by the vision model, a recording transcribed, read exactly as the file chat reads it. Every save is a version; Save & activate makes it the one a step runs.' },
-        { name: 'AI step', required: false, note: 'On the pipeline, a field of type "AI prompt": pick the prompt, map each variable to a field above the step, choose whether a failed call fails the run or leaves the tag empty. Run it before dispatch on the server, or in the worker — where a variable can also be a file a field names, or each object under the task’s input folder, with every answer written to the output folder. The step is the pipeline’s — a task shows it as a read-only card.' },
-      ],
-      notes: [
-        'The key never leaves the server, the step runs once per run (a retry reuses the recorded answer), '
-        + 'and every call is recorded with its tokens and time: on the prompt, on the connection’s usage, '
-        + 'and on the run’s history under "AI steps".',
-        'Reading prompts is open to anyone whose access profile includes Prompts; making or trying one, and '
-        + 'model connections, are for workspace admins.',
+      todo: [
+        'Add alert rules for failed runs, missed schedules, slow runs and reviews waiting too long, sent to the bell, by mail or to your webhooks.',
+        'Read failures grouped by error pattern under Runs › Failed, and retry them from there.',
+        'The bell in the top bar holds every notification; Notifications is the whole list.',
       ],
     },
     {
       id: 'billing', title: 'See what it costs',
-      intro: 'Everything a workspace uses is metered as it happens and priced from a rate card, '
-           + 'and the Cost & usage page shows the month the way the invoice will read it. '
-           + 'Deleting data counts too.',
-      where: 'Billing → Cost & usage · Invoices · Billing documents · Rate cards · Billing analytics',
+      intro: 'Everything a workspace uses is metered as it happens and priced from a rate card; Cost & usage shows the month as the invoice will read it.',
+      where: [
+        { label: 'Administration & billing › Billing', path: '/billing' },
+      ],
+      todo: [
+        'Cost & usage: month to date, a forecast at the last week\'s pace, cost by day and by pipeline, and line by line what is behind each charge.',
+        'Invoices: each closed month, its lines frozen with the rate card that priced them, with payment slips, credit notes and a PDF.',
+        'Billing documents: every bill, slip and statement in one place.',
+      ],
       fields: [
-        { name: 'What is metered', required: true, note: 'Storage kept (measured nightly at 02:00), bytes written, bytes read, and bytes deleted; every storage operation; each pipeline run and the minutes the worker spent on it; model tokens in and out; images described by the vision model; documents converted; analytics queries; seats; the topics in use. A pipeline reports its own usage with its run’s token as it finishes, so a run can only ever report as its own workspace.' },
-        { name: 'Deleting', required: false, note: 'A delete is an operation, and the bytes removed are billed at the write rate as data churn. Storage is measured nightly, so a file that existed at 02:00 is a day of storage whether or not it was deleted at 09:00. The line opens to which object was deleted, and by whom.' },
-        { name: 'The page', required: false, note: 'Month to date and a forecast at the last week’s pace (a guess, labelled as one); data deleted, storage kept and seats; cost by day stacked by service; and line by line — the same lines the invoice will carry — each opening to what is behind it. A platform administrator picks the workspace; a workspace admin sees their own.' },
-        { name: 'Rate cards', required: false, note: 'The calculation behind every bill, kept as versions (platform administrator). Each meter has a price per so many units, a monthly allowance that is free, and optionally graduated tiers. A change is a new version, drafted from an existing one, with a name and an effective date: it prices bills for periods that start on or after that day, and a bill already drafted keeps the version it names. A workspace can be given a card of its own, which wins over the default for that workspace.' },
-        { name: 'Invoices', required: false, note: 'A month closed into a bill, picked from the list on the left and read on the right: the meter’s lines frozen with the rate card version, the allowance and bands that applied, tax when the billing profile carries both a number and a rate, a QR code of the number (on the page and printed on the PDF), payment slips uploaded by the workspace and verified by the platform (a receipt each), credit notes, a yearly statement. Billing documents reads any of them in place.' },
+        { name: 'What is metered', required: false, note: 'Storage kept (measured nightly), bytes written, read and deleted, storage operations, pipeline runs and their minutes, model tokens, images described, documents converted, analytics queries, API calls and seats.' },
+        { name: 'Rate cards', required: false, note: 'Kept as versions by a platform administrator. A change is a new version with an effective date; a bill already drafted keeps the version it names.' },
       ],
-      notes: [
-        'Reporting is never in a job’s way: a metering service that is down costs a warning, the batch is kept on the worker and sent with the next run.',
-        'Changing the calculation never changes a bill already drafted; a version dated mid-month applies from the next period.',
-        'Your profile and the Dashboard carry the bill in one glance — this month so far, what is owed and by when — and Run analytics › Model calls says what the range’s calls cost.',
+    },
+    {
+      id: 'health-data', title: 'Working with health data',
+      intro: 'The console is built for healthcare data work, and gives you controls for it: page access, data levels, which '
+           + 'models may see each level, how long runs keep data, review before results are used, and an audit of who did what.',
+      todo: [
+        'Set up and try pipelines with synthetic or de-identified records first; every example in this guide is made up.',
+        'Under Administration › Data policies, choose which models may see sensitive data and how long runs keep it.',
+        'Give reviewers and viewers profiles that open only the pages their work needs.',
       ],
+      notes: ['Meeting your organisation\'s privacy and regulatory obligations depends on how you configure and use the console; it does not by itself make a workspace compliant with any law or standard.'],
     },
   ];
 
@@ -539,6 +484,11 @@ export class Docs implements AfterViewInit {
     ...this.steps.map(s => ({ id: s.id, title: s.title })),
     { id: 'reference', title: 'Reference' },
   ];
+
+  /** The menu's groups, entries and tabs, from the menu's own tree: the guide's map never drifts from the menu. */
+  readonly menu: MapRow[] = NAV.flatMap(item => item.children
+    ? item.children.filter(c => !c.crumbOnly).map(c => ({ group: item.label, entry: c.label, path: c.path, tabs: (c.tabs ?? []).map(t => t.label).join(', ') }))
+    : item.path ? [{ group: '', entry: item.label, path: item.path, tabs: (item.tabs ?? []).map(t => t.label).join(', ') }] : []);
 
   readonly frequencies = [
     { name: 'Mint', means: 'Every so many minutes', intervals: '5, 10, 15 … 55' },
@@ -550,25 +500,21 @@ export class Docs implements AfterViewInit {
   ];
 
   readonly roles = [
-    { name: 'PLATFORM_ADMIN', note: 'Every tenant, the settings that apply across all of them, and the workspace requests waiting for a decision.' },
-    { name: 'TENANT_ADMIN', note: 'Everything inside one tenant, including its users, connections and forms.' },
-    { name: 'TENANT_USER', note: 'The pipelines: tasks, jobs, runs, logs and reports within their tenant — narrowed further by their access profile, when the workspace uses them.' },
+    { name: 'Platform administrator', note: 'Every workspace, the requests for new ones, the rate cards and the settings that apply across all of them.' },
+    { name: 'Workspace administrator', note: 'Everything inside one workspace: its people and page access, connections, pipelines, schedules, settings, alerts and bills; decides any run\'s review.' },
+    { name: 'Workspace member', note: 'Runs, reviews and reads within their workspace — the pages their page-access profile opens (all of them when the workspace uses no profiles).' },
   ];
 
   readonly outcomes = [
-    { name: 'Queue', note: 'Due and handed to the workers; not started yet.' },
-    { name: 'Start / Running', note: 'A worker has it and is reporting progress.' },
+    { name: 'Queue', note: 'Due and handed to the engine; not started yet.' },
+    { name: 'Start / Running', note: 'Its steps are running and reporting progress.' },
     { name: 'Completed', note: 'Finished, and whatever it produced has been written.' },
-    { name: 'Failed', note: 'Stopped with a reason. The run’s log says what happened.' },
-    { name: 'Interrupt', note: 'Stopped before it finished — cancelled, or the worker went away. Counts against the success rate like Failed.' },
-    { name: 'Skip', note: 'Passed over deliberately — by a person, or because the job was already queued.' },
+    { name: 'Waiting for review', note: 'Completed, with results held until someone approves them in Review.' },
+    { name: 'Failed', note: 'Stopped with a reason. The run\'s page says which step and why; it can be retried from that step.' },
+    { name: 'Interrupt', note: 'Stopped before it finished — cancelled, or a worker went away. Counts against the success rate like Failed.' },
+    { name: 'Skip', note: 'Passed over deliberately — by a person, or because the schedule\'s last run was still in flight.' },
     { name: 'Missed', note: 'Its slot went by while nothing was running to take it.' },
   ];
-
-  /** Screenshots come in a light and a dark file; the viewer's theme picks which. */
-  shotFor(name: string): string {
-    return `/docs/${name}-${this.theme.theme()}.png`;
-  }
 
   /**
    * Scrolls to a section without leaving the page.

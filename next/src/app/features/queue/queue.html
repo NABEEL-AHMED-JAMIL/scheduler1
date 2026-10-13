@@ -1,39 +1,13 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Queue</h1>
-      <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
-    </div>
+  <!-- UX review B3 (E1): the By date view of the one Runs page; owner 2026-10-12: one date-range control in the header. -->
+  <app-page-header title="Runs">
+    <p subtitle class="page-subtitle" data-test="runs-range">Every run from {{ rangeLabel() }}: waiting, running and finished.</p>
     <div class="flex items-center gap-2">
-      @if (live()) {
-        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
-              title="Connected — the list re-reads as runs report in">
-          <span class="live-dot live-on"></span>Live
-        </span>
-      }
-      @if (hasInsights()) {
-        <button type="button" class="btn btn-ghost btn-sm"
-                [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
-                (click)="showInsights.set(!showInsights())">
-          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
-        </button>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
+      <app-date-range [value]="range()" [storageKey]="rangeStore" [maxSpanDays]="366" label="Date range for runs" (rangeChange)="applyRange($event)" />
+      <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
     </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="runs' status" still="You can still see every run and its logs." />
-
-  @if (counts().length) {
-    <div class="flex flex-wrap gap-2">
-      @for (item of counts(); track item.status) {
-        <app-status-filter-chip [status]="item.status" [count]="item.count"
-                                 [selected]="selectedStatuses().includes(item.status)"
-                                 (toggle)="toggleStatus(item.status)" />
-      }
-    </div>
-  }
 
   @if (hasMore()) {
     <!-- The window, said where the chips and the charts are: they count the rows read, not the range. -->
@@ -87,8 +61,8 @@
       </div>
 
       <div class="card chart-card">
-        <h3 class="chart-title">Busiest jobs</h3>
-        <p class="chart-sub">Which jobs are producing the queue traffic.</p>
+        <h3 class="chart-title">Busiest schedules</h3>
+        <p class="chart-sub">Which schedules run most in these dates.</p>
         <app-ranked-bar [data]="byJob()" [max]="4" />
       </div>
 
@@ -114,32 +88,32 @@
     </div>
   }
 
-  <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Runs" [loading]="loading()" [error]="error()"
                    [isEmpty]="!data().length" [shown]="data().length" [total]="rows().length"
                    emptyMessage="Nothing in the queue for these filters."
-                   emptyIcon="clock" [showSubbar]="!!rangeError()"
+                   emptyIcon="clock"
                    (retry)="load()">
     <ng-container toolbar>
-      <!-- Console-format dates ("5 Oct 2026"), the browser's calendar behind each (UI review U3). -->
-      <app-date-field class="max-w-44" inputId="queue-from" label="From date" [value]="fromDate()" [max]="toDate()"
-                      (valueChange)="setFrom($event)" />
-      <app-date-field class="max-w-44" inputId="queue-to" label="To date" [value]="toDate()" [min]="fromDate()"
-                      (valueChange)="setTo($event)" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
+        <input class="input" placeholder="Search schedule, run or message" aria-label="Search runs"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
+      <!-- Owner 2026-10-12: the outcome chips and Charts are filters of this list, after the search, one height. -->
+      @for (item of counts(); track item.status) {
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="selectedStatuses().includes(item.status)"
+                                 (toggle)="toggleStatus(item.status)" />
+      }
+      @if (hasInsights()) {
+        <button type="button" class="btn btn-ghost btn-sm" data-test="runs-charts"
+                [class.text-accent]="showInsights()" [attr.aria-pressed]="showInsights()"
+                (click)="showInsights.set(!showInsights())">
+          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
+        </button>
+      }
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
-      }
-    </ng-container>
-
-    <!-- The range is not read while it makes no sense, so the reason sits right under the boxes. -->
-    <ng-container subbar>
-      @if (rangeError()) {
-        <p id="queue-range-error" class="field-note text-crit-500 mt-0" role="alert">{{ rangeError() }}</p>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
       }
     </ng-container>
 
@@ -147,15 +121,16 @@
       <thead>
         <tr>
           <th>Run</th>
-          <th>Job</th>
+          <th>Schedule</th>
           <th>Created</th>
           <!-- Duration waits for lg: below it Message is the column worth the width, and at 768 the
                table only fits beside the pinned Status without it (UI review U5). -->
-          <th class="hidden lg:table-cell">Duration</th>
+          <th class="hidden lg:table-cell text-right">Duration</th>
+          <!-- Owner 2026-10-12: the status right before the message, a fixed width so the badges line up; the pinned
+               column keeps only the actions. -->
+          <th class="w-32">Status</th>
           <th>Message</th>
-          <!-- Status and the in-flight menu share one cell pinned to the right edge, as Failed runs
-               on Reports does: on a phone both sat hundreds of pixels past the screen. -->
-          <th class="text-right col-pin-right">Status</th>
+          <th class="text-right col-pin-right th-actions">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -165,7 +140,7 @@
                  anyone else gets the same words without a link the page guard would bounce. -->
             <td class="mono text-[color:var(--text-muted)] whitespace-nowrap">
               @if (canOpenJobs()) {
-                <a class="link-inline" [routerLink]="['/pipelines/schedules', row.jobId, 'runs', row.jobQueueId, 'logs']"
+                <a class="link-inline" [routerLink]="['/pipelines/schedules', row.jobId, 'runs', row.jobQueueId]"
                    [title]="'Open the run log for #' + row.jobQueueId">#{{ row.jobQueueId }}</a>
               } @else { #{{ row.jobQueueId }} }
             </td>
@@ -181,21 +156,22 @@
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ row.dateCreated ? (row.dateCreated | serverTime:'recentSec') : '—' }}
             </td>
-            <td class="hidden lg:table-cell tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="hidden lg:table-cell text-right tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               @if (duration(row); as d) { {{ d }} }
               @else if (inFlight(row)) { <span class="text-warn-500">in flight</span> }
               @else { — }
             </td>
+            <td class="w-32 whitespace-nowrap" data-test="run-status"><app-status [label]="row.jobStatus" /></td>
             <!-- The column that gives: it takes the width the others leave and ends in an ellipsis
-                 there, so it never runs on under the pinned Status column (UI review U5). -->
+                 there, so it never runs on under the pinned actions column (UI review U5). -->
             <td class="w-full max-w-0 min-w-40">
-              <span class="truncate block" [title]="row.jobStatusMessage">
+              <!-- UX review E2: two lines and an ellipsis, the whole message on hover. -->
+              <span class="line-clamp-2 break-words" [title]="row.jobStatusMessage || ''">
                 {{ row.jobStatusMessage || '—' }}
               </span>
             </td>
             <td class="text-right col-pin-right">
               <div class="flex items-center justify-end gap-1">
-                <app-status [label]="row.jobStatus" />
                 @if (inFlight(row) && !locked()) {
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="menu"
                           [attr.aria-label]="'Actions for run #' + row.jobQueueId">

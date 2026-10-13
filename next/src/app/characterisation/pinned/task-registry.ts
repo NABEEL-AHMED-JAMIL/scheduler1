@@ -3,7 +3,7 @@ export const PINNED: Record<string, unknown> = {
   "Edit pipeline from a Legacy row's panel opens the pipeline dialog": {
     "requests": [],
     "headings": [
-      "Edit pipeline",
+      "Edit registry task",
       "Fields",
       "Payload preview"
     ],
@@ -20,14 +20,14 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Default value",
       "Description",
-      "F768926",
-      "First season",
       "Help text",
-      "Hurricane season collection",
       "Label *(required)",
       "Name *(required)",
       "Nested under",
+      "ORDERS_IMPORT",
+      "Orders import",
       "Pipeline ID *(required)",
+      "Region",
       "Required",
       "Search topics…",
       "Shown under the field",
@@ -36,7 +36,7 @@ export const PINNED: Record<string, unknown> = {
       "Type",
       "What a task on this pipeline collects",
       "XML tag *(required)",
-      "start_year"
+      "region"
     ],
     "links": [],
     "items": []
@@ -67,12 +67,12 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Close",
-      "Edit pipeline"
+      "Edit registry task"
     ],
     "columns": [],
     "fields": [],
     "links": [
-      "/configuration/kafka"
+      "/settings/kafka"
     ],
     "items": [],
     "terms": [
@@ -181,7 +181,7 @@ export const PINNED: Record<string, unknown> = {
       "Close",
       "Put Join back to its default"
     ],
-    "row": "JoinjoinJoins the rows with an earlier step's output on equal keys (inner or left). | Process | core | Rows → Rows | OffSwitched hereSwitched off in this workspace."
+    "row": "JoinjoinJoins the rows with an earlier step's output on equal keys (inner or left). | Process | core | Rows → Rows | DefaultOffSwitched hereSwitched off in this workspace."
   },
   "the registry when Core cannot read it": {
     "rows": [
@@ -190,7 +190,7 @@ export const PINNED: Record<string, unknown> = {
     "alert": "The step tasks could not be read: The Task Registry is not available. The pipelines are listed as usual.Try again"
   },
   "the registry, as a platform administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -205,7 +205,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Aggregate",
       "Open Enrich",
@@ -224,10 +224,7 @@ export const PINNED: Record<string, unknown> = {
       "Open Upload to bucket",
       "Open Validate",
       "Open Write Database",
-      "Refresh",
-      "Show all 124 characters of Why it is unavailable",
-      "Show all 127 characters of Why it is unavailable",
-      "Show all 136 characters of Why it is unavailable"
+      "Refresh"
     ],
     "columns": [
       [
@@ -235,7 +232,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -246,28 +243,52 @@ export const PINNED: Record<string, unknown> = {
       "Kind",
       "Search name, code, service or topic",
       "Search tasks",
-      "State"
+      "State",
+      "Switch Aggregate on in this workspace",
+      "Switch Enrich on in this workspace",
+      "Switch Filter on in this workspace",
+      "Switch Join on in this workspace",
+      "Switch Read API on in this workspace",
+      "Switch Read CSV/JSON/Parquet on in this workspace",
+      "Switch Read Database on in this workspace",
+      "Switch Read S3 on in this workspace",
+      "Switch Sample rows on in this workspace",
+      "Switch Save File on in this workspace",
+      "Switch Select columns on in this workspace",
+      "Switch Send Notification on in this workspace",
+      "Switch Transform on in this workspace",
+      "Switch Upload to bucket on in this workspace",
+      "Switch Validate on in this workspace",
+      "Switch Write Database on in this workspace"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ],
     "rows": [
-      "Read APIread_apiRuns a saved API request (integration-service's runner) and takes its answer as rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
-      "Read Databaseread_databaseRuns a read-only query on a workspace database connection (integration-service) and takes its rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
-      "Read CSV/JSON/Parquetread_fileReads one file of a workspace bucket — CSV, JSON, JSON Lines or Parquet — as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
-      "Read S3read_s3Lists the objects under a prefix of a workspace bucket, or reads all of them as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
+      "Read APIread_apiRuns a saved API request (integration-service's runner) and takes its answer as rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
+      "Read Databaseread_databaseRuns a read-only query on a workspace database connection (integration-service) and takes its rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
+      "Read CSV/JSON/Parquetread_fileReads one file of a workspace bucket — CSV, JSON, JSON Lines or Parquet — as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)",
+      "Read S3read_s3Lists the objects under a prefix of a workspace bucket, or reads all of them as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)",
       "Sample rowssampleRows written in the step itself: a sample to build and test a pipeline on. | Read | core | None → Rows | On",
       "AggregateaggregateGroups rows by columns and computes count, count_distinct, sum, avg, min, max, first or last. | Process | core | Rows → Rows | On",
-      "EnrichenrichCalls a saved API request per row (integration-service's runner) and adds fields of its answer as columns. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
+      "EnrichenrichCalls a saved API request per row (integration-service's runner) and adds fields of its answer as columns. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
       "FilterfilterKeeps the rows that meet all (or any) of its conditions. | Process | core | Rows → Rows | On",
       "JoinjoinJoins the rows with an earlier step's output on equal keys (inner or left). | Process | core | Rows → Rows | On",
       "Select columnsselectKeeps the columns it names, in that order, optionally renamed. | Process | core | Rows → Rows | On",
       "TransformtransformMaps each row to new columns: copy, constant, concat, upper/lower/trim, cast, coalesce, replace. | Process | core | Rows → Rows | On",
-      "ValidatevalidateChecks each row against a data contract (integration-service): fail, drop or flag the rows that do not hold. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
+      "ValidatevalidateChecks each row against a data contract (integration-service): fail, drop or flag the rows that do not hold. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
       "Save Filesave_fileKeeps the rows as a CSV, JSON or JSON Lines file with the run. | Output | core | Rows → Rows | On",
       "Send Notificationsend_notificationSends a notice about the run to the job's owner, the workspace's admins, everyone, or named people. | Output | notifications-service | Rows → Rows | On",
-      "Upload to bucketupload_bucketWrites the rows as a CSV, JSON or JSON Lines object in a workspace bucket (storage-service). | Output | storage-service | Rows → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
-      "Write Databasewrite_databaseInserts or upserts the rows into a table of a workspace database connection (integration-service). Off by default. | Output | integration-service | Rows → Rows | Unavailableintegration-service has no database write path; MIG-229's connections are read-only (process.pipeline.integration.database-write is off)Show all",
+      "Upload to bucketupload_bucketWrites the rows as a CSV, JSON or JSON Lines object in a workspace bucket (storage-service). | Output | storage-service | Rows → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)",
+      "Write Databasewrite_databaseInserts or upserts the rows into a table of a workspace database connection (integration-service). Off by default. | Output | integration-service | Rows → Rows | Unavailableintegration-service has no database write path; MIG-229's connections are read-only (process.pipeline.integration.database-write is off)",
       "Reference: CSV check and summariseREF_CSV_CHECK_V1service-1 reference pipeline. Reads a CSV, validates it, writes summary.json and rejects.csv. | Legacy | workerservice-1 reference worker | Payload: 7 fields → Worker | On"
     ]
   },
@@ -290,7 +311,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the registry, as a workspace administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -305,7 +326,7 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New pipeline",
+      "New registry task",
       "Only mine",
       "Open Aggregate",
       "Open Enrich",
@@ -324,10 +345,7 @@ export const PINNED: Record<string, unknown> = {
       "Open Upload to bucket",
       "Open Validate",
       "Open Write Database",
-      "Refresh",
-      "Show all 124 characters of Why it is unavailable",
-      "Show all 127 characters of Why it is unavailable",
-      "Show all 136 characters of Why it is unavailable"
+      "Refresh"
     ],
     "columns": [
       [
@@ -335,7 +353,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -344,28 +362,52 @@ export const PINNED: Record<string, unknown> = {
       "Kind",
       "Search name, code, service or topic",
       "Search tasks",
-      "State"
+      "State",
+      "Switch Aggregate on in this workspace",
+      "Switch Enrich on in this workspace",
+      "Switch Filter on in this workspace",
+      "Switch Join on in this workspace",
+      "Switch Read API on in this workspace",
+      "Switch Read CSV/JSON/Parquet on in this workspace",
+      "Switch Read Database on in this workspace",
+      "Switch Read S3 on in this workspace",
+      "Switch Sample rows on in this workspace",
+      "Switch Save File on in this workspace",
+      "Switch Select columns on in this workspace",
+      "Switch Send Notification on in this workspace",
+      "Switch Transform on in this workspace",
+      "Switch Upload to bucket on in this workspace",
+      "Switch Validate on in this workspace",
+      "Switch Write Database on in this workspace"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ],
     "rows": [
-      "Read APIread_apiRuns a saved API request (integration-service's runner) and takes its answer as rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
-      "Read Databaseread_databaseRuns a read-only query on a workspace database connection (integration-service) and takes its rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
-      "Read CSV/JSON/Parquetread_fileReads one file of a workspace bucket — CSV, JSON, JSON Lines or Parquet — as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
-      "Read S3read_s3Lists the objects under a prefix of a workspace bucket, or reads all of them as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
+      "Read APIread_apiRuns a saved API request (integration-service's runner) and takes its answer as rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
+      "Read Databaseread_databaseRuns a read-only query on a workspace database connection (integration-service) and takes its rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
+      "Read CSV/JSON/Parquetread_fileReads one file of a workspace bucket — CSV, JSON, JSON Lines or Parquet — as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)",
+      "Read S3read_s3Lists the objects under a prefix of a workspace bucket, or reads all of them as rows (storage-service). | Read | storage-service | None → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)",
       "Sample rowssampleRows written in the step itself: a sample to build and test a pipeline on. | Read | core | None → Rows | On",
       "AggregateaggregateGroups rows by columns and computes count, count_distinct, sum, avg, min, max, first or last. | Process | core | Rows → Rows | On",
-      "EnrichenrichCalls a saved API request per row (integration-service's runner) and adds fields of its answer as columns. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
+      "EnrichenrichCalls a saved API request per row (integration-service's runner) and adds fields of its answer as columns. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
       "FilterfilterKeeps the rows that meet all (or any) of its conditions. | Process | core | Rows → Rows | On",
       "JoinjoinJoins the rows with an earlier step's output on equal keys (inner or left). | Process | core | Rows → Rows | On",
       "Select columnsselectKeeps the columns it names, in that order, optionally renamed. | Process | core | Rows → Rows | On",
       "TransformtransformMaps each row to new columns: copy, constant, concat, upper/lower/trim, cast, coalesce, replace. | Process | core | Rows → Rows | On",
-      "ValidatevalidateChecks each row against a data contract (integration-service): fail, drop or flag the rows that do not hold. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
+      "ValidatevalidateChecks each row against a data contract (integration-service): fail, drop or flag the rows that do not hold. | Process | integration-service | Rows → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)",
       "Save Filesave_fileKeeps the rows as a CSV, JSON or JSON Lines file with the run. | Output | core | Rows → Rows | On",
       "Send Notificationsend_notificationSends a notice about the run to the job's owner, the workspace's admins, everyone, or named people. | Output | notifications-service | Rows → Rows | On",
-      "Upload to bucketupload_bucketWrites the rows as a CSV, JSON or JSON Lines object in a workspace bucket (storage-service). | Output | storage-service | Rows → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
-      "Write Databasewrite_databaseInserts or upserts the rows into a table of a workspace database connection (integration-service). Off by default. | Output | integration-service | Rows → Rows | Unavailableintegration-service has no database write path; MIG-229's connections are read-only (process.pipeline.integration.database-write is off)Show all",
+      "Upload to bucketupload_bucketWrites the rows as a CSV, JSON or JSON Lines object in a workspace bucket (storage-service). | Output | storage-service | Rows → Rows | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)",
+      "Write Databasewrite_databaseInserts or upserts the rows into a table of a workspace database connection (integration-service). Off by default. | Output | integration-service | Rows → Rows | Unavailableintegration-service has no database write path; MIG-229's connections are read-only (process.pipeline.integration.database-write is off)",
       "Reference: CSV check and summariseREF_CSV_CHECK_V1service-1 reference pipeline. Reads a CSV, validates it, writes summary.json and rejects.csv. | Legacy | workerservice-1 reference worker | Payload: 7 fields → Worker | On"
     ]
   }

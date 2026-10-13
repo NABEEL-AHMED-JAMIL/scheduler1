@@ -194,7 +194,7 @@
         </div>
       </div>
       @if (done.save && done.bucketName) {
-        <a class="btn btn-default btn-sm" routerLink="/documents/files"
+        <a class="btn btn-default btn-sm" routerLink="/data/files"
            [queryParams]="{ bucket: done.bucketName, prefix: savedFolder(done) }"><app-icon name="folder" />Open in storage</a>
       }
       <button type="button" class="btn btn-primary btn-sm" (click)="download()"><app-icon name="download" />Download</button>

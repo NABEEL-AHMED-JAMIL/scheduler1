@@ -197,6 +197,7 @@ describe('design system', () => {
       /^src\/app\/shared\/charts\//,              // every chart draws the caller's series colour
       /^src\/app\/features\/reports\/report-pivot\.html$/, // a pivot's legend and stacked bars
       /^src\/app\/features\/billing\/billing\.html$/,       // a bill's cost split, one colour per meter
+      /^src\/app\/features\/billing\/cost-by-day\.ts$/,    // Cost by day's legend, one colour per service
       /^src\/app\/features\/dashboard\/dashboard\.html$/,   // outcome segments, from statusColor()
     ];
 

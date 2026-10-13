@@ -1,3 +1,4 @@
+import { Avatar } from '../../../shared/ui/avatar';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -5,6 +6,8 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ActionsPage, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** Words that read as initials, not as words, when a resource or action name is split. */
 const INITIALS: Record<string, string> = { ai: 'AI', api: 'API', apis: 'APIs', sql: 'SQL', url: 'URL', id: 'ID', ids: 'IDs', kafka: 'Kafka',
@@ -54,7 +57,7 @@ export const ACTIONS_PAGE = 50;
  */
 @Component({
   selector: 'app-staff-activity',
-  imports: [TableShell, Icon, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar],
   templateUrl: './staff-activity.html',
 })
 export class StaffActivity implements OnInit {

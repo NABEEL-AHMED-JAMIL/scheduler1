@@ -45,7 +45,7 @@ async function render(role: Role, hour: JobBreakdown[] = HOUR) {
       { provide: Router, useValue: { navigate: () => Promise.resolve(true) } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap({}) } } },
       { provide: JobEventsService, useValue: { events: EMPTY, connected: signal(false) } },
-      { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => role === 'PLATFORM_ADMIN' } },
+      { provide: AuthService, useValue: { canOpen: () => true, isPlatformAdmin: () => role === 'PLATFORM_ADMIN', isTenantAdmin: () => role !== 'TENANT_USER', canBuild: () => false } },
     ],
   });
   // The drill-down is what is under test; the billing card and the charts have their own specs
@@ -73,7 +73,7 @@ describe('Dashboard hour drill-down: the workspace a job belongs to', () => {
   it('gives a platform administrator a Workspace column right after the job', async () => {
     const { headings, bodyRows } = await render('PLATFORM_ADMIN');
     const heads = headings();
-    expect(heads.indexOf('Workspace')).toBe(heads.indexOf('Job') + 1);
+    expect(heads.indexOf('Workspace')).toBe(heads.indexOf('Schedule') + 1);
     const at = heads.indexOf('Workspace');
     expect(bodyRows().map(tr => (tr.children[at]?.textContent ?? '').trim()))
       .toEqual(['Acme Ops', 'Workspace #7']);
@@ -86,7 +86,7 @@ describe('Dashboard hour drill-down: the workspace a job belongs to', () => {
 
   it('says "all workspaces" in the heading when the server marks the hour so', async () => {
     const { dashboard, drill } = await render('PLATFORM_ADMIN');
-    expect(dashboard.drillHeading()).toBe('Jobs in all workspaces on Thursday 24 Sep 2026, 22:00–23:00');
+    expect(dashboard.drillHeading()).toBe('Schedules in all workspaces on Thursday 24 Sep 2026, 22:00–23:00');
     expect(drill().getAttribute('aria-label')).toContain('all workspaces');
   });
 
@@ -106,7 +106,7 @@ describe('Dashboard hour drill-down: the workspace a job belongs to', () => {
       expect(headings()).not.toContain('Workspace');
       expect(footCells()).toHaveLength(headings().length);
       expect(drill().textContent).not.toMatch(/Workspace #|all workspaces/);
-      expect(dashboard.drillHeading()).toBe('Jobs on Thursday 24 Sep 2026, 22:00–23:00');
+      expect(dashboard.drillHeading()).toBe('Schedules on Thursday 24 Sep 2026, 22:00–23:00');
       dashboard.breakdownSearch.set('workspace');
       expect(dashboard.filteredBreakdown()).toEqual([]);
     });

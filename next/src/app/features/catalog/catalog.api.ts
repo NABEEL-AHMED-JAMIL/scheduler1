@@ -12,19 +12,22 @@ export class CatalogApi {
   private readonly http = inject(HttpClient);
 
   /** One page of the assets (page from 0); paging.total is how many the filter matches in all. */
-  list(filter: { q?: string; kind?: string; flag?: string; withDeleted?: boolean; page?: number; size?: number }):
+  list(filter: { q?: string; kind?: string; flag?: string; withDeleted?: boolean; withSystem?: boolean; page?: number; size?: number }):
     Observable<ApiResponse<CatalogAsset[]> & { paging?: CatalogPaging }> {
     let params = new HttpParams();
     if (filter.q) params = params.set('q', filter.q);
     if (filter.kind) params = params.set('kind', filter.kind);
     if (filter.flag) params = params.set('flag', filter.flag);
     if (filter.withDeleted) params = params.set('withDeleted', 'true');
+    // Review 2026-10-07 (M13): the platform's own files (OCR page images and intermediates) are left out unless an
+    // administrator asks for them; analytics-service ignores the flag for anyone else.
+    if (filter.withSystem) params = params.set('withSystem', 'true');
     if (filter.size) params = params.set('page', filter.page ?? 0).set('size', filter.size);
     return this.http.get<ApiResponse<CatalogAsset[]> & { paging?: CatalogPaging }>(`${BASE()}/list`, { params });
   }
 
-  summary(): Observable<ApiResponse<CatalogSummary>> {
-    return this.http.get<ApiResponse<CatalogSummary>>(`${BASE()}/summary`);
+  summary(withSystem = false): Observable<ApiResponse<CatalogSummary>> {
+    return this.http.get<ApiResponse<CatalogSummary>>(`${BASE()}/summary`, withSystem ? { params: { withSystem: 'true' } } : {});
   }
 
   asset(assetId: number): Observable<ApiResponse<AssetDetail>> {

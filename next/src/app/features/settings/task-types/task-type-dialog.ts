@@ -44,7 +44,7 @@ export interface TaskType {
                    [control]="form.get('serviceName')" [submitted]="submitted()"
                    hint="How the topic appears when a task picks it — usually the consumer's name.">
           <input id="serviceName" class="input" formControlName="serviceName"
-                 placeholder="ETL Scraping Pipeline" />
+                 placeholder="Orders intake" />
         </app-field>
 
         @if (needsWorkspace()) {
@@ -67,7 +67,7 @@ export interface TaskType {
                      [control]="form.get('topic')" [submitted]="submitted()"
                      hint="Letters, digits, dots, underscores and hyphens — up to 249 characters."
                      [errorMessages]="{ pattern: 'Use letters, digits, dots, underscores or hyphens, such as test-user-1-topic.' }">
-            <input id="topic" class="input mono" formControlName="topic" placeholder="scraping-topic" />
+            <input id="topic" class="input mono" formControlName="topic" placeholder="orders-intake" />
           </app-field>
 
           <app-field label="Partition" for="partitions"

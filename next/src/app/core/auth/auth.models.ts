@@ -27,21 +27,22 @@ export function isUserRole(role: string | null | undefined): role is UserRole {
  */
 export const ROLE_META: Record<UserRole, { label: string; hint: string; pill: string; accent: string }> = {
   TENANT_USER: {
-    label: 'Tenant user',
+    // UX review B (G12): the console's word is workspace; TENANT_USER / TENANT_ADMIN stay the API's values.
+    label: 'Workspace member',
     hint: 'Runs and monitors work.',
     pill: 'pill pill-neutral',
     accent: 'var(--border-subtle)',
   },
   TENANT_ADMIN: {
-    label: 'Tenant administrator',
-    hint: 'Also configures tasks, connections and users.',
+    label: 'Workspace administrator',
+    hint: 'Also configures pipelines, connections and users.',
     pill: 'pill pill-brand',
     // The flipping mark token: brand-500 is the dark card's own colour, so the rule vanished there.
     accent: 'var(--accent-mark)',
   },
   PLATFORM_ADMIN: {
     label: 'Platform administrator',
-    hint: 'Operates across every tenant.',
+    hint: 'Operates across every workspace.',
     pill: 'pill pill-crit',
     accent: 'var(--color-crit-500)',
   },
@@ -72,9 +73,8 @@ export interface AuthUser {
   tenantId?: number;
   accessToken: string;
   refreshToken: string;
-  /** Where the profile picture lives, when one has been set. */
-  avatarBucket?: string | null;
-  avatarKey?: string | null;
+  /** The version of the person's profile picture (appUser.json/avatar); null or absent when they have none. */
+  avatarVersion?: string | null;
   /**
    * The account was opened with, or reset to, a one-time password and still owes its owner's
    * own. Sign-in is what reports it; the profile screen alone knew about it before, so a
@@ -100,6 +100,18 @@ export interface AuthUser {
   managementMode?: ManagementMode | null;
   /** MIG-244: a staff member's managed-service session in a customer's workspace (the token's `msvc`). */
   managedService?: boolean | null;
+  /** MIG-353: the workspace's idle sign-out, in minutes; the console warns a minute before and signs out. */
+  idleMinutes?: number | null;
+  /** MIG-353: when the server ends this session unless it is used (an ISO instant); every refresh moves it. */
+  idleExpiresAt?: string | null;
+  /** MIG-353: the password is older than the workspace allows, so the change is owed (mustChangePassword). */
+  passwordExpired?: boolean | null;
+  /** MIG-353: how this session signed in: PASSWORD, MFA, RECOVERY_CODE or SSO. */
+  signInMethod?: string | null;
+  /** The app theme this person chose (ThemeChoice), kept on their account; null when they never chose. */
+  theme?: string | null;
+  /** Their workspace's default theme, which applies while they have none of their own; null: System. */
+  workspaceTheme?: string | null;
 }
 
 /** MIG-244: SELF, the customer's administrators build; MANAGED, our team does and the customer's people use. */

@@ -1,3 +1,7 @@
+import { readableCell } from '../../shared/charts/number-format';
+import { readsAsYears } from '../analytics/charts/chart-table';
+import type { AnswerChart, ChartAnswer } from '../analytics/charts/chart-answer';
+
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): what ai-service's /askData.json answers, and the pure
  * pieces of the page -- an answer cut into text and citations, and the words for a refusal.
@@ -81,8 +85,32 @@ export interface AskQuery {
   rows: (string | null)[][];
   rowCount: number;
   truncated: boolean;
-  /** A bar chart of one label column and one number column, when the rows make one. */
-  chart: { type: 'bar'; label: string; value: string } | null;
+  /**
+   * MIG-357: the chart the model chose for the rows -- a kind of the console's 51, its settings and a caption -- which the
+   * console's fit rules may overrule (charts/chart-answer.ts). Null from an older ai-service.
+   */
+  chart: AnswerChart | null;
+  /** What the rows hold, in a sentence made from the rows (never by the model). */
+  summary?: string | null;
+}
+
+const DRAWN = new WeakMap<AskQuery, ChartAnswer>();
+
+/**
+ * The query answer as the chart card draws it -- the same object for the same answer, so a template that asks again on
+ * every check hands the card the input it already has.
+ */
+export function chartAnswerOf(q: AskQuery): ChartAnswer {
+  const kept = DRAWN.get(q);
+  if (kept) return kept;
+  const made = chartAnswerFrom(q);
+  DRAWN.set(q, made);
+  return made;
+}
+
+function chartAnswerFrom(q: AskQuery): ChartAnswer {
+  return { sql: q.sql, dataset: q.dataset, columns: q.columns, rows: q.rows, rowCount: q.rowCount, truncated: q.truncated,
+    chart: q.chart && typeof q.chart === 'object' && 'kind' in q.chart ? q.chart : null, summary: q.summary ?? null };
 }
 
 export interface AskAnswer {
@@ -158,15 +186,6 @@ export function refusalText(status: number, message: string | null | undefined):
   return 'The question could not be answered. Try again.';
 }
 
-/** The query's chart as bars: its label column against its number column, in the order the query gave. */
-export function chartItems(q: AskQuery | null | undefined): { name: string; value: number }[] {
-  if (!q?.chart) return [];
-  const label = q.columns.indexOf(q.chart.label);
-  const value = q.columns.indexOf(q.chart.value);
-  if (label < 0 || value < 0) return [];
-  return q.rows.map(r => ({ name: r[label] ?? '—', value: Number(r[value]) })).filter(i => Number.isFinite(i.value));
-}
-
 /** The query's rows as CSV (RFC 4180 quoting), header first. */
 export function csvOf(q: AskQuery): string {
   const cell = (v: string | null) => {
@@ -174,4 +193,29 @@ export function csvOf(q: AskQuery): string {
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   return [q.columns.map(cell).join(','), ...q.rows.map(r => r.map(cell).join(','))].join('\r\n') + '\r\n';
+}
+
+const FIGURES = new WeakMap<AskQuery, boolean[]>();
+
+/**
+ * UX review 2026-10-12: which of an answer's columns hold figures -- every value a number, and not a column of years -- so
+ * the table rounds them to sensible places and right-aligns them (36.347245665183365 read as written, left-aligned). Kept
+ * per answer, so the template asks once.
+ */
+export function figureColumns(q: AskQuery): boolean[] {
+  const kept = FIGURES.get(q);
+  if (kept) return kept;
+  const made = q.columns.map((name, i) => {
+    const values = q.rows.map(row => row[i] ?? null);
+    const present = values.filter((v): v is string => v !== null && String(v).trim() !== '');
+    return present.length > 0 && present.every(v => /^-?\d+(\.\d+)?$/.test(String(v).trim())) && !readsAsYears(name, values);
+  });
+  FIGURES.set(q, made);
+  return made;
+}
+
+/** One cell as the answer's table shows it: a figure rounded as the dashboards' tables round it, anything else as it came. */
+export function answerCell(value: string | null, figure: boolean): string {
+  if (value === null || value === undefined) return '—';
+  return figure ? readableCell(String(value)) : String(value);
 }

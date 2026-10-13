@@ -1,15 +1,17 @@
 <div class="page">
   <!-- One line under the title (owner, 2026-09-28). The longer account -- the engine reads the
        object store, the browser only ever receives a page -- is the tooltip. -->
-  <div class="page-head">
-    <div class="min-w-0">
-      <h1 class="page-title">Analytics Studio</h1>
-      <p class="page-subtitle"
-         title="The query engine reads the object store directly; the browser only ever receives a page.">
-        Read and analyse a file where it lives — nothing is copied.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <h1 class="page-title">Analytics Studio</h1>
+        <p class="page-subtitle"
+           title="The query engine reads the object store directly; the browser only ever receives a page.">
+          Read and analyse a file where it lives — nothing is copied.
+        </p>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   <!-- The data has the full width. The storage rail is the same connection -> folder -> file walk
        the Object Browser does, and uses that screen's own service; it slides in from the right, beside the
@@ -327,10 +329,15 @@
           <p class="mt-1 text-xs text-[color:var(--text-muted)]">
             CSV, TSV, JSON and Parquet. A whole folder can be read as one dataset.
           </p>
-          <button type="button" class="btn btn-primary btn-sm mt-4" aria-controls="files-panel"
-                  (click)="openFiles($event.currentTarget)">
-            <app-icon name="folder" />Choose a file
-          </button>
+          <!-- UX review 2026-10-12 (A8, AS1): the next step, and where else the data can be found. -->
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button type="button" class="btn btn-primary btn-sm" aria-controls="files-panel"
+                    (click)="openFiles($event.currentTarget)">
+              <app-icon name="folder" />Choose a file
+            </button>
+            <a routerLink="/data/analytics/dashboards" class="btn btn-ghost btn-sm">Open a dashboard</a>
+            <a routerLink="/data/catalog" class="btn btn-ghost btn-sm">Find it in the Data Catalog</a>
+          </div>
         </div>
       } @else {
 
@@ -377,6 +384,11 @@
               <button type="button" class="btn btn-default btn-sm" aria-controls="files-panel"
                       [attr.aria-expanded]="filesOpen()" (click)="openFiles($event.currentTarget)">
                 <app-icon name="folder" /><span class="max-sm:sr-only">Files</span>
+              </button>
+              <!-- MIG-357: suggested charts of this file, from its columns (the panel loads when pressed). -->
+              <button type="button" class="btn btn-default btn-sm" data-test="visualise" title="Suggested charts of this file"
+                      (click)="visualise()">
+                <app-icon name="chart" /><span class="max-sm:sr-only">Visualise</span>
               </button>
               <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="More for this file"
                       [cdkMenuTriggerFor]="fileMenu">
@@ -2109,17 +2121,39 @@
                   <div class="seg flex-wrap" role="group" aria-labelledby="a-chart-kind">
                     @for (option of chartKinds(); track option.id) {
                       <button type="button" class="seg-btn"
-                              [class.seg-on]="option.id === chartKind()"
-                              [attr.aria-pressed]="option.id === chartKind()"
+                              [class.seg-on]="option.id === chartKind() && !echartChoice()"
+                              [attr.aria-pressed]="option.id === chartKind() && !echartChoice()"
                               [class.opacity-40]="!!option.issue"
                               [class.cursor-not-allowed]="!!option.issue"
                               [attr.aria-disabled]="option.issue ? true : null"
                               [title]="option.issue || option.label"
-                              (click)="option.issue || chartKindName.set(option.id)">{{ option.label }}</button>
+                              (click)="option.issue || chooseClassicKind(option.id)">{{ option.label }}</button>
                     }
                   </div>
                 </div>
+
+                <!-- The theme and the settings, for whichever chart is drawn. This viewer's own:
+                     the Studio has no widget to store them on, so they are kept in the browser. -->
+                <div class="flex items-center gap-1 ms-auto">
+                  <button type="button" class="btn btn-ghost btn-sm" [cdkMenuTriggerFor]="studioThemeMenu" [attr.aria-label]="'Chart theme: ' + chartThemeLabel()"><app-icon name="sun" />{{ chartThemeLabel() }}</button>
+                  <ng-template #studioThemeMenu>
+                    <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
+                      <app-theme-picker [value]="chartTheme() ?? 'console'" (changed)="setChartTheme($event)" />
+                    </div>
+                  </ng-template>
+                  <button type="button" class="btn btn-ghost btn-sm" [disabled]="!studioView()" (click)="openStudioChartSettings()"><app-icon name="settings" />Chart settings</button>
+                </div>
               </div>
+
+              <!-- Every other kind, by category, each saying what it needs and why it does not fit.
+                   Hovering one draws the result that way below; choosing it keeps it. -->
+              <details class="studio-more-charts" [open]="!!echartChoice()">
+                <summary class="cursor-pointer select-none text-xs font-medium text-[color:var(--text-secondary)] w-fit">More chart types ({{ echartKinds.length }})</summary>
+                <div class="mt-2">
+                  <app-kind-picker [kinds]="echartKinds" [issues]="echartIssues()" [selected]="echartChoice()"
+                                   (chosen)="echartChoice.set($event)" (hover)="echartHover.set($event)" />
+                </div>
+              </details>
 
               <div class="flex flex-wrap items-baseline gap-2 min-w-0">
                 <h4 class="text-sm font-medium min-w-0 truncate">{{ chartCaption() }}</h4>
@@ -2133,6 +2167,13 @@
                 }
               </div>
 
+              @if (echartShown(); as kind) {
+                @if (studioView(); as view) {
+                  <app-widget-chart [view]="view" [kind]="kind" [settings]="chartSettings()" [boardTheme]="chartTheme()" [height]="340"
+                                    [interactive]="true" [name]="chartCaption()" />
+                }
+              } @else {
+              <div [appChartPalette]="chartSettings().colors?.theme ?? chartTheme()" [paletteOrder]="chartSettings().colors?.order">
               @switch (chartKind()) {
                 @case ('bar') {
                   <app-bar-chart [data]="chartData()" [height]="220" [format]="chartNumber" />
@@ -2156,6 +2197,8 @@
                                  [dropBelow]="null" [height]="200" [format]="chartNumber"
                                  emptyMessage="Nothing in this column parses as a number." />
                 }
+              }
+              </div>
               }
 
               <!-- What the picture cannot say about itself. Every line here is a row, a

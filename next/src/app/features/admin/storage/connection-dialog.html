@@ -22,7 +22,7 @@
 
       <app-field label="Alias" for="alias" [required]="true"
                  [control]="form.get('alias')" [submitted]="submitted()"
-                 hint="How jobs and tasks refer to this. Letters, numbers, . _ - only.">
+                 hint="How pipelines refer to this. Letters, numbers, . _ - only.">
         <input id="alias" class="input mono" formControlName="alias" placeholder="reports-archive" />
       </app-field>
 
@@ -142,7 +142,7 @@
     }
 
     <app-field label="Status" for="status" [control]="form.get('status')" [submitted]="submitted()"
-               hint="Inactive connections are not resolved by jobs, tasks or Kafka profiles.">
+               hint="Inactive connections are not resolved by pipelines or Kafka profiles.">
       <select id="status" class="input" formControlName="status">
         <option value="Active">Active</option>
         <option value="Inactive">Inactive</option>

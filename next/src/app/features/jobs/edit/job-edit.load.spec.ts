@@ -108,7 +108,7 @@ describe('JobEdit with Manual execution', () => {
 describe('JobEdit for a job that does not exist', () => {
   it('says the job does not exist and offers no Try again', () => {
     const { component } = editor(() => of({ status: 'ERROR', message: 'SourceJob not found with 41.' }));
-    expect(component.loadError()).toBe('Job #41 does not exist or was deleted.');
+    expect(component.loadError()).toBe('Schedule #41 does not exist or was deleted.');
     expect(component.loadMissing()).toBe(true);
   });
 
@@ -116,7 +116,7 @@ describe('JobEdit for a job that does not exist', () => {
     let asked = 0;
     const { component } = editor(() => { asked++; return of({ status: 'SUCCESS', data: JOB }); }, undefined, 'abc');
     expect(asked).toBe(0);
-    expect(component.loadError()).toBe('That link does not point to a job.');
+    expect(component.loadError()).toBe('That link does not point to a schedule.');
     expect(component.loadMissing()).toBe(true);
   });
 

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Observable, catchError, of, throwError, timeout } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
-import { AssistantAnswer, AssistantMessage, Conversation, ToolDef, ToolRun, ToolTrace } from './assistant.model';
+import { AssistantAnswer, AssistantMessage, Conversation, RunProgress, ToolDef, ToolRun, ToolTrace } from './assistant.model';
 
 /**
  * How long send and decide are waited for. Both are synchronous and a local model can take well
@@ -37,6 +37,33 @@ export class AssistantApi {
     if (conversationId != null) body['conversationId'] = conversationId;
     if (connectionId != null) body['connectionId'] = connectionId;
     return this.answered(this.http.post<ApiResponse<AssistantAnswer>>(`${BASE()}/assistant/send`, body));
+  }
+
+  /**
+   * AI workflow review: answers at once with the run's id (data.run) and the person's message; the loop works on the
+   * server, watched through progress and stopped through cancel.
+   */
+  sendAsync(message: string, conversationId: number | null, connectionId: number | null): Observable<ApiResponse<AssistantAnswer>> {
+    const body: Record<string, unknown> = { message, async: true };
+    if (conversationId != null) body['conversationId'] = conversationId;
+    if (connectionId != null) body['connectionId'] = connectionId;
+    return this.answered(this.http.post<ApiResponse<AssistantAnswer>>(`${BASE()}/assistant/send`, body));
+  }
+
+  decideAsync(actionId: string, approve: boolean): Observable<ApiResponse<AssistantAnswer>> {
+    return this.answered(this.http.post<ApiResponse<AssistantAnswer>>(`${BASE()}/assistant/decide`, { actionId, approve, async: true }));
+  }
+
+  /** Where a run stands: phase, the calls so far, and done once its answer is in the conversation (after message afterSeq). */
+  progress(toolRunId: number, conversationId: number | null, afterSeq: number): Observable<ApiResponse<RunProgress>> {
+    const params: Record<string, number> = { toolRunId, afterSeq };
+    if (conversationId != null) params['conversationId'] = conversationId;
+    return this.http.get<ApiResponse<RunProgress>>(`${BASE()}/assistant/progress`, { params });
+  }
+
+  /** Stops the person's own run at its next step (at once while it waits for a confirmation). */
+  cancel(toolRunId: number): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${BASE()}/assistant/cancel`, { toolRunId });
   }
 
   decide(actionId: string, approve: boolean): Observable<ApiResponse<AssistantAnswer>> {

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -10,24 +10,42 @@ import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Combobox, ComboboxOption } from '../../shared/ui/combobox';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { FlowGraph } from '../../shared/flow-graph/flow-graph';
+import { workflowGraph } from '../../shared/flow-graph/flow-adapters';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi } from './workflows.api';
-import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, toJson } from './designer.model';
+import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson } from './designer.model';
 import { shortTime } from './history';
+import { splitTail } from './inbox-list';
+import { PageHeader } from '../../shared/ui/page-header';
+
+/** The platform made it -- a service's built-in workflow (builtIn, or createdBy 0 from a service that predates it). */
+export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): boolean {
+  return w.builtIn ?? w.createdBy === 0;
+}
 
 /**
- * The Workflow designer (MIG-276): an administrator lays out a workflow's steps as a chain of cards -- who approves,
- * what is checked, what runs -- edits one at a time in the panel beside it, and publishes the chain as the next version.
+ * The Workflow designer (MIG-276): an administrator lays out a workflow's steps -- who approves, what is checked, what
+ * runs -- edits one at a time in the panel beside it, and publishes them as the next version. The steps are drawn as a
+ * flow on the shared graph canvas (the AI Assistant's, 2026-10-12): each step a node with its type's icon and colour and
+ * who or what it is for, every way out of it an edge saying the outcome it follows -- approved, rejected, yes, no -- to
+ * the step it goes to or to the request's end. Zoom, fit, full screen and a minimap come with the canvas.
  * The server checks the steps (WorkflowSteps) and names each problem where it is; the designer puts it on its card.
  * Running requests keep the version they started with. A test run starts a request as the administrator and opens it.
  * Everyone else with the page reads the workflows but changes nothing.
+ *
+ * Laid out as the Task inbox is (owner, 2026-10-06: "redesign the page"): two panes that fill the screen and scroll on
+ * their own -- the workflows, with a pinned search and status filter, and the workflow opened from them, its header and
+ * tabs on top, the canvas and the step's properties side by side, and the publish bar pinned at its foot. Below 1024 px
+ * one pane shows at a time (data-pane) and the properties slide over from the right (data-sheet).
  */
 @Component({
   selector: 'app-workflow-designer',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner],
+  imports: [PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph],
   templateUrl: './workflow-designer.html',
+  host: { '(document:keydown)': 'onKey($event)' },
 })
 export class WorkflowDesigner implements OnInit {
   private readonly api = inject(WorkflowsApi);
@@ -46,6 +64,8 @@ export class WorkflowDesigner implements OnInit {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly current = signal<WorkflowDetail | null>(null);
+  /** A key a link named that this workspace has no workflow for: the detail pane says so instead of opening another. */
+  readonly missingKey = signal<string | null>(null);
 
   /** The chain being edited; `dirty` once it differs from what was loaded. */
   readonly steps = signal<DraftStep[]>([]);
@@ -55,7 +75,19 @@ export class WorkflowDesigner implements OnInit {
   readonly note = signal('');
   readonly busy = signal(false);
   readonly adding = signal(false);
+  /** Where the Add a step menu inserts: before the step at this index (the length is the end); null is after the
+   *  selected step, as before. */
+  readonly insertAt = signal<number | null>(null);
   readonly view = signal<'steps' | 'history' | 'test' | 'new'>('steps');
+
+  // the list's search and status filter
+  readonly query = signal('');
+  readonly statusFilter = signal<'' | 'Active' | 'Inactive'>('');
+  /** Below 1024 px one pane shows at a time: the list, or the workflow opened from it. */
+  readonly pane = signal<'list' | 'detail'>('list');
+  /** Below 1024 px the step's properties slide over the canvas; open once a step is picked, until closed. */
+  readonly sheet = signal(false);
+  private readonly searchBox = viewChild<ElementRef<HTMLInputElement>>('search');
 
   readonly colleagues = signal<Colleague[]>([]);
   private readonly colleaguesLoaded = signal(false);
@@ -77,7 +109,53 @@ export class WorkflowDesigner implements OnInit {
   readonly testSubject = signal('{\n  "amount": 1200\n}');
   readonly testStarted = signal<RequestRow | null>(null);
 
-  readonly canEdit = computed(() => this.auth.isTenantAdmin() && !this.auth.builderLocked());
+  /** A sign-in with no workspace of its own (a platform administrator's): workflows are a workspace's, so nothing is read. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
+  readonly canEdit = computed(() => this.auth.isTenantAdmin() && !this.auth.builderLocked() && !this.noWorkspace());
+  /** MIG-324: an empty list says what a workflow is and who makes one. */
+  readonly emptyText = computed(() => this.canEdit()
+    ? 'No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.'
+    : 'No workflows yet. A workspace administrator makes them.');
+
+  /** The workflows the search and status filter leave, in the service's order (by name). */
+  readonly shown = computed(() => {
+    const words = this.query().trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const status = this.statusFilter();
+    return this.workflows().filter(w => (!status || w.status === status)
+      && words.every(word => `${w.name} ${w.key} ${w.description ?? ''}`.toLowerCase().includes(word)));
+  });
+
+  /**
+   * The shown workflows in their groups, as the Task inbox's day groups: Built in (made by the platform) first, then the
+   * workspace's own. A group nothing is left in has no header.
+   */
+  readonly groupsShown = computed(() => {
+    const rows = this.shown();
+    return [
+      { label: 'Built in', rows: rows.filter(isBuiltIn) },
+      { label: 'This workspace', rows: rows.filter(w => !isBuiltIn(w)) },
+    ].filter(g => g.rows.length);
+  });
+
+  readonly statusChoices: { value: '' | 'Active' | 'Inactive'; label: string }[] = [
+    { value: 'Active', label: 'Active' }, { value: 'Inactive', label: 'Inactive' }, { value: '', label: 'All' }];
+
+  readonly statusCounts = computed<Record<'' | 'Active' | 'Inactive', number>>(() => {
+    const rows = this.workflows();
+    return { '': rows.length, Active: rows.filter(w => w.status === 'Active').length, Inactive: rows.filter(w => w.status === 'Inactive').length };
+  });
+
+  readonly hasFilters = computed(() => !!this.query().trim() || !!this.statusFilter());
+
+  /** "28 workflows", or "3 of 28" while the search or filter leaves some out. */
+  readonly shownLine = computed(() => {
+    const all = this.workflows().length;
+    const shown = this.shown().length;
+    return this.hasFilters() ? `${shown} of ${all}` : `${all} workflow${all === 1 ? '' : 's'}`;
+  });
+
+  /** The platform made it (a service's built-in workflow); the workspace may still change it. */
+  readonly builtIn = computed(() => { const wf = this.current(); return !!wf && isBuiltIn(wf); });
 
   readonly step = computed<DraftStep | null>(() => {
     const i = this.selected();
@@ -85,6 +163,25 @@ export class WorkflowDesigner implements OnInit {
   });
 
   readonly keys = computed(() => this.steps().map(s => s.key));
+
+  /** The steps as the graph draws them; laid out again only when what it shows changes. */
+  readonly graph = computed(() => {
+    const problems = this.problems();
+    return workflowGraph(this.steps(), {
+      summary: s => this.summary(s as DraftStep),
+      problems: i => problems.filter(p => problemStep(p) === i).length,
+      typeLabel: t => STEP_TYPES.find(x => x.type === t)?.label ?? t,
+    });
+  });
+
+  readonly selectedKey = computed(() => this.step()?.key ?? null);
+
+  /** What the Add a step menu says it does: where the new step goes. */
+  readonly addWhere = computed(() => {
+    const at = this.insertAt() ?? this.steps().length;
+    const after = this.steps()[at - 1];
+    return at >= this.steps().length ? 'Add a step at the end' : after ? `Add a step after “${this.stepName(after)}”` : 'Add a step first';
+  });
 
   /** Where a step may go next: any other step, or the end. */
   readonly targets = computed(() => this.steps().map(s => ({ key: s.key, label: s.name || s.key })));
@@ -98,6 +195,7 @@ export class WorkflowDesigner implements OnInit {
     .map(j => ({ value: String(j.jobId), label: j.jobName || `Schedule #${j.jobId}`, hint: `#${j.jobId}` })));
 
   ngOnInit(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     this.api.colleagues().subscribe({ next: r => { if (r.status === API_SUCCESS) { this.colleagues.set(r.data ?? []); this.colleaguesLoaded.set(true); } }, error: () => {} });
     if (this.auth.isTenantAdmin()) {
       this.profiles.list().subscribe({
@@ -109,7 +207,10 @@ export class WorkflowDesigner implements OnInit {
       next: r => { if (r.status === API_SUCCESS) this.jobs.set(Array.isArray(r.data) ? r.data : []); },
       error: () => {},
     });
-    this.loadList(this.route.snapshot.queryParamMap.get('key'));
+    const linked = this.route.snapshot.queryParamMap.get('key');
+    // A link to one workflow opens on it, below 1024 px too.
+    if (linked) this.pane.set('detail');
+    this.loadList(linked);
   }
 
   loadList(open?: string | null): void {
@@ -120,7 +221,11 @@ export class WorkflowDesigner implements OnInit {
         if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Workflows could not be read.'); return; }
         const rows = r.data ?? [];
         this.workflows.set(rows);
-        const key = open ?? this.current()?.key ?? rows[0]?.key;
+        // A link to a workflow this workspace does not have -- another workspace's, a deleted one, a typo. Said plainly in
+        // the detail pane, beside the list, rather than a toast over an empty page; nothing else is opened in its place.
+        if (open && !rows.some(w => w.key === open)) { this.showMissing(open); return; }
+        // With nothing named, the first row as the list draws it: Built in comes first.
+        const key = open ?? this.current()?.key ?? (rows.find(isBuiltIn) ?? rows[0])?.key;
         if (key) this.open(key, true);
         else if (this.canEdit()) this.view.set('new');
       },
@@ -129,16 +234,52 @@ export class WorkflowDesigner implements OnInit {
   }
 
   async choose(key: string): Promise<void> {
-    if (key === this.current()?.key && this.view() !== 'new') return;
+    if (key === this.current()?.key && this.view() !== 'new') { this.pane.set('detail'); return; }
     if (this.dirty() && !(await confirmWith(this.dialog, { title: 'Leave without publishing?',
       body: 'The changes to these steps are not published and will be lost.', confirmLabel: 'Leave', danger: true }))) return;
+    this.sheet.set(false);
+    this.pane.set('detail');
     this.open(key);
+  }
+
+  /** Back to the list, below 1024 px. */
+  backToList(): void {
+    this.sheet.set(false);
+    this.pane.set('list');
+  }
+
+  setQuery(value: string): void {
+    this.query.set(value);
+  }
+
+  clearFilters(): void {
+    this.query.set('');
+    this.statusFilter.set('');
+  }
+
+  /** A workflow's name, split so a narrow row cuts its middle and keeps a trailing number ("E2E purchase 1006022333"). */
+  nameParts(name: string): { name: string; ref: string } {
+    return splitTail(name);
+  }
+
+  /** / searches the list; Escape closes the step's slide-over, then the Add a step menu. */
+  onKey(e: KeyboardEvent): void {
+    if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target?.closest('.cdk-overlay-container')) return;
+    if (e.key === 'Escape') {
+      if (this.sheet()) { this.closeSheet(); return; }
+      if (this.adding()) { this.cancelAdd(); return; }
+    }
+    if (target && (/^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) || target.isContentEditable)) return;
+    if (e.key === '/') { e.preventDefault(); this.searchBox()?.nativeElement.focus(); }
   }
 
   open(key: string, quiet = false): void {
     this.api.fetch(key).subscribe({
       next: r => {
         if (r.status !== API_SUCCESS || !r.data) { if (!quiet) this.toast.error(r.message || 'That workflow could not be read.'); return; }
+        this.missingKey.set(null);
         this.current.set(r.data);
         this.loadVersion(r.data.versions[0]?.steps);
         // Nothing published yet: an administrator starts from one approval step rather than an empty page.
@@ -152,8 +293,22 @@ export class WorkflowDesigner implements OnInit {
         this.testStarted.set(null);
         this.router.navigate([], { relativeTo: this.route, queryParams: { key }, replaceUrl: true });
       },
-      error: () => { if (!quiet) this.toast.error('That workflow could not be read.'); },
+      error: (e: unknown) => {
+        if ((e as { status?: number })?.status === 404) { this.showMissing(key); return; }
+        if (!quiet) this.toast.error('That workflow could not be read. Try again.');
+      },
     });
+  }
+
+  /** No workflow by this key here: nothing is open, the link's key leaves the address, the pane says which key it was. */
+  private showMissing(key: string): void {
+    this.current.set(null);
+    this.steps.set([]);
+    this.selected.set(null);
+    this.dirty.set(false);
+    this.view.set('steps');
+    this.missingKey.set(key);
+    this.router.navigate([], { relativeTo: this.route, queryParams: { key: null }, queryParamsHandling: 'merge', replaceUrl: true });
   }
 
   private loadVersion(json: string | undefined | null): void {
@@ -167,12 +322,40 @@ export class WorkflowDesigner implements OnInit {
 
   // ---- editing the chain ------------------------------------------------------------------------------------------
 
+  /** A node picked on the canvas: a step opens its properties; the start and the ends are not steps. */
+  pickNode(id: string | null): void {
+    const i = id ? this.steps().findIndex(s => s.key === id) : -1;
+    if (i >= 0) this.pick(i);
+  }
+
+  /** A step picked on the canvas: its properties beside it, or sliding over below 1024 px. */
+  pick(i: number): void {
+    this.selected.set(i);
+    this.sheet.set(true);
+  }
+
+  closeSheet(): void {
+    this.sheet.set(false);
+  }
+
+  /** Opens the Add a step menu where it inserts: before step `at`, or at the end. */
+  openAdd(at: number): void {
+    this.insertAt.set(at);
+    this.adding.set(true);
+  }
+
+  cancelAdd(): void {
+    this.adding.set(false);
+    this.insertAt.set(null);
+  }
+
   add(type: StepType): void {
     const step = newStep(type, this.keys());
-    const at = this.selected() === null ? this.steps().length : this.selected()! + 1;
+    const at = this.insertAt() ?? (this.selected() === null ? this.steps().length : this.selected()! + 1);
     this.steps.update(list => [...list.slice(0, at), step, ...list.slice(at)]);
     this.selected.set(at);
-    this.adding.set(false);
+    this.cancelAdd();
+    this.sheet.set(true);
     this.touch();
   }
 
@@ -300,10 +483,13 @@ export class WorkflowDesigner implements OnInit {
   // ---- a new workflow -------------------------------------------------------------------------------------------
 
   startNew(): void {
+    this.sheet.set(false);
+    this.pane.set('detail');
     this.newName.set('');
     this.newKey.set('');
     this.newDescription.set('');
     this.newSubject.set('request');
+    this.missingKey.set(null);
     this.view.set('new');
   }
 
@@ -365,6 +551,11 @@ export class WorkflowDesigner implements OnInit {
     return STEP_TYPES.find(t => t.type === type)!;
   }
 
+  /** A step's name as the canvas and screen readers say it. */
+  stepName(s: DraftStep): string {
+    return s.name || s.key;
+  }
+
   problemsOf(i: number): string[] {
     return this.problems().filter(p => problemStep(p) === i).map(p => p.replace(/^steps\[\d+\]\.?/, '').replace(/^:\s*/, ''));
   }
@@ -411,9 +602,13 @@ export class WorkflowDesigner implements OnInit {
       }
       case 'manager': return 'the requester\'s manager';
       case 'requester': return 'the requester';
+      case 'subject': return subjectWho(w.value).replace(/^The /, 'the ').replace(/^Whoever/, 'whoever');
       default: return 'someone';
     }
   }
+
+  /** UX review 2026-10-12: a subject assignee in the picker's words. */
+  readonly subjectWho = subjectWho;
 
   jobName(id: number): string {
     return this.jobs().find(j => j.jobId === id)?.jobName ?? `schedule #${id}`;

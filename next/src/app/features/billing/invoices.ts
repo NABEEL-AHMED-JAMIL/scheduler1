@@ -7,14 +7,17 @@ import { Observable } from 'rxjs';
 import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
+import { ONE_PANE_BELOW_1024 } from '../../shared/ui/one-pane';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
-import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { BillingApi, InvoiceRow, INVOICE_STATUSES, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, cardPaymentChip } from './billing.service';
 import { MoneyTotals, addMoney, daysOverdue, formatMoney, formatTotals, yearMonth } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
  * Invoices as rail and pane: every month closed into a bill on the left, the one picked on the
@@ -24,7 +27,8 @@ import { WorkspacePicker } from './workspace-picker';
  */
 @Component({
   selector: 'app-invoices',
-  imports: [Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  styles: [ONE_PANE_BELOW_1024],
   templateUrl: './invoices.html',
 })
 export class Invoices implements OnInit {
@@ -44,10 +48,20 @@ export class Invoices implements OnInit {
   readonly status = signal<string>('');
   readonly search = signal('');
   readonly selectedNumber = signal<string | null>(null);
+  /**
+   * The invoice the address names, for the breadcrumb (UX review 2026-10-13): Administration & billing › Billing ›
+   * Invoices › INV-…, from the menu's tree, where the projected title made it Invoices › Invoices.
+   */
+  readonly addressNumber = signal<string | null>(null);
   /** The newest invoice, shown while the address names none; not written to the address. */
   readonly preview = signal<string | null>(null);
   /** What the pane shows: the picked invoice, else the preview. */
   readonly shownNumber = computed(() => this.selectedNumber() ?? this.preview());
+  /**
+   * Review 2026-10-07 (M17): below 1024 px one pane at a time, as the task inbox: the list, or the invoice opened from it
+   * with "Back to list". An address naming an invoice opens it; the automatic pick (a bill that needs a look) does not.
+   */
+  readonly pane = signal<'list' | 'detail'>('list');
   readonly closing = signal(false);
   readonly closePeriod = signal(Invoices.lastMonth());
 
@@ -83,7 +97,8 @@ export class Invoices implements OnInit {
   readonly hasFilters = computed(() => !!this.search() || !!this.status());
 
   ngOnInit(): void {
-    this.route.paramMap.subscribe(p => { const n = p.get('number'); if (n) this.selectedNumber.set(n); });
+    if (this.route.snapshot.paramMap.get('number')) this.pane.set('detail');
+    this.route.paramMap.subscribe(p => { const n = p.get('number'); this.addressNumber.set(n || null); if (n) this.selectedNumber.set(n); });
     this.workspaces.ready(() => this.load());
   }
 
@@ -105,7 +120,7 @@ export class Invoices implements OnInit {
         // address stays the list's until one is picked.
         if (!this.selectedNumber()) {
           const needsLook = rows.find(x => x.status === 'overdue') ?? rows.find(x => (x.pendingPayments ?? 0) > 0) ?? null;
-          if (needsLook) this.select(needsLook, true);
+          if (needsLook) this.select(needsLook, true, false);
           else this.preview.set(rows[0]?.number ?? null);
         }
       },
@@ -118,8 +133,9 @@ export class Invoices implements OnInit {
   }
   static lastMonth(): string { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return yearMonth(d); }
 
-  select(r: InvoiceRow, replace = false): void {
+  select(r: InvoiceRow, replace = false, open = true): void {
     this.selectedNumber.set(r.number);
+    if (open) this.pane.set('detail');
     this.router.navigate(['/billing/invoices', r.number], { replaceUrl: replace });
   }
   pickWorkspace(id: string): void { this.workspaces.tenantId.set(id); this.selectedNumber.set(null); this.preview.set(null); this.load(); }
@@ -130,6 +146,8 @@ export class Invoices implements OnInit {
   /** The billing period as the invoice itself heads it, "September 2026" (MIG-295). */
   period(r: InvoiceRow): string { return this.clock.transform(r.periodStart, 'month') ?? r.periodStart; }
   overdueDays(r: InvoiceRow): number { return daysOverdue(r.dueAt); }
+  /** MIG-359: "paid by card", "card declined" or "pay link open" in the rail, from the same chip the pane shows. */
+  cardNote(r: InvoiceRow): string | null { return cardPaymentChip(r)?.label.toLowerCase() ?? null; }
   /** The rail's dot: what the row's state means for the reader. */
   tone(r: InvoiceRow): string {
     return r.status === 'overdue' ? 'crit' : (r.pendingPayments ?? 0) > 0 ? 'warn' : r.status === 'paid' ? 'ok' : r.status === 'draft' || r.status === 'void' ? 'muted' : 'warn';

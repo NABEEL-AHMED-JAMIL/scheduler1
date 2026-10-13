@@ -6,7 +6,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { Router, provideRouter } from '@angular/router';
 import { Subject, of } from 'rxjs';
 import {
-  Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters } from './dashboard';
+  Dashboards, DatasetRegistry, analysisView, dateOnly, plainDecimal, queryView, combineFilters, figuresFirst } from './dashboard';
 import { dateOnly as studioDateOnly, plainDecimal as studioPlainDecimal } from './analytics';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { KIND_IDS } from './widget-kinds';
@@ -25,12 +25,12 @@ import {
  * THE FIRST IS THE COST OF OPENING A BOARD, and it is the reason this file leads with it. A
  * widget holds a reference and never a result, so every tile on a board is a live query against
  * a governor that admits four at once across the whole application -- shared with every other
- * user and with the ETL work on the same JVM. The rule that makes that safe is that tiles run
- * STRICTLY ONE AT A TIME, and it is a rule with no visible symptom when it breaks: a board that
- * fired its ten queries together looks faster on a developer's laptop and takes the ceiling away
- * from everybody else on a real box. So the serial queue is pinned directly -- one request in
- * flight, the next starting only when the first has settled -- and so is every path that could
- * quietly widen it: adding a widget runs one widget, changing a chart kind runs nothing at all,
+ * user and with the ETL work on the same JVM. The rule that makes that safe is that a board runs
+ * AT MOST THREE TILES AT ONCE (owner 2026-10-12: tiles load in parallel), and it is a rule with no
+ * visible symptom when it breaks: a board that fired its ten queries together looks faster on a
+ * developer's laptop and takes the ceiling away from everybody else on a real box. So the queue is
+ * pinned directly -- three requests in flight, the next starting only as one settles -- and so is
+ * every path that could quietly widen it: adding a widget runs one widget, changing a chart kind runs nothing at all,
  * and Stop both empties the queue and cancels what is already out.
  *
  * THE SECOND IS THE PAIR OF COPIED RENDERING RULES. plainDecimal and dateOnly exist twice in
@@ -194,13 +194,24 @@ function stubbedApi(over: BoardOptions = {}) {
     api, analyzes, queryRuns, analyze, query, cancel, fetchDashboardById, saveWidget, schema,
     deleteWidget, saveDashboard, deleteDashboard,
     /** Settles whichever request is currently out, as a success. */
+    /**
+     * Settles the oldest request still being listened to (a board runs three at once, and they land in the order they
+     * were asked), else the newest -- a response nobody waits for any more is dropped, which is what those tests test.
+     */
     finishAnalysis(result: AnalysisResult = analysisResult()) {
-      analyzes[analyzes.length - 1].next(SERVER_RESPONSE(result));
+      oldestOpen(analyzes).next(SERVER_RESPONSE(result));
     },
     finishQuery(result: QueryResult = queryResult()) {
-      queryRuns[queryRuns.length - 1].next(SERVER_RESPONSE(result));
+      oldestOpen(queryRuns).next(SERVER_RESPONSE(result));
     },
   };
+}
+
+const settledRequests = new WeakSet<Subject<any>>();
+function oldestOpen(requests: Subject<any>[]): Subject<any> {
+  const open = requests.find(request => request.observed && !settledRequests.has(request)) ?? requests[requests.length - 1];
+  settledRequests.add(open);
+  return open;
 }
 
 function configure(over: BoardOptions) {
@@ -253,33 +264,35 @@ function renderedBoard(over: BoardOptions = {}) {
 
 describe('what a board costs to open', () => {
 
-  it('runs the widgets ONE AT A TIME, never all at once', () => {
+  it('runs three widgets at once, never all of them, and the next as one lands (owner 2026-10-12: in parallel)', () => {
     const harness = boardWith({
       widgets: [
         widgetOn({ analyticsDashboardWidgetId: 100 }),
         widgetOn({ analyticsDashboardWidgetId: 101 }),
         widgetOn({ analyticsDashboardWidgetId: 102 }),
+        widgetOn({ analyticsDashboardWidgetId: 103 }),
       ],
     });
     harness.board.openDashboard(BOARD);
 
-    // Three tiles, ONE query. The other two are waiting their turn, and "waiting" is a state
-    // they are actually in rather than a spinner standing in for one.
-    expect(harness.analyze).toHaveBeenCalledTimes(1);
-    expect(harness.runOf(100).state).toBe('running');
-    expect(harness.runOf(101).state).toBe('queued');
-    expect(harness.runOf(102).state).toBe('queued');
-
-    harness.finishAnalysis();
-    expect(harness.analyze).toHaveBeenCalledTimes(2);
-    expect(harness.runOf(100).state).toBe('done');
-    expect(harness.runOf(101).state).toBe('running');
-    expect(harness.runOf(102).state).toBe('queued');
-
-    harness.finishAnalysis();
-    harness.finishAnalysis();
+    // Four tiles, THREE queries: a board holds at most three of the server's four permits. The fourth is waiting, and
+    // "waiting" is a state it is actually in.
     expect(harness.analyze).toHaveBeenCalledTimes(3);
+    expect(harness.runOf(100).state).toBe('running');
+    expect(harness.runOf(102).state).toBe('running');
+    expect(harness.runOf(103).state).toBe('queued');
+
+    harness.finishAnalysis();
+    expect(harness.analyze).toHaveBeenCalledTimes(4);
+    expect(harness.runOf(100).state).toBe('done');
+    expect(harness.runOf(103).state).toBe('running');
+
+    harness.finishAnalysis();
+    harness.finishAnalysis();
+    harness.finishAnalysis();
+    expect(harness.analyze).toHaveBeenCalledTimes(4);
     expect(harness.board.running()).toBe(false);
+    expect([100, 101, 102, 103].map(id => harness.runOf(id).state)).toEqual(['done', 'done', 'done', 'done']);
   });
 
   it('keeps no result: opening the same board again runs everything again', () => {
@@ -297,7 +310,7 @@ describe('what a board costs to open', () => {
     expect(harness.runOf(100).view!.ranAt).toBeGreaterThanOrEqual(first);
   });
 
-  it('says on the board that the tiles run one at a time', () => {
+  it('says on the board how many tiles run at once', () => {
     const harness = boardWith({ widgets: [widgetOn({ analyticsDashboardWidgetId: 100 }),
       widgetOn({ analyticsDashboardWidgetId: 101 })] });
     harness.board.openDashboard(BOARD);
@@ -305,8 +318,24 @@ describe('what a board costs to open', () => {
     // expense. It is on the board rather than in a release note because nothing about a tile
     // reveals that it is a live query.
     expect(harness.board.cost()).toContain('2 widgets');
-    expect(harness.board.cost()).toContain('one at a time');
-    expect(harness.board.cost()).toContain('nothing here is stored from last time');
+    expect(harness.board.cost()).toContain('three at a time');
+    expect(harness.board.cost()).toContain('the server answers at once what it already read for the same data');
+  });
+
+  it('runs the board\'s figures first, then the rest in display order (MIG-344)', () => {
+    const harness = boardWith({
+      widgets: [
+        widgetOn({ analyticsDashboardWidgetId: 100 }),
+        widgetOn({ analyticsDashboardWidgetId: 101, visualizationType: 'kpi' }),
+        widgetOn({ analyticsDashboardWidgetId: 102 }),
+        widgetOn({ analyticsDashboardWidgetId: 103, visualizationType: 'kpiTrend' }),
+        widgetOn({ analyticsDashboardWidgetId: 104 }),
+      ],
+    });
+    harness.board.openDashboard(BOARD);
+    expect([101, 103, 100].map(id => harness.runOf(id).state)).toEqual(['running', 'running', 'running']);
+    expect(harness.board.queue()).toEqual([102, 104]);
+    expect(figuresFirst([1, 2, 3], [widgetOn({ analyticsDashboardWidgetId: 3, visualizationType: 'kpi' })])).toEqual([3, 1, 2]);
   });
 
   it('counts an empty board as costing nothing', () => {
@@ -316,26 +345,25 @@ describe('what a board costs to open', () => {
     expect(harness.analyze).not.toHaveBeenCalled();
   });
 
-  it('stops the queue and cancels the one already out', () => {
+  it('stops the queue and cancels every one already out', () => {
     const harness = boardWith({
       widgets: [
         widgetOn({ analyticsDashboardWidgetId: 100 }),
         widgetOn({ analyticsDashboardWidgetId: 101 }),
         widgetOn({ analyticsDashboardWidgetId: 102 }),
+        widgetOn({ analyticsDashboardWidgetId: 103 }),
       ],
     });
     harness.board.openDashboard(BOARD);
-    const running = harness.runOf(100).queryId;
-    expect(running).not.toBe('');
+    const running = [100, 101, 102].map(id => harness.runOf(id).queryId);
+    expect(running.every(Boolean)).toBe(true);
 
     harness.board.stopRun();
 
-    expect(harness.cancel).toHaveBeenCalledWith(running);
-    expect(harness.runOf(100).state).toBe('stopped');
-    expect(harness.runOf(101).state).toBe('stopped');
-    expect(harness.runOf(102).state).toBe('stopped');
+    for (const queryId of running) expect(harness.cancel).toHaveBeenCalledWith(queryId);
+    expect([100, 101, 102, 103].map(id => harness.runOf(id).state)).toEqual(['stopped', 'stopped', 'stopped', 'stopped']);
     // And nothing else was started on the way out.
-    expect(harness.analyze).toHaveBeenCalledTimes(1);
+    expect(harness.analyze).toHaveBeenCalledTimes(3);
   });
 
   it('drops a response that arrives after the reader has stopped', () => {
@@ -378,6 +406,8 @@ describe('what a board costs to open', () => {
     harness.board.addTitle.set('Monthly totals');
     harness.board.pickSourceKind('query');
     harness.board.addSourceId.set('21');
+    // A chart: a saved query drawn as a table pages itself instead (board-table) and runs no tile query.
+    harness.board.addVisualization.set('bar');
     harness.board.addWidget();
 
     // One new run, and it is the query the new tile points at. The tile that was already drawn
@@ -495,17 +525,19 @@ describe('what a tile is allowed to claim', () => {
     expect(view.issues.bar).toBe('');
   });
 
-  it('allows a ring over a sum, and refuses one over too many slices', () => {
+  it('allows a ring over a sum, past the palette too: the smallest slices go into "Other"', () => {
     expect(analysisView(analysisResult(), 'SUM').issues.donut).toBe('');
 
-    // One past the palette, whatever the palette currently holds. Seven slices used to be the
-    // refusal; the ramp now has eight slots, so seven is drawable and only the ninth is not.
+    // One past the palette used to be refused (owner review, 2026-10-06: a sensible default top-N
+    // with "Other" instead). WidgetChart.donutMarks does the rolling up; a sum has the total for it.
     const tooMany = CHART_SLOTS + 1;
     const many = analysisView(analysisResult({
       rows: Array.from({ length: tooMany }, (_, at) => [`region-${at}`, '10']),
       rowCount: tooMany,
     }), 'SUM');
-    expect(many.issues.donut).toContain(`${CHART_SLOTS} colours`);
+    expect(many.issues.donut).toBe('');
+    // An average has no total to roll a tail into, so it is still refused -- for that reason.
+    expect(analysisView(analysisResult(), 'AVERAGE').issues.donut).toContain('no total');
   });
 
   it('refuses a ring that would have to include a figure of zero or below', () => {
@@ -755,7 +787,8 @@ describe('the chart kind a tile falls back to', () => {
   });
 
   it('treats a visualization it does not recognise as a table rather than as an error', () => {
-    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'treemap' })] });
+    // 'treemap' was the unknown word here until it became a kind (ECharts, 2026-10-06).
+    const harness = boardWith({ widgets: [widgetOn({ visualizationType: 'hologram' })] });
     harness.board.openDashboard(BOARD);
     harness.finishAnalysis();
     const view = harness.runOf(100).view!;
@@ -767,18 +800,13 @@ describe('the board on screen', () => {
 
   it('tells a reader which tiles are waiting and why they are waiting', () => {
     const rendered = renderedBoard({
-      widgets: [
-        widgetOn({ analyticsDashboardWidgetId: 100, visualizationType: 'table' }),
-        widgetOn({ analyticsDashboardWidgetId: 101, visualizationType: 'table' }),
-      ],
+      widgets: [100, 101, 102, 103].map(id => widgetOn({ analyticsDashboardWidgetId: id, visualizationType: 'table' })),
     });
 
     const screen = rendered.text();
-    // Not a spinner on every tile. Two of them genuinely have not started, and saying so is the
-    // difference between a slow board and a board that looks broken.
-    expect(screen).toContain('Waiting its turn');
-    expect(screen).toContain('Widgets run one at a time');
-    expect(screen).toContain('Running 1 of 2');
+    // Three run at once; the fourth genuinely has not started, and says so to a screen reader under its skeleton.
+    expect(screen).toContain('Waiting to run');
+    expect(screen).toContain('Running 1 of 4');
   });
 
   it('says a result is partial, loudly, before it shows the figures', () => {
@@ -1246,11 +1274,9 @@ describe('the kinds a result is not allowed to be drawn as', () => {
     expect(flat.issues.line).toBe('');
   });
 
-  it('offers a share over ranked bars where the ring refuses only for want of colours', () => {
-    // The ring was the only share chart, and it stops at the palette. Bars label themselves, so
-    // "what share does each of these forty rows carry" now has a chart.
+  it('offers a share of forty rows both ways: ranked bars, and a ring that rolls its tail into "Other"', () => {
     const many = analysisView(manyRows(40), 'SUM', { sortedBy: 'MEASURE' });
-    expect(many.issues.donut).toContain('colours this palette can tell apart');
+    expect(many.issues.donut).toBe('');
     expect(many.issues.rankedShare).toBe('');
   });
 
@@ -2002,10 +2028,65 @@ describe('narrowing the board by clicking a mark', () => {
     // The key is the pair joined by a NUL, which is the one separator a bucket key cannot hold.
     expect(harness.board.boardFilterOn())
       .toBe(ANALYSIS.connectionAlias + '\u0000' + ANALYSIS.datasetPath);
-    // Opened, so the reader ends up looking at a filter they can read, edit and clear -- rather
-    // than at numbers that moved for a reason with no trace on the screen.
-    expect(harness.board.filterOpen()).toBe(true);
+    // The editor stays closed (owner 2026-10-06: opening it on a click pushed the board down); the
+    // facts line says a filter is on, and its pill opens the editor.
+    expect(harness.board.filterOpen()).toBe(false);
     expect(harness.analyzes.length).toBeGreaterThan(before);
+  });
+
+  it('keeps each tile\'s result on screen while a narrowed board re-runs, so nothing jumps', () => {
+    // Owner, 2026-10-06, "the panel dances": a click re-ran every tile, and each one dropped its
+    // chart for a short skeleton and grew back. The tile now draws what it had, marked busy.
+    const harness = boardWith({ widgets: [widgetOn()] });
+    harness.board.openDashboard(BOARD);
+    harness.finishAnalysis();
+    const id = widgetOn().analyticsDashboardWidgetId!;
+    const settled = harness.board.runs()[id];
+    expect(settled.view).not.toBeNull();
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+
+    harness.board.narrowTo(widgetOn(), view.marks[0]);
+
+    const rerun = harness.board.runs()[id];
+    expect(rerun.state === 'queued' || rerun.state === 'running').toBe(true);
+    expect(harness.board.shownView(rerun)).toBe(settled.view);
+    expect(harness.board.updating(rerun)).toBe(true);
+    expect(harness.board.stateOf(rerun)).toBe('ready');
+    // The new answer replaces it; a stop drops it rather than leave the old figure under a filter.
+    harness.board.stopRun();
+    expect(harness.board.shownView(harness.board.runs()[id])).toBeNull();
+  });
+
+  it('holds every tile at its height while the board is narrowed, and lets go once it is cleared and re-run', () => {
+    // A click on a mark re-ran the board, the narrowed results were shorter, and every tile below a
+    // shorter row moved up (layout shift 0.12 at 1187, 2026-10-06) -- and back down on Clear.
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    rendered.finishAnalysis();
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    const tile = el.querySelector<HTMLElement>('app-analytics-widget[data-widget]')!;
+    const measured = vi.spyOn(tile, 'getBoundingClientRect').mockReturnValue({ height: 312.5 } as DOMRect);
+    const view = analysisView(analysisResult({ dimensions: ['region'] }), 'SUM');
+
+    rendered.board.narrowTo(widgetOn(), view.marks[0]);
+    rendered.text();
+    expect(tile.style.height).toBe('312.5px');
+    expect(tile.classList).toContain('is-held');
+    rendered.finishAnalysis();
+    rendered.text();
+    TestBed.tick();
+    // Narrowed and settled: still held, so a shorter result does not pull the board up.
+    expect(tile.style.height).toBe('312.5px');
+
+    rendered.board.clearBoardFilter();
+    rendered.text();
+    expect(tile.style.height).toBe('312.5px');
+    rendered.finishAnalysis();
+    TestBed.tick();
+    rendered.text();
+    expect(tile.style.height).toBe('');
+    expect(tile.classList).not.toContain('is-held');
+    measured.mockRestore();
   });
 
   it('ignores a click while the board is running', () => {
@@ -2352,46 +2433,160 @@ describe('a table tile shows five rows and offers the rest', () => {
 });
 
 /**
- * The chart kind used to be a <select> at the foot of every tile. It lives in the tile's menu
- * now, under "Show as", listing every kind in the picker's order with the ones this result refuses
- * inert and saying why -- and choosing one still runs nothing.
+ * The chart kind used to be a <select> at the foot of every tile, then a list of every kind in the
+ * tile's menu. It is a grid there now (owner, 2026-10-06): a search, up to six kinds suggested for
+ * this result with the current one first, then every kind by category, those that cannot draw it
+ * dimmed at the end of theirs with the reason in the tooltip and the description -- and choosing one
+ * still runs nothing.
  */
 describe('choosing how a tile is drawn, from its menu', () => {
   function overlay(): HTMLElement { return document.querySelector('.cdk-overlay-container') as HTMLElement; }
 
-  function openKinds() {
-    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
+  function openKinds(kind = 'table') {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: kind })] });
     rendered.finishAnalysis();
     rendered.text();
     const el = rendered.fixture.nativeElement as HTMLElement;
     expect(el.querySelector('select.widget-kind')).toBeNull();
     el.querySelector<HTMLButtonElement>('button[aria-label="Actions for Revenue by region"]')!.click();
     rendered.fixture.detectChanges();
-    expect(overlay().textContent).toContain('Show as');
-    const kinds = [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-kind')];
-    return { ...rendered, kinds };
+    const kinds = () => [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-kind')];
+    const suggested = () => [...overlay().querySelectorAll<HTMLButtonElement>('button.dash-suggested')];
+    const misfits = () => overlay().querySelector<HTMLButtonElement>('button.dash-misfits');
+    const search = () => overlay().querySelector<HTMLInputElement>('input.dash-kind-search')!;
+    const key = (target: HTMLElement, name: string, extra: KeyboardEventInit = {}) => {
+      target.dispatchEvent(new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true, ...extra }));
+      rendered.fixture.detectChanges();
+    };
+    return { ...rendered, kinds, suggested, misfits, search, key };
   }
 
-  it('lists every kind, ticks the drawn one, and leaves the refused ones inert with the reason', () => {
-    const { kinds } = openKinds();
-    expect(kinds.map(item => item.dataset['kind'])).toEqual(KIND_IDS);
-    const table = kinds.find(item => item.dataset['kind'] === 'table')!;
+  it('offers every kind once, the ones that fit first in each category, after "Show charts that don\'t fit"', () => {
+    const { kinds, misfits, fixture } = openKinds();
+    const before = kinds().map(item => item.dataset['kind']);
+    // Folded: only categories with something that fits are drawn until the toggle is pressed.
+    expect(before.length).toBeLessThan(KIND_IDS.length);
+    expect(misfits()!.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(misfits()!.getAttribute('aria-checked')).toBe('false');
+    misfits()!.click();
+    fixture.detectChanges();
+    const all = kinds();
+    expect(all.map(item => item.dataset['kind']).sort()).toEqual([...KIND_IDS].sort());
+    // Within a category the dimmed ones come after every one that fits.
+    for (const grid of overlay().querySelectorAll('.dash-menu-scroll .dash-kind-grid')) {
+      const off = [...grid.querySelectorAll('.dash-kind')].map(item => item.getAttribute('aria-disabled') === 'true');
+      expect(off).toEqual([...off].sort((a, b) => Number(a) - Number(b)));
+    }
+    expect(misfits()!.getAttribute('aria-checked')).toBe('true');
+  });
+
+  it('ticks the drawn one, and leaves the refused ones inert with the reason in a tooltip and a description, not a second line', () => {
+    const { kinds, misfits, fixture } = openKinds();
+    misfits()!.click();
+    fixture.detectChanges();
+    const table = kinds().find(item => item.dataset['kind'] === 'table')!;
     expect(table.getAttribute('role')).toBe('menuitemradio');
     expect(table.getAttribute('aria-checked')).toBe('true');
+    expect(table.getAttribute('aria-label')).toBe('Table, current');
     // Two rows is not a single figure: refused, and the reason is on the item itself.
-    const kpi = kinds.find(item => item.dataset['kind'] === 'kpi')!;
-    expect(kpi.disabled).toBe(true);
-    expect(kpi.title.length).toBeGreaterThan(0);
-    expect(kpi.textContent).toContain(kpi.title);
+    const kpi = kinds().find(item => item.dataset['kind'] === 'kpi')!;
+    expect(kpi.getAttribute('aria-disabled')).toBe('true');
+    expect(kpi.classList).toContain('is-off');
+    expect(kpi.title).toMatch(/single figure needs one row/i);
+    expect(kpi.getAttribute('aria-label')).toBe("Figure, doesn't fit");
+    const described = overlay().querySelector('#' + kpi.getAttribute('aria-describedby'))!;
+    expect(described.textContent).toContain(kpi.title);
+    expect(described.textContent).toMatch(/^\s*Needs one row with one number\./);
+    // On screen, the glyph and the short name: the reason is not a visible second line.
+    expect(kpi.querySelector('.dash-tile-label')!.textContent!.trim()).toBe('Figure');
+    expect(described.classList).toContain('sr-only');
+  });
+
+  it('suggests up to six kinds that fit, the current one first and marked', () => {
+    const { suggested } = openKinds('ranked');
+    const ids = suggested().map(item => item.dataset['kind']);
+    expect(ids.length).toBeGreaterThan(1);
+    expect(ids.length).toBeLessThanOrEqual(6);
+    expect(ids[0]).toBe('ranked');
+    expect(suggested()[0].getAttribute('aria-label')).toBe('Ranked, current');
+    expect(suggested()[0].classList).toContain('is-on');
+    expect(suggested().every(item => item.getAttribute('aria-disabled') !== 'true')).toBe(true);
+    // Not the .dash-kind hook: "every kind once" stays true with the suggestions on screen too.
+    expect(suggested().some(item => item.classList.contains('dash-kind'))).toBe(false);
+  });
+
+  it('narrows to the kinds whose name or category matches the search, folded ones included', () => {
+    const { kinds, search, fixture } = openKinds();
+    search().value = 'pie';
+    search().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(kinds().map(item => item.dataset['kind']).sort()).toEqual(['donut', 'halfDonut', 'nestedPie', 'rose']);
+    search().value = 'hierarchy';
+    search().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    // Hierarchy has nothing that fits two rows of one column, and a search still finds it.
+    expect(kinds().map(item => item.dataset['kind'])).toEqual(['treemap', 'sunburst', 'tree']);
+    search().value = 'zzz';
+    search().dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(kinds()).toHaveLength(0);
+    expect(overlay().textContent).toContain('No chart is called "zzz"');
+  });
+
+  it('sends typing to the search box from anywhere in the menu', () => {
+    const { board, search, key } = openKinds();
+    const choose = overlay().querySelector<HTMLButtonElement>('.dash-choose')!;
+    choose.focus();
+    // In the box at once, before any change detection: the next key a fast typist presses lands
+    // in a box that already holds the first.
+    choose.dispatchEvent(new KeyboardEvent('keydown', { key: 'b', bubbles: true, cancelable: true }));
+    expect(search().value).toBe('b');
+    expect(document.activeElement).toBe(search());
+    expect(board.kindQuery()).toBe('b');
+    key(search(), 'a');      // typed in the box itself: left to the box, not the menu's typeahead
+    expect(document.activeElement).toBe(search());
+  });
+
+  it('moves across the grid with the arrows, a row by position with up and down', () => {
+    const { suggested, kinds, search, key } = openKinds();
+    key(search(), 'ArrowDown');
+    expect(document.activeElement).toBe(suggested()[0]);
+    key(suggested()[0], 'ArrowRight');
+    expect(document.activeElement).toBe(suggested()[1]);
+    key(suggested()[1], 'ArrowLeft');
+    expect(document.activeElement).toBe(suggested()[0]);
+    key(suggested()[0], 'ArrowUp');
+    expect(document.activeElement).toBe(search());
+    // Down from the first row of the suggestions lands in the row below, by position.
+    key(search(), 'ArrowDown');
+    const rowsBelow = suggested().length > 3 ? suggested()[3] : kinds()[0];
+    key(suggested()[0], 'ArrowDown');
+    expect(document.activeElement).toBe(rowsBelow);
+    key(document.activeElement as HTMLElement, 'End');
+    expect(document.activeElement).toBe(kinds()[kinds().length - 1]);
+    key(document.activeElement as HTMLElement, 'Home');
+    expect(document.activeElement).toBe(suggested()[0]);
   });
 
   it('saves the kind picked and redraws the result in hand, running nothing', () => {
     const { kinds, saveWidget, analyze, fixture } = openKinds();
-    kinds.find(item => item.dataset['kind'] === 'ranked')!.click();
+    kinds().find(item => item.dataset['kind'] === 'ranked')!.click();
     fixture.detectChanges();
     expect(saveWidget).toHaveBeenCalledWith(expect.objectContaining({ visualizationType: 'ranked' }));
     expect(analyze).toHaveBeenCalledTimes(1);
     expect((fixture.nativeElement as HTMLElement).querySelector('app-ranked-bar')).not.toBeNull();
+    // Chosen, the menu closes.
+    expect(overlay().querySelector('.dash-tile-menu')).toBeNull();
+  });
+
+  it('does nothing for a kind that does not fit', () => {
+    const { kinds, misfits, saveWidget, fixture } = openKinds();
+    misfits()!.click();
+    fixture.detectChanges();
+    kinds().find(item => item.dataset['kind'] === 'kpi')!.click();
+    fixture.detectChanges();
+    expect(saveWidget).not.toHaveBeenCalled();
+    expect(overlay().querySelector('.dash-tile-menu')).not.toBeNull();
   });
 });
 
@@ -2433,7 +2628,7 @@ describe('the cards on the landing page', () => {
     expect(cards()[1].textContent).toContain('No description');
     // The page head is one line now, with no count tiles.
     expect(el.querySelector('app-stat-tile')).toBeNull();
-    expect(text()).toContain('Pages of saved analyses, re-run each time you open them.');
+    expect(text()).toContain('Boards of tiles over your data, re-run each time you open them.');
     // The last card makes a new board.
     const create = el.querySelector<HTMLButtonElement>('button.dash-card-new')!;
     create.click();
@@ -2497,10 +2692,11 @@ describe('opening a board and going back', () => {
     expect(view.analyze).toHaveBeenCalledTimes(1);
   });
 
-  it('goes back to the cards from "All dashboards", stopping the board and clearing the address', async () => {
+  // UX review 2026-10-12 (A2): the way back is the breadcrumb's Dashboards (it was a "← All dashboards" link).
+  it('goes back to the cards from the breadcrumb, stopping the board and clearing the address', async () => {
     const view = await page('/?board=7');
     expect(view.board.openId()).toBe(7);
-    const back = [...view.el.querySelectorAll('a')].find(link => link.textContent!.includes('All dashboards'))!;
+    const back = [...view.el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].find(link => link.textContent!.trim() === 'Dashboards') as HTMLElement;
     back.click();
     await view.settle();
     expect(view.board.openId()).toBeNull();
@@ -2535,7 +2731,7 @@ describe('opening a board and going back', () => {
     await view.router.navigateByUrl('/?board=404');
     await view.settle();
     expect(view.el.textContent).toContain('No such dashboard in this workspace.');
-    expect([...view.el.querySelectorAll('a')].some(link => link.textContent!.includes('All dashboards'))).toBe(true);
+    expect([...view.el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].some(link => link.textContent!.trim() === 'Dashboards')).toBe(true);
   });
 
   it('does not carry one board\'s results or filter to the next', async () => {
@@ -2712,5 +2908,79 @@ describe('adding a widget, audit 09-22', () => {
     expect(rendered.board.canAdd()).toBe(false);
     rendered.board.addHeight.set('200');
     expect(rendered.board.canAdd()).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// MIG-367, "Dashboard fixes from the rebuild" (2026-10-07).
+
+describe('the rebuild\'s dashboard fixes (MIG-367)', () => {
+  /** Five cities over fourteen days: seventy rows, fifteen distinct day labels once merged. */
+  const cityDays = () => queryResult({
+    columns: ['day', 'city', 'temp_max'],
+    rows: Array.from({ length: 70 }, (_, at) => [`2026-09-${String(23 + (at % 14)).padStart(2, '0')}`, `city${Math.floor(at / 14)}`, String(20 + at % 7)]),
+    rowCount: 70,
+  });
+
+  it('counts the rows an ECharts tile draws, not the labels its marks merged them into', () => {
+    const board = bareBoard();
+    const view = queryView(cityDays());
+    expect(view.marks.length).toBe(14);
+    // The SVG kinds still draw merged marks and say so; the ECharts line draws every point.
+    expect(board.counted(view, 'lineMarkers')).toBe('70 rows');
+    expect(board.counted(view, 'heatmap')).toBe('70 rows');
+    expect(board.counted(view, 'bar')).toBe('14 of 70 rows shown');
+  });
+
+  it('counts a one-row gauge as its one row, and an author\'s top N where the tail is dropped', () => {
+    const board = bareBoard();
+    const one = analysisView(analysisResult({ rows: [['north', '1200']], rowCount: 1 }), 'SUM');
+    expect(board.counted(one, 'gauge')).toBe('1 row');
+    const forty = analysisView(analysisResult({ rows: Array.from({ length: 40 }, (_, at) => [`r${at}`, String(at + 1)]), rowCount: 40 }), 'AVERAGE');
+    expect(board.counted(forty, 'barH', 5, { topN: 10 })).toBe('10 of 40 rows shown');
+    const summed = analysisView(analysisResult({ rows: Array.from({ length: 40 }, (_, at) => [`r${at}`, String(at + 1)]), rowCount: 40 }), 'SUM');
+    // Summed, the tail is one "Other" bar on the chart: every row is still drawn.
+    expect(board.counted(summed, 'barH', 5, { topN: 10 })).toBe('40 rows');
+  });
+
+  it('says why a saved query asked to draw a ring is shown as a table, and what would draw it', () => {
+    const board = bareBoard();
+    const view = queryView(queryResult({ columns: ['region', 'total'], rows: [['north', '5'], ['south', '7']], rowCount: 2 }));
+    const tile = widgetOn({ analyticsAnalysisId: undefined, analyticsQueryId: 5, visualizationType: 'donut' });
+    expect(board.drawn(tile, view)).toBe('table');
+    const note = board.fallbackNote(tile, view);
+    expect(note).toMatch(/^Shown as a table, not as share of the total: /);
+    expect(note).toContain('a saved query does not say whether its figures add up');
+    expect(note).toContain('Save it as an analysis that sums or counts to draw it this way.');
+    expect(board.fallbackNote(widgetOn({ visualizationType: 'table' }), view)).toBe('');
+    expect(board.fallbackNote(widgetOn({ visualizationType: 'bar' }), view)).toBe('');
+  });
+
+  it('treats a saved query\'s year column as the label, never as a figure', () => {
+    const view = queryView(queryResult({
+      columns: ['year', 'health_spend_gdp_pct', 'country'],
+      rows: [['2002', '14.1', 'United States'], ['2003', '14.6', 'United States'], ['2002', '7.9', 'Germany'], ['2003', '8.1', 'Germany']],
+      rowCount: 4,
+    }));
+    expect(view.chart!.dims.map(dim => dim.name)).toEqual(['year', 'country']);
+    expect(view.chart!.measures.map(measure => measure.name)).toEqual(['health_spend_gdp_pct']);
+    expect(view.chart!.dims[0].date).toBe(false);
+    expect(view.marks.map(mark => mark.name)).toEqual(['2002', '2003']);
+    // A count column that merely holds four digits is still a figure: the name must say year.
+    const counts = queryView(queryResult({ columns: ['region', 'orders'], rows: [['north', '2002'], ['south', '1999']], rowCount: 2 }));
+    expect(counts.chart!.measures.map(measure => measure.name)).toEqual(['orders']);
+  });
+
+  it('shows a yes/no column as Yes and No, from an analysis\'s BOOLEAN or a saved query\'s true/false', () => {
+    const analysed = analysisView(analysisResult({
+      columns: [{ name: 'OverTime', type: 'BOOLEAN', role: 'DIMENSION' }, { name: 'left_count', type: 'BIGINT', role: 'MEASURE' }],
+      rows: [['true', '15'], ['false', '19']], rowCount: 2, measure: 'left_count', dimensions: ['OverTime'],
+    }), 'SUM');
+    expect(analysed.marks.map(mark => mark.name)).toEqual(['Yes', 'No']);
+    // The value a click narrows on is still the one in the data.
+    expect(analysed.marks[0].operands).toEqual([{ field: 'OverTime', value: 'true' }]);
+    const queried = queryView(queryResult({ columns: ['smoker', 'policyholders'], rows: [['true', '23'], ['false', '101']], rowCount: 2 }));
+    expect(queried.marks.map(mark => mark.name)).toEqual(['Yes', 'No']);
+    expect(queried.rows.map(row => row[0])).toEqual(['Yes', 'No']);
   });
 });

@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
+import { ManagedServiceApi } from '../managed-service/managed-service.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -20,8 +21,12 @@ import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { TenantDialog } from './tenant-dialog';
+import { ApiLimitsDialog, ApiLimitsDialogData } from './api-limits-dialog';
+import { BillingZoneDialog, BillingZoneDialogData } from './billing-zone-dialog';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagementMode } from '../../../core/auth/auth.models';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 export interface Tenant {
   /** Filled in by the server on the way out; null on rows with no recorded author. */
@@ -56,7 +61,12 @@ export interface Tenant {
   adminEmail?: string | null;
   /** MIG-244: who builds the workspace -- its own administrators (SELF) or our team (MANAGED). */
   managementMode?: ManagementMode | null;
+  /** MIG-336: the workspace this one is the sandbox of; null for an ordinary workspace. */
+  sandboxOf?: number | null;
 }
+
+/** MIG-336: the sandbox tenant.json/addSandbox made. */
+export interface SandboxTenant { tenantId: number; tenantName: string; tenantCode: string; status: string; sandboxOf: number }
 
 interface ResourceCount {
   key: keyof Tenant;
@@ -68,12 +78,13 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton],
+  imports: [RefreshButton, PageHeader, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {
   /** Tenants started as cards; the table is the addition, so cards stay the default. */
-  readonly view = signal<'table' | 'cards'>('cards');
+  /** UX review B10: the table first -- the question on this page is "which workspace", across them. */
+  readonly view = signal<'table' | 'cards'>('table');
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
@@ -93,13 +104,13 @@ export class Tenants implements OnInit {
 
   readonly resources: ResourceCount[] = [
     { key: 'userCount', label: 'Users', icon: 'users' },
-    { key: 'sourceJobCount', label: 'Jobs', icon: 'briefcase' },
+    { key: 'sourceJobCount', label: 'Schedules', icon: 'calendar' },
     {
-      key: 'sourceTaskCount', label: 'Tasks', icon: 'list',
+      key: 'sourceTaskCount', label: 'Pipelines', icon: 'list',
       // Only shown when it says something the task count does not. Equal numbers mean one task
       // per pipeline, which the task count already told you; zero tasks means nothing to add.
       sub: t => t.pipelineCount && t.pipelineCount !== t.sourceTaskCount
-        ? `${t.pipelineCount} pipeline${t.pipelineCount === 1 ? '' : 's'}`
+        ? `${t.pipelineCount} distinct`
         : '',
     },
     { key: 'sourceTaskTypeCount', label: 'Topics', icon: 'layers' },
@@ -168,9 +179,14 @@ export class Tenants implements OnInit {
 
   private readonly auth = inject(AuthService);
 
-  /** Narrows the list to rows this person created. Not persisted -- see MineFilter. */
-
+  /** Narrows the list to the workspaces this person created or manages. Not persisted -- see MineFilter. */
   readonly onlyMine = signal(false);
+  /**
+   * UX review U2 (2026-10-13): the workspaces this platform administrator manages -- their open managed-service grants
+   * (Identity's myWorkspaces) -- count as theirs beside the ones they created. Read once; none when it cannot be read.
+   */
+  readonly managedByMe = signal<ReadonlySet<number>>(new Set());
+  private readonly managed = inject(ManagedServiceApi);
 
   readonly filtered = computed(() => {
     const term = this.search().trim().toLowerCase();
@@ -212,6 +228,15 @@ export class Tenants implements OnInit {
 
   ngOnInit(): void {
     this.listTenants();
+    this.readManaged();
+  }
+
+  private readManaged(): void {
+    if (typeof this.auth.isPlatformAdmin === 'function' && !this.auth.isPlatformAdmin()) return;
+    this.managed.myWorkspaces?.()?.subscribe({
+      next: r => this.managedByMe.set(new Set(r?.status === API_SUCCESS ? (r.data ?? []).filter(g => !g.revokedAt).map(g => g.tenantId) : [])),
+      error: () => this.managedByMe.set(new Set()),
+    });
   }
 
   resourceTotal(tenant: Tenant): number {
@@ -256,6 +281,61 @@ export class Tenants implements OnInit {
     });
   }
 
+  /** MIG-337: the workspace's bounds for the customer API -- the most a client may have, the ceiling, the monthly quota. */
+  apiLimits(tenant: Tenant): void {
+    const data: ApiLimitsDialogData = { tenantId: tenant.tenantId, tenantName: tenant.tenantName };
+    this.dialog.open<boolean>(ApiLimitsDialog, { data, hasBackdrop: true });
+  }
+
+  /** H9: the workspace's billing time zone -- the days and months its usage is billed in; a change starts with a month. */
+  billingZone(tenant: Tenant): void {
+    const data: BillingZoneDialogData = { tenantId: tenant.tenantId, tenantName: tenant.tenantName };
+    this.dialog.open<boolean>(BillingZoneDialog, { data, hasBackdrop: true });
+  }
+
+  /** MIG-336: "of Northwind" under a sandbox's pill: the workspace it is the sandbox of, by name when it is listed. */
+  sandboxParent(tenant: Tenant): string {
+    const parent = this.tenants().find(t => t.tenantId === tenant.sandboxOf);
+    return parent ? parent.tenantName : `workspace ${tenant.sandboxOf}`;
+  }
+
+  /** MIG-336: a workspace may get a sandbox when it is not one itself and the list shows none of its own yet. */
+  canMakeSandbox(tenant: Tenant): boolean {
+    return !tenant.sandboxOf && !this.tenants().some(t => t.sandboxOf === tenant.tenantId);
+  }
+
+  /**
+   * MIG-336: makes the workspace's sandbox -- a separate, unbilled workspace for its test keys. Identity makes it empty;
+   * our team then seeds it with scripts/sandbox-setup.py.
+   */
+  async createSandbox(tenant: Tenant): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Create a sandbox for ${tenant.tenantName}?`,
+      body: `This makes a separate workspace, ${tenant.tenantName} (sandbox), that is never billed. Its administrators make test `
+        + 'keys for it in API Clients, and those keys work only there. It starts empty: our team then runs '
+        + 'scripts/sandbox-setup.py to give it sample pipelines and data.',
+      confirmLabel: 'Create sandbox',
+    });
+    if (!ok) return;
+    this.busy.set(tenant.tenantId);
+    this.http.post<ApiResponse<SandboxTenant>>(`${API_BASE}/tenant.json/addSandbox`, null,
+      { params: { tenantId: String(tenant.tenantId) } }).subscribe({
+      next: response => {
+        this.busy.set(null);
+        if (response.status === API_SUCCESS) {
+          this.toast.success(response.message || `${response.data?.tenantName ?? 'The sandbox'} is made.`);
+          this.listTenants();
+        } else {
+          this.toast.error(response.message || 'The sandbox could not be made.');
+        }
+      },
+      error: err => {
+        this.busy.set(null);
+        this.toast.error(err?.error?.message || 'The sandbox could not be made.');
+      },
+    });
+  }
+
   viewUsers(tenant: Tenant): void {
     this.router.navigate(['/administration/users'], { queryParams: { tenantId: tenant.tenantId } });
   }
@@ -268,7 +348,7 @@ export class Tenants implements OnInit {
       body: suspending
         ? `Users in ${tenant.tenantName} will not be able to sign in.`
           + (this.resourceTotal(tenant)
-            ? ` Its ${this.resourceSummary(tenant)} are kept, and scheduled jobs keep their definitions.`
+            ? ` Its ${this.resourceSummary(tenant)} are kept, and its schedules keep their definitions.`
             : '')
         : `Users in ${tenant.tenantName} will be able to sign in again.`,
       confirmLabel: suspending ? 'Suspend' : 'Reactivate',
@@ -365,7 +445,7 @@ export class Tenants implements OnInit {
   }
 
   /**
-   * Applies the "Only mine" toggle.
+   * Applies the "Only mine" toggle: created by me, or managed by me (an open managed-service grant).
    *
    * Pure -- it runs inside a computed, where writing a signal is not allowed. The surviving
    * count is already on the table header, so nothing needs recording.
@@ -375,7 +455,8 @@ export class Tenants implements OnInit {
       return rows;
     }
     const myId = this.auth.user()?.appUserId ?? null;
-    return rows.filter(row => isMine(row, myId));
+    const managed = this.managedByMe();
+    return rows.filter(row => isMine(row, myId) || managed.has((row as { tenantId?: number }).tenantId ?? -1));
   }
 
   /**

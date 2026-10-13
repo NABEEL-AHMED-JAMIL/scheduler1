@@ -54,43 +54,43 @@ describe('MIG-247: API Collections', () => {
   afterEach(() => restoreClock());
 
   it('the list, as a workspace administrator', async () => {
-    const v = await visit('/integration/api-collections', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/api-collections', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the list, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the list, as a platform administrator', async () => {
-    const v = await visit('/integration/api-collections', 'PLATFORM_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/api-collections', 'PLATFORM_ADMIN', null, ANSWERS);
     pin(FILE, 'the list, as a platform administrator', v.surface, PINNED);
   });
 
   it('the list, as a tenant user with the page', async () => {
-    const v = await visit('/integration/api-collections', 'TENANT_USER', ALL_PAGES, ANSWERS);
+    const v = await visit('/connections/api-collections', 'TENANT_USER', ALL_PAGES, ANSWERS);
     pin(FILE, 'the list, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('the list, as a tenant user without the page', async () => {
-    const v = await visit('/integration/api-collections', 'TENANT_USER', TU_PAGES, ANSWERS);
+    const v = await visit('/connections/api-collections', 'TENANT_USER', TU_PAGES, ANSWERS);
     pin(FILE, 'the list, as a tenant user without the page', v.surface, PINNED);
   });
 
   it('a collection\'s row menu', async () => {
-    const v = await visit('/integration/api-collections', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/api-collections', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, /^Actions for /);
     pin(FILE, 'a collection\'s row menu', overlay(), PINNED);
   });
 
   it('one collection, as a workspace administrator', async () => {
-    const v = await visit('/integration/api-collections/1000', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/connections/api-collections/1000', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'one collection, as a workspace administrator', v.surface, PINNED);
   });
 
   it('one collection, as a tenant user with the page', async () => {
-    const v = await visit('/integration/api-collections/1000', 'TENANT_USER', ALL_PAGES, ANSWERS);
+    const v = await visit('/connections/api-collections/1000', 'TENANT_USER', ALL_PAGES, ANSWERS);
     pin(FILE, 'one collection, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('an API opened in the side panel', async () => {
-    const v = await visit('/integration/api-collections/1000', 'TENANT_ADMIN', null, {
+    const v = await visit('/connections/api-collections/1000', 'TENANT_ADMIN', null, {
       ...ANSWERS,
       'GET /apiCollection.json/request/get': { status: 'SUCCESS', message: 'API request fetched.', data: {
         requestId: 1000, requestUuid: '28afcce6-fe2c-4782-bbe8-b21c8136d017', collectionId: 1000, folderId: null, name: 'Get status',

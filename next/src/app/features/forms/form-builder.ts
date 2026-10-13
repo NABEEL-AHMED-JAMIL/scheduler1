@@ -25,6 +25,9 @@ const TYPE_ICONS: Record<FieldType, string> = {
 import { FormShare } from './form-share';
 import { FormsApi } from './forms.service';
 import { WorkflowSummary, WorkflowsApi } from '../workflows/workflows.api';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
+import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 
 /** A field while it is being built: whether its key still follows its label (a new field's does, a saved one's never). */
 type BuilderField = FormField & { autoKey?: boolean };
@@ -41,7 +44,7 @@ type BuilderDraft = Omit<FormDraft, 'fields'> & { fields: BuilderField[] };
  */
 @Component({
   selector: 'app-form-builder',
-  imports: [Icon, TableShell, ManagedBanner, ServerTimePipe, RouterLink, FormRenderer, FormShare],
+  imports: [CdkMenu, CdkMenuItem, CdkMenuTrigger, RefreshButton, PageHeader, Icon, TableShell, ManagedBanner, ServerTimePipe, RouterLink, FormRenderer, FormShare],
   templateUrl: './form-builder.html',
 })
 export class FormBuilder implements OnInit {

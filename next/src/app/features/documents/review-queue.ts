@@ -1,4 +1,5 @@
-import { Component, OnInit, WritableSignal, computed, inject, signal } from '@angular/core';
+import { Component, Injector, OnInit, WritableSignal, computed, inject, signal } from '@angular/core';
+import { map } from 'rxjs';
 import { Router, RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -15,6 +16,11 @@ import {
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { ConfidenceBar } from './confidence-bar';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
+import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
+import { BulkReviewApi } from '../../shared/ui/bulk/bulk-review.api';
+import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
 
 /**
  * The review queue (MIG-272, Documents > Review queue, page key document-review): the documents Document Intelligence
@@ -24,24 +30,24 @@ import { ConfidenceBar } from './confidence-bar';
  */
 @Component({
   selector: 'app-review-queue',
-  imports: [RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar],
+  imports: [RefreshButton, PageHeader, RouterLink, Icon, TableShell, StatusPill, Pagination, ServerTimePipe, ConfidenceBar, BulkBar],
   template: `
     <div class="page">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title">Review queue</h1>
-          <p class="page-subtitle">
-            Documents Document Intelligence did not approve on its own, oldest first. Open one to check the values it was
-            not sure about, correct them, and approve or reject it.
-          </p>
+      <app-page-header>
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Document review</h1>
+            <p class="page-subtitle">
+              Documents that Document Intelligence did not approve on its own, oldest first. Open one to check the values it was
+              not sure about, correct them, and approve or reject it.
+            </p>
+          </div>
+          <div class="flex items-center gap-2">
+            <app-refresh-button [loading]="loading()" (refresh)="load()" />
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
+          </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-            <app-icon name="refresh" [class.spin]="loading()" />Refresh
-          </button>
-          <button type="button" class="btn btn-primary btn-sm" [disabled]="!firstFree()" (click)="start()"><app-icon name="play" />Start reviewing</button>
-        </div>
-      </div>
+      </app-page-header>
 
       <app-table-shell data-test="queue" heading="Documents" columnsKey="document-review-queue" [loading]="loading()" [error]="error()"
                        [isEmpty]="!items().length" [shown]="items().length" [total]="total()"
@@ -70,6 +76,13 @@ import { ConfidenceBar } from './confidence-bar';
         <table class="table-modern">
           <thead>
             <tr>
+              @if (canBulk()) {
+                <th class="w-10">
+                  <input type="checkbox" class="checkbox" aria-label="Select all documents on this page that can be decided" data-bulk-page
+                         [checked]="pageState() === 'all'" [indeterminate]="pageState() === 'some'" [disabled]="!pageRows().length"
+                         (change)="bulk.setPage(pageRows(), $any($event.target).checked)" />
+                </th>
+              }
               <th>Document</th>
               <th>Type</th>
               <th class="text-right">To check</th>
@@ -81,9 +94,16 @@ import { ConfidenceBar } from './confidence-bar';
           </thead>
           <tbody>
             @for (e of items(); track e.extractionId) {
-              <tr>
+              <tr [class.row-selected]="bulk.has(e)">
+                @if (canBulk()) {
+                  <td>
+                    <input type="checkbox" class="checkbox" [attr.data-bulk-pick]="e.extractionId" [checked]="bulk.has(e)"
+                           [disabled]="!pickable(e)" [title]="pickTitle(e)" [attr.aria-label]="'Select ' + nameOf(e)"
+                           (change)="pick(e, $any($event.target))" />
+                  </td>
+                }
                 <td class="max-w-72">
-                  <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/documents/review', e.extractionId]">{{ nameOf(e) }}</a>
+                  <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/review/documents', e.extractionId]">{{ nameOf(e) }}</a>
                   <span class="block text-xs text-[color:var(--text-muted)]">Extraction {{ e.extractionId }} · OCR {{ e.ocrDocumentId }}</span>
                 </td>
                 <td class="text-xs whitespace-nowrap">{{ e.documentTypeName || e.documentTypeKey || 'Not classified' }}@if (e.documentTypeVersion) {&ngsp;<span class="text-[color:var(--text-muted)]">v{{ e.documentTypeVersion }}</span>}</td>
@@ -104,6 +124,9 @@ import { ConfidenceBar } from './confidence-bar';
         </table>
         <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
       </app-table-shell>
+      @if (canBulk()) {
+        <app-bulk-bar [selection]="bulk" [pageRows]="pageRows()" [moreMatch]="total() > items().length" [matchTotal]="total()" (decided)="load()" />
+      }
     </div>
   `,
 })
@@ -112,6 +135,7 @@ export class ReviewQueue implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly injector = inject(Injector);
 
   readonly statuses = QUEUE_STATUSES;
   readonly claims = CLAIM_FILTERS;
@@ -139,6 +163,44 @@ export class ReviewQueue implements OnInit {
   readonly firstFree = computed(() => this.status() !== 'Review' ? null
     : this.items().find(e => !(e.claimActive && e.claimedBy != null && e.claimedBy !== this.me())) ?? null);
 
+  /**
+   * Bulk review (2026-10-12): whoever may open the review queue decides its documents one by one, so may decide them in
+   * bulk; a profile without the page -- a viewer -- sees no checkboxes. A document is picked at the revision it was listed
+   * at; the service skips one changed since.
+   */
+  readonly canBulk = computed(() => typeof this.auth.canOpen === 'function' && this.auth.canOpen('document-review'));
+  readonly pageRows = computed(() => this.items().filter(e => this.pickable(e)));
+  readonly bulk = new BulkSelection<Extraction>({
+    idOf: e => e.extractionId,
+    noun: ['document', 'documents'],
+    groupNoun: 'document type',
+    matching: () => this.api.queue({ ...this.filters(), page: 0, size: BULK_CAP }).pipe(map(r => {
+      if (r.status !== API_SUCCESS || !r.data) throw { error: { message: r.message || 'The matching documents could not be read.' } };
+      return { rows: (r.data.items ?? []).filter(e => this.pickable(e)), total: r.data.total ?? null };
+    })),
+    // Looked up when sent: the screen's tests stand in their own DocumentsApi and no HTTP client.
+    send: (rows, request) => this.injector.get(BulkReviewApi).documents(rows.map(e => e.extractionId),
+      Object.fromEntries(rows.map(e => [String(e.extractionId), e.revision])), request),
+  });
+  readonly pageState = computed(() => this.bulk.pageState(this.pageRows()));
+
+  /** In review and not held by someone else: the reader may decide it. */
+  pickable(e: Extraction): boolean {
+    return e.status === 'Review' && !(e.claimActive && e.claimedBy != null && e.claimedBy !== this.me());
+  }
+
+  pickTitle(e: Extraction): string {
+    if (this.pickable(e)) return '';
+    return e.status !== 'Review' ? 'Already decided.' : 'Claimed by someone else: they decide it.';
+  }
+
+  pick(e: Extraction, box: HTMLInputElement): void {
+    if (!this.bulk.toggle(e, box.checked)) {
+      box.checked = false;
+      this.toast.error(`At most ${BULK_CAP} at a time.`);
+    }
+  }
+
   ngOnInit(): void {
     this.load();
     this.api.types().subscribe({ next: r => { if (r.status === API_SUCCESS) this.types.set(r.data ?? []); }, error: () => { /* the filter lists no types */ } });
@@ -151,11 +213,7 @@ export class ReviewQueue implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.queue({
-      status: this.status(), documentTypeId: this.typeId() ? Number(this.typeId()) : null,
-      claimed: this.claimed(), maxConfidence: this.confidence() ? Number(this.confidence()) : null,
-      olderThanMinutes: this.age() ? Number(this.age()) : null, page: this.page() - 1, size: this.size(),
-    }).subscribe({
+    this.api.queue({ ...this.filters(), page: this.page() - 1, size: this.size() }).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message || 'Could not load the queue.'); return; }
@@ -166,13 +224,24 @@ export class ReviewQueue implements OnInit {
     });
   }
 
+  /** The list's filters as the service takes them. */
+  private filters() {
+    return {
+      status: this.status(), documentTypeId: this.typeId() ? Number(this.typeId()) : null,
+      claimed: this.claimed(), maxConfidence: this.confidence() ? Number(this.confidence()) : null,
+      olderThanMinutes: this.age() ? Number(this.age()) : null,
+    };
+  }
+
   set(filter: WritableSignal<string>, value: string): void {
+    this.bulk.clear();
     filter.set(value);
     this.page.set(1);
     this.load();
   }
 
   clear(): void {
+    this.bulk.clear();
     this.status.set('Review');
     this.typeId.set('');
     this.claimed.set('');
@@ -187,7 +256,7 @@ export class ReviewQueue implements OnInit {
 
   start(): void {
     const first = this.firstFree();
-    if (first) this.router.navigate(['/documents/review', first.extractionId]);
+    if (first) this.router.navigate(['/review/documents', first.extractionId]);
     else this.toast.info('Nothing is waiting that someone else has not claimed.');
   }
 

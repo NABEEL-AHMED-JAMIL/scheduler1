@@ -4,7 +4,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
@@ -32,7 +32,7 @@ const WORKFLOW: WorkflowDetail = {
   ],
 };
 
-function screenWith(opts: { admin?: boolean; problems?: string[] } = {}) {
+function screenWith(opts: { admin?: boolean; problems?: string[]; tenantId?: number | null } = {}) {
   const admin = opts.admin ?? true;
   const api = {
     colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' }] })),
@@ -58,7 +58,8 @@ function screenWith(opts: { admin?: boolean; problems?: string[] } = {}) {
       { provide: AccessProfilesService, useValue: profiles },
       { provide: ToastService, useValue: toast },
       { provide: AuthService, useValue: {
-        isTenantAdmin: () => admin, builderLocked: () => false, canOpen: () => true, user: signal({ appUserId: 4537 }),
+        isTenantAdmin: () => admin, builderLocked: () => false, canOpen: () => true,
+        user: signal({ appUserId: 4537, tenantId: opts.tenantId === undefined ? 2924 : opts.tenantId }),
       } },
     ],
   });
@@ -96,15 +97,20 @@ describe('Workflow designer -- the step model', () => {
 });
 
 describe('Workflow designer -- the screen', () => {
-  it('opens the first workflow\'s current version as a chain, in words', () => {
-    const { api, el } = screenWith();
+  it('opens the first workflow\'s current version as a flow, in words, a condition\'s two ways drawn', () => {
+    const { api, el, screen, fixture } = screenWith();
     expect(api.fetch).toHaveBeenCalledWith('purchase');
-    const cards = Array.from(el.querySelectorAll('[data-step]')).map(c => c.textContent!.replace(/\s+/g, ' '));
-    expect(cards).toHaveLength(3);
-    expect(cards[0]).toContain('the requester\'s manager · due in 2 days · then the requester\'s manager');
-    expect(cards[1]).toContain('If amount is more than 1000');
-    expect(cards[1]).toContain('Yes → Finance approves · No → end');
-    expect(cards[2]).toContain('the administrators');
+    const nodes = Array.from(el.querySelectorAll('g[data-node]')).filter(n => !n.getAttribute('data-id')!.startsWith('@')).map(n => n.getAttribute('aria-label')!);
+    expect(nodes).toHaveLength(3);
+    expect(nodes[0]).toContain('the requester\'s manager · due in 2 days · then the requester\'s manager');
+    expect(nodes[1]).toContain('If amount is more than 1000');
+    expect(nodes[2]).toContain('the administrators');
+    const graph = screen.graph();
+    const edge = (from: string, label: string) => graph.edges.find(e => e.from === from && e.label === label)?.to;
+    expect([edge('large', 'yes'), edge('large', 'no'), edge('manager', 'approved'), edge('manager', 'rejected')]).toEqual(['finance', '@end', 'large', '@rejected']);
+    screen.pick(1);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="step-branches"]')!.textContent).toContain('Yes → Finance approves · No → end');
     expect(el.querySelector('[data-test="publish"]')).not.toBeNull();
   });
 
@@ -135,16 +141,18 @@ describe('Workflow designer -- the screen', () => {
     fixture.detectChanges();
     expect(toast.error).toHaveBeenCalled();
     expect(screen.selected()).toBe(1);
-    expect(el.querySelector('[data-step="large"]')!.textContent).toContain('condition.field: which field.');
+    expect(el.querySelector('[data-test="step-problems"]')!.textContent).toContain('condition.field: which field.');
+    expect(el.querySelector('g[data-id="large"]')!.getAttribute('aria-label')).toContain('1 problem');
     expect(el.textContent).toContain('steps: something else.');
   });
 
   it('shows a member the chain and nothing that changes it', () => {
     const { profiles, el } = screenWith({ admin: false });
     expect(profiles.list).not.toHaveBeenCalled();
-    expect(el.querySelectorAll('[data-step]')).toHaveLength(3);
+    expect(el.querySelectorAll('g[data-node]:not([data-id^="@"])')).toHaveLength(3);
     expect(el.querySelector('[data-test="publish"]')).toBeNull();
     expect(el.querySelector('[data-test="add-step"]')).toBeNull();
+    expect(el.querySelector('[data-test="move-up"], [data-test="insert-step"], [data-test="remove-step"]')).toBeNull();
     expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();
     expect((el.querySelector('[data-test="step-panel"] fieldset') as HTMLFieldSetElement).disabled).toBe(true);
   });
@@ -167,5 +175,91 @@ describe('Workflow designer -- the screen', () => {
     expect(api.start).toHaveBeenCalledWith(expect.objectContaining({ definitionKey: 'purchase', subjectId: 'po-1', subject: { amount: 1200 } }),
       'purchase:test:po-1');
     expect(el.querySelector('[data-test="test-link"]')!.textContent).toContain('request #1010 is running');
+  });
+});
+
+/** MIG-324: an empty workflow list said "No workflows yet." and nothing of what one is or who makes it. */
+describe('Workflow designer -- an empty list', () => {
+  it('tells an administrator what New workflow makes, and a member who makes them', () => {
+    expect(screenWith({ admin: true }).screen.emptyText())
+      .toBe('No workflows yet. New workflow makes one: the steps a request goes through, approvals and notices included.');
+    expect(screenWith({ admin: false }).screen.emptyText()).toBe('No workflows yet. A workspace administrator makes them.');
+  });
+});
+
+/** Review 2026-10-07: a link to a workflow this workspace does not have says so beside the list, not in a vague toast. */
+describe('Workflow designer -- a link to a workflow that is not here', () => {
+  it('names the key, opens nothing in its place, and offers New workflow to an administrator', () => {
+    const { api, toast, screen, fixture, el } = screenWith();
+    api.fetch.mockClear();
+    screen.loadList('no-such-workflow');
+    fixture.detectChanges();
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.current()).toBeNull();
+    expect(el.querySelector('[data-test="missing-workflow"]')!.textContent).toContain('There is no workflow “no-such-workflow” in this workspace.');
+    expect(el.querySelector('[data-test="designer-empty"]')!.textContent).toContain('Pick one from the list, or start a new one.');
+    expect(el.querySelector('[data-workflow="purchase"]')).not.toBeNull();
+    (el.querySelector('[data-test="empty-new-workflow"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.view()).toBe('new');
+    expect(screen.missingKey()).toBeNull();
+  });
+
+  it('tells a member the same without the New workflow button', () => {
+    const { screen, fixture, el } = screenWith({ admin: false });
+    screen.loadList('no-such-workflow');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="missing-workflow"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="designer-empty"]')!.textContent).toContain('Pick one from the list.');
+    expect(el.querySelector('[data-test="empty-new-workflow"]')).toBeNull();
+  });
+
+  it('treats a 404 on opening (deleted meanwhile) the same way, with no toast', () => {
+    const { api, toast, screen, fixture, el } = screenWith();
+    api.fetch.mockReturnValueOnce(throwError(() => ({ status: 404 })) as never);
+    screen.open('gone');
+    fixture.detectChanges();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(screen.current()).toBeNull();
+    expect(el.querySelector('[data-test="missing-workflow"]')!.textContent).toContain('“gone”');
+  });
+
+  it('says to pick from the list when workflows exist and none is open', () => {
+    const { screen, fixture, el } = screenWith();
+    screen.current.set(null);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="designer-empty"]')!.textContent).toContain('Pick a workflow from the list.');
+  });
+});
+
+/** Review 2026-10-07: a platform administrator's own sign-in has no workspace; workflows are a workspace's. */
+describe('Workflow designer -- a sign-in with no workspace', () => {
+  it('reads nothing and points to Work in a workspace instead of an error', () => {
+    const { api, el, screen } = screenWith({ tenantId: null });
+    expect(api.list).not.toHaveBeenCalled();
+    expect(api.fetch).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
+    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/platform/work-in-workspace');
+    expect(el.querySelector('[data-test="workflow-list"]')).toBeNull();
+    expect(screen.canEdit()).toBe(false);
+    expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();
+  });
+});
+
+/** UX review 2026-10-12 (W2): a pipeline's workflow says where a pipeline switches it on. */
+describe('Workflow designer -- pipeline workflows link back (W2)', () => {
+  it('says a run review is switched on in a pipeline\'s Settings › Review, and a purchase workflow says nothing of pipelines', () => {
+    const plain = screenWith();
+    expect(plain.el.querySelector('[data-test="pipeline-link"]')).toBeNull();
+    const { screen, el, fixture } = screenWith();
+    screen.current.set({ ...WORKFLOW, key: 'pipeline-run-review', name: 'Pipeline run review', subjectType: 'pipeline_run' });
+    fixture.detectChanges();
+    const note = el.querySelector('[data-test="pipeline-link"]')!;
+    expect(note.textContent).toContain('Settings › Review');
+    expect(note.querySelector('a')!.getAttribute('href')).toBe('/pipelines/list');
+    screen.current.set({ ...WORKFLOW, key: 'pipeline-step-approval', name: 'Pipeline step approval', subjectType: 'pipeline_step' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="pipeline-link"]')!.textContent).toContain('Approval step');
   });
 });

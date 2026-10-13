@@ -98,7 +98,7 @@
                         [attr.datetime]="message.at">{{ formatTime(message.at) }}</time>
                 }
               </div>
-              <app-avatar [bucket]="auth.user()?.avatarBucket" [key]="auth.user()?.avatarKey"
+              <app-avatar [appUserId]="auth.user()?.appUserId" [version]="auth.user()?.avatarVersion"
                           [name]="auth.displayName()" [size]="1.5" class="shrink-0" />
             </div>
         } @else if (message.role === 'error') {
@@ -217,17 +217,18 @@
       </div>
     }
 
-    <div class="flex gap-2 px-3.5 py-2.5 border-t shrink-0 border-subtle">
+    <!-- UX review B6 (AI1): the same composer as the AI Assistant and Ask your data. -->
+    <div class="chat-composer px-3.5 py-2.5 border-t shrink-0 border-subtle" data-test="chat-composer">
       <!-- Only `preparing()` disables these two. A prepare that came back with an error is not a
            dead end -- changing agent re-runs prepare() and can clear it -- and locking the
            composer on it took away the reason to bother. -->
-      <textarea #composer class="input resize-none text-sm" rows="1" placeholder="Message"
+      <textarea #composer class="input text-sm" rows="2" placeholder="Message"
                 [attr.aria-label]="'Message about ' + fileName()"
                 [value]="draft()" (input)="draft.set($any($event.target).value)"
                 (keydown)="onKeydown($event)"
                 [disabled]="preparing()"></textarea>
       @if (voiceSupported) {
-        <button type="button" class="btn btn-ghost btn-icon btn-sm self-end"
+        <button type="button" class="btn btn-ghost btn-icon btn-sm"
                 [class.btn-intent-crit]="listening()"
                 [disabled]="preparing()"
                 (click)="toggleMic()"
@@ -236,8 +237,8 @@
           <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
         </button>
       }
-      <button type="button" class="btn btn-primary btn-sm self-end"
-              [disabled]="sending() || !draft().trim()" (click)="send()">Send</button>
+      <button type="button" class="btn btn-primary btn-sm" data-test="chat-send"
+              [disabled]="sending() || !draft().trim()" (click)="send()"><app-icon name="send" />Send</button>
     </div>
   }
 

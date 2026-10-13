@@ -89,10 +89,11 @@ describe('TaskEdit refusals with no message', () => {
  * a bare number) and offered Try again, which could only fail again; an id that is not a number
  * was sent to the server anyway (UI audit, Low).
  */
-describe('TaskEdit for a task that does not exist', () => {
-  it('says so in plain words, with no Try again', () => {
+describe('TaskEdit for a pipeline that does not exist', () => {
+  /** Owner 2026-10-13: the pipeline editor says Pipeline, the word the console uses for it everywhere else. */
+  it('says so in plain words, naming a Pipeline, with no Try again', () => {
     const { component } = editor(() => of({ status: 'ERROR', message: 'SourceTask not found with 999999.' }), { id: '999999' });
-    expect(component.loadError()).toBe('Task #999999 does not exist or was deleted.');
+    expect(component.loadError()).toBe('Pipeline #999999 does not exist or was deleted.');
     expect(component.loadMissing()).toBe(true);
   });
 
@@ -100,7 +101,7 @@ describe('TaskEdit for a task that does not exist', () => {
     let asked = 0;
     const { component } = editor(() => { asked++; return of({ status: API_SUCCESS, data: TASK }); }, { id: 'abc' });
     expect(asked).toBe(0);
-    expect(component.loadError()).toBe('That link does not point to a task.');
+    expect(component.loadError()).toBe('That link does not point to a pipeline.');
     expect(component.loadMissing()).toBe(true);
   });
 

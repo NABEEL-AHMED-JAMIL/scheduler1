@@ -1,3 +1,4 @@
+import { Avatar } from '../../shared/ui/avatar';
 import { Component, HostListener, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
@@ -13,12 +14,14 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { confirmWith } from '../../shared/ui/confirm';
 import {
   ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, fieldName, fileName, isLow, lowLine,
-  nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
+  nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, skippedWhy, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
+  isNumberColumn, linesMinWidthRem,
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { PageViewer, ViewerBox } from './page-viewer';
 import { ConfidenceBar } from './confidence-bar';
 import { RejectDialog, RejectDialogData } from './reject-dialog';
+import { PageHeader } from '../../shared/ui/page-header';
 
 type Busy = '' | 'save' | 'approve' | 'reject' | 'claim';
 
@@ -45,7 +48,7 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
  */
 @Component({
   selector: 'app-document-review',
-  imports: [RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar],
+  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar, Avatar],
   templateUrl: './review.html',
   styles: [`
     .review-split { display: grid; gap: 1rem; align-items: start; grid-template-columns: minmax(0, 1fr); }
@@ -69,7 +72,13 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
     .kbd { font-family: ui-monospace, monospace; font-size: 0.6875rem; padding: 0 0.25rem; border-radius: var(--radius-sm);
       border: 1px solid var(--border-strong); border-bottom-width: 2px; color: var(--text-secondary); }
     .doc-field .input { min-height: 0; padding-top: 0.3rem; padding-bottom: 0.3rem; }
-    .doc-cell { min-width: 8.5rem; }
+    /* UX final DR1: the line items fit the card at 1187 and 1024 -- no clipped Amount. */
+    .doc-lines { table-layout: fixed; }
+    .doc-lines .doc-col-index { width: 1.75rem; }
+    .doc-lines .doc-col-num { width: 5.75rem; }
+    .doc-lines :is(th, td) { padding-left: 0.375rem; padding-right: 0.375rem; }
+    .doc-lines th { overflow: hidden; text-overflow: ellipsis; }
+    .doc-lines td.num .input { text-align: right; }
     .doc-cell-active .input { box-shadow: 0 0 0 2px var(--info-mark); }
     @media (max-width: 640px) { .doc-field { grid-template-columns: minmax(0, 1fr) 4.25rem; } .doc-field-name { grid-column: 1 / -1; } }
   `],
@@ -103,6 +112,9 @@ export class DocumentReview {
   readonly line = computed(() => lowLine(this.detail()?.autoApproveThreshold ?? this.definition()?.autoApproveThreshold));
   readonly fields = computed(() => documentFields(this.detail()?.fields ?? [], this.definition()));
   readonly tables = computed<TableView[]>(() => tableViews(this.detail()?.fields ?? [], this.definition()));
+  /** A number column (UX final DR1): right-aligned, tabular, a set width. */
+  readonly isNumber = isNumberColumn;
+  linesMinWidth(t: TableView): number { return linesMinWidthRem(t.columns); }
   /** ↑/↓ order: the document's fields, then each table's cells row by row. */
   readonly order = computed<number[]>(() => [
     ...this.fields().map(f => f.fieldId),
@@ -216,6 +228,7 @@ export class DocumentReview {
   nameOf(f: ExtractedField): string { return fieldName(f, this.definition()); }
   valueOf(f: ExtractedField): string { return f.fieldId in this.edits() ? this.edits()[f.fieldId] : (f.value ?? ''); }
   ruleWords(r: RuleOutcome): string { return ruleText(r, this.definition()); }
+  skipped(r: RuleOutcome): string { return skippedWhy(r); }
 
   /**
    * Selects a value: the viewer highlights its box and centres it. `reveal` says what else comes into view -- the box,
@@ -356,10 +369,10 @@ export class DocumentReview {
       next: r => {
         const free = (r.data?.items ?? []).filter(i => !(i.claimActive && i.claimedBy != null && i.claimedBy !== this.me()));
         const next = r.status === API_SUCCESS ? nextInQueue(free, current) : null;
-        if (next) this.router.navigate(['/documents/review', next]);
-        else { this.toast.info('Nothing else is waiting for review.'); this.router.navigate(['/documents/review']); }
+        if (next) this.router.navigate(['/review/documents', next]);
+        else { this.toast.info('Nothing else is waiting for review.'); this.router.navigate(['/review/documents']); }
       },
-      error: () => this.router.navigate(['/documents/review']),
+      error: () => this.router.navigate(['/review/documents']),
     });
   }
 

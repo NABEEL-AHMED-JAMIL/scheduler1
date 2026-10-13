@@ -35,12 +35,13 @@ function stubApi(settings: InboxSettings = SETTINGS) {
     settings: vi.fn(() => of({ status: 'SUCCESS', message: '', data: settings })),
     files: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [FILE] })),
     users: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ appUserId: 4597, fullName: 'Alex' }] })),
+    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex' }] })),
     upload: vi.fn(() => { const s = new Subject<unknown>(); uploads.push(s); return s as Observable<unknown>; }),
   };
 }
 
-function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown } = {}) {
-  const api = stubApi(opts.settings);
+function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith?: unknown; api?: ReturnType<typeof stubApi>; tenantId?: number | null } = {}) {
+  const api = opts.api ?? stubApi(opts.settings);
   const toast = { success: vi.fn(), error: vi.fn() };
   const opened: { component: unknown; data: unknown }[] = [];
   const dialog = {
@@ -57,7 +58,7 @@ function screenWith(opts: { admin?: boolean; settings?: InboxSettings; closeWith
       { provide: InboxApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, user: signal({ appUserId: 4537, tenantId: opts.tenantId === undefined ? 2924 : opts.tenantId }) } },
     ],
   });
   const screen = TestBed.runInInjectionContext(() => new Inbox());
@@ -77,17 +78,37 @@ describe('Inbox -- reading', () => {
     expect(screen.files().map(f => f.fileName)).toEqual(['live-customers.csv']);
   });
 
+  it('reads nothing for a sign-in with no workspace (a platform administrator\'s own; review 2026-10-07, L6)', () => {
+    const { api, screen } = screenWith({ tenantId: null });
+    expect(screen.noWorkspace()).toBe(true);
+    expect(api.settings).not.toHaveBeenCalled();
+    expect(api.files).not.toHaveBeenCalled();
+    expect(api.users).not.toHaveBeenCalled();
+    expect(api.colleagues).not.toHaveBeenCalled();
+    screen.load();
+    expect(api.settings).not.toHaveBeenCalled();
+  });
+
   it('names uploaders from the member list for an administrator', () => {
     const { api, screen } = screenWith();
     expect(api.users).toHaveBeenCalled();
     expect(screen.uploader(FILE)).toBe('Alex');
   });
 
-  it('does not ask a member for the member list, which the service refuses them', () => {
+  it('names uploaders for a member from the colleagues, never asking for the member list it would be refused', () => {
     const { api, screen } = screenWith({ admin: false });
     expect(api.users).not.toHaveBeenCalled();
-    expect(screen.uploader(FILE)).toBe('User 4597');
+    expect(api.colleagues).toHaveBeenCalled();
+    expect(screen.uploader(FILE)).toBe('Alex');
     expect(screen.uploader({ ...FILE, uploadedBy: 4537 })).toBe('You');
+  });
+
+  it('keeps the user number when a member may not read the colleagues either', () => {
+    const api = stubApi();
+    api.colleagues.mockReturnValue(throwError(() => ({ status: 403 })) as never);
+    TestBed.resetTestingModule();
+    const { screen } = screenWith({ admin: false, api });
+    expect(screen.uploader(FILE)).toBe('User 4597');
   });
 
   it('explains a missing inbox: an administrator is offered the setup, a member is told whom to ask', () => {
@@ -179,6 +200,20 @@ describe('Inbox -- settings', () => {
     const { api, screen } = screenWith({ closeWith: false });
     screen.openSettings();
     expect(api.settings).toHaveBeenCalledTimes(1);
+  });
+
+  /** UX review B4 (IN1): the header's "Inbox settings" repeated the Settings card; the card's own Change is the one place. */
+  it('changes the settings from the Settings card, not a second header button', async () => {
+    const { opened } = screenWith({ closeWith: false });
+    const fixture = TestBed.createComponent(Inbox);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('.page-head-actions')!.textContent).not.toContain('settings');
+    const change = el.querySelector('[data-test="inbox-settings"]') as HTMLButtonElement;
+    expect(change.closest('section')!.textContent).toContain('Storage connection');
+    change.click();
+    expect(opened[0].component).toBe(InboxSettingsDialog);
   });
 
   it('offers no change to a member', () => {

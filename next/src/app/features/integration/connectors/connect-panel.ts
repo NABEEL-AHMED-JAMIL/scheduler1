@@ -22,13 +22,24 @@ export interface ConnectPanelData {
   changed: () => void;
 }
 
-type Step = 0 | 1 | 2 | 3 | 4;
+export type Step = 0 | 1 | 2 | 3 | 4;
 
 /** One table the person may sync, and how. */
 interface Choice {
   dataset: Dataset;
   on: boolean;
   cursor: string | null;
+}
+
+/** What a step of Connect is for, as its subtitle says it (UX final I2). */
+export function stepText(step: Step, kindWord = 'tables'): string {
+  switch (step) {
+    case 0: return 'Choose what to connect';
+    case 1: return 'Sign in, and say where its data lands';
+    case 2: return `Choose the ${kindWord} to sync`;
+    case 3: return 'How each sync reads them';
+    default: return 'When it syncs';
+  }
 }
 
 /**
@@ -41,18 +52,19 @@ interface Choice {
   selector: 'app-connect-panel',
   imports: [SidePanel, Icon, Segmented, Field],
   template: `
-    <app-side-panel [heading]="heading()" [subtitle]="data.connection ? 'Add tables to ' + data.connection.name : 'New connection'">
+    <!-- UX final I2: the subtitle says what this step is (it repeated the title), the chooser is step 1 of the stepper
+         when the panel opens on it, and the footer always has Cancel, with the step's primary at the right. -->
+    <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
       <ol class="connect-steps" aria-label="Steps">
-        @for (s of steps; track s.id) {
+        @for (s of shownSteps(); track s.id; let i = $index) {
           <li class="connect-step" [class.is-done]="step() > s.id" [class.is-current]="step() === s.id" [attr.aria-current]="step() === s.id ? 'step' : null">
-            <span class="connect-dot">@if (step() > s.id) { <app-icon name="check" size="0.75em" /> } @else { {{ s.id }} }</span>{{ s.label }}
+            <span class="connect-dot">@if (step() > s.id) { <app-icon name="check" size="0.75em" /> } @else { {{ i + 1 }} }</span>{{ s.label }}
           </li>
         }
       </ol>
 
       @if (step() === 0) {
         <section class="flex flex-col gap-2" data-step="connector">
-          <p class="text-sm text-[color:var(--text-secondary)]">Choose what to connect.</p>
           <div class="connector-gallery">
             @for (c of data.cards; track c.spec.key) {
               <button type="button" class="connector-card text-left" (click)="choose(c)" [attr.data-choose]="c.spec.key">
@@ -222,6 +234,7 @@ interface Choice {
       <div foot class="flex items-center gap-2 w-full">
         @if (step() > minStep()) { <button type="button" class="btn btn-ghost btn-sm" (click)="back()" [disabled]="busy()">Back</button> }
         <span class="flex-1"></span>
+        <button type="button" class="btn btn-default btn-sm" (click)="cancel()" [disabled]="busy()" data-cancel>Cancel</button>
         @switch (step()) {
           @case (1) {
             <button type="button" class="btn btn-primary btn-sm" (click)="saveCredentials()" [disabled]="busy() || !canSave()" data-next>
@@ -273,6 +286,16 @@ export class ConnectPanel implements OnInit {
   readonly syncNow = signal(true);
 
   readonly heading = computed(() => this.card() ? `Connect ${this.card()!.spec.label}` : 'New connection');
+  /** The steps this panel goes through: the connector chooser leads when the panel opened on it (UX final I2). */
+  readonly shownSteps = computed(() => this.minStep() === 0 ? [{ id: 0 as Step, label: 'Connector' }, ...this.steps]
+    : this.steps.filter(s => s.id >= this.minStep()));
+  /** "Step 2 of 5 · Sign in, and say where its data lands" -- what this step is, not the title again. */
+  readonly subtitle = computed(() => {
+    const at = this.shownSteps().findIndex(s => s.id === this.step()) + 1;
+    const what = stepText(this.step(), this.kindWord());
+    const of = `Step ${at} of ${this.shownSteps().length} · ${what}`;
+    return this.data.connection ? `${this.data.connection.name} · ${of}` : of;
+  });
   readonly fields = computed(() => this.card() ? settingsFields(this.card()!.spec) : []);
   readonly kindWord = computed(() => this.card()?.spec.sourceKind === 'file' ? 'folders' : this.card()?.spec.sourceKind === 'endpoint' ? 'requests'
     : 'tables');
@@ -336,6 +359,12 @@ export class ConnectPanel implements OnInit {
       this.mode.set(suggestedMode(this.card()!.spec, this.chosen()[0]?.dataset));
     }
     this.step.set(step);
+  }
+
+  /** Closes the panel; a connection saved on the way stays, and the list is told so. */
+  cancel(): void {
+    if (this.connection() && !this.data.connection) this.data.changed();
+    this.ref.close();
   }
 
   back(): void {

@@ -1,10 +1,6 @@
 <div class="page-tool">
-  <div>
-    <h1 class="page-title">Audio Transcript</h1>
-    <p class="page-subtitle">
-      Speech-to-text for .mp3 and .m4a, run through the same pipeline as the batch job.
-    </p>
-  </div>
+  <app-page-header title="Audio Transcript"
+                   subtitle="Speech-to-text for .mp3 and .m4a, transcribed the same way a scheduled run does it." />
 
   <div class="card p-4 space-y-4">
     <app-segmented [value]="mode()" (valueChange)="mode.set($event); transcript.set('')"
@@ -36,17 +32,15 @@
       Include timestamps before each segment
     </label>
 
-    <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
-            (click)="extract()">
-      <app-icon name="volume" [busy]="extracting()" />
-      {{ extracting() ? 'Extracting…' : 'Extract transcript' }}
-    </button>
-
-    @if (extracting()) {
-      <p class="text-sm text-[color:var(--text-muted)]">
-        Transcription runs on the server and can take a minute or two.
-      </p>
-    }
+    <!-- UX review 2026-10-12 (A5, TR1): the primary at the bottom right, in the card's actions bar. -->
+    <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [dialog]="true" label="Transcribe"
+                     [state]="extracting() ? 'Transcription runs on the server and can take a minute or two.' : ''">
+      <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
+              (click)="extract()">
+        <app-icon name="volume" [busy]="extracting()" />
+        {{ extracting() ? 'Extracting…' : 'Extract transcript' }}
+      </button>
+    </app-actions-bar>
   </div>
 
   @if (error()) {

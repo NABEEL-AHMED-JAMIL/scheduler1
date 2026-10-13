@@ -117,6 +117,17 @@ export function monthShort(month: string): string {
   return match ? formatDate(`${match[1]}-${match[2]}-01`, 'MMM yyyy', 'en-US') : String(month ?? '');
 }
 
+/**
+ * A calendar day (yyyy-MM-dd) moved by whole days -- a billing day as Billing names it in the workspace's zone (H9), which
+ * is a date, not an instant: no zone is involved, so none can shift it. Anything that is not such a day comes back as is.
+ */
+export function shiftDay(day: string, by: number): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day ?? '');
+  if (!match) return day;
+  const d = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]) + by));
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`;
+}
+
 /** The viewer's own calendar day as yyyy-MM-dd. toISOString() is UTC, and in the evening already says tomorrow. */
 export function localIsoDate(d = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -131,4 +142,43 @@ export function workspaceLabels(tenants: { tenantId: number; tenantName: string 
     const name = (t.tenantName ?? '').trim() || `Workspace ${t.tenantId}`;
     return [t.tenantId, (seen.get(key(t.tenantName)) ?? 0) > 1 ? `${name} (#${t.tenantId})` : name];
   }));
+}
+
+// ---- billing days of instants (owner review 2026-10-12: tables grouped by day) ----------------------------------------
+
+function zoned(zone: string | null | undefined, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  try {
+    return new Intl.DateTimeFormat('en-GB', { ...options, timeZone: zone || undefined });
+  } catch {
+    // A zone this browser does not know: its own, rather than nothing.
+    return new Intl.DateTimeFormat('en-GB', options);
+  }
+}
+
+/** The billing day (yyyy-MM-dd) an instant falls on in a zone (the workspace's, H9) -- never the browser's when one is given. */
+export function zonedDay(at: Date, zone: string | null | undefined): string {
+  const parts = zoned(zone, { year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(at);
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+/** The time of day an instant is in a zone, 24-hour: "22:50". */
+export function zonedTime(at: Date, zone: string | null | undefined): string {
+  return zoned(zone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(at);
+}
+
+/** A billing day as a day header names it: "Mon 12 Oct 2026". */
+export function dayHeading(day: string, locale = 'en-US'): string {
+  return /^\d{4}-\d{2}-\d{2}$/.test(day ?? '') ? formatDate(day + 'T00:00:00Z', 'EEE d MMM y', locale, 'UTC') : day;
+}
+
+/** Rows in their order, cut into runs of the same billing day (`dayOf` gives each row's; null for a row with no time). */
+export function groupByDay<T>(rows: T[], dayOf: (row: T) => string | null): { day: string | null; rows: T[] }[] {
+  const out: { day: string | null; rows: T[] }[] = [];
+  for (const row of rows) {
+    const day = dayOf(row);
+    const last = out[out.length - 1];
+    if (last && last.day === day) last.rows.push(row); else out.push({ day, rows: [row] });
+  }
+  return out;
 }

@@ -38,7 +38,7 @@ import { ALIAS_PATTERN } from './connection-dialog';
         <app-field label="Alias" for="alias" [required]="true"
                    [control]="aliasModel.control" [submitted]="submitted()"
                    [errorMessages]="{ pattern: 'Letters, numbers, . _ - only.' }"
-                   hint="Must be unique — this is what jobs and tasks refer to.">
+                   hint="Must be unique — this is what pipelines refer to.">
           <input id="alias" class="input mono" [(ngModel)]="alias" name="alias"
                  #aliasModel="ngModel" required [pattern]="aliasPattern"
                  [ngModelOptions]="{standalone: true}" />

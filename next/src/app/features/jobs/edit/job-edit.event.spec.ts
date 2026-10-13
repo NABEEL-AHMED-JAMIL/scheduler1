@@ -87,6 +87,30 @@ describe('JobEdit: the Event start', () => {
     expect(calls.at(-1)!.body).toEqual({ jobId: 2848, enabled: true, filePattern: 'invoices_*.pdf' });
   });
 
+  // MIG-360: files that waited for a run go together, up to this many; sent only when it changed.
+  it('saves the files per run with the trigger, only when it changed', () => {
+    const { component, calls } = editor({
+      '/sourceJob.json/fetchSourceJobDetailWithSourceJobId': { status: 'SUCCESS', data: JOB },
+      '/sourceJob.json/inboxTrigger': { status: 'SUCCESS', data: { jobId: 2848, configured: true, enabled: true, filePattern: '*.csv', batchSize: 1 } },
+    });
+    expect(component.batchSize()).toBe(1);
+    component.batchSize.set('10');
+    component.save();
+    expect(calls.at(-1)).toMatchObject({ path: '/sourceJob.json/inboxTrigger/save',
+      body: { jobId: 2848, enabled: true, filePattern: '*.csv', batchSize: 10 } });
+  });
+
+  it('refuses files per run outside 1..50 before saving anything', () => {
+    const { component, calls, errors } = editor({
+      '/sourceJob.json/fetchSourceJobDetailWithSourceJobId': { status: 'SUCCESS', data: JOB },
+    });
+    component.onArrival.set(true);
+    component.batchSize.set('0');
+    component.save();
+    expect(writes(calls)).toEqual([]);
+    expect(errors[0]).toContain('1 to 50');
+  });
+
   it('turns it off without forgetting the pattern', () => {
     const { component, calls } = editor({
       '/sourceJob.json/fetchSourceJobDetailWithSourceJobId': { status: 'SUCCESS', data: JOB },

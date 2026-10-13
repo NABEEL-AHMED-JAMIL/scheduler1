@@ -17,16 +17,18 @@
   </header>
 
   <main class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 py-6 page">
-    <div class="page-head" data-gallery="page-head">
-      <div>
-        <h1 class="page-title">Component gallery</h1>
-        <p class="page-subtitle">Every shared component and dashboard widget, with sample data. Development builds only.</p>
+    <app-page-header>
+      <div class="page-head" data-gallery="page-head">
+        <div>
+          <h1 class="page-title">Component gallery</h1>
+          <p class="page-subtitle">Every shared component and dashboard widget, with sample data. Development builds only.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" class="btn btn-default btn-sm"><app-icon name="refresh" />Refresh</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="showToasts()"><app-icon name="bell" />Show toasts</button>
+        </div>
       </div>
-      <div class="flex items-center gap-2">
-        <button type="button" class="btn btn-default btn-sm"><app-icon name="refresh" />Refresh</button>
-        <button type="button" class="btn btn-primary btn-sm" (click)="showToasts()"><app-icon name="bell" />Show toasts</button>
-      </div>
-    </div>
+    </app-page-header>
 
     <!-- Menus ------------------------------------------------------------------------------ -->
     <section class="space-y-3" data-gallery="menus">
@@ -153,7 +155,7 @@
       <h2 class="section-title">KPI strip and stat tiles</h2>
       <app-stat-strip [items]="strip" [smCols]="5" label="Runs this week" [summary]="{ label: 'Success rate', value: '96.6%' }" />
       <app-stat-strip [items]="strip" [smCols]="5" size="md" align="start" label="Runs, larger" />
-      <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div class="grid sm:grid-cols-2 lg:grid-cols-5 stat-strip stat-row is-md is-start" role="list">
         <app-stat-tile label="Completed" value="1,190" icon="checkCircle" tone="ok" foot="92.7% of runs" />
         <app-stat-tile label="Failed" value="42" icon="xCircle" tone="crit" foot="3.3% of runs" />
         <app-stat-tile label="Skipped" value="31" icon="skip" tone="warn" />

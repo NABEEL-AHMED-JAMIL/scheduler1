@@ -1,28 +1,27 @@
 import { test, expect, APIRequestContext, Browser, Page } from '@playwright/test';
+import { canSignIn, NEEDS, pageAs as signedIn, sessionFor } from './support/session';
+import { archiveForm, formIdNamed } from './support/forms';
 
 /**
- * MIG-280, live: the administrator (4537) builds a form in the new builder -- two fields from the palette, a rule in
- * Logic -- publishes it, fills it in and sends it, and finds the submission on Submissions with its strip. It CREATES a
- * form ("E2E builder <time>") and one submission, and leaves them. Sign-in: E2E_TENANT_ADMIN_TOKEN.
+ * MIG-280, live: Riverside Health's administrator builds a form in the new builder -- two fields from the palette, a
+ * rule in Logic -- publishes it, fills it in and sends it, and finds the submission on Submissions with its strip. It
+ * CREATES a form ("E2E builder <time>") and one submission; the form is archived afterwards (forms are never deleted),
+ * and the submission stays with it. Sign-in: support/session.ts (role admin).
  */
-const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
-const token = process.env['E2E_TENANT_ADMIN_TOKEN'];
 const NAME = `E2E builder ${new Date().toISOString().slice(5, 19).replace(/[-:T]/g, '')}`;
 
 async function pageAs(browser: Browser, request: APIRequestContext): Promise<Page> {
-  const claims = JSON.parse(Buffer.from(token!.split('.')[1], 'base64url').toString('utf8'));
-  const pages = await (await request.get(`${api}/pageAccess.json/mine`, { headers: { Authorization: `Bearer ${token}` } })).json();
-  const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), {
-    username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId, tenantId: claims.tenantId,
-    accessToken: token, refreshToken: '', pageKeys: pages?.data?.pageKeys });
-  return page;
+  return signedIn(browser, await sessionFor(request, 'admin'), { viewport: { width: 1440, height: 1000 } });
 }
 
 test.describe('Forms: build, publish, fill, submit (live)', () => {
-  test.skip(!token, 'Set E2E_TENANT_ADMIN_TOKEN to run this.');
+  test.skip(!canSignIn('admin'), NEEDS.admin);
+
+  test.afterAll(async ({ request }) => {
+    const s = await sessionFor(request, 'admin');
+    const id = await formIdNamed(request, s, NAME);
+    if (id) await archiveForm(request, s, id);
+  });
 
   test('a form built from the palette is published, filled in and shows on Submissions', async ({ browser, request }) => {
     const page = await pageAs(browser, request);

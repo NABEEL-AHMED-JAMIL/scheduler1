@@ -14,7 +14,7 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
   selector: 'app-analytics-widget',
   imports: [Icon],
   template: `
-    <div class="card widget min-w-0" [class.widget-busy]="state() === 'running'">
+    <div class="card widget min-w-0" [class.widget-busy]="state() === 'running' || busy()" [attr.aria-busy]="busy() ? 'true' : null">
       <div class="widget-head">
         <div class="min-w-0 flex-1">
           <h3 class="widget-title truncate" [title]="title()">{{ title() }}</h3>
@@ -23,8 +23,8 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
         <div class="flex items-center gap-1 shrink-0">
           <ng-content select="[actions]" />
           @if (refreshable()) {
-            <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Run ' + title() + ' again'" title="Run again" [disabled]="state() === 'running' || state() === 'queued'" (click)="refresh.emit()">
-              <app-icon name="refresh" [class.spin]="state() === 'running'" />
+            <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Run ' + title() + ' again'" title="Run again" [disabled]="state() === 'running' || state() === 'queued' || busy()" (click)="refresh.emit()">
+              <app-icon name="refresh" [class.spin]="state() === 'running' || busy()" />
             </button>
           }
         </div>
@@ -32,7 +32,12 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
       <div class="widget-body">
         @switch (state()) {
           @case ('queued') {
-            <p class="widget-note text-center py-4">Waiting its turn. Widgets run one at a time.</p>
+            <!-- Waiting for a place among the tiles running now (a board runs three at once): the same skeleton, so
+                 the board is drawn whole from the start and nothing moves when a tile's turn comes. -->
+            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Waiting to run ' + title()">
+              <span class="sr-only">Waiting to run {{ title() }}…</span>
+              @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken" [style.width.%]="line" aria-hidden="true"></span> }
+            </div>
           }
           @case ('running') {
             <!-- A skeleton that keeps the tile's height, so a board does not reflow under a reader as each widget lands. -->
@@ -83,6 +88,11 @@ export class AnalyticsWidget {
   /** The longer form of the subtitle, on hover: a board shows a file's name and keeps its path here. */
   readonly subtitleTitle = input('');
   readonly state = input<WidgetState>('ready');
+  /**
+   * Re-running while still drawing its last result: the content stays (so the tile keeps its
+   * size) and the tile says it is busy -- the refresh icon turns and the card dims a shade.
+   */
+  readonly busy = input(false);
   readonly error = input('');
   readonly emptyMessage = input('No rows in this result.');
   readonly refreshable = input(true);

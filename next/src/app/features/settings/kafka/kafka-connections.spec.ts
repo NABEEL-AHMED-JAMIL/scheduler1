@@ -76,7 +76,7 @@ function screenFor(isPlatformAdmin: boolean, profiles: KafkaProfile[], tenants =
       },
       { provide: Dialog, useValue: {} },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
-      { provide: ActivatedRoute, useValue: { queryParamMap: of({ get: () => null }) } },
+      { provide: ActivatedRoute, useValue: { queryParamMap: of({ get: () => null }), snapshot: { queryParamMap: { get: () => null } } } },
       { provide: Router, useValue: { navigate: () => {} } },
     ],
   });
@@ -321,6 +321,7 @@ describe('Kafka health helpers', () => {
   it('colours a state by what it means for runs', () => {
     expect(healthTone('Healthy')).toBe('ok');
     expect(healthTone('No consumer')).toBe('warn');
+    expect(healthTone('Idle')).toBe('neutral');
     expect(healthTone('Missing')).toBe('crit');
     expect(healthTone('Empty')).toBe('warn');
     expect(healthTone('whatever')).toBe('neutral');

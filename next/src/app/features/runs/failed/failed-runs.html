@@ -1,0 +1,171 @@
+<div class="page" data-test="failed-runs">
+  <app-page-header title="Failed runs">
+    <p subtitle class="page-subtitle" data-test="failed-range">
+      Every failed or timed-out run from {{ rangeLabel() }}@if (platform()) { <span>, in every workspace</span> }: where it failed,
+      why, and how often the same error came back.
+    </p>
+    <div class="flex items-center gap-2">
+      <app-date-range [value]="range()" [storageKey]="rangeStore" [maxSpanDays]="90" label="Date range for failed runs" (rangeChange)="applyRange($event)" />
+      <app-refresh-button [loading]="loading()" (refresh)="load()" />
+    </div>
+  </app-page-header>
+
+  @if (answer()?.truncated) {
+    <p class="text-xs text-[color:var(--text-muted)] m-0 flex items-center gap-1.5" data-test="failed-truncated">
+      <app-icon name="info" size="0.9em" class="icon-muted" />
+      The newest {{ answer()!.scanned | number }} failed runs of these dates are counted. Narrow the dates to see older ones.
+    </p>
+  }
+
+  <div class="failed-explorer">
+    <aside class="card p-4 failed-rail" role="group" aria-label="Narrow the failed runs" data-test="failed-facets">
+      @for (section of sections(); track section.name) {
+        <section [attr.aria-labelledby]="'facet-' + section.name" [attr.data-facet]="section.name">
+          <div class="facet-head">
+            <span class="facet-title" [id]="'facet-' + section.name">{{ section.title }}</span>
+            @if (section.picked.length) { <button type="button" class="facet-clear" (click)="clear(section.name)">Clear</button> }
+          </div>
+          @for (v of shown(section); track v.key) {
+            <label class="facet-row" [class.is-on]="section.picked.includes(v.key)" [title]="v.name">
+              <input type="checkbox" class="checkbox" [checked]="section.picked.includes(v.key)" (change)="toggle(section.name, v.key)" />
+              <span class="facet-label">{{ v.name }}</span>
+              <span class="facet-count">{{ v.count | number }}</span>
+            </label>
+          } @empty {
+            <p class="text-xs text-[color:var(--text-muted)] px-1.5 m-0">{{ loading() ? 'Counting…' : 'None in these dates' }}</p>
+          }
+          @if (more(section) > 0) {
+            <button type="button" class="facet-more" (click)="expand(section.name)">Show all {{ section.values.length }}</button>
+          }
+        </section>
+      }
+      @if (anyFilter()) {
+        <button type="button" class="btn btn-ghost btn-sm self-start" (click)="clearAll()" data-test="failed-clear-all">
+          <app-icon name="close" />Clear every filter
+        </button>
+      }
+    </aside>
+
+    <div class="min-w-0 flex flex-col gap-4">
+      <section class="card p-4" aria-labelledby="patterns-title" data-test="failed-patterns">
+        <div class="flex flex-wrap items-baseline gap-2 mb-2">
+          <h3 class="chart-title m-0" id="patterns-title">Error patterns</h3>
+          <span class="chart-sub">The same error with its numbers, names and ids set aside: most frequent first. Pick one to list its runs.</span>
+        </div>
+        @if (groups().length) {
+          <ul class="pattern-list">
+            @for (g of groups().slice(0, 8); track g.signature) {
+              <li>
+                <button type="button" class="pattern-row" [class.is-on]="signature() === g.signature" (click)="pickGroup(g)"
+                        [attr.aria-pressed]="signature() === g.signature" [attr.data-signature]="g.signature" [title]="g.sampleError || g.pattern">
+                  <span class="pattern-count">{{ g.count | number }}</span>
+                  <span class="min-w-0">
+                    <span class="pattern-text block">{{ g.pattern }}</span>
+                    <span class="pattern-meta">
+                      {{ g.task || 'the run itself' }} · <span class="kind-chip">{{ g.kindLabel }}</span> ·
+                      {{ g.schedules }} {{ g.schedules === 1 ? 'schedule' : 'schedules' }}
+                    </span>
+                  </span>
+                  <span class="pattern-meta text-right">
+                    First {{ g.firstSeen | serverTime:'recent' }}<br />Last {{ g.lastSeen | serverTime:'recent' }}
+                  </span>
+                </button>
+              </li>
+            }
+          </ul>
+          @if (groups().length > 8) {
+            <p class="text-xs text-[color:var(--text-muted)] mt-2 mb-0">{{ groups().length - 8 }} rarer patterns are counted in the list below.</p>
+          }
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)] m-0">{{ loading() ? 'Grouping the errors…' : 'No failed runs in these dates.' }}</p>
+        }
+      </section>
+
+      <section class="card overflow-hidden" aria-labelledby="failed-list-title" data-test="failed-list">
+        <div class="flex flex-wrap items-center gap-2 px-4 pt-4 pb-2">
+          <h3 class="chart-title m-0" id="failed-list-title">Runs</h3>
+          <span class="chart-sub" data-test="failed-total">{{ total() | number }} {{ total() === 1 ? 'failed run' : 'failed runs' }}
+            @if (pickedGroup(); as g) { <span>with the pattern “{{ g.pattern }}”</span> }</span>
+        </div>
+        @if (error()) {
+          <div class="px-4 pb-4 flex flex-col items-start gap-2" role="alert">
+            <p class="text-sm text-crit-500 m-0 flex items-center gap-1.5"><app-icon name="alert" />{{ error() }}</p>
+            <button type="button" class="btn btn-default btn-sm" (click)="load()"><app-icon name="refresh" />Try again</button>
+          </div>
+        } @else if (!items().length && !loading()) {
+          <p class="px-4 pb-6 text-sm text-[color:var(--text-muted)]" data-test="failed-empty">
+            {{ anyFilter() ? 'No failed runs match these filters.' : 'No run failed in these dates.' }}
+          </p>
+        } @else {
+          <div class="overflow-x-auto">
+            <table class="table-modern">
+              <thead>
+                <tr>
+                  @if (canBulkRetry()) {
+                    <th class="w-8">
+                      <input type="checkbox" class="checkbox" aria-label="Select the failed runs on this page"
+                             [checked]="selection.pageState(retryableOnPage()) === 'all'"
+                             [indeterminate]="selection.pageState(retryableOnPage()) === 'some'"
+                             (change)="togglePage($any($event.target).checked)" />
+                    </th>
+                  }
+                  <th>Run</th>
+                  @if (platform()) { <th>Workspace</th> }
+                  <th>Pipeline</th>
+                  <th>Failing step</th>
+                  <th>Error</th>
+                  <th>Kind</th>
+                  <th class="whitespace-nowrap">Ended</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (run of items(); track run.runId) {
+                  <tr class="cursor-pointer" (click)="open(run)" [attr.data-run]="run.runId" tabindex="0" (keydown.enter)="open(run)">
+                    @if (canBulkRetry()) {
+                      <td (click)="$event.stopPropagation()">
+                        @if (retryableHere(run)) {
+                          <input type="checkbox" class="checkbox" [checked]="selection.has(run)" [attr.aria-label]="'Select run ' + run.runId"
+                                 (change)="toggleRow(run, $event)" />
+                        }
+                      </td>
+                    }
+                    <td class="mono whitespace-nowrap text-[color:var(--text-secondary)]">#{{ run.runId }}
+                      @if (run.attempt > 1) { <span class="text-[11px] text-[color:var(--text-muted)]">attempt {{ run.attempt }}</span> }
+                      @if (run.backfillId) {
+                        <span class="block text-[11px] text-[color:var(--text-muted)] font-sans" data-test="failed-backfill"
+                              [title]="'Retried by its backfill: Runs › Backfills, Retry failed'">backfill #{{ run.backfillId }}</span>
+                      }</td>
+                    @if (platform()) { <td class="max-w-40 truncate" [title]="run.workspace || ''">{{ run.workspace || ('Workspace ' + run.tenantId) }}</td> }
+                    <td class="max-w-56">
+                      <span class="block truncate" [title]="run.pipeline || ''">{{ run.pipeline || '—' }}</span>
+                      <span class="block truncate text-[11px] text-[color:var(--text-muted)]" [title]="run.schedule || ''">{{ run.schedule }}</span>
+                    </td>
+                    <td class="whitespace-nowrap">
+                      <span class="block">{{ stepOf(run) }}</span>
+                      @if (run.task) { <span class="mono text-[11px] text-[color:var(--text-muted)]">{{ run.task }}</span> }
+                    </td>
+                    <td class="error-cell"><span class="block truncate" [title]="run.error || ''">{{ run.error || '—' }}</span></td>
+                    <td><span class="kind-chip">{{ run.kindLabel }}</span></td>
+                    <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ run.endedAt | serverTime:'recent' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          @if (pages() > 1) {
+            <div class="flex items-center justify-end gap-2 px-4 py-3 text-sm" data-test="failed-pages">
+              <span class="text-[color:var(--text-muted)]">Page {{ page() + 1 }} of {{ pages() }}</span>
+              <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() === 0" (click)="goTo(page() - 1)">
+                <app-icon name="chevronLeft" />Newer</button>
+              <button type="button" class="btn btn-ghost btn-sm" [disabled]="page() + 1 >= pages()" (click)="goTo(page() + 1)">
+                Older<app-icon name="chevronRight" /></button>
+            </div>
+          }
+        }
+      </section>
+      @if (canBulkRetry()) {
+        <app-bulk-bar [selection]="selection" kind="retry" [pageRows]="retryableOnPage()" (decided)="retried()" />
+      }
+    </div>
+  </div>
+</div>

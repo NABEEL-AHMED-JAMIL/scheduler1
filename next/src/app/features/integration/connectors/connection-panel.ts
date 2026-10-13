@@ -368,6 +368,6 @@ export class ConnectionPanel implements OnInit {
     this.ref.close();
     this.dialog.open<void>(ConnectPanel, sidePanelConfig<ConnectPanelData>({
       cards: this.data.cards, card: this.card(), connection: d.connection, changed: this.data.changed,
-    }, 'wide'));
+    }, 'wide', 'right'));
   }
 }

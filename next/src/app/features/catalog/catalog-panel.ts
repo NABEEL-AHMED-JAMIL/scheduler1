@@ -9,8 +9,8 @@ import { SidePanel } from '../../shared/ui/side-panel';
 import { ToastService } from '../../shared/ui/toast.service';
 import { CatalogApi } from './catalog.api';
 import {
-  AssetDetail, Grant, LineageGraph, SENSITIVITIES, TAGS, freshnessText, grantTone, isSensitive, kindText, lineageSides, nodeIcon,
-  sensitivityTone, sourceText, tagText, whereText,
+  AssetDetail, Grant, LineageGraph, SENSITIVITIES, TAGS, freshnessText, grantTone, isSensitive, kindText, lineageSides, nodeIcon, phiHint,
+  sensitivityTone, sourceText, tagText, tagsLevel, whereText,
 } from './catalog.model';
 
 /** What the page hands the panel: the asset to open, and a way to say the list should be read again. */
@@ -28,6 +28,7 @@ export interface CatalogPanelData {
 @Component({
   selector: 'app-catalog-panel',
   imports: [SidePanel, Icon, LoadError, ServerTimePipe],
+  styles: `tr.is-sensitive > td { background: color-mix(in oklab, var(--color-warn-500) 7%, transparent); }`,
   template: `
     <app-side-panel [heading]="asset()?.name || data.name" [subtitle]="subtitle()">
       @if (loading()) {
@@ -105,6 +106,18 @@ export interface CatalogPanelData {
                 <button type="button" class="btn btn-ghost btn-sm" [disabled]="busy()" (click)="scan()" data-scan><app-icon name="shield" />Scan for sensitive data</button>
               }
             </div>
+            <!-- UX review B5 (CT1): columns whose names read like patient data but carry no tag, said where the scan is. -->
+            @if (untaggedPhi().length) {
+              <div class="step-notice step-notice-warn" role="note" data-phi-hint>
+                <app-icon name="shield" class="icon-warn shrink-0 mt-0.5" />
+                <div class="text-xs">
+                  <b>{{ untaggedPhi().length }} {{ untaggedPhi().length === 1 ? 'column looks' : 'columns look' }} like patient data</b> but
+                  {{ untaggedPhi().length === 1 ? 'is' : 'are' }} not marked sensitive: {{ untaggedPhi().join(', ') }}.
+                  @if (a.canEdit) { Scan for sensitive data, or mark {{ untaggedPhi().length === 1 ? 'it' : 'them' }} below; marked values are masked for people without access. }
+                  @else { Ask a workspace admin to mark {{ untaggedPhi().length === 1 ? 'it' : 'them' }}. }
+                </div>
+              </div>
+            }
             @if (a.scanError) { <p class="text-xs text-[color:var(--text-muted)]">Last scan: {{ a.scanError }}</p> }
             @if (a.profileError) { <p class="text-xs text-[color:var(--text-muted)]">Last profile: {{ a.profileError }}</p> }
             @if (a.columns.length) {
@@ -112,8 +125,16 @@ export interface CatalogPanelData {
                 <thead><tr><th>Column</th><th>Type</th><th class="text-right">Empty</th><th>Holds</th></tr></thead>
                 <tbody>
                   @for (c of a.columns; track c.name) {
-                    <tr [attr.data-column]="c.name">
-                      <td class="mono">{{ c.name }}</td>
+                    <tr [attr.data-column]="c.name" [class.is-sensitive]="c.tags.length > 0">
+                      <td class="mono">
+                        <!-- UX review B5 (CT1): a sensitive column is marked where it is listed, not only in a select. -->
+                        <span class="inline-flex items-center gap-1.5">
+                          @if (c.tags.length) { <app-icon name="shield" size="0.9em" class="icon-warn" [attr.aria-label]="c.name + ' is sensitive'" /> }
+                          {{ c.name }}
+                        </span>
+                        @if (c.tags.length) { <span class="pill pill-warn ml-1" data-sensitive-column>Sensitive</span> }
+                        @else if (hintOf(c.name); as hint) { <span class="block text-[11px] text-[color:var(--warn-text)]" data-phi-column>looks like {{ hint }}</span> }
+                      </td>
                       <td class="text-xs">{{ c.dataType || '—' }}</td>
                       <td class="text-right tabular text-xs">{{ c.nullPercent != null ? c.nullPercent + '%' : '—' }}</td>
                       <td>
@@ -206,6 +227,9 @@ export class CatalogPanel implements OnInit {
   readonly icon = nodeIcon;
   readonly fresh = (at: string | null) => freshnessText(at);
   readonly where = whereText;
+  readonly hintOf = phiHint;
+  /** Columns whose names read like patient data and that nobody has tagged (B5, CT1). */
+  readonly untaggedPhi = computed(() => (this.asset()?.columns ?? []).filter(c => !c.tags.length && !c.tagsReviewed && phiHint(c.name)).map(c => c.name));
 
   readonly subtitle = computed(() => {
     const a = this.asset();
@@ -221,9 +245,7 @@ export class CatalogPanel implements OnInit {
   });
   /** What the tags alone make it: the highest level a tagged column raises it to. */
   readonly tagLevel = computed(() => {
-    const tags = (this.asset()?.columns ?? []).flatMap(c => c.tags);
-    if (tags.some(t => ['national_id', 'card_number', 'bank_account'].includes(t))) return 'Restricted';
-    return tags.length ? 'Confidential' : 'Unclassified';
+    return tagsLevel((this.asset()?.columns ?? []).flatMap(c => c.tags));
   });
 
   ngOnInit(): void {

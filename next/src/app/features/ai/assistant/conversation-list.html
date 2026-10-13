@@ -1,0 +1,149 @@
+<ng-template #pinGlyph>
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6Z" />
+  </svg>
+</ng-template>
+<ng-template #railGlyph>
+  <svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 4h16v16H4zM9 4v16" /><path [attr.d]="rail() ? 'm13 10 2 2-2 2' : 'm15 10-2 2 2 2'" />
+  </svg>
+</ng-template>
+
+@if (rail()) {
+  <!-- Folded: an icon rail -- unfold, search, and the newest conversations by their kind. -->
+  <div class="flex flex-col items-center gap-1 py-2 border-b border-subtle">
+    <h2 id="assistant-recent" class="sr-only">Conversations</h2>
+    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Show the conversations" title="Show the conversations" (click)="toggleRail()">
+      <ng-container [ngTemplateOutlet]="railGlyph" />
+    </button>
+    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Search the conversations" title="Search" (click)="searchFromRail()">
+      <app-icon name="search" />
+    </button>
+  </div>
+  <ul class="cl-rail-list" aria-label="Recent conversations" data-conversations>
+    @for (c of railRows(); track c.conversationId) {
+      <li>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm cl-rail-btn" [class.cl-active]="activeId() === c.conversationId"
+                [attr.aria-current]="activeId() === c.conversationId ? 'true' : null" [disabled]="disabled()" [title]="tip(c)"
+                [attr.aria-label]="title(c)" [attr.data-conversation]="c.conversationId" (click)="open(c)">
+          <app-icon [name]="icon(c)" />
+        </button>
+      </li>
+    }
+  </ul>
+} @else {
+  <div class="flex items-center justify-between gap-2 px-3 py-2 border-b border-subtle">
+    <h2 id="assistant-recent" class="font-semibold text-sm">Conversations</h2>
+    <div class="flex items-center">
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Refresh the conversations" title="Refresh" [disabled]="loading()" (click)="load()">
+        <app-icon name="refresh" [class.spin]="loading()" />
+      </button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm hidden xl:flex" aria-label="Fold the conversations to icons"
+              title="Fold to icons, for more chat room" (click)="toggleRail()">
+        <ng-container [ngTemplateOutlet]="railGlyph" />
+      </button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm xl:hidden" aria-label="Close the conversations" (click)="closed.emit()">
+        <app-icon name="close" />
+      </button>
+    </div>
+  </div>
+
+  <div class="flex flex-col gap-2 px-3 pt-2.5 pb-2">
+    <label class="search-field">
+      <app-icon name="search" size="0.9em" />
+      <input type="search" class="input input-sm" placeholder="Search titles and messages" aria-label="Search the conversations, titles and messages"
+             maxlength="200" [value]="query()" (input)="search($any($event.target).value)" (keydown.escape)="clearSearch()" />
+    </label>
+    <div class="seg w-full" role="group" aria-label="Show">
+      @for (ch of chips; track ch.id) {
+        <button type="button" class="seg-btn flex-1 justify-center" [class.seg-on]="chip() === ch.id" [attr.aria-pressed]="chip() === ch.id"
+                (click)="pick(ch.id)">{{ ch.label }}</button>
+      }
+    </div>
+  </div>
+
+  <div class="cl-scroll" data-conversations>
+    @if (error()) {
+      <div class="rounded-lg px-3 py-2 text-xs bg-crit-500/12 text-crit-500 flex items-start gap-2 mx-1 my-1" role="alert">
+        <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" /><span class="flex-1">{{ error() }}</span>
+        <button type="button" class="link-inline" (click)="load()">Retry</button>
+      </div>
+    }
+    @if (!shown().length && !error()) {
+      <p class="text-xs text-[color:var(--text-muted)] px-2 py-3" data-empty>
+        @if (loading()) { Loading… }
+        @else if (query()) { Nothing matches “{{ query() }}”. }
+        @else if (chip() !== 'all') { No {{ chip() === 'pipeline' ? 'pipeline designs' : chip() === 'run' ? 'runs' : 'questions' }} yet. }
+        @else { None yet. A question starts one. }
+      </p>
+    }
+    @for (g of groups(); track g.id) {
+      <section [attr.aria-labelledby]="'cl-group-' + g.id" [attr.data-group]="g.id">
+        <h3 class="cl-group" [id]="'cl-group-' + g.id">{{ g.label }}</h3>
+        <ul class="flex flex-col">
+          @for (c of g.rows; track c.conversationId) {
+            @let active = activeId() === c.conversationId;
+            @let b = badge(c);
+            <li class="cl-row" [class.cl-active]="active" [attr.data-conversation]="c.conversationId" [attr.data-kind]="kind(c)">
+              <span class="cl-kind" [class.cl-pipeline]="kind(c) === 'pipeline'" [class.cl-run]="kind(c) === 'run'" [title]="kindLabel[kind(c)]">
+                <app-icon [name]="icon(c)" size="0.95em" />
+                <span class="sr-only">{{ kindLabel[kind(c)] }}:</span>
+              </span>
+              @if (renamingId() === c.conversationId) {
+                <input class="input input-sm cl-lift min-w-0" data-rename aria-label="Conversation title" maxlength="200" [value]="renameText()"
+                       (input)="renameText.set($any($event.target).value)" (keydown.enter)="saveRename(c)" (keydown.escape)="cancelRename()"
+                       (blur)="saveRename(c)" />
+              } @else {
+                <button type="button" class="cl-open" [disabled]="disabled()" [attr.aria-current]="active ? 'true' : null" [title]="tip(c)" (click)="open(c)">
+                  {{ title(c) }}
+                </button>
+              }
+              <time class="cl-time" [attr.datetime]="c.dateUpdated">{{ time(c) }}</time>
+              <div class="cl-meta">
+                @if (c.pinned) { <span class="cl-pin-on inline-flex" title="Pinned"><ng-container [ngTemplateOutlet]="pinGlyph" /><span class="sr-only">Pinned</span></span> }
+                @if (b) {
+                  @if (b.link) {
+                    <a class="pill cl-lift" [class]="'pill-' + b.tone" [routerLink]="b.link" data-badge [title]="'Open: ' + b.label">{{ b.label }}</a>
+                  } @else {
+                    <span class="pill" [class]="'pill-' + b.tone" data-badge>{{ b.label }}</span>
+                  }
+                }
+              </div>
+              <div class="cl-actions" [class.cl-menu-open]="menuOpenId() === c.conversationId">
+                <button type="button" class="btn btn-ghost btn-icon btn-xs" [class.cl-pin-on]="c.pinned" [attr.aria-pressed]="!!c.pinned"
+                        [attr.aria-label]="(c.pinned ? 'Unpin ' : 'Pin ') + title(c)" [title]="c.pinned ? 'Unpin' : 'Pin'" (click)="togglePin(c)">
+                  <ng-container [ngTemplateOutlet]="pinGlyph" />
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + title(c)"
+                        title="More" (cdkMenuOpened)="menuOpenId.set(c.conversationId)" (cdkMenuClosed)="menuOpenId.set(null)">
+                  <app-icon name="dots" size="1em" />
+                </button>
+              </div>
+              <ng-template #rowMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
+                  <button cdkMenuItem class="menu-item" [cdkMenuItemDisabled]="disabled()" (cdkMenuItemTriggered)="open(c)"><app-icon name="chat" />Open</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="togglePin(c)">
+                    <ng-container [ngTemplateOutlet]="pinGlyph" />{{ c.pinned ? 'Unpin' : 'Pin' }}
+                  </button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="startRename(c)"><app-icon name="edit" />Rename</button>
+                  <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="askRemove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                </div>
+              </ng-template>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+    @if (more()) {
+      <div class="px-2 pt-2">
+        <button type="button" class="btn btn-default btn-sm w-full justify-center" [disabled]="loadingMore()" (click)="loadMore()">
+          {{ loadingMore() ? 'Loading…' : 'Load ' + (total() - rows().length > 50 ? 50 : total() - rows().length) + ' more' }}
+        </button>
+      </div>
+    }
+  </div>
+  <div class="flex items-center justify-between gap-2 px-3 py-2 border-t border-subtle text-xs text-[color:var(--text-muted)]">
+    <span>{{ total() }} conversation{{ total() === 1 ? '' : 's' }}</span>
+    <a class="link-inline font-medium" routerLink="/ai/assistant/conversations" data-see-all>See all<app-icon name="external" size="0.85em" /></a>
+  </div>
+}

@@ -7,6 +7,8 @@ import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { LoadError } from '../../../shared/ui/load-error';
 import { ManagedGrant, ManagedServiceApi } from './managed-service.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * MIG-254: a staff member (a platform administrator with grants) picks a customer's workspace to work in. Opening
@@ -15,21 +17,21 @@ import { ManagedGrant, ManagedServiceApi } from './managed-service.api';
  */
 @Component({
   selector: 'app-work-in-workspace',
-  imports: [Icon, ServerTimePipe, RouterLink, LoadError],
+  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, RouterLink, LoadError],
   template: `
     <div class="page">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title">Work in a workspace</h1>
-          <p class="page-subtitle">
-            Open a managed session in a customer's workspace you hold a grant for. You work there as its administrator,
-            and every change is audited. Exit returns you here.
-          </p>
+      <app-page-header>
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Work in a workspace</h1>
+            <p class="page-subtitle">
+              Open a managed session in a customer's workspace you hold a grant for. You work there as its administrator,
+              and every change is audited. Exit returns you here.
+            </p>
+          </div>
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
         </div>
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-      </div>
+      </app-page-header>
 
       @if (openError()) {
         <div class="card px-4 py-2.5 flex items-center gap-2 border-crit-500" role="alert">
@@ -47,7 +49,7 @@ import { ManagedGrant, ManagedServiceApi } from './managed-service.api';
           <h2 class="text-base font-semibold">You have no managed workspaces.</h2>
           <p class="text-sm text-[color:var(--text-secondary)] max-w-xl">
             A platform administrator grants them in
-            <a routerLink="/administration/managed-service" class="link-inline">Managed service</a>.
+            <a routerLink="/platform/managed-service" class="link-inline">Managed service</a>.
           </p>
         </div>
       } @else {

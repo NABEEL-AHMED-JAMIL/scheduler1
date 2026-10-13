@@ -14,6 +14,8 @@ export interface ReviewDecision {
   comment?: string | null;
   reason?: string | null;
   reviewer?: string | null;
+  /** Who decided, for their picture. */
+  reviewerUserId?: number | null;
   decidedAt?: string | null;
 }
 
@@ -23,8 +25,11 @@ export interface RunReviewView {
   jobId: number;
   reviewStatus: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
   required: ('internal' | 'customer')[];
-  decisions: ReviewDecision[];
+  /** Absent in some answers (a run whose review row is new): read as none. */
+  decisions?: ReviewDecision[];
   rerunJobQueueId?: number | null;
+  /** Whose Task inbox the internal review waits in: a role (TENANT_ADMIN, TENANT_USER) or a group (an access profile, by id). */
+  reviewers?: { kind?: string | null; value?: string | null } | null;
   you?: { party?: string | null; canDecide?: boolean; refusal?: string | null };
 }
 
@@ -54,7 +59,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
             <span class="pill {{ status().tone }}"><app-icon [name]="status().icon" size="0.85em" />{{ status().label }}</span>
             <span class="text-xs text-[color:var(--text-muted)]">Needs: {{ parties() }}</span>
           </div>
-          @if (r.decisions.length) {
+          @if (r.decisions?.length) {
             <ul class="space-y-1.5 text-sm">
               @for (d of r.decisions; track d.runReviewDecisionId) {
                 <li class="flex flex-wrap items-baseline gap-x-2">
@@ -70,7 +75,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
             </ul>
           }
           @if (r.rerunJobQueueId) {
-            <p class="text-sm">Run again as <a class="link" [href]="'/pipelines/schedules/' + r.jobId + '/runs/' + r.rerunJobQueueId + '/logs'">run #{{ r.rerunJobQueueId }}</a>.</p>
+            <p class="text-sm">Run again as <a class="link" [href]="'/pipelines/schedules/' + r.jobId + '/runs/' + r.rerunJobQueueId">run #{{ r.rerunJobQueueId }}</a>.</p>
           }
           @if (r.reviewStatus === 'PENDING') {
             @if (r.you?.canDecide) {
@@ -93,7 +98,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
                   </label>
                   <label class="flex items-center gap-2 text-sm">
                     <input id="reviewRerun" type="checkbox" class="checkbox" [checked]="rerun()" (change)="rerun.set($any($event.target).checked)" />
-                    Run the job again
+                    Run the schedule again
                   </label>
                   <div class="flex gap-2">
                     <button type="button" class="btn btn-danger btn-sm" [disabled]="busy() || !reason().trim()" (click)="decide('REJECTED')">Reject results</button>

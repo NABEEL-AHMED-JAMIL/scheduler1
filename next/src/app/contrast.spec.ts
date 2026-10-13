@@ -1,14 +1,15 @@
 /**
- * MIG-257: WCAG 2 contrast, measured from the tokens themselves.
+ * MIG-257: WCAG 2 contrast, measured from the tokens themselves -- for every app theme.
  *
  * Every ratio quoted in styles.css's comments was measured by hand once, and a later change to a
  * token could quietly undo it. This reads the token values out of styles.css for each theme --
- * @theme, then :root for light, then html.dark on top for dark -- resolves var() chains and
+ * @theme, then :root for light, html.dark on top for dark, and each app theme's own block on top
+ * of its family (THEMES: Ocean and High contrast on light, Midnight on dark) -- resolves var() chains and
  * color-mix(), and measures each pair a person actually reads: body text on every surface, the
  * buttons, every pill, the semantic text colours, and the chart colours that label a series.
  *
  *   4.5:1  text (WCAG 1.4.3 AA) -- body text, pills, a series colour used as a legend's text
- *   3:1    a mark that carries meaning without text (WCAG 1.4.11) -- a chart fill, a focus ring
+ *   3:1    a mark that carries meaning without text (WCAG 1.4.11) -- a chart fill, a focus ring, a control's edge
  */
 interface Fs { readFileSync(path: string, encoding: 'utf8'): string }
 
@@ -40,11 +41,19 @@ function declarations(body: string, into: Tokens): void {
   for (const m of body.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)) into.set(m[1], m[2].trim());
 }
 
-function theme(css: string, dark: boolean): Tokens {
+/** The five app themes and the selectors that build each, in cascade order (styles.css, "App themes"). */
+const THEMES: { id: string; selectors: string[] }[] = [
+  { id: 'light', selectors: [':root'] },
+  { id: 'dark', selectors: [':root', 'html.dark'] },
+  { id: 'ocean', selectors: [':root', 'html[data-theme="ocean"]:not(.dark)'] },
+  { id: 'midnight', selectors: [':root', 'html.dark', 'html.dark[data-theme="midnight"]'] },
+  { id: 'contrast', selectors: [':root', 'html[data-theme="contrast"]:not(.dark)'] },
+];
+
+function theme(css: string, selectors: string[]): Tokens {
   const tokens: Tokens = new Map();
   for (const b of blocks(css, '@theme')) declarations(b, tokens);
-  for (const b of blocks(css, ':root')) declarations(b, tokens);
-  if (dark) for (const b of blocks(css, 'html.dark')) declarations(b, tokens);
+  for (const selector of selectors) for (const b of blocks(css, selector)) declarations(b, tokens);
   return tokens;
 }
 
@@ -175,11 +184,10 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
       .toEqual([0xbb, 0x2d, 0x48, Math.round(0.22 * 255)]);
   });
 
-  for (const dark of [false, true]) {
-    const name = dark ? 'dark' : 'light';
+  for (const { id: name, selectors } of THEMES) {
     describe(`${name} theme`, () => {
       let tokens: Tokens;
-      beforeAll(async () => { tokens = theme(await stylesheet(), dark); });
+      beforeAll(async () => { tokens = theme(await stylesheet(), selectors); });
 
       it('text on every surface clears 4.5:1', () => {
         const off: string[] = [];
@@ -247,6 +255,94 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
             expect(measure(tokens, mark, bg), `${mark} on ${bg}`).toBeGreaterThanOrEqual(3);
           }
         }
+      });
+
+      /** UI that carries meaning without text (WCAG 1.4.11): a filled button is seen as a button. */
+      it('the primary and danger buttons stand 3:1 off the page and the card', () => {
+        for (const fill of ['--btn-primary-bg', '--btn-danger-bg']) {
+          for (const bg of ['--surface-page', '--surface-raised']) {
+            expect(measure(tokens, fill, bg), `${fill} on ${bg}`).toBeGreaterThanOrEqual(3);
+          }
+        }
+      });
+
+      /** Status text on the tint a row action hovers to, and on the page itself. */
+      it('status text clears 4.5:1 on its own soft tint', () => {
+        const off: string[] = [];
+        for (const [fg, bg] of [['--ok-text', '--ok-soft'], ['--crit-text', '--crit-soft'], ['--info-text', '--info-soft']]) {
+          const r = measure(tokens, fg, bg);
+          if (r < 4.5) off.push(`${fg} on ${bg}: ${r}`);
+        }
+        expect(off).toEqual([]);
+      });
+
+      /** The pickers draw each theme from --swatch-<id>-* (styles.css), plain values: they must be the theme's own. */
+      it('its picker swatches are its own resolved tokens', () => {
+        const same = (swatch: string, token: string) =>
+          expect(resolve(`var(--swatch-${name}-${swatch})`, tokens).map(c => Math.round(c * 255)), `${swatch} = ${token}`)
+            .toEqual(resolve(`var(${token})`, tokens).map(c => Math.round(c * 255)));
+        same('page', '--surface-page');
+        same('card', '--surface-raised');
+        same('accent', '--btn-primary-bg');
+        same('text', '--text-primary');
+      });
+
+      /**
+       * Owner 2026-10-13: a control's edge -- input, select, text area -- 3:1 against every surface a form sits on
+       * (WCAG 1.4.11), in every theme. It was --border-subtle, 1.13-1.24:1 in Light, Dark, Ocean and Midnight.
+       */
+      it('draws control borders 3:1 against the page, the card and the sunken and inset surfaces', () => {
+        const off: string[] = [];
+        for (const bg of ['--surface-page', '--surface-raised', '--surface-sunken', '--surface-inset']) {
+          const r = measure(tokens, '--border-control', bg);
+          if (r < 3) off.push(`--border-control on ${bg}: ${r}`);
+        }
+        expect(off).toEqual([]);
+      });
+
+      /** A focused control's ring stands 3:1 off the control's own resting edge's ground (the card). */
+      it('the focused control edge (--focus-ring) clears 3:1 on the card and the page', () => {
+        for (const bg of ['--surface-page', '--surface-raised', '--surface-sunken']) {
+          expect(measure(tokens, '--focus-ring', bg), `--focus-ring on ${bg}`).toBeGreaterThanOrEqual(3);
+        }
+      });
+
+      /** High contrast is the accessible choice for every edge: its quiet border reads 3:1 there too. */
+      if (name === 'contrast') {
+        it('draws even its quiet borders 3:1 against the page and the card', () => {
+          for (const edge of ['--border-subtle', '--border-strong']) {
+            for (const bg of ['--surface-page', '--surface-raised', '--surface-sunken']) {
+              expect(measure(tokens, edge, bg), `${edge} on ${bg}`).toBeGreaterThanOrEqual(3);
+            }
+          }
+        });
+      }
+
+      /** CONTRAST_REPORT=<file> appends the weakest pair of each kind to that file, for the record. */
+      it('reports its weakest pairs', async () => {
+        const env = (globalThis as unknown as { process?: { env?: Record<string, string> } }).process?.env ?? {};
+        const weakest = (pairs: [string, string, string?][]) => pairs
+          .map(([fg, bg, ground]) => ({ pair: `${fg} on ${bg}`, r: measure(tokens, fg, bg, ground) }))
+          .sort((a, b) => a.r - b.r)[0];
+        const text = weakest(TEXT.flatMap(fg => SURFACES.map(bg => [fg, bg] as [string, string])));
+        const pills = weakest(PILLS.map(t => [`--pill-${t}-fg`, `--pill-${t}-bg`] as [string, string]));
+        const charts = weakest(Array.from({ length: 8 }, (_, i) => [`--chart-${i}`, '--surface-raised'] as [string, string]));
+        const series = weakest(['brand', 'ok', 'warn', 'crit'].flatMap(f => [`--series-${f}`, `--series-${f}-soft`])
+          .map(t => [t, '--surface-raised'] as [string, string]));
+        const controls = weakest(['--surface-page', '--surface-raised', '--surface-sunken', '--surface-inset']
+          .map(bg => ['--border-control', bg] as [string, string]));
+        const marks = weakest(['--focus-ring', '--accent-mark', '--btn-primary-bg'].flatMap(m =>
+          ['--surface-page', '--surface-raised'].map(bg => [m, bg] as [string, string])));
+        if (env['CONTRAST_REPORT']) {
+          const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { appendFileSync(p: string, d: string): void };
+          fs.appendFileSync(env['CONTRAST_REPORT'], `${name}: text ${text.r} (${text.pair}); pills ${pills.r} (${pills.pair}); ` +
+            `chart ${charts.r} (${charts.pair}); status fills ${series.r} (${series.pair}); focus/marks ${marks.r} (${marks.pair}); ` +
+            `control borders ${controls.r} (${controls.pair}); ` +
+            `primary text on card ${measure(tokens, '--text-primary', '--surface-raised')}\n`);
+        }
+        expect(text.r).toBeGreaterThanOrEqual(4.5);
+        expect(series.r).toBeGreaterThanOrEqual(3);
+        expect(controls.r).toBeGreaterThanOrEqual(3);
       });
     });
   }

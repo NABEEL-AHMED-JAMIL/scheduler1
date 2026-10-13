@@ -13,6 +13,8 @@ import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './
 import { MoneyTotals, addMoney, formatMoney, formatTotals } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
  * Every billing document -- invoices, receipts, credit notes, statements, payment slips -- as a
@@ -21,7 +23,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
  */
 @Component({
   selector: 'app-billing-documents',
-  imports: [Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './documents.html',
 })
 export class BillingDocuments implements OnInit, OnDestroy {

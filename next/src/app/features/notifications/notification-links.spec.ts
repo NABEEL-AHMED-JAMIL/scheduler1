@@ -4,10 +4,10 @@ import { notificationTarget, openableTarget, pageKeyForPath } from './notificati
 describe('notificationTarget', () => {
   it('rewrites a route stored by the old app', () => {
     expect(notificationTarget('/jobList')).toBe('/pipelines/schedules');
-    expect(notificationTarget('/taskList')).toBe('/pipelines');
-    expect(notificationTarget('/objectBrowser')).toBe('/documents/files');
+    expect(notificationTarget('/taskList')).toBe('/pipelines/list');
+    expect(notificationTarget('/objectBrowser')).toBe('/data/files');
     expect(notificationTarget('/users')).toBe('/administration/users');
-    expect(notificationTarget('/tenants')).toBe('/administration/tenants');
+    expect(notificationTarget('/tenants')).toBe('/platform/workspaces');
   });
 
   // The stored links carry a query string the old app understood and this one has no route

@@ -13,7 +13,7 @@ import { Unauthorized } from './unauthorized';
  * Tenant-user review, 2026-09-24: "Go back" in a freshly opened tab went to about:blank, out of the console.
  * With nothing to go back to, it goes to the Dashboard instead.
  */
-function page(historyLength: number) {
+function page(historyLength: number, params: Record<string, string> = {}) {
   const back = vi.fn();
   const navigateByUrl = vi.fn();
   TestBed.resetTestingModule();
@@ -23,7 +23,7 @@ function page(historyLength: number) {
     { provide: Router, useValue: { navigateByUrl } },
     { provide: HttpClient, useValue: { post: () => of({}) } },
     { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
-    { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap({})) } },
+    { provide: ActivatedRoute, useValue: { queryParamMap: of(convertToParamMap(params)) } },
   ] });
   const component = TestBed.runInInjectionContext(() => new Unauthorized());
   (component as any).historyLength = () => historyLength;
@@ -43,5 +43,16 @@ describe('Unauthorized "Go back"', () => {
     component.back();
     expect(back).not.toHaveBeenCalled();
     expect(navigateByUrl).toHaveBeenCalledWith('/');
+  });
+
+  it('names the screen the person tried, and the page whose access opens it (MIG-321)', () => {
+    const { component } = page(2, { page: 'ai-prompts', title: 'AI Assistant' });
+    expect(component.screenLabel()).toBe('AI Assistant');
+    expect(component.pageLabel()).not.toBe('AI Assistant');
+  });
+
+  it('names the page itself when no title came with it', () => {
+    const { component } = page(2, { page: 'ai-prompts' });
+    expect(component.screenLabel()).toBe(component.pageLabel());
   });
 });

@@ -14,8 +14,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 describe('email notification labels', () => {
   it('are the edit form\'s wording', () => {
     expect(NOTIFY_OPTIONS.map(o => [o.control, o.label])).toEqual([
-      ['completeJob', 'The job completes'],
-      ['failJob', 'The job fails'],
+      ['completeJob', 'A run completes'],
+      ['failJob', 'A run fails'],
       ['skipJob', 'A run is skipped'],
     ]);
   });

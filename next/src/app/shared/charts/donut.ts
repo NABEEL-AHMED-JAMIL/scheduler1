@@ -33,7 +33,11 @@ export interface Slice { name: string; value: number; }
             }
           </svg>
           <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none px-3 text-center">
-            <span class="text-xl font-semibold tabular leading-none">{{ compactTotal() }}</span>
+            <!-- The hole is about 66px across. On the chart type scale (chart-type.ts) the total is at
+                 most the tile title's 14px -- it labels the ring, it is not the answer -- and a figure
+                 of seven characters or more steps down to 12 rather than spilling over the ring. -->
+            <span class="donut-total font-semibold tabular leading-none" [class.text-sm]="compactTotal().length <= 6"
+                  [class.text-xs]="compactTotal().length > 6">{{ compactTotal() }}</span>
             @if (totalLabel()) {
               <span class="text-[11px] leading-tight mt-0.5 max-w-[70px] truncate
                            text-[color:var(--text-muted)]" [title]="totalLabel()">
@@ -43,7 +47,7 @@ export interface Slice { name: string; value: number; }
           </div>
         </div>
 
-        <ul class="min-w-0 flex-1 max-w-80 space-y-1">
+        <ul class="min-w-0 flex-1 max-w-56 space-y-1">
           @for (segment of segments(); track segment.name) {
             <li class="flex items-center gap-2 text-[11px] leading-none"
                 [title]="segment.title + ': ' + segment.display">

@@ -21,10 +21,12 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { StepsApi } from '../../tasks/steps/steps.service';
 import { StepTaskEntry, withSwitchedLine } from '../../tasks/steps/steps.model';
-import { TaskStatePill } from '../../tasks/steps/task-switch';
+import { TaskStatePill, TaskSwitch } from '../../tasks/steps/task-switch';
 import { Pipeline, PipelineDialog, PipelineField } from '../pipelines/pipeline-dialog';
 import { TaskPanel, TaskPanelData, TaskPanelResult } from './task-panel';
 import { REGISTRY_KINDS, RegistryRow, TASK_STATES, filterRows, kindCounts, registryRows } from './task-registry.model';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** The whole scope's pipeline numbers, from pipeline.json/list, whatever filter is on. */
 interface PipelineSummary { total: number; active: number; fields: number; topics: number; untopped: number; }
@@ -44,7 +46,7 @@ const EMPTY_SUMMARY: PipelineSummary = { total: 0, active: 0, fields: 0, topics:
  */
 @Component({
   selector: 'app-task-registry',
-  imports: [MineFilter, StatTile, TableShell, TaskStatePill, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, StatTile, TableShell, TaskStatePill, TaskSwitch, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
   templateUrl: './task-registry.html',
 })
 export class TaskRegistry implements OnInit {
@@ -100,6 +102,29 @@ export class TaskRegistry implements OnInit {
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   /** Switches the workspace's tasks, as on the step builder's Settings tab (Core refuses anyone else). */
   readonly isWorkspaceAdmin = computed(() => this.auth.isTenantAdmin());
+  /**
+   * UX review 2026-10-12 (B2, P7, P8): the workspace's task switches live here, on each step task's row -- not on one
+   * pipeline's Settings tab. A legacy row is a pipeline, never switched.
+   */
+  readonly canSwitch = computed(() => this.isWorkspaceAdmin() && !this.locked());
+  readonly switching = signal<string | null>(null);
+
+  /** Switches a task on or off in this workspace, or (null) back to its default; the row shows Core's answer. */
+  switchTask(task: StepTaskEntry, enabled: boolean | null): void {
+    if (!this.canSwitch() || this.switching()) return;
+    this.switching.set(task.code);
+    this.api.switchTask(task.code, enabled).subscribe({
+      next: r => {
+        this.switching.set(null);
+        if (r.status !== API_SUCCESS) { this.toast.error(r.message || 'The task could not be switched.'); this.tasks.update(list => [...list]); return; }
+        this.toast.success(r.message || 'Switched.');
+        const line = r.data;
+        if (line?.code) this.tasks.update(list => withSwitchedLine(list, line));
+        else this.loadTasks();
+      },
+      error: err => { this.switching.set(null); this.toast.error(err?.error?.message || 'The task could not be switched.'); this.tasks.update(list => [...list]); },
+    });
+  }
 
   // ---- rows -----------------------------------------------------------------------------------------------------
   readonly rows = computed(() => registryRows(this.pipelinesOnly() ? this.tasks().filter(t => t.kind === 'Legacy' || t.code === 'legacy') : this.tasks(), this.forms()));
@@ -200,7 +225,7 @@ export class TaskRegistry implements OnInit {
       isAdmin: this.isWorkspaceAdmin() && !this.locked(),
       onSwitched: line => this.tasks.update(list => withSwitchedLine(list, line)),
     };
-    this.dialog.open<TaskPanelResult>(TaskPanel, sidePanelConfig(data, 'wide')).closed.subscribe(result => {
+    this.dialog.open<TaskPanelResult>(TaskPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(result => {
       if (result === 'edit' && target.pipeline && !this.locked()) this.edit(target.pipeline);
     });
   }

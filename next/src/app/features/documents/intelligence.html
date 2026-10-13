@@ -1,35 +1,35 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Document Intelligence</h1>
-      <p class="page-subtitle">
-        Upload documents, mail them to the workspace's email-in address, or read one from a storage connection; each one is
-        read, split into fields against its document type and checked. Values it is not sure of go to the review queue.
-      </p>
-    </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="loading() || datasetLoading()">
-        <app-icon name="refresh" [class.spin]="loading() || datasetLoading()" />Refresh
-      </button>
-      @if (canManage()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="readDocument()"><app-icon name="folder" />Read a stored file</button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
-    </div>
-  </div>
+  <!-- UX review B4 (DI1): the standard header -- Refresh, the overflow (a new type, a stored file) and the one primary. -->
+  <app-page-header [title]="heading()"
+                   subtitle="Upload, mail in or read stored documents; each is split into fields against its document type, and values it is unsure of go to Document review.">
+    <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
+    <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow data-test="intelligence-more" [cdkMenuTriggerFor]="headerMenu" aria-label="More actions">
+      <app-icon name="dots" size="1.05em" />
+    </button>
+    <ng-template #headerMenu>
+      <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
+        @if (canManage()) {
+          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openType(null)"><app-icon name="plus" />New document type</button>
+        }
+        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="readDocument()"><app-icon name="folder" />Read a stored file</button>
+      </div>
+    </ng-template>
+    <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
+  </app-page-header>
   <app-managed-banner what="document types" />
 
-  <div class="tabs" role="tablist" aria-label="Document Intelligence">
-    @for (t of tabs; track t.id) {
-      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
-    }
-  </div>
+  @if (!hubView) {
+    <div class="tabs" role="tablist" aria-label="Document Intelligence">
+      @for (t of tabs; track t.id) {
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
+      }
+    </div>
+  }
 
   @switch (tab()) {
     @case ('types') {
       <app-table-shell data-test="types" heading="Document types" columnsKey="document-types" [loading]="!types().length && !typesError()" [error]="typesError()"
-                       [isEmpty]="!types().length" [shown]="types().length" emptyMessage="No document types." emptyIcon="file" (retry)="loadTypes()">
+                       [isEmpty]="!types().length" [shown]="types().length" [emptyMessage]="'No document types yet. Add one for each kind of document you receive: ' + exampleTypes + '.'" emptyIcon="file" (retry)="loadTypes()">
         <table class="table-modern">
           <thead>
             <tr>
@@ -92,7 +92,7 @@
             @for (r of dataset(); track r.datasetRowId) {
               <tr>
                 <td class="whitespace-nowrap">
-                  <a class="link-inline mono text-xs" [routerLink]="['/documents/review', r.extractionId]">#{{ r.extractionId }}</a>
+                  <a class="link-inline mono text-xs" [routerLink]="['/review/documents', r.extractionId]">#{{ r.extractionId }}</a>
                   <span class="block text-xs text-[color:var(--text-muted)]">v{{ r.documentTypeVersion }}</span>
                 </td>
                 <td class="text-xs whitespace-nowrap">
@@ -179,7 +179,7 @@
                   @if (i.extractionNote) { <span class="block text-[color:var(--warn-text)] mt-0.5">{{ i.extractionNote }}</span> }
                 </td>
                 <td class="text-xs whitespace-nowrap">
-                  @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/documents/review', i.extractionId]">#{{ i.extractionId }}</a> }
+                  @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/review/documents', i.extractionId]">#{{ i.extractionId }}</a> }
                   @else if (i.ocrDocumentId) { <span class="mono">OCR {{ i.ocrDocumentId }}</span> } @else { — }
                 </td>
                 <td class="text-xs whitespace-nowrap">@if (i.dateCreated) { {{ i.dateCreated | serverTime: 'recent' }} } @else { — }</td>
@@ -193,25 +193,46 @@
     @default {
       <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Document Intelligence at a glance" />
 
-      <section aria-label="Document types" class="type-cards" data-test="type-cards">
-        @for (t of activeTypes(); track t.documentTypeId) {
-          <button type="button" class="card p-4 type-card" [attr.aria-label]="t.name + ': ' + countOf(t.fieldCount ?? 0, 'field') + ', ' + countOf(documentsOf(t), 'document')" (click)="openType(t)">
-            <app-icon [name]="typeIcon(t)" size="1.25rem" class="text-[color:var(--text-secondary)]" />
-            <span class="font-medium text-sm truncate w-full">{{ t.name }}</span>
-            <span class="text-xs text-[color:var(--text-muted)]">{{ countOf(t.fieldCount ?? 0, 'field') }} · {{ countOf(documentsOf(t), 'doc') }}</span>
-            @if (!t.builtIn) { <span class="pill pill-neutral">This workspace</span> }
-          </button>
-        }
-        @if (canManage()) {
-          <button type="button" class="card p-4 type-card type-card-add" (click)="openType(null)">
-            <app-icon name="plus" size="1.25rem" /><span class="text-xs">Custom type</span>
-          </button>
-        }
+      <!-- UX review DI1 (2026-10-13): the types once, with what an approved document of each starts (the schedules set to
+           run "Also when a document is approved", MIG-364) -- not the Document types view again as cards. -->
+      <section class="card overflow-hidden" aria-labelledby="type-starts-title" data-test="type-starts">
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 pt-3 pb-2">
+          <h3 class="chart-title m-0" id="type-starts-title">What approved documents start</h3>
+          <span class="chart-sub">A schedule set to run when a document of its type is approved starts once per approved document (or batch).</span>
+          @if (canManage()) {
+            <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="openType(null)"><app-icon name="plus" />Custom type</button>
+          }
+        </div>
+        <ul class="type-starts">
+          @for (row of typeStarts(); track row.type.documentTypeId) {
+            <li class="type-start" [attr.data-type]="row.type.typeKey">
+              <app-icon [name]="typeIcon(row.type)" class="text-[color:var(--text-secondary)]" />
+              <button type="button" class="link-inline font-medium text-left truncate" [title]="row.type.name" (click)="openType(row.type)">{{ row.type.name }}</button>
+              <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ countOf(row.type.fieldCount ?? 0, 'field') }} · {{ countOf(documentsOf(row.type), 'doc') }}</span>
+              <span class="text-xs min-w-0" data-test="type-start-what">
+                @if (!canSeeSchedules()) {
+                  <span class="text-[color:var(--text-muted)]">—</span>
+                } @else if (triggers() === null) {
+                  <span class="text-[color:var(--text-muted)]">Reading the schedules…</span>
+                } @else if (row.starts.length) {
+                  <span class="text-[color:var(--text-secondary)]">Starts </span>
+                  @for (s of row.starts; track s.jobId; let last = $last) {
+                    <a class="link-inline" [routerLink]="['/pipelines/schedules', s.jobId, 'executions']" [attr.data-job]="s.jobId">{{ s.name }}</a>@if (!s.on) {<span class="text-[color:var(--text-muted)]"> ({{ s.why }})</span>}@if (!last) {<span>, </span>}
+                  }
+                } @else {
+                  <span class="text-[color:var(--text-muted)]">Starts nothing: set it on a schedule (Also when a document is approved)</span>
+                }
+              </span>
+            </li>
+          } @empty {
+            <li class="px-4 py-3 text-sm text-[color:var(--text-muted)] border-t border-subtle">No active document types.</li>
+          }
+        </ul>
       </section>
 
       <app-table-shell data-test="recent" heading="Recent documents" columnsKey="document-recent" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="recent().length"
-                       [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : 'No documents yet. Upload one: a PDF or an image.'"
+                       [emptyMessage]="hasFilters() ? 'No document matches the current filters.' : 'No documents yet. Upload one as a PDF or an image: ' + exampleTypes + '.'"
                        emptyIcon="file" (retry)="load()">
         <ng-container toolbar>
           <select class="input max-w-40" aria-label="Document type" [value]="typeFilter()" (change)="typeFilter.set($any($event.target).value)">
@@ -242,7 +263,7 @@
               <th>Confidence</th>
               <th>State</th>
               <th>Received</th>
-              <th class="w-12"><span class="sr-only">Actions</span></th>
+              <th class="w-12 th-actions">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -250,7 +271,7 @@
               <tr>
                 <td class="max-w-72">
                   @if (r.extraction) {
-                    <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/documents/review', r.extraction.extractionId]">{{ r.name }}</a>
+                    <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/review/documents', r.extraction.extractionId]">{{ r.name }}</a>
                   } @else { <span class="font-medium [overflow-wrap:anywhere]">{{ r.name }}</span> }
                   @if (r.where) { <span class="block text-xs text-[color:var(--text-muted)]">{{ r.where }}</span> }
                 </td>

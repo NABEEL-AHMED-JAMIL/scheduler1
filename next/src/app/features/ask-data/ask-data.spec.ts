@@ -5,8 +5,10 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { Observable, Subject, of, throwError } from 'rxjs';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, chartItems, csvOf, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, chartAnswerOf, csvOf, refusalText, searchedText, segments } from './ask-data.model';
 import { AskData } from './ask-data';
+import { AuthService } from '../../core/auth/auth.service';
+import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
 const SEARCHED = { documents: 1, runOutputs: 2 };
 
@@ -25,6 +27,8 @@ const NOT_FOUND: AskAnswer = { ...ANSWER, question: 'Capital of France?', answer
 interface Setup {
   suggestions?: () => Observable<unknown>;
   ask?: (q: string) => Observable<unknown>;
+  /** The sign-in's workspace; null for a platform administrator's own (review 2026-10-07, L6). */
+  tenantId?: number | null;
 }
 
 function render(setup: Setup = {}) {
@@ -36,7 +40,8 @@ function render(setup: Setup = {}) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     imports: [AskData],
-    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AskDataApi, useValue: api }],
+    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AskDataApi, useValue: api },
+      { provide: AuthService, useValue: { isTenantAdmin: () => false, canOpen: () => true, canEditDashboards: () => true, user: () => ({ appUserId: 4641, tenantId: setup.tenantId === undefined ? 2960 : setup.tenantId }) } }],
   });
   const fixture = TestBed.createComponent(AskData);
   fixture.detectChanges();
@@ -64,6 +69,14 @@ describe('Ask your data -- the pure pieces', () => {
 });
 
 describe('Ask your data -- as drawn', () => {
+  it('asks nothing of a sign-in with no workspace, and points to Work in a workspace (review 2026-10-07, L6)', () => {
+    const { q, api } = render({ tenantId: null });
+    expect(api.suggestions).not.toHaveBeenCalled();
+    expect(q('[data-test=needs-workspace]')!.textContent).toContain('Ask your data is a workspace\'s, and this sign-in has none.');
+    expect(q('[data-test=needs-workspace] a')!.getAttribute('href')).toBe('/platform/work-in-workspace');
+    expect(q('[data-test=question]')).toBeNull();
+  });
+
   it('opens with examples built from the workspace and what it searches', () => {
     const { el, q, api } = render();
     expect(api.suggestions).toHaveBeenCalledTimes(1);
@@ -178,27 +191,98 @@ describe('Ask your data -- a question answered by a query (MIG-283)', () => {
     sql: 'SELECT city, sum(amount) AS total FROM dataset GROUP BY city ORDER BY total DESC\nLIMIT 200',
     dataset: { datasetId: 1002, name: 'Customers small', connection: 's3', path: 'customers.csv' },
     columns: ['city', 'total'], rows: [['Austin', '120.5'], ['Paris, FR', '80']], rowCount: 2, truncated: false,
-    chart: { type: 'bar' as const, label: 'city', value: 'total' },
+    chart: { kind: 'donut', title: 'Total by city', caption: 'The total amount for each city.', xAxis: 'City', yAxis: 'Total',
+      stack: 'none' as const, sort: 'desc' as const, topN: 0, additive: true, source: 'model' as const },
+    summary: '2 rows; the first: Austin, 120.5.',
   };
 
-  it('shows the sentence, the chart, the rows and the query it ran -- and hands the query to Analytics Studio', () => {
+  it('shows the sentence, the chart, the rows and the query it ran -- and hands the query to Analytics Studio', async () => {
     const { screen, fixture, q } = render({ ask: (question: string) => of({ status: 'SUCCESS', data: {
-      question, kind: 'query', answer: '2 rows; the first: Austin, 120.5.', notFound: false, sources: [], query: QUERY,
+      question, kind: 'query', answer: 'The total amount for each city.', notFound: false, sources: [], query: QUERY,
       model: 'gemma3:1b', connection: 'Local Ollama', runId: 9, latencyMs: 2100, searched: { datasets: 1 }, warnings: [] } }) });
     screen.ask('Total amount by city');
     fixture.detectChanges();
-    expect(q('[data-test="query-answer"] [data-test="answer"]')?.textContent).toContain('2 rows; the first: Austin, 120.5.');
-    expect(q('[data-test="query-chart"]')?.textContent).toContain('Austin');
+    await vi.waitFor(() => { fixture.detectChanges(); if (!q('[data-test="chart-answer"]')) throw new Error('the chart is still loading'); });
+    expect(q('[data-test="query-answer"] [data-test="answer"]')?.textContent).toContain('The total amount for each city.');
+    // UX review 2026-10-12: the rows' raw first line is folded under Details.
+    expect(q('[data-test="answer-details"]')?.hasAttribute('open')).toBe(false);
+    expect(q('[data-test="answer-details"] [data-test="answer-summary"]')?.textContent).toContain('From the rows: 2 rows; the first: Austin, 120.5.');
+    // The figures right-aligned, the names not.
+    expect(Array.from(fixture.nativeElement.querySelectorAll('[data-test="query-rows"] th')).map((th: any) => th.classList.contains('num')))
+      .toEqual([false, true]);
+    // MIG-357: the chart card draws the model's kind (a ring: two cities whose totals add up) over the rows that ran.
+    expect(q('[data-test="query-chart"] [data-test="chart-answer"]')?.getAttribute('data-kind')).toBe('donut');
+    expect(q('[data-test="chart-title"]')?.textContent).toContain('Total by city');
+    expect(q('[data-test="chart-fallback"]')).toBeNull();
+    expect(q('[data-test="pin-chart"]')).not.toBeNull();
     expect(q('[data-test="query-rows"]')?.textContent).toContain('Paris, FR');
     expect(q('[data-test="query-sql"]')?.textContent).toContain('GROUP BY city');
     expect(q('[data-test="open-analytics"]')?.getAttribute('href')).toContain('sql=SELECT');
     expect(q('[data-test="meta"]')?.textContent).toContain('1 dataset');
   });
 
-  it('turns the rows into CSV and the chart into bars', () => {
+  it('turns the rows into CSV and the answer into the chart card\'s', () => {
     expect(csvOf(QUERY)).toBe('city,total\r\nAustin,120.5\r\n"Paris, FR",80\r\n');
-    expect(chartItems(QUERY)).toEqual([{ name: 'Austin', value: 120.5 }, { name: 'Paris, FR', value: 80 }]);
-    expect(chartItems({ ...QUERY, chart: null })).toEqual([]);
+    expect(chartAnswerOf(QUERY).chart?.kind).toBe('donut');
+    expect(chartAnswerOf(QUERY).summary).toBe('2 rows; the first: Austin, 120.5.');
+    // An older ai-service's bar hint is not a chart answer: the card picks from the shape.
+    expect(chartAnswerOf({ ...QUERY, chart: { type: 'bar', label: 'city', value: 'total' } as never }).chart).toBeNull();
+  });
+
+  it('falls back to a kind that fits when the model\'s cannot draw the rows, and says why', async () => {
+    const averages = { ...QUERY, chart: { ...QUERY.chart, kind: 'donut', additive: false } };
+    const { screen, fixture, q } = render({ ask: (question: string) => of({ status: 'SUCCESS', data: {
+      question, kind: 'query', answer: 'The average amount for each city.', notFound: false, sources: [], query: averages,
+      model: 'qwen3:8b', connection: 'Local Ollama', runId: 9, latencyMs: 2100, searched: { datasets: 1 }, warnings: [] } }) });
+    screen.ask('Average amount by city');
+    await vi.waitFor(() => { fixture.detectChanges(); if (!q('[data-test="chart-answer"]')) throw new Error('the chart is still loading'); });
+    expect(q('[data-test="chart-answer"]')?.getAttribute('data-kind')).not.toBe('donut');
+    expect(q('[data-test="chart-fallback"]')?.textContent).toContain('was asked for, but');
   });
 });
 
+describe('Ask your data -- before the first question (UX final AD1)', () => {
+  useMemoryStorage();
+
+  it('offers healthcare examples on a first visit that fill the box, and says an answer can be pinned', () => {
+    const { el, q, screen, fixture, api } = render();
+    expect(q('[data-test="examples"]')).not.toBeNull();
+    expect(q('[data-test="recent"]')).toBeNull();
+    expect(q('[data-test="pin-hint"]')!.textContent).toContain('Pin to dashboard');
+    const example = [...el.querySelectorAll<HTMLButtonElement>('[data-test="examples"] button')][0];
+    example.click();
+    fixture.detectChanges();
+    expect(screen.question()).toBe(example.textContent!.trim());
+    expect(api.ask).not.toHaveBeenCalled();
+  });
+
+  it('remembers this viewer\'s questions and lists them next time, asked again on a click', () => {
+    const first = render();
+    first.screen.ask('How many readmissions were there each month?');
+    expect(JSON.parse(localStorage.getItem('etl.ask.history.2960.4641')!).questions[0].question)
+      .toBe('How many readmissions were there each month?');
+    const { el, q, api, fixture } = render();
+    expect(q('[data-test="examples"]')).toBeNull();
+    const again = el.querySelector<HTMLButtonElement>('[data-test="recent"] li button')!;
+    expect(again.textContent!.trim()).toBe('How many readmissions were there each month?');
+    again.click();
+    fixture.detectChanges();
+    expect(api.ask).toHaveBeenCalledWith('How many readmissions were there each month?');
+    expect(q('[data-test="ask-start"]')).toBeNull();
+  });
+
+  it('lists an answer pinned from here with a link to its dashboard, and forgets on Clear', () => {
+    const first = render();
+    first.screen.ask('Readmissions by month?');
+    first.screen.onPinned(first.screen.turns()[0], { dashboard: { analyticsDashboardId: 77, dashboardName: 'Quality board', created: false },
+      analyticsQueryId: 5, widget: { analyticsDashboardWidgetId: 9, analyticsDashboardId: 77, widgetTitle: 'Readmissions' } } as never);
+    const { q, fixture } = render();
+    const link = q('[data-test="pinned"] a.link-inline') as HTMLAnchorElement;
+    expect(link.textContent!.trim()).toBe('Readmissions');
+    expect(link.getAttribute('href')).toBe('/data/analytics/dashboards?board=77');
+    (q('[data-test="forget"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(localStorage.getItem('etl.ask.history.2960.4641')).toBeNull();
+    expect(q('[data-test="examples"]')).not.toBeNull();
+  });
+});

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { Router, UrlTree } from '@angular/router';
-import { AuthService } from './auth.service';
+import { AuthService, EXPLICIT_PAGES } from './auth.service';
 import { AuthUser, ROLE_RANK, UserRole } from './auth.models';
 import { pageGuard } from './auth.guard';
 import { PAGE_LABELS, isPageKey } from './page-keys';
@@ -77,6 +77,25 @@ describe('AuthService.canOpen', () => {
     expect(service().canOpen('jobs')).toBe(false);
   });
 
+  // MIG-336, owner: the API docs are for administrators and developers only.
+  it('opens the developer portal to an administrator, and to a tenant user only when their profile names it', () => {
+    storedUser('TENANT_ADMIN', []);
+    expect(service().canOpen('developer-portal')).toBe(true);
+    storedUser('PLATFORM_ADMIN', undefined);
+    expect(service().canOpen('developer-portal')).toBe(true);
+    storedUser('TENANT_USER', ['jobs', 'developer-portal']);
+    expect(service().canOpen('developer-portal')).toBe(true);
+    storedUser('TENANT_USER', ['jobs']);
+    expect(service().canOpen('developer-portal')).toBe(false);
+    // Unlike every other page, no profile at all is not enough.
+    storedUser('TENANT_USER', undefined);
+    const profileless = service();
+    expect(profileless.canOpen('developer-portal')).toBe(false);
+    expect(profileless.canOpen('reports')).toBe(true);
+    expect(EXPLICIT_PAGES).toEqual(['developer-portal']);
+    expect(PAGE_LABELS['developer-portal']).toBe('Developer portal');
+  });
+
   it('picks up a changed list from a token refresh through patchUser', () => {
     storedUser('TENANT_USER', ['jobs']);
     const auth = service();
@@ -88,9 +107,9 @@ describe('AuthService.canOpen', () => {
 });
 
 describe('pageGuard', () => {
-  const snapshotWith = (data: any) => ({ data, url: [] }) as any;
+  const snapshotWith = (data: any, title?: string) => ({ data, url: [], routeConfig: title ? { title } : {} }) as any;
 
-  function run(pageKeys: string[] | undefined, role: UserRole, data: any) {
+  function run(pageKeys: string[] | undefined, role: UserRole, data: any, title?: string) {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       providers: [
@@ -102,18 +121,32 @@ describe('pageGuard', () => {
           },
         },
         { provide: Router, useValue: { createUrlTree: (c: any[], extras?: any) =>
-          ({ toString: () => c.join('/') + (extras?.queryParams?.page ? '?page=' + extras.queryParams.page : '') }) as UrlTree } },
+          ({ toString: () => c.join('/') + (extras?.queryParams?.page ? '?page=' + extras.queryParams.page : '')
+            + (extras?.queryParams?.title ? '&title=' + extras.queryParams.title : '') }) as UrlTree } },
       ],
     });
-    return TestBed.runInInjectionContext(() => pageGuard(snapshotWith(data), {} as any));
+    return TestBed.runInInjectionContext(() => pageGuard(snapshotWith(data, title), {} as any));
   }
 
   it('sends a tenant user without the page to /unauthorized, naming the page', () => {
     expect(String(run(['jobs'], 'TENANT_USER', { pageKey: 'reports' }))).toBe('/unauthorized?page=reports');
   });
 
+  it('names the screen too, when it opens with another page\'s access (MIG-321)', () => {
+    expect(String(run(['jobs'], 'TENANT_USER', { pageKey: 'ai-prompts' }, 'AI Assistant')))
+      .toBe('/unauthorized?page=ai-prompts&title=AI Assistant');
+  });
+
   it('lets a tenant user through a page they hold', () => {
     expect(run(['jobs', 'reports'], 'TENANT_USER', { pageKey: 'reports' })).toBe(true);
+  });
+
+  it('opens a route several pages open with any one of them (UX review 2026-10-12, R2: the run page and the Queue)', () => {
+    const run_ = { pageKey: 'jobs', pageKeys: ['jobs', 'queue'] };
+    expect(run(['queue', 'task-inbox'], 'TENANT_USER', run_, 'Run logs')).toBe(true);
+    expect(run(['jobs'], 'TENANT_USER', run_, 'Run logs')).toBe(true);
+    // A viewer holds neither: refused, naming the first.
+    expect(String(run(['reports', 'analytics-dashboards'], 'TENANT_USER', run_, 'Run logs'))).toBe('/unauthorized?page=jobs&title=Run logs');
   });
 
   it('lets an admin through regardless', () => {

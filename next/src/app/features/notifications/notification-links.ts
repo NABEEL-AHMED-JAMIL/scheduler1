@@ -11,10 +11,10 @@ import { PageKey } from '../../core/auth/page-keys';
  */
 const ROUTE_MAP: Record<string, string> = {
   '/jobList': '/pipelines/schedules',
-  '/taskList': '/pipelines',
-  '/objectBrowser': '/documents/files',
+  '/taskList': '/pipelines/list',
+  '/objectBrowser': '/data/files',
   '/users': '/administration/users',
-  '/tenants': '/administration/tenants',
+  '/tenants': '/platform/workspaces',
 };
 
 /**
@@ -27,9 +27,15 @@ const ROUTE_MAP: Record<string, string> = {
 export function notificationTarget(linkUrl: string | null | undefined): string | null {
   const raw = (linkUrl ?? '').trim();
   if (!raw) return null;
-  const [path] = raw.split('?');
+  const [path, query] = raw.split('?');
+  // MIG-355: an alert's link names what it is about (the pipeline on Runs › Failed, the service on Reliability); those
+  // pages read their query, so it is kept for them alone.
+  if (query && QUERY_KEPT.includes(path) && /^[A-Za-z0-9=&_.:-]{1,200}$/.test(query)) return `${path}?${query}`;
   return ROUTE_MAP[path] ?? (path.startsWith('/') ? path : null);
 }
+
+/** The pages of today's console whose links carry a query they read (MIG-355's alerts). */
+const QUERY_KEPT = ['/runs/failed', '/platform/reliability', '/settings/alerts'];
 
 /**
  * The page an access profile governs at each path, most specific first so the saved-analysis
@@ -39,6 +45,29 @@ export function notificationTarget(linkUrl: string | null | undefined): string |
  * redirect turns them into today's.
  */
 const PAGE_PATHS: [string, PageKey][] = [
+  // Tab hubs (2026-10-12): each page at its hub's address.
+  ['/runs/latest', 'jobs'],
+  ['/runs/by-date', 'queue'],
+  ['/runs/analytics', 'reports'],
+  ['/runs/failed', 'queue'],
+  ['/pipelines/prompts', 'ai-prompts'],
+  ['/data/files', 'objects'],
+  ['/data/reports', 'tools-converter'],
+  ['/documents/in', 'document-intelligence'],
+  ['/documents/types', 'document-intelligence'],
+  ['/documents/datasets', 'document-intelligence'],
+  ['/documents/email-in', 'document-intelligence'],
+  ['/documents/file-drop', 'objects'],
+  ['/tools/converter', 'tools-converter'],
+  ['/tools/transcript', 'tools-transcript'],
+  ['/connections/connectors', 'connector-hub'],
+  ['/connections/api-collections', 'api-collections'],
+  ['/connections/sources', 'sources'],
+  ['/connections/databases', 'sources'],
+  ['/connections/contracts', 'sources'],
+  ['/settings/tools', 'ai-prompts'],
+  ['/developers/portal', 'developer-portal'],
+  // Before the tab hubs: the addresses the server has already stored.
   ['/pipelines/schedules', 'jobs'],
   ['/pipelines/executions', 'jobs'],
   ['/pipelines/queue', 'queue'],
@@ -62,8 +91,6 @@ const PAGE_PATHS: [string, PageKey][] = [
   ['/objects/files', 'objects'],
   ['/objects/analytics/dashboards', 'analytics-dashboards'],
   ['/objects/analytics', 'analytics'],
-  ['/tools/converter', 'tools-converter'],
-  ['/tools/transcript', 'tools-transcript'],
   ['/assistants/prompts', 'ai-prompts'],
 ];
 
@@ -81,6 +108,6 @@ export function pageKeyForPath(path: string): PageKey | null {
 export function openableTarget(linkUrl: string | null | undefined, canOpen: (page: PageKey) => boolean): string | null {
   const target = notificationTarget(linkUrl);
   if (!target) return null;
-  const key = pageKeyForPath(target);
+  const key = pageKeyForPath(target.split('?')[0]);
   return key && !canOpen(key) ? null : target;
 }

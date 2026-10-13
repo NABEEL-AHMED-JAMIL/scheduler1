@@ -66,29 +66,29 @@ describe('MIG-250: Configuration › Task Registry', () => {
   afterEach(() => { restoreClock(); closeOverlays(); });
 
   it('the registry, as a workspace administrator', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the registry, as a workspace administrator', { ...v.surface, rows: rowsOf(v) }, PINNED);
   });
 
   it('the registry, as a platform administrator', async () => {
-    const v = await visit('/configuration/task-registry', 'PLATFORM_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'PLATFORM_ADMIN', null, ANSWERS);
     pin(FILE, 'the registry, as a platform administrator', { ...v.surface, rows: rowsOf(v) }, PINNED);
   });
 
   it('the registry, as a tenant user (admin-only)', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_USER', TU_PAGES, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_USER', TU_PAGES, ANSWERS);
     pin(FILE, 'the registry, as a tenant user (admin-only)', v.surface, PINNED);
   });
 
   it('the registry when Core cannot read it', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, {
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, {
       'GET /pipeline.json/steps/tasks': { status: 'ERROR', message: 'The Task Registry is not available.', data: null },
     });
     pin(FILE, 'the registry when Core cannot read it', { rows: rowsOf(v), alert: clean(v.main.querySelector('[role="alert"]')?.textContent) }, PINNED);
   });
 
   it('Legacy only', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     const kind = v.main.querySelector('select[aria-label="Kind"]') as HTMLSelectElement;
     kind.value = 'Legacy';
     kind.dispatchEvent(new Event('change'));
@@ -97,19 +97,19 @@ describe('MIG-250: Configuration › Task Registry', () => {
   });
 
   it('a step task in the side panel, as a workspace administrator', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     const requests = await click(v, 'Open Filter');
     pin(FILE, 'a step task in the side panel, as a workspace administrator', { requests, ...overlay(), ...panelOf() }, PINNED);
   });
 
   it('an unavailable task in the side panel', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'Open Write Database');
     pin(FILE, 'an unavailable task in the side panel', panelOf(), PINNED);
   });
 
   it('switching a task off from its panel', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, {
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, {
       ...ANSWERS,
       'POST /pipeline.json/steps/tasks/enabled': { status: 'SUCCESS', message: "'join' is switched off in this workspace.", data: {
         ...(WITH_SCHEMAS.data.find((t: any) => t.code === 'join') as object), enabled: false, overridden: true } },
@@ -123,15 +123,15 @@ describe('MIG-250: Configuration › Task Registry', () => {
   });
 
   it('a Legacy row in the side panel', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     const requests = await click(v, 'Open Reference: CSV check and summarise');
     pin(FILE, 'a Legacy row in the side panel', { requests, ...overlay(), ...panelOf() }, PINNED);
   });
 
   it('Edit pipeline from a Legacy row\'s panel opens the pipeline dialog', async () => {
-    const v = await visit('/configuration/task-registry', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'Open Reference: CSV check and summarise');
-    const requests = await click(v, 'Edit pipeline');
+    const requests = await click(v, 'Edit registry task');
     pin(FILE, 'Edit pipeline from a Legacy row\'s panel opens the pipeline dialog', { requests, ...overlay() }, PINNED);
   });
 });

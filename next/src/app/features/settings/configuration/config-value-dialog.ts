@@ -92,7 +92,7 @@ const KIND_OPTIONS: SegmentOption<Kind>[] = [
                    [type]="secret() ? 'password' : 'text'"
                    [attr.autocomplete]="secret() ? 'new-password' : 'off'"
                    spellcheck="false"
-                   [placeholder]="secret() ? 'Type the secret' : 's3://claims-in'" />
+                   [placeholder]="secret() ? 'Type the secret' : 's3://intake'" />
           </app-field>
         }
 

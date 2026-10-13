@@ -1,18 +1,38 @@
-import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { initialsOf } from '../../shared/ui/avatar';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
 import { AuthUser, ManagementMode, ROLE_RANK, UserRole, isUserRole } from './auth.models';
 import { PageKey } from './page-keys';
+import { ThemeService } from '../theme.service';
 
 const STORAGE_KEY = 'etl_auth_user';
+
+/**
+ * MIG-336: the pages a tenant user holds only when their access profile names them -- not by having no profile at all.
+ * Owner decision: the API docs (the developer portal) are for administrators and developers, so a workspace administrator
+ * grants them to a developer by profile; everyone else does not see them.
+ */
+export const EXPLICIT_PAGES: readonly PageKey[] = ['developer-portal'];
 
 /** The login page's `reason` for a session signed out because its password changed. */
 export const PASSWORD_CHANGED_REASON = 'password-changed';
 /** What the login page says for it. */
 export const PASSWORD_CHANGED_NOTICE = 'Your password was changed. Please sign in with the new password.';
+
+/** MIG-353: the login page's `reason` for a session ended by the workspace's idle sign-out. */
+export const IDLE_REASON = 'idle';
+/**
+ * MIG-353: when this browser last saw its person act (epoch milliseconds), shared by every tab. The idle guard writes it;
+ * a refresh sends it, so the server moves the session's idle deadline from real activity, not from the refresh itself.
+ */
+export const LAST_ACTIVITY_KEY = 'etl_last_activity';
+
+/** Whether a refused refresh was the server's idle sign-out (its sentence names the inactivity). */
+export function isIdleRefusal(message: string | null | undefined): boolean {
+  return !!message && message.includes('inactivity');
+}
 
 /**
  * The role the server signed into the access token, or null when there is nothing readable.
@@ -61,12 +81,13 @@ function readStorage(key: string): string | null {
 }
 
 /** Where Exit returns a staff member: the picker they opened the managed session from. */
-export const WORK_IN_WORKSPACE_PATH = '/administration/work-in-workspace';
+export const WORK_IN_WORKSPACE_PATH = '/platform/work-in-workspace';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly themes = inject(ThemeService);
 
   /** Signal rather than BehaviorSubject: templates read it directly with no async pipe. */
   private readonly currentUser = signal<AuthUser | null>(this.readStoredUser());
@@ -185,17 +206,28 @@ export class AuthService {
    * unrestricted rather than as empty: the server still refuses what it should, and a menu
    * that vanished on upgrade would look like a break, not a rule. The list itself comes from
    * sign-in and from every token refresh, so a changed profile reaches the menu within the
-   * access token's lifetime without anyone signing out.
+   * access token's lifetime without anyone signing out. The EXPLICIT_PAGES are the exception: those
+   * need the profile to name them.
    */
   canOpen(page: PageKey): boolean {
     if (this.hasAtLeast('TENANT_ADMIN')) return true;
     const keys = this.currentUser()?.pageKeys;
-    if (!keys) return true;
+    if (!keys) return !EXPLICIT_PAGES.includes(page);
     return keys.includes(page);
   }
 
   /** The same answer as a signal, for templates that want to react to a refresh. */
   readonly pageKeys = computed(() => this.currentUser()?.pageKeys ?? null);
+
+  /**
+   * UX review 2026-10-12: whether the person may change dashboards -- a new board, a tile saved, moved or deleted, Pin to
+   * dashboard. Saved Analyses alone reads them (a viewer's profile); Edit dashboards or Analytics Studio writes. The
+   * gateway refuses the writes on its own (403); this keeps the buttons from offering them.
+   */
+  readonly canEditDashboards = computed(() => {
+    this.pageKeys();
+    return this.canOpen('dashboards-edit') || this.canOpen('analytics');
+  });
   /**
    * ollama.json pullModel/deleteModel. Listing them stays TENANT_ADMIN.
    *
@@ -211,58 +243,7 @@ export class AuthService {
     return user?.fullName?.trim() || user?.username || '';
   });
 
-  private readonly avatarObjectUrl = signal('');
-
-  /**
-   * The picture as a blob URL rather than the endpoint's own URL. An <img src> cannot carry
-   * the bearer token, so pointing it straight at previewObject produced an unauthenticated
-   * request whose response the browser then blocked outright (ERR_BLOCKED_BY_ORB). Fetching
-   * through HttpClient lets the interceptor attach the token, and the blob URL that comes
-   * back is what the header and the profile screen bind to.
-   */
-  readonly avatarUrl = this.avatarObjectUrl.asReadonly();
-
-  /**
-   * Where the picture lives, and nothing else about the user.
-   *
-   * The sync below watched the whole stored user, so every write to it re-fetched: a token
-   * refresh, a name change, settling the password debt. Each one revoked the blob URL and went
-   * back to the server for a picture that had not moved, and the header emptied and refilled
-   * while it did. Compared by value, so a new user object carrying the same location is not a
-   * change at all.
-   */
-  private readonly avatarSource = computed(
-    () => {
-      const user = this.currentUser();
-      return { bucket: user?.avatarBucket ?? '', key: user?.avatarKey ?? '' };
-    },
-    { equal: (a, b) => a.bucket === b.bucket && a.key === b.key });
-
   constructor() {
-    // An effect rather than a direct call. Fetching from the constructor sent the request
-    // while this service was still being instantiated -- the auth interceptor injects it, so
-    // the interceptor was not in place yet and the call went out with no token and came back
-    // 401. An effect defers to after the injector settles, and re-runs whenever the picture
-    // changes, so signing in or replacing it refreshes without a manual call.
-    effect(onCleanup => {
-      const { bucket, key } = this.avatarSource();
-
-      const previous = untracked(() => this.avatarObjectUrl());
-      if (previous) URL.revokeObjectURL(previous);
-      this.avatarObjectUrl.set('');
-      if (!bucket || !key) return;
-
-      const loading = this.http.get(`${API_BASE}/storage.json/previewObject`, {
-        params: { bucket, key },
-        responseType: 'blob',
-      }).subscribe({
-        next: blob => this.avatarObjectUrl.set(URL.createObjectURL(blob)),
-        error: () => this.avatarObjectUrl.set(''),
-      });
-      // MIG-214: a new picture cancels the request still out for the old one, whose URL nothing would release.
-      onCleanup(() => loading.unsubscribe());
-    });
-
     // Another tab signed out (it removed the stored session): this tab signs out too instead of carrying on.
     const onStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY && event.newValue === null && this.currentUser()) {
@@ -283,19 +264,22 @@ export class AuthService {
     this.persist({ ...user, ...changes });
   }
 
-  readonly initials = computed(() => {
-    const name = this.displayName();
-    return name ? initialsOf(name) : '';
-  });
-
   login(username: string, password: string): Observable<ApiResponse<AuthUser>> {
     return this.http
       .post<ApiResponse<AuthUser>>(`${API_BASE}/auth.json/login`, { username, password })
-      .pipe(tap(response => {
-        if (response.status === API_SUCCESS && response.data) {
-          this.persist(response.data);
-        }
-      }));
+      .pipe(tap(response => this.signedIn(response)));
+  }
+
+  /**
+   * A sign-in's answer, from the password (login) or a later step (MIG-353: a two-factor code, single sign-on): kept only
+   * when it carries a session -- a two-factor challenge carries none.
+   */
+  signedIn(response: ApiResponse<AuthUser>): void {
+    if (response.status === API_SUCCESS && response.data?.accessToken) {
+      this.persist(withPictureKnown(response.data));
+      // The person's theme follows them to this device: their own choice, else their workspace's default.
+      this.themes.adoptSignIn(response.data.theme, response.data.workspaceTheme);
+    }
   }
 
   /**
@@ -305,8 +289,9 @@ export class AuthService {
    */
   refresh(): Observable<ApiResponse<AuthUser>> {
     const refreshToken = this.currentUser()?.refreshToken ?? '';
+    const lastActivityAt = Number(readStorage(LAST_ACTIVITY_KEY)) || null;
     return this.http
-      .post<ApiResponse<AuthUser>>(`${API_BASE}/auth.json/refresh`, { refreshToken })
+      .post<ApiResponse<AuthUser>>(`${API_BASE}/auth.json/refresh`, { refreshToken, lastActivityAt })
       .pipe(tap(response => {
         if (response.status === API_SUCCESS && response.data) {
           this.persist({ ...this.currentUser(), ...response.data } as AuthUser);
@@ -321,12 +306,15 @@ export class AuthService {
    * /auth.json/logout) -- forgetting them only in this tab left both working. Fire and forget: a server that cannot be
    * reached must not keep anyone signed in here. Other open tabs follow through the storage event (see below).
    */
-  logout(): void {
+  logout(reason?: string): void {
+    // Already signed out (MIG-353): a request that failed after the sign-out must not navigate again -- that second
+    // navigation, without a reason, replaced the idle sign-out's "you were signed out because..." on the login page.
+    if (!reason && !this.currentUser() && !this.readHeldPlatformSession()) return;
     this.revoke(this.currentUser());
     // A staff member signed out inside a managed session leaves both: the platform session held aside too.
     this.revoke(this.readHeldPlatformSession());
     this.clear();
-    void this.router.navigate(['/login']);
+    void this.router.navigate(['/login'], reason ? { queryParams: { reason } } : {});
   }
 
   private revoke(user: AuthUser | null): void {
@@ -354,7 +342,7 @@ export class AuthService {
     if (!own || !this.isPlatformAdmin() || this.isManagedSession()) return;
     localStorage.setItem(PLATFORM_SESSION_KEY, JSON.stringify(own));
     this.heldPlatform.set(true);
-    this.persist(session);
+    this.persist(withPictureKnown(session));
   }
 
   /**
@@ -414,4 +402,14 @@ export class AuthService {
       return null;
     }
   }
+}
+
+/**
+ * A sign-in's answer (and a managed session's, which is answered like one) always says whether the person has a
+ * picture, but Identity leaves a null out: absent there means "none", so it is kept as null and the top bar asks
+ * nothing, rather than as "unknown", which asks once per session. A refresh's answer does not carry it and is merged
+ * over the session, so what the sign-in said stays.
+ */
+function withPictureKnown(user: AuthUser): AuthUser {
+  return { ...user, avatarVersion: user.avatarVersion ?? null };
 }

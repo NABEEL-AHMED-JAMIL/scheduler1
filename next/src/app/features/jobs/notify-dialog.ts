@@ -54,7 +54,7 @@ export interface NotifyData {
       @if (!anyOn()) {
         <p class="field-note text-[color:var(--text-muted)] flex items-start gap-1.5 mt-3">
           <app-icon name="info" size="0.9em" class="mt-px shrink-0" />
-          <span>With all three off, nothing is emailed about this job — it will only be visible here.</span>
+          <span>With all three off, nothing is emailed about this schedule — it will only be visible here.</span>
         </p>
       }
     </app-form-dialog>
@@ -103,7 +103,7 @@ export class NotifyDialog {
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
           this.saving.set(false);
-          this.toast.error(response.message || 'That job could not be read.');
+          this.toast.error(response.message || 'That schedule could not be read.');
           return;
         }
         const job = response.data;
@@ -143,7 +143,7 @@ export class NotifyDialog {
       },
       error: err => {
         this.saving.set(false);
-        this.toast.error(err?.error?.message || 'That job could not be read.');
+        this.toast.error(err?.error?.message || 'That schedule could not be read.');
       },
     });
   }

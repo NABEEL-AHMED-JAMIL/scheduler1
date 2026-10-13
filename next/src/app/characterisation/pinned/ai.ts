@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "a new prompt": {
-    "url": "/ai/prompts/new",
+    "url": "/pipelines/prompts/new",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -10,6 +10,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "New prompt",
+      "1 About it",
+      "2 Model",
+      "3 What it says",
+      "4 The answer",
       "Try it"
     ],
     "buttons": [
@@ -22,7 +26,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "0.2",
       "800",
-      "Claim {{claim_id}}. Summarise the attached file in four keys: diagnosis, procedures, total_billed, flags. {{document_text}}",
       "Connection",
       "Data sensitivity",
       "Description",
@@ -31,18 +34,20 @@ export const PINNED: Record<string, unknown> = {
       "Model",
       "Name *(required)",
       "Output",
-      "Summarise claim file",
+      "Record {{record_id}}. Summarise the attached file in four keys: summary, items, total, flags. {{document_text}}",
+      "Summarise a document",
       "System instructions",
       "Tags",
       "Temperature",
       "What this prompt is for",
       "Workspace default",
-      "You are a claims analyst for a US health network. Be terse. Never invent a claim number.",
+      "You are an analyst. Be terse. Never invent a value the document does not hold.",
       "gemma3:1b",
       "pdf, docx"
     ],
     "links": [
-      "/ai/prompts"
+      "/pipelines",
+      "/pipelines/prompts"
     ]
   },
   "a prompt's row menu": {
@@ -55,7 +60,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/ai/prompts/1049/edit"
+      "/pipelines/prompts/1049/edit"
     ],
     "items": [
       "Edit & try",
@@ -64,7 +69,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "editing a prompt": {
-    "url": "/ai/prompts/1049/edit",
+    "url": "/pipelines/prompts/1049/edit",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -75,6 +80,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list v1Inactive",
+      "1 About it",
+      "2 Model",
+      "3 What it says",
+      "4 The answer",
       "Try it",
       "Recent runs"
     ],
@@ -102,7 +111,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "0.2",
       "800",
-      "Claim {{claim_id}}. Summarise the attached file in four keys: diagnosis, procedures, total_billed, flags. {{document_text}}",
       "Connection",
       "Data sensitivity",
       "Description",
@@ -111,7 +119,8 @@ export const PINNED: Record<string, unknown> = {
       "Model",
       "Name *(required)",
       "Output",
-      "Summarise claim file",
+      "Record {{record_id}}. Summarise the attached file in four keys: summary, items, total, flags. {{document_text}}",
+      "Summarise a document",
       "System instructions",
       "Tags",
       "Temperature",
@@ -129,18 +138,19 @@ export const PINNED: Record<string, unknown> = {
       "Variable 3 type",
       "What this prompt is for",
       "Workspace default",
-      "You are a claims analyst for a US health network. Be terse. Never invent a claim number.",
-      "claim_id",
+      "You are an analyst. Be terse. Never invent a value the document does not hold.",
       "gemma3:1b",
       "pdf, docx",
+      "record_id",
       "what Try it uses"
     ],
     "links": [
-      "/ai/prompts"
+      "/pipelines",
+      "/pipelines/prompts"
     ]
   },
   "model connections, as a platform administrator": {
-    "url": "/ai/connections",
+    "url": "/settings/model-connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -159,6 +169,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Actions for Local Ollama",
+      "Back to list",
       "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
       "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
       "New connection",
@@ -174,7 +185,16 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/prompts?connection=1047"
+      "/pipelines/prompts?connection=1047",
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "model connections, as a tenant user": {
@@ -196,7 +216,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "model connections, as a workspace administrator": {
-    "url": "/ai/connections",
+    "url": "/settings/model-connections",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -215,6 +235,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Actions for Local Ollama",
+      "Back to list",
       "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
       "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
       "New connection",
@@ -230,11 +251,20 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/prompts?connection=1047"
+      "/pipelines/prompts?connection=1047",
+      "/settings",
+      "/settings/alerts",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "prompts, as a tenant user with every page": {
-    "url": "/ai/prompts",
+    "url": "/pipelines/prompts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -269,10 +299,15 @@ export const PINNED: Record<string, unknown> = {
       "Search prompts",
       "State"
     ],
-    "links": []
+    "links": [
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
+    ]
   },
   "prompts, as a tenant user without the page": {
-    "url": "/unauthorized?page=ai-prompts",
+    "url": "/unauthorized?page=ai-prompts&title=Prompts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
@@ -290,7 +325,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "prompts, as a workspace administrator": {
-    "url": "/ai/prompts",
+    "url": "/pipelines/prompts",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -330,9 +365,13 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/prompts/1048/edit",
-      "/ai/prompts/1049/edit",
-      "/ai/prompts/new"
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/prompts/1048/edit",
+      "/pipelines/prompts/1049/edit",
+      "/pipelines/prompts/new",
+      "/pipelines/schedules"
     ]
   }
 };

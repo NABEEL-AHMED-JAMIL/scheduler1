@@ -1,37 +1,51 @@
 <div class="page">
-  <div class="page-head">
-    <div class="min-w-0">
-      <a class="link-inline text-sm" routerLink="/integration/api-collections"><app-icon name="arrowLeft" size="0.9em" />API Collections</a>
-      <div class="mt-1 flex flex-wrap items-center gap-2">
-        <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ collection()?.name || 'API collection' }}</h1>
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <!-- The breadcrumb leads back to API Collections (UX review 2026-10-12, A2). -->
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ collection()?.name || 'API collection' }}</h1>
+          @if (collection(); as c) {
+            @if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> }
+            <app-status [label]="c.status || 'Inactive'" [quiet]="true" />
+          }
+        </div>
         @if (collection(); as c) {
-          @if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> }
-          <app-status [label]="c.status || 'Inactive'" [quiet]="true" />
+          <p class="page-subtitle">
+            @if (c.description) { {{ c.description }} · }{{ sourceLabel(c.sourceFormat) }} · version {{ c.currentVersion ?? 0 }}@if (c.dateUpdated || c.dateCreated) { · updated {{ (c.dateUpdated || c.dateCreated) | serverTime: 'dateTime' }} }
+          </p>
         }
       </div>
-      @if (collection(); as c) {
-        <p class="page-subtitle">
-          @if (c.description) { {{ c.description }} · }{{ sourceLabel(c.sourceFormat) }} · version {{ c.currentVersion ?? 0 }}@if (c.dateUpdated || c.dateCreated) { · updated {{ (c.dateUpdated || c.dateCreated) | serverTime: 'dateTime' }} }
-        </p>
-      }
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canManage() && collection()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="editDetails()"><app-icon name="edit" />Edit details</button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (canManage() && collection()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="editDetails()"><app-icon name="edit" />Edit details</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="API collections" />
 
   @if (!detail() && error()) {
     <app-table-shell heading="API collection" [error]="error()" [errorRetryable]="!missing()" (retry)="load()">
-      <a error-action class="btn btn-default btn-sm" routerLink="/integration/api-collections"><app-icon name="arrowLeft" />Back to API Collections</a>
+      <a error-action class="btn btn-default btn-sm" routerLink="/connections/api-collections"><app-icon name="arrowLeft" />Back to API Collections</a>
     </app-table-shell>
   } @else {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="5" align="start" size="md" label="This collection at a glance" />
+
+    <!-- UX final I3: a detail page's tabs (review 2.3). The overview stays short -- APIs, environments, who uses them --
+         and every saved version is under History, the longest list on the page (42 rows) out of the way. ?tab=history
+         opens it, so the tab is linkable and survives a reload. -->
+    <div class="tabs" role="tablist" aria-label="API collection" data-test="collection-tabs">
+      <a role="tab" class="tab" [class.tab-active]="activeTab() === 'overview'" [attr.aria-selected]="activeTab() === 'overview'"
+         [routerLink]="[]" [queryParams]="{ tab: null }" queryParamsHandling="merge" replaceUrl>Overview</a>
+      <a role="tab" class="tab" [class.tab-active]="activeTab() === 'history'" [attr.aria-selected]="activeTab() === 'history'"
+         [routerLink]="[]" [queryParams]="{ tab: 'history' }" queryParamsHandling="merge" replaceUrl>
+        <app-icon name="history" />History @if (versions().length) { <span class="pill pill-neutral">{{ versions().length }}</span> }
+      </a>
+    </div>
+
+    @if (activeTab() === 'overview') {
 
     <app-table-shell data-test="apis" heading="APIs" columnsKey="api-collection-requests" [loading]="loading()" [error]="error()"
                      [isEmpty]="!visibleRequests().length" [shown]="visibleRequests().length" [total]="detail()?.requests?.length ?? null"
@@ -88,7 +102,7 @@
               <th class="text-right">Timeout</th>
               <th>Last test</th>
               <th class="text-right">State</th>
-              @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+              @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
             </tr>
           </thead>
           <tbody>
@@ -154,7 +168,7 @@
           <tr>
             <th>Environment</th>
             <th>Variables</th>
-            @if (canManage()) { <th class="w-12"><span class="sr-only">Actions</span></th> }
+            @if (canManage()) { <th class="w-12 th-actions">Actions</th> }
           </tr>
         </thead>
         <tbody>
@@ -194,9 +208,29 @@
       </table>
     </app-table-shell>
 
-    <div class="grid gap-4 lg:grid-cols-2">
-      <app-table-shell heading="Versions" [scrollRows]="false" [loading]="loading() && !detail()" [isEmpty]="!versions().length"
-                       emptyMessage="No versions yet." emptyIcon="history">
+      <app-table-shell heading="Used by" [scrollRows]="false" [loading]="loading() && !detail()" [isEmpty]="!usage().length"
+                       emptyMessage="No pipeline, source or AI tool uses these APIs yet." emptyIcon="link">
+        <table class="table-modern">
+          <thead><tr><th>Used by</th><th>Name</th><th>API</th><th class="text-right">Pinned</th></tr></thead>
+          <tbody>
+            @for (u of usage(); track $index) {
+              <tr>
+                <td class="text-xs whitespace-nowrap">{{ userKind(u.userType) }}</td>
+                <td class="max-w-56"><app-data-text [value]="u.userName || u.userRef" label="Used by" /></td>
+                <td class="max-w-56"><app-data-text [value]="u.requestName || '—'" label="API" /></td>
+                <!-- A step-engine pipeline's step that pins no version runs the API as it is now (review M12). -->
+                <td class="text-right text-xs whitespace-nowrap">@if (u.pinnedVersion == null) { Latest } @else { v{{ u.pinnedVersion }} }@if (u.behind) { <span class="text-warn-600">· behind</span> }</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </app-table-shell>
+    } @else {
+      <!-- Every saved version, newest first, in its own scroll box (review 2026-10-07: forty saves made the page three
+           screens long). -->
+      <app-table-shell data-test="versions" heading="Versions" [loading]="loading() && !detail()" [isEmpty]="!versions().length"
+                       [shown]="versions().length" [total]="versions().length"
+                       emptyMessage="No versions yet. Every save of the collection is kept as a version." emptyIcon="history">
         <table class="table-modern">
           <thead><tr><th>Version</th><th>Saved</th></tr></thead>
           <tbody>
@@ -209,23 +243,6 @@
           </tbody>
         </table>
       </app-table-shell>
-
-      <app-table-shell heading="Used by" [scrollRows]="false" [loading]="loading() && !detail()" [isEmpty]="!usage().length"
-                       emptyMessage="No pipeline, source or AI tool uses these APIs yet." emptyIcon="link">
-        <table class="table-modern">
-          <thead><tr><th>Used by</th><th>Name</th><th>API</th><th class="text-right">Pinned</th></tr></thead>
-          <tbody>
-            @for (u of usage(); track $index) {
-              <tr>
-                <td class="text-xs whitespace-nowrap">{{ userKind(u.userType) }}</td>
-                <td class="max-w-56"><app-data-text [value]="u.userName || u.userRef" label="Used by" /></td>
-                <td class="max-w-56"><app-data-text [value]="u.requestName || '—'" label="API" /></td>
-                <td class="text-right text-xs whitespace-nowrap">v{{ u.pinnedVersion ?? '—' }}@if (u.behind) { <span class="text-warn-600">· behind</span> }</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </app-table-shell>
-    </div>
+    }
   }
 </div>

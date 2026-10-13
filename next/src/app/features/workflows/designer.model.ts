@@ -3,7 +3,19 @@
  * checks, so what is published is what the engine walks. Only the fields a step's type uses are sent.
  */
 export type StepType = 'approval' | 'task' | 'condition' | 'notify' | 'run_pipeline' | 'save_dataset' | 'wait';
-export type WhoKind = 'user' | 'role' | 'group' | 'manager' | 'requester';
+export type WhoKind = 'user' | 'role' | 'group' | 'manager' | 'requester' | 'subject';
+
+/**
+ * UX review 2026-10-12: who a "subject" assignee is -- workflow-service's AssigneeKind.SUBJECT, a field of the request's
+ * subject that names a role, a group or a person (the built-in run review and step approval: "reviewers", set by the
+ * pipeline). The designer said "someone" and showed a blank "Who approves".
+ */
+export function subjectWho(value: string | null | undefined): string {
+  const field = (value ?? '').trim();
+  if (!field || field === 'reviewers') return 'The reviewers named on the request';
+  const words = field.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase();
+  return `Whoever the request names as its ${words}`;
+}
 
 export interface Who { kind: WhoKind; value?: string | null; }
 
@@ -35,14 +47,20 @@ export interface DraftStep {
   hours?: number | null;
 }
 
-export const STEP_TYPES: { type: StepType; label: string; icon: string; hint: string }[] = [
-  { type: 'approval', label: 'Approval', icon: 'checkCircle', hint: 'Someone approves, rejects or asks for changes' },
-  { type: 'task', label: 'Task', icon: 'list', hint: 'Someone does a piece of work and marks it done' },
-  { type: 'condition', label: 'Condition', icon: 'selector', hint: 'Goes one of two ways on the request\'s fields' },
-  { type: 'notify', label: 'Notify', icon: 'bell', hint: 'Tells someone, and goes on' },
-  { type: 'run_pipeline', label: 'Run pipeline', icon: 'play', hint: 'Starts a schedule\'s run' },
-  { type: 'save_dataset', label: 'Save to dataset', icon: 'database', hint: 'Keeps the request as a row' },
-  { type: 'wait', label: 'Wait', icon: 'clock', hint: 'Pauses for some hours' },
+/**
+ * A step type's tone: the pill family its badge on the canvas is drawn in, so an approval reads apart from a notice at a
+ * glance. People's steps (approval, task) and the fork (condition) each have their own; the rest share quieter ones.
+ */
+export type StepTone = 'ok' | 'info' | 'warn' | 'brand' | 'neutral';
+
+export const STEP_TYPES: { type: StepType; label: string; icon: string; hint: string; tone: StepTone }[] = [
+  { type: 'approval', label: 'Approval', icon: 'checkCircle', hint: 'Someone approves, rejects or asks for changes', tone: 'ok' },
+  { type: 'task', label: 'Task', icon: 'list', hint: 'Someone does a piece of work and marks it done', tone: 'info' },
+  { type: 'condition', label: 'Condition', icon: 'filter', hint: 'Goes one of two ways on the request\'s fields', tone: 'warn' },
+  { type: 'notify', label: 'Notify', icon: 'bell', hint: 'Tells someone, and goes on', tone: 'brand' },
+  { type: 'run_pipeline', label: 'Run pipeline', icon: 'play', hint: 'Starts a schedule\'s run', tone: 'info' },
+  { type: 'save_dataset', label: 'Save to dataset', icon: 'database', hint: 'Keeps the request as a row', tone: 'neutral' },
+  { type: 'wait', label: 'Wait', icon: 'clock', hint: 'Pauses for some hours', tone: 'neutral' },
 ];
 
 export const OPERATORS: { op: string; label: string; needsValue: boolean }[] = [
@@ -138,5 +156,6 @@ export function problemStep(problem: string): number | null {
 
 function who(value: Who | null | undefined): Who {
   const kind = value?.kind ?? 'requester';
-  return kind === 'user' || kind === 'role' || kind === 'group' ? { kind, value: value?.value ?? '' } : { kind };
+  // A subject assignee keeps its field ("reviewers"): without it workflow-service refuses the step (WorkflowSteps).
+  return kind === 'user' || kind === 'role' || kind === 'group' || kind === 'subject' ? { kind, value: value?.value ?? '' } : { kind };
 }

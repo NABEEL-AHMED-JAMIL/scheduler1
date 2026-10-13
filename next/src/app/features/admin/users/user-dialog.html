@@ -5,103 +5,117 @@
     [saving]="saving()"
     (cancelled)="ref.close(false)" (confirmed)="save()">
 
+  <!-- UX review 2026-10-12 (A3, A4, U1): who they are and how they sign in first (the email is the sign-in), then their
+       role and pages, then the details -- in numbered sections on a 12-column grid, not one long column. -->
   <form [formGroup]="form" class="form-stack">
-    <div class="form-grid">
-      <app-field label="Full name" for="fullName" [required]="true"
-                 [control]="form.get('fullName')" [submitted]="submitted()">
-        <input id="fullName" class="input" formControlName="fullName" placeholder="Alex Morgan" />
-      </app-field>
-
-      <app-field label="Position" for="position"
-                 [control]="form.get('position')" [submitted]="submitted()"
-                 hint="Their job title. What they may do in the app is set by Role, below.">
-        <input id="position" class="input" formControlName="position" list="common-positions"
-               placeholder="Software Engineer" />
-        <datalist id="common-positions">
-          <option value="Software Engineer"></option>
-          <option value="Senior Software Engineer"></option>
-          <option value="Team Lead"></option>
-          <option value="Engineering Manager"></option>
-          <option value="Data Engineer"></option>
-          <option value="Data Analyst"></option>
-          <option value="IT Administrator"></option>
-          <option value="Systems Administrator"></option>
-          <option value="Operations Manager"></option>
-          <option value="Operations Analyst"></option>
-          <option value="QA Engineer"></option>
-          <option value="Product Manager"></option>
-          <option value="Compliance Officer"></option>
-          <option value="Finance Analyst"></option>
-          <option value="Support Specialist"></option>
-        </datalist>
-      </app-field>
-
-      @if (role() !== 'PLATFORM_ADMIN') {
-        <app-field label="Manager" for="managerId" class="sm:col-span-2"
-                   hint="Whom their workflow approvals go to when a step says &quot;their manager&quot;, and whom overdue tasks escalate to.">
-          <app-combobox id="managerId" formControlName="managerId" [numeric]="true" placeholder="Search people…"
-                        clearLabel="No manager" [options]="managerOptions()" />
+    <app-section [number]="1" title="Who and how they sign in" [level]="3">
+      <app-form-row>
+        <app-field label="Full name" for="fullName" class="fr-6" [required]="true"
+                   [control]="form.get('fullName')" [submitted]="submitted()">
+          <input id="fullName" class="input" formControlName="fullName" placeholder="Alex Morgan" />
         </app-field>
+        <app-field label="Email" for="username" [required]="true" class="fr-6"
+                   [control]="form.get('username')" [submitted]="submitted()"
+                   hint="Used to sign in.">
+          <input id="username" type="email" class="input" formControlName="username"
+                 placeholder="alex@example.com" autocomplete="off" />
+        </app-field>
+      </app-form-row>
+      <div class="mt-5">
+      <app-field label="Password" for="password"
+                 [control]="form.get('password')" [submitted]="submitted()"
+                 [hint]="isEdit()
+                   ? 'Leave blank to keep the current password.'
+                   : 'Leave blank and we email them a one-time password. Set one here and it is not emailed \u2014 you pass it on yourself.'">
+        <input id="password" type="password" class="input" formControlName="password"
+               autocomplete="new-password"
+               [placeholder]="isEdit() ? 'Leave blank to keep the current one' : 'Leave blank to email a one-time password'" />
+      </app-field>
+      @if (typedPassword()) {
+        <app-password-rules [rules]="passwordRules()" [password]="typedPassword()" />
       }
 
-      <app-field label="Phone" for="phoneNumber" class="sm:col-span-2"
-                 hint="Pick the country, then the number as it is written there.">
-        <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="submitted()" />
-      </app-field>
+      </div>
+    </app-section>
 
-      <app-field label="Email" for="username" [required]="true" class="sm:col-span-2"
-                 [control]="form.get('username')" [submitted]="submitted()"
-                 hint="Used to sign in.">
-        <input id="username" type="email" class="input" formControlName="username"
-               placeholder="alex@example.com" autocomplete="off" />
-      </app-field>
-    </div>
-
-    <app-field label="Password" for="password"
-               [control]="form.get('password')" [submitted]="submitted()"
-               [hint]="isEdit()
-                 ? 'Leave blank to keep the current password.'
-                 : 'Leave blank and we email them a one-time password. Set one here and it is not emailed \u2014 you pass it on yourself.'">
-      <input id="password" type="password" class="input" formControlName="password"
-             autocomplete="new-password"
-             [placeholder]="isEdit() ? '' : 'leave blank to send a one-time password'" />
-    </app-field>
-
-    <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"
-               [control]="form.get('userRole')" [submitted]="submitted()">
-      <select id="userRole" class="input" formControlName="userRole">
-        @for (option of roles(); track option.value) {
-          <option [value]="option.value">{{ option.label }}</option>
+    <app-section [number]="2" title="Role and access" sub="What they may do, and which pages they can open." [level]="3">
+      <div class="form-stack">
+        <app-field label="Role" for="userRole" [required]="true" [hint]="roleHint()"
+                   [control]="form.get('userRole')" [submitted]="submitted()">
+          <select id="userRole" class="input" formControlName="userRole">
+            @for (option of roles(); track option.value) {
+              <option [value]="option.value">{{ option.label }}</option>
+            }
+          </select>
+        </app-field>
+        @if (needsTenant() && data.canPickTenant) {
+          <app-field label="Workspace" for="tenantId" [required]="!tenantLocked()"
+                     [control]="form.get('tenantId')" [submitted]="submitted()"
+                     [hint]="tenantLocked()
+                       ? 'Fixed once the account exists. Moving somebody between workspaces re-parents everything they are attached to.'
+                       : ''">
+            <app-combobox id="tenantId" formControlName="tenantId" [numeric]="true"
+                          placeholder="Search workspaces…" [allowClear]="false" [options]="tenantOptions()" />
+          </app-field>
+        } @else if (!needsTenant()) {
+          <p class="text-sm rounded-md px-3 py-2 bg-sunken">
+            A platform administrator spans every workspace, so no workspace is assigned.
+          </p>
         }
-      </select>
-    </app-field>
 
-    @if (needsTenant() && data.canPickTenant) {
-      <app-field label="Tenant" for="tenantId" [required]="!tenantLocked()"
-                 [control]="form.get('tenantId')" [submitted]="submitted()"
-                 [hint]="tenantLocked()
-                   ? 'Fixed once the account exists. Moving somebody between workspaces re-parents everything they are attached to.'
-                   : ''">
-        <app-combobox id="tenantId" formControlName="tenantId" [numeric]="true"
-                      placeholder="Search tenants…" [allowClear]="false" [options]="tenantOptions()" />
-      </app-field>
-    } @else if (!needsTenant()) {
-      <p class="text-sm rounded-md px-3 py-2 bg-sunken">
-        A platform administrator spans every tenant, so no tenant is assigned.
-      </p>
-    }
+        @if (offersProfile()) {
+          <app-field label="Page access" for="pageAccessProfileId"
+                     [control]="form.get('pageAccessProfileId')" [submitted]="submitted()"
+                     hint="Which pages they can open. Set up under Administration &amp; billing › Page access.">
+            <select id="pageAccessProfileId" class="input" formControlName="pageAccessProfileId">
+              <option [ngValue]="null">Workspace default{{ defaultProfileName() ? ' (' + defaultProfileName() + ')' : '' }}</option>
+              @for (profile of accessProfiles(); track profile.pageAccessProfileId) {
+                <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
+              }
+            </select>
+          </app-field>
+        }
+      </div>
+    </app-section>
 
-    @if (offersProfile()) {
-      <app-field label="Access profile" for="pageAccessProfileId"
-                 [control]="form.get('pageAccessProfileId')" [submitted]="submitted()"
-                 hint="Which pages they can open. Profiles are set up under Administration › Access profiles.">
-        <select id="pageAccessProfileId" class="input" formControlName="pageAccessProfileId">
-          <option [ngValue]="null">Workspace default{{ defaultProfileName() ? ' (' + defaultProfileName() + ')' : '' }}</option>
-          @for (profile of accessProfiles(); track profile.pageAccessProfileId) {
-            <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
-          }
-        </select>
-      </app-field>
-    }
+    <app-section [number]="3" title="About them" [level]="3">
+      <app-form-row>
+        <app-field label="Position" for="position" class="fr-6"
+                   [control]="form.get('position')" [submitted]="submitted()"
+                   hint="Their job title. What they may do in the app is set by Role, above.">
+          <input id="position" class="input" formControlName="position" list="common-positions"
+                 placeholder="Software Engineer" />
+          <datalist id="common-positions">
+            <option value="Software Engineer"></option>
+            <option value="Senior Software Engineer"></option>
+            <option value="Team Lead"></option>
+            <option value="Engineering Manager"></option>
+            <option value="Data Engineer"></option>
+            <option value="Data Analyst"></option>
+            <option value="IT Administrator"></option>
+            <option value="Systems Administrator"></option>
+            <option value="Operations Manager"></option>
+            <option value="Operations Analyst"></option>
+            <option value="QA Engineer"></option>
+            <option value="Product Manager"></option>
+            <option value="Compliance Officer"></option>
+            <option value="Finance Analyst"></option>
+            <option value="Support Specialist"></option>
+          </datalist>
+        </app-field>
+        @if (role() !== 'PLATFORM_ADMIN') {
+          <app-field label="Manager" for="managerId" class="fr-6"
+                     hint="Whom their workflow approvals go to when a step says &quot;their manager&quot;, and whom overdue tasks escalate to.">
+            <app-combobox id="managerId" formControlName="managerId" [numeric]="true" placeholder="Search people…"
+                          clearLabel="No manager" [options]="managerOptions()" />
+          </app-field>
+        }
+
+        <app-field label="Phone" for="phoneNumber" class="fr-12"
+                   hint="Pick the country, then the number as it is written there.">
+          <app-phone-input [(value)]="phone" inputId="phoneNumber" [submitted]="submitted()" />
+        </app-field>
+      </app-form-row>
+    </app-section>
   </form>
 </app-form-dialog>
