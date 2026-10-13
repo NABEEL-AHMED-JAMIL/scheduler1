@@ -2984,3 +2984,37 @@ describe('the rebuild\'s dashboard fixes (MIG-367)', () => {
     expect(queried.rows.map(row => row[0])).toEqual(['Yes', 'No']);
   });
 });
+
+describe('the board\'s header holds still while it runs (e2e board-layout: a click that narrows moved it)', () => {
+
+  it('puts the load time last on the facts line, after the filter pill, so its coming and going moves nothing', async () => {
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    rendered.finishAnalysis();
+    rendered.fixture.detectChanges();
+    await rendered.fixture.whenStable();
+    rendered.fixture.detectChanges();
+    const facts = (rendered.fixture.nativeElement as HTMLElement).querySelector('.dash-facts')!;
+    expect(facts.lastElementChild?.getAttribute('data-test')).toBe('load-time');
+
+    // And in the template: whatever else the line gains (the filter pill), the load time is written after it.
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/analytics/dashboard.html`, 'utf8');
+    const line = html.slice(html.indexOf('class="dash-facts'), html.indexOf('</p>', html.indexOf('class="dash-facts')));
+    expect(line.indexOf('data-test="load-time"')).toBeGreaterThan(line.indexOf('dash-filter-facts'));
+  });
+
+  it('puts Stop where Run every widget was: the page header orders a .btn-primary last, and Stop is not one', async () => {
+    const rendered = renderedBoard({ widgets: [widgetOn()] });
+    const stop = [...(rendered.fixture.nativeElement as HTMLElement).querySelectorAll('button')].find(b => b.textContent?.trim() === 'Stop');
+    expect(stop?.classList.contains('dash-run-button')).toBe(true);
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const orderOf = (css: string, selector: RegExp) => css.match(selector)?.[1];
+    const header = fs.readFileSync(`${root}/src/app/shared/ui/page-header.ts`, 'utf8');
+    const board = fs.readFileSync(`${root}/src/app/features/analytics/dashboard.css`, 'utf8');
+    const primary = orderOf(header, /> \.btn-primary \{ order: (\d+); \}/);
+    expect(primary).toBeTruthy();
+    expect(orderOf(board, /\.dash-run-button \{[^}]*order: (\d+);/)).toBe(primary);
+  });
+});

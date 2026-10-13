@@ -21,7 +21,9 @@
 .dash-facts > .dash-filter-facts::before { content: none; }
 /* Run every widget and Stop take turns in one place: one width, so the theme and the menu beside
    them stay put. */
-.dash-run-button { min-width: 8.75rem; justify-content: center; }
+/* And one place: the page header puts a .btn-primary last (order 10, page-header.ts), which Run is and Stop is not --
+   so Stop takes the same order, or the swap moves it to the front and the theme and the menu with it. */
+.dash-run-button { min-width: 8.75rem; justify-content: center; order: 10; }
 /* A tile's "8 rows · ran 21:26:48", right-aligned: a box of fixed width (its start cannot move),
    and new words drawn as a new span inside it (the template tracks it by its words), because
    right-aligned text edited in place moves its start when its length changes. */

@@ -166,7 +166,6 @@
               @else if (lastRun()) {
                 <span class="dash-run" [title]="'Last run: ' + lastRun() + ' · ' + lastRunText()"><span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span> · {{ lastRunText() }}</span>
               }
-              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ (loadMs()! / 1000).toFixed(1) }} s</span> }
               @if (boardFilterCount()) {
                 <!-- In the facts line, which is there anyway: a click on a mark that narrows the board
                      changes this line's words and nothing's position. -->
@@ -176,6 +175,9 @@
                   <button type="button" class="btn btn-ghost btn-icon btn-xs dash-filter-clear" aria-label="Clear the board filter" title="Clear the board filter" [disabled]="running()" (click)="clearBoardFilter()"><app-icon name="close" size="0.85em" /></button>
                 </span>
               }
+              <!-- Last on the line: it goes while the board runs and comes back with another length, and nothing may sit
+                   after it to be moved (the filter pill did, on every click that narrowed: e2e board-layout). -->
+              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ (loadMs()! / 1000).toFixed(1) }} s</span> }
             </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
