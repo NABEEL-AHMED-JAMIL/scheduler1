@@ -1,4 +1,3 @@
-import { localIsoDaysAgo } from '../../../shared/ui/local-day';
 import { Component, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -38,6 +37,8 @@ import {
 import { DocumentsApi } from '../../documents/documents.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { RunFacetsRail } from './run-facets-rail';
+import { ExplorerFilter, NO_FILTER, RUN_WINDOWS, RunExplorerApi, RunFacets, activeCount, explorerBody, histogramBars } from './run-explorer';
 
 /**
  * How many runs one read brings: the newest window first, and older ones a window at a time on request.
@@ -62,12 +63,20 @@ interface JobQueue {
   runManual?: boolean | null;
   skipManual?: boolean | null;
   skipTime?: string;
+  /** B3: the schedule's pipeline and what started the run, from Core's fetchLogs (absent from an older Core). */
+  taskDetailId?: number;
+  taskName?: string;
+  trigger?: string;
 }
+
+const TRIGGER_WORDS: Record<string, string> = {
+  schedule: 'on its timetable', manual: 'Run now', file: 'a file arrived', document: 'a document approved', retry: 'a retry', api: 'the API',
+};
 
 @Component({
   selector: 'app-job-history',
   imports: [PageHeader, RefreshButton, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
-    ReviewWaiting],
+    ReviewWaiting, RunFacetsRail],
   templateUrl: './job-history.html',
 })
 export class JobHistory {
@@ -132,6 +141,46 @@ export class JobHistory {
   private missedEvents = false;
 
   readonly runs = signal<JobQueue[]>([]);
+
+  // ------------------------------------------------------------------------------------------ B3: the explorer
+  private readonly explorerApi = inject(RunExplorerApi);
+  /** Runs opened from the menu: no schedule, no dashboard drill-down. */
+  readonly explorer = computed(() => !this.jobId() && !this.isDrillDown());
+  readonly explorerFilter = signal<ExplorerFilter>(NO_FILTER);
+  readonly facets = signal<RunFacets | null>(null);
+  readonly facetsLoading = signal(false);
+  readonly facetsUnavailable = signal(false);
+  private facetsRequest?: Subscription;
+  readonly histogram = computed(() => histogramBars(this.facets()));
+  readonly histogramSub = computed(() => {
+    const f = this.facets();
+    const window = RUN_WINDOWS.find(w => w.id === this.explorerFilter().window)?.label ?? '';
+    if (!f) return window;
+    return `${window} · ${f.total} run${f.total === 1 ? '' : 's'} · by ${f.histogram?.bucket === 'hour' ? 'hour' : 'day'}, stacked by status`;
+  });
+
+  /** A facet picked: the counts and the list are read again with it. */
+  setExplorerFilter(filter: ExplorerFilter): void {
+    this.explorerFilter.set(filter);
+    this.pager.reset();
+    this.load();
+  }
+
+  triggerWord(trigger: string): string { return TRIGGER_WORDS[trigger] ? `started by ${TRIGGER_WORDS[trigger]}` : trigger; }
+
+  private loadFacets(): void {
+    this.facetsRequest?.unsubscribe();
+    this.facetsLoading.set(true);
+    this.facetsRequest = this.explorerApi.facets(explorerBody(this.explorerFilter(), RECENT_WINDOW)).subscribe({
+      next: r => {
+        this.facetsLoading.set(false);
+        const ok = r.status === API_SUCCESS && !!r.data && typeof r.data === 'object';
+        this.facets.set(ok ? (r.data as RunFacets) : null);
+        this.facetsUnavailable.set(!ok);
+      },
+      error: () => { this.facetsLoading.set(false); this.facets.set(null); this.facetsUnavailable.set(true); },
+    });
+  }
   /** The server has runs older than the ones loaded; Load older reads the next window. */
   readonly hasMore = signal(false);
   /** Executions without a job: more ran in the last day than RECENT_WINDOW shows. */
@@ -201,7 +250,7 @@ export class JobHistory {
   readonly emptyMessage = computed(() =>
     this.statusFilter() || this.search().trim() ? 'No runs match the current filters.'
       : this.isDrillDown() ? 'No runs in this hour.'
-      : !this.jobId() ? 'No job ran in the last day. Open a schedule to see its whole history.'
+      : !this.jobId() ? (activeCount(this.explorerFilter()) ? 'No run matches these filters.' : 'No schedule ran in this window. Widen it on the left, or open a schedule to see its whole history.')
       : 'This job has never run.');
 
   /** Counts per status, so the shape of a job's history reads at a glance. */
@@ -563,7 +612,8 @@ export class JobHistory {
   /** The newest runs of every job in the last day (at most RECENT_WINDOW), for Executions opened without a job. */
   private loadRecent(silent: boolean): void {
     this.request?.unsubscribe();
-    const body = { fromDate: localIsoDaysAgo(1), toDate: localIsoDaysAgo(0), limit: RECENT_WINDOW };
+    this.loadFacets();
+    const body = explorerBody(this.explorerFilter(), RECENT_WINDOW);
     this.request = this.http.post<ApiResponse<any>>(`${API_BASE}/message.json/fetchLogs`, body).subscribe({
       next: response => {
         this.loading.set(false);

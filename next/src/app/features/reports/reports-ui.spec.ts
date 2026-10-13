@@ -73,11 +73,25 @@ describe('Reports, rendered', () => {
     expect(clear).toBeTruthy();
   });
 
-  it('labels the filters with the shared .label', () => {
+  // UX review 2026-10-12 (RA1): one date-range control in the header and one filter bar whose controls share a line --
+  // each named for a screen reader, none with a label stacked above it; Pipeline and Schedule, not Task and Job.
+  it('puts the range in the header and names every filter, Pipeline and Schedule among them', () => {
     const { el } = page();
-    for (const id of ['r-from', 'r-to', 'r-f-task', 'r-f-job', 'r-f-status', 'r-f-owner']) {
-      expect(el.querySelector(`label[for="${id}"]`)!.classList, id).toContain('label');
+    expect(el.querySelector('.page-head app-date-range')).not.toBeNull();
+    const bar = el.querySelector('[data-test="analytics-filters"]')!;
+    for (const name of ['Pipeline', 'Schedule', 'Outcome', 'Owner']) {
+      expect(bar.querySelector(`[aria-label="${name}"]`), name).not.toBeNull();
     }
+    expect(bar.querySelectorAll('label')).toHaveLength(0);
+    expect(bar.textContent).not.toMatch(/\bTask\b|\bJob\b/);
+  });
+
+  it('applies a range picked in the header, and folds the rare outcomes into Other below 2xl (RA1)', () => {
+    const { reports } = page();
+    reports.applyRange({ from: '2026-10-01', to: '2026-10-07', preset: 'custom' });
+    expect([reports.startDate(), reports.endDate(), reports.range().preset]).toEqual(['2026-10-01', '2026-10-07', 'custom']);
+    expect(reports.rareOutcomes({ outcomes: { Completed: 9, Failed: 1, Interrupt: 1, Skip: 2, Missed: 3 } })).toBe(6);
+    expect(reports.rareOutcomes({ outcomes: { Completed: 9 } })).toBe(0);
   });
 
   it('pairs Try again with the refresh icon', () => {

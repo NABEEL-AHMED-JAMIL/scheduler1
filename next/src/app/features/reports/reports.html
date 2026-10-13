@@ -4,87 +4,50 @@
       <div>
         <h1 class="page-title">Run analytics</h1>
         <p class="page-subtitle">
-          What your runs did in this range — how many succeeded, which tasks are struggling,
-          and what failed.
+          What your runs did in this range — how many succeeded, which pipelines are struggling, and what failed.
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="toggleBuilder()"
+        <!-- UX review 2026-10-12 (RA1): one date-range control, as Home and Runs › By date. -->
+        <app-date-range [value]="range()" [presets]="rangePresets" [storageKey]="rangeStore" [maxSpanDays]="366"
+                        label="Date range for run analytics" (rangeChange)="applyRange($event)" />
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <button type="button" class="btn btn-default btn-sm" (click)="toggleBuilder()"
                 [attr.aria-expanded]="showBuilder()">
           <app-icon [name]="showBuilder() ? 'chevronDown' : 'chevronRight'" />Build your own view
         </button>
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
       </div>
     </div>
   </app-page-header>
 
-  <!-- Range. Kept as the app's two native date inputs rather than a new picker component:
-       every other screen does it this way, and matching costs nothing. -->
-  <div class="card p-4">
-    <div class="flex flex-wrap items-end gap-3">
-      <div>
-        <label class="label"
-               for="r-from">From</label>
-        <app-date-field class="mt-1" inputId="r-from" label="From" [value]="startDate()" (valueChange)="setStart($event)" />
-      </div>
-      <div>
-        <label class="label"
-               for="r-to">To</label>
-        <app-date-field class="mt-1" inputId="r-to" label="To" [value]="endDate()" (valueChange)="setEnd($event)" />
-      </div>
-      @if (!loading() && !error()) {
-        <span class="pill pill-neutral mb-1.5">{{ counts().total }} runs</span>
-      }
-      <div class="ml-auto flex flex-wrap items-end gap-2">
-        <!-- Every one of these narrows data(), which is what the tiles, all three charts, the
-             task table and the pivot builder all read. There is one predicate, so there is no
-             way for a filter to reach some of the page and not the rest. -->
-        <div>
-          <label class="label"
-                 for="r-f-task">Task</label>
-          <div class="w-44 mt-1"><app-combobox id="r-f-task" [selected]="taskFilter()" (selectedChange)="taskFilter.set($event)"
-                    placeholder="All tasks" clearLabel="All tasks" [options]="asOptions(taskOptions())" /></div>
-        </div>
-        <div>
-          <label class="label"
-                 for="r-f-job">Job</label>
-          <div class="w-44 mt-1"><app-combobox id="r-f-job" [selected]="jobFilter()" (selectedChange)="jobFilter.set($event)"
-                    placeholder="All jobs" clearLabel="All jobs" [options]="asOptions(jobOptions())" /></div>
-        </div>
-        <div>
-          <label class="label"
-                 for="r-f-status">Outcome</label>
-          <select id="r-f-status" class="input max-w-36 mt-1" [value]="statusFilter()"
-                  (change)="statusFilter.set($any($event.target).value)">
-            <option value="">All outcomes</option>
-            @for (option of statusOptions(); track option) { <option [value]="option">{{ option }}</option> }
-          </select>
-        </div>
-        @if (showTenantFilter()) {
-          <div>
-            <label class="label"
-                   for="r-f-tenant">Workspace</label>
-            <div class="w-44 mt-1"><app-combobox id="r-f-tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event)"
-                    placeholder="All workspaces" clearLabel="All workspaces" [options]="asOptions(tenantOptions())" /></div>
-          </div>
-        }
-        <div>
-          <label class="label"
-                 for="r-f-owner">Owner</label>
-          <div class="w-40 mt-1"><app-combobox id="r-f-owner" [selected]="ownerFilter()" (selectedChange)="ownerFilter.set($event)"
-                    placeholder="All owners" clearLabel="All owners" [options]="asOptions(ownerOptions())" /></div>
-        </div>
-      </div>
-      @if (truncated()) {
-        <span class="pill pill-warn mb-1.5">
-          <app-icon name="alert" size="0.85em" />Capped
-        </span>
-        <p class="w-full text-xs text-crit-500 mt-1">
-          Only the most recent runs were read. Every figure below describes that sample, not
-          the whole range — narrow the dates for exact numbers.
-        </p>
-      }
-    </div>
+  <!-- RA1: one filter bar, every control one height on one line -- no labels stacked above some of them. Every one of
+       these narrows data(), which is what the tiles, all three charts, the pipeline table and the builder read. -->
+  <div class="card px-4 py-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filters" data-test="analytics-filters">
+    <div class="w-48"><app-combobox id="r-f-task" ariaLabel="Pipeline" [selected]="taskFilter()" (selectedChange)="taskFilter.set($event)"
+              placeholder="All pipelines" clearLabel="All pipelines" [options]="asOptions(taskOptions())" /></div>
+    <div class="w-48"><app-combobox id="r-f-job" ariaLabel="Schedule" [selected]="jobFilter()" (selectedChange)="jobFilter.set($event)"
+              placeholder="All schedules" clearLabel="All schedules" [options]="asOptions(jobOptions())" /></div>
+    <select id="r-f-status" class="input max-w-40" aria-label="Outcome" [value]="statusFilter()"
+            (change)="statusFilter.set($any($event.target).value)">
+      <option value="">All outcomes</option>
+      @for (option of statusOptions(); track option) { <option [value]="option">{{ option }}</option> }
+    </select>
+    @if (showTenantFilter()) {
+      <div class="w-44"><app-combobox id="r-f-tenant" ariaLabel="Workspace" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event)"
+              placeholder="All workspaces" clearLabel="All workspaces" [options]="asOptions(tenantOptions())" /></div>
+    }
+    <div class="w-44"><app-combobox id="r-f-owner" ariaLabel="Owner" [selected]="ownerFilter()" (selectedChange)="ownerFilter.set($event)"
+              placeholder="All owners" clearLabel="All owners" [options]="asOptions(ownerOptions())" /></div>
+    @if (!loading() && !error()) {
+      <span class="pill pill-neutral ml-auto">{{ counts().total }} runs</span>
+    }
+    @if (truncated()) {
+      <span class="pill pill-warn"><app-icon name="alert" size="0.85em" />Capped</span>
+      <p class="w-full text-xs text-crit-500">
+        Only the most recent runs were read. Every figure below describes that sample, not
+        the whole range — narrow the dates for exact numbers.
+      </p>
+    }
   </div>
 
   @if (activeFilters().length) {
@@ -136,7 +99,7 @@
       } @else {
         <p class="mt-3 text-sm text-[color:var(--text-secondary)]">No runs started in this range.</p>
         <p class="mt-1 text-xs text-[color:var(--text-muted)]">
-          Widen the dates, or run a job from the Jobs screen to see it here.
+          Widen the dates, or run a schedule from Pipelines › Schedules to see it here.
         </p>
       }
     </div>
@@ -228,11 +191,11 @@
     <!-- ── Task health ────────────────────────────────────────────────────────────────── -->
     <section class="space-y-3">
       <div>
-        <h2 class="section-title">Task health</h2>
+        <h2 class="section-title">Pipeline health</h2>
         <p class="section-sub">
           Median and Slowest are queued-to-finished, so the dispatcher's wait is inside them —
           the builder's Execution measures have it taken out.
-          Every task that ran, worst first.
+          Every pipeline that ran, worst first.
           @if (unhealthyTasks()) {
             <strong>{{ unhealthyTasks() }}</strong> of {{ taskHealth().length }} had a failure.
           } @else {
@@ -240,35 +203,36 @@
           }
         </p>
       </div>
-      <app-table-shell heading="Tasks" [shown]="healthRows().length" [total]="taskHealth().length"
+      <app-table-shell heading="Pipelines" [shown]="healthRows().length" [total]="taskHealth().length"
                        [isEmpty]="!healthRows().length"
-                       [emptyMessage]="taskHealth().length ? 'No task matches.' : 'No task ran in this range.'" emptyIcon="chart">
+                       [emptyMessage]="taskHealth().length ? 'No pipeline matches.' : 'No pipeline ran in this range.'" emptyIcon="chart">
         <ng-container toolbar>
           <!-- At a hundred tasks the worst-first order is not enough: the chips cut the list to
                the tasks that need looking at, the search finds one by name. -->
           <button type="button" class="pill pill-crit hover-brand" [class.is-on]="healthState() === 'failing'" [attr.aria-pressed]="healthState() === 'failing'"
-                  (click)="setHealthState('failing')" title="Tasks with at least one failed run">{{ unhealthyTasks() }} failing</button>
+                  (click)="setHealthState('failing')" title="Pipelines with at least one failed run">{{ unhealthyTasks() }} failing</button>
           <button type="button" class="pill pill-warn hover-brand" [class.is-on]="healthState() === 'inflight'" [attr.aria-pressed]="healthState() === 'inflight'"
-                  (click)="setHealthState('inflight')" title="Tasks with a run still going">{{ inFlightTasks() }} in flight</button>
+                  (click)="setHealthState('inflight')" title="Pipelines with a run still going">{{ inFlightTasks() }} in flight</button>
           <button type="button" class="pill pill-ok hover-brand" [class.is-on]="healthState() === 'healthy'" [attr.aria-pressed]="healthState() === 'healthy'"
-                  (click)="setHealthState('healthy')" title="Tasks whose every run completed">{{ taskHealth().length - unhealthyTasks() - inFlightTasks() }} healthy</button>
+                  (click)="setHealthState('healthy')" title="Pipelines whose every run completed">{{ taskHealth().length - unhealthyTasks() - inFlightTasks() }} healthy</button>
           <div class="search-field max-w-56">
             <app-icon name="search" size="0.95em" />
-            <input class="input" placeholder="Find a task" aria-label="Find a task" [value]="healthSearch()" (input)="setHealthSearch($any($event.target).value)" />
+            <input class="input" placeholder="Find a pipeline" aria-label="Find a pipeline" [value]="healthSearch()" (input)="setHealthSearch($any($event.target).value)" />
           </div>
         </ng-container>
         <table class="table-modern">
           <thead>
             <tr>
-              <th>Task</th>
-              <th class="text-right hidden lg:table-cell" title="Distinct jobs that drove this task">Jobs</th>
+              <th>Pipeline</th>
+              <th class="text-right hidden lg:table-cell" title="Distinct schedules that ran this pipeline">Schedules</th>
               <th class="text-right">Runs</th>
               <!-- One column per outcome, not a single "Failed": Interrupt is a different
                    problem from Failed (the run was stopped, not broken), and Skip and Missed
                    are the only trace a task leaves when it never ran at all. -->
               @for (col of outcomeColumns; track col.status) {
-                <th class="text-right" [title]="col.title">{{ col.label }}</th>
+                <th class="text-right" [class.hidden]="'rare' in col" [class.2xl:table-cell]="'rare' in col" [title]="col.title">{{ col.label }}</th>
               }
+              <th class="text-right 2xl:hidden" [title]="rareTitle">Other</th>
               <th class="text-right">Success</th>
               <th class="text-right">Median</th>
               <th class="text-right hidden xl:table-cell" title="Slowest finished run">Slowest</th>
@@ -293,20 +257,22 @@
                 <td class="text-right tabular hidden lg:table-cell">{{ task.jobs }}</td>
                 <td class="text-right tabular">{{ task.runs }}</td>
                 @for (col of outcomeColumns; track col.status) {
-                  <td class="text-right tabular"
+                  <td class="text-right tabular" [class.hidden]="'rare' in col" [class.2xl:table-cell]="'rare' in col"
                       [class.text-[color:var(--text-muted)]]="!task.outcomes[col.status]"
                       [class.text-crit-500]="col.tone === 'crit' && task.outcomes[col.status] > 0"
                       [class.text-warn-500]="col.tone === 'warn' && task.outcomes[col.status] > 0">
                     {{ task.outcomes[col.status] || 0 }}
                   </td>
                 }
+                <td class="text-right tabular 2xl:hidden" [class.text-[color:var(--text-muted)]]="!rareOutcomes(task)"
+                    [class.text-warn-500]="rareOutcomes(task) > 0" [title]="rareTitle">{{ rareOutcomes(task) }}</td>
                 <td class="text-right tabular">
                   {{ task.successRate >= 0 ? task.successRate + '%' : '—' }}
                 </td>
-                <td class="text-right tabular mono text-xs">
+                <td class="text-right tabular mono text-xs whitespace-nowrap">
                   {{ formatDuration(task.median) }}
                 </td>
-                <td class="text-right tabular mono text-xs hidden xl:table-cell">
+                <td class="text-right tabular mono text-xs whitespace-nowrap hidden xl:table-cell">
                   {{ formatDuration(task.slowest) }}
                 </td>
                 <td class="hidden md:table-cell mono text-xs whitespace-nowrap

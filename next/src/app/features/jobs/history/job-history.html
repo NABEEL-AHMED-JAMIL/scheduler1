@@ -12,9 +12,8 @@
       } @else if (jobId()) {
         Every recorded run of schedule <span class="mono">#{{ jobId() }}</span>.
       } @else {
-        <!-- Reached without a schedule (Runs in the menu): the last day's runs of every schedule. -->
-        The newest runs of every schedule in the last day@if (recentCut()) { (the latest {{ runs().length }})}. By date lists
-        every run in a range.
+        <!-- Reached without a schedule (Runs in the menu): the explorer -- facets, a histogram and the list (B3). -->
+        Every schedule's runs: narrow them on the left; the bars show when they ran@if (recentCut()) { (the list holds the latest {{ runs().length }})}.
       }
     </p>
   </app-page-header>
@@ -270,6 +269,26 @@
     </div>
   }
 
+  <!-- UX review 2026-10-12 (B3, E1): opened from the menu, Runs is an explorer -- facets on the left with the server's
+       counts, a time histogram above the list. A schedule's own runs and a dashboard drill-down keep one column. -->
+  <div [class.runs-explorer]="explorer()">
+  @if (explorer()) {
+    <aside class="card p-3 runs-explorer-rail" data-test="run-facets">
+      <app-run-facets-rail [facets]="facets()" [filter]="explorerFilter()" [unavailable]="facetsUnavailable()" [loading]="facetsLoading()"
+                           (filterChange)="setExplorerFilter($event)" />
+    </aside>
+  }
+  <div class="min-w-0 flex flex-col gap-4">
+  @if (explorer()) {
+    <section class="card chart-card" data-test="run-histogram" aria-labelledby="run-histogram-title">
+      <div class="flex flex-wrap items-baseline gap-2">
+        <h3 class="chart-title" id="run-histogram-title">Runs over time</h3>
+        <span class="chart-sub">{{ histogramSub() }}</span>
+      </div>
+      <app-bar-chart [data]="histogram()" [height]="96" [clickable]="false"
+                     [emptyMessage]="facetsUnavailable() ? 'The counts could not be read.' : 'No runs in this window.'" />
+    </section>
+  }
   @if (showInsights() && hasInsights()) {
     <!-- Spans must tile the 3-column grid or every row is left part-empty: the donut (1) and
          the duration card (2) fill one row, the full-width flag split takes the next. -->
@@ -325,7 +344,7 @@
       </div>
       <!-- Owner 2026-10-12: the outcome chips and the Charts toggle are filters of this list, in its toolbar after the
            search -- one height -- rather than floating between the review box and the table. -->
-      @for (item of summary(); track item.status) {
+      @for (item of explorer() ? [] : summary(); track item.status) {
         <app-status-filter-chip [status]="item.status" [count]="item.count"
                                  [selected]="statusFilter() === item.status"
                                  (toggle)="setStatusFilter(statusFilter() === item.status ? '' : item.status)" />
@@ -378,10 +397,16 @@
                    is. A job the list does not have keeps just its number. -->
               <td class="whitespace-nowrap">
                 <a class="link-inline mono" [routerLink]="['/pipelines/schedules', run.jobId, 'executions']"
-                   title="Open this job's own history">#{{ run.jobId }}</a>
+                   title="Open this schedule's own runs">#{{ run.jobId }}</a>
                 @if (jobNames().get(run.jobId); as name) {
                   <span class="ml-1.5 inline-block max-w-[16rem] truncate align-bottom text-[color:var(--text-secondary)]"
                         [title]="name">{{ name }}</span>
+                }
+                <!-- B3: the pipeline the schedule runs, and what started this run (Core's fetchLogs names both). -->
+                @if (run.taskName || run.trigger) {
+                  <div class="text-xs text-[color:var(--text-muted)] max-w-[20rem] truncate" [title]="run.taskName || ''">
+                    {{ run.taskName }}@if (run.taskName && run.trigger) { · }@if (run.trigger) { {{ triggerWord(run.trigger) }} }
+                  </div>
                 }
               </td>
             }
@@ -507,6 +532,8 @@
     <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
+  </div>
+  </div>
 </div>
 
 @if (assistantOpen() && !isAllJobs()) {

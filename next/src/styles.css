@@ -2158,6 +2158,10 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .step-stage[data-stage="write"] { --stage-tone: var(--color-ok-500); }
 .step-stage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; margin-bottom: 0.5rem; font-size: 12px; line-height: 1rem; color: var(--text-secondary); }
 .step-stage-head > app-icon { color: var(--stage-tone); }
+/* UX review 2026-10-12 (B3): Runs as an explorer -- the facets rail at the left, the histogram and the list beside it. */
+.runs-explorer { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+.runs-explorer-rail { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+@media (max-width: 1023px) { .runs-explorer { grid-template-columns: minmax(0, 1fr); } .runs-explorer-rail { position: static; max-height: none; } }
 /* The pipeline's parts, in the order they are set up: Source -> Steps -> Review -> Outputs -> Schedule & triggers. */
 .pipeline-overview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; list-style: none; margin: 0; padding: 0; }
 @media (max-width: 1100px) { .pipeline-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); } }

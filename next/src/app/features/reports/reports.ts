@@ -1,4 +1,4 @@
-import { DateField } from '../../shared/ui/date-field';
+import { DateRange, DateRangePicker, RangePreset, rangeKey, restoreRange } from '../../shared/ui/date-range';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, RouterLink } from '@angular/router';
@@ -56,10 +56,12 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 const OUTCOME_COLUMNS = [
   { status: 'Completed', label: 'Completed', tone: 'ok',   title: 'Runs that finished successfully' },
   { status: 'Failed',    label: 'Failed',    tone: 'crit', title: 'Runs that reported an error' },
-  { status: 'Interrupt', label: 'Interrupted', tone: 'crit', title: 'Runs stopped before they finished' },
-  { status: 'Skip',      label: 'Skipped',   tone: 'warn', title: 'Runs skipped by hand or because the job was already queued' },
-  { status: 'Missed',    label: 'Missed',    tone: 'warn', title: 'Scheduled runs the dispatcher never picked up' },
+  { status: 'Interrupt', label: 'Interrupted', tone: 'crit', title: 'Runs stopped before they finished', rare: true },
+  { status: 'Skip',      label: 'Skipped',   tone: 'warn', title: 'Runs skipped by hand or because the schedule was already queued', rare: true },
+  { status: 'Missed',    label: 'Missed',    tone: 'warn', title: 'Scheduled runs the dispatcher never picked up', rare: true },
 ] as const;
+/** RA1: the three outcomes that are usually 0, folded into one "Other" column below 2xl so the table fits at 1187. */
+const RARE_OUTCOMES = OUTCOME_COLUMNS.filter(c => 'rare' in c).map(c => c.status);
 const IN_FLIGHT = new Set(['Queue', 'Start', 'Running']);
 
 // NO_DURATION -- the -1 a run that has not ended carries instead of a duration -- is imported
@@ -172,7 +174,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [RefreshButton, PageHeader, DateField, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, DateRangePicker, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {
@@ -220,8 +222,8 @@ export class Reports implements OnInit {
   readonly showTenantFilter = computed(() => this.tenantOptions().length > 1);
 
   readonly activeFilters = computed(() => [
-    { key: 'task', label: 'Task', value: this.taskFilter() },
-    { key: 'job', label: 'Job', value: this.jobFilter() },
+    { key: 'task', label: 'Pipeline', value: this.taskFilter() },
+    { key: 'job', label: 'Schedule', value: this.jobFilter() },
     { key: 'status', label: 'Outcome', value: this.statusFilter() },
     { key: 'owner', label: 'Owner', value: this.ownerFilter() },
     { key: 'tenant', label: 'Workspace', value: this.tenantFilter() },
@@ -266,8 +268,30 @@ export class Reports implements OnInit {
   });
   readonly truncated = signal(false);
 
-  readonly startDate = signal(isoDaysAgo(30));
-  readonly endDate = signal(isoDaysAgo(0));
+  /**
+   * UX review 2026-10-12 (RA1): one date-range control, as Home and Runs › By date have -- the viewer's last choice
+   * remembered. The two days stay the page's signals (a day picked on the chart narrows to it, as Custom).
+   */
+  readonly rangeStore = rangeKey('run-analytics', typeof this.auth?.user === 'function' ? this.auth.user()?.appUserId : null);
+  private readonly openedRange = restoreRange(this.rangeStore, '30d');
+  readonly startDate = signal(this.openedRange.from || isoDaysAgo(30));
+  readonly endDate = signal(this.openedRange.to || isoDaysAgo(0));
+  readonly rangePreset = signal<RangePreset>(this.openedRange.from ? this.openedRange.preset : '30d');
+  readonly range = computed<DateRange>(() => ({ from: this.startDate(), to: this.endDate(), preset: this.rangePreset() }));
+  readonly rangePresets: RangePreset[] = ['today', '7d', '30d', 'month', '90d'];
+
+  applyRange(range: DateRange): void {
+    this.rangePreset.set(range.preset);
+    this.startDate.set(range.from);
+    this.endDate.set(range.to);
+    this.load();
+  }
+
+  /** The rarely-nonzero outcomes of a pipeline, together: "Other" below 2xl. */
+  rareOutcomes(task: { outcomes: Record<string, number> }): number {
+    return RARE_OUTCOMES.reduce((sum, status) => sum + (task.outcomes[status] || 0), 0);
+  }
+  readonly rareTitle = 'Interrupted, skipped and missed runs (each its own column on a wider screen)';
 
   /** The builder is opt-in: most visits want the answers, not the tool. */
   readonly showBuilder = signal(false);
@@ -854,6 +878,7 @@ export class Reports implements OnInit {
 
   /** The way out of a range that can never load. */
   resetRange(): void {
+    this.rangePreset.set('30d');
     this.startDate.set(isoDaysAgo(30));
     this.endDate.set(isoDaysAgo(0));
     this.load();
@@ -1067,6 +1092,7 @@ export class Reports implements OnInit {
   focusDay(bar: Bar): void {
     const day = typeof bar?.meta === 'string' ? bar.meta : '';
     if (!day || !bar.value) return;
+    this.rangePreset.set('custom');
     this.startDate.set(day);
     this.endDate.set(day);
     this.load();
