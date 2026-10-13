@@ -1,27 +1,27 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Tool Registry</h1>
-      <p class="page-subtitle">
-        The only operations the AI Assistant may request. Each tool calls a service, checks your role, and is
-        logged on the run; a tool that writes asks you first.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Tool Registry</h1>
+        <p class="page-subtitle">
+          The only operations the AI Assistant may request. Each tool calls a service, checks your role, and is
+          logged on the run; a tool that writes asks you first.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (canPickTenant()) {
+          <div class="w-56" data-testid="tool-tenant-picker">
+            <app-combobox id="tools-tenant" ariaLabel="Workspace" [selected]="tenantId() ? '' + tenantId() : ''" (selectedChange)="pickTenant($event)"
+                          placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
+          </div>
+        }
+        <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
+        <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (canPickTenant()) {
-        <div class="w-56" data-testid="tool-tenant-picker">
-          <app-combobox id="tools-tenant" ariaLabel="Workspace" [selected]="tenantId() ? '' + tenantId() : ''" (selectedChange)="pickTenant($event)"
-                        placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
-        </div>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || needsWorkspace()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
-    </div>
-  </div>
+  </app-page-header>
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Tools', value: summary().total, foot: 'in the registry', icon: 'plug', tone: 'info' },
       { label: 'Allowed for you', value: summary().allowed, foot: 'the assistant may call', icon: 'check', tone: 'ok' },

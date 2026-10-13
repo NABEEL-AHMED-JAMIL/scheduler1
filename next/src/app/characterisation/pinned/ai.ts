@@ -10,6 +10,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "New prompt",
+      "1 About it",
+      "2 Model",
+      "3 What it says",
+      "4 The answer",
       "Try it"
     ],
     "buttons": [
@@ -75,6 +79,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "UI-REVIEW Zürich – 東京 ✓ draft prompt (never activated) with a deliberately long name for truncation checks in the prompt list v1Inactive",
+      "1 About it",
+      "2 Model",
+      "3 What it says",
+      "4 The answer",
       "Try it",
       "Recent runs"
     ],

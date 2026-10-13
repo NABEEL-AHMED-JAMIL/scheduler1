@@ -1,25 +1,25 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Prompts</h1>
-      <p class="page-subtitle">
-        What a step says to a model: instructions, a message with <span class="mono">{{ '{{' }}variables{{ '}}' }}</span>
-        the pipeline fills in, and the shape of the answer. Every save is a version; Try it runs
-        one before anything is wired to it.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Prompts</h1>
+        <p class="page-subtitle">
+          What a step says to a model: instructions, a message with <span class="mono">{{ '{{' }}variables{{ '}}' }}</span>
+          the pipeline fills in, and the shape of the answer. Every save is a version; Try it runs
+          one before anything is wired to it.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canManage()) {
+          <a class="btn btn-primary btn-sm" [routerLink]="['/ai/prompts/new']"><app-icon name="plus" />New prompt</a>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (canManage()) {
-        <a class="btn btn-primary btn-sm" [routerLink]="['/ai/prompts/new']"><app-icon name="plus" />New prompt</a>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="prompts" />
 
-  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Prompts', value: summary().total, foot: summary().active + ' active', icon: 'sparkle', tone: 'info' },
       { label: 'JSON output', value: summary().json, foot: 'validated against a schema', icon: 'code', tone: 'info' },

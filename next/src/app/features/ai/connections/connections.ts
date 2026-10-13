@@ -20,6 +20,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { Bar, BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -28,7 +30,7 @@ import { statusColor } from '../../../shared/charts/status-color';
  */
 @Component({
   selector: 'app-connections',
-  imports: [Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner,
+  imports: [RefreshButton, PageHeader, Icon, StatTile, StatusPill, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, BlurLoader, ServerTimePipe, DecimalPipe, ManagedBanner,
     BarChart],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './connections.html',

@@ -17,6 +17,8 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { Prompt } from './prompt-model';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * Prompts: what a step says to a model. Readable by everyone who can open the page (a
@@ -25,7 +27,7 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
  */
 @Component({
   selector: 'app-prompts',
-  imports: [Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Icon, TableShell, StatusPill, StatTile, ViewToggle, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, ServerTimePipe, ManagedBanner],
   templateUrl: './prompts.html',
 })
 export class Prompts implements OnInit {

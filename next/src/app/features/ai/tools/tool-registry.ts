@@ -12,6 +12,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { capTitle } from '../../../shared/ui/long-text';
 import { AssistantApi } from '../assistant/assistant.api';
 import { ToolDef, allowedTools, ioOf, serviceOf, toolState } from '../assistant/assistant.model';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * AI › Tool Registry (MIG-252): the only operations the AI Assistant may request (ai-service's
@@ -26,7 +28,7 @@ import { ToolDef, allowedTools, ioOf, serviceOf, toolState } from '../assistant/
  */
 @Component({
   selector: 'app-tool-registry',
-  imports: [Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox],
+  imports: [RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox],
   templateUrl: './tool-registry.html',
 })
 export class ToolRegistry implements OnInit {

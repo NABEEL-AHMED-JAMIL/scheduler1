@@ -17,6 +17,10 @@ import { Prompt, PromptRun, PromptVariable, placeholdersOf } from './prompt-mode
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { SENSITIVITY_LEVELS, SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { Section } from '../../../shared/ui/section';
+import { FormRow } from '../../../shared/ui/form-row';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -25,7 +29,7 @@ import { ManagedBanner } from '../../../shared/ui/managed-banner';
  */
 @Component({
   selector: 'app-prompt-edit',
-  imports: [ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner],
+  imports: [ActionsBar, Section, FormRow, PageHeader, ReactiveFormsModule, RouterLink, Field, Icon, Combobox, ServerTimePipe, DecimalPipe, ManagedBanner],
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {

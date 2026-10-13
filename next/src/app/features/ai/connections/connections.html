@@ -1,27 +1,27 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Model connections</h1>
-      <p class="page-subtitle">
-        Where prompts run: a provider, a key, a default model, and the two caps that keep a
-        scheduled job from running up a bill. One connection is the workspace default; a prompt
-        that names none runs on it. Keys are encrypted and never sent back to the browser.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Model connections</h1>
+        <p class="page-subtitle">
+          Where prompts run: a provider, a key, a default model, and the two caps that keep a
+          scheduled job from running up a bill. One connection is the workspace default; a prompt
+          that names none runs on it. Keys are encrypted and never sent back to the browser.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (!locked()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+            <app-icon name="plus" />New connection
+          </button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (!locked()) {
-        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-          <app-icon name="plus" />New connection
-        </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="model connections" />
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Connections', value: summary().total, foot: summary().active + ' active', icon: 'server', tone: 'info' },
       { label: 'Tested OK', value: summary().testedOk, foot: 'last test passed', icon: 'plug', tone: 'ok' },
