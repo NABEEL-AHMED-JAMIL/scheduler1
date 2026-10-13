@@ -47,14 +47,17 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /aiPrompt.json/dataPolicy"
+      "GET /aiPrompt.json/dataPolicy",
+      "GET /sourceJob.json/review/policy",
+      "GET /documentReview.json/policy"
     ],
     "headings": [
       "Data policies",
       "Sensitive",
       "Internal",
       "Public",
-      "How a call's level is decided"
+      "How a call's level is decided",
+      "Bulk review"
     ],
     "buttons": [
       "Refresh"
@@ -227,19 +230,24 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiPrompt.json/dataPolicy",
-      "GET /aiConnection.json/list"
+      "GET /aiConnection.json/list",
+      "GET /sourceJob.json/review/policy",
+      "GET /documentReview.json/policy"
     ],
     "headings": [
       "Data policies",
       "Sensitive",
       "Internal",
       "Public",
-      "How a call's level is decided"
+      "How a call's level is decided",
+      "Bulk review"
     ],
     "buttons": [
+      "Discard",
       "Discard changes",
       "Refresh",
-      "Save policy"
+      "Save policy",
+      "Save review policy"
     ],
     "columns": [
       [
@@ -250,6 +258,9 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "Allow bulk approve of documents",
+      "Allow bulk approve of runs",
+      "Include documents whose rules fail",
       "Keep Internal run files (days)",
       "Keep Public run files (days)",
       "Keep Sensitive run files (days)",

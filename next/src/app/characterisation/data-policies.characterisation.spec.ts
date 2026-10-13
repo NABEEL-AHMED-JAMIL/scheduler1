@@ -27,6 +27,10 @@ const ANSWERS: Record<string, unknown> = {
   'GET /aiPrompt.json/dataPolicy': POLICY,
   'GET /aiConnection.json/list': CONNECTIONS,
   'GET /tenant.json/listTenants': TENANTS,
+  // Bulk review (2026-10-12): nothing saved, so the defaults -- bulk approve on for runs and documents, rule failures left out.
+  'GET /sourceJob.json/review/policy': { status: 'SUCCESS', message: 'The review policy.', data: { bulkApproveRuns: true, saved: false, updatedBy: null, updatedAt: null } },
+  'GET /documentReview.json/policy': { status: 'SUCCESS', message: 'The review policy.',
+    data: { bulkApprove: true, bulkApproveRuleFailures: false, saved: false, updatedBy: null, updatedAt: null } },
 };
 
 const clean = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();

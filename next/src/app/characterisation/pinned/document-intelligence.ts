@@ -449,6 +449,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [
       [
+        "",
         "Document",
         "Type",
         "To check",
@@ -462,6 +463,8 @@ export const PINNED: Record<string, unknown> = {
       "Claimed",
       "Confidence",
       "Document type",
+      "Select all documents on this page that can be decided",
+      "Select ocr-live-check.png",
       "State",
       "Waiting"
     ],

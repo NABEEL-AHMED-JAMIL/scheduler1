@@ -17,8 +17,8 @@ import { BulkPanel, BulkPanelData } from './bulk-panel';
   styles: `
     :host { display: contents; }
     .bulk-bar { position: sticky; bottom: 0.75rem; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
-      padding: 0.5rem 0.75rem; border: 1px solid var(--border-strong); border-radius: var(--radius-lg, 0.75rem);
-      background: var(--surface-raised); box-shadow: 0 8px 24px -12px rgb(0 0 0 / 0.35); font-size: 0.875rem; }
+      padding: 0.5rem 0.75rem; border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
+      background: var(--surface-raised); box-shadow: 0 8px 24px -12px var(--shadow-color); font-size: 0.875rem; }
     .bulk-bar.is-flush { position: static; border-width: 1px 0 0; border-radius: 0; box-shadow: none; }
     .bulk-bar-count { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
     .bulk-bar-note { font-size: 0.75rem; color: var(--text-secondary); min-width: 0; }
