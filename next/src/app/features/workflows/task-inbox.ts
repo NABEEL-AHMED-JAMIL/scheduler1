@@ -281,6 +281,8 @@ export class TaskInbox implements OnInit {
         if (--pending > 0) return;
         this.loading.set(false);
         if (this.followLinkedTask) { this.followLinkedTask = false; this.showLinkedTab(); }
+        else if (this.firstLoad) this.openWhereTheWorkIs();
+        this.firstLoad = false;
       });
     }
     this.badge.refresh();
@@ -391,6 +393,19 @@ export class TaskInbox implements OnInit {
     const first = this.shownIds()[0];
     if (first) this.openTask(first);
     else { this.selectedTask.set(null); this.detail.set(null); }
+  }
+
+  /** The first load only: a Refresh or a decision never moves the reader off the tab they chose. */
+  private firstLoad = true;
+
+  /**
+   * UX review 2026-10-12 (W1): the inbox opens on the tab with work. A reviewer whose tasks all wait in their group's pool
+   * opened on an empty "Waiting for me" saying "Nothing is waiting for you" while My groups held five. When Mine is empty
+   * and My groups is not, it opens My groups on its first task; a link to a task or to My requests decides for itself.
+   */
+  private openWhereTheWorkIs(): void {
+    if (this.tab() !== 'mine' || this.mine().length || !this.groups().length) return;
+    this.pick('groups');
   }
 
   private showLinkedTab(): void {

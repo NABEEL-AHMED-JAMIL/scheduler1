@@ -6,7 +6,7 @@ import { Subscription, TimeoutError } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { AskDataApi } from './ask-data.api';
-import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, chartAnswerOf, csvOf, linkParts, refusalText, searchedText, segments } from './ask-data.model';
+import { AskAnswer, AskQuery, AskSourceRef, AskTurn, QUESTION_MAX, Searched, answerCell, chartAnswerOf, csvOf, figureColumns, linkParts, refusalText, searchedText, segments } from './ask-data.model';
 import { AuthService } from '../../core/auth/auth.service';
 import { AskIndex } from './ask-index';
 import { ChartAnswerSlot } from '../analytics/charts/chart-answer-slot';
@@ -157,8 +157,11 @@ export class AskData implements OnInit {
    * the rows), Change chart, Chart settings and Pin to dashboard.
    */
   readonly chartAnswerOf = chartAnswerOf;
-  /** Pinning puts a tile on a dashboard: whoever may open the dashboards (Saved Analyses or Analytics Studio). */
-  readonly canPin = computed(() => this.auth.canOpen('analytics-dashboards') || this.auth.canOpen('analytics'));
+  /** UX review 2026-10-12: which columns are figures, and a cell as the table shows it. */
+  readonly figureColumns = figureColumns;
+  readonly answerCell = answerCell;
+  /** Pinning puts a tile on a dashboard: whoever may change them (Edit dashboards or Analytics Studio), not a viewer. */
+  readonly canPin = computed(() => this.auth.canEditDashboards());
 
   shownRows(q: AskQuery): (string | null)[][] {
     return q.rows.slice(0, 20);

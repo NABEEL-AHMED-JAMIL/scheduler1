@@ -266,10 +266,12 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // UX review 2026-10-12 (R2): the run page opens with Schedules or the Queue -- a reviewer holds the Queue, and Core
+        // answers a run's reads only to its owner or one of its reviewers (RunReaders).
         path: 'pipelines/schedules/:jobId/runs/:jobQueueId/logs',
         title: 'Run',
         loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', pageKeys: ['jobs', 'queue'] },
         canActivate: [pageGuard],
       },
       {
@@ -279,7 +281,8 @@ export const routes: Routes = [
         title: 'Runs',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
-        data: { pageKey: 'jobs' },
+        // UX review 2026-10-12 (R2): with the Queue too -- a reviewer's runs waiting for review are listed here.
+        data: { pageKey: 'jobs', pageKeys: ['jobs', 'queue'] },
         canActivate: [pageGuard],
       },
       {

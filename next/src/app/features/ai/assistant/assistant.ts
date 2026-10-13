@@ -1,3 +1,4 @@
+import { ConversationRow, titleOf } from './conversation.model';
 import { ModelSetupBanner } from '../model-setup-banner';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
@@ -222,7 +223,7 @@ export class Assistant implements OnInit {
   readonly chartMessageId = computed(() => this.pickedChart() ?? newestChart(this.messages())?.messageId ?? null);
   readonly chartAnswer = computed(() => { const c = this.chart(); return c ? chartAnswerOfArtifact(c) : null; });
   /** Pinning puts a tile on a dashboard: whoever may open the dashboards. */
-  readonly canPinCharts = computed(() => this.auth.canOpen('analytics-dashboards') || this.auth.canOpen('analytics'));
+  readonly canPinCharts = computed(() => this.auth.canEditDashboards());
 
   /** What the Trace tab shows: the live run, or a finished run's trace as read. */
   readonly traceView = computed<{ run: TraceRun | null; calls: ToolCall[]; live: boolean }>(() => {
@@ -724,6 +725,27 @@ export class Assistant implements OnInit {
   toolLook(t: ToolDef) { return toolState(t); }
   size(bytes: number | null | undefined): string { return formatSize(bytes); }
   tip(text: string | null | undefined): string { return capTitle(text); }
+
+  /**
+   * Coordinator 2026-10-12: the thread's header reads the conversation's short title, as the list does (ai-service's
+   * ConversationSummary; a title the person gave wins), with the first question in full as its tooltip. The list's row is
+   * read first: it is the one refreshed after each answer.
+   */
+  private readonly threadRow = computed<ConversationRow | null>(() => {
+    const open = this.conversation();
+    if (!open) return null;
+    const listed = this.conversations().find(c => c.conversationId === open.conversationId) as ConversationRow | undefined;
+    return { ...(open as ConversationRow), ...(listed ?? {}) };
+  });
+  readonly threadTitle = computed(() => {
+    const c = this.threadRow();
+    if (!c) return 'New conversation';
+    return c.renamed ? (c.title || 'Untitled conversation').trim() : titleOf(c);
+  });
+  readonly threadTip = computed(() => {
+    const c = this.threadRow();
+    return c ? (c.firstQuestion || c.title || '').trim() : '';
+  });
   flowOf(m: AssistantMessage): PipelineFlowArtifact | null { return isFlow(m.artifact) ? m.artifact : null; }
   chartOf(m: AssistantMessage): ChartArtifact | null { return isChart(m.artifact) ? m.artifact : null; }
   draftOf(m: AssistantMessage): PipelineDraft | null {

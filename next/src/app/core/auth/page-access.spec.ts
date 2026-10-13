@@ -141,6 +141,14 @@ describe('pageGuard', () => {
     expect(run(['jobs', 'reports'], 'TENANT_USER', { pageKey: 'reports' })).toBe(true);
   });
 
+  it('opens a route several pages open with any one of them (UX review 2026-10-12, R2: the run page and the Queue)', () => {
+    const run_ = { pageKey: 'jobs', pageKeys: ['jobs', 'queue'] };
+    expect(run(['queue', 'task-inbox'], 'TENANT_USER', run_, 'Run logs')).toBe(true);
+    expect(run(['jobs'], 'TENANT_USER', run_, 'Run logs')).toBe(true);
+    // A viewer holds neither: refused, naming the first.
+    expect(String(run(['reports', 'analytics-dashboards'], 'TENANT_USER', run_, 'Run logs'))).toBe('/unauthorized?page=jobs&title=Run logs');
+  });
+
   it('lets an admin through regardless', () => {
     expect(run([], 'TENANT_ADMIN', { pageKey: 'reports' })).toBe(true);
   });

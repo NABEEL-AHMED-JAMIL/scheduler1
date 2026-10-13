@@ -100,7 +100,7 @@ export class VisualisePanel implements OnInit {
 
   readonly queryable = computed(() => !!this.data.connection && !!this.data.path);
   readonly canAsk = computed(() => this.auth.canOpen('ask-data'));
-  readonly canPin = computed(() => this.auth.canOpen('analytics-dashboards') || this.auth.canOpen('analytics'));
+  readonly canPin = computed(() => this.auth.canEditDashboards());
   readonly tried = signal<Tried[]>([]);
   readonly picked = signal(0);
   readonly loading = signal('');

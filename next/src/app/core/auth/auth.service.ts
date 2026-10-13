@@ -217,6 +217,16 @@ export class AuthService {
 
   /** The same answer as a signal, for templates that want to react to a refresh. */
   readonly pageKeys = computed(() => this.currentUser()?.pageKeys ?? null);
+
+  /**
+   * UX review 2026-10-12: whether the person may change dashboards -- a new board, a tile saved, moved or deleted, Pin to
+   * dashboard. Saved Analyses alone reads them (a viewer's profile); Edit dashboards or Analytics Studio writes. The
+   * gateway refuses the writes on its own (403); this keeps the buttons from offering them.
+   */
+  readonly canEditDashboards = computed(() => {
+    this.pageKeys();
+    return this.canOpen('dashboards-edit') || this.canOpen('analytics');
+  });
   /**
    * ollama.json pullModel/deleteModel. Listing them stays TENANT_ADMIN.
    *

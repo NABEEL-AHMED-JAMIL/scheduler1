@@ -1,9 +1,10 @@
 import { PageHeader } from '../../shared/ui/page-header';
 import { Crumb } from '../../core/nav/nav-tree';
+import { AuthService } from '../../core/auth/auth.service';
 import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
-import { Subscription, from, mergeMap } from 'rxjs';
+import { Subscription, catchError, from, mergeMap, of } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
@@ -78,6 +79,13 @@ export { DatasetRegistry } from './dataset-registry';
 export class Dashboards implements OnInit, OnDestroy {
 
   private readonly analytics = inject(AnalyticsService);
+  private readonly auth = inject(AuthService);
+  /**
+   * UX review 2026-10-12: whether the reader may change the boards -- a new board, a tile added, re-charted, re-set or
+   * removed, the board's theme, a board deleted. A viewer's profile holds Saved Analyses only: they read the boards, run
+   * and filter them, and the gateway refuses every write with a 403 besides.
+   */
+  readonly canEdit = computed(() => this.auth.canEditDashboards());
   /** Server times, read and written as the rest of the console does. */
   private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
   /** A time in the given format, or the text as it came when it is not a time at all. */
@@ -362,6 +370,8 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly dashboards = signal<Dashboard[]>([]);
   readonly loading = signal(false);
   readonly error = signal('');
+  /** The list read was refused (403). */
+  readonly refused = signal(false);
 
   /** Narrows the cards by name or description. Only offered past SEARCH_FROM boards. */
   readonly listFilter = signal('');
@@ -432,6 +442,8 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly board = signal<Dashboard | null>(null);
   readonly boardLoading = signal(false);
   readonly boardError = signal('');
+  /** UX review 2026-10-12: the board read was refused (403): the page says so, with whom to ask, and offers no retry. */
+  readonly boardRefused = signal(false);
   readonly widgetError = signal('');
 
   /**
@@ -613,6 +625,7 @@ export class Dashboards implements OnInit, OnDestroy {
       },
       error: err => {
         this.loading.set(false);
+        this.refused.set(err?.status === 403);
         this.error.set(err?.error?.message || 'The dashboards could not be read.');
       },
     });
@@ -629,12 +642,14 @@ export class Dashboards implements OnInit, OnDestroy {
       .filter((id): id is number => typeof id === 'number' && !(id in known));
     if (!ids.length) return;
     from(ids).pipe(
-      mergeMap(id => this.analytics.fetchDashboardById(id), 3),
+      // UX review 2026-10-12: one board that cannot be read (a refusal, a dropped connection) leaves its card without
+      // counts; it no longer ends the reading of every card after it, as an error in mergeMap did.
+      mergeMap(id => this.analytics.fetchDashboardById(id).pipe(catchError(() => of(null))), 3),
       takeUntilDestroyed(this.destroyRef),
     ).subscribe({
       next: response => {
-        const id = response.data?.analyticsDashboardId;
-        if (response.status !== API_SUCCESS || !id) return;
+        const id = response?.data?.analyticsDashboardId;
+        if (!response || response.status !== API_SUCCESS || !id) return;
         this.cardWidgets.update(all => ({ ...all, [id]: response.data!.widgets ?? [] }));
       },
       error: () => {},
@@ -815,6 +830,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.abandon();
     this.boardLoading.set(true);
     this.boardError.set('');
+    this.boardRefused.set(false);
     this.widgetError.set('');
     // Two boards asked for in quick succession answer in whatever order the server manages, and
     // the one that answers last is not necessarily the one the reader is waiting for. Only the
@@ -837,6 +853,8 @@ export class Dashboards implements OnInit, OnDestroy {
       error: err => {
         if (token !== this.boardToken) return;
         this.boardLoading.set(false);
+        // UX review 2026-10-12: a refusal is said as one, not as a failure to retry.
+        this.boardRefused.set(err?.status === 403);
         this.boardError.set(err?.error?.message || 'The dashboard could not be read.');
       },
     });

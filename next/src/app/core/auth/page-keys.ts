@@ -26,7 +26,10 @@ export type PageKey =
   | 'task-inbox' | 'workflow-designer'
   // MIG-336: Integration > Developer portal. Unlike every other key, a tenant user without an access profile does not
   // hold it: the owner keeps the API docs to administrators and developers (EXPLICIT_PAGES in auth.service.ts).
-  | 'developer-portal';
+  | 'developer-portal'
+  // UX review 2026-10-12: Saved Analyses reads the boards; saving, pinning and deleting are Edit dashboards' (or the
+  // Studio's). Identity's PageKey has the same split, and the gateway refuses the writes with a 403.
+  | 'dashboards-edit';
 
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
@@ -66,6 +69,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'task-inbox': 'Review inbox',
   'workflow-designer': 'Approval workflows',
   'developer-portal': 'Developer portal',
+  'dashboards-edit': 'Edit dashboards',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

@@ -9,15 +9,21 @@
           <p class="page-subtitle">Boards of tiles over your data, re-run each time you open them.</p>
         </div>
         <div class="flex items-center gap-2 flex-wrap">
-          <button type="button" class="btn btn-primary btn-sm" (click)="createOpen() ? createOpen.set(false) : openCreate()" [attr.aria-expanded]="createOpen()">
-            <app-icon name="plus" />New dashboard
-          </button>
+          @if (canEdit()) {
+            <button type="button" class="btn btn-primary btn-sm" (click)="createOpen() ? createOpen.set(false) : openCreate()" [attr.aria-expanded]="createOpen()">
+              <app-icon name="plus" />New dashboard
+            </button>
+          }
           <a routerLink="/data/analytics" class="btn btn-default btn-sm">Analytics Studio</a>
         </div>
       </div>
     </app-page-header>
 
-    @if (createOpen()) {
+    @if (!canEdit()) {
+      <!-- UX review 2026-10-12: a viewer reads the boards; changing them is another page's. -->
+      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page -- ask your workspace admin.</p>
+    }
+    @if (createOpen() && canEdit()) {
       <div class="card p-4 flex flex-wrap items-end gap-2">
         <label class="flex-1 min-w-48"><span class="label">Name</span>
           <input id="dashName" class="input" placeholder="Sales overview" aria-label="New dashboard name" [value]="newName()" (input)="newName.set($any($event.target).value)" (keydown.enter)="createDashboard()" /></label>
@@ -31,6 +37,12 @@
 
     @if (loading() && !dashboards().length) {
       <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]"><app-icon name="refresh" class="spin icon-muted" /> Reading the dashboards…</div>
+    } @else if (refused()) {
+      <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="list-refused">
+        <span class="stat-glyph"><app-icon name="lock" /></span>
+        <h2 class="text-base font-semibold">Dashboards aren't open to you</h2>
+        <p class="text-sm text-[color:var(--text-secondary)] max-w-md">{{ error() }}</p>
+      </div>
     } @else if (error()) {
       <div class="card dash-list-error"><app-load-error [message]="error()" (retry)="loadDashboards()" /></div>
     } @else if (!dashboards().length) {
@@ -42,7 +54,7 @@
           A dashboard is a page of saved analyses and queries that runs again each time it is opened.
           Make one, then add the work you saved in the Analytics Studio.
         </p>
-        <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openCreate()"><app-icon name="plus" />Create a dashboard</button>
+        @if (canEdit()) { <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openCreate()"><app-icon name="plus" />Create a dashboard</button> }
       </div>
     } @else {
       @if (dashboards().length > searchFrom) {
@@ -57,7 +69,7 @@
       <!-- Three across at most, as the Object Browser's cards: four made each too narrow for a name. -->
       <ul class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-label="Dashboards">
         <!-- First, not last (owner 2026-10-06): with many boards the tile was below the fold. -->
-        @if (!listFilter().trim()) {
+        @if (!listFilter().trim() && canEdit()) {
           <li class="min-w-0 flex">
             <button type="button" class="dash-card-new flex-1 min-h-32 rounded-card border border-dashed border-[color:var(--border-strong)] text-sm text-[color:var(--text-secondary)]
                                          flex flex-col items-center justify-center gap-1 transition-colors hover:text-[color:var(--text-primary)] hover:bg-[color:var(--surface-sunken)]"
@@ -101,7 +113,16 @@
     <div class="flex flex-col gap-3">
       <!-- UX review 2026-10-12 (A2): the breadcrumb is the way back to the cards (See results › Dashboards › the board);
            Back does the same. -->
-      @if (boardError()) {
+      @if (boardRefused()) {
+        <app-page-header title="Dashboard" [trail]="boardTrail" />
+        <!-- UX review 2026-10-12: a refusal said as one -- what it is, whom to ask, the way back -- never a retry box. -->
+        <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="board-refused">
+          <span class="stat-glyph"><app-icon name="lock" /></span>
+          <h2 class="text-base font-semibold">This dashboard isn't open to you</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] max-w-md">{{ boardError() }}</p>
+          <a [routerLink]="[]" class="btn btn-default btn-sm mt-2" (click)="leaveBoard()">All dashboards</a>
+        </div>
+      } @else if (boardError()) {
         <app-page-header title="Dashboard" [trail]="boardTrail" />
         <div class="card"><app-load-error [message]="boardError()" (retry)="retryBoard()" /></div>
       } @else if (board(); as open) {
@@ -140,7 +161,9 @@
               <button type="button" class="btn btn-primary btn-sm dash-run-button" (click)="runAll()"><app-icon name="refresh" />Run every widget</button>
             }
             <!-- The theme every tile draws in. Stored on the board; choosing one runs nothing. -->
-            <button type="button" class="btn btn-ghost btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
+            @if (canEdit()) {
+              <button type="button" class="btn btn-ghost btn-sm dash-theme" [cdkMenuTriggerFor]="themeMenu" [attr.aria-label]="'Chart theme: ' + boardThemeLabel()"><app-icon name="sun" />{{ boardThemeLabel() }}</button>
+            }
             <ng-template #themeMenu>
               <div cdkMenu class="card shadow-xl p-4 w-[34rem] max-w-[92vw] text-sm">
                 <p class="px-2 pt-1 pb-2 text-[11px] font-medium uppercase tracking-wide text-[color:var(--text-muted)]">Chart theme for every widget</p>
@@ -148,14 +171,16 @@
                 <p class="px-2 pt-2 text-[11px] text-[color:var(--text-muted)]">A widget can override it in its Chart settings. Colours are held to 3:1 against the card in light and dark.</p>
               </div>
             </ng-template>
-            <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            @if (canEdit() || boardDatasets().length) {
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            }
             <ng-template #boardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
-                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button>
+                @if (canEdit()) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button> }
                 @if (boardDatasets().length) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="filterOpen.set(!filterOpen())"><app-icon name="filter" />{{ filterOpen() ? 'Hide the board filter' : 'Filter this board' }}</button>
                 }
-                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeDashboard(open)"><app-icon name="trash" class="icon-crit" />Delete this dashboard</button>
+                @if (canEdit()) { <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeDashboard(open)"><app-icon name="trash" class="icon-crit" />Delete this dashboard</button> }
               </div>
             </ng-template>
           </div>
@@ -268,7 +293,7 @@
           <div class="card p-10 flex flex-col items-center text-center gap-2">
             <app-icon name="layers" size="1.5rem" class="icon-muted" />
             <p class="text-sm text-[color:var(--text-secondary)]">Nothing on this board yet.</p>
-            <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button>
+            @if (canEdit()) { <button type="button" class="btn btn-primary btn-sm mt-2" (click)="openAdd()"><app-icon name="plus" />Add a widget</button> }
           </div>
         } @else {
           <!-- Twelve columns: a single figure takes 3, a chart 6, a table the row (spanOf). -->
@@ -280,8 +305,10 @@
                                     [style.height.px]="heldHeight(widget)" [class.is-held]="heldHeight(widget) !== null" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
                                     [state]="stateOf(run)" [busy]="updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
-                  <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"
-                          (cdkMenuOpened)="kindMenuOpened()"><app-icon name="dots" size="1em" /></button>
+                  @if (canEdit() || (shown && hasMoreRows(shown))) {
+                    <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"
+                            (cdkMenuOpened)="kindMenuOpened()"><app-icon name="dots" size="1em" /></button>
+                  }
                   <ng-template #tileMenu>
                     <!-- "Show as" is a section of this menu rather than a submenu: a CDK submenu opens on
                          hover and a click on its trigger then closed it again. A grid of glyphs rather than
@@ -290,9 +317,9 @@
                          the reason in the tooltip and the description -- never as a second line. The search,
                          the suggestions and the actions stay put; only "All charts" scrolls. Arrow keys move
                          across the grid (kindMenuKey), Enter applies, Escape closes, typing searches. -->
-                    <div cdkMenu class="card shadow-xl text-sm dash-tile-menu" [class.has-kinds]="!!shown">
+                    <div cdkMenu class="card shadow-xl text-sm dash-tile-menu" [class.has-kinds]="canEdit() && !!shown">
                       <div class="dash-menu-panel" tabindex="-1" (keydown)="kindMenuKey($event)">
-                      @if (shown; as view) {
+                      @if (canEdit() && shown; as view) {
                         @let menu = kindMenuOf(widget, view);
                         @let wid = widget.analyticsDashboardWidgetId;
                         <div class="dash-menu-head">
@@ -353,11 +380,11 @@
                           }
                         </div>
                       }
-                      <div class="dash-menu-foot" [class.has-kinds]="!!shown">
+                      <div class="dash-menu-foot" [class.has-kinds]="canEdit() && !!shown">
                         @if (shown; as view) {
                           @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
                         }
-                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
+                        @if (canEdit()) { <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button> }
                       </div>
                       </div>
                     </div>
