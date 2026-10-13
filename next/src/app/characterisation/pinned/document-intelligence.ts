@@ -156,8 +156,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentReview.json/fetchById?extractionId=1000",
       "GET /documentOcr.json/fetchById?ocrDocumentId=1001",
-      "GET /documentOcr.json/pageImage?ocrDocumentId=1001&page=1",
-      "GET /appUser.json/avatar?appUserId=4537&size=64"
+      "GET /documentOcr.json/pageImage?ocrDocumentId=1001&page=1"
     ],
     "headings": [
       "ocr-live-check.png",
@@ -230,9 +229,8 @@ export const PINNED: Record<string, unknown> = {
       "Document types",
       "Intake",
       "JSON Lines",
-      "New document type",
+      "More actions",
       "Overview",
-      "Read a stored file",
       "Refresh",
       "Upload documents"
     ],
@@ -273,10 +271,9 @@ export const PINNED: Record<string, unknown> = {
       "Document types",
       "Intake",
       "Invoice",
-      "New document type",
+      "More actions",
       "Overview",
       "Purchase order",
-      "Read a stored file",
       "Refresh",
       "Upload documents"
     ],
@@ -316,9 +313,9 @@ export const PINNED: Record<string, unknown> = {
       "Document types",
       "Intake",
       "Invoice: 4 fields, 0 documents",
+      "More actions",
       "Overview",
       "Purchase order: 4 fields, 1 document",
-      "Read a stored file",
       "Refresh",
       "Upload documents"
     ],
@@ -385,10 +382,9 @@ export const PINNED: Record<string, unknown> = {
       "Document types",
       "Intake",
       "Invoice: 4 fields, 0 documents",
-      "New document type",
+      "More actions",
       "Overview",
       "Purchase order: 4 fields, 1 document",
-      "Read a stored file",
       "Refresh",
       "Upload documents"
     ],

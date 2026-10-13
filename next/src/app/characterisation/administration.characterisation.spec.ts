@@ -55,6 +55,8 @@ describe("MIG-222 (Wave 4): Access profiles, Tenants and the page-access gate", 
 
   it("a tenant's edit form", async () => {
     const v = await visit('/administration/tenants', 'PLATFORM_ADMIN', null);
+    // UX review B10: a workspace's actions are in its row's ⋮ menu.
+    await click(v, /^Actions for /);
     const requests = await click(v, 'Edit');
     pin(FILE, "a tenant's edit form", { requests, ...overlay() }, PINNED);
   });

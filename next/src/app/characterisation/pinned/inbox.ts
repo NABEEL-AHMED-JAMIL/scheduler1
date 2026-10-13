@@ -11,7 +11,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "File drop",
-      "No inbox yet"
+      "No file drop yet"
     ],
     "buttons": [
       "Refresh"
@@ -32,11 +32,11 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "File drop",
-      "No inbox yet"
+      "No file drop yet"
     ],
     "buttons": [
       "Refresh",
-      "Set up the inbox"
+      "Set up the file drop"
     ],
     "columns": [],
     "fields": [],
@@ -61,7 +61,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Copy the key of live-customers.csv",
       "Refresh",
-      "What the inbox accepts"
+      "What the file drop accepts"
     ],
     "columns": [
       [
@@ -114,11 +114,11 @@ export const PINNED: Record<string, unknown> = {
       "Arrivals"
     ],
     "buttons": [
+      "Change",
       "Columns",
       "Copy the key of live-customers.csv",
-      "Inbox settings",
       "Refresh",
-      "What the inbox accepts"
+      "What the file drop accepts"
     ],
     "columns": [
       [
@@ -138,7 +138,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "the settings dialog": {
     "headings": [
-      "Inbox settings"
+      "File drop settings"
     ],
     "buttons": [
       "Cancel",

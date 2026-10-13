@@ -43,7 +43,10 @@ export const PINNED: Record<string, unknown> = {
       "Search connectors",
       "State"
     ],
-    "links": [],
+    "links": [
+      "/integration/connectors",
+      "/integration/connectors/storage"
+    ],
     "panel": {
       "headings": [
         "Shop DB (demo)",
@@ -169,7 +172,10 @@ export const PINNED: Record<string, unknown> = {
       "Search connectors",
       "State"
     ],
-    "links": []
+    "links": [
+      "/integration/connectors",
+      "/integration/connectors/storage"
+    ]
   },
   "the page, as a tenant user without it": {
     "url": "/unauthorized?page=connector-hub&title=Connections",

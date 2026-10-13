@@ -153,6 +153,8 @@ describe('MIG-272: Document Intelligence', () => {
 
   it('read a document', async () => {
     const v = await visit('/documents/intelligence', 'TENANT_ADMIN', null, ANSWERS);
+    // UX review B4 (DI1): in the header's ⋮ overflow.
+    await click(v, 'More actions');
     await click(v, 'Read a stored file');
     pin(FILE, 'read a document', overlay(), PINNED);
   });

@@ -54,19 +54,27 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Page access",
+      "Who can open what",
       "UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "UI-REVIEW No pages"
     ],
     "buttons": [
       "Actions for UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "Actions for UI-REVIEW No pages",
+      "Check a person",
       "New profile",
       "People × pages",
       "Profiles",
       "Refresh",
       "See in grid ›"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Role",
+        "Opens",
+        "Can change"
+      ]
+    ],
     "fields": [],
     "links": []
   },
@@ -75,15 +83,22 @@ export const PINNED: Record<string, unknown> = {
       "GET /pageAccess.json/listPeople"
     ],
     "headings": [
-      "Page access"
+      "Page access",
+      "Who can open what"
     ],
     "buttons": [
+      "Check a person",
       "New profile",
       "People × pages",
       "Profiles",
       "Refresh"
     ],
     "columns": [
+      [
+        "Role",
+        "Opens",
+        "Can change"
+      ],
       [
         "",
         "",
@@ -128,36 +143,50 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Workspaces",
-      "Tenants (2 of 2)",
-      "Claude Demo 75a611b4",
-      "Default"
+      "Workspaces (2 of 2)"
     ],
     "buttons": [
-      "API limits",
-      "Access",
-      "Billing time zone",
+      "Actions for Claude Demo 75a611b4",
+      "Actions for Default",
+      "Buckets",
       "Cards",
+      "Columns",
       "Copy claude-demo-75a611b4",
       "Copy default",
-      "Create sandbox",
-      "Delete Claude Demo 75a611b4",
-      "Delete Default",
-      "Edit",
-      "Make managed",
-      "New tenant",
+      "Created",
+      "Kafka",
+      "New workspace",
       "Only mine",
+      "Pipelines",
       "Refresh",
-      "Sorted ascending; sort descending",
-      "Suspend",
+      "Schedules",
       "Table",
-      "Users"
+      "Topics",
+      "Users",
+      "Workspace"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Workspace",
+        "Admin",
+        "Users",
+        "Schedules",
+        "Pipelines",
+        "Topics",
+        "Buckets",
+        "Kafka",
+        "Created",
+        "Created by",
+        "Updated by",
+        "Mode",
+        "State",
+        "Actions"
+      ]
+    ],
     "fields": [
       "Filter by state",
       "Search name or code",
-      "Search tenants",
-      "Sort by"
+      "Search workspaces"
     ],
     "links": []
   },

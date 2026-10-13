@@ -51,33 +51,34 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Data policies",
-      "Public",
-      "Internal",
       "Sensitive",
+      "Internal",
+      "Public",
       "How a call's level is decided"
     ],
     "buttons": [
       "Refresh"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Setting",
+        "Sensitive Personal, health or confidential data (PHI, PII, confidential, restricted).Default",
+        "Internal The workspace's everyday data. A call is internal when nothing says otherwise.Default",
+        "Public Data anyone may see: published figures, open datasets and APIs.Default"
+      ]
+    ],
     "fields": [],
     "links": [],
     "page": {
       "state": "Not saved yet — these are the defaults They are what runs today: public and internal data may go to any model and the AI Assistant's write tools may act on it; sensitive data stays on local models and",
       "levels": [
         {
-          "level": "public",
+          "level": "sensitive",
           "state": "Default",
           "rule": null,
           "models": [],
           "switches": [],
-          "terms": [
-            "Model rule: Any model",
-            "Allowed models: Any the rule allows",
-            "Keep run files: The pipeline's own",
-            "AI write tools: On",
-            "Minimum-fields warning: On"
-          ]
+          "terms": []
         },
         {
           "level": "internal",
@@ -85,27 +86,135 @@ export const PINNED: Record<string, unknown> = {
           "rule": null,
           "models": [],
           "switches": [],
-          "terms": [
-            "Model rule: Any model",
-            "Allowed models: Any the rule allows",
-            "Keep run files: The pipeline's own",
-            "AI write tools: On",
-            "Minimum-fields warning: On"
-          ]
+          "terms": []
         },
         {
-          "level": "sensitive",
+          "level": "public",
           "state": "Default",
           "rule": null,
           "models": [],
           "switches": [],
-          "terms": [
-            "Model rule: Local only",
-            "Allowed models: Any the rule allows",
-            "Keep run files: The pipeline's own",
-            "AI write tools: Off",
-            "Minimum-fields warning: On"
-          ]
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
         }
       ],
       "footer": null
@@ -122,9 +231,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Data policies",
-      "Public",
-      "Internal",
       "Sensitive",
+      "Internal",
+      "Public",
       "How a call's level is decided"
     ],
     "buttons": [
@@ -132,13 +241,24 @@ export const PINNED: Record<string, unknown> = {
       "Refresh",
       "Save policy"
     ],
-    "columns": [],
+    "columns": [
+      [
+        "Setting",
+        "Sensitive Personal, health or confidential data (PHI, PII, confidential, restricted).Default",
+        "Internal The workspace's everyday data. A call is internal when nothing says otherwise.Default",
+        "Public Data anyone may see: published figures, open datasets and APIs.Default"
+      ]
+    ],
     "fields": [
-      "AI write toolsThe assistant may run pipelines, create PDFs, save or delete files and call APIs that change data. It still asks you first.",
-      "Keep run files (days)",
+      "Keep Internal run files (days)",
+      "Keep Public run files (days)",
+      "Keep Sensitive run files (days)",
       "Local Ollama — any model",
-      "Minimum-fields warningRemind whoever builds a step to send a model only the fields it needs.",
-      "Model rule",
+      "Model rule for Internal",
+      "Model rule for Public",
+      "Model rule for Sensitive",
+      "Off",
+      "On",
       "The pipeline's own",
       "UI-CHECK Ollama qwen3 (tool loop) — any model",
       "gemma3:1b",
@@ -152,9 +272,57 @@ export const PINNED: Record<string, unknown> = {
       "state": "Not saved yet — these are the defaults They are what runs today: public and internal data may go to any model and the AI Assistant's write tools may act on it; sensitive data stays on local models and",
       "levels": [
         {
+          "level": "sensitive",
+          "state": "Default",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "Default",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
           "level": "public",
           "state": "Default",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": "local",
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
           "rule": "any",
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": "any",
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
           "models": [
             "1049",
             "1049|qwen3:8b",
@@ -163,46 +331,145 @@ export const PINNED: Record<string, unknown> = {
             "1047|gemma3:4b",
             "1047|qwen3:8b"
           ],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [
+            "1049",
+            "1049|qwen3:8b",
+            "1047",
+            "1047|gemma3:1b",
+            "1047|gemma3:4b",
+            "1047|qwen3:8b"
+          ],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [
+            "1049",
+            "1049|qwen3:8b",
+            "1047",
+            "1047|gemma3:1b",
+            "1047|gemma3:4b",
+            "1047|qwen3:8b"
+          ],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
           "switches": [
-            "aiWriteTools: on",
+            "aiWriteTools: off"
+          ],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [
+            "aiWriteTools: on"
+          ],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [
+            "aiWriteTools: on"
+          ],
+          "terms": []
+        },
+        {
+          "level": "sensitive",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [
             "minFieldsWarning: on"
           ],
           "terms": []
         },
         {
           "level": "internal",
-          "state": "Default",
-          "rule": "any",
-          "models": [
-            "1049",
-            "1049|qwen3:8b",
-            "1047",
-            "1047|gemma3:1b",
-            "1047|gemma3:4b",
-            "1047|qwen3:8b"
-          ],
+          "state": "",
+          "rule": null,
+          "models": [],
           "switches": [
-            "aiWriteTools: on",
+            "minFieldsWarning: on"
+          ],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [
             "minFieldsWarning: on"
           ],
           "terms": []
         },
         {
           "level": "sensitive",
-          "state": "Default",
-          "rule": "local",
-          "models": [
-            "1049",
-            "1049|qwen3:8b",
-            "1047",
-            "1047|gemma3:1b",
-            "1047|gemma3:4b",
-            "1047|qwen3:8b"
-          ],
-          "switches": [
-            "aiWriteTools: off",
-            "minFieldsWarning: on"
-          ],
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "internal",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
+          "terms": []
+        },
+        {
+          "level": "public",
+          "state": "",
+          "rule": null,
+          "models": [],
+          "switches": [],
           "terms": []
         }
       ],

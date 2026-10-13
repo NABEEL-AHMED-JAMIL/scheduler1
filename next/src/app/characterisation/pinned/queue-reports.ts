@@ -213,13 +213,13 @@ export const PINNED: Record<string, unknown> = {
   "the queue's charts": {
     "requests": [],
     "headings": [
-      "Runs by date",
+      "Runs",
       "Outcomes",
-      "Busiest jobs",
+      "Busiest schedules",
       "Volume by day",
       "How long runs took",
       "How runs were started",
-      "Queue (2 of 2)"
+      "Runs (2 of 2)"
     ],
     "buttons": [
       "022 Sep",
@@ -229,16 +229,19 @@ export const PINNED: Record<string, unknown> = {
       "026 Sep",
       "027 Sep",
       "228 Sep",
+      "30 days",
       "5-30s1 100%",
+      "7 days",
       "Columns",
       "Completed 1",
-      "From date: 22 Sep 2026",
+      "Custom",
       "Hide charts",
       "Job #28351 50%",
       "Job #28381 50%",
       "Refresh",
       "Skip 1",
-      "To date: 28 Sep 2026"
+      "This month",
+      "Today"
     ],
     "columns": [
       [
@@ -252,10 +255,12 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Search job, run or message",
-      "Search queue messages"
+      "Search runs",
+      "Search schedule, run or message"
     ],
     "links": [
+      "/pipelines/executions",
+      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
       "/pipelines/schedules/2835/runs/7381/logs",
       "/pipelines/schedules/2838/executions",
@@ -271,17 +276,20 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Runs by date",
-      "Queue (2 of 2)"
+      "Runs",
+      "Runs (2 of 2)"
     ],
     "buttons": [
+      "30 days",
+      "7 days",
       "Charts",
       "Columns",
       "Completed 1",
-      "From date: 22 Sep 2026",
+      "Custom",
       "Refresh",
       "Skip 1",
-      "To date: 28 Sep 2026"
+      "This month",
+      "Today"
     ],
     "columns": [
       [
@@ -295,10 +303,12 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Search job, run or message",
-      "Search queue messages"
+      "Search runs",
+      "Search schedule, run or message"
     ],
     "links": [
+      "/pipelines/executions",
+      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
       "/pipelines/schedules/2835/runs/7381/logs",
       "/pipelines/schedules/2838/executions",
@@ -315,17 +325,20 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Runs by date",
-      "Queue (2 of 2)"
+      "Runs",
+      "Runs (2 of 2)"
     ],
     "buttons": [
+      "30 days",
+      "7 days",
       "Charts",
       "Columns",
       "Completed 1",
-      "From date: 22 Sep 2026",
+      "Custom",
       "Refresh",
       "Skip 1",
-      "To date: 28 Sep 2026"
+      "This month",
+      "Today"
     ],
     "columns": [
       [
@@ -339,10 +352,12 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Search job, run or message",
-      "Search queue messages"
+      "Search runs",
+      "Search schedule, run or message"
     ],
     "links": [
+      "/pipelines/executions",
+      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
       "/pipelines/schedules/2835/runs/7381/logs",
       "/pipelines/schedules/2838/executions",

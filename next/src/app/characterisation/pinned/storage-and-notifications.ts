@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "storage connections, as a platform administrator": {
-    "url": "/integration/storage-connections",
+    "url": "/integration/connectors/storage",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -27,7 +27,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /tenant.json/listTenants"
     ],
     "headings": [
-      "Storage connections",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -36,7 +36,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Copy ui-review-2924",
       "Copy ui-review-s3",
-      "New connection",
+      "New storage connection",
       "Only mine",
       "Refresh",
       "Table"
@@ -65,7 +65,10 @@ export const PINNED: Record<string, unknown> = {
       "Select all shown",
       "Workspace"
     ],
-    "links": []
+    "links": [
+      "/integration/connectors",
+      "/integration/connectors/storage"
+    ]
   },
   "storage connections, as a tenant user (admin-only)": {
     "url": "/unauthorized",
@@ -86,7 +89,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "storage connections, as a workspace administrator": {
-    "url": "/integration/storage-connections",
+    "url": "/integration/connectors/storage",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -94,7 +97,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /storageConnection.json/fetchAllConnections"
     ],
     "headings": [
-      "Storage connections",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -103,7 +106,7 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Copy ui-review-2924",
       "Copy ui-review-s3",
-      "New connection",
+      "New storage connection",
       "Only mine",
       "Refresh",
       "Table"
@@ -130,7 +133,10 @@ export const PINNED: Record<string, unknown> = {
       "Select UI-REVIEW LocalStack S3 (fake keys)",
       "Select all shown"
     ],
-    "links": []
+    "links": [
+      "/integration/connectors",
+      "/integration/connectors/storage"
+    ]
   },
   "the bell, opened": {
     "requests": [

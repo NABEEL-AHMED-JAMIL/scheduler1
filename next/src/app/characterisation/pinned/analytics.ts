@@ -148,6 +148,8 @@ export const PINNED: Record<string, unknown> = {
       "Dashboards"
     ],
     "buttons": [
+      "Add to favourites: UI-REVIEW Empty dashboard with a very long name to check how the header, the picker and the list cope with it — Zürich – 東京 ✓",
+      "Add to favourites: UI-REVIEW Finance overview",
       "New dashboard"
     ],
     "columns": [],

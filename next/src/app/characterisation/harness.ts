@@ -45,6 +45,9 @@ function restoreZone(): void {
   else env['TZ'] = machineZone;
 }
 
+/** The signed-in person's own picture in the top bar (shell chrome, asked for on its own timing). */
+const SHELL_PICTURE = /^GET \/appUser\.json\/avatar\?/;
+
 export type Role = 'PLATFORM_ADMIN' | 'TENANT_ADMIN' | 'TENANT_USER';
 
 /**
@@ -202,8 +205,12 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
       quiet = pending.length ? 0 : quiet + 1;
       for (const req of pending) {
         const described = describeRequest(req);
-        if (!seen.includes(described)) seen.push(described);
-        made.push(described);
+        // The top bar's picture is the shell's, not the screen's, and when it is asked for depends on the image's own
+        // timing: recorded, it moved about the list between runs (2026-10-12). It is answered and left out of the pin.
+        if (!SHELL_PICTURE.test(described)) {
+          if (!seen.includes(described)) seen.push(described);
+          made.push(described);
+        }
         const reply = fixtureFor(req, answers);
         if (req.cancelled) continue;
         if (reply.error) req.flush(reply.body as any, { status: reply.error, statusText: 'Error' });

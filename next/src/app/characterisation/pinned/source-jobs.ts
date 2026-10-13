@@ -201,7 +201,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/billing/usage",
+      "/billing/usage?run=7331",
       "/data/analytics/dashboards",
       "/pipelines/1854/edit?tab=steps",
       "/pipelines/schedules",
@@ -317,6 +317,8 @@ export const PINNED: Record<string, unknown> = {
       "Search runs"
     ],
     "links": [
+      "/pipelines/executions",
+      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
       "/pipelines/schedules/2835/runs/7381/logs",
       "/pipelines/schedules/2838/executions",

@@ -73,7 +73,7 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/integration/storage-connections",
+      "path": "/integration/connectors/storage",
       "title": "Storage connections",
       "minRole": "TENANT_ADMIN",
       "guards": [
@@ -842,7 +842,13 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/configuration/storage-connections",
-      "redirectTo": "integration/storage-connections",
+      "redirectTo": "integration/connectors/storage",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/integration/storage-connections",
+      "redirectTo": "integration/connectors/storage",
       "guards": [],
       "lazy": false
     },
@@ -1004,13 +1010,13 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/admin/storage",
-      "redirectTo": "integration/storage-connections",
+      "redirectTo": "integration/connectors/storage",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/settings/storage-connections",
-      "redirectTo": "integration/storage-connections",
+      "redirectTo": "integration/connectors/storage",
       "guards": [],
       "lazy": false
     },
@@ -1152,8 +1158,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Page access"
   },
   "old address /admin/storage": {
-    "lands": "/integration/storage-connections",
-    "heading": "Storage connections"
+    "lands": "/integration/connectors/storage",
+    "heading": "Connections"
   },
   "old address /admin/tenant-requests": {
     "lands": "/administration/tenant-requests",
@@ -1236,8 +1242,12 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Task Registry"
   },
   "old address /configuration/storage-connections": {
-    "lands": "/integration/storage-connections",
-    "heading": "Storage connections"
+    "lands": "/integration/connectors/storage",
+    "heading": "Connections"
+  },
+  "old address /integration/storage-connections": {
+    "lands": "/integration/connectors/storage",
+    "heading": "Connections"
   },
   "old address /jobs": {
     "lands": "/pipelines/schedules",
@@ -1321,7 +1331,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /operations/queue": {
     "lands": "/pipelines/queue",
-    "heading": "Runs by date"
+    "heading": "Runs"
   },
   "old address /operations/reports": {
     "lands": "/pipelines/run-analytics",
@@ -1345,7 +1355,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /queue": {
     "lands": "/pipelines/queue",
-    "heading": "Runs by date"
+    "heading": "Runs"
   },
   "old address /reports": {
     "lands": "/pipelines/run-analytics",
@@ -1372,8 +1382,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Task Registry"
   },
   "old address /settings/storage-connections": {
-    "lands": "/integration/storage-connections",
-    "heading": "Storage connections"
+    "lands": "/integration/connectors/storage",
+    "heading": "Connections"
   },
   "old address /settings/task-types": {
     "lands": "/configuration/kafka",

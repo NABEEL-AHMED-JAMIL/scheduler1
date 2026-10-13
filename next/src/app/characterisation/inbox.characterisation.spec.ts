@@ -66,7 +66,8 @@ describe('MIG-239: Inbox', () => {
 
   it('the settings dialog', async () => {
     const v = await visit('/documents/inbox', 'TENANT_ADMIN', null, CONFIGURED);
-    await click(v, 'Inbox settings');
+    // UX review B4 (IN1): the Settings card's Change is the one way in.
+    await click(v, 'Change');
     pin(FILE, 'the settings dialog', overlay(), PINNED);
   });
 });

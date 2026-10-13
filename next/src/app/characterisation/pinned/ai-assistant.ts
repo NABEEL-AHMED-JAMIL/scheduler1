@@ -79,7 +79,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiConnection.json/list",
       "GET /aiPrompt.json/assistant/conversation?conversationId=1000",
       "GET /aiPrompt.json/tools/trace?toolRunId=1004",
-      "GET /sourceJob.json/stepExecutions?jobQueueId=7404"
+      "GET /sourceJob.json/stepExecutions?jobQueueId=7404",
+      "GET /analyticsWorkspace.json/fetchAllDashboards"
     ],
     "headings": [
       "AI Assistant",
@@ -120,7 +121,8 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/ai/assistant/conversations",
       "/pipelines/schedules/2848/executions",
-      "/pipelines/schedules/2848/runs/7404/logs"
+      "/pipelines/schedules/2848/runs/7404/logs",
+      "/pipelines/schedules/2848/runs/7404/logs?tab=outputs"
     ],
     "opened": [],
     "thread": {
@@ -135,7 +137,7 @@ export const PINNED: Record<string, unknown> = {
         "confirmed"
       ],
       "links": [
-        "execution: Completed UI-CHECK step engine job 0928run #7404Run logsExecutions"
+        "execution: Completed UI-CHECK step engine job 0928run #7404See resultsOpen the runAll runs"
       ],
       "calls": [
         "get_jobs allowed: 1get_jobsAllowed436 ms",
@@ -294,12 +296,12 @@ export const PINNED: Record<string, unknown> = {
       "/ai/assistant"
     ],
     "rows": [
-      "get_sourcesData sources | Sources | search?, page?, limit? → list | Tenant userReads | — | Enabled | Never",
-      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Tenant administratorReads | — | Enabled | Never",
-      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Tenant userReads | — | Enabled | 29 Sep, 06:57",
-      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Tenant userWrites | Asks first | Enabled | 29 Sep, 06:58",
-      "delete_fileDelete a file | Storage | bucket, key → result | Tenant userWrites | Asks first | Enabled | Never",
-      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Tenant userReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
+      "get_sourcesData sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
+      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Workspace administratorReads | — | Enabled | Never",
+      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Workspace memberReads | — | Enabled | 29 Sep, 06:57",
+      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Workspace memberWrites | Asks first | Enabled | 29 Sep, 06:58",
+      "delete_fileDelete a file | Storage | bucket, key → result | Workspace memberWrites | Asks first | Enabled | Never",
+      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Workspace memberReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
     ]
   },
   "the tool registry, as a workspace administrator": {
@@ -344,12 +346,12 @@ export const PINNED: Record<string, unknown> = {
       "/ai/assistant"
     ],
     "rows": [
-      "get_sourcesData sources | Sources | search?, page?, limit? → list | Tenant userReads | — | Enabled | Never",
-      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Tenant administratorReads | — | Enabled | Never",
-      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Tenant userReads | — | Enabled | 29 Sep, 06:57",
-      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Tenant userWrites | Asks first | Enabled | 29 Sep, 06:58",
-      "delete_fileDelete a file | Storage | bucket, key → result | Tenant userWrites | Asks first | Enabled | Never",
-      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Tenant userReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
+      "get_sourcesData sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
+      "call_apiCall a saved API request | API collections | requestId, environmentId?, variables? → dataset ref | Workspace administratorReads | — | Enabled | Never",
+      "get_jobsPipeline jobs | Pipelines | search?, limit? → list | Workspace memberReads | — | Enabled | 29 Sep, 06:57",
+      "run_pipelineRun a pipeline job | Pipelines | jobId → result | Workspace memberWrites | Asks first | Enabled | 29 Sep, 06:58",
+      "delete_fileDelete a file | Storage | bucket, key → result | Workspace memberWrites | Asks first | Enabled | Never",
+      "join_dataJoin datasets | Pipeline engine | datasetRef, config? → list | Workspace memberReads | — | BlockedNo user-facing endpoint runs a pipeline step on rows outside a pipeline run. | Never"
     ]
   }
 };
