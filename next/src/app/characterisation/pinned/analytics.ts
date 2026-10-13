@@ -28,6 +28,7 @@ export const PINNED: Record<string, unknown> = {
       "Quality issues: 0, nothing to look at",
       "Refresh the saved analysis list",
       "SQL",
+      "Visualise",
       "all *.csv",
       "customers.csv 1.4 KB",
       "root"
