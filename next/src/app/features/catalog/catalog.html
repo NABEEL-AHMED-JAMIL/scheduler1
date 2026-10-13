@@ -41,7 +41,7 @@
     </ng-container>
     <table class="table-modern">
       <thead>
-        <tr><th>Asset</th><th class="hidden xl:table-cell">Type</th><th>Owner</th><th>Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell">Sensitivity</th><th class="text-right">Quality</th></tr>
+        <tr><th>Asset</th><th class="hidden xl:table-cell">Type</th><th>Owner</th><th class="num">Freshness</th><th>Sensitive fields</th><th class="hidden lg:table-cell">Sensitivity</th><th class="text-right">Quality</th></tr>
       </thead>
       <tbody>
         @for (a of shown(); track a.assetId) {
@@ -56,7 +56,7 @@
             <td class="whitespace-nowrap hidden xl:table-cell">{{ kindText(a.kind) }}
               @if (a.status === 'Deleted') { <span class="pill pill-crit">Deleted</span> }</td>
             <td><div class="truncate max-w-[8rem] lg:max-w-[10rem] xl:max-w-[14rem]" [title]="a.ownerName || ''">{{ a.ownerName || '—' }}</div></td>
-            <td class="whitespace-nowrap" [class.is-stale]="a.stale">{{ fresh(a.lastChangedAt) }}</td>
+            <td class="num whitespace-nowrap" [class.is-stale]="a.stale">{{ fresh(a.lastChangedAt) }}</td>
             <td>
               <!-- Two tags and a count: a file with eight tagged columns stacked eight pills and stood a row 100px tall. -->
               <div class="flex flex-wrap items-center gap-1">

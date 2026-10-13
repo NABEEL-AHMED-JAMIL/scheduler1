@@ -551,6 +551,8 @@
   }
   .btn-circle:disabled { @apply opacity-40 cursor-not-allowed; }
   .btn-icon { @apply px-2 py-1.5; }
+  /* An icon button among -sm buttons (Refresh, ⋮, a month stepper) is their 28px, not 30px (A1). */
+  .btn-sm.btn-icon { @apply py-1; }
 
   /* KPI tiles were p-3.5 while every other card was p-4 -- a 2px difference that reads as
      sloppiness rather than intent. One class so they cannot drift apart again. */
