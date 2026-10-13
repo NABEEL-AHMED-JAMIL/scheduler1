@@ -36,6 +36,9 @@ interface HistoryEntry { at: string; text: string; tone?: 'ok' | 'warn' | 'crit'
   selector: 'app-invoice-pane',
   imports: [Icon, RouterLink, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, CopyButton],
   templateUrl: './invoice-detail.html',
+  // UX final BL2: the lines are shown whole (no inner scroll box of a fixed height cutting a row); only a narrow window
+  // scrolls the table sideways.
+  styles: `.bill-lines { overflow-x: auto; flex: none; }`,
 })
 export class InvoicePane implements OnDestroy {
   /** MIG-214: a blob that arrives after this is gone would make a URL nothing releases. */

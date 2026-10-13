@@ -264,3 +264,28 @@ describe('InvoicePane with an answer that is not a whole invoice', () => {
     expect(component.history().map(h => h.text)).toContain('Card payment of $402.75 declined · Your card was declined. (card_declined: generic_decline)');
   });
 });
+
+describe('InvoicePane header and lines (UX final BL2)', () => {
+  it('puts the status pills beside the number, on one line, and the dates under it', () => {
+    const { fixture } = page(false);
+    const el = fixture.nativeElement as HTMLElement;
+    const title = el.querySelector('[data-test="invoice-title"]')!;
+    expect(title.querySelector('h2')!.textContent!.trim()).toBe('INV-2026-08-0006');
+    const status = title.querySelector('[data-test="invoice-status"]')!;
+    expect(status.textContent).toContain('open');
+    expect(title.querySelector('h2')!.compareDocumentPosition(status) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(title.nextElementSibling!.textContent).toContain('issued');
+  });
+
+  it('shows every line whole, in no fixed-height scroll box', () => {
+    const many = { ...DETAIL, lines: Array.from({ length: 15 }, (_, n) => ({ ...DETAIL.lines[0], invoiceLineId: n + 1, sort: n,
+      description: n === 14 ? 'Webhook deliveries' : `Line ${n + 1}` })) };
+    const { fixture } = page(false, many);
+    const el = fixture.nativeElement as HTMLElement;
+    const lines = el.querySelector('[data-test="invoice-lines"]')!;
+    expect(lines.closest('.lookup-entries-scroll')).toBeNull();
+    expect(lines.querySelector('.lookup-entries-scroll')).toBeNull();
+    expect(lines.querySelectorAll('tbody tr').length).toBe(15);
+    expect(lines.textContent).toContain('Webhook deliveries');
+  });
+});

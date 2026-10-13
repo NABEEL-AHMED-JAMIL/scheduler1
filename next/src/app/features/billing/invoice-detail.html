@@ -9,25 +9,25 @@
 } @else {
   @if (invoice(); as i) {
     <header class="lookup-detail-head">
+      <!-- UX final BL2: the number leads its line and the status pills sit beside it (they sat on a line above it);
+           the period, what it is against, issue and due dates follow underneath. -->
       <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="pill" [class]="'pill ' + statusTone[i.status]">{{ statusLabel[i.status] }}@if (i.status === 'overdue') { · {{ overdueDays() }} d }@if (isOpen()) { · {{ money(i.balance) }} open }</span>
+        <div class="flex items-center gap-2 min-w-0 flex-wrap" data-test="invoice-title">
+          <h2 class="lookup-detail-key mono" [title]="i.number">{{ i.number }}</h2>
+          <app-copy-button [value]="i.number" [copied]="copied()" copiedLabel="Number copied" (copy)="copyNumber()" />
+          <span class="pill" [class]="'pill ' + statusTone[i.status]" data-test="invoice-status">{{ statusLabel[i.status] }}@if (i.status === 'overdue') { · {{ overdueDays() }} d }@if (isOpen()) { · {{ money(i.balance) }} open }</span>
           @if (cardChip(); as c) { <span class="pill" [class]="'pill ' + c.tone" [title]="c.title" data-card-chip>{{ c.label }}</span> }
           @if (i.kind === 'credit_note') { <span class="pill pill-neutral">Credit note</span> }
           @if (isPlatformAdmin()) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ i.tenantName }}</span> }
           @if (pending().length) { <span class="pill pill-warn">{{ pending().length }} slip{{ pending().length === 1 ? '' : 's' }} to verify</span> }
           @if (i.rateCardVersion) { <span class="pill pill-neutral" [title]="'Priced with rate card ' + (i.rateCardName || '') + ' v' + i.rateCardVersion">Rate card v{{ i.rateCardVersion }}</span> }
         </div>
-        <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
-          <h2 class="lookup-detail-key mono" [title]="i.number">{{ i.number }}</h2>
-          <app-copy-button [value]="i.number" [copied]="copied()" copiedLabel="Number copied" (copy)="copyNumber()" />
-          <span class="text-xs text-[color:var(--text-muted)]">
-            {{ i.periodStart | serverTime: 'month' }}
-            @if (i.referencesNumber) { · against <a class="link-inline mono" [routerLink]="['/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
-            @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'date' }} }@if (i.dueAt && i.kind === 'invoice' && i.status !== 'paid') { · due {{ i.dueAt | serverTime: 'date' }} }
-            @if (paidByCardAt(); as at) { · <span data-paid-by-card>Paid by card on {{ at | serverTime: 'date' }}</span> }
-          </span>
-        </div>
+        <p class="text-xs text-[color:var(--text-muted)] mt-1">
+          {{ i.periodStart | serverTime: 'month' }}
+          @if (i.referencesNumber) { · against <a class="link-inline mono" [routerLink]="['/billing/invoices', i.referencesNumber]">{{ i.referencesNumber }}</a> }
+          @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'date' }} }@if (i.dueAt && i.kind === 'invoice' && i.status !== 'paid') { · due {{ i.dueAt | serverTime: 'date' }} }
+          @if (paidByCardAt(); as at) { · <span data-paid-by-card>Paid by card on {{ at | serverTime: 'date' }}</span> }
+        </p>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         @if (isPlatformAdmin() && i.status === 'draft') {
@@ -121,7 +121,8 @@
       @if (!i.lines.length) {
         <div class="lookup-entries-empty"><app-icon name="file" size="1.5rem" class="icon-muted" /><p>Nothing metered in this period.</p></div>
       } @else {
-        <div class="lookup-entries-scroll">
+        <!-- UX final BL2: every line, whole -- the page scrolls, not a box that cut "Webhook deliveries" in half. -->
+        <div class="bill-lines" data-test="invoice-lines">
           <table class="table-modern lookup-entry-table">
             <thead><tr><th>Description</th><th class="text-right">Qty</th><th class="text-right hidden md:table-cell">Rate</th><th class="text-right">Amount</th></tr></thead>
             <tbody>
@@ -156,7 +157,7 @@
     </section>
 
     <!-- Documents: the PDF, the slips, the receipts, the credit notes. -->
-    <!-- flex-none: Documents, Payments and History keep their height; only the lines scroll. Shrinking them cut
+    <!-- flex-none: Documents, Payments and History keep their height. Shrinking them cut
          the last history entry in half at the card's foot (UI review U7). -->
     <section class="lookup-entries flex-none">
       <div class="lookup-entries-head">
