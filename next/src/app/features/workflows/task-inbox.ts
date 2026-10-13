@@ -1,3 +1,4 @@
+import { Avatar } from '../../shared/ui/avatar';
 import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, inject, signal, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -40,7 +41,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox],
+  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
 })

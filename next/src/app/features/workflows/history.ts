@@ -14,6 +14,8 @@ export interface HistoryLine {
   comment?: string;
   /** Who acted, when a person did: the timeline's byline. */
   actor?: string;
+  /** Their id, for the byline's picture. */
+  actorId?: number;
 }
 
 type Names = (id: number | null | undefined) => string;
@@ -28,7 +30,10 @@ export function historyLines(events: HistoryEvent[], name: Names, stepName: (key
     const step = stepName(e.stepKey);
     const who = e.onBehalfOf ? `${name(e.actor)} (for ${name(e.onBehalfOf)})` : name(e.actor);
     const line = (text: string, tone: HistoryLine['tone'] = 'plain', comment?: string) =>
-      lines.push({ id: e.id, at: e.at, text, tone, comment, actor: e.actor != null && BY_A_PERSON.has(e.type) ? who : undefined });
+      {
+      const byPerson = e.actor != null && BY_A_PERSON.has(e.type);
+      lines.push({ id: e.id, at: e.at, text, tone, comment, actor: byPerson ? who : undefined, actorId: byPerson ? e.actor ?? undefined : undefined });
+    };
     switch (e.type) {
       case 'Started': line(e.actor ? `Requested by ${name(e.actor)}` : 'Started', 'ok'); break;
       case 'TaskOpened': line(`${step}: waiting for ${assignee(d, name)}${d['due'] ? ' · due ' + shortTime(String(d['due'])) : ''}`, 'now'); break;

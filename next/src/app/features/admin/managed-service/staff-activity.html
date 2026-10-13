@@ -50,8 +50,13 @@
           <tr>
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ a.createdAt ? (a.createdAt | serverTime: 'dateTimeSec') : '—' }}</td>
             <td class="max-w-56">
-              <div class="font-medium truncate">{{ name(a) }}</div>
-              @if (a.fullName && a.username) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ a.username }}</div> }
+              <div class="flex items-center gap-2 min-w-0">
+                <app-avatar [appUserId]="a.appUserId" [name]="name(a)" [size]="1.75" [decorative]="true" />
+                <div class="min-w-0">
+                  <div class="font-medium truncate">{{ name(a) }}</div>
+                  @if (a.fullName && a.username) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ a.username }}</div> }
+                </div>
+              </div>
             </td>
             @if (showWorkspace()) { <td class="max-w-56 truncate">{{ workspaceName(a) }}</td> }
             <td class="min-w-64">

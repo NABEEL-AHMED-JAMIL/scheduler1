@@ -154,7 +154,10 @@
             <p class="inbox-detail-sub">{{ d.name }} · {{ d.workflowName }}</p>
             <div class="inbox-chips">
               <app-status [label]="stateLabel(d)" />
-              <span class="pill pill-neutral"><app-icon name="users" size="0.9em" />With {{ holder(d) }}</span>
+              <span class="pill pill-neutral">@if (d.assigneeUserId != null) {<app-avatar [appUserId]="d.assigneeUserId" [name]="holder(d)" [size]="1.05" [decorative]="true" />} @else {<app-icon name="users" size="0.9em" />}With {{ holder(d) }}</span>
+              @if (d.requestedBy != null) {
+                <span class="pill pill-neutral" data-test="task-requester"><app-avatar [appUserId]="d.requestedBy" [name]="name(d.requestedBy)" [size]="1.05" [decorative]="true" />From {{ name(d.requestedBy) }}</span>
+              }
               @if (dueLabel(d)) {
                 <span class="pill" [class.pill-crit]="d.overdue && d.state === 'Open'" [class.pill-neutral]="!d.overdue || d.state !== 'Open'"><app-icon name="clock" size="0.9em" />{{ dueLabel(d) }}</span>
               }
@@ -335,7 +338,9 @@
       <li [class]="'is-' + h.tone">
         <span class="inbox-timeline-text">{{ h.text }}</span>
         <span class="inbox-timeline-meta">
-          @if (h.actor) { <span>{{ h.actor }}</span><span aria-hidden="true">·</span> }
+          @if (h.actor) {
+            <span class="inline-flex items-center gap-1">@if (h.actorId) {<app-avatar [appUserId]="h.actorId" [name]="h.actor" [size]="1.1" [decorative]="true" />}{{ h.actor }}</span><span aria-hidden="true">·</span>
+          }
           <time [attr.datetime]="h.at" [title]="exact(h.at)">{{ ago(h.at) }}</time>
         </span>
         @if (h.comment) { <blockquote class="inbox-quote">{{ h.comment }}</blockquote> }

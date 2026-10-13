@@ -77,11 +77,9 @@
                   aria-label="Account menu" [attr.aria-expanded]="openMenu() === '__user'"
                   aria-controls="user-menu"
                   class="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-[color:var(--surface-sunken)]">
-            @if (auth.avatarUrl()) {
-              <img [src]="auth.avatarUrl()" alt="" class="avatar-img size-7" />
-            } @else {
-              <span class="avatar-initials size-7 text-[11px]">{{ auth.initials() }}</span>
-            }
+            <!-- app-avatar, through ShellAvatar: its own chunk after the first paint; an empty circle until then. -->
+            <ng-container #topAvatar />
+            @if (!avatarType()) { <span class="avatar-initials size-7" aria-hidden="true"></span> }
             <!-- Beside the top bar's menus (1180-1440px) only the avatar shows; the name is in the panel's header.
                  The cap stops a long name or an email fallback pushing the page wider than the screen. -->
             <span class="text-sm font-medium hidden sm:block nav:hidden wide:block max-w-36 truncate"
@@ -90,10 +88,13 @@
           @if (openMenu() === '__user') {
             <div id="user-menu"
                  class="absolute right-0 top-full mt-1 w-56 rounded-lg border shadow-lg py-1 z-50 bg-raised border-subtle">
-              <div class="px-3 py-2 border-b border-subtle">
-                <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
-                <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
-                  {{ roleText() }}
+              <div class="px-3 py-2 border-b border-subtle flex items-center gap-2.5">
+                <ng-container #menuAvatar />
+                <div class="min-w-0">
+                  <div class="text-sm font-medium truncate">{{ auth.displayName() }}</div>
+                  <div class="text-xs text-[color:var(--text-muted)] mt-0.5">
+                    {{ roleText() }}
+                  </div>
                 </div>
               </div>
               <!-- MIG-254: a staff session belongs to no workspace's people: no profile to read there (appUser.json/me

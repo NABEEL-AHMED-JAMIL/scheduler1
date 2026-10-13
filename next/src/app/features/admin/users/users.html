@@ -107,8 +107,8 @@
                      colour alone is not a signal everybody receives. -->
                 <span class="rounded-full shrink-0 p-[2px] tone-ring"
                       [class]="toneClass(statusRing(user.status))">
-                  <app-avatar [appUserId]="avatarOwner(user)"
-                              [name]="user.fullName || user.username" [size]="2.75" />
+                  <app-avatar [appUserId]="user.appUserId" [version]="avatarVersionOf(user)"
+                              [name]="user.fullName || user.username" [size]="2.75" [decorative]="true" />
                 </span>
                 <div class="min-w-0 flex-1">
                   <div class="flex items-start gap-2">
@@ -257,6 +257,12 @@
                     <app-icon name="shield" />2FA
                   </button>
                 }
+                @if (avatarVersionOf(user) && !isSelf(user)) {
+                  <button type="button" class="btn btn-ghost btn-sm" (click)="removePicture(user)" [disabled]="busy() === user.appUserId"
+                          title="Remove their profile picture" data-test="user-remove-picture">
+                    <app-icon name="image" />Picture
+                  </button>
+                }
                 <button type="button" class="btn btn-ghost btn-sm"
                         [class]="isSelf(user) ? '' : (user.status === 'Active' ? 'btn-intent-warn' : 'btn-intent-ok')"
                         [disabled]="isSelf(user) || busy() === user.appUserId"
@@ -324,8 +330,8 @@
                  split across three columns they cost a third of the table's width to say it. -->
             <td class="max-w-72">
               <div class="flex items-center gap-2.5 min-w-0">
-                <app-avatar [appUserId]="avatarOwner(user)"
-                            [name]="user.fullName || user.username" [size]="2" class="shrink-0" />
+                <app-avatar [appUserId]="user.appUserId" [version]="avatarVersionOf(user)"
+                            [name]="user.fullName || user.username" [size]="2" [decorative]="true" class="shrink-0" />
                 <div class="min-w-0">
                   <div class="flex items-center gap-1.5">
                     <span class="font-medium truncate">{{ user.fullName || '—' }}</span>
@@ -509,6 +515,11 @@
                   @if (mfaOn(user)) {
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="resetMfa(user)" data-test="user-reset-mfa">
                       <app-icon name="shield" />Reset two-factor login
+                    </button>
+                  }
+                  @if (avatarVersionOf(user) && !isSelf(user)) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="removePicture(user)" data-test="user-remove-picture">
+                      <app-icon name="image" />Remove profile picture
                     </button>
                   }
                   <div class="my-1 border-t border-subtle"></div>

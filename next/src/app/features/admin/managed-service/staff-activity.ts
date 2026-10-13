@@ -1,3 +1,4 @@
+import { Avatar } from '../../../shared/ui/avatar';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -56,7 +57,7 @@ export const ACTIONS_PAGE = 50;
  */
 @Component({
   selector: 'app-staff-activity',
-  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar],
   templateUrl: './staff-activity.html',
 })
 export class StaffActivity implements OnInit {

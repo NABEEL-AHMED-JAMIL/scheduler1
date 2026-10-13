@@ -1,3 +1,4 @@
+import { Avatar } from '../../shared/ui/avatar';
 import { Component, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -31,7 +32,7 @@ export function outcomeTone(outcome: string): string {
  */
 @Component({
   selector: 'app-sign-in-history',
-  imports: [TableShell, Icon, ServerTimePipe],
+  imports: [TableShell, Icon, ServerTimePipe, Avatar],
   template: `
     <app-table-shell heading="Sign-in history" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
                      [shown]="rows().length" [total]="total()" emptyIcon="history" [columnsKey]="'sign-in-history-' + scope()"
@@ -83,7 +84,12 @@ export function outcomeTone(outcome: string): string {
             <tr>
               <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ e.at | serverTime: 'dateTimeSec' }}</td>
               @if (scope() === 'workspace') {
-                <td class="max-w-64"><div class="truncate" [title]="e.username">{{ e.username }}</div></td>
+                <td class="max-w-64">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <app-avatar [appUserId]="e.appUserId" [name]="e.username" [size]="1.5" [decorative]="true" />
+                    <div class="truncate" [title]="e.username">{{ e.username }}</div>
+                  </div>
+                </td>
               }
               <td class="whitespace-nowrap"><span [class]="tone(e.outcome)">{{ outcomeText(e.outcome) }}</span></td>
               <td class="whitespace-nowrap">{{ methodText(e.method) }}</td>

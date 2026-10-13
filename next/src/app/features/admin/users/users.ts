@@ -73,8 +73,8 @@ export interface AppUser {
   tenantId?: number;
   tenantName?: string;
   tenantActive?: boolean;
-  avatarBucket?: string | null;
-  avatarKey?: string | null;
+  /** The version of their profile picture; null or absent when they have none. */
+  avatarVersion?: string | null;
   dateCreated?: string;
   lastLoginAt?: string;
 }
@@ -584,11 +584,36 @@ export class Users implements OnInit {
 
   /** Ring around the avatar: the same fact the status pill carries, said in the portrait. */
   /**
-   * Whose picture to ask the server for: only someone the list says has one (avatarKey is omitted
-   * when there is none). Asking for everyone sent a request per person per load, most of them 404s.
+   * Which picture to show: the version the list carries, or null when the person has none -- then app-avatar asks for
+   * nothing. Asking for everyone sent a request per person per load, most of them 404s.
    */
-  avatarOwner(user: AppUser): number | null {
-    return user.avatarKey ? user.appUserId : null;
+  avatarVersionOf(user: AppUser): string | null {
+    return user.avatarVersion || null;
+  }
+
+  /** Moderation: an administrator removes someone's picture; their initials show instead, everywhere. */
+  async removePicture(user: AppUser): Promise<void> {
+    const ok = await confirmWith(this.dialog, {
+      title: `Remove ${user.fullName || user.username}'s profile picture?`,
+      body: 'Their initials are shown instead, everywhere their name appears. They can upload a new one. The removal is recorded '
+        + 'in the sign-in history with your name.',
+      confirmLabel: 'Remove picture',
+      danger: true,
+    });
+    if (!ok) return;
+    this.busy.set(user.appUserId);
+    this.http.delete<ApiResponse>(`${API_BASE}/appUser.json/avatar`, { params: { appUserId: user.appUserId } }).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status === API_SUCCESS) {
+          this.users.update(list => list.map(u => (u.appUserId === user.appUserId ? { ...u, avatarVersion: null } : u)));
+          this.toast.success(r.message);
+        } else {
+          this.toast.error(r.message);
+        }
+      },
+      error: err => { this.busy.set(null); this.toast.error(err?.error?.message || 'Could not remove the picture.'); },
+    });
   }
 
   statusRing(status: string): string {

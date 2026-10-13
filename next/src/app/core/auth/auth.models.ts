@@ -72,9 +72,8 @@ export interface AuthUser {
   tenantId?: number;
   accessToken: string;
   refreshToken: string;
-  /** Where the profile picture lives, when one has been set. */
-  avatarBucket?: string | null;
-  avatarKey?: string | null;
+  /** The version of the person's profile picture (appUser.json/avatar); null or absent when they have none. */
+  avatarVersion?: string | null;
   /**
    * The account was opened with, or reset to, a one-time password and still owes its owner's
    * own. Sign-in is what reports it; the profile screen alone knew about it before, so a

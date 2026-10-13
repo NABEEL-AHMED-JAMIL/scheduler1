@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, ViewContainerRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, HostListener, Type, ViewContainerRef, afterNextRender, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
@@ -48,6 +48,11 @@ export class Shell {
    */
   readonly currentUrl = signal(this.router.url);
 
+  /** The signed-in person's avatar (shell-avatar.ts), once its chunk has loaded; where it goes in the bar and the menu. */
+  readonly avatarType = signal<Type<unknown> | null>(null);
+  private readonly topAvatar = viewChild('topAvatar', { read: ViewContainerRef });
+  private readonly menuAvatar = viewChild('menuAvatar', { read: ViewContainerRef });
+
   /** Where the sidebar's links go once their chunk has loaded (side-nav.ts). */
   private readonly sideNavHost = viewChild('sideNav', { read: ViewContainerRef });
 
@@ -63,6 +68,7 @@ export class Shell {
         this.checkTeamActivity();
       }
       void import('../../core/auth/idle-guard').then(m => { if (!destroyed && !host.length) host.createComponent(m.IdleGuard); });
+      void import('./shell-avatar').then(m => { if (!destroyed) this.avatarType.set(m.ShellAvatar); });
       // The sidebar (≥1440px): its own chunk, so the first load carries only the bar.
       void import('./side-nav').then(m => {
         const side = this.sideNavHost();
@@ -71,6 +77,20 @@ export class Shell {
       });
     });
     inject(DestroyRef).onDestroy(() => { destroyed = true; host.clear(); });
+    // The avatar into the bar once loaded, and into the menu's header each time the menu opens (its slot comes and goes).
+    effect(() => {
+      const type = this.avatarType();
+      const top = this.topAvatar();
+      const menu = this.menuAvatar();
+      untracked(() => {
+        if (type && top && !top.length) top.createComponent(type);
+        if (type && menu && !menu.length) {
+          const avatar = menu.createComponent(type);
+          avatar.setInput('size', 2.25);
+          avatar.setInput('link', true);
+        }
+      });
+    });
     this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {
       if (event instanceof NavigationEnd) {
         this.currentUrl.set(event.urlAfterRedirects);

@@ -46,17 +46,17 @@
         <app-icon name="lock" size="0.95em" />
         @switch (d.status) {
           @case ('Approved') {
-            {{ d.autoApproved ? 'Approved on its own' : 'Approved by ' + reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
+            @if (d.autoApproved) {Approved on its own} @else {Approved by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
           }
           @case ('Rejected') {
-            Rejected by {{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
+            Rejected by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
           }
           @case ('Failed') { The extraction failed: {{ d.error || 'no reason was given' }}. Extract the document again from Document Intelligence. }
           @default { This document is {{ statusText().toLowerCase() }}; it is not waiting for review. This view is read-only. }
         }
       </p>
     } @else if (claimedByOther()) {
-      <p class="note-bar note-bar-warn" role="note"><app-icon name="lock" size="0.95em" />Claimed by {{ reviewer(d.claimedBy, d.claimedByName) }}@if (d.claimedAt) { since {{ d.claimedAt | serverTime: 'recent' }}}. It is theirs until they let it go or the claim lapses; you can read it.</p>
+      <p class="note-bar note-bar-warn" role="note"><app-icon name="lock" size="0.95em" />Claimed by <app-avatar [appUserId]="d.claimedBy" [name]="reviewer(d.claimedBy, d.claimedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.claimedBy, d.claimedByName) }}@if (d.claimedAt) { since {{ d.claimedAt | serverTime: 'recent' }}}. It is theirs until they let it go or the claim lapses; you can read it.</p>
     }
 
     <div class="review-split">
@@ -187,7 +187,7 @@
                     <app-data-text class="mono min-w-0 max-w-full" [value]="c.oldValue ?? '(empty)'" label="Was" />
                     <span aria-hidden="true">→</span>
                     <app-data-text class="mono min-w-0 max-w-full" [value]="c.newValue ?? '(empty)'" label="Now" />
-                    <span class="text-[color:var(--text-muted)]">· {{ reviewer(c.correctedBy, c.correctedByName) }}@if (c.dateCreated) {, {{ c.dateCreated | serverTime: 'recent' }}}</span>
+                    <span class="text-[color:var(--text-muted)]">· <app-avatar [appUserId]="c.correctedBy" [name]="reviewer(c.correctedBy, c.correctedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(c.correctedBy, c.correctedByName) }}@if (c.dateCreated) {, {{ c.dateCreated | serverTime: 'recent' }}}</span>
                   </li>
                 }
               </ul>

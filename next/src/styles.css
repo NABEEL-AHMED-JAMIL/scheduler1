@@ -647,6 +647,21 @@
     color: var(--text-secondary);
     @apply inline-flex items-center justify-center rounded-full font-semibold shrink-0 select-none;
   }
+  /* app-avatar's initials on the person's own colour: a chart slot (5:1 or better on the raised surface in both
+     themes), the letters in the surface colour -- white on a mid tone in light, navy on the lifted tone in dark. */
+  .avatar-tone-0, .avatar-tone-1, .avatar-tone-2, .avatar-tone-3,
+  .avatar-tone-4, .avatar-tone-5, .avatar-tone-6, .avatar-tone-7 { color: var(--surface-raised); }
+  .avatar-initials[data-initials]::before { content: attr(data-initials); }
+  .avatar-tone-0 { background: var(--chart-0); }
+  .avatar-tone-1 { background: var(--chart-1); }
+  .avatar-tone-2 { background: var(--chart-2); }
+  .avatar-tone-3 { background: var(--chart-3); }
+  .avatar-tone-4 { background: var(--chart-4); }
+  .avatar-tone-5 { background: var(--chart-5); }
+  .avatar-tone-6 { background: var(--chart-6); }
+  .avatar-tone-7 { background: var(--chart-7); }
+  /* Profile: a picture dragged over the portrait. */
+  .avatar-drop-active { outline: 2px dashed var(--accent-mark-strong); outline-offset: 4px; }
 
   /* A listing that can run to hundreds of rows scrolls inside its own box rather than
      growing the page, so the toolbar, breadcrumb and column headers stay put. Without this

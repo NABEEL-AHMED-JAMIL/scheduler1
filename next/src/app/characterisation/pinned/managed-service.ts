@@ -44,7 +44,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /managedService.json/actions?limit=50"
+      "GET /managedService.json/actions?limit=50",
+      "GET /appUser.json/avatar?appUserId=5001&size=64"
     ],
     "headings": [
       "Our team's activity",
@@ -118,7 +119,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /managedService.json/actions?limit=50",
       "GET /tenant.json/listTenants",
-      "GET /appUser.json/listUsers"
+      "GET /appUser.json/listUsers",
+      "GET /appUser.json/avatar?appUserId=5001&size=64"
     ],
     "headings": [
       "Staff activity",

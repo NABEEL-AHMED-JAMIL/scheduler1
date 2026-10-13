@@ -156,7 +156,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentReview.json/fetchById?extractionId=1000",
       "GET /documentOcr.json/fetchById?ocrDocumentId=1001",
-      "GET /documentOcr.json/pageImage?ocrDocumentId=1001&page=1"
+      "GET /documentOcr.json/pageImage?ocrDocumentId=1001&page=1",
+      "GET /appUser.json/avatar?appUserId=4537&size=64"
     ],
     "headings": [
       "ocr-live-check.png",

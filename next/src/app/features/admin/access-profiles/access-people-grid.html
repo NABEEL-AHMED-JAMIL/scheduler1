@@ -49,7 +49,7 @@
             <tr [class.opacity-55]="busy() === row.person.appUserId" [attr.data-person]="row.person.username">
               <td class="access-grid-person">
                 <div class="flex items-center gap-2.5 pl-6">
-                  <app-avatar [appUserId]="row.person.avatarKey ? row.person.appUserId : null" [name]="row.person.fullName" [size]="1.9" />
+                  <app-avatar [appUserId]="row.person.appUserId" [version]="row.person.avatarVersion ?? null" [name]="row.person.fullName" [size]="1.9" [decorative]="true" />
                   <div class="min-w-0">
                     <div class="font-medium truncate leading-tight">{{ row.person.fullName }}</div>
                     <div class="text-xs text-[color:var(--text-muted)] truncate">{{ row.person.position || row.person.username }}</div>

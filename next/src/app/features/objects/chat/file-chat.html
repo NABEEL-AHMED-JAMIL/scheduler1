@@ -98,7 +98,7 @@
                         [attr.datetime]="message.at">{{ formatTime(message.at) }}</time>
                 }
               </div>
-              <app-avatar [bucket]="auth.user()?.avatarBucket" [key]="auth.user()?.avatarKey"
+              <app-avatar [appUserId]="auth.user()?.appUserId" [version]="auth.user()?.avatarVersion ?? null"
                           [name]="auth.displayName()" [size]="1.5" class="shrink-0" />
             </div>
         } @else if (message.role === 'error') {

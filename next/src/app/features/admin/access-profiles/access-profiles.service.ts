@@ -30,7 +30,8 @@ export interface AccessPerson {
   username: string;
   position?: string | null;
   status: string;
-  avatarKey?: string | null;
+  /** The version of their profile picture; null or absent when they have none. */
+  avatarVersion?: string | null;
   pageAccessProfileId: number | null;
   pageAccessProfileName: string | null;
   pageKeys: PageKey[];

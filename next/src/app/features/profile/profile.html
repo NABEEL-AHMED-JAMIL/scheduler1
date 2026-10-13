@@ -27,16 +27,19 @@
 
       <div class="space-y-4">
       <div class="card p-4 text-center">
-        <div class="relative inline-block">
-          @if (avatarUrl()) {
-            <img [src]="avatarUrl()" alt="Your profile picture"
-                 class="avatar-img size-28 mx-auto border-2 border-subtle" />
-          } @else {
-            <span class="avatar-initials size-28 text-3xl mx-auto">{{ auth.initials() }}</span>
-          }
+        <!-- Drop a picture on the portrait, or use the button; either opens the square crop. -->
+        <div class="relative inline-block rounded-full" data-test="profile-picture-drop"
+             [class.avatar-drop-active]="dragging()"
+             (dragover)="onDragOver($event)" (dragleave)="dragging.set(false)" (drop)="onDrop($event)">
+          <app-avatar [appUserId]="me.appUserId" [version]="me.avatarVersion ?? null" [name]="me.fullName || me.username"
+                      [size]="7" class="block" />
           @if (uploading()) {
             <span class="absolute inset-0 rounded-full grid place-items-center bg-[color:var(--scrim-strong)]">
               <app-icon name="refresh" class="spin text-[color:var(--on-solid)]" size="1.4em" />
+            </span>
+          } @else if (dragging()) {
+            <span class="absolute inset-0 rounded-full grid place-items-center text-xs font-medium bg-[color:var(--scrim-strong)] text-[color:var(--on-solid)]">
+              Drop to use
             </span>
           }
         </div>
@@ -53,24 +56,19 @@
         <div class="flex items-center justify-center gap-2 mt-4">
           <!-- Focus lands on the hidden input, so the label draws the ring for it. -->
           <label class="btn btn-default btn-sm cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-[color:var(--focus-ring)]"
-                 [class.opacity-50]="uploading() || !targetBucket()">
-            <app-icon name="upload" />{{ avatarUrl() ? 'Replace' : 'Add picture' }}
-            <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp,image/gif"
-                   [disabled]="uploading() || !targetBucket()" (change)="onPicture($event)" />
+                 [class.opacity-50]="uploading()">
+            <app-icon name="upload" />{{ me.avatarVersion ? 'Replace' : 'Add picture' }}
+            <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp" data-test="profile-picture-input"
+                   [disabled]="uploading()" (change)="onPicture($event)" />
           </label>
-          @if (avatarUrl()) {
+          @if (me.avatarVersion) {
             <button type="button" class="btn btn-ghost btn-sm btn-intent-crit"
                     [disabled]="uploading()" (click)="removePicture()">
               <app-icon name="trash" />Remove
             </button>
           }
         </div>
-
-        @if (!targetBucket()) {
-          <p class="field-note text-warn-500 mt-2">
-            No storage connection is available, so there is nowhere to keep a picture.
-          </p>
-        }
+        <p class="field-note mt-2">PNG, JPEG or WebP, up to 5 MB. Location and camera details are removed.</p>
 
         <dl class="grid grid-cols-2 gap-3 mt-5 pt-5 border-t text-left border-subtle"
            >

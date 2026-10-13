@@ -1,3 +1,4 @@
+import { Avatar } from '../../shared/ui/avatar';
 import { Component, HostListener, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
@@ -46,7 +47,7 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
  */
 @Component({
   selector: 'app-document-review',
-  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar],
+  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar, Avatar],
   templateUrl: './review.html',
   styles: [`
     .review-split { display: grid; gap: 1rem; align-items: start; grid-template-columns: minmax(0, 1fr); }

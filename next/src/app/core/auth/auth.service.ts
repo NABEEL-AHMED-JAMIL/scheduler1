@@ -1,5 +1,4 @@
-import { DestroyRef, Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { initialsOf } from '../../shared/ui/avatar';
+import { DestroyRef, Injectable, computed, inject, signal } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Observable, tap } from 'rxjs';
@@ -242,58 +241,7 @@ export class AuthService {
     return user?.fullName?.trim() || user?.username || '';
   });
 
-  private readonly avatarObjectUrl = signal('');
-
-  /**
-   * The picture as a blob URL rather than the endpoint's own URL. An <img src> cannot carry
-   * the bearer token, so pointing it straight at previewObject produced an unauthenticated
-   * request whose response the browser then blocked outright (ERR_BLOCKED_BY_ORB). Fetching
-   * through HttpClient lets the interceptor attach the token, and the blob URL that comes
-   * back is what the header and the profile screen bind to.
-   */
-  readonly avatarUrl = this.avatarObjectUrl.asReadonly();
-
-  /**
-   * Where the picture lives, and nothing else about the user.
-   *
-   * The sync below watched the whole stored user, so every write to it re-fetched: a token
-   * refresh, a name change, settling the password debt. Each one revoked the blob URL and went
-   * back to the server for a picture that had not moved, and the header emptied and refilled
-   * while it did. Compared by value, so a new user object carrying the same location is not a
-   * change at all.
-   */
-  private readonly avatarSource = computed(
-    () => {
-      const user = this.currentUser();
-      return { bucket: user?.avatarBucket ?? '', key: user?.avatarKey ?? '' };
-    },
-    { equal: (a, b) => a.bucket === b.bucket && a.key === b.key });
-
   constructor() {
-    // An effect rather than a direct call. Fetching from the constructor sent the request
-    // while this service was still being instantiated -- the auth interceptor injects it, so
-    // the interceptor was not in place yet and the call went out with no token and came back
-    // 401. An effect defers to after the injector settles, and re-runs whenever the picture
-    // changes, so signing in or replacing it refreshes without a manual call.
-    effect(onCleanup => {
-      const { bucket, key } = this.avatarSource();
-
-      const previous = untracked(() => this.avatarObjectUrl());
-      if (previous) URL.revokeObjectURL(previous);
-      this.avatarObjectUrl.set('');
-      if (!bucket || !key) return;
-
-      const loading = this.http.get(`${API_BASE}/storage.json/previewObject`, {
-        params: { bucket, key },
-        responseType: 'blob',
-      }).subscribe({
-        next: blob => this.avatarObjectUrl.set(URL.createObjectURL(blob)),
-        error: () => this.avatarObjectUrl.set(''),
-      });
-      // MIG-214: a new picture cancels the request still out for the old one, whose URL nothing would release.
-      onCleanup(() => loading.unsubscribe());
-    });
-
     // Another tab signed out (it removed the stored session): this tab signs out too instead of carrying on.
     const onStorage = (event: StorageEvent) => {
       if (event.key === STORAGE_KEY && event.newValue === null && this.currentUser()) {
@@ -313,11 +261,6 @@ export class AuthService {
     if (!user) return;
     this.persist({ ...user, ...changes });
   }
-
-  readonly initials = computed(() => {
-    const name = this.displayName();
-    return name ? initialsOf(name) : '';
-  });
 
   login(username: string, password: string): Observable<ApiResponse<AuthUser>> {
     return this.http
