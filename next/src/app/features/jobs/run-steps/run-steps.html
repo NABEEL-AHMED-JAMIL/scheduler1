@@ -205,6 +205,7 @@
                     Step <span class="mono">{{ o.stepKey }}</span>
                     @if (rowsLabel(o.rowCount); as rows) { · {{ rows }} }
                     @if (o.byteCount) { · {{ formatSize(o.byteCount) }} }
+                    @if (o.pageCount) { · {{ o.pageCount }} {{ o.pageCount === 1 ? 'page' : 'pages' }} }
                     @if (o.kind === 'file') {
                       @if (o.expired) { · <span class="text-warn-500">Expired</span> }
                       @else if (o.expiresAt) { · Kept until {{ o.expiresAt | serverTime:'recent' }} }

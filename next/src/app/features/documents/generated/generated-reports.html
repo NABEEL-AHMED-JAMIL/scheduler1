@@ -72,7 +72,10 @@
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ r.created ? (r.created | serverTime: 'dateTime') : '—' }}
             </td>
-            <td class="text-right tabular whitespace-nowrap text-[color:var(--text-secondary)]">{{ r.size != null ? size(r.size) : '—' }}</td>
+            <td class="text-right tabular whitespace-nowrap text-[color:var(--text-secondary)]">
+              {{ r.size != null ? size(r.size) : '—' }}
+              @if (r.pages) { <div class="text-xs text-[color:var(--text-muted)]">{{ r.pages }} {{ r.pages === 1 ? 'page' : 'pages' }}</div> }
+            </td>
             <td class="whitespace-nowrap">
               <span class="pill" [class.pill-ok]="r.status === 'Ready'" [class.pill-neutral]="r.status === 'In storage'"
                     [class.pill-warn]="r.status === 'Expired'"

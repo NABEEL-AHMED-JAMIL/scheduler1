@@ -182,6 +182,8 @@ export interface GeneratedReport {
   runDatasetId?: number | null;
   expiresAt?: string | null;
   rowCount?: number | null;
+  /** ADR-027: a PDF's pages, when a run made it (render_pdf); a bucket listing does not say. */
+  pages?: number | null;
 }
 
 /** The run an output list belongs to, with the schedule and pipeline it ran under. */
@@ -215,7 +217,7 @@ export function reportsFromRun(run: RunContext, outputs: RunOutput[]): Generated
       id: `run-${o.runOutputId}`, name: o.name, type: typeOf(o.name, o.format),
       created: o.recordedAt ?? null, size: o.byteCount ?? null, owner: run.owner ?? null,
       jobQueueId: run.jobQueueId, jobId: run.jobId, jobName: run.jobName ?? null, pipeline: run.pipelineName ?? null,
-      rowCount: o.rowCount ?? null,
+      rowCount: o.rowCount ?? null, pages: o.pageCount ?? null,
     };
     return o.kind === 'bucket'
       ? { ...common, origin: 'run-bucket' as const, status: 'In storage' as const, bucket: o.bucket ?? null, key: o.key ?? null }

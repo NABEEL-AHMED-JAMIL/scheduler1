@@ -1,6 +1,6 @@
 import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpEventType } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
@@ -53,6 +53,42 @@ interface ConvertResult {
   outputFormat: string;
   outputContentType: string;
   outputBase64: string;
+  outputFileSize?: number;
+  /** ADR-027: "table" (drawn without LibreOffice) or "libreoffice". */
+  engine?: string;
+  pageCount?: number | null;
+  /** A table converted to PDF: its data rows, the rows printed, and whether rows were left out. */
+  rowCount?: number | null;
+  rowsShown?: number | null;
+  truncated?: boolean | null;
+}
+
+/** What the converter takes (documentConverter.json/limits, ADR-027), shown before a file is picked. */
+export interface ConverterLimits {
+  maxFileSizeMb: number;
+  tableMaxFileSizeMb: number;
+  xlsxMaxFileSizeMb: number;
+  pdfMaxRows: number;
+  pdfMaxPages: number;
+  maxOutputMb: number;
+  timeoutSeconds: number;
+  slots: number;
+  maxWaiting: number;
+}
+
+/** The size limit for one conversion: a CSV/TSV (or XLSX) to PDF is streamed, everything else goes to LibreOffice. */
+export function limitMbFor(limits: ConverterLimits | null, extension: string, target: string): number | null {
+  if (!limits) return null;
+  if (target === 'pdf' && (extension === 'csv' || extension === 'tsv')) return limits.tableMaxFileSizeMb;
+  if (target === 'pdf' && extension === 'xlsx') return limits.xlsxMaxFileSizeMb;
+  return limits.maxFileSizeMb;
+}
+
+/** The limits in one line for the drop zone. */
+export function limitsHint(limits: ConverterLimits | null): string {
+  if (!limits) return '';
+  return `Up to ${limits.maxFileSizeMb} MB; a CSV or TSV to PDF up to ${limits.tableMaxFileSizeMb} MB, an XLSX to PDF up to `
+    + `${limits.xlsxMaxFileSizeMb} MB. A table's PDF prints its first ${limits.pdfMaxRows.toLocaleString('en-US')} rows.`;
 }
 
 @Component({
@@ -72,6 +108,23 @@ export class Converter implements OnInit {
   /** The supported-formats read failed: said as such, not as "this file can't be converted". */
   readonly formatsError = signal('');
   readonly showFormats = signal(false);
+  /** ADR-027: the converter's limits, read once; null until read (the screen works without them). */
+  readonly limits = signal<ConverterLimits | null>(null);
+  readonly limitsHint = computed(() => limitsHint(this.limits()));
+  /** Upload progress of the file being converted (0-100), then null while the server converts. */
+  readonly progress = signal<number | null>(null);
+  /** Why the last conversion failed, said where the Convert button is (busy, too big, unreadable). */
+  readonly convertError = signal('');
+  readonly busy = signal(false);
+  /** The picked file is over this conversion's limit: said before it is sent. */
+  readonly overLimit = computed(() => {
+    const file = this.mode() === 'upload' ? this.file() : null;
+    const mb = limitMbFor(this.limits(), this.extension(), this.outputFormat());
+    if (!file || mb == null) return '';
+    return file.size > mb * 1024 * 1024
+      ? `This file is ${this.size(file.size)}; a ${this.extension().toUpperCase()} to ${this.outputFormat().toUpperCase()} takes up to ${mb} MB.`
+      : '';
+  });
 
   private readonly dialog = inject(Dialog);
   private readonly storage = inject(StorageService);
@@ -177,6 +230,10 @@ export class Converter implements OnInit {
       error: () => { /* upload mode still works with no bucket list */ },
     });
     this.loadFormats();
+    this.http.get<ApiResponse<ConverterLimits>>(`${API_BASE}/documentConverter.json/limits`).subscribe({
+      next: r => { if (r.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') this.limits.set(r.data); },
+      error: () => { /* the limits are a hint; the server still checks */ },
+    });
   }
 
   loadFormats(): void {
@@ -197,7 +254,7 @@ export class Converter implements OnInit {
     // output under the new selection.
     effect(() => {
       this.sourceName(); this.outputFormat(); this.mode();
-      untracked(() => this.result.set(null));
+      untracked(() => { this.result.set(null); this.convertError.set(''); this.busy.set(false); });
     });
     // Picks a target format whenever the source changes, in either mode. Only the upload
     // handler used to do this, so choosing a file from a bucket left the format empty while
@@ -241,25 +298,52 @@ export class Converter implements OnInit {
     }
 
     this.converting.set(true);
-    this.http.post<ApiResponse<ConvertResult>>(`${API_BASE}/documentConverter.json/convert`, form)
+    this.convertError.set('');
+    this.busy.set(false);
+    this.progress.set(0);
+    this.http.post<ApiResponse<ConvertResult>>(`${API_BASE}/documentConverter.json/convert`, form,
+      { reportProgress: true, observe: 'events' })
       .subscribe({
-        next: response => {
+        next: event => {
+          if (event.type === HttpEventType.UploadProgress) {
+            // Uploaded: the rest is the server converting, shown as such (no percentage to give).
+            const done = event.total ? Math.round((event.loaded / event.total) * 100) : 0;
+            this.progress.set(done >= 100 ? null : done);
+            return;
+          }
+          if (event.type !== HttpEventType.Response) return;
           this.converting.set(false);
-          if (response.status === API_SUCCESS && response.data) {
+          this.progress.set(null);
+          const response = event.body;
+          if (response?.status === API_SUCCESS && response.data) {
             this.result.set(response.data);
             this.toast.success(this.saveToBucket()
               ? `Converted and saved to ${this.saveBucket()}.`
               : `Converted to ${this.outputFormat().toUpperCase()}.`);
             if (this.saveToBucket()) this.loadTasks();
           } else {
-            this.toast.error(response.message);
+            this.convertError.set(response?.message || 'The conversion failed.');
           }
         },
         error: err => {
           this.converting.set(false);
-          this.toast.error(err?.error?.message || 'The conversion failed.');
+          this.progress.set(null);
+          // 429: every office process is busy and the queue is full -- nothing went wrong with the file.
+          this.busy.set(err?.status === 429);
+          this.convertError.set(err?.error?.message
+            || (err?.status === 429 ? 'The converter is busy. Try again in a minute.'
+              : err?.status === 413 ? 'The file is too big for the converter.' : 'The conversion failed.'));
         },
       });
+  }
+
+  /** "Showing 5,000 of 1,000,000 rows" for a table converted to PDF; nothing for any other file. */
+  rowsNote(done: ConvertResult): string {
+    if (done.rowCount == null) return '';
+    const total = done.rowCount.toLocaleString('en-US');
+    return done.truncated
+      ? `First ${(done.rowsShown ?? 0).toLocaleString('en-US')} of ${total} rows printed; the full data is the file you converted.`
+      : `${total} rows`;
   }
 
   download(): void {

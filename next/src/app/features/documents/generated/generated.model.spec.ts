@@ -91,6 +91,13 @@ describe('the Reports list', () => {
     expect(reportsFromRun(RUN, [{ ...OUTPUTS[0], expired: true }])[0].status).toBe('Expired');
   });
 
+  it('carries a PDF report\'s page count (ADR-027), and none for a file without one', () => {
+    const [pdf, json] = reportsFromRun(RUN, [{ ...OUTPUTS[0], name: 'encounters.pdf', format: 'pdf', pageCount: 148 }, OUTPUTS[0]]);
+    expect(pdf.pages).toBe(148);
+    expect(pdf.type).toBe('PDF');
+    expect(json.pages).toBeNull();
+  });
+
   it('lists the files in a folder, not its subfolders', () => {
     const rows = reportsFromObjects('b', [
       { name: '2026', key: 'reports/2026/', folder: true },

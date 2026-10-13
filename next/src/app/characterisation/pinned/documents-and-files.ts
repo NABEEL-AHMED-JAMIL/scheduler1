@@ -126,7 +126,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /documentConverter.json/fetchAllTasks",
       "GET /storage.json/buckets",
-      "GET /documentConverter.json/supportedFormats"
+      "GET /documentConverter.json/supportedFormats",
+      "GET /documentConverter.json/limits"
     ],
     "headings": [
       "Document Converter",

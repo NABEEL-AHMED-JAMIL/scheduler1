@@ -197,6 +197,8 @@ export interface RunOutput {
   format?: string | null;
   rowCount?: number | null;
   byteCount?: number | null;
+  /** ADR-027: a PDF's pages (render_pdf); null for any other file. */
+  pageCount?: number | null;
   recordedAt?: string | null;
   runDatasetId?: number | null;
   expiresAt?: string | null;
