@@ -1,20 +1,22 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Connector Hub</h1>
-      <p class="page-subtitle">
-        Ready-made connectors for databases, SaaS apps and files. Connect once; sync on a schedule or continuously into this
-        workspace's own storage, where the Data Catalog, Sources and pipelines pick the data up.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Connections</h1>
+        <p class="page-subtitle">
+          Ready-made connectors for databases, SaaS apps and files. Connect once; sync on a schedule or continuously into this
+          workspace's own storage, where the Data Catalog, Sources and pipelines pick the data up.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canBuild()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="custom()" data-custom-rest><app-icon name="code" />Build custom (REST)</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="connect(null)" data-new-connection><app-icon name="plus" />New connection</button>
+        }
+      </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [class.spin]="loading()" />Refresh</button>
-      @if (canBuild()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="custom()" data-custom-rest><app-icon name="code" />Build custom (REST)</button>
-        <button type="button" class="btn btn-primary btn-sm" (click)="connect(null)" data-new-connection><app-icon name="plus" />New connection</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="connections and what they sync" still="Testing a connection, granting access and syncing now" />
 
   @if (kpis().length) {
@@ -58,12 +60,20 @@
 
   <app-table-shell heading="Connections" columnsKey="connector-hub" [loading]="loading()" [error]="error()" [isEmpty]="!shownConnections().length"
                      [shown]="shownConnections().length" [total]="connections().length" emptyIcon="plug" (retry)="load()"
-                     [emptyMessage]="connections().length ? 'No connection in that state.' : canBuild() ? 'No connections yet: choose a connector above.' : 'No connections yet. A workspace administrator makes them.'">
+                     [emptyMessage]="connections().length ? 'No connection in that state.' : canBuild() ? 'No connections yet: choose a connector above.' : 'No connections yet. A workspace administrator makes them.'"
+                     [emptyHint]="connections().length ? '' : 'Pipelines can also read API Collections and storage directly; those are listed under Sources.'">
       <ng-container toolbar>
         <label class="sr-only" for="connectionState">State</label>
         <select id="connectionState" class="input input-sm w-auto" (change)="stateFilter.set($any($event.target).value)" data-state-filter>
           @for (s of states; track s.id) { <option [value]="s.id" [selected]="stateFilter() === s.id">{{ s.label }}</option> }
         </select>
+      </ng-container>
+      <!-- UX review 2026-10-12 (A8, G10): the empty list offers the next step, and the step before it. -->
+      <ng-container empty-action>
+        @if (!connections().length) {
+          @if (canBuild()) { <button type="button" class="btn btn-primary btn-sm" (click)="connect(null)"><app-icon name="plus" />New connection</button> }
+          <a routerLink="/integration/sources" class="btn btn-ghost btn-sm">See Sources</a>
+        }
       </ng-container>
       <table class="table-modern">
         <thead>

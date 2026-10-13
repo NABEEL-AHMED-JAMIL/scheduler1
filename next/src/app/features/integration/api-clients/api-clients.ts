@@ -20,6 +20,8 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
 import { WebhookDialog, WebhookDialogData, WebhookDialogResult } from './webhook-dialog';
 import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-dialog';
 import { SandboxPanel } from './sandbox-panel';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * MIG-332: Integration › API Clients (workspace administrators). The workspace's API clients for the customer API --
@@ -35,7 +37,7 @@ import { SandboxPanel } from './sandbox-panel';
  */
 @Component({
   selector: 'app-api-clients',
-  imports: [TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger, SandboxPanel],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger, SandboxPanel],
   templateUrl: './api-clients.html',
 })
 export class ApiClients implements OnInit {

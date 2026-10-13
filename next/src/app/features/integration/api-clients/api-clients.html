@@ -1,21 +1,21 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">API clients</h1>
-      <p class="page-subtitle">
-        How your own systems, such as a portal, reach the platform's API (/v1): each client has the scopes it needs and
-        an optional IP allowlist. The secret is shown once.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">API Clients</h1>
+        <p class="page-subtitle">
+          How your own systems, such as a portal, reach the platform's API (/v1): each client has the scopes it needs and
+          an optional IP allowlist. The secret is shown once.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load(); loadRoutes(); loadWebhooks()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
+          <app-icon name="plus" />New API client
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load(); loadRoutes(); loadWebhooks()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
-        <app-icon name="plus" />New API client
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   @if (limits(); as l) {
     <div class="card p-4 mb-3 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm" data-api-limits>

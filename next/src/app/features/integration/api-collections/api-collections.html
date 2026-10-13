@@ -1,22 +1,22 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">API Collections</h1>
-      <p class="page-subtitle">
-        Reusable APIs for this workspace. Pipelines and sources reference an API here; they never copy its configuration.
-        Secrets live in a collection's environments and are never shown again once saved.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">API Collections</h1>
+        <p class="page-subtitle">
+          Reusable APIs for this workspace. Pipelines and sources reference an API here; they never copy its configuration.
+          Secrets live in a collection's environments and are never shown again once saved.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canManage()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="importFiles()"><app-icon name="upload" />Import</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New collection</button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (canManage()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="importFiles()"><app-icon name="upload" />Import</button>
-        <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New collection</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="API collections" />
 
   <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="API collections at a glance" />

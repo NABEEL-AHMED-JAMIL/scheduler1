@@ -3,6 +3,7 @@ import { Router, RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { Icon } from '../../../shared/ui/icon';
 import { ConnectorsApi } from './connectors.api';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 /**
  * Where an OAuth provider sends the person's browser back (MIG-292; INTEGRATION_CONNECTORS_OAUTH_REDIRECT_URL): the code
@@ -11,14 +12,16 @@ import { ConnectorsApi } from './connectors.api';
  */
 @Component({
   selector: 'app-oauth-callback',
-  imports: [Icon, RouterLink],
+  imports: [PageHeader, Icon, RouterLink],
   template: `
     <div class="page">
-      <div class="page-head"><div><h1 class="page-title">Connecting…</h1></div></div>
+      <app-page-header>
+        <div class="page-head"><div><h1 class="page-title">Connecting…</h1></div></div>
+      </app-page-header>
       <div class="card p-4 flex flex-col gap-3 max-w-2xl" data-oauth-callback>
         @if (problem()) {
           <p class="text-sm" role="alert"><app-icon name="alert" /> {{ problem() }}</p>
-          <a class="btn btn-default btn-sm w-fit" routerLink="/integration/connectors">Back to Connector Hub</a>
+          <a class="btn btn-default btn-sm w-fit" routerLink="/integration/connectors">Back to Connections</a>
         } @else {
           <p class="text-sm" role="status"><app-icon name="refresh" class="spin" /> Finishing the grant…</p>
         }

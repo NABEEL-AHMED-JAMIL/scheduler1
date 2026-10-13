@@ -1,18 +1,20 @@
 <div class="flex flex-col gap-8 min-w-0" data-reference>
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">API reference</h1>
-      <p class="page-subtitle">
-        {{ model.title }} {{ model.version }}. Every path below is under <code class="md-inline-code">{{ base }}</code>; a call needs a
-        token with the scope it names unless it says otherwise.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">API reference</h1>
+        <p class="page-subtitle">
+          {{ model.title }} {{ model.version }}. Every path below is under <code class="md-inline-code">{{ base }}</code>; a call needs a
+          token with the scope it names unless it says otherwise.
+        </p>
+      </div>
+      <div class="relative w-full sm:w-80">
+        <app-icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 icon-muted" size="0.9em" />
+        <input class="input pl-8" type="search" placeholder="Filter by path, summary or operation" aria-label="Filter the operations"
+               [value]="filter()" (input)="filter.set($any($event.target).value)" data-reference-filter />
+      </div>
     </div>
-    <div class="relative w-full sm:w-80">
-      <app-icon name="search" class="absolute left-2.5 top-1/2 -translate-y-1/2 icon-muted" size="0.9em" />
-      <input class="input pl-8" type="search" placeholder="Filter by path, summary or operation" aria-label="Filter the operations"
-             [value]="filter()" (input)="filter.set($any($event.target).value)" data-reference-filter />
-    </div>
-  </div>
+  </app-page-header>
 
   @if (filter().trim()) {
     <p class="text-sm text-[color:var(--text-muted)] -mt-4" role="status">{{ shown() }} of {{ total }} operations match.</p>

@@ -9,6 +9,7 @@ import { ApiClientsApi, SandboxInfo } from '../integration/api-clients/api-clien
 import { DOCS, DOWNLOADS, scrollToFragments } from './developer-docs';
 import { GuideBody } from './guide-body';
 import { PORTAL, parseGuide } from './guide-markdown';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /**
  * MIG-336: the developer portal's first page -- what the API is for (the contract's own description), its address, where
@@ -17,16 +18,18 @@ import { PORTAL, parseGuide } from './guide-markdown';
  */
 @Component({
   selector: 'app-developer-overview',
-  imports: [RouterLink, Icon, CopyButton, GuideBody],
+  imports: [PageHeader, RouterLink, Icon, CopyButton, GuideBody],
   styles: [`@media (min-width: 1536px) { .overview-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 26rem); } }`],
   template: `
     <div class="page" data-developer-overview>
-      <div class="page-head">
-        <div>
-          <h1 class="page-title">Developer portal</h1>
-          <p class="page-subtitle">{{ spec.info.summary || spec.info.title }}</p>
+      <app-page-header>
+        <div class="page-head">
+          <div>
+            <h1 class="page-title">Developer portal</h1>
+            <p class="page-subtitle">{{ spec.info.summary || spec.info.title }}</p>
+          </div>
         </div>
-      </div>
+      </app-page-header>
 
       <div class="overview-grid grid gap-4">
         <div class="flex flex-col gap-4 min-w-0">

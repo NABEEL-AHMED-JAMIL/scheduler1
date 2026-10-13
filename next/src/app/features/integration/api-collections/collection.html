@@ -1,29 +1,29 @@
 <div class="page">
-  <div class="page-head">
-    <div class="min-w-0">
-      <a class="link-inline text-sm" routerLink="/integration/api-collections"><app-icon name="arrowLeft" size="0.9em" />API Collections</a>
-      <div class="mt-1 flex flex-wrap items-center gap-2">
-        <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ collection()?.name || 'API collection' }}</h1>
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <!-- The breadcrumb leads back to API Collections (UX review 2026-10-12, A2). -->
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="page-title min-w-0 [overflow-wrap:anywhere]">{{ collection()?.name || 'API collection' }}</h1>
+          @if (collection(); as c) {
+            @if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> }
+            <app-status [label]="c.status || 'Inactive'" [quiet]="true" />
+          }
+        </div>
         @if (collection(); as c) {
-          @if (c.sensitivity) { <app-sensitivity [level]="c.sensitivity" [label]="c.sensitivityLabel" /> }
-          <app-status [label]="c.status || 'Inactive'" [quiet]="true" />
+          <p class="page-subtitle">
+            @if (c.description) { {{ c.description }} · }{{ sourceLabel(c.sourceFormat) }} · version {{ c.currentVersion ?? 0 }}@if (c.dateUpdated || c.dateCreated) { · updated {{ (c.dateUpdated || c.dateCreated) | serverTime: 'dateTime' }} }
+          </p>
         }
       </div>
-      @if (collection(); as c) {
-        <p class="page-subtitle">
-          @if (c.description) { {{ c.description }} · }{{ sourceLabel(c.sourceFormat) }} · version {{ c.currentVersion ?? 0 }}@if (c.dateUpdated || c.dateCreated) { · updated {{ (c.dateUpdated || c.dateCreated) | serverTime: 'dateTime' }} }
-        </p>
-      }
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canManage() && collection()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="editDetails()"><app-icon name="edit" />Edit details</button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      @if (canManage() && collection()) {
-        <button type="button" class="btn btn-default btn-sm" (click)="editDetails()"><app-icon name="edit" />Edit details</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="API collections" />
 
   @if (!detail() && error()) {

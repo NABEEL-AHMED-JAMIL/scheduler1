@@ -2,7 +2,7 @@ import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angula
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -30,6 +30,8 @@ import { TemplateDialog, TemplateDialogData } from './template-dialog';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
@@ -47,7 +49,7 @@ const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
  */
 @Component({
   selector: 'app-sources',
-  imports: [SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [RouterLink, RefreshButton, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {

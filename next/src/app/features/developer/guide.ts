@@ -4,6 +4,7 @@ import { Icon } from '../../shared/ui/icon';
 import { DOCS, Guide, scrollToFragments } from './developer-docs';
 import { GuideBody } from './guide-body';
 import { GuideBlock, PORTAL, parseGuide, withoutTitle } from './guide-markdown';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /**
  * MIG-336: one guide of the developer portal (etl-platform docs/api/guides/<file>.md), drawn from its markdown, with the
@@ -11,16 +12,18 @@ import { GuideBlock, PORTAL, parseGuide, withoutTitle } from './guide-markdown';
  */
 @Component({
   selector: 'app-developer-guide',
-  imports: [RouterLink, Icon, GuideBody],
+  imports: [PageHeader, RouterLink, Icon, GuideBody],
   template: `
     @if (guide(); as g) {
       <article class="page max-w-4xl" [attr.data-guide]="g.slug">
-        <div class="page-head">
-          <div>
-            <h1 class="page-title">{{ g.title }}</h1>
-            @if (g.summary) { <p class="page-subtitle">{{ g.summary }}</p> }
+        <app-page-header>
+          <div class="page-head">
+            <div>
+              <h1 class="page-title">{{ g.title }}</h1>
+              @if (g.summary) { <p class="page-subtitle">{{ g.summary }}</p> }
+            </div>
           </div>
-        </div>
+        </app-page-header>
         <app-guide-body [blocks]="blocks()" />
         <nav class="flex flex-wrap justify-between gap-3 border-t border-subtle pt-4 mt-8" aria-label="More guides">
           @if (previous(); as p) {

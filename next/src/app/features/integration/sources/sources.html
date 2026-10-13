@@ -1,29 +1,29 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Sources</h1>
-      <p class="page-subtitle">
-        Where a pipeline's data comes from: an API from API Collections, a file or folder in one of this workspace's
-        storage connections, or a database query. Test one, preview its first rows and read the schema they suggest.
-        Data contracts say what a payload must hold.
-      </p>
-    </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="refresh()" [disabled]="tabLoading()">
-        <app-icon name="refresh" [class.spin]="tabLoading()" />Refresh
-      </button>
-      @if (canManage()) {
-        @switch (tab()) {
-          @case ('connections') { <button type="button" class="btn btn-primary btn-sm" (click)="newConnection()"><app-icon name="plus" />New connection</button> }
-          @case ('contracts') {
-            <button type="button" class="btn btn-default btn-sm" (click)="installTemplate()"><app-icon name="template" />Install template</button>
-            <button type="button" class="btn btn-primary btn-sm" (click)="newContract()"><app-icon name="plus" />New from sample</button>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Sources</h1>
+        <p class="page-subtitle">
+          Where a pipeline's data comes from: an API from API Collections, a file or folder in one of this workspace's
+          storage connections, or a database query. Test one, preview its first rows and read the schema they suggest.
+          Data contracts say what a payload must hold.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="tabLoading()" (refresh)="refresh()" />
+        @if (canManage()) {
+          @switch (tab()) {
+            @case ('connections') { <button type="button" class="btn btn-primary btn-sm" (click)="newConnection()"><app-icon name="plus" />New connection</button> }
+            @case ('contracts') {
+              <button type="button" class="btn btn-default btn-sm" (click)="installTemplate()"><app-icon name="template" />Install template</button>
+              <button type="button" class="btn btn-primary btn-sm" (click)="newContract()"><app-icon name="plus" />New from sample</button>
+            }
+            @default { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
           }
-          @default { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
         }
-      }
+      </div>
     </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="sources and data contracts" />
 
   <div class="tabs" role="tablist" aria-label="Sources">
@@ -132,7 +132,8 @@
 
       <app-table-shell data-test="sources" heading="Sources" columnsKey="sources" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"
-                       [emptyMessage]="emptyMessage()" emptyIcon="database" (retry)="load()">
+                       [emptyMessage]="emptyMessage()" emptyIcon="database" (retry)="load()"
+                       [emptyHint]="hasFilters() ? '' : 'Pipelines also read API Collections and storage directly, without a source; add one here to test and preview it.'">
         <ng-container toolbar>
           <app-view-toggle [(value)]="view" key="sources" cardsIcon="database" />
           <select class="input max-w-40" [value]="kindFilter()" aria-label="Kind" (change)="kindFilter.set($any($event.target).value)">
@@ -150,6 +151,7 @@
 
         <div empty-action class="flex justify-center">
           @if (canManage() && !hasFilters()) { <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New source</button> }
+          @if (!hasFilters()) { <a routerLink="/integration/api-collections" class="btn btn-ghost btn-sm ml-2">See API Collections</a> }
         </div>
 
         @if (view() === 'cards') {

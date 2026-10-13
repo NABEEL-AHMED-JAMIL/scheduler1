@@ -10,7 +10,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /connectorHub.json/connection/list"
     ],
     "headings": [
-      "Connector Hub",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -95,7 +95,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /connectorHub.json/connection/list"
     ],
     "headings": [
-      "Connector Hub",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
@@ -136,7 +136,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /connectorHub.json/connection/list"
     ],
     "headings": [
-      "Connector Hub",
+      "Connections",
       "Connections (1 of 1)"
     ],
     "buttons": [
