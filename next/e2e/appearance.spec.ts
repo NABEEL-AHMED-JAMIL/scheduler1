@@ -53,6 +53,10 @@ async function overflowing(page: Page): Promise<string[]> {
       if (box.width === 0) return;
       // Allowed IF it sits in something that scrolls sideways on purpose.
       if (element.closest('[class*="overflow-x"], [class*="scroll-table"]')) return;
+      // ...or one whose stylesheet makes it scroll sideways (a hub's tab strip: .tabs, overflow-x auto).
+      for (let p = element.parentElement; p && p !== document.body; p = p.parentElement) {
+        if (/^(auto|scroll)$/.test(getComputedStyle(p).overflowX)) return;
+      }
       if (box.right > limit + 1) wide.push(element.tagName.toLowerCase());
     });
     return wide.slice(0, 5);

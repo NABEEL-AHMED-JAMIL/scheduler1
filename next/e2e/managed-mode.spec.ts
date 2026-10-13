@@ -1,4 +1,5 @@
 import { test, expect, Browser, Page, Route, TestInfo } from '@playwright/test';
+import { openFromMenu } from './support/menu';
 import { hasToken, NEEDS, tokenFor } from './support/session';
 import { join } from 'path';
 import { LIVE, LIVE_IDS } from '../src/app/characterisation/fixtures.live';
@@ -140,8 +141,9 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
       data: [{ id: 42, tenantId: FAKE.tenant, appUserId: 5001, fullName: 'Sam Staff', username: 'staff@example.com', service: 'process',
         method: 'POST', path: '/sourceTask.json/updateSourceTask', target: 'sourceTaskId=9301', builderAction: true, createdAt: '2026-09-28 10:05:00' }] } });
     await page.goto('/dashboard');
-    await page.getByRole('button', { name: 'Administration' }).click();
-    await page.getByRole('link', { name: /Our team's activity/ }).click();
+    // Administration is a hub since the menu tree (2026-10-12): its Activity tab, offered to a managed workspace.
+    await openFromMenu(page, 'Administration & billing', 'Administration');
+    await page.getByRole('navigation', { name: 'Administration' }).getByRole('link', { name: 'Activity', exact: true }).click();
     await expect(page.getByRole('heading', { name: "Our team's activity" })).toBeVisible();
     // Read as a person reads it (UI review U6); the raw method and path are on the row's tooltip.
     await expect(page.getByText('Source task › Update source task')).toBeVisible();
@@ -171,7 +173,9 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
       'PUT /tenant.json/changeManagementMode': { status: 'SUCCESS', message: 'Tenant "Claude Demo" is now MANAGED. Its people sign in again to continue.' } });
     await page.goto('/platform/workspaces');
     await expect(page.getByText('Self-managed').first()).toBeVisible();
-    await page.getByRole('button', { name: 'Make managed' }).first().click();
+    // A workspace's actions are in its row menu (UX final: row actions in ⋮).
+    await page.getByRole('button', { name: 'Actions for Claude Demo' }).first().click();
+    await page.getByRole('menuitem', { name: 'Make managed' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Make Claude Demo managed by our team?')).toBeVisible();
     await expect(dialog.getByText(/Everyone in Claude Demo is signed out now/)).toBeVisible();
@@ -248,7 +252,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await expect(page.getByText('Managed by our team')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'New pipeline' })).toBeVisible();
     await bar.getByRole('button', { name: 'Exit' }).click();
-    await expect(page).toHaveURL(/\/administration\/work-in-workspace$/);
+    await expect(page).toHaveURL(/\/platform\/work-in-workspace$/);
     await expect(bar).toHaveCount(0);
     const logout = seen.find(s => s.path === '/auth.json/logout');
     expect(logout?.auth).toBe(`Bearer ${STAFF_SESSION['accessToken']}`);

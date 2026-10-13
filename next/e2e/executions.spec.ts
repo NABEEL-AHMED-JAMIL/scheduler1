@@ -125,7 +125,7 @@ test.describe('Executions', () => {
       await expect(row).toContainText(/[\d,—]+ → [\d,—]+/);
     }
     // The read step's counts are Core's own; save_file names the file it wrote.
-    await expect(rows.nth(keys.indexOf(read.key))).toContainText(`${count(read.recordsIn)} → ${count(read.recordsOut)}`);
+    await expect(rows.nth(keys.indexOf(read.key))).toContainText(new RegExp(`${count(read.recordsIn)} → ${count(read.recordsOut)}`));
     await expect(rows.nth(keys.indexOf(saved.key))).toContainText(KEPT_FILE);
 
     // A step's Log button: its own lines in the side panel, then in the Log with the run's entries about it.
@@ -134,7 +134,7 @@ test.describe('Executions', () => {
     await expect(panel.locator('.run-log-line').first()).toContainText(/Try 1 of \d+\./);
     await panel.getByRole('button', { name: 'Open in Log' }).click();
     await expect(page).toHaveURL(new RegExp(`/runs/${ENGINE.run}/logs$`));
-    await expect(page.getByLabel('Step')).toHaveValue(read.key);
+    await expect(page.getByRole('combobox', { name: 'Step', exact: true })).toHaveValue(read.key);
     await expect(page.locator('app-run-log .run-log-line', { hasText: /Try 1 of \d+\./ }).first()).toBeVisible();
     await page.context().close();
   });
@@ -202,9 +202,13 @@ test.describe('Executions', () => {
     await page.goto(`/pipelines/schedules/${INBOX.job}/executions`);
     const row = page.locator('tbody tr', { hasText: `#${INBOX.run}` }).first();
     await expect(row).toContainText(INBOX.file ? INBOX.file : /\.\w+/);
+    // The schedule's details are folded under the title on its runs page.
+    const expand = page.getByRole('button', { name: 'Expand the schedule details' });
+    if (await expand.isVisible()) await expand.click();
     const inbox = page.locator('.inbox-trigger');
-    await expect(inbox).toContainText('arrives in the inbox starts this job');
-    await expect(inbox.locator(`a[href$="/runs/${INBOX.run}/logs"]`)).toBeVisible();
+    await expect(inbox).toContainText('arrives in the inbox starts this schedule');
+    // Run links open the run on its Steps (no /logs).
+    await expect(inbox.locator(`a[href$="/runs/${INBOX.run}"]`)).toBeVisible();
 
     await page.goto(`/pipelines/schedules/${INBOX.job}/edit`);
     await expect(page.getByRole('heading', { name: 'When it runs' })).toBeVisible();
@@ -225,13 +229,15 @@ test.describe('Executions', () => {
       }
       const page = await pageAs(browser, s);
       await page.goto('/pipelines/schedules');
-      await page.getByLabel('Search jobs').fill(NAMES[job]);
+      await page.getByLabel('Search schedules', { exact: true }).fill(NAMES[job]);
       await page.getByRole('button', { name: new RegExp(`^Actions for ${escape(NAMES[job])}`) }).first().click();
       const menu = page.getByRole('menu');
       // Every row action is where it was; the AI-model run sits after Run now, and only for a pipeline with an AI step
       // (review 2026-10-07).
+      // Backfill… (MIG-347) follows Run now and Run with; "this job" is "this schedule" in the console's words.
       await expect(menu.getByRole('menuitem')).toHaveText([/Run now/, ...(hasAi ? [/Run with a different AI model…/] : []),
-        /Skip next run/, /Edit/, /Executions/, /Ask about this job/, /Duplicate/, /Email notifications/, /Deactivate|Activate/, /Delete/]);
+        /Backfill…/, /Skip next run/, /Edit/, /Executions/, /Ask about this schedule/, /Duplicate/, /Email notifications/,
+        /Deactivate|Activate/, /Delete/]);
       if (!hasAi) {
         await expect(menu.getByRole('menuitem', { name: /Run with/ })).toHaveCount(0);
         await page.keyboard.press('Escape');

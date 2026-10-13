@@ -141,7 +141,8 @@ test.describe('AI prompts in pipelines', () => {
     expect(refused.message).toContain('pipeline(s) run this prompt');
 
     // ── 4. Task: the step is a read-only card, the other fields are inputs ───────────────
-    await page.goto('/pipelines/new');
+    // New pipeline starts from a choice (AI Assistant, steps, a copy); the full form for a topic's pipeline is /form.
+    await page.goto('/pipelines/new/form');
     await page.getByRole('heading', { name: 'New pipeline' }).waitFor();
     await page.locator('#taskName').fill(TASK_NAME);
     await expect(page.locator('#taskProfile')).not.toHaveValue('');
@@ -178,9 +179,11 @@ test.describe('AI prompts in pipelines', () => {
     expect(steps.data[0].run.status, steps.data[0].run.error).toBe('ok');
     expect(steps.data[0].run.stepTag).toBe('summary');
 
-    await page.goto(`/operations/jobs/${jobId}/runs/${queueRow.jobQueueId}/logs`);
-    await expect(page.getByText('AI steps')).toBeVisible();
-    await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText('Answered');
-    await expect(page.locator('.detail-panel .side-panel-list li').first()).toContainText(PROMPT);
+    // The run's AI answers are a tab of the run page (UX review R1), one line each: outcome, prompt, step.
+    await page.goto(`/pipelines/schedules/${jobId}/runs/${queueRow.jobQueueId}`);
+    await page.getByRole('tab', { name: /^AI answers/ }).click();
+    const answer = page.locator('[data-test="ai-answers"] details.ai-answer').first();
+    await expect(answer).toContainText('Answered');
+    await expect(answer).toContainText(PROMPT);
   });
 });

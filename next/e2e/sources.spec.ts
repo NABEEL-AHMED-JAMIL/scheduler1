@@ -1,5 +1,5 @@
 import { test, expect, Browser, Page, Response } from '@playwright/test';
-import { canSignIn, NEEDS, Session, sessionFor } from './support/session';
+import { canSignIn, NEEDS, Session, sessionFor, pageWith } from './support/session';
 import { bestEffort, ensureObject, getJson } from './support/workspace';
 import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
 
@@ -7,7 +7,7 @@ import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
  * MIG-248: Sources end to end, as a workspace administrator -- create a FILE source on the workspace's own storage
  * connection, test it, preview its first rows and infer its schema; add a database connection with a password and
  * see it only as "configured"; install a contract template, propose a contract from a sample, and validate payloads
- * against wound_intake (one that fails, with its errors by path, and one that holds).
+ * against record_intake (one that fails, with its errors by path, and one that holds).
  *
  * Beside every step, the business rule: a database password never comes back. Every response from the API gateway
  * is read, and none may hold the password this spec typed -- only the request that set it may carry it.
@@ -16,7 +16,7 @@ import { hasFixtures, NEEDS_FIXTURES, riverside } from './support/fixtures';
  * source reads the suite's own e2e/sources/E2E-customers.csv in Riverside Health's bucket (support/fixtures.ts),
  * uploaded once and kept for the next run. Sign-in through support/session.ts (role admin).
  * Everything it makes is named "E2E …". The source and the database connection are deleted when the describe ends; the
- * contract it proposes and the wound_intake template it installs (once) stay, as the service deletes neither.
+ * contract it proposes and the record_intake template it installs (once) stay, as the service deletes neither.
  */
 const api = process.env['E2E_API_URL'] ?? 'http://localhost:9098/api/v1';
 const STORAGE = () => process.env['E2E_SOURCE_STORAGE'] ?? riverside().storageAlias;
@@ -30,11 +30,8 @@ const CONTRACT = `E2E contract ${STAMP}`;
 const PASSWORD = `e2e-db-password-${STAMP}-${Math.random().toString(36).slice(2)}`;
 
 async function pageAs(browser: Browser, s: Session): Promise<Page> {
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  await page.goto('/');
-  await page.evaluate(user => window.localStorage.setItem('etl_auth_user', JSON.stringify(user)), s.data);
-  return page;
+  // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
+  return pageWith(browser, s.data);
 }
 
 /** Every gateway response whose body holds the password: must stay empty. */
@@ -164,15 +161,16 @@ test.describe('Sources', () => {
     await expect(contracts).toContainText('result_manifest');
     await expect(contracts).toContainText('System · read-only');
 
-    // ---- install: wound_intake, unless this workspace already has it (the spec may have run before); validated below
+    // ---- install: record_intake, unless this workspace already has it (the spec may have run before); validated below.
+    // The templates are generic since 2026-10-06 (record_intake in, image_measurement_result out): nothing domain-specific.
     await page.getByRole('button', { name: 'Install template' }).click();
     const templates = page.locator('app-template-dialog');
-    await expect(templates).toContainText('wound_result');
-    const install = templates.getByRole('button', { name: 'Install wound_intake' });
+    await expect(templates).toContainText('image_measurement_result');
+    const install = templates.getByRole('button', { name: 'Install record_intake' });
     if (await install.count()) await install.click();
-    await expect(templates.locator('li', { hasText: 'wound_intake' })).toContainText('Installed', { timeout: 20_000 });
+    await expect(templates.locator('li', { hasText: 'record_intake' })).toContainText('Installed', { timeout: 20_000 });
     await templates.getByRole('button', { name: 'Close' }).click();
-    await expect(contracts).toContainText('wound_intake');
+    await expect(contracts).toContainText('record_intake');
 
     // ---- propose from a sample, mark a field required, save v1
     await page.getByRole('button', { name: 'New from sample' }).click();
@@ -185,19 +183,19 @@ test.describe('Sources', () => {
     await sample.getByRole('button', { name: 'Save v1' }).click();
     await expect(contracts).toContainText(CONTRACT);
 
-    // ---- validate against wound_intake: a payload that fails, then its template's example, which holds
-    await contracts.getByRole('button', { name: 'wound_intake', exact: true }).click();
+    // ---- validate against record_intake: a payload that fails, then its template's example, which holds
+    await contracts.getByRole('button', { name: 'record_intake', exact: true }).click();
     const panel = page.locator('app-contract-panel');
-    await expect(panel.locator('[data-test="schema-fields"]')).toContainText('case_id');
-    await panel.locator('#ctPayload').fill(JSON.stringify({ case_id: '', patient: {}, images: [] }));
+    await expect(panel.locator('[data-test="schema-fields"]')).toContainText('record_id');
+    await panel.locator('#ctPayload').fill(JSON.stringify({ record_id: '', fields: {}, attachments: [] }));
     await panel.getByRole('button', { name: 'Validate' }).click();
     const errors = panel.locator('[data-test="validation-errors"]');
     await expect(errors).toBeVisible({ timeout: 20_000 });
-    await expect(errors).toContainText('$.captured_at');
+    await expect(errors).toContainText('$.created_at');
     await expect(errors).toContainText('required');
     await panel.locator('#ctPayload').fill(JSON.stringify({
-      case_id: 'WC-1001', patient: { mrn: 'M-77' }, wound: { location: 'left heel', type: 'pressure_injury' },
-      images: [{ file_key: 'intake/WC-1001/1.jpg' }], captured_at: '2026-09-28T09:15:00-05:00',
+      record_id: 'R-1001', record_type: 'inspection', created_at: '2026-10-06T09:15:00-05:00', fields: { site: 'Plant 2' },
+      attachments: [{ file_key: 'intake/R-1001/photo-1.jpg' }],
     }));
     await panel.getByRole('button', { name: 'Validate' }).click();
     await expect(panel.locator('[data-test="validation"]')).toContainText('Holds', { timeout: 20_000 });

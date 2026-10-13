@@ -58,9 +58,16 @@ test.describe('Task Registry', () => {
     for (const kind of ['Read', 'Process', 'Output', 'Legacy']) {
       await expect(page.locator(`tbody [data-kind="${kind}"]`).first()).toBeVisible();
     }
-    for (const id of LISTED) await expect(row(page, `legacy:${KEY[id]}`)).toContainText('Legacy');
-    await expect(row(page, `legacy:${SHARED.pipelineKey}`)).toContainText(SHARED.pipelineId);
     await expect(row(page, 'write_database')).toContainText('Unavailable');
+    // The list is paged, and the workspace's test pipelines fill its first pages: each is found by its id.
+    const search = page.getByRole('textbox', { name: 'Search tasks' });
+    for (const id of LISTED) {
+      await search.fill(id);
+      await expect(row(page, `legacy:${KEY[id]}`)).toContainText('Legacy');
+    }
+    await search.fill(SHARED.pipelineId);
+    await expect(row(page, `legacy:${SHARED.pipelineKey}`)).toContainText(SHARED.pipelineId);
+    await search.fill('');
     await page.getByLabel('Kind').selectOption('Legacy');
     await expect(page.locator('tbody tr[data-row]').first()).toHaveAttribute('data-row', /^legacy:/);
     await expect(row(page, 'filter')).toHaveCount(0);
@@ -102,6 +109,8 @@ test.describe('Task Registry', () => {
   test('a Legacy row opens the existing pipeline dialog (viewed only)', async ({ browser }) => {
     const page = await pageAs(browser, s);
     await page.goto('/settings/task-registry');
+    // Found by its id: the list is paged.
+    await page.getByRole('textbox', { name: 'Search tasks' }).fill(SHARED.pipelineId);
     await page.getByRole('button', { name: `Open ${SHARED.pipelineName}` }).click();
     const panel = page.getByRole('dialog', { name: SHARED.pipelineName });
     await expect(panel).toContainText(SHARED.pipelineId);
@@ -120,6 +129,7 @@ test.describe('Task Registry', () => {
     const before = await fieldsOf(request, s, key);
     const page = await pageAs(browser, s);
     await page.goto('/settings/task-registry');
+    await page.getByRole('textbox', { name: 'Search tasks' }).fill(CHECK_ID);
     await page.getByRole('button', { name: `Open ${CHECK_NAME}` }).click();
     await page.getByRole('dialog', { name: CHECK_NAME }).getByRole('button', { name: /^Edit (pipeline|registry task)$/ }).click();
     const dialog = page.locator('app-pipeline-dialog');

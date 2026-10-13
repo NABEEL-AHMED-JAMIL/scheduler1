@@ -60,7 +60,7 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
   test('the administrator designs and publishes a workflow, then starts two requests', async ({ browser }) => {
     const page = await pageAs(browser, admin);
     await page.goto('/workflows/designer');
-    await expect(page.getByRole('heading', { level: 1, name: 'Workflow designer' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Approval workflows' })).toBeVisible();
 
     await expect(page.locator('[data-workflow]').first()).toBeVisible();
     await page.locator('[data-test="new-workflow"]').click();
@@ -77,13 +77,16 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
     await panel.getByLabel('Who approves', { exact: true }).selectOption('user');
     await panel.getByRole('combobox', { name: 'Who approves: person' }).fill(person);
     await panel.getByRole('option', { name: new RegExp(person) }).first().click();
-    await expect(page.locator('[data-step="approval"]')).toContainText(person);
+    // The steps are drawn as a graph since the designer's redesign: each step a node, named with what it does.
+    const steps = page.getByRole('group', { name: 'The workflow\'s steps' });
+    await expect(steps.getByRole('button', { name: new RegExp(`^${step}, ${person}`) })).toBeVisible();
 
     // Then: tell the requester.
     await page.locator('[data-test="add-step"]').click();
     await page.locator('[data-add="notify"]').click();
     await panel.getByLabel('Message').fill('Your purchase request was approved.');
-    await expect(page.locator('[data-step]')).toHaveCount(2);
+    // Two steps, between the graph's start and its two ends.
+    await expect(steps.locator('[data-node]')).toHaveCount(5);
 
     await page.getByLabel('What changed').fill(`E2E: ${step}, then the requester is told`);
     await page.locator('[data-test="publish"]').click();
@@ -98,8 +101,9 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
 
   test('the reviewer approves one and rejects the other, with a reason', async ({ browser }) => {
     const page = await pageAs(browser, user);
-    await page.goto('/workflows/inbox');
-    await expect(page.getByRole('heading', { level: 1, name: 'Task inbox' })).toBeVisible();
+    // The Task inbox is Review › Approvals since the one Review home (UX review DR2, 2026-10-13).
+    await page.goto('/review/approvals');
+    await expect(page.getByRole('heading', { level: 1, name: 'Approvals' })).toBeVisible();
 
     const detail = page.locator('[data-test="task-detail"]');
     const row = (ref: string) => page.locator('.inbox-row', { hasText: `Purchase po-${stamp}-${ref}` });
@@ -135,19 +139,19 @@ test.describe.serial('Workflows: design, publish, submit, approve, reject (live)
 
     // The designer is not the reviewer's page.
     await page.goto('/workflows/designer');
-    await expect(page.getByRole('heading', { name: 'Workflow designer isn\'t part of your access' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Approval workflows isn\'t part of your access' })).toBeVisible();
   });
 
   test('the administrator follows both in My requests', async ({ browser }) => {
     const page = await pageAs(browser, admin);
-    await page.goto(`/workflows/requests?id=${approved}`);
+    await page.goto(`/review/requests?id=${approved}`);
     const request = page.locator('[data-test="request-detail"]');
     await expect(request).toContainText('Approved');
     await expect(request).toContainText(step);
     await expect(request).toContainText(new RegExp(`approved by ${person}`, 'i'));
     await expect(request).toContainText('Request approved');
 
-    await page.goto(`/workflows/requests?id=${rejected}`);
+    await page.goto(`/review/requests?id=${rejected}`);
     await expect(request).toContainText('Rejected');
     await expect(request).toContainText('Over the quarter\'s budget');
   });

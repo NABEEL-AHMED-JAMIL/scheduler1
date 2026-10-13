@@ -6,7 +6,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 
 /**
- * MIG-253: Documents -- the converter's Dataset → PDF and From an execution, Reports as generated outputs, and
+ * MIG-253: Documents -- the converter's PDF from a dataset and PDF from a run, Reports as generated outputs, and
  * Storage's file details, as Riverside Health's administrator, against the live media-service render (MIG-232) and
  * Core's run outputs.
  *
@@ -127,11 +127,12 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     if (s && BUCKET) await bestEffort(`delete ${BUCKET}/reports/${SAVED}.pdf`, () => deleteObject(request, s, BUCKET, `reports/${SAVED}.pdf`));
   });
 
-  test('Dataset → PDF: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
+  test('PDF from a dataset: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     await page.goto('/tools/converter');
-    await page.getByRole('button', { name: 'Dataset → PDF' }).click();
+    // The source is a pressed button in the "Choose a source" group, named as the Generated reports button is.
+    await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a dataset' }).click();
     await page.locator('#render-rows').fill('[{"region":"North","revenue":1234.5},{"region":"South","revenue":980}]');
     await expect(page.getByText('2 rows · 2 columns: region, revenue')).toBeVisible();
     await page.locator('#render-title').fill('E2E regions');
@@ -156,7 +157,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
   /** The schedule → its latest kept run → that run's kept statistics, picked in the converter. */
   async function pickKeptRun(page: Page): Promise<void> {
     await page.goto('/tools/converter');
-    await page.getByRole('button', { name: 'From an execution' }).click();
+    await page.getByRole('group', { name: 'Choose a source' }).getByRole('button', { name: 'PDF from a run' }).click();
     await page.locator('#render-schedule').fill(SCHEDULE.split(' ').slice(0, 2).join(' '));
     await page.getByRole('option', { name: new RegExp(`^${SCHEDULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click();
     await page.locator('#render-run').selectOption(String(RUN));
@@ -167,7 +168,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expect(page.getByText(`${ROWS} rows from run #${RUN}, ready to render.`)).toBeVisible();
   }
 
-  test('From an execution: the kept run\'s dataset previewed as a PDF', async ({ browser }, info) => {
+  test('PDF from a run: the kept run\'s dataset previewed as a PDF', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     await pickKeptRun(page);
@@ -179,7 +180,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await shot(page, info, 'documents-execution-preview');
   });
 
-  test('From an execution: the kept run\'s PDF saved to the workspace\'s bucket, under reports/', async ({ browser }) => {
+  test('PDF from a run: the kept run\'s PDF saved to the workspace\'s bucket, under reports/', async ({ browser }) => {
     const page = await pageAs(browser, s);
     test.skip(!(await bucketReadable(page.request)), `${BUCKET} cannot be listed (LocalStack down): saving is not checked.`);
     const renders = await recordRenders(page);
@@ -212,7 +213,9 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
     await shot(page, info, 'documents-reports');
 
-    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: `Preview ${KEPT}` }).click();
+    // A row's actions are in its ⋮ menu (UX final RP1).
+    await run.filter({ hasText: `Kept by run #${RUN}` }).getByRole('button', { name: `Actions for ${KEPT}` }).click();
+    await page.getByRole('menuitem', { name: 'Preview' }).click();
     expect((await nextRender(renders, 0)).status).toBe('SUCCESS');
     const dialog = page.getByRole('dialog', { name: `Preview of ${KEPT}` });
     await expect(dialog.locator('canvas').first()).toBeVisible();

@@ -30,7 +30,7 @@ async function confirmedConversation(request: APIRequestContext, s: Session): Pr
     for (const m of messages) {
       const run = (m.links ?? []).find((l: { kind: string; jobQueueId?: number }) => l.kind === 'execution' && l.jobQueueId);
       if (run && messages.some((x: { card?: { tool?: string; state?: string } }) => x.card?.tool === 'run_pipeline' && x.card?.state === 'confirmed')) {
-        return { id: c.conversationId, href: `/pipelines/schedules/${run.jobId}/runs/${run.jobQueueId}/logs` };
+        return { id: c.conversationId, href: `/pipelines/schedules/${run.jobId}/runs/${run.jobQueueId}` };
       }
     }
   }
@@ -165,10 +165,11 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
     await expect(page.getByRole('heading', { name: 'AI Assistant', exact: true })).toBeVisible();
     await ask(page, QUESTION());
 
-    // Waiting: the question shows, and the working line with a way to stop waiting.
-    await expect(page.locator('[data-working]')).toContainText('Working with approved tools');
-    await expect(page.getByRole('button', { name: 'Stop waiting' })).toBeVisible();
-    expect(fake.sends[0]).toEqual({ message: QUESTION() });
+    // Waiting: the question shows, and the working line with a way to stop. The send is the async one (AI workflow
+    // review): the server answers with the run, and the page follows it.
+    await expect(page.locator('[data-working]')).toContainText('Starting…');
+    await expect(page.locator('[data-working]').getByRole('button', { name: 'Stop', exact: true })).toBeVisible();
+    expect(fake.sends[0]).toEqual({ message: QUESTION(), async: true });
 
     // The card: nothing ran yet.
     const card = page.locator('[data-card]');
@@ -179,10 +180,13 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
     await expect(card.getByRole('button', { name: 'Cancel' })).toBeEnabled();
     expect(fake.decisions).toEqual([]);
 
-    // The run's calls opened with the answer: the blocked one is shown as blocked, with why.
+    // The run's calls, in the Result's Tool calls tab: the blocked one is shown as blocked, with why.
+    await page.getByRole('tab', { name: 'Tool calls' }).click();
     const blocked = page.locator('[data-call="join_data"]');
     await expect(blocked).toHaveAttribute('data-outcome', 'blocked');
     await expect(blocked).toContainText('Blocked');
+    // A call opens on a click to say why, with its arguments.
+    await blocked.getByRole('button').click();
     await expect(blocked).toContainText('join_data is not available');
     await expect(page.locator('[data-call="run_pipeline"]')).toContainText('Waiting for you');
     await expect(page).toHaveURL(/\/ai\/assistant\?c=990001/);
@@ -191,22 +195,22 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
     await card.getByRole('button', { name: 'Run pipeline' }).click();
     await expect(page.locator('[data-working]')).toContainText('Carrying out your decision');
     await expect(page.locator('[data-card]')).toHaveAttribute('data-state', 'confirmed');
-    expect(fake.decisions).toEqual([{ actionId: ACTION, approve: true }]);
+    expect(fake.decisions).toEqual([{ actionId: ACTION, approve: true, async: true }]);
     await expect(page.locator('[data-card]').getByRole('button')).toHaveCount(0);
 
-    // The result: the execution (the MIG-251 run page) and where the report lands.
+    // The result: the run, followed live (run-follow), and where the report lands. Run links open the run on its Steps.
     const execution = page.locator('[data-link="execution"]');
     await expect(execution).toContainText(F.jobName);
     await expect(execution).toContainText(`run #${F.run}`);
-    await expect(execution.getByRole('link', { name: 'Open execution' })).toHaveAttribute('href', `/pipelines/schedules/${F.jobId}/runs/${F.run}/logs`);
+    await expect(execution.getByRole('link', { name: 'Open the run' })).toHaveAttribute('href', `/pipelines/schedules/${F.jobId}/runs/${F.run}`);
     await expect(page.locator('[data-link="output"]').getByRole('link', { name: 'Open report files' }))
       .toHaveAttribute('href', new RegExp(`/data/files\\?bucket=${F.bucket}&prefix=runs%2F${F.run}%2F`));
     await expect(page.locator('[data-role="assistant"] pre').last()).toHaveText(`jobId: ${F.jobId}`);
     await expect(page.locator('[data-call="run_pipeline"]')).toHaveAttribute('data-outcome', 'confirmed');
     await shot(page, info, 'assistant-result-1440');
 
-    await execution.getByRole('link', { name: 'Open execution' }).click();
-    await expect(page).toHaveURL(new RegExp(`/pipelines/schedules/${F.jobId}/runs/${F.run}/logs`));
+    await execution.getByRole('link', { name: 'Open the run' }).click();
+    await expect(page).toHaveURL(new RegExp(`/pipelines/schedules/${F.jobId}/runs/${F.run}$`));
     await page.context().close();
   });
 
@@ -219,20 +223,21 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
     await expect(card).toHaveAttribute('data-state', 'pending');
     await card.getByRole('button', { name: 'Cancel' }).click();
     await expect(card).toHaveAttribute('data-state', 'declined');
-    expect(fake.decisions).toEqual([{ actionId: ACTION, approve: false }]);
+    expect(fake.decisions).toEqual([{ actionId: ACTION, approve: false, async: true }]);
     await expect(page.locator('[data-link]')).toHaveCount(0);
     await expect(page.getByText('Understood, nothing was run.')).toBeVisible();
     await page.context().close();
   });
 
-  test('Stop waiting stops waiting, and the composer is free again', async ({ browser }) => {
+  test('Stop stops waiting, and the composer is free again', async ({ browser }) => {
     const page = await pageAs(browser, s);
     const fake = await fakeAssistant(page, { hold: true });
     await page.goto('/ai/assistant');
     await ask(page, 'Which pipeline jobs do I have?');
     await expect(page.locator('[data-waiting]')).toContainText('Which pipeline jobs do I have?');
-    await page.getByRole('button', { name: 'Stop waiting' }).click();
-    await expect(page.locator('[data-stopped]')).toContainText('Stopped waiting');
+    // The answer has not named its run yet, so Stop only stops waiting: nothing to cancel on the server.
+    await page.locator('[data-working]').getByRole('button', { name: 'Stop', exact: true }).click();
+    await expect(page.locator('[data-stopped]')).toContainText('Stopped.');
     await expect(page.locator('[data-working]')).toHaveCount(0);
     await composer(page).fill('Another question');
     await expect(page.getByRole('button', { name: 'Send', exact: true })).toBeEnabled();
@@ -266,11 +271,13 @@ test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
     const writes = forbidWrites(page);
     await page.goto(`/ai/assistant?c=${found!.id}`);
     await expect(page.locator('[data-card]').first()).toHaveAttribute('data-state', 'confirmed');
-    await expect(page.locator('[data-link="execution"]').getByRole('link', { name: 'Open execution' }).first())
+    await expect(page.locator('[data-link="execution"]').getByRole('link', { name: 'Open the run' }).first())
       .toHaveAttribute('href', found!.href);
-    await page.getByRole('button', { name: 'Show tool calls' }).click();
+    // The Result's tabs: Tool calls, then Context.
+    await page.getByRole('tab', { name: 'Tool calls' }).click();
     await expect(page.locator('[data-call="get_jobs"]')).toHaveAttribute('data-outcome', 'allowed');
     await expect(page.locator('[data-call="run_pipeline"]')).toHaveAttribute('data-outcome', 'confirmed');
+    await page.getByRole('tab', { name: 'Context' }).click();
     await expect(page.locator('[data-context]')).toContainText('Tools allowed');
     await expect(page.locator('[data-blocked]')).toContainText('transform_data');
     await shot(page, info, 'assistant-live-1440');

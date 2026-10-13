@@ -113,7 +113,8 @@ test.describe('Step builder', () => {
     await panel.locator('#cfg-columns').fill('["patient"]');
     await panel.getByRole('button', { name: 'Apply' }).click();
     await expect.poll(() => cards(page)).toEqual(['read', 'keep', 'extra']);
-    await expect(page.getByText('Unsaved changes', { exact: true })).toBeVisible();
+    // The one save bar names what changed (B2): "Unsaved changes to the steps".
+    await expect(page.getByText(/Unsaved changes to the steps/).first()).toBeVisible();
 
     // Reorder: a button, then a drag by the handle, then a button back.
     await page.getByRole('button', { name: 'Move extra up' }).click();
@@ -229,23 +230,26 @@ test.describe('Step builder', () => {
     await expect(drawer.locator('.run-log')).toContainText('2 sample row(s).');
   });
 
-  test('a workspace administrator switches a task off and back to its default', async ({ browser, request }) => {
+  test('a task the administrator switches off cannot be added to a pipeline', async ({ browser, request }) => {
+    // The workspace's task switches are on the Task Registry's rows since the editor became one page (B2: P7, P8).
     const page = await pageAs(browser, s);
-    await page.goto(`/pipelines/${TASK}/edit?tab=settings`);
-    const row = page.locator('[data-task="aggregate"]');
+    await page.goto('/settings/task-registry');
+    await page.getByRole('textbox', { name: 'Search tasks' }).fill('aggregate');
+    const row = page.locator('[data-switch="aggregate"]');
     await expect(row).toContainText('On');
-    // An unavailable task cannot be switched on: write_database waits for an owner decision (integration connections are read-only).
-    await expect(page.locator('[data-task="write_database"] input[role="switch"]')).toBeDisabled();
-    await row.getByRole('switch').uncheck();
-    await expect(row).toContainText('Switched off in this workspace.');
-    await page.getByRole('tab', { name: 'Steps' }).click();
-    await page.locator('#addStep').click();
-    await page.locator('#addStep').fill('aggregate');
-    await expect(page.getByRole('option', { name: /^Aggregate \(disabled\)/ })).toHaveAttribute('aria-disabled', 'true');
-    await page.keyboard.press('Escape');
-    await page.getByRole('tab', { name: 'Settings' }).click();
-    await row.getByRole('button', { name: 'Put Aggregate back to its default' }).click();
-    await expect(row).not.toContainText('Switched here');
+    try {
+      await row.getByRole('switch').uncheck();
+      await expect(row).toContainText('Switched here');
+      await page.goto(`/pipelines/${TASK}/edit`);
+      await page.getByRole('tab', { name: 'Steps' }).click();
+      await page.locator('#addStep').click();
+      await page.locator('#addStep').fill('aggregate');
+      await expect(page.getByRole('option', { name: /^Aggregate \(disabled\)/ })).toHaveAttribute('aria-disabled', 'true');
+      await page.keyboard.press('Escape');
+    } finally {
+      // Back to its default whatever happened above: another spec's pipeline may need it.
+      await request.post(`${api}/pipeline.json/steps/tasks/enabled`, { headers: authOf(s), data: { code: 'aggregate', enabled: null } });
+    }
     const line = (await (await request.get(`${api}/pipeline.json/steps/tasks`, { headers: authOf(s) })).json())
       .data.find((t: { code: string }) => t.code === 'aggregate');
     expect(line).toMatchObject({ enabled: true, overridden: false });
@@ -255,7 +259,9 @@ test.describe('Step builder', () => {
     const page = await pageAs(browser, s);
     await page.goto(`/pipelines/${LEGACY_TASK}/edit`);
     await expect(page.locator('#payload, #taskName').first()).toBeVisible();
-    await expect(page.getByRole('tab', { name: 'Steps' })).toHaveCount(0);
+    // B2: a legacy pipeline opens on its Details, the step builder's tabs beside it but not opened.
+    await expect(page.getByRole('tab', { name: 'Details' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Steps' })).toHaveAttribute('aria-selected', 'false');
     await expect(page.locator('app-step-builder')).toHaveCount(0);
   });
 });

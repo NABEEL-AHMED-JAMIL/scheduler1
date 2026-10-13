@@ -71,7 +71,16 @@ async function ensureBoards(request: APIRequestContext, s: Session, connection: 
   for (const [kind, source] of KINDS) {
     const name = `${BOARD} — ${kind}`;
     const found = boards.find(b => b.dashboardName === name)?.analyticsDashboardId;
-    if (found) { ids[kind] = found; continue; }
+    if (found) {
+      // A board kept from an earlier run is the suite's, but its tile can have been redrawn as another kind since (by hand,
+      // through Show as: chord's was a stacked bar on 2026-10-13): put the kind back, or the test checks the wrong chart.
+      const widgets: { widgetTitle: string; visualizationType: string }[] = (await (await request.get(
+        `${api}/analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=${found}`, { headers: authOf(s) })).json()).data?.widgets ?? [];
+      const tile = widgets.find(w => w.widgetTitle === `Events — ${kind}`);
+      if (tile && tile.visualizationType !== kind) await post(request, s, 'saveWidget', { ...tile, visualizationType: kind });
+      ids[kind] = found;
+      continue;
+    }
     const id = (await post(request, s, 'saveDashboard', { dashboardName: name, dashboardDescription: 'One ECharts tile, to click (made by the e2e suite)' })).analyticsDashboardId;
     await post(request, s, 'saveWidget', { analyticsDashboardId: id, analyticsAnalysisId: await analysisOf(source), widgetTitle: `Events — ${kind}`,
       visualizationType: kind, displayOrder: 0 });

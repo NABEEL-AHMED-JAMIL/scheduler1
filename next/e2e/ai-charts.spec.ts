@@ -66,7 +66,9 @@ async function tableRows(page: Page): Promise<string[][]> {
     rows.map(r => Array.from(r.querySelectorAll('td')).map(td => (td.textContent ?? '').trim())));
 }
 
-const round = (v: string | number | null | undefined, places = 2) => Number(Number(v).toFixed(places));
+/** A figure as a number: the answer's table groups thousands ("698,758.58"), the direct query does not. */
+const round = (v: string | number | null | undefined, places = 2) =>
+  Number(Number(typeof v === 'string' ? v.replace(/,/g, '') : v).toFixed(places));
 
 /**
  * Every figure a correct answer could hold, per group, from a query of our own: the group's rows, and for each value of
@@ -181,7 +183,8 @@ test.describe('MIG-357: charts for analytics questions', () => {
     const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
     await page.goto('/ai/assistant');
     await page.locator('textarea[aria-label="Message the assistant"]').fill('Show me the no-show rate by weekday as a chart.');
-    await page.getByRole('button', { name: 'Send' }).click();
+    // Exact: the conversation list beside the composer has questions with "send" in their names.
+    await page.getByRole('button', { name: 'Send', exact: true }).click();
     await expect(page.locator('[data-tab="chart"]')).toBeVisible({ timeout: ANSWER_MS });
     await page.locator('[data-tab="chart"]').click();
     await expect(page.locator('[data-test="chart-answer"]')).toBeVisible({ timeout: 30_000 });
@@ -202,7 +205,9 @@ test.describe('MIG-357: charts for analytics questions', () => {
     await page.keyboard.press('Escape');
 
     const readmission = pipeline('readmission');
-    await page.goto(`/pipelines/schedules/${readmission.jobId}/runs/${readmission.run!.jobQueueId}/logs`);
+    // The run's files are the run page's Outputs tab now, beside Steps, Map and Log.
+    await page.goto(`/pipelines/schedules/${readmission.jobId}/runs/${readmission.run!.jobQueueId}`);
+    await page.getByRole('tab', { name: /^Outputs/ }).click();
     const output = page.locator('.exec-file [data-test="visualise"]').first();
     await expect(output).toBeVisible({ timeout: 30_000 });
     await output.click();

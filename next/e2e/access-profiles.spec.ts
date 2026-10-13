@@ -84,7 +84,7 @@ test.describe('access profiles', () => {
     // --- the admin, in the browser: create a Reports-only profile
     const adminPage = await pageAs(browser, adminSession);
     await adminPage.goto('/administration/access-profiles');
-    await expect(adminPage.getByRole('heading', { name: 'Access profiles' })).toBeVisible();
+    await expect(adminPage.getByRole('heading', { level: 1, name: 'Page access' })).toBeVisible();
     // The dialog takes the page catalogue the screen fetched; opened before it lands, it lists "0 of 0" pages.
     await expect(adminPage.locator('app-stat-tile', { hasText: 'can be granted or withheld' })).toContainText(/Pages\s*[1-9]/);
     await adminPage.getByTestId('new-profile').click();
@@ -126,11 +126,13 @@ test.describe('access profiles', () => {
 
     const memberPage = await pageAs(browser, memberSession);
     await memberPage.goto('/dashboard');
-    const nav = memberPage.locator('nav, header').first();
-    // MIG-246: Operations is Pipelines, Tools and Object Browser are Documents, Assistants is AI.
-    await expect(nav.getByRole('button', { name: 'Pipelines', exact: true })).toBeVisible();
-    await expect(nav.getByRole('button', { name: 'Documents', exact: true })).toHaveCount(0);
-    await expect(nav.getByRole('button', { name: 'AI', exact: true })).toHaveCount(0);
+    // The menu tree (2026-10-12): Run analytics is Runs › Analytics, under Run & review; the sections the profile holds
+    // nothing in are not offered.
+    // Sidebar or top bar, whichever this width draws.
+    const nav = memberPage.getByRole('complementary', { name: 'Main menu' }).or(memberPage.getByRole('navigation', { name: 'Main menu' })).filter({ visible: true }).first();
+    await expect(nav.getByText('Run & review', { exact: true })).toBeVisible();
+    await expect(nav.getByText('Get data in', { exact: true })).toHaveCount(0);
+    await expect(nav.getByText('Build', { exact: true })).toHaveCount(0);
 
     // A direct URL to a withheld page lands on the access page, naming it, with a way to ask.
     await memberPage.goto('/objects/analytics');
@@ -141,7 +143,7 @@ test.describe('access profiles', () => {
 
     // The page they do hold opens -- at its old address too (MIG-246 redirect).
     await memberPage.goto('/operations/reports');
-    await expect(memberPage).toHaveURL(/\/pipelines\/run-analytics$/);
+    await expect(memberPage).toHaveURL(/\/runs\/analytics$/);
 
     // And the server refuses the API behind a withheld page, whatever the browser shows.
     const refused = await request.get(`${api}/analytics.json/listQueries`, {

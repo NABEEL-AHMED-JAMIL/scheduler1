@@ -65,7 +65,8 @@ test.describe('Inbox (live storage-service)', () => {
   test('shows the configured inbox, its limit and its arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
     await page.goto('/documents/file-drop');
-    await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
+    // The inbox is Documents › File drop since the tab hubs (2026-10-12).
+    await expect(page.getByRole('heading', { name: 'File drop', level: 1 })).toBeVisible();
     await expect(page.getByText(label).first()).toBeVisible();
     await expect(page.getByText(/Up to \d+ MB a file/).first()).toBeVisible();
     // The newest arrival the service reports, whatever put it there: a fixed name (live-customers.csv) fell off the
@@ -111,9 +112,9 @@ test.describe('Inbox (live storage-service)', () => {
     const page = await signedIn(browser, request);
     const writes = settingsWrites(page);
     await page.goto('/documents/file-drop');
-    await page.getByRole('button', { name: 'Inbox settings' }).click();
+    await page.getByRole('region', { name: 'Settings' }).getByRole('button', { name: 'Change' }).click();
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('heading', { name: 'Inbox settings' })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'File drop settings' })).toBeVisible();
     await expect(dialog.getByLabel(/Storage connection/)).toHaveValue(riverside().storageAlias);
     await expect(dialog.getByRole('button', { name: 'Turn off' })).toBeVisible();
     await shot(page, info, 'inbox-settings');
