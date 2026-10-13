@@ -64,7 +64,7 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
     await click(v, /^Actions for /);
     const items = overlay().items.join(' | ');
     expect(v.main.querySelector('[data-managed-banner]')?.textContent).toContain('You can still run them.');
-    for (const kept of ['Run now', 'Run with a different AI model…', 'Edit', 'Executions', 'Ask about this job']) expect(items).toContain(kept);
+    for (const kept of ['Run now', 'Run with a different AI model…', 'Edit', 'Executions', 'Ask about this schedule']) expect(items).toContain(kept);
     for (const gone of ['Skip next run', 'Duplicate', 'Email notifications', 'Deactivate', 'Delete']) {
       expect(items, gone).not.toContain(gone);
     }
@@ -115,6 +115,18 @@ describe('MIG-254: build screens in a MANAGED workspace', () => {
     restoreClock();
     const staff = await visit('/ai/assistant', 'TENANT_ADMIN', null, {}, STAFF);
     expect(staff.surface.requests).not.toContain('GET /appUser.json/me');
+  });
+
+  // UX final MG1: Create pipeline is a build action -- Core refuses its saves in a MANAGED workspace with the same
+  // sentence -- so the assistant carries the build screens' banner, and offers Create pipeline only where one may build.
+  it('the AI Assistant shows the managed banner in a MANAGED workspace, and none in a SELF one or a staff session', async () => {
+    const managed = await visit('/ai/assistant', 'TENANT_ADMIN', null, {}, MANAGED);
+    expect(hasBanner(managed)).toBe(true);
+    expect(managed.main.querySelector('[data-managed-banner]')!.textContent).toContain('pipelines');
+    restoreClock();
+    expect(hasBanner(await visit('/ai/assistant', 'TENANT_ADMIN', null))).toBe(false);
+    restoreClock();
+    expect(hasBanner(await visit('/ai/assistant', 'TENANT_ADMIN', null, {}, STAFF))).toBe(false);
   });
 
   it('the inbox keeps its uploads and loses its settings', async () => {

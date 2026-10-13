@@ -87,7 +87,7 @@ function screenWith(setup: Setup = {}) {
       { provide: Dialog, useValue: { open: vi.fn(() => ({ closed: of(true) })) } },
       { provide: ToastService, useValue: toast },
       { provide: JobEventsService, useValue: { events: new Subject<JobEvent>().asObservable(), connected: signal(true) } },
-      { provide: AuthService, useValue: { isManagedSession: () => false, canManageAgents: () => admin, isTenantAdmin: () => admin, displayName: () => 'Test Admin',
+      { provide: AuthService, useValue: { isManagedSession: () => false, canManageAgents: () => admin, isTenantAdmin: () => admin, canBuild: () => admin, builderLocked: () => false, displayName: () => 'Test Admin',
         role: () => (admin ? 'TENANT_ADMIN' : 'TENANT_USER'), user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
@@ -322,5 +322,18 @@ describe('AI Assistant -- a design handed over from New pipeline (UX review 2026
     expect(screen.draft()).toBe('Read the daily admissions file, flag readmissions within 30 days');
     expect(api.sendAsync).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith([], expect.objectContaining({ queryParams: { prompt: null }, replaceUrl: true }));
+  });
+});
+
+// UX final MG1: Create pipeline goes where a person may build -- canBuild, not only the administrator role.
+describe('Create pipeline in a MANAGED workspace (UX final MG1)', () => {
+  it('is offered from canBuild, which a MANAGED workspace\'s own administrator does not have', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const ts = fs.readFileSync(`${root}/src/app/features/ai/assistant/assistant.ts`, 'utf8');
+    const html = fs.readFileSync(`${root}/src/app/features/ai/assistant/assistant.html`, 'utf8');
+    expect(ts).toContain('readonly canCreatePipelines = computed(() => this.auth.canBuild());');
+    expect(html).toContain('[canCreate]="canCreatePipelines()"');
+    expect(html).toContain('<app-managed-banner what="pipelines"');
   });
 });

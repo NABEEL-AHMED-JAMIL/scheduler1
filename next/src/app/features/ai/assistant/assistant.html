@@ -38,6 +38,9 @@
   </app-page-header>
 
   <app-model-setup-banner what="The assistant" />
+  <!-- UX final MG1: Create pipeline is a build action, so a MANAGED workspace sees the same notice the build screens
+       show (and no Create pipeline); asking, and drawing a flow, still work. -->
+  <app-managed-banner what="pipelines" still="You can still ask about runs, sources and files, and draw a pipeline here." />
 
   <div class="ai-grid">
 
@@ -355,7 +358,7 @@
       <div class="flex-1 min-h-0 overflow-y-auto p-3.5">
         @switch (tab()) {
           @case ('flow') {
-            <app-flow-panel class="block h-full" [flow]="flow()" [canCreate]="canEditPipelines()" />
+            <app-flow-panel class="block h-full" [flow]="flow()" [canCreate]="canCreatePipelines()" />
           }
           @case ('chart') {
             <!-- MIG-357: the chart_data tool's answer, drawn with the dashboards' chart engine; loaded only when shown. -->

@@ -1,5 +1,6 @@
 import { ConversationRow, titleOf } from './conversation.model';
 import { ModelSetupBanner } from '../model-setup-banner';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
@@ -74,7 +75,7 @@ export const PROGRESS_MS = [1000, 2000] as const;
  */
 @Component({
   selector: 'app-assistant',
-  imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, RunFollow,
+  imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, ManagedBanner, RunFollow,
     FlowPanel, TracePanel, ChartAnswerSlot, ConversationList],
   templateUrl: './assistant.html',
   // Escape closes the history laid over the thread, as it closes a side panel.
@@ -168,6 +169,12 @@ export class Assistant implements OnInit {
   readonly canPickModel = computed(() => this.auth.canManageAgents());
   /** Create pipeline and the step builder are a workspace administrator's (Core's save endpoints are theirs). */
   readonly canEditPipelines = computed(() => this.auth.isTenantAdmin());
+  /**
+   * UX final MG1: Create pipeline is a build action. In a MANAGED workspace Core refuses its saves (pipeline.json/save,
+   * sourceTask.json/addSourceTask, sourceJob.json/addSourceJob are @BuilderAction) with ManagementMode's refusal, so it
+   * is not offered -- as New pipeline is not on the other build screens -- and the managed banner says why.
+   */
+  readonly canCreatePipelines = computed(() => this.auth.canBuild());
   readonly connections = signal<Connection[]>([]);
   readonly connectionOptions = computed(() => this.connections().filter(c => (c.status ?? 'Active') === 'Active'));
   /** The picked connection; null is the workspace default, which the server chooses. */
