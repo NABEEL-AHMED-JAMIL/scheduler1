@@ -41,7 +41,13 @@ export const PINNED: Record<string, unknown> = {
       "Choose a workspace…",
       "Workspace"
     ],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ]
   },
   "access profiles, as a workspace administrator": {
     "url": "/administration/access-profiles",
@@ -50,7 +56,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /pageAccess.json/pages",
-      "GET /pageAccess.json/listProfiles"
+      "GET /pageAccess.json/listProfiles",
+      "GET /managedService.json/actions?limit=1"
     ],
     "headings": [
       "Page access",
@@ -76,7 +83,13 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ]
   },
   "access profiles: the people x pages grid": {
     "requests": [
@@ -116,7 +129,13 @@ export const PINNED: Record<string, unknown> = {
       "Source Jobs for Casey Baseline",
       "Source Tasks for Casey Baseline"
     ],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ]
   },
   "an access profile's row menu": {
     "headings": [],
@@ -135,7 +154,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "tenants, as a platform administrator": {
-    "url": "/administration/tenants",
+    "url": "/platform/workspaces",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -188,7 +207,18 @@ export const PINNED: Record<string, unknown> = {
       "Search name or code",
       "Search workspaces"
     ],
-    "links": []
+    "links": [
+      "/platform",
+      "/platform/billing-analytics",
+      "/platform/engine",
+      "/platform/managed-service",
+      "/platform/rate-cards",
+      "/platform/reliability",
+      "/platform/requests",
+      "/platform/staff-activity",
+      "/platform/work-in-workspace",
+      "/platform/workspaces"
+    ]
   },
   "tenants, as a workspace administrator": {
     "url": "/unauthorized",

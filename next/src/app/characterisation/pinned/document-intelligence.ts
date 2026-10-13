@@ -209,7 +209,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the dataset, as a workspace administrator": {
-    "url": "/documents/intelligence?tab=dataset",
+    "url": "/documents/datasets",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -219,18 +219,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentExtraction.json/dataset?documentTypeId=1001&page=0&size=50"
     ],
     "headings": [
-      "Documents in",
+      "Datasets",
       "Dataset (1 of 1)"
     ],
     "buttons": [
       "CSV",
       "Columns",
-      "Dataset",
-      "Document types",
-      "Intake",
       "JSON Lines",
       "More actions",
-      "Overview",
       "Refresh",
       "Upload documents"
     ],
@@ -249,11 +245,17 @@ export const PINNED: Record<string, unknown> = {
       "Document type"
     ],
     "links": [
-      "/documents/review/1000"
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/review/1000",
+      "/documents/types"
     ]
   },
   "the document types, as a workspace administrator": {
-    "url": "/documents/intelligence?tab=types",
+    "url": "/documents/types",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -267,12 +269,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
-      "Dataset",
-      "Document types",
-      "Intake",
       "Invoice",
       "More actions",
-      "Overview",
       "Purchase order",
       "Refresh",
       "Upload documents"
@@ -290,10 +288,17 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": []
+    "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types"
+    ]
   },
   "the overview, as a tenant user with the page": {
-    "url": "/documents/intelligence",
+    "url": "/documents/in",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -309,12 +314,8 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for ocr-live-check.png",
       "Columns",
-      "Dataset",
-      "Document types",
-      "Intake",
       "Invoice: 4 fields, 0 documents",
       "More actions",
-      "Overview",
       "Purchase order: 4 fields, 1 document",
       "Refresh",
       "Upload documents"
@@ -336,9 +337,15 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
       "/documents/review",
       "/documents/review/1000",
-      "/documents/review/1005"
+      "/documents/review/1005",
+      "/documents/types"
     ]
   },
   "the overview, as a tenant user without the page": {
@@ -360,7 +367,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the overview, as a workspace administrator": {
-    "url": "/documents/intelligence",
+    "url": "/documents/in",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -378,12 +385,8 @@ export const PINNED: Record<string, unknown> = {
       "Actions for ocr-live-check.png",
       "Columns",
       "Custom type",
-      "Dataset",
-      "Document types",
-      "Intake",
       "Invoice: 4 fields, 0 documents",
       "More actions",
-      "Overview",
       "Purchase order: 4 fields, 1 document",
       "Refresh",
       "Upload documents"
@@ -405,9 +408,15 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
       "/documents/review",
       "/documents/review/1000",
-      "/documents/review/1005"
+      "/documents/review/1005",
+      "/documents/types"
     ]
   },
   "the review queue, as a tenant user without the page": {

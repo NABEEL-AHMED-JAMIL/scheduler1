@@ -39,7 +39,14 @@ export const PINNED: Record<string, unknown> = {
       "Filter the files and folders listed here",
       "Filter this folder"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   },
   "Analytics Studio, as a tenant user with every page": {
     "url": "/data/analytics",
@@ -70,8 +77,12 @@ export const PINNED: Record<string, unknown> = {
       "Filter this folder"
     ],
     "links": [
+      "/data",
+      "/data/analytics",
       "/data/analytics/dashboards",
-      "/data/catalog"
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
     ]
   },
   "Analytics Studio, as a workspace administrator": {
@@ -104,8 +115,13 @@ export const PINNED: Record<string, unknown> = {
       "Filter this folder"
     ],
     "links": [
+      "/data",
+      "/data/analytics",
       "/data/analytics/dashboards",
-      "/data/catalog"
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
     ]
   },
   "a dashboard, opened": {

@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "no inbox yet, as a tenant user": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -18,10 +18,12 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [],
-    "links": []
+    "links": [
+      "/documents"
+    ]
   },
   "no inbox yet, as a workspace administrator": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -40,10 +42,17 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [],
-    "links": []
+    "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types"
+    ]
   },
   "the inbox, as a tenant user with the page": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -76,6 +85,7 @@ export const PINNED: Record<string, unknown> = {
       "Choose files"
     ],
     "links": [
+      "/documents",
       "/pipelines/schedules"
     ]
   },
@@ -98,7 +108,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the inbox, as a workspace administrator": {
-    "url": "/documents/inbox",
+    "url": "/documents/file-drop",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -133,6 +143,12 @@ export const PINNED: Record<string, unknown> = {
       "Choose files"
     ],
     "links": [
+      "/documents",
+      "/documents/datasets",
+      "/documents/email-in",
+      "/documents/file-drop",
+      "/documents/in",
+      "/documents/types",
       "/pipelines/schedules"
     ]
   },

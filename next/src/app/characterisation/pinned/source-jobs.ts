@@ -51,8 +51,12 @@ export const PINNED: Record<string, unknown> = {
       "Select all jobs on this page"
     ],
     "links": [
-      "/documents/files?bucket=etl-bucket&prefix=",
+      "/data/files?bucket=etl-bucket&prefix=",
+      "/pipelines",
       "/pipelines/1854/edit",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/schedules",
       "/pipelines/schedules/2833/executions",
       "/pipelines/schedules/bulk",
       "/pipelines/schedules/new"
@@ -118,9 +122,10 @@ export const PINNED: Record<string, unknown> = {
       "Search runs"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/1854/edit",
       "/pipelines/schedules",
-      "/pipelines/schedules/2833/runs/7331/logs"
+      "/pipelines/schedules/2833/runs/7331"
     ]
   },
   "a new job": {
@@ -173,6 +178,7 @@ export const PINNED: Record<string, unknown> = {
       "Start time, minute"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/schedules"
     ]
   },
@@ -243,6 +249,7 @@ export const PINNED: Record<string, unknown> = {
       "Choose a file"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/schedules"
     ]
   },
@@ -288,11 +295,12 @@ export const PINNED: Record<string, unknown> = {
       "Search pipelines…"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/schedules"
     ]
   },
   "every job's run history": {
-    "url": "/pipelines/executions",
+    "url": "/runs/latest",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -331,12 +339,14 @@ export const PINNED: Record<string, unknown> = {
       "Search runs"
     ],
     "links": [
-      "/pipelines/executions",
-      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
-      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2835/runs/7381",
       "/pipelines/schedules/2838/executions",
-      "/pipelines/schedules/2838/runs/7382/logs"
+      "/pipelines/schedules/2838/runs/7382",
+      "/runs",
+      "/runs/analytics",
+      "/runs/by-date",
+      "/runs/latest"
     ]
   },
   "the job assistant": {
@@ -370,6 +380,7 @@ export const PINNED: Record<string, unknown> = {
       "Ask with a saved prompt"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/schedules",
       "/pipelines/schedules/2833/executions"
     ]
@@ -420,6 +431,9 @@ export const PINNED: Record<string, unknown> = {
       "Select all jobs on this page"
     ],
     "links": [
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/schedules",
       "/pipelines/schedules/bulk",
       "/pipelines/schedules/new"
     ]
@@ -472,6 +486,10 @@ export const PINNED: Record<string, unknown> = {
       "Select all jobs on this page"
     ],
     "links": [
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/schedules",
       "/pipelines/schedules/bulk",
       "/pipelines/schedules/new"
     ]

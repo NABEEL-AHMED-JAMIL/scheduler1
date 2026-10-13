@@ -17,7 +17,13 @@ export const PINNED: Record<string, unknown> = {
       "Workspace",
       "Workspace whose data policy to read"
     ],
-    "links": [],
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users"
+    ],
     "page": {
       "state": "",
       "levels": [],
@@ -71,7 +77,9 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": [],
+    "links": [
+      "/administration"
+    ],
     "page": {
       "state": "Not saved yet — these are the defaults They are what runs today: public and internal data may go to any model and the AI Assistant's write tools may act on it; sensitive data stays on local models and",
       "levels": [
@@ -232,7 +240,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/dataPolicy",
       "GET /aiConnection.json/list",
       "GET /sourceJob.json/review/policy",
-      "GET /documentReview.json/policy"
+      "GET /documentReview.json/policy",
+      "GET /managedService.json/actions?limit=1"
     ],
     "headings": [
       "Data policies",
@@ -277,7 +286,12 @@ export const PINNED: Record<string, unknown> = {
       "qwen3:8b"
     ],
     "links": [
-      "/ai/connections"
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/users",
+      "/settings/model-connections"
     ],
     "page": {
       "state": "Not saved yet — these are the defaults They are what runs today: public and internal data may go to any model and the AI Assistant's write tools may act on it; sensitive data stays on local models and",

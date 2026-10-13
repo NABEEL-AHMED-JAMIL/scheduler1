@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "reports, as a tenant user with five pages": {
-    "url": "/pipelines/run-analytics",
+    "url": "/runs/analytics",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -101,10 +101,15 @@ export const PINNED: Record<string, unknown> = {
       "Task",
       "To"
     ],
-    "links": []
+    "links": [
+      "/runs",
+      "/runs/analytics",
+      "/runs/by-date",
+      "/runs/latest"
+    ]
   },
   "reports, as a workspace administrator": {
-    "url": "/pipelines/run-analytics",
+    "url": "/runs/analytics",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -207,7 +212,11 @@ export const PINNED: Record<string, unknown> = {
       "To"
     ],
     "links": [
-      "/billing/usage"
+      "/billing/usage",
+      "/runs",
+      "/runs/analytics",
+      "/runs/by-date",
+      "/runs/latest"
     ]
   },
   "the queue's charts": {
@@ -259,16 +268,18 @@ export const PINNED: Record<string, unknown> = {
       "Search schedule, run or message"
     ],
     "links": [
-      "/pipelines/executions",
-      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
-      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2835/runs/7381",
       "/pipelines/schedules/2838/executions",
-      "/pipelines/schedules/2838/runs/7382/logs"
+      "/pipelines/schedules/2838/runs/7382",
+      "/runs",
+      "/runs/analytics",
+      "/runs/by-date",
+      "/runs/latest"
     ]
   },
   "the queue, as a tenant user with five pages": {
-    "url": "/pipelines/queue",
+    "url": "/runs/by-date",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -307,16 +318,18 @@ export const PINNED: Record<string, unknown> = {
       "Search schedule, run or message"
     ],
     "links": [
-      "/pipelines/executions",
-      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
-      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2835/runs/7381",
       "/pipelines/schedules/2838/executions",
-      "/pipelines/schedules/2838/runs/7382/logs"
+      "/pipelines/schedules/2838/runs/7382",
+      "/runs",
+      "/runs/analytics",
+      "/runs/by-date",
+      "/runs/latest"
     ]
   },
   "the queue, as a workspace administrator": {
-    "url": "/pipelines/queue",
+    "url": "/runs/by-date",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -356,12 +369,14 @@ export const PINNED: Record<string, unknown> = {
       "Search schedule, run or message"
     ],
     "links": [
-      "/pipelines/executions",
-      "/pipelines/queue",
       "/pipelines/schedules/2835/executions",
-      "/pipelines/schedules/2835/runs/7381/logs",
+      "/pipelines/schedules/2835/runs/7381",
       "/pipelines/schedules/2838/executions",
-      "/pipelines/schedules/2838/runs/7382/logs"
+      "/pipelines/schedules/2838/runs/7382",
+      "/runs",
+      "/runs/analytics",
+      "/runs/by-date",
+      "/runs/latest"
     ]
   }
 };

@@ -121,8 +121,8 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/ai/assistant/conversations",
       "/pipelines/schedules/2848/executions",
-      "/pipelines/schedules/2848/runs/7404/logs",
-      "/pipelines/schedules/2848/runs/7404/logs?tab=outputs"
+      "/pipelines/schedules/2848/runs/7404",
+      "/pipelines/schedules/2848/runs/7404?tab=outputs"
     ],
     "opened": [],
     "thread": {
@@ -235,7 +235,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the tool registry, as a platform administrator": {
-    "url": "/ai/tools",
+    "url": "/settings/tools",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -257,12 +257,20 @@ export const PINNED: Record<string, unknown> = {
       "Workspace"
     ],
     "links": [
-      "/ai/assistant"
+      "/ai/assistant",
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ],
     "rows": []
   },
   "the tool registry, as a tenant user with every page": {
-    "url": "/ai/tools",
+    "url": "/settings/tools",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -293,7 +301,8 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/assistant"
+      "/ai/assistant",
+      "/settings"
     ],
     "rows": [
       "get_sourcesData sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",
@@ -305,7 +314,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the tool registry, as a workspace administrator": {
-    "url": "/ai/tools",
+    "url": "/settings/tools",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -343,7 +352,15 @@ export const PINNED: Record<string, unknown> = {
       "Switch run_pipeline on in this workspace"
     ],
     "links": [
-      "/ai/assistant"
+      "/ai/assistant",
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ],
     "rows": [
       "get_sourcesData sources | Sources | search?, page?, limit? → list | Workspace memberReads | — | Enabled | Never",

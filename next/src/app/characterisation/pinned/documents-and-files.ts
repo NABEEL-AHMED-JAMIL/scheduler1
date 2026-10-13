@@ -119,7 +119,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the converter, as a workspace administrator": {
-    "url": "/documents/converter",
+    "url": "/tools/converter",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -159,11 +159,14 @@ export const PINNED: Record<string, unknown> = {
       "Choose a file"
     ],
     "links": [
-      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
     ]
   },
   "the object browser, as a tenant user": {
-    "url": "/documents/files?bucket=ui-review-s3",
+    "url": "/data/files?bucket=ui-review-s3",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -205,10 +208,12 @@ export const PINNED: Record<string, unknown> = {
       "Upload",
       "Upload folder"
     ],
-    "links": []
+    "links": [
+      "/data"
+    ]
   },
   "the object browser, in a bucket": {
-    "url": "/documents/files?bucket=ui-review-s3",
+    "url": "/data/files?bucket=ui-review-s3",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -251,10 +256,17 @@ export const PINNED: Record<string, unknown> = {
       "Upload",
       "Upload folder"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   },
   "the object browser, no bucket chosen": {
-    "url": "/documents/files",
+    "url": "/data/files",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -273,6 +285,13 @@ export const PINNED: Record<string, unknown> = {
       "Connection",
       "Search connections…"
     ],
-    "links": []
+    "links": [
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/reports"
+    ]
   }
 };

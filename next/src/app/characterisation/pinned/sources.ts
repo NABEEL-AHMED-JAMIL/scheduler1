@@ -84,22 +84,19 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the data contracts, as a tenant user with the page": {
-    "url": "/integration/sources?tab=contracts",
+    "url": "/connections/contracts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /dataContract.json/list"
     ],
     "headings": [
-      "Sources",
+      "Data contracts",
       "Data contracts"
     ],
     "buttons": [
       "Columns",
-      "Data contracts",
-      "Database connections",
       "Refresh",
-      "Sources",
       "result_manifest",
       "wound_intake"
     ],
@@ -114,10 +111,16 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources"
+    ]
   },
   "the data contracts, as a workspace administrator": {
-    "url": "/integration/sources?tab=contracts",
+    "url": "/connections/contracts",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -125,17 +128,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /dataContract.json/list"
     ],
     "headings": [
-      "Sources",
+      "Data contracts",
       "Data contracts"
     ],
     "buttons": [
       "Columns",
-      "Data contracts",
-      "Database connections",
       "Install template",
       "New from sample",
       "Refresh",
-      "Sources",
       "result_manifest",
       "wound_intake"
     ],
@@ -150,10 +150,18 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
+    ]
   },
   "the database connections, as a workspace administrator": {
-    "url": "/integration/sources?tab=connections",
+    "url": "/connections/databases",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -161,17 +169,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /dataSource.json/connection/list"
     ],
     "headings": [
-      "Sources",
+      "Database connections",
       "Database connections"
     ],
     "buttons": [
       "Actions for UI-CHECK warehouse",
       "Columns",
-      "Data contracts",
-      "Database connections",
       "New connection",
       "Refresh",
-      "Sources",
       "UI-CHECK warehouse"
     ],
     "columns": [
@@ -186,10 +191,18 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
+    ]
   },
   "the sources, as a platform administrator": {
-    "url": "/integration/sources",
+    "url": "/connections/sources",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -205,13 +218,10 @@ export const PINNED: Record<string, unknown> = {
       "Actions for LIVE-CHECK platform bucket probe",
       "Cards",
       "Columns",
-      "Data contracts",
-      "Database connections",
       "LIVE-CHECK 0928 customers CSV",
       "LIVE-CHECK platform bucket probe",
       "New source",
       "Refresh",
-      "Sources",
       "Table"
     ],
     "columns": [
@@ -230,10 +240,18 @@ export const PINNED: Record<string, unknown> = {
       "Kind",
       "Search sources"
     ],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
+    ]
   },
   "the sources, as a tenant user with the page": {
-    "url": "/integration/sources",
+    "url": "/connections/sources",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -246,12 +264,9 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Cards",
       "Columns",
-      "Data contracts",
-      "Database connections",
       "LIVE-CHECK 0928 customers CSV",
       "LIVE-CHECK platform bucket probe",
       "Refresh",
-      "Sources",
       "Table"
     ],
     "columns": [
@@ -268,7 +283,13 @@ export const PINNED: Record<string, unknown> = {
       "Kind",
       "Search sources"
     ],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources"
+    ]
   },
   "the sources, as a tenant user without the page": {
     "url": "/unauthorized?page=sources&title=Sources",
@@ -289,7 +310,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the sources, as a workspace administrator": {
-    "url": "/integration/sources",
+    "url": "/connections/sources",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -305,13 +326,10 @@ export const PINNED: Record<string, unknown> = {
       "Actions for LIVE-CHECK platform bucket probe",
       "Cards",
       "Columns",
-      "Data contracts",
-      "Database connections",
       "LIVE-CHECK 0928 customers CSV",
       "LIVE-CHECK platform bucket probe",
       "New source",
       "Refresh",
-      "Sources",
       "Table"
     ],
     "columns": [
@@ -329,6 +347,14 @@ export const PINNED: Record<string, unknown> = {
       "Kind",
       "Search sources"
     ],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
+    ]
   }
 };

@@ -72,7 +72,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/configuration/kafka"
+      "/settings/kafka"
     ],
     "items": [],
     "terms": [
@@ -190,7 +190,7 @@ export const PINNED: Record<string, unknown> = {
     "alert": "The step tasks could not be read: The Task Registry is not available. The pipelines are listed as usual.Try again"
   },
   "the registry, as a platform administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -249,7 +249,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ],
     "rows": [
       "Read APIread_apiRuns a saved API request (integration-service's runner) and takes its answer as rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",
@@ -290,7 +297,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the registry, as a workspace administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -347,7 +354,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ],
     "rows": [
       "Read APIread_apiRuns a saved API request (integration-service's runner) and takes its answer as rows. | Read | integration-service | None → Rows | Unavailableintegration-service's internal pipeline endpoints are not deployed yet (process.pipeline.integration.internal-endpoints is off)Show all",

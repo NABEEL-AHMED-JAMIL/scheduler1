@@ -78,8 +78,12 @@ export const PINNED: Record<string, unknown> = {
       "Search tasks"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/bulk",
-      "/pipelines/new"
+      "/pipelines/list",
+      "/pipelines/new",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
     ],
     "details": {
       "terms": [],
@@ -109,7 +113,7 @@ export const PINNED: Record<string, unknown> = {
       "Choose a file"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines/list"
     ]
   },
   "editing a task": {
@@ -156,7 +160,8 @@ export const PINNED: Record<string, unknown> = {
       "Topic *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ]
   },
   "editing a task, as a tenant user (the editor is admin-only)": {
@@ -217,7 +222,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ],
     "values": [
       "taskName=Reference: CSV check and summarise",
@@ -231,7 +237,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a tenant user with five pages": {
-    "url": "/pipelines",
+    "url": "/pipelines/list",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -271,10 +277,14 @@ export const PINNED: Record<string, unknown> = {
       "Search id, name, topic or pipeline",
       "Search tasks"
     ],
-    "links": []
+    "links": [
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/schedules"
+    ]
   },
   "the list, as a workspace administrator": {
-    "url": "/pipelines",
+    "url": "/pipelines/list",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -318,8 +328,12 @@ export const PINNED: Record<string, unknown> = {
       "Search tasks"
     ],
     "links": [
+      "/pipelines",
       "/pipelines/bulk",
-      "/pipelines/new"
+      "/pipelines/list",
+      "/pipelines/new",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
     ]
   },
   "the row menu, as a workspace administrator": {

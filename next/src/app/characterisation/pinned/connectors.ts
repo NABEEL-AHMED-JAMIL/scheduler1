@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "a connection, as a workspace administrator": {
-    "url": "/integration/connectors",
+    "url": "/connections/connectors",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -44,8 +44,13 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/connectors",
-      "/integration/connectors/storage"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ],
     "panel": {
       "headings": [
@@ -90,7 +95,7 @@ export const PINNED: Record<string, unknown> = {
     }
   },
   "the gallery and connections, as a tenant user with the page": {
-    "url": "/integration/connectors",
+    "url": "/connections/connectors",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -127,10 +132,17 @@ export const PINNED: Record<string, unknown> = {
       "Search connectors",
       "State"
     ],
-    "links": []
+    "links": [
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources"
+    ]
   },
   "the gallery and connections, as a workspace administrator": {
-    "url": "/integration/connectors",
+    "url": "/connections/connectors",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -173,8 +185,13 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/connectors",
-      "/integration/connectors/storage"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   },
   "the page, as a tenant user without it": {

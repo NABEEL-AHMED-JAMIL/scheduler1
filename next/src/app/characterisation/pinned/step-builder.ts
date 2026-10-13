@@ -40,7 +40,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ],
     "details": {
       "terms": [],
@@ -133,7 +134,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ]
   },
   "Validate, with a problem on a step": {
@@ -195,7 +197,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ],
     "problems": [
       "keep"
@@ -241,7 +244,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ],
     "details": {
       "terms": [],
@@ -313,7 +317,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ]
   },
   "a new schedule for the pipeline": {
@@ -393,7 +398,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ]
   },
   "a step in the side panel": {
@@ -481,7 +487,8 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/list"
     ],
     "hidden": [
       "app-step-builder"

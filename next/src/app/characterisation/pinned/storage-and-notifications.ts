@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "storage connections, as a platform administrator": {
-    "url": "/integration/connectors/storage",
+    "url": "/connections/storage",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -66,8 +66,13 @@ export const PINNED: Record<string, unknown> = {
       "Workspace"
     ],
     "links": [
-      "/integration/connectors",
-      "/integration/connectors/storage"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   },
   "storage connections, as a tenant user (admin-only)": {
@@ -89,7 +94,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "storage connections, as a workspace administrator": {
-    "url": "/integration/connectors/storage",
+    "url": "/connections/storage",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -134,8 +139,13 @@ export const PINNED: Record<string, unknown> = {
       "Select all shown"
     ],
     "links": [
-      "/integration/connectors",
-      "/integration/connectors/storage"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   },
   "the bell, opened": {

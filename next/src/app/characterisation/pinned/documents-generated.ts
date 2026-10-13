@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "Reports, as a workspace administrator": {
-    "url": "/documents/reports",
+    "url": "/data/reports",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -67,10 +67,16 @@ export const PINNED: Record<string, unknown> = {
       "reports/"
     ],
     "links": [
-      "/documents/converter",
-      "/documents/files?bucket=ui-review-s3&prefix=registry-live-check%2F",
-      "/documents/files?bucket=ui-review-s3&prefix=reports%2F",
-      "/pipelines/schedules/2849/runs/7405/logs"
+      "/data",
+      "/data/analytics",
+      "/data/ask",
+      "/data/catalog",
+      "/data/files",
+      "/data/files?bucket=ui-review-s3&prefix=registry-live-check%2F",
+      "/data/files?bucket=ui-review-s3&prefix=reports%2F",
+      "/data/reports",
+      "/pipelines/schedules/2849/runs/7405",
+      "/tools/converter"
     ]
   },
   "a file's details, written by a recent run": {
@@ -92,7 +98,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/pipelines/schedules/2849/runs/7405/logs"
+      "/pipelines/schedules/2849/runs/7405"
     ],
     "items": []
   },
@@ -149,7 +155,10 @@ export const PINNED: Record<string, unknown> = {
       "[{\"region\": \"North\", \"revenue\": 1234.50}, {\"region\": \"South\", \"revenue\": 980}]"
     ],
     "links": [
-      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
     ]
   },
   "the converter, From an execution": {
@@ -206,7 +215,10 @@ export const PINNED: Record<string, unknown> = {
       "Watermark"
     ],
     "links": [
-      "/documents/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F"
+      "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/tools",
+      "/tools/converter",
+      "/tools/transcript"
     ]
   }
 };

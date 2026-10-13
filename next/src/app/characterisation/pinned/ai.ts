@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "a new prompt": {
-    "url": "/ai/prompts/new",
+    "url": "/pipelines/prompts/new",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -46,7 +46,8 @@ export const PINNED: Record<string, unknown> = {
       "pdf, docx"
     ],
     "links": [
-      "/ai/prompts"
+      "/pipelines",
+      "/pipelines/prompts"
     ]
   },
   "a prompt's row menu": {
@@ -59,7 +60,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/ai/prompts/1049/edit"
+      "/pipelines/prompts/1049/edit"
     ],
     "items": [
       "Edit & try",
@@ -68,7 +69,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "editing a prompt": {
-    "url": "/ai/prompts/1049/edit",
+    "url": "/pipelines/prompts/1049/edit",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -144,11 +145,12 @@ export const PINNED: Record<string, unknown> = {
       "what Try it uses"
     ],
     "links": [
-      "/ai/prompts"
+      "/pipelines",
+      "/pipelines/prompts"
     ]
   },
   "model connections, as a platform administrator": {
-    "url": "/ai/connections",
+    "url": "/settings/model-connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -183,7 +185,15 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/prompts?connection=1047"
+      "/pipelines/prompts?connection=1047",
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "model connections, as a tenant user": {
@@ -205,7 +215,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "model connections, as a workspace administrator": {
-    "url": "/ai/connections",
+    "url": "/settings/model-connections",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -240,11 +250,19 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/prompts?connection=1047"
+      "/pipelines/prompts?connection=1047",
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "prompts, as a tenant user with every page": {
-    "url": "/ai/prompts",
+    "url": "/pipelines/prompts",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -279,7 +297,12 @@ export const PINNED: Record<string, unknown> = {
       "Search prompts",
       "State"
     ],
-    "links": []
+    "links": [
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
+    ]
   },
   "prompts, as a tenant user without the page": {
     "url": "/unauthorized?page=ai-prompts&title=Prompts",
@@ -300,7 +323,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "prompts, as a workspace administrator": {
-    "url": "/ai/prompts",
+    "url": "/pipelines/prompts",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -340,9 +363,13 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/ai/prompts/1048/edit",
-      "/ai/prompts/1049/edit",
-      "/ai/prompts/new"
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/prompts/1048/edit",
+      "/pipelines/prompts/1049/edit",
+      "/pipelines/prompts/new",
+      "/pipelines/schedules"
     ]
   }
 };

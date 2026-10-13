@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "managed service, as a platform administrator": {
-    "url": "/administration/managed-service",
+    "url": "/platform/managed-service",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -35,7 +35,16 @@ export const PINNED: Record<string, unknown> = {
       "Include revoked"
     ],
     "links": [
-      "/administration/staff-activity"
+      "/platform",
+      "/platform/billing-analytics",
+      "/platform/engine",
+      "/platform/managed-service",
+      "/platform/rate-cards",
+      "/platform/reliability",
+      "/platform/requests",
+      "/platform/staff-activity",
+      "/platform/work-in-workspace",
+      "/platform/workspaces"
     ]
   },
   "our team's activity, as a MANAGED workspace's administrator": {
@@ -65,10 +74,17 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Filter by staff member"
     ],
-    "links": []
+    "links": [
+      "/administration",
+      "/administration/access-profiles",
+      "/administration/data-policies",
+      "/administration/security",
+      "/administration/team-activity",
+      "/administration/users"
+    ]
   },
   "pipelines, in a MANAGED workspace": {
-    "url": "/pipelines",
+    "url": "/pipelines/list",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -109,10 +125,15 @@ export const PINNED: Record<string, unknown> = {
       "Search id, name, topic or pipeline",
       "Search tasks"
     ],
-    "links": []
+    "links": [
+      "/pipelines",
+      "/pipelines/list",
+      "/pipelines/prompts",
+      "/pipelines/schedules"
+    ]
   },
   "staff activity, as a platform administrator": {
-    "url": "/administration/staff-activity",
+    "url": "/platform/staff-activity",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -142,11 +163,22 @@ export const PINNED: Record<string, unknown> = {
       "Filter by staff member",
       "Filter by workspace"
     ],
-    "links": []
+    "links": [
+      "/platform",
+      "/platform/billing-analytics",
+      "/platform/engine",
+      "/platform/managed-service",
+      "/platform/rate-cards",
+      "/platform/reliability",
+      "/platform/requests",
+      "/platform/staff-activity",
+      "/platform/work-in-workspace",
+      "/platform/workspaces"
+    ]
   },
   "the pages refuse a workspace administrator": "/unauthorized",
   "work in a workspace, as a platform administrator": {
-    "url": "/administration/work-in-workspace",
+    "url": "/platform/work-in-workspace",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -162,6 +194,17 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [],
-    "links": []
+    "links": [
+      "/platform",
+      "/platform/billing-analytics",
+      "/platform/engine",
+      "/platform/managed-service",
+      "/platform/rate-cards",
+      "/platform/reliability",
+      "/platform/requests",
+      "/platform/staff-activity",
+      "/platform/work-in-workspace",
+      "/platform/workspaces"
+    ]
   }
 };

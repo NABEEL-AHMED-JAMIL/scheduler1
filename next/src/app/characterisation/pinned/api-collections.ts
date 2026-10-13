@@ -11,7 +11,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections/api-collections/1000"
     ],
     "items": [
       "Open",
@@ -55,7 +55,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "one collection, as a tenant user with the page": {
-    "url": "/integration/api-collections/1000",
+    "url": "/connections/api-collections/1000",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -101,11 +101,12 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections"
+      "/connections",
+      "/connections/api-collections"
     ]
   },
   "one collection, as a workspace administrator": {
-    "url": "/integration/api-collections/1000",
+    "url": "/connections/api-collections/1000",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -163,11 +164,12 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections"
+      "/connections",
+      "/connections/api-collections"
     ]
   },
   "the list, as a platform administrator": {
-    "url": "/integration/api-collections",
+    "url": "/connections/api-collections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -206,11 +208,18 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   },
   "the list, as a tenant user with the page": {
-    "url": "/integration/api-collections",
+    "url": "/connections/api-collections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -243,7 +252,12 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources"
     ]
   },
   "the list, as a tenant user without the page": {
@@ -265,7 +279,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a workspace administrator": {
-    "url": "/integration/api-collections",
+    "url": "/connections/api-collections",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -303,7 +317,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/integration/api-collections/1000"
+      "/connections",
+      "/connections/api-collections",
+      "/connections/api-collections/1000",
+      "/connections/connectors",
+      "/connections/contracts",
+      "/connections/databases",
+      "/connections/sources",
+      "/connections/storage"
     ]
   }
 };

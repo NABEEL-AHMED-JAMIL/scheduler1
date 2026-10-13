@@ -142,7 +142,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "the list, as a platform administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -182,7 +182,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "the list, as a tenant user (admin-only)": {
@@ -204,7 +211,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the list, as a workspace administrator": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -242,14 +249,21 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "the old Configuration › Pipelines address": {
-    "url": "/configuration/task-registry"
+    "url": "/settings/task-registry"
   },
   "the old forms address": {
-    "url": "/configuration/task-registry",
+    "url": "/settings/task-registry",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -287,7 +301,14 @@ export const PINNED: Record<string, unknown> = {
       "State"
     ],
     "links": [
-      "/configuration/kafka"
+      "/settings",
+      "/settings/home-pages",
+      "/settings/kafka",
+      "/settings/model-connections",
+      "/settings/task-groups",
+      "/settings/task-registry",
+      "/settings/tools",
+      "/settings/values"
     ]
   },
   "the row menu": {
