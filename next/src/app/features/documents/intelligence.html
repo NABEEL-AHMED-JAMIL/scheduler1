@@ -1,6 +1,6 @@
 <div class="page">
   <!-- UX review B4 (DI1): the standard header -- Refresh, the overflow (a new type, a stored file) and the one primary. -->
-  <app-page-header [title]="tab() === 'types' ? 'Document types' : 'Documents in'"
+  <app-page-header [title]="heading()"
                    subtitle="Upload, mail in or read stored documents; each is split into fields against its document type, and values it is unsure of go to Document review.">
     <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
     <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow data-test="intelligence-more" [cdkMenuTriggerFor]="headerMenu" aria-label="More actions">
@@ -18,11 +18,13 @@
   </app-page-header>
   <app-managed-banner what="document types" />
 
-  <div class="tabs" role="tablist" aria-label="Document Intelligence">
-    @for (t of tabs; track t.id) {
-      <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
-    }
-  </div>
+  @if (!hubView) {
+    <div class="tabs" role="tablist" aria-label="Document Intelligence">
+      @for (t of tabs; track t.id) {
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id" (click)="setTab(t.id)">{{ t.label }}</button>
+      }
+    </div>
+  }
 
   @switch (tab()) {
     @case ('types') {

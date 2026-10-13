@@ -138,7 +138,7 @@ test.describe('Document Intelligence', () => {
     await expect(page).not.toHaveURL(new RegExp(`/documents/review/${extractionId}$`), { timeout: 20_000 });
 
     // ---- the dataset: the approved document's row, with the corrected vendor as typed
-    await page.goto('/documents/intelligence?tab=dataset');
+    await page.goto('/documents/in?tab=dataset');
     const dataset = page.locator('[data-test="dataset"]');
     await dataset.getByRole('combobox', { name: 'Document type' }).selectOption({ label: 'Invoice' });
     const row = dataset.locator('tbody tr', { hasText: `#${extractionId}` });

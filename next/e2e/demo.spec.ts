@@ -58,7 +58,7 @@ test.describe('Sales demo paths (MIG-319)', () => {
     const { s, page } = await signedIn(browser, request, ids.ap.admin);
     expect(s.tenantId).toBe(ids.ap.tenant);
 
-    await page.goto('/documents/intelligence?tab=types');
+    await page.goto('/documents/types');
     await expect(page.getByText('Demo AP invoice').first()).toBeVisible();
 
     const invoice = resolve(PLATFORM, 'demo/fixtures/out/ap/INV-NW-1007.pdf');
@@ -108,7 +108,7 @@ test.describe('Sales demo paths (MIG-319)', () => {
     const outputs = (await (await request.get(`${api}/sourceJob.json/runOutputs?jobQueueId=${run}`, { headers: authOf(s) })).json()).data;
     expect(outputs.reviewStatus).toBe('PENDING');
 
-    await page.goto('/pipelines/executions');
+    await page.goto('/runs/latest');
     const waiting = page.locator('[data-review-waiting]');
     await expect(waiting).toContainText('Waiting for review');
     await expect(waiting).toContainText(`run #${run}`);
@@ -118,7 +118,7 @@ test.describe('Sales demo paths (MIG-319)', () => {
     await expect(review).toContainText('Waiting for review');
 
     // D in one look: the customer's build screens are read-only, with the banner.
-    await page.goto('/pipelines');
+    await page.goto('/pipelines/list');
     await expect(page.locator('[data-managed-banner]')).toContainText('Managed by our team');
     await expect(page.getByRole('link', { name: 'New pipeline' })).toHaveCount(0);
     await page.context().close();

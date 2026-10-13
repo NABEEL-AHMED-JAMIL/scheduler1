@@ -30,6 +30,10 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export type IntelligenceTab = 'overview' | 'types' | 'dataset' | 'intake';
 const TABS: IntelligenceTab[] = ['overview', 'types', 'dataset', 'intake'];
+/** Tab hubs (2026-10-12): each view is a tab of Documents, at its own address. */
+export const INTELLIGENCE_VIEW_PATHS: Record<IntelligenceTab, string> = {
+  overview: '/documents/in', types: '/documents/types', dataset: '/documents/datasets', intake: '/documents/email-in',
+};
 
 /** A type's glyph on its card, from what it is for. */
 const TYPE_ICONS: Record<string, string> = {
@@ -84,7 +88,14 @@ export class DocumentIntelligence implements OnInit {
     { id: 'overview', label: 'Overview' }, { id: 'types', label: 'Document types' }, { id: 'dataset', label: 'Dataset' },
     { id: 'intake', label: 'Intake' },
   ];
-  readonly tab = signal<IntelligenceTab>(this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
+  /**
+   * Tab hubs (2026-10-12): the address names the view -- Documents › Documents in, Document types, Datasets or Email-in --
+   * and the hub's strip is the way between them, so the page's own tab strip is not shown. Without a view in the route
+   * (a unit test mounting the page alone) the page keeps its own tabs, read from ?tab=.
+   */
+  readonly hubView = (this.route.snapshot?.data?.['view'] as IntelligenceTab | undefined) ?? null;
+  readonly tab = signal<IntelligenceTab>(this.hubView ?? this.tabOf(this.route.snapshot?.queryParamMap?.get('tab')));
+  readonly heading = computed(() => ({ overview: 'Documents in', types: 'Document types', dataset: 'Datasets', intake: 'Email-in' })[this.tab()]);
   readonly canManage = computed(() => this.auth.canBuild());
   /** The email-in address is the workspace's: an administrator's to turn on, renew or turn off (MIG-271). */
   readonly canManageMailbox = computed(() => this.auth.isTenantAdmin());
@@ -150,6 +161,12 @@ export class DocumentIntelligence implements OnInit {
   private datasetRead = false;
 
   ngOnInit(): void {
+    // An old link to a view by ?tab= (Document types) opens that view's own tab.
+    const asked = this.route.snapshot?.queryParamMap?.get('tab');
+    if (this.hubView && asked && (TABS as string[]).includes(asked) && asked !== this.hubView) {
+      void this.router.navigate([INTELLIGENCE_VIEW_PATHS[asked as IntelligenceTab]], { replaceUrl: true });
+      return;
+    }
     // The stats first: the dataset opens on the type most documents were approved as.
     this.loadStats(() => { this.loadTypes(); this.readTab(this.tab()); });
   }
@@ -166,6 +183,7 @@ export class DocumentIntelligence implements OnInit {
   }
 
   setTab(tab: IntelligenceTab): void {
+    if (this.hubView) { void this.router.navigateByUrl(INTELLIGENCE_VIEW_PATHS[tab]); return; }
     this.tab.set(tab);
     this.readTab(tab);
     this.router.navigate([], { relativeTo: this.route, queryParams: { tab: tab === 'overview' ? null : tab }, queryParamsHandling: 'merge', replaceUrl: true });

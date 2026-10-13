@@ -64,7 +64,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('shows the configured inbox, its limit and its arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/inbox');
+    await page.goto('/documents/file-drop');
     await expect(page.getByRole('heading', { name: 'Inbox', level: 1 })).toBeVisible();
     await expect(page.getByText(label).first()).toBeVisible();
     await expect(page.getByText(/Up to \d+ MB a file/).first()).toBeVisible();
@@ -79,7 +79,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('uploads a small JSON file and lists it', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/inbox');
+    await page.goto('/documents/file-drop');
     const name = `E2E-inbox-${Date.now()}.json`;
     uploaded.push(name);
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
@@ -96,7 +96,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('shows the service\'s refusal for an executable, word for word', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/inbox');
+    await page.goto('/documents/file-drop');
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
       name: 'E2E-evil.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ not really a program'),
     });
@@ -110,7 +110,7 @@ test.describe('Inbox (live storage-service)', () => {
   test('the settings dialog opens, and Cancel changes nothing', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
     const writes = settingsWrites(page);
-    await page.goto('/documents/inbox');
+    await page.goto('/documents/file-drop');
     await page.getByRole('button', { name: 'Inbox settings' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Inbox settings' })).toBeVisible();
@@ -125,7 +125,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('a phone stacks upload, settings and arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request, 390);
-    await page.goto('/documents/inbox');
+    await page.goto('/documents/file-drop');
     await expect(page.getByRole('heading', { name: 'Upload' })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);
