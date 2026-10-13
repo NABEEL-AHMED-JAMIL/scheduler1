@@ -284,7 +284,9 @@ paths:
       summary: "The run's manifest: the files it received and made, by file id, and its review."
       description: >
         The files the run's latest attempt made (role result, or report for a PDF) and, for a run started through the
-        API, the files it was given (role input), each by its file id: GET /v1/files/{fileId} downloads it. Never a
+        API, the files it was given (role input), each by its file id: GET /v1/files/{fileId} downloads it. A step
+        that makes a PDF lists two files with the same step: the PDF (report), which prints the first rows of a big
+        table, and the full data beside it as a CSV (result), unless the step turns that off. Never a
         bucket, a storage key or a connection. A made file is kept as long as the pipeline keeps its run's files
         (expiresAt); after that it is listed as expired and its download is 410.
       security: [{ clientCredentials: [runs:read] }]
