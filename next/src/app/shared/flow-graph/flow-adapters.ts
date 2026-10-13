@@ -276,7 +276,7 @@ export function pipelineGraph(steps: readonly PipelineStepLike[], opts: Pipeline
     nodes.push({
       id: step.key, label: step.name || step.key, sub: step.task, kind: stepKind(step.task, entry),
       icon: TASK_ICONS[step.task] ?? null, tone, badges, metrics: opts.summary === 0 ? [] : stepSummary(step, opts.summary ?? 2, entry?.configSchema, opts.names),
-      pending: !!change,
+      pending: !!change, metricsPerRow: 1,
     });
   });
   const edges = pipelineEdges(steps, { ...opts, startId: opts.start ? FLOW_START : opts.startId });

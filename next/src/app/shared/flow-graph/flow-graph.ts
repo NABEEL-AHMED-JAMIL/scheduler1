@@ -247,13 +247,14 @@ export class FlowGraph {
         pills.push({ text, x: bx, w });
         bx += w + 4;
       }
-      const cellW = (n.w - 24) / FLOW_METRICS_PER_ROW;
+      const perRow = n.metricsPerRow ?? FLOW_METRICS_PER_ROW;
+      const cellW = (n.w - 24) / perRow;
       const rows = nodeRows(n);
       const cells = (n.metrics ?? []).map((m, i) => {
         const label = fitText(m.label, cellW * 0.45, 12, 0.6);
         return {
           label, value: fitText(m.value, cellW - label.length * 7.2 - 8, 12, 0.62),
-          x: 12 + (i % FLOW_METRICS_PER_ROW) * cellW, y: rows.metricsY + Math.floor(i / FLOW_METRICS_PER_ROW) * FLOW_ROW.metric + 13,
+          x: 12 + (i % perRow) * cellW, y: rows.metricsY + Math.floor(i / perRow) * FLOW_ROW.metric + 13,
         };
       });
       const aria = [n.label, n.sub, ...badges, ...(n.metrics ?? []).map(m => `${m.label} ${m.value}`)].filter(Boolean).join(', ');

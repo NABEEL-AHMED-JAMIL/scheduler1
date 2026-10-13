@@ -27,6 +27,11 @@ export interface FlowNode {
   hot?: boolean;
   /** Not saved yet: the frame is dashed. */
   pending?: boolean;
+  /**
+   * How many metrics share a row (FLOW_METRICS_PER_ROW when absent). A pipeline step's settings take a row each (UX review
+   * 2026-10-12): a setting's name and the name it points at ("Environment  Production") do not fit in half a node.
+   */
+  metricsPerRow?: 1 | 2;
 }
 export interface FlowEdge { from: string; to: string; label?: string | null; tone?: FlowTone | null; dashed?: boolean; }
 
@@ -53,7 +58,7 @@ export function nodeRows(node: FlowNode, base = FLOW_NODE_BASE): { badgesY: numb
   const badgesY = y;
   if (node.badges?.length) y += FLOW_ROW.badges;
   const metricsY = y;
-  const metricRows = Math.ceil((node.metrics?.length ?? 0) / FLOW_METRICS_PER_ROW);
+  const metricRows = Math.ceil((node.metrics?.length ?? 0) / (node.metricsPerRow ?? FLOW_METRICS_PER_ROW));
   if (metricRows) y += metricRows * FLOW_ROW.metric + 4;
   const shareY = y;
   if (node.share != null) y += FLOW_ROW.share;
@@ -326,7 +331,7 @@ export function sameGraph(an: readonly FlowNode[], ae: readonly FlowEdge[], bn: 
   if (an === bn && ae === be) return true;
   return sameList(an, bn, (a, b) => a === b || (a.id === b.id && a.label === b.label && (a.sub ?? null) === (b.sub ?? null) && a.kind === b.kind
       && (a.icon ?? null) === (b.icon ?? null) && (a.accent ?? null) === (b.accent ?? null) && (a.tone ?? null) === (b.tone ?? null)
-      && (a.share ?? null) === (b.share ?? null) && !!a.hot === !!b.hot && !!a.pending === !!b.pending
+      && (a.share ?? null) === (b.share ?? null) && !!a.hot === !!b.hot && !!a.pending === !!b.pending && (a.metricsPerRow ?? 2) === (b.metricsPerRow ?? 2)
       && sameList(a.badges, b.badges, (x, y) => x === y)
       && sameList(a.metrics, b.metrics, (x, y) => x.label === y.label && x.value === y.value)))
     && sameList(ae, be, (a, b) => a === b || (a.from === b.from && a.to === b.to && (a.label ?? null) === (b.label ?? null)
