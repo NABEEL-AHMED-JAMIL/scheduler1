@@ -216,7 +216,7 @@ export const NAV: NavItem[] = [
     children: [
       {
         label: 'Administration', path: '/administration', icon: 'users',
-        hint: 'Users, page access, sign-in security and data policies',
+        hint: 'Users, page access, sign-in security, data policies and appearance',
         tabs: [
           { label: 'Users', path: '/administration/users', icon: 'users', adminOnly: true },
           { label: 'Page access', path: '/administration/access-profiles', icon: 'shield', adminOnly: true },
@@ -225,6 +225,8 @@ export const NAV: NavItem[] = [
           // The route opens to whoever holds Prompts (a member reads the policy from the AI Assistant); the tab is an
           // administrator's, as the menu entry was.
           { label: 'Data policies', path: '/administration/data-policies', icon: 'lock', adminOnly: true },
+          // Owner 2026-10-13: the workspace's default theme.
+          { label: 'Appearance', path: '/administration/appearance', icon: 'eye', adminOnly: true },
           { label: 'Activity', path: '/administration/team-activity', icon: 'history', adminOnly: true, teamOnly: true },
         ],
       },

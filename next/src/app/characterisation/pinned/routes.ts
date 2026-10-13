@@ -746,6 +746,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/appearance",
+      "title": "Appearance",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/platform/workspaces",
       "title": "Workspaces",
       "minRole": "PLATFORM_ADMIN",

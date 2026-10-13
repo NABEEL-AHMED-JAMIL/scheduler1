@@ -747,6 +747,15 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // Owner 2026-10-13: the workspace's default app theme, for people who have not chosen their own. Role-gated like
+        // Sign-in security: both calls behind it (tenant.json/appearance) are TENANT_ADMIN.
+        path: 'administration/appearance',
+        title: 'Appearance',
+        loadComponent: () => import('./features/admin/appearance/workspace-appearance').then(m => m.WorkspaceAppearance),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'platform/workspaces',
         title: 'Workspaces',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),

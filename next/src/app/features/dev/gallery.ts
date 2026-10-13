@@ -118,7 +118,7 @@ export class Gallery {
 
   setTheme(theme: 'light' | 'dark'): void {
     this.themeChoice.set(theme);
-    this.themeService.theme.set(theme);
+    this.themeService.pick(theme);
   }
 
   showToasts(): void {

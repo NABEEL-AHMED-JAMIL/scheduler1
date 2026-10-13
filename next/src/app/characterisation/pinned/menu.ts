@@ -15,7 +15,7 @@ export const PINNED: Record<string, unknown> = {
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Tools — Convert documents, and turn speech into text -> /tools",
-    "Administration & billing › Administration — Users, page access, sign-in security and data policies -> /administration",
+    "Administration & billing › Administration — Users, page access, sign-in security, data policies and appearance -> /administration",
     "Administration & billing › Billing — What the workspace used, what it costs, and its bills -> /billing",
     "Administration & billing › Settings — Models, tools, tasks, Kafka, the values a task reads, and alerts -> /settings",
     "Administration & billing › Developers — Your systems on the API, and its reference -> /developers"
@@ -56,7 +56,7 @@ export const PINNED: Record<string, unknown> = {
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Tools — Convert documents, and turn speech into text -> /tools",
-    "Administration & billing › Administration — Users, page access, sign-in security and data policies -> /administration",
+    "Administration & billing › Administration — Users, page access, sign-in security, data policies and appearance -> /administration",
     "Administration & billing › Billing — What the workspace used, what it costs, and its bills -> /billing",
     "Administration & billing › Settings — Models, tools, tasks, Kafka, the values a task reads, and alerts -> /settings",
     "Administration & billing › Developers — Your systems on the API, and its reference -> /developers"

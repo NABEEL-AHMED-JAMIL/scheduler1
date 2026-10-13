@@ -16,7 +16,8 @@
   <meta name="theme-color" content="#030712">
   <!-- The same choice ThemeService makes, taken before Angular boots so a dark page does not
        flash light first. ThemeService stays the one that keeps it in step afterwards. -->
-  <script>try{var t=localStorage.getItem('etl_theme');if(t==='dark'||(!t&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark')}catch(e){}</script>
+  <!-- etl_theme holds the choice: light, dark, ocean, midnight, contrast or system (none: system). -->
+  <script>try{var t=localStorage.getItem('etl_theme'),d=document.documentElement;if(!t||t==='system')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';if(t==='dark'||t==='midnight')d.classList.add('dark');if(/^(ocean|midnight|contrast)$/.test(t))d.setAttribute('data-theme',t)}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <!-- Compass's own two faces. Inter is requested on its variable axis (100..900) rather

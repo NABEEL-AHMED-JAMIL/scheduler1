@@ -1655,6 +1655,170 @@ html.dark {
   --chart-7: #a5b4fc;   /* indigo  8.90 */
 }
 
+/* ---------------------------------------------------------------------------
+   App themes (owner 2026-10-13): each person picks one in the top bar's theme menu or Profile ›
+   Appearance; a workspace administrator sets the workspace's default (Administration › Appearance).
+
+     light     :root above                        dark      html.dark above
+     ocean     light + html[data-theme=ocean]     midnight  html.dark + [data-theme=midnight]
+     contrast  light + html[data-theme=contrast]
+     system    light or dark, as the OS says
+
+   A theme is only token values. Ocean and High contrast sit on the light theme and Midnight on the
+   dark one, so every html.dark / html:not(.dark) component rule keeps applying to its own family
+   and no component knows the theme exists. The ink (and for Ocean the brand) ramp is re-tinted
+   rather than each role restated: the roles above read the ramp, so retinting it carries every
+   surface, border and text step at once. ThemeService puts the class and attribute on <html>;
+   index.html does the same before the first paint. Unlayered and more specific than :root and
+   html.dark, so a block here always wins. A light theme's block is :not(.dark) so a page that
+   forces dark (the embedded run view's ?theme=dark) is not repainted light under it.
+
+   contrast.spec.ts measures every theme: text 4.5:1 on each surface, UI marks and status fills 3:1.
+   --------------------------------------------------------------------------- */
+
+/* Ocean: a calm clinical blue and teal on a cool paper ground. Slate-tinted ink, a teal-blue
+   brand (the primary button is brand-500, white on it 6.41:1). */
+html[data-theme="ocean"]:not(.dark) {
+  --color-ink-50:  #eef3f8;
+  --color-ink-100: #e8eff5;
+  --color-ink-200: #dbe4ec;
+  --color-ink-300: #c3d1dd;
+  --color-ink-400: #8fa3b5;
+  --color-ink-450: #536779;
+  --color-ink-500: #5d7286;
+  --color-ink-600: #3d5367;
+  --color-ink-700: #2b3f52;
+  --color-ink-800: #1a2c3e;
+  --color-ink-900: #0e1f30;
+  --color-ink-950: #06121f;
+
+  --color-brand-50:  #e8f5f8;
+  --color-brand-100: #cdeaf1;
+  --color-brand-300: #5fb3cb;
+  --color-brand-500: #0b6782;
+  --color-brand-600: #08546b;
+  --color-brand-700: #064257;
+
+  --surface-inset: #f4f8fb;
+  /* The blue of information, a step deeper: info-600 is 4.4:1 on this theme's bluer sunken surface. */
+  --info-text: var(--color-info-700);
+  --scrollbar-thumb: #c3d1dd;
+  --scrollbar-thumb-hover: #8fa3b5;
+  --focus-ring: var(--color-brand-500);
+  --pill-brand-bg:     var(--color-brand-100);
+  --pill-brand-fg:     var(--color-brand-700);
+  --pill-brand-border: var(--color-brand-300);
+
+  /* The categorical slots lead with the theme's own cool hues; the same eight, each 4.5:1 on white. */
+  --heat: #0e7490;
+  --chart-0: #0e7490;   /* cyan    5.36 */
+  --chart-1: #c2410c;   /* orange  5.18 */
+  --chart-2: #1d4ed8;   /* blue    6.70 */
+  --chart-3: #be1d63;   /* rose    5.92 */
+  --chart-4: #0f766e;   /* teal    5.47 */
+  --chart-5: #7e22ce;   /* violet  6.98 */
+  --chart-6: #4d7c0f;   /* lime    4.99 */
+  --chart-7: #4338ca;   /* indigo  7.90 */
+}
+
+/* Midnight: a deep navy dark with teal accents. Navy-tinted ink; the accent is the teal the dark
+   theme does not have (it is monochrome), so the roles that carry it are restated here. */
+html.dark[data-theme="midnight"] {
+  --color-ink-50:  #f2f6fb;
+  --color-ink-100: #e3eaf3;
+  --color-ink-200: #cdd8e6;
+  --color-ink-300: #b6c5d8;
+  --color-ink-400: #8fa5c0;
+  --color-ink-450: #7389a6;
+  --color-ink-500: #5a7395;
+  --color-ink-600: #3c5577;
+  --color-ink-700: #263e60;
+  --color-ink-800: #18304d;
+  --color-ink-900: #0a1729;
+  --color-ink-950: #06101f;
+
+  --surface-code: #030a14;
+  --scrollbar-thumb: #263e60;
+  --scrollbar-thumb-hover: #3c5577;
+
+  --accent-text:        #5fd4c4;
+  --accent-soft:        color-mix(in oklab, #2dd4bf 14%, var(--surface-raised));
+  --hover-brand-bg:     color-mix(in oklab, #2dd4bf 18%, var(--surface-raised));
+  --hover-brand-fg:     #7fe3d6;
+  --btn-primary-bg:     #2bb8a8;
+  --btn-primary-fg:     #03201d;
+  --btn-primary-hover:  #4fd1c1;
+  --btn-primary-active: #7fe0d3;
+  --focus-ring:         #5eead4;
+  --accent-mark:        #2dd4bf;
+  --accent-mark-strong: #5eead4;
+  --pill-brand-bg:      color-mix(in oklab, #2dd4bf 22%, transparent);
+  --pill-brand-fg:      #7fe3d6;
+  --pill-brand-border:  #2a9d90;
+  --pill-solid-brand-bg: var(--btn-primary-bg);
+  --pill-solid-brand-fg: var(--btn-primary-fg);
+
+  --heat: #2dd4bf;
+  --chart-0: #2dd4bf;   /* teal    9.38 on the raised surface */
+  --chart-1: #60a5fa;   /* blue    6.87 */
+  --chart-2: #fb923c;   /* orange */
+  --chart-3: #f472b6;   /* rose    6.59 */
+  --chart-4: #c084fc;   /* violet  6.61 */
+  --chart-5: #a3e635;   /* lime */
+  --chart-6: #22d3ee;   /* cyan */
+  --chart-7: #a5b4fc;   /* indigo  8.76 */
+}
+
+/* High contrast: the light theme pushed to its strongest -- black text, borders a control can be
+   seen by (3:1 and more), darker status text and a blue focus ring that no surface hides. */
+html[data-theme="contrast"]:not(.dark) {
+  --surface-page:   #ffffff;
+  --surface-sunken: #eeeeee;
+  --surface-inset:  #f5f5f5;
+  --surface-code:   #e6e6e6;
+  --border-subtle:  #767676;
+  --border-strong:  #3d3d3d;
+  --text-primary:   #000000;
+  --text-secondary: #1f1f1f;
+  --text-muted:     #3d3d3d;
+  --accent-text:    #000000;
+  --accent-soft:    #e6e6e6;
+  --btn-primary-bg:     #000000;
+  --btn-primary-hover:  #262626;
+  --btn-primary-active: #3d3d3d;
+  --focus-ring:         #0040c1;
+  --accent-mark:        #000000;
+  --accent-mark-strong: #000000;
+  --ok-text:   #0c5a2e;
+  --warn-text: #6b2f05;
+  --crit-text: #8f1530;
+  --info-text: #1d3fae;
+  --pill-neutral-bg: #e6e6e6;
+  --pill-neutral-fg: #1f1f1f;
+  --pill-brand-bg:   #d4d4d4;
+  --pill-brand-fg:   #000000;
+  --pill-brand-border: #000000;
+  --pill-ok-fg:   #0c5a2e;
+  --pill-warn-fg: #6b2f05;
+  --pill-crit-fg: #8f1530;
+  --pill-info-fg: #1d3fae;
+  --scrollbar-thumb: #767676;
+  --scrollbar-thumb-hover: #3d3d3d;
+}
+
+/* The theme pickers' previews: page, card, accent and text of each theme, as plain values so a
+   preview shows that theme whichever one is on (core/theme-options.ts, SWATCH_CSS, maps them for an
+   element with data-swatch). contrast.spec.ts holds each to the theme's own resolved tokens, so
+   they cannot drift. */
+:root {
+  --swatch-light-page: #f9fafb;    --swatch-light-card: #ffffff;    --swatch-light-accent: #1e2939;    --swatch-light-text: #101828;
+  --swatch-dark-page: #030712;     --swatch-dark-card: #101828;     --swatch-dark-accent: #f9fafb;     --swatch-dark-text: #f9fafb;
+  --swatch-ocean-page: #eef3f8;    --swatch-ocean-card: #ffffff;    --swatch-ocean-accent: #0b6782;    --swatch-ocean-text: #0e1f30;
+  --swatch-midnight-page: #06101f; --swatch-midnight-card: #0a1729; --swatch-midnight-accent: #2bb8a8; --swatch-midnight-text: #f2f6fb;
+  --swatch-contrast-page: #ffffff; --swatch-contrast-card: #ffffff; --swatch-contrast-accent: #000000; --swatch-contrast-text: #000000;
+}
+
+
 @layer components {
   .input-invalid,
   .field-invalid :is(input, select, textarea).input {

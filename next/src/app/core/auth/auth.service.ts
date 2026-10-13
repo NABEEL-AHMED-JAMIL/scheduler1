@@ -5,6 +5,7 @@ import { Observable, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../api/api.config';
 import { AuthUser, ManagementMode, ROLE_RANK, UserRole, isUserRole } from './auth.models';
 import { PageKey } from './page-keys';
+import { ThemeService } from '../theme.service';
 
 const STORAGE_KEY = 'etl_auth_user';
 
@@ -86,6 +87,7 @@ export const WORK_IN_WORKSPACE_PATH = '/platform/work-in-workspace';
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly themes = inject(ThemeService);
 
   /** Signal rather than BehaviorSubject: templates read it directly with no async pipe. */
   private readonly currentUser = signal<AuthUser | null>(this.readStoredUser());
@@ -273,7 +275,11 @@ export class AuthService {
    * when it carries a session -- a two-factor challenge carries none.
    */
   signedIn(response: ApiResponse<AuthUser>): void {
-    if (response.status === API_SUCCESS && response.data?.accessToken) this.persist(withPictureKnown(response.data));
+    if (response.status === API_SUCCESS && response.data?.accessToken) {
+      this.persist(withPictureKnown(response.data));
+      // The person's theme follows them to this device: their own choice, else their workspace's default.
+      this.themes.adoptSignIn(response.data.theme, response.data.workspaceTheme);
+    }
   }
 
   /**

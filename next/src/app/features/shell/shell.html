@@ -63,14 +63,14 @@
       <!-- Right side -->
       <div class="flex items-center gap-1 shrink-0">
         <app-notification-bell />
-        <button type="button" class="btn btn-ghost btn-icon" (click)="theme.toggle()"
-                [title]="theme.theme() === 'dark' ? 'Switch to light' : 'Switch to dark'">
-          @if (theme.theme() === 'dark') {
-            <app-icon name="sun" size="1.05em" label="Switch to light theme" />
-          } @else {
-            <app-icon name="moon" size="1.05em" label="Switch to dark theme" />
-          }
-        </button>
+        <!-- The app themes (owner 2026-10-13): a menu, where this was a light/dark switch. Its own chunk, loaded after the
+             first paint (as the avatar is), so the first download does not carry it; until then the same button, inert. -->
+        <ng-container #themeMenu />
+        @if (!themeMenuLoaded()) {
+          <button type="button" class="btn btn-ghost btn-icon" aria-label="Theme" aria-disabled="true">
+            <app-icon [name]="theme.theme() === 'dark' ? 'moon' : 'sun'" size="1.05em" />
+          </button>
+        }
 
         <div class="relative" data-nav-menu="__user" (focusout)="onMenuFocusOut($event, '__user')">
           <button type="button" (click)="toggleMenu('__user')"

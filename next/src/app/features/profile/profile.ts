@@ -28,6 +28,10 @@ import { StatTile } from '../../shared/ui/stat-tile';
 import { AccountSecurityApi, PasswordRules } from '../account/account-security.api';
 import { PasswordRulesHint, newPasswordPlaceholder } from '../account/password-rules';
 import { PageHeader } from '../../shared/ui/page-header';
+import { ThemeChooser } from '../../shared/ui/theme-chooser';
+import { ThemeChoice, ThemeService } from '../../core/theme.service';
+import { themeLabel } from '../../core/theme-options';
+import { ThemePreference } from '../../core/theme-preference';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
 export interface ActivityRun {
@@ -67,17 +71,29 @@ interface UserProfile {
   position?: string | null;
   /** E.164, exactly as the admin screen and the server hold it. */
   phoneNumber?: string | null;
+  /** Their own app theme, null when they never chose; and their workspace's default (null: System). */
+  theme?: string | null;
+  workspaceTheme?: string | null;
 }
 
 @Component({
   selector: 'app-profile',
-  imports: [PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint],
+  imports: [PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint, ThemeChooser],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  readonly themes = inject(ThemeService);
+  private readonly themePreference = inject(ThemePreference);
+  /** After a pick: kept on the account, or (the server refused or was unreachable) on this device only. */
+  readonly themeSaved = signal<'saved' | 'local' | null>(null);
+  readonly ownTheme = computed(() => this.themePreference.own());
+  readonly workspaceThemeLabel = computed(() => {
+    const ws = this.themePreference.workspaceDefault();
+    return ws ? themeLabel(ws) : null;
+  });
   private readonly pictures = inject(AvatarCache);
   readonly auth = inject(AuthService);
   private readonly security = inject(AccountSecurityApi);
@@ -208,6 +224,12 @@ export class Profile implements OnInit {
     return !!run.startTime && !run.endTime;
   }
 
+  /** Profile › Appearance: on screen at once, then kept on the account. null: back to the workspace's default. */
+  chooseTheme(choice: ThemeChoice | null): void {
+    this.themeSaved.set(null);
+    this.themePreference.choose(choice).subscribe(kept => this.themeSaved.set(kept ? 'saved' : 'local'));
+  }
+
   ngOnInit(): void {
     this.load();
     if (!this.auth.isManagedSession()) {
@@ -237,6 +259,9 @@ export class Profile implements OnInit {
         this.loading.set(false);
         if (response.status === API_SUCCESS && response.data) {
           this.profile.set(response.data);
+          // The account's theme as it stands now, for Appearance: a session from before themes, or one whose
+          // workspace default changed since sign-in, learns it here. What is on screen stays this device's.
+          this.auth.patchUser({ theme: response.data.theme ?? null, workspaceTheme: response.data.workspaceTheme ?? null });
           // Every editable field, not just the name: a field left unset would render empty and
           // then read as "cleared" the next time anything was saved.
           this.resetDetails();

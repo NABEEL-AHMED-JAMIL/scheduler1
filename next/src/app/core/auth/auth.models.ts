@@ -108,6 +108,10 @@ export interface AuthUser {
   passwordExpired?: boolean | null;
   /** MIG-353: how this session signed in: PASSWORD, MFA, RECOVERY_CODE or SSO. */
   signInMethod?: string | null;
+  /** The app theme this person chose (ThemeChoice), kept on their account; null when they never chose. */
+  theme?: string | null;
+  /** Their workspace's default theme, which applies while they have none of their own; null: System. */
+  workspaceTheme?: string | null;
 }
 
 /** MIG-244: SELF, the customer's administrators build; MANAGED, our team does and the customer's people use. */

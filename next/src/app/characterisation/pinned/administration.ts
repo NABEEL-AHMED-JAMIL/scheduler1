@@ -44,6 +44,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/administration",
       "/administration/access-profiles",
+      "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
       "/administration/users"
@@ -86,6 +87,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/administration",
       "/administration/access-profiles",
+      "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
       "/administration/users"
@@ -132,6 +134,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/administration",
       "/administration/access-profiles",
+      "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
       "/administration/users"

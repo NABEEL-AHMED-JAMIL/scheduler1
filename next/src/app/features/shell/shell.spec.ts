@@ -218,7 +218,8 @@ describe('shell navigation', () => {
       const { fixture, shell: s, el } = await rendered();
       s.toggleMenu('Get data in');
       await fixture.whenStable();
-      expect(el.querySelector('[aria-haspopup]')).toBeNull();
+      // The navigation's panels; the theme menu (app-theme-menu) is a real menu of choices, and says so.
+      expect(el.querySelector('[data-nav-menu] [aria-haspopup]')).toBeNull();
       const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Get data in"] > button')!;
       const panel = el.querySelector<HTMLElement>('#' + trigger.getAttribute('aria-controls'));
       expect(panel).not.toBeNull();

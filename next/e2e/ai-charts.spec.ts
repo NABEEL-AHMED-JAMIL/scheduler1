@@ -30,7 +30,11 @@ async function shots(page: Page, info: TestInfo, name: string, focus?: string): 
     for (const theme of ['light', 'dark'] as const) {
       const now = await page.evaluate(() => (document.documentElement.classList.contains('dark') ? 'dark' : 'light'));
       // Dispatched, not clicked: an open panel's backdrop covers the header's button.
-      if (now !== theme) await page.locator(`button[title="Switch to ${theme}"]`).first().dispatchEvent('click');
+      // The top bar's theme menu (2026-10-13): open it, pick the theme.
+      if (now !== theme) {
+        await page.locator('button[title^="Theme:"]').first().dispatchEvent('click');
+        await page.locator(`[data-theme-choice="${theme}"]`).first().dispatchEvent('click');
+      }
       if (focus) await page.locator(focus).first().scrollIntoViewIfNeeded();
       await page.waitForTimeout(600);
       await shot(page, info, `${name}-${width}-${theme}`);

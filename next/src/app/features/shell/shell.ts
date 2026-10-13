@@ -3,8 +3,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
-import { roleLabel } from '../../core/auth/auth.models';
 import { ThemeService } from '../../core/theme.service';
+import { roleLabel } from '../../core/auth/auth.models';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
 import { NAV, NavChild, NavItem, placeOf } from '../../core/nav/nav-tree';
@@ -26,6 +26,7 @@ const COLLAPSED_KEY = 'etl_nav_collapsed';
 })
 export class Shell {
   readonly auth = inject(AuthService);
+  /** The theme menu's placeholder shows the family's icon until the menu's chunk is in. */
   readonly theme = inject(ThemeService);
   readonly tasks = inject(TaskCountService);
   private readonly access = inject(NavAccess);
@@ -50,6 +51,9 @@ export class Shell {
   readonly avatarType = signal<Type<unknown> | null>(null);
   private readonly topAvatar = viewChild('topAvatar', { read: ViewContainerRef });
   private readonly menuAvatar = viewChild('menuAvatar', { read: ViewContainerRef });
+  /** The theme menu (theme-menu.ts), once its chunk has loaded; the placeholder button stands in until then. */
+  private readonly themeMenuHost = viewChild('themeMenu', { read: ViewContainerRef });
+  readonly themeMenuLoaded = signal(false);
 
   /** Where the sidebar's links go once their chunk has loaded (side-nav.ts). */
   private readonly sideNavHost = viewChild('sideNav', { read: ViewContainerRef });
@@ -67,6 +71,12 @@ export class Shell {
       }
       void import('../../core/auth/idle-guard').then(m => { if (!destroyed && !host.length) host.createComponent(m.IdleGuard); });
       void import('./shell-avatar').then(m => { if (!destroyed) this.avatarType.set(m.ShellAvatar); });
+      void import('./theme-menu').then(m => {
+        const slot = this.themeMenuHost();
+        if (destroyed || !slot || slot.length) return;
+        slot.createComponent(m.ThemeMenu);
+        this.themeMenuLoaded.set(true);
+      });
       // The sidebar (≥1440px): its own chunk, so the first load carries only the bar.
       void import('./side-nav').then(m => {
         const side = this.sideNavHost();
