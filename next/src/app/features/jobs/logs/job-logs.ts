@@ -18,6 +18,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { Crumb } from '../../../core/nav/nav-tree';
 import { RunTimelineStore } from '../run-steps/run-timeline.store';
+import { formatMoney } from '../../billing/billing-format';
 import { RunStepsTable } from '../run-steps/run-steps-table';
 import { RunMap } from '../run-steps/run-map';
 import { RunOutputs } from '../run-steps/run-outputs';
@@ -61,8 +62,11 @@ function stillRunningWord(status: string | null | undefined): string {
       display: flex; flex-direction: column; justify-content: center; }
     .run-fact:last-child { box-shadow: none; }
     @media (min-width: 1024px) {
-      .has-next .run-fact:nth-child(3n) { box-shadow: none; }
-      .has-next .run-fact:nth-child(n+4) { border-top: 1px solid var(--border-subtle); }
+      .has-next .run-facts.is-wide { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      .has-next .run-facts:not(.is-wide) .run-fact:nth-child(3n),
+      .has-next .run-facts.is-wide .run-fact:nth-child(4n) { box-shadow: none; }
+      .has-next .run-facts:not(.is-wide) .run-fact:nth-child(n+4),
+      .has-next .run-facts.is-wide .run-fact:nth-child(n+5) { border-top: 1px solid var(--border-subtle); }
     }
     .run-fact dt { font-size: 11px; color: var(--text-muted); margin-bottom: 0.125rem; white-space: nowrap; }
     .run-fact dd { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -160,8 +164,26 @@ export class JobLogs implements OnInit, OnDestroy {
       duration: this.duration(),
       startedBy: startedBy(run, this.job()),
       timeline: this.store.timeline(),
+      cost: this.cost(),
     });
   });
+  /** UX review B9: what the run cost, for an administrator (Billing's runCost); null when unknown or not theirs to read. */
+  readonly cost = signal<string | null>(null);
+  private costFor: string | null = null;
+  private loadCost(): void {
+    const id = this.jobQueueId().trim();
+    if (this.costFor === id || !this.auth.isTenantAdmin?.()) return;
+    this.costFor = id;
+    this.http.get<ApiResponse<{ cost?: number | null; currency?: string | null }>>(`${API_BASE}/billing.json/runCost`, { params: { jobQueueId: id } })
+      .subscribe({
+        next: r => {
+          const cost = r.status === API_SUCCESS ? r.data?.cost : null;
+          this.cost.set(typeof cost === 'number' ? formatMoney(cost, r.data?.currency || 'USD', cost > 0 && cost < 1 ? 4 : 2) : null);
+        },
+        error: () => this.cost.set(null),
+      });
+  }
+
   /** The run's closing message, when it says something the strip and the steps do not (a failure, a skip). */
   readonly closingMessage = computed(() => {
     const run = this.run();
@@ -241,7 +263,7 @@ export class JobLogs implements OnInit, OnDestroy {
       const key = `${this.jobId()}/${this.jobQueueId()}`;
       if (shown !== null && shown !== key) untracked(() => {
         this.logs.set([]); this.job.set(null); this.run.set(null); this.review.set(null); this.aiSteps.set([]);
-        this.aiStepsLoadedFor = null; this.missing.set(false);
+        this.aiStepsLoadedFor = null; this.costFor = null; this.cost.set(null); this.missing.set(false);
         this.load();
       });
       shown = key;
@@ -547,6 +569,7 @@ export class JobLogs implements OnInit, OnDestroy {
           this.run.set(data?.sourceJobQueue ?? null);
           this.loads.update(n => n + 1);
           this.loadAiSteps();
+          this.loadCost();
         } else if (isMissingRecord(response)) {
           this.goneMissing();
           return;

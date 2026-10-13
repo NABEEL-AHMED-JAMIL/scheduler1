@@ -78,6 +78,8 @@ export interface RunFact { label: string; value: string; hint?: string; }
  */
 export function runFacts(input: {
   start: string; end: string; duration: string; startedBy: string; timeline: StepTimeline | null;
+  /** What the run cost (Billing's runCost, an administrator's read), already in words; null when not known. */
+  cost?: string | null;
 }): RunFact[] {
   const facts: RunFact[] = [
     { label: 'Started', value: input.start },
@@ -92,6 +94,7 @@ export function runFacts(input: {
     const rows = runRows(steps);
     if (rows) facts.push({ label: 'Rows in → out', value: rows.value, hint: rows.hint });
   }
+  if (input.cost) facts.push({ label: 'Cost', value: input.cost, hint: 'This run\'s share of the month\'s priced usage, before allowances' });
   return facts;
 }
 

@@ -73,6 +73,11 @@ describe('run page: the summary strip', () => {
     expect(runRows([step(0, 'a', 'x', { recordsOut: 1 })])?.hint).toBe('1 record read, 1 record out of the last step');
   });
 
+  it('adds the run\'s cost when Billing told an administrator what it was', () => {
+    const f = runFacts({ start: 'a', end: 'b', duration: '1s', startedBy: 'By hand', timeline: null, cost: '$0.8722' });
+    expect(f.at(-1)).toMatchObject({ label: 'Cost', value: '$0.8722' });
+  });
+
   it('leaves the steps out for a run the step engine did not take', () => {
     expect(facts(null).map(f => f.label)).toEqual(['Started', 'Ended', 'Duration', 'Started by']);
   });

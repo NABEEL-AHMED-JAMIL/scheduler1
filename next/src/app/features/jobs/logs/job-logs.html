@@ -20,7 +20,7 @@
   @if (run(); as r) {
     <div class="run-top" [class.has-next]="hasNext()">
       <section class="card overflow-clip min-w-0 flex flex-col" aria-label="This run" data-test="run-summary">
-        <dl class="run-facts flex-1">
+        <dl class="run-facts flex-1" [class.is-wide]="facts().length > 6">
           @for (f of facts(); track f.label) {
             <div class="run-fact" [attr.title]="f.hint || null" [attr.data-fact]="f.label"><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div>
           }
