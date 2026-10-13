@@ -27,9 +27,10 @@ describe('Bulk import / export', () => {
    * Back was location.back(): opened directly or in a new tab it left the console. Each route
    * already carried a backTo that nothing read (UI audit, Low).
    */
+  // UX review 2026-10-12 (A2): the way back is the breadcrumb, Build › Pipelines › Bulk pipelines.
   it('links back to its own list rather than to the browser history', () => {
     const { el } = page();
-    const back = [...el.querySelectorAll('a')].find(a => /Back to pipelines/.test(a.textContent!));
+    const back = [...el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].find(a => a.textContent!.trim() === 'Pipelines');
     expect(back?.getAttribute('href')).toBe('/pipelines');
   });
 

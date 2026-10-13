@@ -1,13 +1,8 @@
 <div class="page-form">
-  <div>
-    <a routerLink="/pipelines" class="text-sm text-accent hover:underline">← Back to pipelines</a>
-    <h1 class="page-title mt-1">
-      {{ isEdit() ? 'Edit pipeline' : 'New pipeline' }}
-    </h1>
-    <p class="page-subtitle">
-      A pipeline describes one unit of work and where it reads and writes.
-    </p>
-  </div>
+  <!-- UX review 2026-10-12 (A2, P4): the pipeline's name as the title, its status beside it; the breadcrumb leads back. -->
+  <app-page-header [title]="heading()" subtitle="A pipeline describes one unit of work and where it reads and writes.">
+    @if (isEdit() && loadedStatus()) { <app-status pills [label]="loadedStatus()" /> }
+  </app-page-header>
   <app-managed-banner what="pipelines" />
 
   @if (loading()) {
@@ -218,12 +213,14 @@
       }
 
       </fieldset>
-      <div class="form-actions">
+      <!-- UX review 2026-10-12 (A5, G6, P6): one save bar, stuck to the editor's foot: the change state on the left, Cancel
+           then the primary on the right. -->
+      <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [state]="form.dirty ? 'Unsaved changes' : 'No changes'" label="Save the pipeline">
         <a routerLink="/pipelines" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create pipeline') }}
         </button>
-      </div>
+      </app-actions-bar>
     </form>
     @if (stepsMode() && stepsView(); as view) {
       <app-step-builder [class.hidden]="activeTab() === 'details'" [view]="view" [tab]="builderTab()" [taskDetailId]="taskIdNumber()"

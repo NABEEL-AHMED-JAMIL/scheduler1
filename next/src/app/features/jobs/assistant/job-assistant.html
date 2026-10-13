@@ -1,37 +1,36 @@
 <div [class.page]="!compact()" [class.flex]="compact()" [class.flex-col]="compact()"
      [class.gap-3]="compact()" [class.min-h-0]="compact()" [class.p-3]="compact()">
-  @if (!compact()) {
-    <a class="link-inline text-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']">
-      <app-icon name="arrowLeft" size="0.9em" />Back to run history
-    </a>
-  }
-
-  <div class="page-head" [class.hidden]="compact()">
-    <div>
-      <h1 class="page-title">
-        Schedule assistant
-        @if (facts(); as f) { <span class="font-normal text-[color:var(--text-secondary)]">— {{ f.jobName }}</span> }
-      </h1>
-      <p class="page-subtitle">
-        Answers about job #{{ jobId() }} only, built from its own record and runs.
-      </p>
+  <!-- UX review 2026-10-12 (A2): the breadcrumb leads back to the schedule's runs. Docked beside the runs (compact),
+       the page has no header at all. -->
+  <app-page-header [class.hidden]="compact()" [trail]="[{ label: 'Run & review' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' },
+                    { label: (facts()?.jobName ? facts()!.jobName + ' · runs' : 'Schedule runs'), link: '/pipelines/schedules/' + jobId() + '/executions' }]">
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">
+          Schedule assistant
+          @if (facts(); as f) { <span class="font-normal text-[color:var(--text-secondary)]">— {{ f.jobName }}</span> }
+        </h1>
+        <p class="page-subtitle">
+          Answers about schedule #{{ jobId() }} only, built from its own record and runs.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <!-- Bordered rather than ghost: these are real actions, and a ghost button in a page
+             header reads as a caption. Not brand-filled -- they are secondary to asking. -->
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+                [title]="runs().length ? 'Download this job\'s runs as CSV' : 'There are no runs to export yet'"
+                (click)="exportRuns('csv')">
+          <app-icon name="download" />CSV
+        </button>
+        <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+                [title]="runs().length ? 'Download this job\'s runs as an Excel workbook' : 'There are no runs to export yet'"
+                (click)="exportRuns('xlsx')">
+          <app-icon name="table" [busy]="exporting() === 'xlsx'" />
+          {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <!-- Bordered rather than ghost: these are real actions, and a ghost button in a page
-           header reads as a caption. Not brand-filled -- they are secondary to asking. -->
-      <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
-              [title]="runs().length ? 'Download this job\'s runs as CSV' : 'There are no runs to export yet'"
-              (click)="exportRuns('csv')">
-        <app-icon name="download" />CSV
-      </button>
-      <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
-              [title]="runs().length ? 'Download this job\'s runs as an Excel workbook' : 'There are no runs to export yet'"
-              (click)="exportRuns('xlsx')">
-        <app-icon name="table" [busy]="exporting() === 'xlsx'" />
-        {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
@@ -79,8 +78,9 @@
            not match, so with none configured there is nothing here to choose. -->
       @if (agents().length) {
         <div class="flex items-center gap-2 mb-2.5">
-          <label class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]"
-                 [attr.for]="'assistant-agent-' + jobId()">Anything else, ask</label>
+          <!-- G11, SAS1: says what the picker does, as a label rather than an overline. -->
+          <label class="text-sm font-medium text-[color:var(--text-primary)]"
+                 [attr.for]="'assistant-agent-' + jobId()">Ask with a saved prompt</label>
           <select class="input max-w-52 shrink-0" [attr.id]="'assistant-agent-' + jobId()"
                   [value]="agentId()"
                   (change)="agentId.set(+$any($event.target).value || null)">

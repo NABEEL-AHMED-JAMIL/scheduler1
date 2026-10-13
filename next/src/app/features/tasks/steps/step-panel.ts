@@ -1,4 +1,6 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { FormRow } from '../../../shared/ui/form-row';
+import { Section } from '../../../shared/ui/section';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
@@ -43,7 +45,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {

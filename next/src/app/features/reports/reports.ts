@@ -28,6 +28,8 @@ import {
   EXEC_SECONDS, JOB_NAME, NO_DURATION, RUN_ID, TENANT_IDX, RunData, RunRow, SECONDS, aggregate,
   withJobDimension,
 } from './pivot';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 const EMPTY: RunData = { task: [], status: [], owner: [], day: [], job: [], tenant: [], rows: [] };
 
@@ -170,7 +172,7 @@ interface QueueLog {
  */
 @Component({
   selector: 'app-reports',
-  imports: [DateField, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, DateField, Icon, StatTile, StatusPill, TableShell, Donut, BarChart, Histogram, ReportPivot, Combobox, Pagination, DecimalPipe, RouterLink, ServerTimePipe],
   templateUrl: './reports.html',
 })
 export class Reports implements OnInit {

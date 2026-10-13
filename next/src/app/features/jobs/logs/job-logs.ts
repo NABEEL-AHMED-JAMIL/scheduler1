@@ -18,6 +18,9 @@ import { Markdown } from '../../../shared/ui/markdown';
 import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { LogSegment, logSegments, pathParts } from './log-segments';
 import { RunSteps } from '../run-steps/run-steps';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { Crumb } from '../../../core/nav/nav-tree';
 
 interface AuditLog {
   jobAuditLogId?: number;
@@ -32,7 +35,7 @@ const RENDER_STEP = 2000;
 
 @Component({
   selector: 'app-job-logs',
-  imports: [StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented, RunSteps],
+  imports: [PageHeader, RefreshButton, StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Markdown, Segmented, RunSteps],
   templateUrl: './job-logs.html',
 })
 export class JobLogs implements OnInit, OnDestroy {
@@ -65,6 +68,17 @@ export class JobLogs implements OnInit, OnDestroy {
   /** The job and the specific run, so a log line has the context the old screen showed. */
   readonly job = signal<any | null>(null);
   readonly run = signal<any | null>(null);
+  /** UX review 2026-10-12 (A2, R1): the run's number and its schedule as the title, not "Run logs". */
+  readonly heading = computed(() => {
+    const name = this.job()?.jobName;
+    return `Run #${this.jobQueueId()}` + (name ? ` · ${name}` : '');
+  });
+  /** Run & review › Schedules & triggers › <the schedule's runs> › Run #8214. */
+  readonly trail = computed<Crumb[]>(() => [
+    { label: 'Run & review' },
+    { label: 'Schedules & triggers', link: '/pipelines/schedules' },
+    { label: this.job()?.jobName ? `${this.job().jobName} · runs` : 'Schedule runs', link: `/pipelines/schedules/${this.jobId()}/executions` },
+  ]);
   /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
   readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
   readonly showDetail = signal(true);

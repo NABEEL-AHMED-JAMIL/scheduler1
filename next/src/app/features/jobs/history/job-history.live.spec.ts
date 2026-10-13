@@ -114,13 +114,15 @@ describe('Run history live updates', () => {
     expect(gets.find(url => url.includes('fetchSourceJobQueueListWithJobId'))).toContain('limit=500');
   });
 
+  // UX review 2026-10-12 (A2): the Live mark is a dot inside the header's Refresh, its tooltip saying so.
   it('shows the Live mark only while the feed is connected', () => {
     const { connected } = setup();
     const fixture = TestBed.createComponent(JobHistory);
     fixture.componentRef.setInput('jobId', '41');
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const hasLive = () => [...el.querySelectorAll('span')].some(s => s.textContent?.trim() === 'Live');
+    const hasLive = () => !!el.querySelector('.refresh-live')
+      && /live/.test(el.querySelector('.refresh-btn')?.getAttribute('title') ?? '');
     expect(hasLive()).toBe(false);
     connected.set(true);
     fixture.detectChanges();

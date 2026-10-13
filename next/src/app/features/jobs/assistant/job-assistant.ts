@@ -17,6 +17,7 @@ import {
 } from './job-assistant.answers';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 interface Turn {
   /** Monotonic, so two turns in the same millisecond cannot collide as @for track keys. */
@@ -39,7 +40,7 @@ const ASSISTANT_RUNS = 500;
  */
 @Component({
   selector: 'app-job-assistant',
-  imports: [Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip],
+  imports: [PageHeader, Icon, ServerTimePipe, RouterLink, StatusPill, Donut, RankedBar, StatStrip],
   templateUrl: './job-assistant.html',
   /*
    * In a panel the host has to be a flex item that can shrink, or the layout chain breaks

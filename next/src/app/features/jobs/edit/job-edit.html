@@ -1,13 +1,8 @@
 <div class="page-form">
-  <div>
-    <a routerLink="/pipelines/schedules" class="text-sm text-accent hover:underline">← Back to schedules</a>
-    <h1 class="page-title mt-1">
-      {{ isEdit() ? 'Edit schedule' : 'New schedule' }}
-    </h1>
-    <p class="page-subtitle">
-      Choose a pipeline, say when it should run, and who hears how it went.
-    </p>
-  </div>
+  <!-- UX review 2026-10-12 (A2): the schedule's name as the title; the breadcrumb leads back to the schedules. -->
+  <app-page-header [title]="heading()" subtitle="Choose a pipeline, say when it should run, and who hears how it went.">
+    @if (isEdit() && loadedName()) { <app-status pills [label]="jobStatusValue()" /> }
+  </app-page-header>
   <app-managed-banner what="schedules" />
 
   @if (loading()) {
@@ -286,9 +281,10 @@
       </div>
 
       </fieldset>
-      <div class="form-actions">
-        <!-- State beside the button that saves it: Active runs as soon as it is saved. -->
-        <label class="flex items-center gap-2 text-sm mr-auto">
+      <!-- UX review 2026-10-12 (A5, G6): one save bar, stuck to the form's foot. The schedule's state on the left, beside
+           the button that saves it (Active runs as soon as it is saved); Cancel then the primary on the right. -->
+      <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" label="Save the schedule">
+        <label state class="flex items-center gap-2 text-sm text-[color:var(--text-primary)]">
           <input type="checkbox" class="checkbox" role="switch" id="jobActive" [disabled]="locked()"
                  [checked]="jobStatusValue() === 'Active'" (change)="setActive($any($event.target).checked)" />
           {{ jobStatusValue() === 'Active' ? 'Active: runs as soon as it is saved' : 'Inactive: saved without runs' }}
@@ -301,7 +297,7 @@
         <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create schedule') }}
         </button>
-      </div>
+      </app-actions-bar>
     </form>
 
     <aside class="card p-4 schedule-summary" aria-labelledby="schedule-summary-heading" data-schedule-summary>

@@ -38,6 +38,8 @@ import { dayLabel } from '../../shared/ui/time-format';
 import { Combobox } from '../../shared/ui/combobox';
 import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export interface Scheduler {
   schedulerId: number;
@@ -114,7 +116,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {

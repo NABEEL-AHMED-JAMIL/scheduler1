@@ -136,7 +136,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/steps/definition?pipelineKey=100167"
     ],
     "headings": [
-      "Edit pipeline",
+      "Reference: CSV check and summarise",
       "Basics",
       "Reference: CSV check and summarise"
     ],
@@ -197,7 +197,7 @@ export const PINNED: Record<string, unknown> = {
   ],
   "the editor: the raw XML payload, for a pipeline without a definition": {
     "headings": [
-      "Edit pipeline",
+      "Reference: CSV check and summarise",
       "Basics",
       "Payload"
     ],

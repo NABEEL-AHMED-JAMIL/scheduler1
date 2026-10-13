@@ -31,6 +31,9 @@ import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } 
 import { AiModelPicks } from '../ai-models/ai-model-picks';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { AuthService } from '../../../core/auth/auth.service';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { StatusPill } from '../../../shared/ui/status-pill';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 const FREQUENCIES = [
   { value: 'Mint',    label: 'Every N minutes', choice: 'Minutes', unit: 'minute' },
@@ -98,7 +101,7 @@ function endAfterStart(group: AbstractControl): ValidationErrors | null {
 
 @Component({
   selector: 'app-job-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner, DateField, TimeField],
+  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, AiModelPicks, ManagedBanner, DateField, TimeField],
   templateUrl: './job-edit.html',
   /*
    * The weekday picker is the one multi-select .seg: several days can be on at once, so "on" has
@@ -210,6 +213,9 @@ export class JobEdit implements OnInit {
   readonly selectedDays = signal<string[]>([]);
 
   readonly isEdit = computed(() => !!this.jobId());
+  /** UX review 2026-10-12 (A2, S2): the page is titled with the schedule's name, its status beside it. */
+  readonly loadedName = signal('');
+  readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Schedule') : 'New schedule');
 
   readonly form: FormGroup = this.fb.group({
     jobId: [null],
@@ -478,6 +484,7 @@ export class JobEdit implements OnInit {
           return;
         }
         const job = response.data;
+        this.loadedName.set(job.jobName ?? '');
         this.form.patchValue({
           jobId: job.jobId,
           jobName: job.jobName,

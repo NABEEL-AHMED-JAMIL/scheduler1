@@ -1,28 +1,22 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Queue</h1>
-      <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Runs by date</h1>
+        <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (hasInsights()) {
+          <button type="button" class="btn btn-ghost btn-sm"
+                  [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
+                  (click)="showInsights.set(!showInsights())">
+            <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
+          </button>
+        }
+        <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (live()) {
-        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
-              title="Connected — the list re-reads as runs report in">
-          <span class="live-dot live-on"></span>Live
-        </span>
-      }
-      @if (hasInsights()) {
-        <button type="button" class="btn btn-ghost btn-sm"
-                [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
-                (click)="showInsights.set(!showInsights())">
-          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
-        </button>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="runs' status" still="You can still see every run and its logs." />
 
   @if (counts().length) {

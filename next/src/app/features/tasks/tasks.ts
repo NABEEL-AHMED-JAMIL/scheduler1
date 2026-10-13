@@ -22,6 +22,8 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { parseTopicPartition } from '../../shared/ui/topic';
 import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export interface LinkedJob {
   jobId: number;
@@ -61,7 +63,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
+  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {

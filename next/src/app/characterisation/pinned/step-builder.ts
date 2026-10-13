@@ -2,7 +2,7 @@
 export const PINNED: Record<string, unknown> = {
   "JSON": {
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload"
     ],
@@ -52,7 +52,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "Settings": {
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload",
       "Pipeline settings",
@@ -139,7 +139,7 @@ export const PINNED: Record<string, unknown> = {
       "POST /pipeline.json/steps/validate {format,text}"
     ],
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload",
       "Steps"
@@ -201,7 +201,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "YAML": {
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload"
     ],
@@ -268,7 +268,7 @@ export const PINNED: Record<string, unknown> = {
       "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1854 {}"
     ],
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload",
       "Steps"
@@ -337,7 +337,7 @@ export const PINNED: Record<string, unknown> = {
       "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1864 {}"
     ],
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload",
       "Steps"
@@ -397,7 +397,8 @@ export const PINNED: Record<string, unknown> = {
   "a step in the side panel": {
     "headings": [
       "Step 2 · keep",
-      "Task settings"
+      "Task settings",
+      "How it runs"
     ],
     "buttons": [
       "Apply",
@@ -424,7 +425,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "its Details tab is the task form": {
     "headings": [
-      "Edit pipeline",
+      "UI-CHECK step engine task 0928",
       "Basics",
       "Payload",
       "Steps"

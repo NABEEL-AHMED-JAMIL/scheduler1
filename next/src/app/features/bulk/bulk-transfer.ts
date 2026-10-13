@@ -9,6 +9,8 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { localIsoDay } from '../../shared/ui/local-day';
+import { PageHeader } from '../../shared/ui/page-header';
+import { Crumb } from '../../core/nav/nav-tree';
 
 /** How many of a rejected sheet's row reasons the card lists before "and N more". */
 const ROWS_SHOWN = 20;
@@ -33,6 +35,8 @@ interface Endpoints {
   upload: string;
   noun: string;
   backTo: string;
+  /** The breadcrumb before "Bulk …": the menu's group and the list it imports into (UX review 2026-10-12, A2). */
+  trail: Crumb[];
   /** What the template cannot say for itself, under the template button. */
   templateNote?: string;
 }
@@ -44,6 +48,7 @@ const ROUTES: Record<Kind, Endpoints> = {
     upload: '/sourceJob.json/uploadSourceJob',
     noun: 'schedules',
     backTo: '/pipelines/schedules',
+    trail: [{ label: 'Run & review' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' }],
     // Wave 4 (Core 6f9261e): the sheet keeps its eleven columns; JobDetailValidation reads a Cron row's Recurrence.
     templateNote: 'For a Cron row, put the cron expression in the Recurrence cell, e.g. 0 3 * * * for 03:00 daily '
       + '(server time). Five fields, or six with seconds 0.',
@@ -54,12 +59,13 @@ const ROUTES: Record<Kind, Endpoints> = {
     upload: '/sourceTask.json/uploadSourceTask',
     noun: 'pipelines',
     backTo: '/pipelines',
+    trail: [{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines' }],
   },
 };
 
 @Component({
   selector: 'app-bulk-transfer',
-  imports: [Icon, RouterLink, FileDropzone, ManagedBanner],
+  imports: [PageHeader, Icon, RouterLink, FileDropzone, ManagedBanner],
   templateUrl: './bulk-transfer.html',
 })
 export class BulkTransfer {

@@ -213,7 +213,7 @@ export const PINNED: Record<string, unknown> = {
   "the queue's charts": {
     "requests": [],
     "headings": [
-      "Queue",
+      "Runs by date",
       "Outcomes",
       "Busiest jobs",
       "Volume by day",
@@ -270,7 +270,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Queue",
+      "Runs by date",
       "Queue (2 of 2)"
     ],
     "buttons": [
@@ -313,7 +313,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Queue",
+      "Runs by date",
       "Queue (2 of 2)"
     ],
     "buttons": [

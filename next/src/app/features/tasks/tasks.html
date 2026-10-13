@@ -1,26 +1,26 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-    <h1 class="page-title">Pipelines</h1>
-    <p class="page-subtitle">
-      A pipeline describes one unit of work and where it reads and writes. Schedules point at these.
-    </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+      <h1 class="page-title">Pipelines</h1>
+      <p class="page-subtitle">
+        A pipeline describes one unit of work and where it reads and writes. Schedules point at these.
+      </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
+             Both routes behind these links are guarded, so for a tenant user they only ever led to
+             /unauthorized -- an offer the console already knows it cannot keep. -->
+        @if (auth.canManageTasks()) {
+          <a routerLink="/pipelines/bulk" class="btn btn-default btn-sm">
+            <app-icon name="upload" />Bulk import
+          </a>
+          <a routerLink="/pipelines/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New pipeline</a>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <!-- The list is TENANT_USER and stays open; everything that writes a task is TENANT_ADMIN.
-           Both routes behind these links are guarded, so for a tenant user they only ever led to
-           /unauthorized -- an offer the console already knows it cannot keep. -->
-      @if (auth.canManageTasks()) {
-        <a routerLink="/pipelines/bulk" class="btn btn-default btn-sm">
-          <app-icon name="upload" />Bulk import
-        </a>
-        <a routerLink="/pipelines/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New pipeline</a>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="pipelines" />
 
   <app-table-shell heading="Pipelines" [loading]="loading()" [error]="error()"

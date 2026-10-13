@@ -20,6 +20,9 @@ import { StepsApi } from '../steps/steps.service';
 import { AuthService } from '../../../core/auth/auth.service';
 import { DefinitionView } from '../steps/steps.model';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { StatusPill } from '../../../shared/ui/status-pill';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 /** The page's tabs when its pipeline has steps (MIG-249): Details is today's form; the rest are the step builder's. */
 export type PageTab = 'details' | BuilderTab;
@@ -40,7 +43,7 @@ export function yesNoAsCheckbox(field: PipelineField): PipelineField {
 
 @Component({
   selector: 'app-task-edit',
-  imports: [Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner],
+  imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner],
   templateUrl: './task-edit.html',
 })
 export class TaskEdit implements OnInit {
@@ -113,6 +116,10 @@ export class TaskEdit implements OnInit {
   private taskTenantId: number | null = null;
 
   readonly isEdit = computed(() => !!this.taskDetailId());
+  /** UX review 2026-10-12 (P4): the page is titled with the pipeline's name, and its status beside it. */
+  readonly loadedName = signal('');
+  readonly loadedStatus = signal('');
+  readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Pipeline') : 'New pipeline');
 
   readonly form: FormGroup = this.fb.group({
     taskDetailId: [null],
@@ -332,6 +339,8 @@ export class TaskEdit implements OnInit {
           groupId: task.groupId,
           taskPayload: task.taskPayload,
         }, { emitEvent: false });
+        this.loadedName.set(task.taskName ?? '');
+        this.loadedStatus.set(task.taskStatus ?? '');
         this.pipelineChosen.set(task.pipelineId ?? '');
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');

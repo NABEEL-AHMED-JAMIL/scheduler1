@@ -1,22 +1,22 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Run analytics</h1>
-      <p class="page-subtitle">
-        What your runs did in this range — how many succeeded, which tasks are struggling,
-        and what failed.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Run analytics</h1>
+        <p class="page-subtitle">
+          What your runs did in this range — how many succeeded, which tasks are struggling,
+          and what failed.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button type="button" class="btn btn-ghost btn-sm" (click)="toggleBuilder()"
+                [attr.aria-expanded]="showBuilder()">
+          <app-icon [name]="showBuilder() ? 'chevronDown' : 'chevronRight'" />Build your own view
+        </button>
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-ghost btn-sm" (click)="toggleBuilder()"
-              [attr.aria-expanded]="showBuilder()">
-        <app-icon [name]="showBuilder() ? 'chevronDown' : 'chevronRight'" />Build your own view
-      </button>
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   <!-- Range. Kept as the app's two native date inputs rather than a new picker component:
        every other screen does it this way, and matching costs nothing. -->
@@ -153,7 +153,7 @@
           }
         </p>
       </div>
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
         <app-stat-tile label="Runs" [value]="counts().total" icon="play"
                        [foot]="runsFoot()" />
         <app-stat-tile label="Failed" [value]="counts().failed" icon="alert"
@@ -452,7 +452,7 @@
           </p>
         </div>
         @if (aiUsage().length) {
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
           <app-stat-tile label="Calls" [value]="aiTotals().calls" icon="sparkle" tone="info" [foot]="aiTotals().prompts + ' prompt' + (aiTotals().prompts === 1 ? '' : 's')" />
           <app-stat-tile label="Failed" [value]="aiTotals().failed" icon="alert" [tone]="aiTotals().failed ? 'warn' : 'muted'" [foot]="aiTotals().calls ? aiTotals().failedPct + '% of calls' : ''" />
           <app-stat-tile label="Tokens in" [value]="aiTotals().tokensIn" icon="list" tone="info" foot="what the prompts sent" />

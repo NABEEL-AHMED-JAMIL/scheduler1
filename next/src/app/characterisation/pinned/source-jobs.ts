@@ -7,7 +7,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1854"
     ],
     "headings": [
-      "Schedules",
+      "Schedules & triggers",
       "Schedules (2 of 2)",
       "Task payload",
       "Recent runs"
@@ -88,7 +88,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/inboxTrigger?jobId=2833"
     ],
     "headings": [
-      "Executions — Reference CSV check (e2e)",
+      "Reference CSV check (e2e) · runs",
       "Runs (1 of 1)"
     ],
     "buttons": [
@@ -186,7 +186,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiPrompt.json/runsForJob?jobQueueId=7331"
     ],
     "headings": [
-      "Run logs",
+      "Run #7331 · Reference CSV check (e2e)",
       "Log entries (2 of 2)"
     ],
     "buttons": [
@@ -203,6 +203,7 @@ export const PINNED: Record<string, unknown> = {
       "Search log entries"
     ],
     "links": [
+      "/pipelines/schedules",
       "/pipelines/schedules/2833/executions"
     ]
   },
@@ -243,7 +244,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/aiModelChoice?jobId=2833"
     ],
     "headings": [
-      "Edit schedule",
+      "Reference CSV check (e2e)",
       "1What runs",
       "2When it runs",
       "3Email me when",
@@ -286,7 +287,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/review/waiting"
     ],
     "headings": [
-      "Executions",
+      "Runs",
       "Runs (2 of 2)"
     ],
     "buttons": [
@@ -346,11 +347,12 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "Anything else, ask",
       "Ask about this job",
-      "Ask about this job — its schedule, files, failures or history"
+      "Ask about this job — its schedule, files, failures or history",
+      "Ask with a saved prompt"
     ],
     "links": [
+      "/pipelines/schedules",
       "/pipelines/schedules/2833/executions"
     ]
   },
@@ -362,7 +364,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Schedules",
+      "Schedules & triggers",
       "Schedules (2 of 2)"
     ],
     "buttons": [
@@ -413,7 +415,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/listSourceJob"
     ],
     "headings": [
-      "Schedules",
+      "Schedules & triggers",
       "Schedules (2 of 2)"
     ],
     "buttons": [

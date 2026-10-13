@@ -1,30 +1,24 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Schedules</h1>
-      <p class="page-subtitle">
-        When each pipeline runs. A schedule binds a pipeline to a timetable.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Schedules &amp; triggers</h1>
+        <p class="page-subtitle">
+          When each pipeline runs, and what starts it: a timetable, a file arriving or an approved document.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
+        <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
+        @if (!locked()) {
+          <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
+            <app-icon name="upload" />Bulk import
+          </a>
+          <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (live()) {
-        <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
-              title="Connected — job status arrives as the pipeline reports it">
-          <span class="live-dot live-on"></span>Live
-        </span>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <!-- MIG-254: every schedule write is a builder action, a member's own included. -->
-      @if (!locked()) {
-        <a routerLink="/pipelines/schedules/bulk" class="btn btn-default btn-sm">
-          <app-icon name="upload" />Bulk import
-        </a>
-        <a routerLink="/pipelines/schedules/new" class="btn btn-primary btn-sm"><app-icon name="plus" />New schedule</a>
-      }
-    </div>
-  </div>
+  </app-page-header>
   <app-managed-banner what="schedules" still="You can still run them." />
 
   @if (stalledCount()) {

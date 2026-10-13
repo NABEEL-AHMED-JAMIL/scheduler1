@@ -29,6 +29,8 @@ import { DateField } from '../../shared/ui/date-field';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 interface QueueRow {
   jobQueueId: number;
@@ -64,7 +66,7 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner],
+  imports: [RefreshButton, PageHeader, DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {

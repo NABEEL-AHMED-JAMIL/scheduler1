@@ -36,6 +36,8 @@ import {
   triggerOf as documentTriggerOf, triggerSentence as documentTriggerSentence, waitingSentence as documentWaitingSentence,
 } from '../documents/document-trigger';
 import { DocumentsApi } from '../../documents/documents.service';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
  * How many runs one read brings: the newest window first, and older ones a window at a time on request.
@@ -64,7 +66,7 @@ interface JobQueue {
 
 @Component({
   selector: 'app-job-history',
-  imports: [AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
+  imports: [PageHeader, RefreshButton, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
     ReviewWaiting],
   templateUrl: './job-history.html',
 })

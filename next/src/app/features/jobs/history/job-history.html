@@ -1,44 +1,23 @@
 <div class="page">
-  <div>
-    <!-- From a schedule, the way back to the schedules; from the menu there is nowhere to go back to (review L3). -->
-    @if (jobId()) {
-      <a routerLink="/pipelines/schedules" class="text-sm text-accent hover:underline">← Back to schedules</a>
-    }
-    <!-- The screen people watch while a job runs: it follows the job-status feed (Live), and
-         the header Refresh, laid out as Run logs has it, stays for when the feed is down. -->
-    <div class="flex items-start gap-3">
-      <h1 class="page-title mt-1 mr-auto">
-        Executions
-        @if (jobName()) {
-          <span class="text-[color:var(--text-secondary)] font-normal">— {{ jobName() }}</span>
-        }
-      </h1>
-      <div class="flex items-center gap-2 mt-1 shrink-0">
-        @if (live()) {
-          <span class="inline-flex items-center gap-1.5 text-[11px] text-[color:var(--text-muted)] mr-1"
-                title="Connected — new runs appear as the pipeline reports them">
-            <span class="live-dot live-on"></span>Live
-          </span>
-        }
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-      </div>
-    </div>
-    <p class="page-subtitle">
+  <!-- UX review 2026-10-12 (A2, G1, E1): one header -- the breadcrumb leads back to the schedules from a schedule's runs;
+       the title names the schedule. The screen people watch while a job runs: it follows the job-status feed (the Live dot
+       in Refresh), and Refresh stays for when the feed is down. -->
+  <app-page-header [title]="jobId() ? (jobName() ? jobName() + ' · runs' : 'Schedule runs') : 'Runs'">
+    <app-refresh-button [loading]="loading()" [live]="live()" (refresh)="load()" />
+    <p subtitle class="page-subtitle">
       @if (isDrillDown()) {
         {{ jobStatus() || 'All' }} runs
-        @if (isAllJobs()) { across every job } @else { of job <span class="mono">#{{ jobId() }}</span> }
+        @if (isAllJobs()) { across every schedule } @else { of schedule <span class="mono">#{{ jobId() }}</span> }
         on {{ dayLabel(targetDate()) }}, {{ hourRange(targetHr()) }}.
       } @else if (jobId()) {
-        Every recorded run of job <span class="mono">#{{ jobId() }}</span>.
+        Every recorded run of schedule <span class="mono">#{{ jobId() }}</span>.
       } @else {
-        <!-- Reached without a job (Executions in the menu): the last day's runs of every job. -->
-        The newest runs of every job in the last day@if (recentCut()) { (the latest {{ runs().length }})}. Open a run's job for its
-        whole history, or choose an hour on the dashboard.
+        <!-- Reached without a schedule (Runs in the menu): the last day's runs of every schedule. -->
+        The newest runs of every schedule in the last day@if (recentCut()) { (the latest {{ runs().length }})}. Open a run's
+        schedule for its whole history, or choose an hour on Home.
       }
     </p>
-  </div>
+  </app-page-header>
 
   @if (!jobId() && !isDrillDown()) {
     <app-review-waiting />
