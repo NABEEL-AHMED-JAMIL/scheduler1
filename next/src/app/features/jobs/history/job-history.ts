@@ -78,6 +78,13 @@ const TRIGGER_WORDS: Record<string, string> = {
   imports: [PageHeader, RefreshButton, AssistantDock, Icon, ServerTimePipe, RouterLink, TableShell, StatusPill, StatusFilterChip, Donut, BarChart, SplitBar, Pagination, StatStrip,
     ReviewWaiting, RunFacetsRail],
   templateUrl: './job-history.html',
+  // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
+  styles: `
+/* UX review 2026-10-12 (B3): Runs as an explorer -- the facets rail at the left, the histogram and the list beside it. */
+.runs-explorer { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1rem; align-items: start; }
+.runs-explorer-rail { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
+@media (max-width: 1023px) { .runs-explorer { grid-template-columns: minmax(0, 1fr); } .runs-explorer-rail { position: static; max-height: none; } }
+  `,
 })
 export class JobHistory {
   /** Runs whose full message is open. Short ones never need it. */
@@ -170,6 +177,8 @@ export class JobHistory {
 
   private loadFacets(): void {
     this.facetsRequest?.unsubscribe();
+    // The counts are Runs by date's (page queue): a reader holding Schedules alone gets the list without them, not a 403.
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); return; }
     this.facetsLoading.set(true);
     this.facetsRequest = this.explorerApi.facets(explorerBody(this.explorerFilter(), RECENT_WINDOW)).subscribe({
       next: r => {

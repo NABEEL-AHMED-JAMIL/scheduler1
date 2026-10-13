@@ -22,7 +22,7 @@
 
   <!-- RA1: one filter bar, every control one height on one line -- no labels stacked above some of them. Every one of
        these narrows data(), which is what the tiles, all three charts, the pipeline table and the builder read. -->
-  <div class="card px-4 py-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filters" data-test="analytics-filters">
+  <div class="card px-4 py-2.5 flex flex-wrap items-center gap-2" role="group" aria-label="Filters" data-test="analytics-filters">
     <div class="w-48"><app-combobox id="r-f-task" ariaLabel="Pipeline" [selected]="taskFilter()" (selectedChange)="taskFilter.set($event)"
               placeholder="All pipelines" clearLabel="All pipelines" [options]="asOptions(taskOptions())" /></div>
     <div class="w-48"><app-combobox id="r-f-job" ariaLabel="Schedule" [selected]="jobFilter()" (selectedChange)="jobFilter.set($event)"

@@ -168,7 +168,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -237,7 +237,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],
@@ -289,7 +289,7 @@ export const PINNED: Record<string, unknown> = {
         "Kind",
         "Service",
         "Input → output",
-        "State",
+        "In this workspace",
         "Actions"
       ]
     ],

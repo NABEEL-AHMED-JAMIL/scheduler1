@@ -28,15 +28,15 @@ export const PINNED: Record<string, unknown> = {
       [
         "",
         "",
-        "Job",
-        "Task",
-        "Execution",
         "Schedule",
-        "Next / last run",
+        "Pipeline",
+        "Mode",
+        "When",
         "Created",
-        "Run status",
         "Created by",
         "Updated by",
+        "Next / last run",
+        "Run status",
         "State",
         "Actions"
       ]
@@ -44,11 +44,11 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Filter by execution type",
       "Filter by run status",
-      "Search id, job or task",
+      "Search id, schedule or pipeline",
       "Search jobs",
       "Select Reference CSV check (e2e)",
       "Select UI-REVIEW Clean customers (manual, notify on completion)",
-      "Select all jobs on this page"
+      "Select all schedules on this page"
     ],
     "links": [
       "/data/files?bucket=etl-bucket&prefix=",
@@ -140,6 +140,7 @@ export const PINNED: Record<string, unknown> = {
       "New schedule",
       "1What runs",
       "2When it runs",
+      "Also starts when",
       "3Email me when",
       "What you will get",
       "Next runs (server time, Chicago)",
@@ -160,12 +161,12 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
+      "A document is approvedEach approved document of a type starts a run; one approved while a run is going waits its turn.",
+      "A file arrivesEach file in the workspace inbox starts a run; one that lands while a run is going waits its turn.",
       "A run completes",
       "A run fails",
       "A run is skipped",
       "Active: runs as soon as it is saved",
-      "Also when a document is approvedEach approved document of a type starts a run; one approved while a run is going waits its turn.",
-      "Also when a file arrivesEach file in the workspace inbox starts a run; one that lands while a run is going waits its turn.",
       "Attempts",
       "Ends",
       "Nightly orders export",
@@ -269,6 +270,7 @@ export const PINNED: Record<string, unknown> = {
       "Reference CSV check (e2e)",
       "1What runs",
       "2When it runs",
+      "Also starts when",
       "3Email me when",
       "What you will get",
       "Emails"
@@ -281,12 +283,12 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
+      "A document is approvedEach approved document of a type starts a run; one approved while a run is going waits its turn.",
+      "A file arrivesEach file in the workspace inbox starts a run; one that lands while a run is going waits its turn.",
       "A run completes",
       "A run fails",
       "A run is skipped",
       "Active: runs as soon as it is saved",
-      "Also when a document is approvedEach approved document of a type starts a run; one approved while a run is going waits its turn.",
-      "Also when a file arrivesEach file in the workspace inbox starts a run; one that lands while a run is going waits its turn.",
       "Attempts",
       "Nightly orders export",
       "Pipeline *(required)",
@@ -296,6 +298,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/pipelines",
+      "/pipelines/1854/edit",
       "/pipelines/schedules"
     ]
   },
@@ -306,20 +309,20 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/listSourceJob",
+      "POST /message.json/runFacets {fromDate,limit,toDate}",
       "POST /message.json/fetchLogs {fromDate,limit,toDate}",
       "GET /sourceJob.json/review/waiting"
     ],
     "headings": [
       "Runs",
+      "Runs over time",
       "Runs (2 of 2)"
     ],
     "buttons": [
       "Charts",
       "Columns",
-      "Completed 1",
       "Refresh",
-      "Show the full message for run #7381",
-      "Skip 1"
+      "Show the full message for run #7381"
     ],
     "columns": [
       [
@@ -335,8 +338,12 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "Last 30 days",
+      "Last 7 days",
       "Search run id or message",
-      "Search runs"
+      "Search runs",
+      "Since yesterday",
+      "Today"
     ],
     "links": [
       "/pipelines/schedules/2835/executions",
@@ -406,15 +413,15 @@ export const PINNED: Record<string, unknown> = {
       [
         "",
         "",
-        "Job",
-        "Task",
-        "Execution",
         "Schedule",
-        "Next / last run",
+        "Pipeline",
+        "Mode",
+        "When",
         "Created",
-        "Run status",
         "Created by",
         "Updated by",
+        "Next / last run",
+        "Run status",
         "State",
         "Actions"
       ]
@@ -422,11 +429,11 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Filter by execution type",
       "Filter by run status",
-      "Search id, job or task",
+      "Search id, schedule or pipeline",
       "Search jobs",
       "Select Reference CSV check (e2e)",
       "Select UI-REVIEW Clean customers (manual, notify on completion)",
-      "Select all jobs on this page"
+      "Select all schedules on this page"
     ],
     "links": [
       "/pipelines",
@@ -461,15 +468,15 @@ export const PINNED: Record<string, unknown> = {
       [
         "",
         "",
-        "Job",
-        "Task",
-        "Execution",
         "Schedule",
-        "Next / last run",
+        "Pipeline",
+        "Mode",
+        "When",
         "Created",
-        "Run status",
         "Created by",
         "Updated by",
+        "Next / last run",
+        "Run status",
         "State",
         "Actions"
       ]
@@ -477,11 +484,11 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Filter by execution type",
       "Filter by run status",
-      "Search id, job or task",
+      "Search id, schedule or pipeline",
       "Search jobs",
       "Select Reference CSV check (e2e)",
       "Select UI-REVIEW Clean customers (manual, notify on completion)",
-      "Select all jobs on this page"
+      "Select all schedules on this page"
     ],
     "links": [
       "/pipelines",

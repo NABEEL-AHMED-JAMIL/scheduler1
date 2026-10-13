@@ -100,17 +100,17 @@ export const PINNED: Record<string, unknown> = {
       "Columns",
       "Only mine",
       "Refresh",
-      "Show payload",
+      "Show schedules and details",
       "Table"
     ],
     "columns": [
       [
         "",
         "Pipeline",
-        "Type",
-        "Topic",
-        "Registry task",
-        "Storage",
+        "Steps",
+        "Schedules",
+        "Last run",
+        "Data",
         "Created by",
         "Updated by",
         "Status",
@@ -127,6 +127,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/pipelines",
+      "/pipelines/1854/edit",
+      "/pipelines/1855/edit",
       "/pipelines/list",
       "/pipelines/prompts",
       "/pipelines/schedules"

@@ -60,6 +60,25 @@ export function yesNoAsCheckbox(field: PipelineField): PipelineField {
   imports: [ActionsBar, PageHeader, StatusPill, Icon, ReactiveFormsModule, RouterLink, Field, Combobox, LoadError, StepBuilder, ManagedBanner,
     CdkMenu, CdkMenuItem, CdkMenuTrigger, Section, EmptyState, ServerTimePipe],
   templateUrl: './task-edit.html',
+  // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
+  styles: `
+/* The pipeline's parts, in the order they are set up: Source -> Steps -> Review -> Outputs -> Schedule & triggers. */
+.pipeline-overview { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; list-style: none; margin: 0; padding: 0; }
+@media (max-width: 1100px) { .pipeline-overview { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 700px) { .pipeline-overview { grid-template-columns: minmax(0, 1fr); } }
+.pipeline-overview > li { min-width: 0; display: flex; }
+.pipeline-part { display: flex; align-items: flex-start; gap: 0.625rem; width: 100%; min-width: 0; padding: 0.75rem 0.875rem; text-align: left; background: none; border: 0; border-right: 1px solid var(--border-subtle); color: inherit; font: inherit; cursor: pointer; }
+.pipeline-overview > li:last-child .pipeline-part { border-right: 0; }
+.pipeline-part:hover { background: var(--surface-inset); }
+.pipeline-part:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.pipeline-part.is-current { box-shadow: inset 0 -2px 0 0 var(--accent-mark-strong); }
+.pipeline-part-state { flex: none; display: inline-grid; place-items: center; width: 1.375rem; height: 1.375rem; border-radius: 9999px; font-size: 0.75rem; border: 1px solid var(--border-subtle); background: var(--surface-sunken); color: var(--text-muted); }
+.pipeline-part[data-state="done"] .pipeline-part-state { background: color-mix(in oklab, var(--color-ok-500) 14%, transparent); border-color: color-mix(in oklab, var(--color-ok-500) 45%, transparent); color: var(--color-ok-500); }
+.pipeline-part[data-state="missing"] .pipeline-part-state { background: color-mix(in oklab, var(--color-warn-500) 14%, transparent); border-color: color-mix(in oklab, var(--color-warn-500) 45%, transparent); color: var(--color-warn-500); }
+.pipeline-part-label { display: flex; align-items: baseline; gap: 0.375rem; font-size: 13px; font-weight: 600; color: var(--text-primary); }
+.pipeline-part-word { font-size: 11px; font-weight: 500; color: var(--text-muted); }
+.pipeline-part-detail { display: block; margin-top: 0.125rem; font-size: 12px; line-height: 1.35; color: var(--text-secondary); overflow-wrap: anywhere; }
+  `,
 })
 export class TaskEdit implements OnInit {
   readonly taskDetailId = input<string>('');
@@ -812,7 +831,9 @@ export class TaskEdit implements OnInit {
   // ------------------------------------------------------------------------------------------ B2: one page, one save
 
   /** The step builder, while it is on the page: its draft, its dirtiness and its save are the save bar's. */
-  readonly builder = viewChild(StepBuilder);
+  private readonly builderQuery = viewChild(StepBuilder);
+  /** Only once its inputs are set (see StepBuilder.ready). */
+  readonly builder = computed(() => { const b = this.builderQuery(); return b?.ready() ? b : undefined; });
 
   /** The details form has changes (followed through the form's pristine events, which a save's markAsPristine fires too). */
   readonly detailsDirty = signal(false);

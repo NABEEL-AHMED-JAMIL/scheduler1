@@ -7,16 +7,21 @@ export const PINNED: Record<string, unknown> = {
       "Payload"
     ],
     "buttons": [
+      "1. Source: Set. Sample rows",
+      "2. Steps: Set. 2 steps in 2 stages",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Details",
+      "History",
       "JSON",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
       "Steps",
-      "Test with sample",
       "Validate",
       "YAML"
     ],
@@ -40,8 +45,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines",
-      "/pipelines/list"
+      "/pipelines"
     ],
     "details": {
       "terms": [],
@@ -56,40 +60,31 @@ export const PINNED: Record<string, unknown> = {
       "UI-CHECK step engine task 0928",
       "Basics",
       "Payload",
-      "Pipeline settings",
-      "Tasks in this workspace",
-      "Versions"
+      "Source",
+      "Run defaults",
+      "Data sensitivity",
+      "Review"
     ],
     "buttons": [
+      "1. Source: Set. Sample rows",
+      "2. Steps: Set. 2 steps in 2 stages",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Details",
+      "History",
       "JSON",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
-      "Show all 124 characters of Why it is unavailable",
-      "Show all 127 characters of Why it is unavailable",
-      "Show all 136 characters of Why it is unavailable",
       "Steps",
-      "Test with sample",
       "Validate",
       "YAML"
     ],
-    "columns": [
-      [
-        "Task",
-        "Kind",
-        "In this workspace",
-        "Switch"
-      ],
-      [
-        "Version",
-        "Saved",
-        "By"
-      ]
-    ],
+    "columns": [],
     "fields": [
       "<pipeline>...</pipeline>",
       "Daily orders import",
@@ -113,29 +108,15 @@ export const PINNED: Record<string, unknown> = {
       "Search this topic’s registry tasks…",
       "Source",
       "Status *(required)",
-      "Switch Aggregate on in this workspace",
-      "Switch Enrich on in this workspace",
-      "Switch Filter on in this workspace",
-      "Switch Join on in this workspace",
-      "Switch Read API on in this workspace",
-      "Switch Read CSV/JSON/Parquet on in this workspace",
-      "Switch Read Database on in this workspace",
-      "Switch Read S3 on in this workspace",
-      "Switch Sample rows on in this workspace",
-      "Switch Save File on in this workspace",
-      "Switch Select columns on in this workspace",
-      "Switch Send Notification on in this workspace",
-      "Switch Transform on in this workspace",
-      "Switch Upload to bucket on in this workspace",
-      "Switch Validate on in this workspace",
-      "Switch Write Database on in this workspace",
       "The customer (through the API)",
       "Topic *(required)",
       "XML configuration *(required)"
     ],
     "links": [
       "/pipelines",
-      "/pipelines/list"
+      "/settings/task-registry",
+      "/workflows/designer?key=pipeline-run-review",
+      "/workflows/designer?key=pipeline-step-approval"
     ]
   },
   "Validate, with a problem on a step": {
@@ -149,6 +130,11 @@ export const PINNED: Record<string, unknown> = {
       "Steps"
     ],
     "buttons": [
+      "1. Source: Set. Sample rows",
+      "2. Steps: Set. 2 steps in 2 stages",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Delete step keep",
       "Delete step read",
@@ -156,6 +142,7 @@ export const PINNED: Record<string, unknown> = {
       "Edit step keep",
       "Edit step read",
       "Flow",
+      "History",
       "JSON",
       "List",
       "Move keep down",
@@ -168,8 +155,8 @@ export const PINNED: Record<string, unknown> = {
       "Reorder read: drag, or use the arrow keys",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
       "Steps",
       "Test with sample",
@@ -197,8 +184,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines",
-      "/pipelines/list"
+      "/pipelines"
     ],
     "problems": [
       "keep"
@@ -211,16 +197,21 @@ export const PINNED: Record<string, unknown> = {
       "Payload"
     ],
     "buttons": [
+      "1. Source: Set. Sample rows",
+      "2. Steps: Set. 2 steps in 2 stages",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Details",
+      "History",
       "JSON",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
       "Steps",
-      "Test with sample",
       "Validate",
       "YAML"
     ],
@@ -244,8 +235,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines",
-      "/pipelines/list"
+      "/pipelines"
     ],
     "details": {
       "terms": [],
@@ -263,6 +253,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1854",
+      "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1854 {}",
       "GET /setting.json/taskReferences?kind=TASK_GROUP&tenantId=2924",
       "GET /setting.json/taskReferences?kind=HOME_PAGE&tenantId=2924",
       "GET /setting.json/topics?ids=11831",
@@ -270,8 +261,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/listForTopic?sourceTaskTypeId=11831",
       "GET /setting.json/topics?kafkaConnectionProfileId=1009",
       "GET /pipeline.json/steps/definition?pipelineKey=100167",
-      "GET /pipeline.json/steps/tasks",
-      "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1854 {}"
+      "GET /pipeline.json/steps/tasks"
     ],
     "headings": [
       "UI-CHECK step engine task 0928",
@@ -280,16 +270,22 @@ export const PINNED: Record<string, unknown> = {
       "Steps"
     ],
     "buttons": [
+      "1. Source: Set. Its worker reads the topic (legacy step)",
+      "2. Steps: Missing. None yet: it runs as its legacy step",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Optional. Written by its worker",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Details",
       "Flow",
+      "History",
       "JSON",
       "List",
       "Open step legacy",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
       "Steps",
       "Test with sample",
@@ -317,8 +313,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines",
-      "/pipelines/list"
+      "/pipelines"
     ]
   },
   "a new schedule for the pipeline": {
@@ -333,6 +328,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /kafkaConnectionProfile.json/fetchAllProfiles",
       "GET /sourceTask.json/fetchSourceTaskWithSourceTaskId?sourceTaskId=1864",
+      "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1864 {}",
       "GET /setting.json/taskReferences?kind=TASK_GROUP&tenantId=2924",
       "GET /setting.json/taskReferences?kind=HOME_PAGE&tenantId=2924",
       "GET /setting.json/topics?ids=11831",
@@ -340,8 +336,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pipeline.json/listForTopic?sourceTaskTypeId=11831",
       "GET /setting.json/topics?kafkaConnectionProfileId=1009",
       "GET /pipeline.json/steps/definition?pipelineKey=100175",
-      "GET /pipeline.json/steps/tasks",
-      "POST /sourceTask.json/fetchAllLinkJobsWithSourceTaskId?limit=1000&sourceTaskId=1864 {}"
+      "GET /pipeline.json/steps/tasks"
     ],
     "headings": [
       "UI-CHECK step engine task 0928",
@@ -350,6 +345,11 @@ export const PINNED: Record<string, unknown> = {
       "Steps"
     ],
     "buttons": [
+      "1. Source: Set. Sample rows",
+      "2. Steps: Set. 2 steps in 2 stages",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Delete step keep",
       "Delete step read",
@@ -357,6 +357,7 @@ export const PINNED: Record<string, unknown> = {
       "Edit step keep",
       "Edit step read",
       "Flow",
+      "History",
       "JSON",
       "List",
       "Move keep down",
@@ -369,8 +370,8 @@ export const PINNED: Record<string, unknown> = {
       "Reorder read: drag, or use the arrow keys",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
       "Steps",
       "Test with sample",
@@ -398,8 +399,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines",
-      "/pipelines/list"
+      "/pipelines"
     ]
   },
   "a step in the side panel": {
@@ -439,6 +439,11 @@ export const PINNED: Record<string, unknown> = {
       "Steps"
     ],
     "buttons": [
+      "1. Source: Set. Sample rows",
+      "2. Steps: Set. 2 steps in 2 stages",
+      "3. Review: Optional. Not required: results are final when the run ends",
+      "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
+      "5. Schedule & triggers: Set. 1 schedule · 1 active",
       "Clear",
       "Delete step keep",
       "Delete step read",
@@ -446,6 +451,7 @@ export const PINNED: Record<string, unknown> = {
       "Edit step keep",
       "Edit step read",
       "Flow",
+      "History",
       "JSON",
       "List",
       "Move keep down",
@@ -458,8 +464,8 @@ export const PINNED: Record<string, unknown> = {
       "Reorder read: drag, or use the arrow keys",
       "Run now",
       "Save",
-      "Save changes",
       "Schedule",
+      "Schedules",
       "Settings",
       "Steps",
       "Test with sample",
@@ -487,8 +493,7 @@ export const PINNED: Record<string, unknown> = {
       "XML configuration *(required)"
     ],
     "links": [
-      "/pipelines",
-      "/pipelines/list"
+      "/pipelines"
     ],
     "hidden": [
       "app-step-builder"

@@ -55,7 +55,8 @@ describe("MIG-222 (Wave 4): Source Tasks", () => {
 
   it("a task's XML payload, opened in the list", async () => {
     const v = await visit('/operations/tasks', 'TENANT_ADMIN', null);
-    const requests = await click(v, 'Show payload');
+    // UX review 2026-10-12 (B2, P2): the row opens on its schedules; the payload is under its Advanced.
+    const requests = await click(v, 'Show schedules and details');
     pin(FILE, "a task's XML payload, opened in the list", { requests, ...surfaceOf(v.main), details: detailsOf(v.main) }, PINNED);
   });
 

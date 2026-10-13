@@ -1,4 +1,4 @@
-import { Component, ComponentRef, ViewContainerRef, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
+import { Component, ComponentRef, OnInit, ViewContainerRef, computed, effect, inject, input, linkedSignal, output, signal, untracked, viewChild } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -60,8 +60,23 @@ type Tone = 'ok' | 'warn' | 'crit';
   selector: 'app-step-builder',
   imports: [Icon, Field, Combobox, ServerTimePipe, Segmented, RouterLink, Section],
   templateUrl: './step-builder.html',
+  // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
+  styles: `
+/* UX review 2026-10-12 (B2, P5): the steps grouped by stage -- a run of one stage under its own small heading, a rule
+   in the stage's tone at the left so read, check, AI, review and write are told apart at a glance. */
+.step-stages { display: flex; flex-direction: column; gap: 0.875rem; }
+.step-stage { --stage-tone: var(--border-strong); border-left: 3px solid var(--stage-tone); padding-left: 0.75rem; scroll-margin-top: 1rem; }
+.step-stage[data-stage="read"] { --stage-tone: var(--color-info-500); }
+.step-stage[data-stage="check"] { --stage-tone: var(--color-warn-500); }
+.step-stage[data-stage="ai"] { --stage-tone: var(--color-brand-500); }
+.step-stage[data-stage="review"] { --stage-tone: var(--color-crit-500); }
+.step-stage[data-stage="write"] { --stage-tone: var(--color-ok-500); }
+.step-stage-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.375rem; margin-bottom: 0.5rem; font-size: 12px; line-height: 1rem; color: var(--text-secondary); }
+.step-stage-head > app-icon { color: var(--stage-tone); }
+.review-ways { margin: 1rem 0 0; padding: 0.75rem 0.875rem; list-style: none; display: flex; flex-direction: column; gap: 0.5rem; font-size: 13px; line-height: 1.45; color: var(--text-secondary); background: var(--surface-inset); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+  `,
 })
-export class StepBuilder {
+export class StepBuilder implements OnInit {
   /** What the page read: pipeline.json/steps/definition. */
   readonly view = input.required<DefinitionView>();
   readonly tab = input<BuilderTab>('steps');
@@ -139,6 +154,13 @@ export class StepBuilder {
   readonly latestVersion = computed(() => this.meta().versions?.[0] ?? null);
 
   private shownTab: BuilderTab = 'steps';
+
+  /**
+   * Its inputs are set: the page reads the draft and the save state through it only then (B2). A signal query hands the
+   * page this component as it is created, before its required `view` has a value.
+   */
+  readonly ready = signal(false);
+  ngOnInit(): void { this.ready.set(true); }
 
   constructor() {
     this.reloadTasks();

@@ -213,7 +213,7 @@
                   <app-status [label]="run.jobStatus || '—'" />
                   <span class="text-xs text-[color:var(--text-secondary)]">{{ run.at ? (run.at | serverTime: 'recent') : '#' + run.jobQueueId }}</span>
                 </a>
-              } @else { <span class="text-xs text-[color:var(--text-muted)]">{{ task.lastRun === null ? 'Never' : '—' }}</span> }
+              } @else { <span class="text-xs text-[color:var(--text-muted)]">{{ task.stepCount != null ? 'Never' : '—' }}</span> }
             </td>
             <td class="hidden xl:table-cell text-xs whitespace-nowrap">
               @if (task.sensitivity) { <span class="pill" [class.pill-warn]="task.sensitivity === 'sensitive'" [class.pill-neutral]="task.sensitivity !== 'sensitive'">{{ sensitivityText(task.sensitivity) }}</span> }

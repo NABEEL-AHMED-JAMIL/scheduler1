@@ -273,7 +273,7 @@
        counts, a time histogram above the list. A schedule's own runs and a dashboard drill-down keep one column. -->
   <div [class.runs-explorer]="explorer()">
   @if (explorer()) {
-    <aside class="card p-3 runs-explorer-rail" data-test="run-facets">
+    <aside class="card p-4 runs-explorer-rail" data-test="run-facets">
       <app-run-facets-rail [facets]="facets()" [filter]="explorerFilter()" [unavailable]="facetsUnavailable()" [loading]="facetsLoading()"
                            (filterChange)="setExplorerFilter($event)" />
     </aside>
