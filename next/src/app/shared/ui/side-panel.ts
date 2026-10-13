@@ -1,4 +1,4 @@
-import { Component, inject, input } from '@angular/core';
+import { Component, ViewEncapsulation, inject, input } from '@angular/core';
 import { DialogRef } from '@angular/cdk/dialog';
 import { Icon } from './icon';
 
@@ -11,6 +11,16 @@ import { Icon } from './icon';
 @Component({
   selector: 'app-side-panel',
   imports: [Icon],
+  // Global: the rules style the overlay pane the panel is opened in (sidePanelConfig's panelClass).
+  encapsulation: ViewEncapsulation.None,
+  styles: `
+    /* UX review 2026-10-12 (A9, G9): a row's detail slides over the right of the screen, as the reference products'
+       detail panel does, rather than a modal over the middle of the list. Full height; the list stays readable beside it. */
+    .side-panel-host.side-panel-right { position: fixed !important; top: 0; right: 0; bottom: 0; margin: 0 !important; max-height: none; height: 100dvh; }
+    .side-panel-right .side-panel { max-height: none; height: 100%; border-radius: 0; border-width: 0 0 0 1px; animation: side-panel-slide 180ms ease-out; }
+    @keyframes side-panel-slide { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .side-panel-right .side-panel { animation: none; } }
+  `,
   template: `
     <aside class="side-panel" role="dialog" [attr.aria-label]="heading()">
       <header class="side-panel-head">

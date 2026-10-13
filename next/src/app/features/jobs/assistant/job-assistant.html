@@ -78,7 +78,7 @@
            not match, so with none configured there is nothing here to choose. -->
       @if (agents().length) {
         <div class="flex items-center gap-2 mb-2.5">
-          <!-- G11, SAS1: says what the picker does, as a label rather than an overline. -->
+          <!-- G11, SAS1: says what the picker does, as a label rather than small caps. -->
           <label class="text-sm font-medium text-[color:var(--text-primary)]"
                  [attr.for]="'assistant-agent-' + jobId()">Ask with a saved prompt</label>
           <select class="input max-w-52 shrink-0" [attr.id]="'assistant-agent-' + jobId()"

@@ -1,4 +1,4 @@
-import { Component, DestroyRef, HostListener, ViewContainerRef, afterNextRender, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, ViewContainerRef, afterNextRender, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
@@ -48,6 +48,9 @@ export class Shell {
    */
   readonly currentUrl = signal(this.router.url);
 
+  /** Where the sidebar's links go once their chunk has loaded (side-nav.ts). */
+  private readonly sideNavHost = viewChild('sideNav', { read: ViewContainerRef });
+
   constructor() {
     // MIG-353: idle sign-out -- the warning a minute before, and the sign-out. Its own lazy chunk, fetched after the
     // shell's first paint; a dynamic import rather than @defer, which would pull the defer runtime into the initial bundle.
@@ -60,6 +63,12 @@ export class Shell {
         this.checkTeamActivity();
       }
       void import('../../core/auth/idle-guard').then(m => { if (!destroyed && !host.length) host.createComponent(m.IdleGuard); });
+      // The sidebar (≥1440px): its own chunk, so the first load carries only the bar.
+      void import('./side-nav').then(m => {
+        const side = this.sideNavHost();
+        if (destroyed || !side || side.length) return;
+        side.createComponent(m.SideNav).setInput('shell', this);
+      });
     });
     inject(DestroyRef).onDestroy(() => { destroyed = true; host.clear(); });
     this.router.events.pipe(takeUntilDestroyed()).subscribe(event => {

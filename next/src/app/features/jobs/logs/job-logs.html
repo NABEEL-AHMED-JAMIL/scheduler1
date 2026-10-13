@@ -71,7 +71,7 @@
         <!-- The pipeline's AI steps for this run: what each prompt answered, what it cost. -->
         @if (aiSteps().length) {
           <div class="detail-panel mt-3">
-            <!-- G11: a group's title, not the uppercase overline the field labels use. -->
+            <!-- G11: a group's title, not the uppercase small caps the field labels use. -->
             <h3 class="form-legend !mb-2">AI steps <span class="font-normal text-[color:var(--text-muted)]">({{ aiSteps().length }})</span></h3>
             <!-- Its own scroll box: a run of forty images drew forty answers in full and pushed the steps and the log
                  twelve thousand pixels down (review 2026-10-07). -->

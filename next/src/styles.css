@@ -1457,23 +1457,12 @@ html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
     flex-direction: column;
     border-right: 1px solid var(--border-subtle);
     background: var(--surface-raised);
+    /* Sticky makes its own stacking context: without a z-index a collapsed group's panel opened under the page. */
+    z-index: 30;
   }
   @media (min-width: 90rem) { .app-sidebar { display: flex; } }
+  /* The collapsed width is here (the aside is the shell's, in the first load); its links' rules are side-nav.ts's. */
   .app-sidebar.is-collapsed { width: 3.5rem; }
-  .app-sidebar-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0.75rem 0.5rem; }
-  .app-sidebar.is-collapsed .app-sidebar-scroll { overflow: visible; }
-  .side-group { margin-top: 0.875rem; }
-  .side-group-label {
-    @apply px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)];
-  }
-  .side-group .nav-section { @apply pt-1.5 normal-case tracking-normal font-medium; }
-  .side-link { @apply items-center py-1.5; }
-  .side-link .nav-child-icon { margin-top: 0; }
-  .side-label { @apply truncate leading-5; }
-  .app-sidebar.is-collapsed .side-link { justify-content: center; padding-inline: 0; }
-  .app-sidebar.is-collapsed .side-label { display: none; }
-  .side-collapse { @apply m-2 mt-0 border-t border-subtle rounded-none pt-2.5; }
-  .side-flyout { left: calc(100% + 0.5rem); top: 0; margin-top: 0; }
 
   /* Compact key/value pairs for the context panels. */
   .detail-head {
@@ -1773,10 +1762,6 @@ html.dark {
   .btn-join > .btn-label { @apply cursor-default font-medium; pointer-events: none; }
   /* UX review 2026-10-12, Batch A: the page header, section, form row, actions bar and empty state carry their own
      styles (shared/ui/*.ts), so they load with the pages rather than in the first paint. */
-  /* A7: a row of app-stat-tile, drawn as app-stat-strip: one surface, hairlines between the tiles, and no blank
-     square of border colour when the last row is short. */
-  .stat-strip.stat-row { gap: 0; background: var(--surface-raised); }
-  .stat-row > .stat-strip-cell { box-shadow: -1px 0 0 var(--border-subtle), 0 -1px 0 var(--border-subtle); }
 
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
@@ -2097,12 +2082,6 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
    global wrapper is a centred flex box); the panel keeps its head, scrolling body and pinned foot, sized to its content
    up to 85% of the window's height, as the form dialogs are (the same card, border and shadow). */
 .side-panel-host { width: min(36rem, calc(100vw - 2rem)); max-height: 85vh; }
-/* UX review 2026-10-12 (A9, G9): a row's detail slides over the right of the screen, as the reference products' detail
-   panel does, rather than a modal over the middle of the list. Full height; the list stays readable beside it. */
-.side-panel-host.side-panel-right { position: fixed !important; top: 0; right: 0; bottom: 0; margin: 0 !important; max-height: none; height: 100dvh; }
-.side-panel-right .side-panel { max-height: none; height: 100%; border-radius: 0; border-width: 0 0 0 1px; animation: side-panel-slide 180ms ease-out; }
-@keyframes side-panel-slide { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .side-panel-right .side-panel { animation: none; } }
 .side-panel-host > * { display: block; }
 .side-panel-host.side-panel-wide { width: min(58rem, calc(100vw - 2rem)); }
 .side-panel { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-raised);

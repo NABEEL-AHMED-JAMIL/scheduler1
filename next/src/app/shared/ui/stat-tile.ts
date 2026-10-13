@@ -1,4 +1,4 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, ViewEncapsulation, computed, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Params, RouterLink } from '@angular/router';
 import { Icon } from './icon';
@@ -24,6 +24,14 @@ export function figure(value: string | number | null | undefined): string {
   selector: 'app-stat-tile',
   imports: [Icon, RouterLink, NgTemplateOutlet],
   host: { class: 'stat-strip-cell stat-tile-cell', role: 'listitem' },
+  // Global: the rules style the row the page lays its tiles in.
+  encapsulation: ViewEncapsulation.None,
+  styles: `
+    /* A7: a row of tiles drawn as app-stat-strip -- one surface, hairlines between the tiles, and no blank square of
+       border colour when the last row is short. */
+    .stat-strip.stat-row { gap: 0; background: var(--surface-raised); }
+    .stat-row > .stat-strip-cell { box-shadow: -1px 0 0 var(--border-subtle), 0 -1px 0 var(--border-subtle); }
+  `,
   template: `
     @if (link()) {
       <a class="stat-strip-item is-action" [routerLink]="link()" [queryParams]="queryParams()"

@@ -2,7 +2,7 @@ import { Component, ViewEncapsulation, input } from '@angular/core';
 
 /**
  * UX review 2026-10-12 (A3, G11): a named part of a page or a form. An optional step number (when the order matters,
- * as New schedule's "1 What runs · 2 When it runs"), a title in .section-title -- never the uppercase overline field
+ * as New schedule's "1 What runs · 2 When it runs"), a title in .section-title -- never the uppercase small caps field
  * labels use, so the hierarchy reads page › section › field -- a one-line sub, actions at the right, then the content.
  *
  * `card` draws it as a card of its own; without it the section sits inside whatever card holds it, separated from the
