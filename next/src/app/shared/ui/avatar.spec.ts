@@ -110,15 +110,36 @@ describe('app-avatar', () => {
     expect(fixture.nativeElement.querySelectorAll('img.avatar-img').length).toBe(3);
   });
 
-  it('asks without a version when the data does not say, and keeps the answer -- "none" included', () => {
+  it('asks without a version when the data does not say, and keeps the answer -- "none" (204) included', () => {
     const first = render([{ id: 4642, name: 'Viewer' }]);
-    http.expectOne(`${API_BASE}/appUser.json/avatar?appUserId=4642&size=256`)
-      .flush(null, { status: 404, statusText: 'Not Found' });
+    const asked = http.expectOne(`${API_BASE}/appUser.json/avatar?appUserId=4642&size=256`);
+    expect(asked.request.responseType).toBe('blob');
+    asked.flush(null, { status: 204, statusText: 'No Content' });
     first.detectChanges();
     expect(first.nativeElement.querySelector('.avatar-initials')).not.toBeNull();
+    expect(first.nativeElement.querySelector('img')).toBeNull();
+    expect(TestBed.inject(AvatarCache).picture(4642, 256, undefined)()).toBeNull();
 
     render([{ id: 4642, name: 'Viewer' }]);
     http.expectNone(`${API_BASE}/appUser.json/avatar?appUserId=4642&size=256`);
+  });
+
+  it('reads an empty body as no picture, however it arrives', () => {
+    const fixture = render([{ id: 4645, name: 'Empty' }]);
+    http.expectOne(`${API_BASE}/appUser.json/avatar?appUserId=4645&size=256`)
+      .flush(new Blob([]), { status: 204, statusText: 'No Content' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('img')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.avatar-initials')).not.toBeNull();
+  });
+
+  it('draws initials when the picture cannot be read (an older server\'s 404, an outage)', () => {
+    const fixture = render([{ id: 4646, name: 'Old' }, { id: 4647, name: 'Down' }]);
+    http.expectOne(`${API_BASE}/appUser.json/avatar?appUserId=4646&size=256`).flush(null, { status: 404, statusText: 'Not Found' });
+    http.expectOne(`${API_BASE}/appUser.json/avatar?appUserId=4647&size=256`).flush(null, { status: 503, statusText: 'Unavailable' });
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('img')).toBeNull();
+    expect(fixture.nativeElement.querySelectorAll('.avatar-initials').length).toBe(2);
   });
 
   it('starts again for a person whose picture changed', () => {

@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { AuthService, PASSWORD_CHANGED_REASON } from './auth.service';
 import { AuthUser, UserRole } from './auth.models';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
+import { API_SUCCESS, ApiResponse } from '../api/api.config';
 
 const STORAGE_KEY = 'etl_auth_user';
 
@@ -193,5 +194,32 @@ describe('AuthService after a password change', () => {
     expect(auth.isLoggedIn()).toBe(false);
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
     expect(navigations).toEqual([[['/login'], { queryParams: { reason: PASSWORD_CHANGED_REASON } }]]);
+  });
+});
+
+/** A sign-in's answer leaves a null avatarVersion out: kept as "none", so the top bar asks nothing for a picture. */
+describe('AuthService keeps what a sign-in says about the picture', () => {
+  useMemoryStorage();
+
+  const answer = (extra: Partial<AuthUser>): ApiResponse<AuthUser> => ({
+    status: API_SUCCESS,
+    message: '',
+    data: {
+      username: 'someone@example.com', userRole: 'TENANT_USER' as UserRole, appUserId: 7,
+      accessToken: tokenWithRole('TENANT_USER'), refreshToken: 'refresh', ...extra,
+    } as AuthUser,
+  });
+
+  it('reads an absent avatarVersion as none', () => {
+    const auth = service();
+    auth.signedIn(answer({}));
+    expect(auth.user()?.avatarVersion).toBeNull();
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).avatarVersion).toBeNull();
+  });
+
+  it('keeps a version the sign-in names', () => {
+    const auth = service();
+    auth.signedIn(answer({ avatarVersion: 'abc123' }));
+    expect(auth.user()?.avatarVersion).toBe('abc123');
   });
 });

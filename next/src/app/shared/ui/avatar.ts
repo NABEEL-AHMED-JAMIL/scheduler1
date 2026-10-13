@@ -45,7 +45,9 @@ export function avatarTone(appUserId: number | null | undefined, name?: string |
  * A known version is fetched with ?v=, which the server caches for a year as immutable (a new picture is a new
  * version, so a new URL). An unknown one (a screen whose data names the person but not their picture) is asked
  * without, once per session -- "no picture" included, so initials do not re-ask on every screen; the server's own
- * five-minute cache covers a reload.
+ * five-minute cache covers a reload. "No picture" (and "not yours to see", the same answer) is a 204 with no body:
+ * an empty or absent blob is null, so initials -- and nothing in the browser's console, as a 404 would put there.
+ * An error (an older server's 404 included) is null too.
  *
  * The pictures come back as blobs through HttpClient: an <img src> cannot carry the bearer token. The cache owns the
  * blob URLs and releases the oldest past {@link MAX}.
@@ -67,8 +69,9 @@ export class AvatarCache {
       this.http.get(`${API_BASE}/appUser.json/avatar?appUserId=${appUserId}&size=${px}${version ? '&v=' + version : ''}`,
         { responseType: 'blob' }).subscribe({
         // Kept only while still cached: a picture evicted mid-flight would make a URL nothing releases.
+        // A 204 arrives as a null body (or, through fetch, an empty blob): no picture.
         next: blob => {
-          if (this.entries.get(key) === made) made.set(blob instanceof Blob && blob.size ? URL.createObjectURL(blob) : null);
+          if (this.entries.get(key) === made) made.set(blob instanceof Blob && blob.size > 0 ? URL.createObjectURL(blob) : null);
         },
         error: () => made.set(null),
       });

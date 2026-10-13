@@ -273,7 +273,7 @@ export class AuthService {
    * when it carries a session -- a two-factor challenge carries none.
    */
   signedIn(response: ApiResponse<AuthUser>): void {
-    if (response.status === API_SUCCESS && response.data?.accessToken) this.persist(response.data);
+    if (response.status === API_SUCCESS && response.data?.accessToken) this.persist(withPictureKnown(response.data));
   }
 
   /**
@@ -336,7 +336,7 @@ export class AuthService {
     if (!own || !this.isPlatformAdmin() || this.isManagedSession()) return;
     localStorage.setItem(PLATFORM_SESSION_KEY, JSON.stringify(own));
     this.heldPlatform.set(true);
-    this.persist(session);
+    this.persist(withPictureKnown(session));
   }
 
   /**
@@ -396,4 +396,14 @@ export class AuthService {
       return null;
     }
   }
+}
+
+/**
+ * A sign-in's answer (and a managed session's, which is answered like one) always says whether the person has a
+ * picture, but Identity leaves a null out: absent there means "none", so it is kept as null and the top bar asks
+ * nothing, rather than as "unknown", which asks once per session. A refresh's answer does not carry it and is merged
+ * over the session, so what the sign-in said stays.
+ */
+function withPictureKnown(user: AuthUser): AuthUser {
+  return { ...user, avatarVersion: user.avatarVersion ?? null };
 }
