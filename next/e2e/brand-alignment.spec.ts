@@ -38,7 +38,7 @@ async function geometry(page: Page): Promise<Geometry> {
 async function open(page: Page, width: number, collapsed: boolean): Promise<Geometry> {
   await page.setViewportSize({ width, height: 900 });
   await page.addInitScript(c => localStorage.setItem('etl_nav_collapsed', c ? '1' : '0'), collapsed);
-  await page.goto('/pipelines');
+  await page.goto('/pipelines/list');
   await expect(page.locator('main h1')).toBeVisible();
   if (width >= 1440) await expect(page.locator('.app-sidebar .side-link').first()).toBeVisible();
   return geometry(page);

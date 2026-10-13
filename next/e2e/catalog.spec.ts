@@ -119,7 +119,7 @@ test.describe('Data Catalog', () => {
 
   test('the prompt editor names the variable a file fills, without template braces', async ({ browser, request }, info) => {
     const page = await pageAs(browser, await sessionOf(request, tokenFor('admin')!));
-    await page.goto('/ai/prompts/new');
+    await page.goto('/pipelines/prompts/new');
     await page.getByRole('heading', { name: 'New prompt' }).waitFor();
     await page.locator('#pTemplate').fill('Summarise {{file_name}}');
     await page.locator('.prompt-vars tbody tr').first().getByRole('button', { name: 'Fill from a file' }).click();

@@ -130,7 +130,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
   test('Dataset → PDF: two pasted rows, the default layout, a PDF preview, and the download', async ({ browser }, info) => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
-    await page.goto('/documents/converter');
+    await page.goto('/tools/converter');
     await page.getByRole('button', { name: 'Dataset → PDF' }).click();
     await page.locator('#render-rows').fill('[{"region":"North","revenue":1234.5},{"region":"South","revenue":980}]');
     await expect(page.getByText('2 rows · 2 columns: region, revenue')).toBeVisible();
@@ -155,7 +155,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
 
   /** The schedule → its latest kept run → that run's kept statistics, picked in the converter. */
   async function pickKeptRun(page: Page): Promise<void> {
-    await page.goto('/documents/converter');
+    await page.goto('/tools/converter');
     await page.getByRole('button', { name: 'From an execution' }).click();
     await page.locator('#render-schedule').fill(SCHEDULE.split(' ').slice(0, 2).join(' '));
     await page.getByRole('option', { name: new RegExp(`^${SCHEDULE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`) }).click();
@@ -199,7 +199,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     const bucket = await bucketReadable(page.request);
-    await page.goto('/documents/reports');
+    await page.goto('/data/reports');
     const rows = page.locator('table tbody tr');
     const run = rows.filter({ has: page.getByRole('link', { name: `Run #${RUN}` }) });
     await expect(run.first()).toBeVisible();
@@ -223,7 +223,7 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     test.skip(!(await bucketReadable(page.request)), `${BUCKET} cannot be listed (LocalStack down).`);
     const folder = UPLOAD.key!.slice(0, UPLOAD.key!.lastIndexOf('/') + 1);
     const size = Number((await getJson(page.request, s, `/storage.json/objectMetadata?bucket=${encodeURIComponent(BUCKET)}&key=${encodeURIComponent(UPLOAD.key!)}`)).data?.size);
-    await page.goto(`/documents/files?bucket=${encodeURIComponent(BUCKET)}&prefix=${encodeURIComponent(folder)}`);
+    await page.goto(`/data/files?bucket=${encodeURIComponent(BUCKET)}&prefix=${encodeURIComponent(folder)}`);
     await page.getByRole('button', { name: `Actions for ${UPLOAD.name}` }).click();
     await page.getByRole('menuitem', { name: 'Details' }).click();
     const panel = page.getByRole('dialog', { name: UPLOAD.name });

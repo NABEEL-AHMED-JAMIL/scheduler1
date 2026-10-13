@@ -58,7 +58,7 @@ test.describe('topics and pipelines', () => {
     const page = await pageAs(browser, session);
 
     // ── 1. Kafka & Topics: add a topic under the workspace's profile ─────────────────────
-    await page.goto('/configuration/kafka');
+    await page.goto('/settings/kafka');
     await page.getByRole('button', { name: 'Add topic' }).click();
     // The dialog animates in; a fill that lands mid-mount is dropped.
     await page.getByRole('heading', { name: 'New topic' }).waitFor();
@@ -100,7 +100,7 @@ test.describe('topics and pipelines', () => {
     expect(pipelineRow?.sourceTaskTypeId, 'the pipeline names the topic').toBe(topicId);
 
     // The topic row on the Kafka pane now names it (one pipeline shows inline, by name).
-    await page.goto('/configuration/kafka');
+    await page.goto('/settings/kafka');
     await expect(page.locator('.kafka-topics tbody tr', { hasText: TOPIC_NAME }).locator('a', { hasText: PIPELINE_NAME })).toBeVisible();
 
     // ── 3. A task: connection → topic → pipeline, each list fetched on the pick before ──

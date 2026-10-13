@@ -53,7 +53,7 @@ test.describe('Task Registry', () => {
 
   test('lists every kind, and each pipeline as a Legacy task', async ({ browser }) => {
     const page = await pageAs(browser, s);
-    await page.goto('/configuration/task-registry');
+    await page.goto('/settings/task-registry');
     await expect(page.getByRole('heading', { name: 'Task Registry' })).toBeVisible();
     for (const kind of ['Read', 'Process', 'Output', 'Legacy']) {
       await expect(page.locator(`tbody [data-kind="${kind}"]`).first()).toBeVisible();
@@ -68,7 +68,7 @@ test.describe('Task Registry', () => {
 
   test('opens a task\'s panel: settings, input and output, how it runs', async ({ browser }) => {
     const page = await pageAs(browser, s);
-    await page.goto('/configuration/task-registry');
+    await page.goto('/settings/task-registry');
     await page.getByRole('button', { name: 'Open Filter' }).click();
     const panel = page.getByRole('dialog', { name: 'Filter' });
     await expect(panel).toBeVisible();
@@ -84,7 +84,7 @@ test.describe('Task Registry', () => {
 
   test('an administrator switches a task off and back to its default', async ({ browser, request }) => {
     const page = await pageAs(browser, s);
-    await page.goto('/configuration/task-registry');
+    await page.goto('/settings/task-registry');
     await expect(row(page, SWITCHED)).toContainText('On');
     await page.getByRole('button', { name: 'Open Aggregate' }).click();
     const panel = page.getByRole('dialog', { name: 'Aggregate' });
@@ -101,7 +101,7 @@ test.describe('Task Registry', () => {
 
   test('a Legacy row opens the existing pipeline dialog (viewed only)', async ({ browser }) => {
     const page = await pageAs(browser, s);
-    await page.goto('/configuration/task-registry');
+    await page.goto('/settings/task-registry');
     await page.getByRole('button', { name: `Open ${SHARED.pipelineName}` }).click();
     const panel = page.getByRole('dialog', { name: SHARED.pipelineName });
     await expect(panel).toContainText(SHARED.pipelineId);
@@ -119,7 +119,7 @@ test.describe('Task Registry', () => {
     const key = await checkPipeline(request, s);
     const before = await fieldsOf(request, s, key);
     const page = await pageAs(browser, s);
-    await page.goto('/configuration/task-registry');
+    await page.goto('/settings/task-registry');
     await page.getByRole('button', { name: `Open ${CHECK_NAME}` }).click();
     await page.getByRole('dialog', { name: CHECK_NAME }).getByRole('button', { name: /^Edit (pipeline|registry task)$/ }).click();
     const dialog = page.locator('app-pipeline-dialog');

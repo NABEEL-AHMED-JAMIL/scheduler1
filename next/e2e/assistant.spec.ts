@@ -200,7 +200,7 @@ test.describe('AI Assistant: confirm, then run (send and decide faked)', () => {
     await expect(execution).toContainText(`run #${F.run}`);
     await expect(execution.getByRole('link', { name: 'Open execution' })).toHaveAttribute('href', `/pipelines/schedules/${F.jobId}/runs/${F.run}/logs`);
     await expect(page.locator('[data-link="output"]').getByRole('link', { name: 'Open report files' }))
-      .toHaveAttribute('href', new RegExp(`/documents/files\\?bucket=${F.bucket}&prefix=runs%2F${F.run}%2F`));
+      .toHaveAttribute('href', new RegExp(`/data/files\\?bucket=${F.bucket}&prefix=runs%2F${F.run}%2F`));
     await expect(page.locator('[data-role="assistant"] pre').last()).toHaveText(`jobId: ${F.jobId}`);
     await expect(page.locator('[data-call="run_pipeline"]')).toHaveAttribute('data-outcome', 'confirmed');
     await shot(page, info, 'assistant-result-1440');
@@ -281,7 +281,7 @@ test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
   test('the tool registry: every tool, the blocked ones blocked', async ({ browser, request }, info) => {
     const page = await pageAs(browser, s);
     const writes = forbidWrites(page);
-    await page.goto('/ai/tools');
+    await page.goto('/settings/tools');
     await expect(page.getByRole('heading', { name: 'Tool Registry', exact: true })).toBeVisible();
     await expect(page.locator('tr[data-row="run_pipeline"]')).toContainText('Asks first');
     for (const name of ['transform_data', 'enrich_data', 'join_data']) {
@@ -319,7 +319,7 @@ test.describe('Tool Registry: last used and Reset (live, restores what it change
     const page = await pageAs(browser, s);
     const read: string[] = [];
     page.on('request', req => { if (/aiPrompt\.json\/tools\/(runs|trace)/.test(req.url())) read.push(req.url()); });
-    await page.goto('/ai/tools');
+    await page.goto('/settings/tools');
     const row = page.locator('tr[data-row="validate_data"]');
     await expect(row).toHaveAttribute('data-state', 'Off');
     await expect(row).toContainText('switched here');

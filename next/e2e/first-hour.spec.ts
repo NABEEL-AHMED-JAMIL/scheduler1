@@ -133,7 +133,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     lap('storage');
 
     // ── 2. The inbox, and a file in it ────────────────────────────────────────────────────────────────────────────
-    await page.goto('/documents/inbox');
+    await page.goto('/documents/file-drop');
     const setUp = page.getByRole('button', { name: 'Set up the inbox' });
     await expect(page.getByRole('heading', { name: 'Inbox', exact: true })).toBeVisible();
     if (await setUp.isVisible()) {
@@ -164,7 +164,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     // ── 3. A topic, on the platform's Kafka connection ────────────────────────────────────────────────────────────
     const topics = (await getJson(request, s, `/setting.json/topics?q=${encodeURIComponent(TOPIC)}&limit=5`)).data ?? [];
     if (!topics.some((t: any) => t.serviceName === TOPIC)) {
-      await page.goto('/configuration/kafka');
+      await page.goto('/settings/kafka');
       await page.getByRole('button', { name: 'Add topic' }).click();
       await page.getByRole('heading', { name: 'New topic' }).waitFor();
       await page.locator('#serviceName').fill(TOPIC);
@@ -177,7 +177,7 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     // ── 4. The registry task the pipeline picks ───────────────────────────────────────────────────────────────────
     const registry = (await getJson(request, s, '/pipeline.json/list?page=1&limit=1000')).data?.rows ?? [];
     if (!registry.some((p: any) => p.pipelineId === REGISTRY_ID)) {
-      await page.goto('/configuration/task-registry');
+      await page.goto('/settings/task-registry');
       await page.getByRole('button', { name: 'New registry task' }).click();
       await page.getByRole('heading', { name: 'New registry task' }).waitFor();
       const dialog = page.getByRole('dialog').last();

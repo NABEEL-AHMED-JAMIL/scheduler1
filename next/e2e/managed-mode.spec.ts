@@ -92,7 +92,7 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
   test('the build screens say who builds them and offer no writes', async ({ browser }, info) => {
     const page = await pageAs(browser, MANAGED_ADMIN);
     await fakeApi(page);
-    await page.goto('/pipelines');
+    await page.goto('/pipelines/list');
     await expect(page.getByText('Managed by our team')).toBeVisible();
     await expect(page.getByText("Our team builds and changes this workspace's pipelines, so they are read-only here.")).toBeVisible();
     await expect(page.getByRole('link', { name: 'New pipeline' })).toHaveCount(0);
@@ -100,7 +100,7 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     await page.goto('/pipelines/schedules');
     await expect(page.getByText("this workspace's schedules, so they are read-only here")).toBeVisible();
     await expect(page.getByRole('link', { name: 'New schedule' })).toHaveCount(0);
-    await page.goto(`/ai/prompts/${LIVE_IDS.promptId}/edit`);
+    await page.goto(`/pipelines/prompts/${LIVE_IDS.promptId}/edit`);
     await expect(page.getByText("this workspace's prompts, so they are read-only here")).toBeVisible();
     await expect(page.getByRole('button', { name: /Save & activate/ })).toBeDisabled();
     await page.close();
@@ -121,13 +121,13 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     await expect(page.getByRole('menuitem', { name: 'Duplicate' })).toHaveCount(0);
     await shot(page, info, 'managed-schedule-menu');
     await page.keyboard.press('Escape');
-    await page.goto('/pipelines/queue');
+    await page.goto('/runs/by-date');
     await expect(page.getByText('You can still see every run and its logs.')).toBeVisible();
     await expect(page.getByRole('button', { name: /^Actions for run #/ })).toHaveCount(0);
-    await page.goto('/configuration/kafka');
+    await page.goto('/settings/kafka');
     await expect(page.getByText("this workspace's Kafka connections and topics, so they are read-only here")).toBeVisible();
     await expect(page.getByRole('button', { name: 'New connection' })).toHaveCount(0);
-    await page.goto('/configuration/task-registry');
+    await page.goto('/settings/task-registry');
     await expect(page.getByText("this workspace's pipelines and tasks, so they are read-only here")).toBeVisible();
     await expect(page.getByRole('button', { name: 'New registry task' })).toHaveCount(0);
     await shot(page, info, 'managed-task-registry');
@@ -153,7 +153,7 @@ test.describe('MIG-254: a MANAGED workspace, as its own administrator (faked)', 
     // The token still says SELF (issued before a switch), the server already knows better.
     const page = await pageAs(browser, SELF_ADMIN);
     await fakeApi(page, { 'POST /aiPrompt.json/save': () => ({ status: 403, body: { status: 'ERROR', message: REFUSAL } }) });
-    await page.goto(`/ai/prompts/${LIVE_IDS.promptId}/edit`);
+    await page.goto(`/pipelines/prompts/${LIVE_IDS.promptId}/edit`);
     await page.getByRole('button', { name: /Save & activate/ }).click();
     await expect(page.getByText(REFUSAL).first()).toBeVisible();
     await page.close();
@@ -169,7 +169,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     const page = await pageAs(browser, PLATFORM);
     const seen = await fakeApi(page, { 'GET /tenant.json/listTenants': TENANTS,
       'PUT /tenant.json/changeManagementMode': { status: 'SUCCESS', message: 'Tenant "Claude Demo" is now MANAGED. Its people sign in again to continue.' } });
-    await page.goto('/administration/tenants');
+    await page.goto('/platform/workspaces');
     await expect(page.getByText('Self-managed').first()).toBeVisible();
     await page.getByRole('button', { name: 'Make managed' }).first().click();
     const dialog = page.getByRole('dialog');
@@ -193,7 +193,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
       'POST /managedService.json/grant': { status: 'SUCCESS', message: 'Granted.' },
       'POST /managedService.json/revoke': { status: 'SUCCESS', message: 'Revoked. The staff member signs in again.' },
     });
-    await page.goto('/administration/managed-service');
+    await page.goto('/platform/managed-service');
     await expect(page.getByRole('cell', { name: /Sam Staff/ }).first()).toBeVisible();
     await page.getByRole('button', { name: 'Grant', exact: true }).click();
     const grant = page.getByRole('dialog');
@@ -219,7 +219,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     const seen = await fakeApi(page, { 'GET /managedService.json/actions': (s: Seen) => ({ status: 200, body: s.path.includes('beforeId')
       ? { status: 'SUCCESS', message: '', data: [row(40)], paging: { nextBeforeId: null } }
       : { status: 'SUCCESS', message: '', data: [row(42), row(41)], paging: { nextBeforeId: 41 } } }) });
-    await page.goto('/administration/staff-activity');
+    await page.goto('/platform/staff-activity');
     await expect(page.getByText('Source task › Change42')).toBeVisible();
     await page.getByRole('button', { name: 'Load older' }).click();
     await expect(page.getByText('Source task › Change40')).toBeVisible();
@@ -236,14 +236,14 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
         managementMode: 'MANAGED', appUserId: 5001, grantedAt: '2026-09-28 10:00:00' }] },
       'POST /managedService.json/openSession': { status: 'SUCCESS', message: 'Managed-service session opened.', data: STAFF_SESSION },
     });
-    await page.goto('/administration/work-in-workspace');
+    await page.goto('/platform/work-in-workspace');
     await page.getByRole('button', { name: 'Work in Claude Demo' }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     const bar = page.locator('[data-managed-session]');
     await expect(bar).toContainText('Managed session: Claude Demo — every change is audited');
     await shot(page, info, 'managed-session-bar');
     // Our staff build in a MANAGED workspace: no customer banner, and the writes are there.
-    await page.goto('/pipelines');
+    await page.goto('/pipelines/list');
     await expect(bar).toBeVisible();
     await expect(page.getByText('Managed by our team')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'New pipeline' })).toBeVisible();
@@ -266,7 +266,7 @@ test.describe('MIG-254: live smoke, a SELF workspace', () => {
     const page = await pageAs(browser, { username: claims.sub, fullName: claims.sub, userRole: claims.userRole, appUserId: claims.appUserId,
       tenantId: claims.tenantId, accessToken: live, refreshToken: '', pageKeys: null });
     expect(claims.mgmt ?? 'SELF').toBe('SELF');
-    await page.goto('/pipelines');
+    await page.goto('/pipelines/list');
     await expect(page.getByRole('heading', { name: 'Pipelines', level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: 'New pipeline' })).toBeVisible();
     await expect(page.getByText('Managed by our team')).toHaveCount(0);
