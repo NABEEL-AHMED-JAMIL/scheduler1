@@ -352,6 +352,6 @@ describe('Notifications for a tenant user without the page a link names', () => 
     expect(notifications.targetOf(row)).toBeNull();
     notifications.open(row);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
-    expect(notifications.targetOf({ ...row, linkUrl: '/pipelines/queue' })).toBe('/pipelines/queue');
+    expect(notifications.targetOf({ ...row, linkUrl: '/runs/by-date' })).toBe('/runs/by-date');
   });
 });

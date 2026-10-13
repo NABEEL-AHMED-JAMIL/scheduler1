@@ -299,6 +299,12 @@ export async function menuOf(v: Visit): Promise<string[]> {
   return out;
 }
 
+/** A hub's tab strip as the reader sees it: "Storage -> /connections/storage", the open tab marked "(open)". */
+export function hubTabsOf(v: Visit): string[] {
+  return Array.from(v.root.querySelectorAll('[data-test="tab-hub"] a[href]')).map(a =>
+    `${text(a)} -> ${a.getAttribute('href')}${a.getAttribute('aria-current') === 'page' ? ' (open)' : ''}`);
+}
+
 function buttonNamed(scope: ParentNode, name: string | RegExp): HTMLElement | null {
   const candidates = Array.from(scope.querySelectorAll('button, [role="menuitem"], [role="tab"], a')) as HTMLElement[];
   return candidates.find(el => {

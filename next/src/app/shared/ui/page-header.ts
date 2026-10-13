@@ -1,7 +1,8 @@
 import { Component, DestroyRef, ElementRef, ViewEncapsulation, afterNextRender, computed, inject, input, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
-import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
+import { Crumb, crumbsFor, tabAt } from '../../core/nav/nav-tree';
+import { TabHub } from './tab-hub';
 
 /**
  * UX review 2026-10-12 (A2, G1, G3): every page's header, one component.
@@ -26,6 +27,7 @@ import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
  */
 @Component({
   selector: 'app-page-header',
+  imports: [TabHub],
   host: { class: 'page-header' },
   // Global on purpose: the rules order and space the content a page projects into it.
   encapsulation: ViewEncapsulation.None,
@@ -87,6 +89,8 @@ import { Crumb, crumbsFor } from '../../core/nav/nav-tree';
         <div class="page-head-actions"><ng-content /></div>
       </div>
     }
+    <!-- A hub's tabs under the title, on a page that is one of them (the menu's tree says which: tab-hub.ts). -->
+    @if (inHub()) { <app-tab-hub [url]="url()" /> }
   `,
 })
 export class PageHeader {
@@ -104,7 +108,7 @@ export class PageHeader {
 
   // Optional: a screen's own unit test often has no router; the header then shows the trail without following the URL.
   private readonly router = inject(Router, { optional: true });
-  private readonly url = signal(this.router?.url ?? '');
+  readonly url = signal(this.router?.url ?? '');
   private readonly host = inject(ElementRef).nativeElement as HTMLElement;
   private readonly destroyRef = inject(DestroyRef);
   /** A wrapped heading block's own h1, read as it renders (it can follow the data: an object's name). */
@@ -132,6 +136,9 @@ export class PageHeader {
       this.destroyRef.onDestroy(() => observer.disconnect());
     });
   }
+
+  /** Whether the address is one of a hub's tabs: only then is the strip (and what it injects) created. */
+  readonly inHub = computed(() => !!tabAt(this.url()));
 
   readonly crumbs = computed<Crumb[]>(() => {
     const last = this.crumb() || this.title() || this.projectedTitle();

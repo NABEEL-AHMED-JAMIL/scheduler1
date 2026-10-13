@@ -1,6 +1,7 @@
 import { Routes, Route } from '@angular/router';
 import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
+import { toFirstTab } from './core/nav/nav-access';
 
 /**
  * MIG-246 / MIG-267: the entry point of a Wave 4 or Wave 5 page that is on the menu before it is built.
@@ -102,7 +103,7 @@ export const routes: Routes = [
       {
         // Infrastructure a pipeline reads from and writes to. Role-gated, not page-keyed: every call
         // behind it is TENANT_ADMIN. UX review B7 (I1): the Storage tab of Connections; the old address redirects here.
-        path: 'integration/connectors/storage',
+        path: 'connections/storage',
         title: 'Storage connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
@@ -112,7 +113,7 @@ export const routes: Routes = [
       {
         // MIG-332: the customer API's API clients and event routes. Role-gated like Storage Connections: every call
         // behind it is TENANT_ADMIN (Identity's apiClient.json, Core's eventRoute.json).
-        path: 'integration/api-clients',
+        path: 'developers/api-clients',
         title: 'API Clients',
         loadComponent: () =>
           import('./features/integration/api-clients/api-clients').then(m => m.ApiClients),
@@ -125,7 +126,7 @@ export const routes: Routes = [
         // first load carries one route. Owner: API docs are for administrators and developers only, so its page key is
         // one a tenant user holds only when their access profile names it (AuthService.canOpen). The guard here covers
         // every page under it.
-        path: 'integration/developer',
+        path: 'developers/portal',
         title: 'Developer portal',
         loadChildren: () => import('./features/developer/developer.routes').then(m => m.DEVELOPER_ROUTES),
         data: { pageKey: 'developer-portal' },
@@ -134,7 +135,7 @@ export const routes: Routes = [
       {
         // MIG-247: which APIs exist, tested and versioned. Every member holding the page reads; the pages
         // hide what integration-service answers only for a workspace administrator (writes and Test).
-        path: 'integration/api-collections',
+        path: 'connections/api-collections',
         title: 'API Collections',
         loadComponent: () =>
           import('./features/integration/api-collections/api-collections').then(m => m.ApiCollections),
@@ -142,7 +143,7 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        path: 'integration/api-collections/:collectionId',
+        path: 'connections/api-collections/:collectionId',
         title: 'API collection',
         loadComponent: () =>
           import('./features/integration/api-collections/collection').then(m => m.Collection),
@@ -154,18 +155,36 @@ export const routes: Routes = [
         // database -- with its test, preview and schema, the database connections, and the data contracts
         // (MIG-233) that sit on the same page key. Every member holding the page reads; writes and anything that
         // reads the source itself are a workspace administrator's, and the page hides them from anyone else.
-        path: 'integration/sources',
+        path: 'connections/sources',
         title: 'Sources',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources' },
+        data: { pageKey: 'sources', view: 'sources' },
+        canActivate: [pageGuard],
+      },
+      {
+        // Tab hubs (2026-10-12): the Sources page's database connections and data contracts are tabs of Connections,
+        // each its own address on the same page key and the same screen.
+        path: 'connections/databases',
+        title: 'Database connections',
+        loadComponent: () =>
+          import('./features/integration/sources/sources').then(m => m.Sources),
+        data: { pageKey: 'sources', view: 'connections' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'connections/contracts',
+        title: 'Data contracts',
+        loadComponent: () =>
+          import('./features/integration/sources/sources').then(m => m.Sources),
+        data: { pageKey: 'sources', view: 'contracts' },
         canActivate: [pageGuard],
       },
       {
         // Wave 5 (MIG-292): Connector Hub -- the gallery, connecting a database, SaaS app or folder, and every connection's
         // sync health, from integration-service's /connectorHub.json, gated by connector-hub at the gateway. Every member
         // holding the page reads; connecting and changing are a workspace administrator's (the page hides them otherwise).
-        path: 'integration/connectors',
+        path: 'connections/connectors',
         title: 'Connections',
         loadComponent: () => import('./features/integration/connectors/connectors').then(m => m.Connectors),
         data: { pageKey: 'connector-hub' },
@@ -186,8 +205,7 @@ export const routes: Routes = [
       {
         // The list itself stays open: listSourceTask is TENANT_USER on purpose, and a schedule points
         // at a pipeline, so seeing them is part of reading the console.
-        path: 'pipelines',
-        pathMatch: 'full',
+        path: 'pipelines/list',
         title: 'Pipelines',
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
         data: { pageKey: 'tasks' },
@@ -288,7 +306,7 @@ export const routes: Routes = [
       {
         // Same screen without a schedule: the dashboard's TOTAL row drills into an hour across
         // every schedule, which has no single id to put in the path.
-        path: 'pipelines/executions',
+        path: 'runs/latest',
         title: 'Runs',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
@@ -297,14 +315,14 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        path: 'pipelines/queue',
+        path: 'runs/by-date',
         title: 'Runs by date',
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
         data: { pageKey: 'queue' },
         canActivate: [pageGuard],
       },
       {
-        path: 'pipelines/run-analytics',
+        path: 'runs/analytics',
         title: 'Run analytics',
         loadComponent: () =>
           import('./features/reports/reports').then(m => m.Reports),
@@ -317,10 +335,33 @@ export const routes: Routes = [
       {
         // MIG-272: documents read into structured data -- the overview, the document types with their editor, and each
         // type's dataset. Every member holding the page reads, reads documents and extracts; a type is an administrator's.
-        path: 'documents/intelligence',
+        path: 'documents/in',
         title: 'Documents in',
         loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
-        data: { pageKey: 'document-intelligence' },
+        data: { pageKey: 'document-intelligence', view: 'overview' },
+        canActivate: [pageGuard],
+      },
+      {
+        // Tab hubs (2026-10-12): Document Intelligence's types, datasets and email-in address are tabs of Documents, each
+        // its own address on the same page key and the same screen.
+        path: 'documents/types',
+        title: 'Document types',
+        loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
+        data: { pageKey: 'document-intelligence', view: 'types' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'documents/datasets',
+        title: 'Datasets',
+        loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
+        data: { pageKey: 'document-intelligence', view: 'dataset' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'documents/email-in',
+        title: 'Email-in',
+        loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
+        data: { pageKey: 'document-intelligence', view: 'intake' },
         canActivate: [pageGuard],
       },
       {
@@ -339,7 +380,7 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        path: 'documents/converter',
+        path: 'tools/converter',
         title: 'Document Converter',
         loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
         data: { pageKey: 'tools-converter' },
@@ -348,7 +389,7 @@ export const routes: Routes = [
       {
         // MIG-253: generated outputs -- renders saved to a bucket and what recent runs put out. Behind the
         // converter's key: it lists what the converter makes, and there is no page key of its own yet.
-        path: 'documents/reports',
+        path: 'data/reports',
         title: 'Generated reports',
         loadComponent: () => import('./features/documents/generated/generated-reports').then(m => m.GeneratedReports),
         data: { pageKey: 'tools-converter' },
@@ -361,7 +402,7 @@ export const routes: Routes = [
         // does add is the case authGuard cannot see -- a session whose token carries no
         // readable role lands on /unauthorized rather than on a page that is nothing but
         // storage calls, every one of which comes back refused.
-        path: 'documents/files',
+        path: 'data/files',
         title: 'Browse files',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
         data: { pageKey: 'objects', minRole: 'TENANT_USER' },
@@ -371,14 +412,14 @@ export const routes: Routes = [
         // MIG-239: the workspace inbox -- upload files that start jobs with an inbox trigger. Browse files' page key and
         // floor: the gateway leaves /storage.json open, storage-service lets every member read and upload, and only
         // configuring it is an administrator's (gated inside the page).
-        path: 'documents/inbox',
+        path: 'documents/file-drop',
         title: 'File drop',
         loadComponent: () => import('./features/documents/inbox/inbox').then(m => m.Inbox),
         data: { pageKey: 'objects', minRole: 'TENANT_USER' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'documents/transcript',
+        path: 'tools/transcript',
         title: 'Audio Transcript',
         loadComponent: () => import('./features/tools/transcript/transcript').then(m => m.Transcript),
         data: { pageKey: 'tools-transcript' },
@@ -492,21 +533,21 @@ export const routes: Routes = [
       // what the step on their pipeline says; the file chat lists prompts), writing and Try it are
       // gated inside the pages on auth.canManageAgents.
       {
-        path: 'ai/prompts',
+        path: 'pipelines/prompts',
         title: 'Prompts',
         loadComponent: () => import('./features/ai/prompts/prompts').then(m => m.Prompts),
         data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
       },
       {
-        path: 'ai/prompts/new',
+        path: 'pipelines/prompts/new',
         title: 'New prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'ai/prompts/:promptId/edit',
+        path: 'pipelines/prompts/:promptId/edit',
         title: 'Prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
@@ -524,14 +565,14 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        path: 'ai/tools',
+        path: 'settings/tools',
         title: 'Tool Registry',
         loadComponent: () => import('./features/ai/tools/tool-registry').then(m => m.ToolRegistry),
         data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
       },
       {
-        path: 'ai/connections',
+        path: 'settings/model-connections',
         title: 'Model connections',
         loadComponent: () => import('./features/ai/connections/connections').then(m => m.Connections),
         data: { minRole: 'TENANT_ADMIN' },
@@ -543,7 +584,7 @@ export const routes: Routes = [
       {
         // Task Registry was Configuration › Pipelines (MIG-218): every task a pipeline's steps can
         // run (MIG-250), and every existing pipeline as a Legacy task, still edited in its dialog.
-        path: 'configuration/task-registry',
+        path: 'settings/task-registry',
         title: 'Task Registry',
         loadComponent: () =>
           import('./features/settings/task-registry/task-registry').then(m => m.TaskRegistry),
@@ -551,7 +592,7 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'configuration/kafka',
+        path: 'settings/kafka',
         title: 'Kafka & Topics',
         loadComponent: () =>
           import('./features/settings/kafka/kafka-connections').then(m => m.KafkaConnections),
@@ -562,7 +603,7 @@ export const routes: Routes = [
       // a workspace's configuration values and secrets, the engine's own settings, and the home
       // pages and groups a task points at. The old address lands on the nearest of them.
       {
-        path: 'configuration/values',
+        path: 'settings/values',
         title: 'Configuration values',
         loadComponent: () =>
           import('./features/settings/configuration/config-values').then(m => m.ConfigValues),
@@ -572,7 +613,7 @@ export const routes: Routes = [
       {
         // Platform-wide: the fetch limit and the crons' watermarks are the engine's, not a
         // workspace's, and every call behind this screen is PLATFORM_ADMIN on the server.
-        path: 'configuration/engine',
+        path: 'platform/engine',
         title: 'Engine settings',
         loadComponent: () =>
           import('./features/settings/configuration/engine-settings').then(m => m.EngineSettings),
@@ -580,7 +621,7 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'configuration/home-pages',
+        path: 'settings/home-pages',
         title: 'Home pages',
         loadComponent: () =>
           import('./features/settings/configuration/task-references').then(m => m.TaskReferences),
@@ -588,7 +629,7 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'configuration/task-groups',
+        path: 'settings/task-groups',
         title: 'Task groups',
         loadComponent: () =>
           import('./features/settings/configuration/task-references').then(m => m.TaskReferences),
@@ -629,14 +670,14 @@ export const routes: Routes = [
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'billing/analytics',
+        path: 'platform/billing-analytics',
         title: 'Billing analytics',
         loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
-        path: 'billing/rates',
+        path: 'platform/rate-cards',
         title: 'Rate cards',
         loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
         data: { minRole: 'PLATFORM_ADMIN' },
@@ -682,14 +723,14 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'administration/tenants',
+        path: 'platform/workspaces',
         title: 'Workspaces',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
       },
       {
-        path: 'administration/tenant-requests',
+        path: 'platform/requests',
         title: 'Workspace requests',
         loadComponent: () =>
           import('./features/tenant-request/tenant-requests').then(m => m.TenantRequests),
@@ -699,7 +740,7 @@ export const routes: Routes = [
       // MIG-254: the managed service. Role-gated, no page keys: every call behind the first three is PLATFORM_ADMIN
       // (identity-service ManagedServiceRestApi), and the fourth is a workspace administrator's read of the same audit.
       {
-        path: 'administration/managed-service',
+        path: 'platform/managed-service',
         title: 'Managed service',
         loadComponent: () =>
           import('./features/admin/managed-service/managed-service').then(m => m.ManagedService),
@@ -707,7 +748,7 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'administration/staff-activity',
+        path: 'platform/staff-activity',
         title: 'Staff activity',
         loadComponent: () =>
           import('./features/admin/managed-service/staff-activity').then(m => m.StaffActivity),
@@ -715,7 +756,7 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'administration/work-in-workspace',
+        path: 'platform/work-in-workspace',
         title: 'Work in a workspace',
         loadComponent: () =>
           import('./features/admin/managed-service/work-in-workspace').then(m => m.WorkInWorkspace),
@@ -725,7 +766,7 @@ export const routes: Routes = [
       {
         // MIG-196: the 99.99% objectives for pipeline execution and billing, their error budgets and burn rates.
         // Platform-wide: every call behind it is PLATFORM_ADMIN (process /reliability.json, billing /billing.json/reliability).
-        path: 'administration/reliability',
+        path: 'platform/reliability',
         title: 'Reliability',
         loadComponent: () => import('./features/admin/reliability/reliability').then(m => m.Reliability),
         data: { minRole: 'PLATFORM_ADMIN' },
@@ -766,38 +807,85 @@ export const routes: Routes = [
           import('./features/unauthorized/unauthorized').then(m => m.Unauthorized),
       },
       // ---------------------------------------------------------------------------------------------
+      // Tab hubs (owner 2026-10-12): a hub's own address -- its menu entry's link -- opens the first of its tabs the
+      // reader may open (core/nav/nav-access.ts), and the console's 403 page when there is none. The tabs are the
+      // routes above, each with its own guard: the redirect only picks one, it never opens one.
+      // ---------------------------------------------------------------------------------------------
+      ...['connections', 'documents', 'forms', 'pipelines', 'runs', 'data', 'tools', 'administration', 'billing', 'settings',
+        'developers', 'platform'].map(path => ({ path, pathMatch: 'full' as const, redirectTo: toFirstTab })),
+      // ---------------------------------------------------------------------------------------------
       // Old addresses. Every one a full match: a prefix redirect also catches every longer address
       // under it and rewrites only its own part (administration/billing sent .../invoices to
       // billing/usage/invoices -- Page not found). Each points straight at today's page, no chains.
       // ---------------------------------------------------------------------------------------------
+      // Tab hubs (2026-10-12): each page moved under its hub's address. Old links land on the tab, whose own guard
+      // decides -- a reader without the page gets the 403 page there, never more than the page would have shown.
+      ...moved([
+        ['integration/connectors', 'connections/connectors'],
+        ['integration/connectors/storage', 'connections/storage'],
+        ['integration/api-collections', 'connections/api-collections'],
+        ['integration/api-collections/:collectionId', 'connections/api-collections/:collectionId'],
+        ['integration/sources', 'connections/sources'],
+        ['integration/api-clients', 'developers/api-clients'],
+        ['integration/developer', 'developers/portal'],
+        ['integration/developer/reference', 'developers/portal/reference'],
+        ['integration/developer/changelog', 'developers/portal/changelog'],
+        ['integration/developer/guides/:slug', 'developers/portal/guides/:slug'],
+        ['documents/intelligence', 'documents/in'],
+        ['documents/inbox', 'documents/file-drop'],
+        ['documents/reports', 'data/reports'],
+        ['documents/files', 'data/files'],
+        ['documents/converter', 'tools/converter'],
+        ['documents/transcript', 'tools/transcript'],
+        ['pipelines/executions', 'runs/latest'],
+        ['pipelines/queue', 'runs/by-date'],
+        ['pipelines/run-analytics', 'runs/analytics'],
+        ['ai/prompts', 'pipelines/prompts'],
+        ['ai/prompts/new', 'pipelines/prompts/new'],
+        ['ai/prompts/:promptId/edit', 'pipelines/prompts/:promptId/edit'],
+        ['ai/tools', 'settings/tools'],
+        ['ai/connections', 'settings/model-connections'],
+        ['configuration/task-registry', 'settings/task-registry'],
+        ['configuration/kafka', 'settings/kafka'],
+        ['configuration/values', 'settings/values'],
+        ['configuration/home-pages', 'settings/home-pages'],
+        ['configuration/task-groups', 'settings/task-groups'],
+        ['configuration/engine', 'platform/engine'],
+        ['billing/analytics', 'platform/billing-analytics'],
+        ['billing/rates', 'platform/rate-cards'],
+        ['administration/tenants', 'platform/workspaces'],
+        ['administration/tenant-requests', 'platform/requests'],
+        ['administration/managed-service', 'platform/managed-service'],
+        ['administration/staff-activity', 'platform/staff-activity'],
+        ['administration/work-in-workspace', 'platform/work-in-workspace'],
+        ['administration/reliability', 'platform/reliability'],
+      ]),
       // The addresses of MIG-246's renames and regrouping (2026-09-28).
       ...moved([
         ['operations/jobs', 'pipelines/schedules'],
         ['operations/jobs/new', 'pipelines/schedules/new'],
         ['operations/jobs/bulk', 'pipelines/schedules/bulk'],
-        ['operations/jobs/history', 'pipelines/executions'],
+        ['operations/jobs/history', 'runs/latest'],
         ['operations/jobs/:jobId/edit', 'pipelines/schedules/:jobId/edit'],
         ['operations/jobs/:jobId/assistant', 'pipelines/schedules/:jobId/assistant'],
         ['operations/jobs/:jobId/history', 'pipelines/schedules/:jobId/executions'],
         ['operations/jobs/:jobId/runs/:jobQueueId/logs', 'pipelines/schedules/:jobId/runs/:jobQueueId/logs'],
-        ['operations/queue', 'pipelines/queue'],
-        ['operations/tasks', 'pipelines'],
+        ['operations/queue', 'runs/by-date'],
+        ['operations/tasks', 'pipelines/list'],
         ['operations/tasks/new', 'pipelines/new'],
         ['operations/tasks/bulk', 'pipelines/bulk'],
         ['operations/tasks/:taskDetailId/edit', 'pipelines/:taskDetailId/edit'],
-        ['operations/reports', 'pipelines/run-analytics'],
-        ['configuration/pipelines', 'configuration/task-registry'],
-        ['configuration/storage-connections', 'integration/connectors/storage'],
-        ['integration/storage-connections', 'integration/connectors/storage'],
-        ['objects/files', 'documents/files'],
+        ['operations/reports', 'runs/analytics'],
+        ['configuration/pipelines', 'settings/task-registry'],
+        ['configuration/storage-connections', 'connections/storage'],
+        ['integration/storage-connections', 'connections/storage'],
+        ['objects/files', 'data/files'],
         ['objects/analytics', 'data/analytics'],
         ['objects/analytics/dashboards', 'data/analytics/dashboards'],
-        ['tools/converter', 'documents/converter'],
-        ['tools/transcript', 'documents/transcript'],
-        ['assistants/prompts', 'ai/prompts'],
-        ['assistants/prompts/new', 'ai/prompts/new'],
-        ['assistants/prompts/:promptId/edit', 'ai/prompts/:promptId/edit'],
-        ['assistants/connections', 'ai/connections'],
+        ['assistants/prompts', 'pipelines/prompts'],
+        ['assistants/prompts/new', 'pipelines/prompts/new'],
+        ['assistants/prompts/:promptId/edit', 'pipelines/prompts/:promptId/edit'],
+        ['assistants/connections', 'settings/model-connections'],
       ]),
       // 2026-09-18: the flat addresses from before <section>/<page>, and the screens retired or
       // renamed since (params carry over).
@@ -805,49 +893,47 @@ export const routes: Routes = [
         ['jobs', 'pipelines/schedules'],
         ['jobs/new', 'pipelines/schedules/new'],
         ['jobs/bulk', 'pipelines/schedules/bulk'],
-        ['jobs/history', 'pipelines/executions'],
+        ['jobs/history', 'runs/latest'],
         ['jobs/:jobId/edit', 'pipelines/schedules/:jobId/edit'],
         ['jobs/:jobId/assistant', 'pipelines/schedules/:jobId/assistant'],
         ['jobs/:jobId/history', 'pipelines/schedules/:jobId/executions'],
         ['jobs/:jobId/runs/:jobQueueId/logs', 'pipelines/schedules/:jobId/runs/:jobQueueId/logs'],
-        ['queue', 'pipelines/queue'],
-        ['tasks', 'pipelines'],
+        ['queue', 'runs/by-date'],
+        ['tasks', 'pipelines/list'],
         ['tasks/new', 'pipelines/new'],
         ['tasks/bulk', 'pipelines/bulk'],
         ['tasks/:taskDetailId/edit', 'pipelines/:taskDetailId/edit'],
-        ['reports', 'pipelines/run-analytics'],
-        ['objects', 'documents/files'],
+        ['reports', 'runs/analytics'],
+        ['objects', 'data/files'],
         ['analytics', 'data/analytics'],
         ['analytics/dashboards', 'data/analytics/dashboards'],
-        ['admin/storage', 'integration/connectors/storage'],
-        ['settings/storage-connections', 'integration/connectors/storage'],
+        ['admin/storage', 'connections/storage'],
+        ['settings/storage-connections', 'connections/storage'],
         // Prompts replaced AI Agents on 2026-09-18; the Ollama Models page folded into a
         // connection's "Test connection", which lists them.
-        ['ai/agents', 'ai/prompts'],
-        ['ai/models', 'ai/connections'],
+        ['ai/agents', 'pipelines/prompts'],
+        ['ai/models', 'settings/model-connections'],
         ['admin/users', 'administration/users'],
         ['admin/access-profiles', 'administration/access-profiles'],
-        ['admin/tenants', 'administration/tenants'],
-        ['admin/tenant-requests', 'administration/tenant-requests'],
+        ['admin/tenants', 'platform/workspaces'],
+        ['admin/tenant-requests', 'platform/requests'],
         // Renamed from settings/forms once the feature became the pipeline catalogue rather than a
         // general form builder, then Configuration › Pipelines, now the Task Registry.
-        ['settings/pipelines', 'configuration/task-registry'],
-        ['settings/forms', 'configuration/task-registry'],
-        ['settings/pipeline-forms', 'configuration/task-registry'],
+        ['settings/pipelines', 'settings/task-registry'],
+        ['settings/forms', 'settings/task-registry'],
+        ['settings/pipeline-forms', 'settings/task-registry'],
         // Topics (source task types) are managed on the Kafka screen since 2026-09-18; a
         // ?profileId= link keeps its meaning.
-        ['settings/task-types', 'configuration/kafka'],
-        ['settings/kafka', 'configuration/kafka'],
-        ['settings/lookup', 'configuration/values'],
-        ['configuration/lookup', 'configuration/values'],
+        ['settings/task-types', 'settings/kafka'],
+        ['settings/lookup', 'settings/values'],
+        ['configuration/lookup', 'settings/values'],
         // Billing is a section of its own since it left Administration.
-        ['billing', 'billing/usage'],
         ['administration/billing', 'billing/usage'],
         ['administration/billing/invoices', 'billing/invoices'],
         ['administration/billing/invoices/:number', 'billing/invoices/:number'],
         ['administration/billing/documents', 'billing/documents'],
-        ['administration/billing/analytics', 'billing/analytics'],
-        ['administration/billing/rates', 'billing/rates'],
+        ['administration/billing/analytics', 'platform/billing-analytics'],
+        ['administration/billing/rates', 'platform/rate-cards'],
       ]),
       // Last: an address that matches no page shows "Page not found" inside the layout.
       {

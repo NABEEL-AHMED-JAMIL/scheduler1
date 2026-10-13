@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
-import { Visit, menuOf, restoreClock, visit } from '../../characterisation/harness';
+import { Visit, hubTabsOf, menuOf, restoreClock, visit } from '../../characterisation/harness';
 import { AuthService, PLATFORM_SESSION_KEY } from '../../core/auth/auth.service';
 
 /** MIG-254: what the shell adds for the managed service -- the staff session's bar, and the menu's new pages. */
@@ -54,41 +54,41 @@ describe('MIG-254: the shell and the managed service', () => {
     }
   });
 
-  // UX review 2026-10-12 (A10, PL2): the platform's pages are one group of their own.
+  // UX review 2026-10-12 (A10, PL2): the platform's pages are one group of their own -- since the tab hubs, one Platform
+  // entry whose tabs they are.
   it('a platform administrator finds the managed service under Platform', async () => {
-    const v = await visit('/dashboard', 'PLATFORM_ADMIN', null);
-    const menu = (await menuOf(v)).filter(e => e.startsWith('Platform') || e.startsWith('Administration'));
-    expect(menu.some(e => e.includes('Managed service') && e.endsWith('-> /administration/managed-service'))).toBe(true);
-    expect(menu.some(e => e.includes('Staff activity') && e.endsWith('-> /administration/staff-activity'))).toBe(true);
-    expect(menu.some(e => e.includes('Work in a workspace') && e.endsWith('-> /administration/work-in-workspace'))).toBe(true);
-    expect(menu.some(e => e.includes("Our team's activity"))).toBe(false);
+    const v = await visit('/platform/workspaces', 'PLATFORM_ADMIN', null);
+    expect(await menuOf(v)).toContain('Platform -> /platform');
+    const tabs = hubTabsOf(v);
+    expect(tabs).toContain('Managed service -> /platform/managed-service');
+    expect(tabs).toContain('Staff activity -> /platform/staff-activity');
+    expect(tabs).toContain('Work in a workspace -> /platform/work-in-workspace');
+    // Our team's activity is a workspace administrator's view; the platform administrator has Staff activity.
+    restoreClock();
+    const admin = await visit('/administration/users', 'PLATFORM_ADMIN', null);
+    expect(hubTabsOf(admin).some(t => t.startsWith('Activity'))).toBe(false);
   });
 
   it('a MANAGED workspace\'s administrator finds our team\'s activity, with no request to decide it', async () => {
-    const v = await visit('/dashboard', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED' });
+    const v = await visit('/administration/users', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED' });
     const made = await openAdministration(v);
     expect(made.some(r => r.includes('/managedService.json/actions'))).toBe(false);
-    const menu = (await menuOf(v)).filter(e => e.startsWith('Administration'));
-    expect(menu.some(e => e.includes("Our team's activity") && e.endsWith('-> /administration/team-activity'))).toBe(true);
-    expect(menu.some(e => e.includes('Managed service'))).toBe(false);
+    expect(v.surface.requests.some(r => r.includes('/managedService.json/actions'))).toBe(false);
+    expect(hubTabsOf(v)).toContain('Activity -> /administration/team-activity');
+    expect((await menuOf(v)).some(e => e.includes('Platform'))).toBe(false);
   });
 
   it('a SELF workspace\'s administrator sees it only once our team has done something there', async () => {
     const answers = { 'GET /managedService.json/actions': { status: 'SUCCESS', message: '', data: [{ id: 3 }], paging: {} } };
-    const v = await visit('/dashboard', 'TENANT_ADMIN', null, answers);
-    const made = await openAdministration(v);
-    expect(made).toContain('GET /managedService.json/actions?limit=1');
-    const menu = (await menuOf(v)).filter(e => e.startsWith('Administration'));
-    expect(menu.some(e => e.includes("Our team's activity"))).toBe(true);
+    const v = await visit('/administration/users', 'TENANT_ADMIN', null, answers);
+    expect(v.surface.requests).toContain('GET /managedService.json/actions?limit=1');
+    expect(hubTabsOf(v)).toContain('Activity -> /administration/team-activity');
   });
 
   it('and not when there is nothing, asking once', async () => {
-    const v = await visit('/dashboard', 'TENANT_ADMIN', null);
-    const first = await openAdministration(v);
-    const second = await openAdministration(v);
-    expect(first.filter(r => r.includes('/managedService.json/actions'))).toHaveLength(1);
-    expect(second.filter(r => r.includes('/managedService.json/actions'))).toHaveLength(0);
-    const menu = (await menuOf(v)).filter(e => e.startsWith('Administration'));
-    expect(menu.some(e => e.includes("Our team's activity"))).toBe(false);
+    const v = await visit('/administration/users', 'TENANT_ADMIN', null);
+    const made = [...v.surface.requests, ...await openAdministration(v), ...await openAdministration(v)];
+    expect(made.filter(r => r.includes('/managedService.json/actions'))).toHaveLength(1);
+    expect(hubTabsOf(v).some(t => t.startsWith('Activity'))).toBe(false);
   });
 });

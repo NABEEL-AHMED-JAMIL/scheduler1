@@ -5,6 +5,8 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { provideHttpClient } from '@angular/common/http';
 import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { Shell } from './shell';
+import { HUBS, NAV } from '../../core/nav/nav-tree';
+import { NavAccess } from '../../core/nav/nav-access';
 import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
 /**
@@ -47,16 +49,19 @@ describe('shell navigation', () => {
     shell.nav().flatMap(item => item.children ?? []);
 
   it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
-    const tagged = children().filter(child => child.pageKey || child.pageKeys).map(child => child.path).sort();
+    // Tab hubs (2026-10-12): a hub's tabs carry the keys; the hub itself has none of its own.
+    const leaves = NAV.flatMap(item => [...(item.tabs ?? []), ...(item.children ?? []).flatMap(child => child.tabs ?? [child])]);
+    const tagged = leaves.filter(leaf => leaf.pageKey || leaf.pageKeys).map(leaf => leaf.path).sort();
     expect(tagged).toEqual([
-      '/ai/assistant', '/ai/prompts', '/ai/tools', '/data/analytics', '/data/analytics/dashboards', '/data/ask', '/data/catalog',
-      // Documents in and Document types (its tab) are one page, behind one key.
-      '/documents/converter', '/documents/files', '/documents/inbox', '/documents/intelligence', '/documents/intelligence',
-      '/documents/reports', '/documents/review',
-      '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
-      '/integration/connectors', '/integration/sources', '/pipelines', '/pipelines/executions', '/pipelines/run-analytics',
-      '/pipelines/schedules', '/workflows/designer', '/workflows/inbox',
+      '/ai/assistant', '/connections/api-collections', '/connections/connectors', '/connections/contracts',
+      '/connections/databases', '/connections/sources', '/data/analytics', '/data/analytics/dashboards', '/data/ask',
+      '/data/catalog', '/data/files', '/data/reports', '/developers/portal', '/documents/datasets', '/documents/email-in',
+      '/documents/file-drop', '/documents/in', '/documents/review', '/documents/types', '/forms/builder', '/forms/submissions',
+      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/runs/analytics', '/runs/by-date', '/runs/latest',
+      '/settings/tools', '/tools/converter', '/tools/transcript', '/workflows/designer', '/workflows/inbox',
+      '/workflows/requests',
     ]);
+    expect(HUBS.every(hub => !('pageKey' in hub && hub.pageKey) && !('pageKeys' in hub && hub.pageKeys))).toBe(true);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
   });
 
@@ -74,16 +79,14 @@ describe('shell navigation', () => {
       providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     });
     const restricted = TestBed.createComponent(Shell).componentInstance;
-    const paths = restricted.nav().flatMap(item => item.children ?? []).map(child => child.path);
-
-    expect(paths).toContain('/pipelines/schedules');
-    // UX review B3 (E1): Runs and Runs by date are one entry, shown to a holder of either page.
-    expect(paths).toContain('/pipelines/executions');
-    expect(paths).not.toContain('/pipelines/queue');
-    expect(paths).not.toContain('/pipelines/run-analytics');
-    expect(paths).not.toContain('/documents/converter');
-    expect(restricted.nav().map(item => item.label)).not.toContain('Documents');
-    expect(restricted.nav().map(item => item.label)).not.toContain('AI');
+    const shown = restricted.nav().flatMap(item => item.children ?? []);
+    // Two hubs, each with only the tabs the profile opens: Pipelines is Schedules alone, Runs is Latest and By date.
+    expect(shown.map(child => child.path)).toEqual(['/pipelines', '/runs']);
+    const access = TestBed.inject(NavAccess);
+    expect(access.tabsOf(shown[0]).map(t => t.path)).toEqual(['/pipelines/schedules']);
+    expect(access.tabsOf(shown[1]).map(t => t.path)).toEqual(['/runs/latest', '/runs/by-date']);
+    expect(restricted.nav().map(item => item.label)).not.toContain('See results');
+    expect(restricted.nav().map(item => item.label)).not.toContain('Get data in');
     // Dashboard is not a page a profile can take away.
     expect(restricted.nav().find(item => item.path === '/dashboard')).toBeDefined();
     localStorage.removeItem('etl_auth_user');
@@ -102,7 +105,8 @@ describe('shell navigation', () => {
   });
 
   it('marks a parent route exact, so standing on the child does not light both', () => {
-    const parent = children().find(child => child.path === '/data/analytics');
+    // Analysis (/data) has Dashboards (/data/analytics/dashboards) beneath it.
+    const parent = children().find(child => child.path === '/data');
     expect(parent?.exact).toBe(true);
   });
 
@@ -110,15 +114,16 @@ describe('shell navigation', () => {
     const saved = children().find(child => child.path === '/data/analytics/dashboards');
     expect(saved?.exact).toBe(false);
     // Not a special case for analytics: every entry with nothing beneath it stays prefix-matched.
-    expect(children().find(child => child.path === '/documents/files')?.exact).toBe(false);
+    expect(children().find(child => child.path === '/tools')?.exact).toBe(false);
   });
 
   /**
    * MIG-167: Lookups became typed screens. A tenant administrator gets the workspace's own;
-   * Engine settings is the platform's and only a platform administrator is shown it.
+   * Engine settings is the platform's and only a platform administrator is shown it. Tab hubs (2026-10-12): the
+   * workspace's are tabs of Settings, Engine settings a tab of Platform.
    */
   it('lists the typed configuration screens, and Engine settings for a platform administrator only', () => {
-    const configurationFor = (role: string) => {
+    const tabsFor = (role: string) => {
       const claims = btoa(JSON.stringify({ sub: 'a@example.com', appUserId: 5, userRole: role }))
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
       localStorage.setItem('etl_auth_user', JSON.stringify({
@@ -129,18 +134,15 @@ describe('shell navigation', () => {
       TestBed.configureTestingModule({
         providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
       });
-      const built = TestBed.createComponent(Shell).componentInstance;
+      const access = TestBed.inject(NavAccess);
       localStorage.removeItem('etl_auth_user');
-      return built.nav().flatMap(item => item.children ?? []).filter(child => child.path.startsWith('/configuration/'))
-        .map(child => child.path);
+      return HUBS.flatMap(hub => access.tabsOf(hub)).map(tab => tab.path);
     };
 
-    const tenant = configurationFor('TENANT_ADMIN');
-    expect(tenant).toEqual(expect.arrayContaining(['/configuration/values', '/configuration/home-pages', '/configuration/task-groups']));
-    expect(tenant).not.toContain('/configuration/engine');
-    expect(tenant).not.toContain('/configuration/lookup');
-
-    expect(configurationFor('PLATFORM_ADMIN')).toContain('/configuration/engine');
+    const tenant = tabsFor('TENANT_ADMIN');
+    expect(tenant).toEqual(expect.arrayContaining(['/settings/values', '/settings/home-pages', '/settings/task-groups']));
+    expect(tenant).not.toContain('/platform/engine');
+    expect(tabsFor('PLATFORM_ADMIN')).toContain('/platform/engine');
   });
 
   /** Build the shell as a rendered component so keyboard focus can be checked. */
@@ -218,7 +220,7 @@ describe('shell navigation', () => {
       const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Get data in"] > button')!;
       const panel = el.querySelector<HTMLElement>('#' + trigger.getAttribute('aria-controls'));
       expect(panel).not.toBeNull();
-      expect(panel!.querySelector('a[href="/documents/inbox"]')).not.toBeNull();
+      expect(panel!.querySelector('a[href="/documents"]')).not.toBeNull();
     });
 
     it('marks an entry whose page is not built yet as coming, and only those', async () => {
@@ -227,7 +229,7 @@ describe('shell navigation', () => {
       await fixture.whenStable();
       // Every entry is marked exactly when its page is not built; Connections is built (Wave 5).
       const data = s.nav().find(item => item.label === 'Get data in')!.children ?? [];
-      expect(data.find(c => c.path === '/integration/connectors')?.soon).toBeFalsy();
+      expect(data.find(c => c.path === '/connections')?.soon).toBeFalsy();
       for (const entry of data) {
         const link = el.querySelector<HTMLElement>(`[data-nav-menu="Get data in"] a[href="${entry.path}"]`)!;
         if (entry.soon) expect(link.querySelector('.pill')?.textContent?.trim(), entry.path).toBe('Soon');

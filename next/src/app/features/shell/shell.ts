@@ -8,9 +8,8 @@ import { ThemeService } from '../../core/theme.service';
 import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
 import { NAV, NavChild, NavItem, placeOf } from '../../core/nav/nav-tree';
+import { NavAccess } from '../../core/nav/nav-access';
 import { NotificationBell } from './notification-bell';
-import { HttpClient } from '@angular/common/http';
-import { API_BASE, ApiResponse } from '../../core/api/api.config';
 import { TaskCountService } from '../workflows/task-count.service';
 
 /** A run of entries under one sub-heading of a group ("Workspace", "Billing", "Tools"); the first run may have none. */
@@ -29,9 +28,8 @@ export class Shell {
   readonly auth = inject(AuthService);
   readonly theme = inject(ThemeService);
   readonly tasks = inject(TaskCountService);
+  private readonly access = inject(NavAccess);
   private readonly router = inject(Router);
-  // HttpClient rather than ManagedServiceApi: the shell is in the initial bundle, the admin pages' client is not.
-  private readonly http = inject(HttpClient);
 
   readonly openMenu = signal<string | null>(null);
   readonly mobileOpen = signal(false);
@@ -113,21 +111,17 @@ export class Shell {
 
   /**
    * Menus the current role -- and, for a tenant user, their access profile -- can actually
-   * reach, so nothing renders that would 403. A section whose every page is out of reach is
-   * dropped whole rather than left as an empty heading. canOpen reads the stored session, so the
-   * menu recomputes on its own when a token refresh brings a changed profile.
+   * reach, so nothing renders that would 403. A hub shows when at least one of its tabs does (its link opens the
+   * first of them), and a section whose every page is out of reach is dropped whole rather than left as an empty
+   * heading. The rules are NavAccess's, the same ones a hub's tab strip and its address use. canOpen reads the stored
+   * session, so the menu recomputes on its own when a token refresh brings a changed profile.
    */
   readonly nav = computed<ShownNavItem[]>(() => {
-    const isAdmin = this.auth.isTenantAdmin();
-    const isPlatform = this.auth.isPlatformAdmin();
+    this.access.viewer();
     return this.allNav
+      .filter(item => !item.tabs || this.access.visible(item))
       .map(item => {
-        const children = this.withExactFlags(item.children?.filter(child =>
-          !child.crumbOnly
-          && (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform)
-          && (!child.teamOnly || (!isPlatform && this.showTeamActivity()))
-          && (!child.pageKey || this.auth.canOpen(child.pageKey))
-          && (!child.pageKeys || child.pageKeys.some(key => this.auth.canOpen(key)))));
+        const children = this.withExactFlags(item.children?.filter(child => this.access.visible(child)));
         return { ...item, children, blocks: blocksOf(children ?? []) };
       })
       .filter(item => !item.children || item.children.length > 0);
@@ -148,23 +142,11 @@ export class Shell {
     }));
   }
 
-  /** An id for a nav panel, so its trigger can say which panel it controls. Labels have spaces. */
-  /** MIG-254: our team has acted in this SELF workspace (asked once, when the menu is first opened). */
-  private readonly teamActivitySeen = signal(false);
-  private teamActivityAsked = false;
-  readonly showTeamActivity = computed(() => this.auth.managementMode() === 'MANAGED' || this.teamActivitySeen());
+  /** MIG-254: our team's activity is offered in this workspace (NavAccess asks once, when a menu first opens). */
+  readonly showTeamActivity = computed(() => this.access.showTeamActivity());
 
-  /**
-   * Whether a SELF workspace has any of our team's changes, asked when a menu first opens rather than on every
-   * page: one small read, and only for the one person it can change the menu for.
-   */
   private checkTeamActivity(): void {
-    if (this.teamActivityAsked || !this.auth.isTenantAdmin() || this.auth.isPlatformAdmin() || this.showTeamActivity()) return;
-    this.teamActivityAsked = true;
-    this.http.get<ApiResponse<unknown[]>>(`${API_BASE}/managedService.json/actions`, { params: { limit: 1 } }).subscribe({
-      next: r => this.teamActivitySeen.set(!!r.data?.length),
-      error: () => { /* the menu stays as it is */ },
-    });
+    this.access.checkTeamActivity();
   }
 
   toggleCollapsed(): void {
@@ -191,7 +173,7 @@ export class Shell {
   /**
    * Where the current address sits in the menu: the group, and the one entry whose address is the longest prefix of it
    * -- the same answer the breadcrumb gives. A prefix match per link lit two entries at once once the groups mixed
-   * sections (Pipelines under Build, Runs at /pipelines/executions under Run & review).
+   * sections (Pipelines under Build, Runs at /runs/latest under Run & review).
    */
   private readonly place = computed(() => placeOf(this.currentUrl()));
 

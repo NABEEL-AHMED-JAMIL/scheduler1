@@ -11,10 +11,10 @@ import { PageKey } from '../../core/auth/page-keys';
  */
 const ROUTE_MAP: Record<string, string> = {
   '/jobList': '/pipelines/schedules',
-  '/taskList': '/pipelines',
-  '/objectBrowser': '/documents/files',
+  '/taskList': '/pipelines/list',
+  '/objectBrowser': '/data/files',
   '/users': '/administration/users',
-  '/tenants': '/administration/tenants',
+  '/tenants': '/platform/workspaces',
 };
 
 /**
@@ -39,6 +39,28 @@ export function notificationTarget(linkUrl: string | null | undefined): string |
  * redirect turns them into today's.
  */
 const PAGE_PATHS: [string, PageKey][] = [
+  // Tab hubs (2026-10-12): each page at its hub's address.
+  ['/runs/latest', 'jobs'],
+  ['/runs/by-date', 'queue'],
+  ['/runs/analytics', 'reports'],
+  ['/pipelines/prompts', 'ai-prompts'],
+  ['/data/files', 'objects'],
+  ['/data/reports', 'tools-converter'],
+  ['/documents/in', 'document-intelligence'],
+  ['/documents/types', 'document-intelligence'],
+  ['/documents/datasets', 'document-intelligence'],
+  ['/documents/email-in', 'document-intelligence'],
+  ['/documents/file-drop', 'objects'],
+  ['/tools/converter', 'tools-converter'],
+  ['/tools/transcript', 'tools-transcript'],
+  ['/connections/connectors', 'connector-hub'],
+  ['/connections/api-collections', 'api-collections'],
+  ['/connections/sources', 'sources'],
+  ['/connections/databases', 'sources'],
+  ['/connections/contracts', 'sources'],
+  ['/settings/tools', 'ai-prompts'],
+  ['/developers/portal', 'developer-portal'],
+  // Before the tab hubs: the addresses the server has already stored.
   ['/pipelines/schedules', 'jobs'],
   ['/pipelines/executions', 'jobs'],
   ['/pipelines/queue', 'queue'],
@@ -62,8 +84,6 @@ const PAGE_PATHS: [string, PageKey][] = [
   ['/objects/files', 'objects'],
   ['/objects/analytics/dashboards', 'analytics-dashboards'],
   ['/objects/analytics', 'analytics'],
-  ['/tools/converter', 'tools-converter'],
-  ['/tools/transcript', 'tools-transcript'],
   ['/assistants/prompts', 'ai-prompts'],
 ];
 
