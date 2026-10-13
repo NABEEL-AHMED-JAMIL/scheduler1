@@ -52,7 +52,7 @@ function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => 
       provideRouter([]),
       { provide: AssistantApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { canManageAgents: () => admin, isTenantAdmin: () => admin, isPlatformAdmin: () => !!opts.platform } },
+      { provide: AuthService, useValue: { canManageAgents: () => admin, builderLocked: () => false, isTenantAdmin: () => admin, isPlatformAdmin: () => !!opts.platform } },
     ],
   });
   const fixture = TestBed.createComponent(ToolRegistry);

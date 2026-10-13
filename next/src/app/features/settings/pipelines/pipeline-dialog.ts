@@ -233,7 +233,7 @@ export function validateSelectChoices(rows: PipelineField[]): string | null {
                         [remote]="true" (search)="topicSearch.search($event)" [searching]="topicSearch.searching()"
                         [options]="topicSearch.options()" [selectedLabel]="topicLabel()" />
           @if (noTopicsYet()) {
-            <a routerLink="/configuration/kafka" class="link-inline text-xs mt-1 inline-block" (click)="ref.close(false)">Open Kafka &amp; Topics</a>
+            <a routerLink="/settings/kafka" class="link-inline text-xs mt-1 inline-block" (click)="ref.close(false)">Open Kafka &amp; Topics</a>
           }
         </app-field>
 

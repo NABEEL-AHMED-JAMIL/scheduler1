@@ -51,7 +51,7 @@ export type TaskPanelResult = 'edit' | undefined;
               <dt class="text-[color:var(--text-muted)]">Topic</dt>
               <dd class="min-w-0">
                 @if (p.topicName) {
-                  <a class="link-inline" [routerLink]="['/configuration/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
+                  <a class="link-inline" [routerLink]="['/settings/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
                      (click)="ref.close()">{{ p.topicName }}</a>
                   @if (p.kafkaTopic) { <span class="mono text-[color:var(--text-muted)] ml-1">{{ p.kafkaTopic }}</span> }
                 } @else {

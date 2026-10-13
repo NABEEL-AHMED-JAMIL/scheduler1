@@ -99,8 +99,8 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
             </div>
           }
           <p class="px-4 py-2.5 border-t border-subtle text-sm text-[color:var(--text-secondary)]">
-            New to the API? Start with the <a class="md-link" routerLink="/integration/developer/guides/quickstart">quickstart</a>
-            in the <a class="md-link" routerLink="/integration/developer">Developer portal</a>.
+            New to the API? Start with the <a class="md-link" routerLink="/developers/portal/guides/quickstart">quickstart</a>
+            in the <a class="md-link" routerLink="/developers/portal">Developer portal</a>.
           </p>
         </div>
       } @else {

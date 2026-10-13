@@ -23,7 +23,7 @@
         <div>
           <b>Usage with no price anywhere</b> — on no workspace card and not on the default card, so billed at 0:
           @for (u of unpriced(); track u.tenantId) { <span>{{ u.tenantName }}: <span class="mono">{{ u.meters.join(', ') }}</span>{{ $last ? '.' : '; ' }}</span> }
-          <a routerLink="/billing/rates" class="link-inline">Price them on a rate card</a>; the days are priced again.
+          <a routerLink="/platform/rate-cards" class="link-inline">Price them on a rate card</a>; the days are priced again.
         </div>
       </div>
     }

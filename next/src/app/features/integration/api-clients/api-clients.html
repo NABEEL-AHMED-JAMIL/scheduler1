@@ -17,7 +17,7 @@
     </div>
   </app-page-header>
 
-  @if (limits(); as l) {
+  @if (limits()?.bounds && limits(); as l) {
     <div class="card p-4 mb-3 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm" data-api-limits>
       <div>
         <div class="text-xs text-[color:var(--text-muted)]">Each client</div>

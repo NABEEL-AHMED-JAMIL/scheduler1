@@ -38,7 +38,7 @@
       @if (rateCard(); as card) {
         Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> }
         @if (card.fallback; as f) { <span data-fallback-card>· meters it does not name are priced from <b>{{ f.name }}</b> v{{ f.version }}</span> } · {{ currency() }}
-        @if (isPlatformAdmin()) { · <a routerLink="/billing/rates" class="link-inline">rate cards</a> }
+        @if (isPlatformAdmin()) { · <a routerLink="/platform/rate-cards" class="link-inline">rate cards</a> }
       } @else { Priced with the rate card in effect · {{ currency() }} }
       · day {{ daysElapsed() }} of {{ daysInMonth() }}
       @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
@@ -53,7 +53,7 @@
           <b>Usage with no price anywhere:</b>
           @for (l of unpricedLines(); track l.meter) { <span class="mono">{{ l.label }} ({{ l.meter }})</span>{{ $last ? '' : ', ' }} }
           — on {{ unpricedWhere() }}, so it is billed at 0.
-          @if (isPlatformAdmin()) { <a routerLink="/billing/rates" class="link-inline">Price it on a rate card</a> and the month is priced again. }
+          @if (isPlatformAdmin()) { <a routerLink="/platform/rate-cards" class="link-inline">Price it on a rate card</a> and the month is priced again. }
         </div>
       </div>
     }

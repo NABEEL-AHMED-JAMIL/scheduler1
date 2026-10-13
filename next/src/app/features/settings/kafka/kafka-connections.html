@@ -432,7 +432,7 @@
                           @if (!list.length) {
                             <span class="text-xs text-[color:var(--text-muted)]">none yet</span>
                           } @else if (list.length === 1) {
-                            <a class="link-inline kafka-cell-clip" [routerLink]="['/configuration/task-registry']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
+                            <a class="link-inline kafka-cell-clip" [routerLink]="['/settings/task-registry']" [queryParams]="{ topic: row.type.sourceTaskTypeId }"
                                [title]="list[0].pipelineId + ' · ' + list[0].fields + ' field(s)'">{{ list[0].pipelineName }}</a>
                           } @else {
                             <button type="button" class="pill pill-brand hover-brand" (click)="showPipelines(row.type)"

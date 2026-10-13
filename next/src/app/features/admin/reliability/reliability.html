@@ -144,7 +144,7 @@
             <strong class="text-[color:var(--text-primary)]">What to do:</strong>
             @if (b.unpriced > 0) {
               {{ b.unpriced | number }} {{ b.unpriced === 1 ? 'event has' : 'events have' }} no rate on the rate card.
-              <a class="rel-link" routerLink="/billing/rates">Add the missing rates</a>
+              <a class="rel-link" routerLink="/platform/rate-cards">Add the missing rates</a>
             }
             @if (b.unrolled > 0) {
               {{ b.unrolled | number }} {{ b.unrolled === 1 ? 'event was' : 'events were' }} not rolled up into their day's bill; the daily rollup in billing-service needs a look.

@@ -13,6 +13,7 @@ import { capTitle } from '../../../shared/ui/long-text';
 import { AssistantApi } from '../assistant/assistant.api';
 import { ToolDef, allowedTools, ioOf, serviceOf, toolState } from '../assistant/assistant.model';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /**
@@ -28,7 +29,7 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-tool-registry',
-  imports: [RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox],
+  imports: [RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox, ManagedBanner],
   templateUrl: './tool-registry.html',
 })
 export class ToolRegistry implements OnInit {

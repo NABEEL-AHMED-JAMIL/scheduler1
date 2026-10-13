@@ -52,7 +52,7 @@ export function slugify(text: string): string {
 }
 
 /** The console route of the portal; a guide's relative link to another guide (`webhooks.md#retries`) resolves here. */
-export const PORTAL = '/integration/developer';
+export const PORTAL = '/developers/portal';
 
 /**
  * Where a link may go: http(s) and mailto open as they are; a console path or a `#fragment` stays in the console; a

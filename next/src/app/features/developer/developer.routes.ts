@@ -7,7 +7,7 @@ import { DeveloperOverview } from './overview';
 import { DeveloperReference } from './reference';
 
 /**
- * MIG-336: the developer portal's pages, under /integration/developer (app.routes.ts holds its page key and guard). Lazy
+ * MIG-336: the developer portal's pages, under /developers/portal (app.routes.ts holds its page key and guard). Lazy
  * as one chunk with the bundled contract: every page reads it.
  */
 export const DEVELOPER_ROUTES: Routes = [

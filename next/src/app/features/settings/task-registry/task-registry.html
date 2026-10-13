@@ -133,7 +133,7 @@
               @if (row.pipeline; as p) {
                 <div class="mt-0.5">
                   @if (p.topicName) {
-                    <a class="link-inline" [routerLink]="['/configuration/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
+                    <a class="link-inline" [routerLink]="['/settings/kafka']" [queryParams]="p.kafkaConnectionProfileId ? { profileId: p.kafkaConnectionProfileId } : {}"
                        [title]="'Publishes on ' + (p.kafkaTopic || '') + ' — open on Kafka & Topics'">{{ p.topicName }}</a>
                   } @else {
                     <span class="pill pill-warn" title="Assign a topic; a task cannot pick this pipeline until then">No topic</span>

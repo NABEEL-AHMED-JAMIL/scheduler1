@@ -240,7 +240,7 @@ describe('Workflow designer -- a sign-in with no workspace', () => {
     expect(api.list).not.toHaveBeenCalled();
     expect(api.fetch).not.toHaveBeenCalled();
     expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
-    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/administration/work-in-workspace');
+    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/platform/work-in-workspace');
     expect(el.querySelector('[data-test="workflow-list"]')).toBeNull();
     expect(screen.canEdit()).toBe(false);
     expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();

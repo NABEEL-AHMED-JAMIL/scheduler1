@@ -12,7 +12,7 @@ import { useMemoryStorage } from '../../shared/testing/memory-storage';
 const FIXTURE = [
   '# Quickstart',
   '',
-  'Get a token, then start a run. See [webhooks](webhooks.md#verify) and the [reference](/integration/developer/reference#op-startRun).',
+  'Get a token, then start a run. See [webhooks](webhooks.md#verify) and the [reference](/developers/portal/reference#op-startRun).',
   '',
   '## Get a token',
   '',
@@ -86,11 +86,11 @@ describe('MIG-336: guide markdown', () => {
 
   it('links only to safe places: the web, the console, a sibling guide', () => {
     expect(linkTarget('https://example.com/x')).toEqual({ href: 'https://example.com/x' });
-    expect(linkTarget('/integration/developer/reference#op-startRun')).toEqual({ route: '/integration/developer/reference', fragment: 'op-startRun' });
-    expect(linkTarget('webhooks.md#verify')).toEqual({ route: '/integration/developer/guides/webhooks', fragment: 'verify' });
+    expect(linkTarget('/developers/portal/reference#op-startRun')).toEqual({ route: '/developers/portal/reference', fragment: 'op-startRun' });
+    expect(linkTarget('webhooks.md#verify')).toEqual({ route: '/developers/portal/guides/webhooks', fragment: 'verify' });
     expect(linkTarget('#retries')).toEqual({ route: '.', fragment: 'retries' });
-    expect(linkTarget('webhooks')).toEqual({ route: '/integration/developer/guides/webhooks' });
-    expect(linkTarget('reference#op-startRun')).toEqual({ route: '/integration/developer/reference', fragment: 'op-startRun' });
+    expect(linkTarget('webhooks')).toEqual({ route: '/developers/portal/guides/webhooks' });
+    expect(linkTarget('reference#op-startRun')).toEqual({ route: '/developers/portal/reference', fragment: 'op-startRun' });
     expect(linkTarget('../secrets/env')).toBeNull();
     expect(linkTarget('javascript:alert(1)')).toBeNull();
     expect(linkTarget('//evil.example.com')).toBeNull();
@@ -120,7 +120,7 @@ describe('MIG-336: the bundled guides', () => {
       const blocks = parseGuide(guide.markdown);
       expect(blocks[0], 'a guide starts with its # title').toMatchObject({ kind: 'h', level: 1 });
       expect(JSON.stringify(blocks)).not.toContain('<!--');
-      const broken = blocks.flatMap(spansOf).filter(s => s.route?.startsWith('/integration/developer/guides/'))
+      const broken = blocks.flatMap(spansOf).filter(s => s.route?.startsWith('/developers/portal/guides/'))
         .map(s => s.route!.split('/').pop()!).filter(slug => !slugs.has(slug));
       expect(broken).toEqual([]);
     });
@@ -153,7 +153,7 @@ describe('MIG-336: a guide drawn', () => {
     expect([...el.querySelectorAll('a')].some(a => (a.getAttribute('href') ?? '').startsWith('javascript'))).toBe(false);
     const external = [...el.querySelectorAll('a[target="_blank"]')];
     expect(external.every(a => a.getAttribute('rel') === 'noopener noreferrer')).toBe(true);
-    expect(el.querySelector('a[href="/integration/developer/guides/webhooks#verify"]')).not.toBeNull();
+    expect(el.querySelector('a[href="/developers/portal/guides/webhooks#verify"]')).not.toBeNull();
     expect(el.querySelector('h2#get-a-token')).not.toBeNull();
     expect(el.querySelector('table.table-modern')).not.toBeNull();
   });

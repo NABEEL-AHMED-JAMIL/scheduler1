@@ -43,9 +43,9 @@ describe('MIG-254: the managed-service pages', () => {
   afterEach(() => restoreClock());
 
   const platform: [string, string][] = [
-    ['managed service, as a platform administrator', '/administration/managed-service'],
-    ['staff activity, as a platform administrator', '/administration/staff-activity'],
-    ['work in a workspace, as a platform administrator', '/administration/work-in-workspace'],
+    ['managed service, as a platform administrator', '/platform/managed-service'],
+    ['staff activity, as a platform administrator', '/platform/staff-activity'],
+    ['work in a workspace, as a platform administrator', '/platform/work-in-workspace'],
   ];
   for (const [name, url] of platform) {
     it(name, async () => {
@@ -60,12 +60,12 @@ describe('MIG-254: the managed-service pages', () => {
   });
 
   it('the pages refuse a workspace administrator', async () => {
-    const v = await visit('/administration/managed-service', 'TENANT_ADMIN', null, ANSWERS);
+    const v = await visit('/platform/managed-service', 'TENANT_ADMIN', null, ANSWERS);
     pin(FILE, 'the pages refuse a workspace administrator', v.surface.url, PINNED);
   });
 
   it('pipelines, in a MANAGED workspace', async () => {
-    const v = await visit('/pipelines', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED' });
+    const v = await visit('/pipelines/list', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED' });
     pin(FILE, 'pipelines, in a MANAGED workspace', v.surface, PINNED);
   });
 });

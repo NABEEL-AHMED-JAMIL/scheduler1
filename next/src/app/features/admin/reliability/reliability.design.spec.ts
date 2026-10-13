@@ -117,7 +117,7 @@ describe('Reliability, the design -- the status cards', () => {
     const card = el.querySelector('[data-testid="status-billing"]')!;
     expect(text('[data-testid="health"]', card)).toBe('Needs attention');
     expect(text('[data-testid="what-to-do"]', card)).toContain('3 events have no rate on the rate card.');
-    expect(card.querySelector('[data-testid="what-to-do"] a')!.getAttribute('href')).toBe('/billing/rates');
+    expect(card.querySelector('[data-testid="what-to-do"] a')!.getAttribute('href')).toBe('/platform/rate-cards');
   });
 });
 

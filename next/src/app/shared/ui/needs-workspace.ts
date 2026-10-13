@@ -15,7 +15,7 @@ import { Icon } from './icon';
       <app-icon [name]="icon()" size="1.5rem" class="icon-muted" />
       <p class="text-sm text-[color:var(--text-primary)]">{{ what() }} a workspace's, and this sign-in has none.</p>
       <p class="text-sm text-[color:var(--text-secondary)]">Open the workspace from Work in a workspace to {{ todo() }}.</p>
-      <a routerLink="/administration/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
+      <a routerLink="/platform/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
     </div>
   `,
 })

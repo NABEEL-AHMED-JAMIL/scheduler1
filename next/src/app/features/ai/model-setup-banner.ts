@@ -30,7 +30,7 @@ export function hasWorkspaceDefault(connections: ModelConnection[], tenantId: nu
             {{ what() }} needs a model to answer with, and this workspace has no default model connection yet.
             Add one, local or hosted, and it becomes the default.
           </p>
-          <a class="btn btn-primary btn-sm mt-3" routerLink="/ai/connections"><app-icon name="plus" />Add a model connection</a>
+          <a class="btn btn-primary btn-sm mt-3" routerLink="/settings/model-connections"><app-icon name="plus" />Add a model connection</a>
         </div>
       </div>
     }

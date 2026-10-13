@@ -83,7 +83,7 @@ import { PageHeader } from '../../shared/ui/page-header';
             } @else if (sandbox(); as s) {
               <p class="text-sm">Your sandbox: <span class="font-medium">{{ s.name }}</span> (workspace {{ s.tenantId }}).</p>
               <p class="text-sm text-[color:var(--text-secondary)] mt-1">
-                Make test keys in <a class="md-link" routerLink="/integration/api-clients" fragment="sandbox">API Clients › Sandbox</a>: they
+                Make test keys in <a class="md-link" routerLink="/developers/api-clients" fragment="sandbox">API Clients › Sandbox</a>: they
                 work only there, and nothing there is billed.
               </p>
             } @else {

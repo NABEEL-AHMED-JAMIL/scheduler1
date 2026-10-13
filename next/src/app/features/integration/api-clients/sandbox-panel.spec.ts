@@ -69,7 +69,7 @@ describe('MIG-336: API Clients › Sandbox', () => {
     expect(table.textContent).toContain('Portal test');
     expect(table.textContent).toContain('cl_test_portal0000000000000');
     expect(table.textContent).toContain('Test');
-    expect(el.querySelector('a[href="/integration/developer/guides/quickstart"]')).not.toBeNull();
+    expect(el.querySelector('a[href="/developers/portal/guides/quickstart"]')).not.toBeNull();
   });
 
   it('makes a test key through the client dialog with sandbox set, and shows its secret once', () => {

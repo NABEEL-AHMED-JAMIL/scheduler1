@@ -24,7 +24,7 @@ function configure(admin: boolean, sandbox: () => unknown = () => of({ status: '
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     provideZonelessChangeDetection(),
-    provideRouter([{ path: 'integration/developer', children: DEVELOPER_ROUTES }], withComponentInputBinding()),
+    provideRouter([{ path: 'developers/portal', children: DEVELOPER_ROUTES }], withComponentInputBinding()),
     { provide: ApiClientsApi, useValue: api },
     { provide: AuthService, useValue: { hasAtLeast: (role: string) => admin && role !== 'PLATFORM_ADMIN' } },
     { provide: ToastService, useValue: { success: () => undefined, error: () => undefined } },
@@ -41,7 +41,7 @@ function overview(admin: boolean, sandbox?: () => unknown) {
 
 describe('MIG-336: the developer portal\'s routes and menu', () => {
   it('is one lazy route under Integration, guarded by its own page key', () => {
-    const route = routes.find(r => r.children)!.children!.find(r => r.path === 'integration/developer')!;
+    const route = routes.find(r => r.children)!.children!.find(r => r.path === 'developers/portal')!;
     expect(route.title).toBe('Developer portal');
     expect(route.data?.['pageKey']).toBe('developer-portal');
     expect(route.canActivate).toContain(pageGuard);
@@ -63,11 +63,11 @@ describe('MIG-336: the developer portal\'s routes and menu', () => {
   it('lands each address on its page', async () => {
     configure(true);
     const harness = await RouterTestingHarness.create();
-    await harness.navigateByUrl('/integration/developer/reference#op-createToken');
-    expect(TestBed.inject(Router).url).toBe('/integration/developer/reference#op-createToken');
+    await harness.navigateByUrl('/developers/portal/reference#op-createToken');
+    expect(TestBed.inject(Router).url).toBe('/developers/portal/reference#op-createToken');
     expect(harness.routeNativeElement!.querySelector('[data-developer-portal]')).not.toBeNull();
     expect(harness.routeNativeElement!.querySelector('#op-createToken')).not.toBeNull();
-    await harness.navigateByUrl('/integration/developer/changelog');
+    await harness.navigateByUrl('/developers/portal/changelog');
     expect(harness.routeNativeElement!.querySelector('[data-changelog]')!.textContent).toContain('v1.0.0-draft');
   });
 
@@ -78,7 +78,7 @@ describe('MIG-336: the developer portal\'s routes and menu', () => {
       expect(labels).toContain(label);
     }
     const events = DeveloperLayout.links().find(l => l.label === 'Event types')!;
-    expect([events.route, events.fragment]).toEqual(['/integration/developer/reference', 'events']);
+    expect([events.route, events.fragment]).toEqual(['/developers/portal/reference', 'events']);
   });
 });
 
@@ -96,7 +96,7 @@ describe('MIG-336: the overview', () => {
     expect(api.sandbox).toHaveBeenCalledTimes(1);
     const card = el.querySelector('[data-sandbox-card]')!;
     expect(card.textContent).toContain('Your sandbox: Northwind (sandbox) (workspace 2950)');
-    expect(card.querySelector('a[href="/integration/api-clients#sandbox"]')).not.toBeNull();
+    expect(card.querySelector('a[href="/developers/api-clients#sandbox"]')).not.toBeNull();
   });
 
   it('tells an administrator without one to ask the account team', () => {
@@ -180,12 +180,12 @@ describe('MIG-336: a guide page', () => {
     expect(el.querySelectorAll('h1').length).toBe(1);
     expect(el.querySelector('[data-code-group]')).not.toBeNull();
     expect(el.querySelector('[data-guide-previous]')).toBeNull();
-    expect(el.querySelector('[data-guide-next]')!.getAttribute('href')).toBe('/integration/developer/guides/second');
+    expect(el.querySelector('[data-guide-next]')!.getAttribute('href')).toBe('/developers/portal/guides/second');
     expect(guideTitle('first')).toBe('First');
   });
 
   it('links back from the last guide, and says so for a slug there is no guide for', () => {
-    expect(guide('second').querySelector('[data-guide-previous]')!.getAttribute('href')).toBe('/integration/developer/guides/first');
+    expect(guide('second').querySelector('[data-guide-previous]')!.getAttribute('href')).toBe('/developers/portal/guides/first');
     expect(guide('nope').querySelector('[data-guide-missing]')!.textContent).toContain('There is no guide called "nope".');
   });
 });

@@ -49,7 +49,7 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
           <h2 class="text-base font-semibold">You have no managed workspaces.</h2>
           <p class="text-sm text-[color:var(--text-secondary)] max-w-xl">
             A platform administrator grants them in
-            <a routerLink="/administration/managed-service" class="link-inline">Managed service</a>.
+            <a routerLink="/platform/managed-service" class="link-inline">Managed service</a>.
           </p>
         </div>
       } @else {
