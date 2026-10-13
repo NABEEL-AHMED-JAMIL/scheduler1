@@ -40,9 +40,9 @@ export function stepChange(step: Step, saved: readonly Step[] | null): StepChang
       <span class="flex-1"></span>
       <div class="seg" role="group" aria-label="Layout">
         <button type="button" class="seg-btn" [class.seg-on]="direction() === 'TB'" [attr.aria-pressed]="direction() === 'TB'" (click)="direction.set('TB')"
-                title="Top to bottom" data-test="flow-tb"><app-icon name="arrowDown" size="0.9em" /></button>
+                title="Top to bottom" aria-label="Top to bottom" data-test="flow-tb"><app-icon name="arrowDown" size="0.9em" /></button>
         <button type="button" class="seg-btn" [class.seg-on]="direction() === 'LR'" [attr.aria-pressed]="direction() === 'LR'" (click)="direction.set('LR')"
-                title="Left to right" data-test="flow-lr"><app-icon name="arrowRight" size="0.9em" /></button>
+                title="Left to right" aria-label="Left to right" data-test="flow-lr"><app-icon name="arrowRight" size="0.9em" /></button>
       </div>
     </div>
     <div class="sf-canvas rounded-lg border border-subtle overflow-hidden">

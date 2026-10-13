@@ -54,6 +54,8 @@ describe('ThemeMenu', () => {
     expect(items().map(i => i.querySelector('.theme-chip')?.getAttribute('data-swatch')))
       .toEqual(['system', 'light', 'dark', 'ocean', 'midnight', 'contrast']);
     expect(trigger.title).toBe('Theme: Ocean');
+    // The button's own name: the sun/moon inside it is decorative.
+    expect(trigger.getAttribute('aria-label')).toBe('Theme: Ocean');
   });
 
   it('opens on the ticked theme and moves with the arrows, Home and End', async () => {
