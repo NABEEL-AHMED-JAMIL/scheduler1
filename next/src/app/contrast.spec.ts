@@ -9,7 +9,7 @@
  * buttons, every pill, the semantic text colours, and the chart colours that label a series.
  *
  *   4.5:1  text (WCAG 1.4.3 AA) -- body text, pills, a series colour used as a legend's text
- *   3:1    a mark that carries meaning without text (WCAG 1.4.11) -- a chart fill, a focus ring
+ *   3:1    a mark that carries meaning without text (WCAG 1.4.11) -- a chart fill, a focus ring, a control's edge
  */
 interface Fs { readFileSync(path: string, encoding: 'utf8'): string }
 
@@ -287,9 +287,29 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
         same('text', '--text-primary');
       });
 
-      /** High contrast is the accessible choice for control edges too: an input's border reads 3:1 there. */
+      /**
+       * Owner 2026-10-13: a control's edge -- input, select, text area -- 3:1 against every surface a form sits on
+       * (WCAG 1.4.11), in every theme. It was --border-subtle, 1.13-1.24:1 in Light, Dark, Ocean and Midnight.
+       */
+      it('draws control borders 3:1 against the page, the card and the sunken and inset surfaces', () => {
+        const off: string[] = [];
+        for (const bg of ['--surface-page', '--surface-raised', '--surface-sunken', '--surface-inset']) {
+          const r = measure(tokens, '--border-control', bg);
+          if (r < 3) off.push(`--border-control on ${bg}: ${r}`);
+        }
+        expect(off).toEqual([]);
+      });
+
+      /** A focused control's ring stands 3:1 off the control's own resting edge's ground (the card). */
+      it('the focused control edge (--focus-ring) clears 3:1 on the card and the page', () => {
+        for (const bg of ['--surface-page', '--surface-raised', '--surface-sunken']) {
+          expect(measure(tokens, '--focus-ring', bg), `--focus-ring on ${bg}`).toBeGreaterThanOrEqual(3);
+        }
+      });
+
+      /** High contrast is the accessible choice for every edge: its quiet border reads 3:1 there too. */
       if (name === 'contrast') {
-        it('draws control borders 3:1 against the page and the card', () => {
+        it('draws even its quiet borders 3:1 against the page and the card', () => {
           for (const edge of ['--border-subtle', '--border-strong']) {
             for (const bg of ['--surface-page', '--surface-raised', '--surface-sunken']) {
               expect(measure(tokens, edge, bg), `${edge} on ${bg}`).toBeGreaterThanOrEqual(3);
@@ -309,16 +329,20 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
         const charts = weakest(Array.from({ length: 8 }, (_, i) => [`--chart-${i}`, '--surface-raised'] as [string, string]));
         const series = weakest(['brand', 'ok', 'warn', 'crit'].flatMap(f => [`--series-${f}`, `--series-${f}-soft`])
           .map(t => [t, '--surface-raised'] as [string, string]));
+        const controls = weakest(['--surface-page', '--surface-raised', '--surface-sunken', '--surface-inset']
+          .map(bg => ['--border-control', bg] as [string, string]));
         const marks = weakest(['--focus-ring', '--accent-mark', '--btn-primary-bg'].flatMap(m =>
           ['--surface-page', '--surface-raised'].map(bg => [m, bg] as [string, string])));
         if (env['CONTRAST_REPORT']) {
           const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { appendFileSync(p: string, d: string): void };
           fs.appendFileSync(env['CONTRAST_REPORT'], `${name}: text ${text.r} (${text.pair}); pills ${pills.r} (${pills.pair}); ` +
             `chart ${charts.r} (${charts.pair}); status fills ${series.r} (${series.pair}); focus/marks ${marks.r} (${marks.pair}); ` +
+            `control borders ${controls.r} (${controls.pair}); ` +
             `primary text on card ${measure(tokens, '--text-primary', '--surface-raised')}\n`);
         }
         expect(text.r).toBeGreaterThanOrEqual(4.5);
         expect(series.r).toBeGreaterThanOrEqual(3);
+        expect(controls.r).toBeGreaterThanOrEqual(3);
       });
     });
   }
