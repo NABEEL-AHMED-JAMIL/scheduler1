@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { signal } from '@angular/core';
-import { provideRouter } from '@angular/router';
+import { Location } from '@angular/common';
+import { provideLocationMocks } from '@angular/common/testing';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
@@ -27,7 +29,7 @@ const LOGS = {
 const STEPS = [{ promptName: 'CSV analyst', run: { runId: 9, status: 'ok', promptVersion: 1, stepTag: 'analysis', output: '**Files** look like sales.\n\n* one\n* two', latencyMs: 9900, tokensIn: 10, tokensOut: 2 } }];
 
 /** UX review 2026-10-12 (R1): the page opens on Steps; the entries are the Log tab's, the AI answers their own tab's. */
-function page(tab: 'steps' | 'ai' | 'outputs' | 'log' = 'log') {
+function page(tab: 'steps' | 'map' | 'ai' | 'outputs' | 'log' = 'log') {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
     { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
@@ -46,7 +48,7 @@ function page(tab: 'steps' | 'ai' | 'outputs' | 'log' = 'log') {
 describe('JobLogs', () => {
   it('links each path a line names to its folder in the task\'s bucket', () => {
     const { el } = page();
-    const links = [...el.querySelectorAll<HTMLAnchorElement>('.log-timeline a.log-path')];
+    const links = [...el.querySelectorAll<HTMLAnchorElement>('.run-log-lines a.log-path')];
     expect(links.map(a => a.textContent!.replace(/\s+/g, ''))).toEqual(['etl-bucket/sales/in', 'sales/in/orders_2026-09-a.csv', 'e2e/json/orders_2026-09-a.json']);
     expect(links.map(a => a.getAttribute('href'))).toEqual([
       '/documents/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
@@ -57,13 +59,11 @@ describe('JobLogs', () => {
     expect(links[2].querySelectorAll('wbr').length).toBe(2);
   });
 
-  it('keeps the links in the table and console views too', () => {
-    const { fixture, el, component } = page();
-    for (const view of ['table', 'console'] as const) {
-      component.view.set(view);
-      fixture.detectChanges();
-      expect(el.querySelectorAll('a.log-path').length, view).toBe(3);
-    }
+  it('keeps the links when the lines wrap', () => {
+    const { fixture, el } = page();
+    (el.querySelector('[data-test="log-wrap"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.run-log-lines.is-wrap a.log-path').length).toBe(3);
   });
 
   it('renders an AI step\'s answer as formatted text, with the chip in sentence case', () => {
@@ -78,7 +78,7 @@ describe('JobLogs', () => {
     const { el } = page();
     const toolbar = [...el.querySelectorAll('button')].find(b => /Timing/.test(b.textContent ?? ''));
     expect(toolbar).toBeTruthy();
-    expect(toolbar!.closest('app-table-shell')).not.toBeNull();
+    expect(toolbar!.closest('app-run-log')).not.toBeNull();
   });
   /**
    * Two Refresh buttons: the header's called load() (the blanking reload) and the toolbar's
@@ -91,32 +91,8 @@ describe('JobLogs', () => {
     expect(refreshes).toHaveLength(1);
     refreshes[0].click();
     fixture.detectChanges();
-    expect(el.querySelectorAll('.log-timeline li').length).toBe(3);
-    TestBed.inject(HttpTestingController).match(() => true).forEach(r => r.flush({ status: API_SUCCESS, data: LOGS }));
-  });
-});
-
-/**
- * Workers write "Failed: ...", "Attempt 1 of 3 failed", "Completed: ..." -- the tone patterns only
- * matched the bare stems (fail, complete), so every timeline dot came out grey.
- */
-describe('JobLogs timeline tone', () => {
-  const CRIT = 'var(--color-crit-500)', WARN = 'var(--color-warn-500)', OK = 'var(--color-ok-500)', NONE = 'var(--border-strong)';
-
-  it.each([
-    ['Failed: Input CSV not found: x', CRIT],
-    ['Attempt 1 of 3 failed: timeout. Queued for attempt 2', CRIT],
-    ['Run interrupted', CRIT],
-    ['3 errors while parsing', CRIT],
-    ['Completed: Checked 40 row(s)', OK],
-    ['Job completed successfully', OK],
-    ['Skipped: nothing to do', WARN],
-    ['Job started', NONE],
-    // "rejected" is a count on a good run, not a failure.
-    ['Checked 40 row(s): 40 accepted, 0 rejected', NONE],
-  ])('%s', (text, tone) => {
-    const { component } = page();
-    expect(component.toneOf(text)).toBe(tone);
+    expect(el.querySelectorAll('.run-log-line').length).toBe(3);
+    TestBed.inject(HttpTestingController).match(r => r.url.endsWith('/findSourceJobAuditLog')).forEach(r => r.flush({ status: API_SUCCESS, data: LOGS }));
   });
 });
 
@@ -147,15 +123,6 @@ describe('JobLogs timing chart names', () => {
     expect(names).toContain(`Before ${clock.transform(at('18:15:10.400'), 'HH:mm:ss')} (#3)`);
   });
 
-  it('keeps each entry\'s own number in the table while a search narrows it', () => {
-    const { fixture, el, component } = page();
-    component.logs.set([...ENTRIES].reverse() as any);
-    component.view.set('table');
-    component.search.set('handed');
-    fixture.detectChanges();
-    const numbers = [...el.querySelectorAll('tbody tr')].map(tr => tr.querySelector('td')!.textContent!.trim());
-    expect(numbers.sort()).toEqual(['2', '4']);
-  });
 });
 
 /**
@@ -216,13 +183,14 @@ describe('JobLogs on the console clock', () => {
     expect(component.gapSummary()?.totalLabel).toBe('2m 5s');
   });
 
-  it('dates the console\'s entries as the rest of the console dates things', () => {
-    const { fixture, el, component } = page();
-    component.view.set('console');
-    fixture.detectChanges();
-    const stamps = [...el.querySelectorAll('.log-console-time')].map(s => s.textContent!.trim());
+  it('times the log\'s lines on the 24-hour clock, the full date in each one\'s title', () => {
+    const { el } = page();
+    const stamps = [...el.querySelectorAll('.run-log-time')];
     expect(stamps.length).toBe(3);
-    for (const stamp of stamps) expect(stamp).toMatch(/^\[\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}:\d{2}\]$/);
+    for (const stamp of stamps) {
+      expect(stamp.textContent!.trim()).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+      expect(stamp.getAttribute('title')).toMatch(/^\d{1,2} [A-Z][a-z]{2} \d{4}, \d{2}:\d{2}:\d{2}$/);
+    }
   });
 });
 
@@ -251,28 +219,29 @@ describe('JobLogs with the run\'s steps', () => {
 
   it('shows an engine run\'s steps on the Steps tab, and its entries on the Log tab', () => {
     const { el, fixture } = withSteps(ENGINE);
-    const steps = el.querySelector('.exec-steps')!;
+    const steps = el.querySelector('[data-test="run-steps"]')!;
     expect(steps).not.toBeNull();
     expect(steps.querySelectorAll('.exec-step').length).toBe(1);
-    expect(el.querySelector('app-table-shell')).toBeNull();
+    expect(el.querySelector('app-run-log')).toBeNull();
     (el.querySelector('[data-tab="log"]') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(el.querySelector('app-table-shell')).not.toBeNull();
-    expect(el.querySelector('.exec-steps')).toBeNull();
+    expect(el.querySelector('app-run-log')).not.toBeNull();
+    expect(el.querySelector('[data-test="run-steps"]')).toBeNull();
   });
 
-  it('adds nothing to a legacy run\'s page', () => {
+  it('says a legacy run has no steps, and keeps its entries on the Log', () => {
     const { el, fixture } = withSteps(LEGACY);
-    expect(el.querySelector('.exec-steps')).toBeNull();
+    expect(el.querySelector('[data-test="run-steps"]')).toBeNull();
+    expect(el.querySelector('[data-test="legacy-steps"]')).not.toBeNull();
     (el.querySelector('[data-tab="log"]') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(el.querySelectorAll('.log-timeline li').length).toBe(3);
+    expect(el.querySelectorAll('.run-log-line').length).toBe(3);
   });
 
   it('opens on Steps, with the AI answers, outputs and log a tab each, and the summary above them', () => {
     const { el } = withSteps(ENGINE);
     expect(Array.from(el.querySelectorAll('[data-test="run-tabs"] [role="tab"]')).map(t => t.getAttribute('data-tab')))
-      .toEqual(['steps', 'ai', 'outputs', 'log']);
+      .toEqual(['steps', 'map', 'ai', 'outputs', 'log']);
     expect(el.querySelector('[data-tab="steps"]')?.getAttribute('aria-selected')).toBe('true');
     expect(el.querySelector('[data-tab="ai"]')?.textContent).toContain('AI answers (1)');
     const summary = el.querySelector('[data-test="run-summary"]')!;
@@ -354,18 +323,83 @@ describe('JobLogs at scale', () => {
     expect(polls()).toBe(1);
   });
 
-  it('draws the newest 2000 entries and adds earlier ones on request', () => {
-    const { fixture, el, component } = running(2500, true);
+  it('draws only the lines in view, however long the log (run page fix: a virtual list)', () => {
+    const { el } = running(6000, true);
+    expect(el.querySelectorAll('.run-log-line').length).toBeLessThan(200);
+    expect((el.querySelector('.run-log-spacer') as HTMLElement).style.height).toBe(`${6000 * 20}px`);
+    expect(el.querySelector('[data-tab="log"]')!.textContent).toContain('Log (6,000)');
+  });
+});
 
-    expect(el.querySelectorAll('.log-timeline li').length).toBe(2000);
-    expect(el.querySelector('.log-timeline li:last-child')!.textContent).toContain('line 2500');
-    const more = el.querySelector<HTMLButtonElement>('[data-earlier] button')!;
-    expect(more.textContent!.trim()).toBe('Show 500 earlier');
+/**
+ * UX review 2026-10-12, run page fix: /logs opens the Log and the bare run the Steps; a tab is kept in the address; one
+ * header (one status pill, a link row) and a strip of the facts the header does not say.
+ */
+describe('Run page: the address, the header and the summary', () => {
+  const ENGINE = { jobQueueId: 6839, jobId: 2808, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false, aiSteps: [],
+    steps: [
+      { stepExecutionId: 1, index: 0, key: 'read', task: 'read_file', status: 'Completed', durationMs: 5, recordsIn: 0, recordsOut: 40, tries: 1, datasets: [], log: 'step' },
+      { stepExecutionId: 2, index: 1, key: 'save', task: 'save_file', status: 'Completed', durationMs: 9, recordsIn: 40, recordsOut: 1, tries: 1, datasets: [], log: 'step' },
+    ] };
+  const REVIEW = { jobQueueId: 6839, jobId: 2808, reviewStatus: 'PENDING', required: ['internal'], decisions: [],
+    reviewers: { kind: 'role', value: 'TENANT_ADMIN' }, you: { party: 'internal', canDecide: true } };
 
-    more.click();
+  function at(child: string | null, tab: string | null = null) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideLocationMocks(), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } },
+      { provide: ActivatedRoute, useValue: { snapshot: { url: [{ path: '6839' }], firstChild: child === null ? null : { url: child ? [{ path: child }] : [] },
+        queryParamMap: convertToParamMap(tab ? { tab } : {}) } } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2808');
+    fixture.componentRef.setInput('jobQueueId', '6839');
     fixture.detectChanges();
-    expect(el.querySelectorAll('.log-timeline li').length).toBe(2500);
-    expect(el.querySelector('[data-earlier]')).toBeNull();
-    expect(component.filtered().length).toBe(2500);
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).flush({ status: API_SUCCESS, data: LOGS });
+    http.match(r => r.url.endsWith('/aiPrompt.json/runsForJob')).forEach(r => r.flush({ status: API_SUCCESS, data: STEPS }));
+    fixture.detectChanges();
+    http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions')).forEach(r => r.flush({ status: API_SUCCESS, data: ENGINE }));
+    http.match(r => r.url.endsWith('/sourceJob.json/runOutputs')).forEach(r => r.flush({ status: API_SUCCESS, data: { outputs: [] } }));
+    http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: REVIEW }));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    return { fixture, el, component: fixture.componentInstance, location: TestBed.inject(Location) };
+  }
+
+  it('opens the Log at /logs and the Steps at the bare run', () => {
+    expect(at('logs').component.tab()).toBe('log');
+    expect(at('').el.querySelector('[data-tab="steps"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(at('logs', 'outputs').component.tab()).toBe('outputs');
+  });
+
+  it('keeps the chosen tab in the address, replacing it rather than navigating', () => {
+    const { el, fixture, component, location } = at('logs');
+    (el.querySelector('[data-tab="outputs"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(location.path()).toBe('/pipelines/schedules/2808/runs/6839?tab=outputs');
+    component.setTab('steps');
+    expect(location.path()).toBe('/pipelines/schedules/2808/runs/6839');
+    component.setTab('log');
+    expect(location.path()).toBe('/pipelines/schedules/2808/runs/6839/logs');
+  });
+
+  it('says the status once, with the review, and never repeats the title', () => {
+    const { el } = at('');
+    expect(el.querySelectorAll('[data-test="run-status"]').length).toBe(1);
+    expect(el.querySelector('[data-test="run-status"]')?.textContent?.trim()).toBe('Completed · waiting for review');
+    expect(el.querySelector('h1')?.textContent).toContain('Run #6839 · orders');
+    expect(el.querySelector('.page-subtitle')).toBeNull();
+    // The summary adds facts; the schedule, the pipeline and the status are not said again.
+    const summary = el.querySelector('[data-test="run-summary"]')!;
+    expect([...summary.querySelectorAll('dt')].map(d => d.textContent)).toEqual(['Started', 'Ended', 'Duration', 'Started by', 'Steps', 'Rows in → out']);
+    expect(summary.textContent).toContain('2/2');
+    expect(summary.textContent).toContain('40 → 1');
+    expect(summary.textContent).not.toContain('orders task');
+    expect(summary.querySelector('app-status')).toBeNull();
+  });
+
+  it('says who the review waits on beside the summary', () => {
+    const { el } = at('');
+    expect(el.querySelector('[data-test="waiting-on"]')?.textContent).toContain('the workspace administrators');
   });
 });

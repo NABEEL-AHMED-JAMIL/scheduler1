@@ -1,50 +1,51 @@
 <div class="page">
-  <!-- UX review 2026-10-12 (A2, R1, R3): the run as a detail page. Its number and schedule as the title, its status beside
-       it; links to its pipeline, its results and what it cost; a summary beside the Next steps (Reject then Approve); then
-       tabs: Steps, AI answers, Outputs, Log. The review used to sit under thirty raw AI answers, below the fold. -->
+  <!-- UX review 2026-10-12 (A2, R1, R3, run page fix): the run as a detail page. One header -- the run and its schedule as
+       the title, ONE status pill ("Completed · waiting for review"), a link row -- then a strip of the facts the header
+       does not say beside the Next steps (equal height), then tabs: Steps (a table), Map, AI answers, Outputs, Log. -->
   <app-page-header [title]="heading()" [trail]="trail()" [crumb]="'Run #' + jobQueueId()">
-    @if (run()?.jobStatus) { <app-status pills [label]="run().jobStatus" /> }
+    @if (statusLook(); as s) {
+      <span pills class="pill pill-{{ s.tone }} run-status-pill" data-test="run-status"><app-icon [name]="s.icon" size="0.85em" />{{ s.label }}</span>
+    }
     <app-refresh-button [loading]="loading() || refreshing()" (refresh)="refresh()" />
-    <p subtitle class="page-subtitle">
-      Run <span class="mono">#{{ jobQueueId() }}</span> of
-      @if (canOpenSchedule()) { <a class="link-inline" [routerLink]="['/pipelines/schedules', jobId(), 'executions']">{{ job()?.jobName || 'schedule #' + jobId() }}</a> }
-      @else { {{ job()?.jobName || 'schedule #' + jobId() }} }
-      @if (job()?.taskDetail?.taskName) { · pipeline {{ job().taskDetail.taskName }} }
-    </p>
-    @if (related().length) {
+    @if (related().length || pipelineText()) {
       <p meta class="run-related flex flex-wrap items-center gap-x-4 gap-y-1 text-xs" data-test="run-related">
         @for (r of related(); track r.label) {
-          <a class="link-inline inline-flex items-center gap-1" [routerLink]="r.link" [queryParams]="r.query ?? null"><app-icon [name]="r.icon" size="0.95em" />{{ r.label }}</a>
+          <a class="link-inline inline-flex items-center gap-1" [routerLink]="r.link" [queryParams]="r.query ?? null" [attr.data-link]="r.test"><app-icon [name]="r.icon" size="0.95em" />{{ r.label }}</a>
         }
+        @if (pipelineText(); as p) { <span class="inline-flex items-center gap-1 text-[color:var(--text-secondary)]"><app-icon name="layers" size="0.95em" />Pipeline: {{ p }}</span> }
       </p>
     }
   </app-page-header>
 
-  @if (job() || run(); as _) {
-    <div class="grid gap-4 lg:grid-cols-3 items-start run-top">
-      <section class="card p-4 lg:col-span-2 min-w-0" aria-label="This run" data-test="run-summary">
-        <dl class="run-facts grid gap-x-6 gap-y-3 grid-cols-2 sm:grid-cols-4">
-          @if (run(); as r) {
-            <div><dt>Status</dt><dd>@if (r.jobStatus) { <app-status [label]="r.jobStatus" /> } @else { — }</dd></div>
-            <div><dt>Started</dt><dd class="tabular">{{ r.startTime ? (r.startTime | serverTime:'dateTimeSec') : '—' }}</dd></div>
-            <div><dt>Ended</dt><dd class="tabular">{{ r.endTime ? (r.endTime | serverTime:'dateTimeSec') : '—' }}</dd></div>
-            <div><dt>Duration</dt><dd class="tabular">{{ duration() }}</dd></div>
-          }
-          @if (job(); as j) {
-            <div><dt>Schedule</dt><dd class="truncate" [title]="j.jobName">{{ j.jobName }}</dd></div>
-            <div><dt>Started by</dt><dd>{{ j.execution === 'Auto' ? 'Its timetable' : j.execution || '—' }}</dd></div>
-            @if (j.taskDetail?.taskName) { <div class="col-span-2"><dt>Pipeline</dt><dd class="truncate" [title]="j.taskDetail.taskName">{{ j.taskDetail.taskName }}</dd></div> }
-          }
-          @if (run(); as r) {
-            <div class="col-span-2 sm:col-span-4 min-w-0"><dt>Reported</dt>
-              <dd class="break-words">{{ r.jobStatusMessage || 'No closing message.' }}</dd></div>
+  @if (run(); as r) {
+    <div class="run-top" [class.has-next]="hasNext()">
+      <section class="card overflow-clip min-w-0 flex flex-col" aria-label="This run" data-test="run-summary">
+        <dl class="run-facts flex-1">
+          @for (f of facts(); track f.label) {
+            <div class="run-fact" [attr.title]="f.hint || null" [attr.data-fact]="f.label"><dt>{{ f.label }}</dt><dd>{{ f.value }}</dd></div>
           }
         </dl>
+        @if (closingMessage(); as message) {
+          <p class="flex items-start gap-1.5 px-4 py-2 border-t border-subtle text-xs text-crit-500 break-words" data-test="run-message">
+            <app-icon name="alert" size="0.95em" class="mt-px shrink-0" />{{ message }}</p>
+        }
       </section>
-      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" />
+      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" (reviewChange)="review.set($event)" />
     </div>
   }
 
+  @if (missing()) {
+    <div class="card p-8 flex flex-col items-start gap-3" role="alert" data-test="run-missing">
+      <p class="text-sm">{{ error() }}</p>
+      <a routerLink="/pipelines/schedules" class="btn btn-default btn-sm">Back to schedules</a>
+    </div>
+  } @else {
+  @if (error() && !run()) {
+    <div class="card p-4 flex flex-wrap items-center gap-3 text-sm" role="alert" data-test="run-error">
+      <span class="text-crit-500">{{ error() }}</span>
+      <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
+    </div>
+  }
   <div class="tabs" role="tablist" aria-label="Run" data-test="run-tabs">
     @for (t of tabs(); track t.id) {
       <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id"
@@ -54,168 +55,70 @@
 
   @switch (tab()) {
     @case ('steps') {
-      <!-- MIG-251: a step-engine run's steps, Timeline and Console. A legacy run draws nothing here. -->
-      @if (!missing()) {
-        <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" [withReview]="false" part="steps" (retried)="refresh()" />
+      <app-run-steps-table (showInLog)="showStepInLog($event)" (retried)="refresh()" />
+    }
+    @case ('map') {
+      @if (store.timeline(); as t) {
+        <section class="card overflow-clip" data-test="run-map-tab"><app-run-map [timeline]="t" /></section>
+      } @else {
+        <p class="card p-4 text-sm text-[color:var(--text-muted)]">{{ store.legacy() ? 'This run was not taken by the step engine, so it has no map.' : 'Reading the run\'s steps…' }}</p>
       }
     }
     @case ('ai') {
-      <app-run-ai-answers [answers]="aiSteps()" />
+      <div class="flex flex-col gap-4">
+        <app-run-ai-trace />
+        <app-run-ai-answers [answers]="aiSteps()" />
+      </div>
     }
     @case ('outputs') {
-      @if (!missing()) {
-        <app-run-steps [jobQueueId]="jobQueueId()" [revision]="loads()" [withReview]="false" part="outputs" />
-      }
+      <app-run-outputs />
     }
     @case ('log') {
-  @if (hasInsights()) {
-    @if (showInsights()) {
-      <div class="card chart-card">
-        <div class="flex flex-wrap items-baseline gap-2">
-          <h3 class="chart-title">Where this run waited</h3>
-          @if (gapSummary(); as summary) {
-            <span class="ml-auto text-[11px] tabular text-[color:var(--text-muted)]">
-              {{ summary.entries }} entries · {{ summary.totalLabel }} between first and last
-            </span>
+      <app-run-log [entries]="logs()" [loading]="loading()" [error]="error()" [bucket]="bucket()" [follow]="autoRefreshing()"
+                   [fileName]="'run-' + jobQueueId()" [(step)]="logStep">
+        <ng-container toolbar>
+          @if (hasInsights()) {
+            <button type="button" class="btn btn-default btn-xs" [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
+                    (click)="showInsights.set(!showInsights())" title="Where this run waited between entries">
+              <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
+            </button>
           }
-        </div>
-        <p class="chart-sub">
-          The longest pauses between one log entry and the next.
-          @if (gapSummary(); as summary) {
-            These {{ topGaps().length }} account for {{ summary.shownShare }}% of the time between
-            the first entry and the last.
+          @if (stillRunning()) {
+            <button type="button" class="btn btn-default btn-xs" [class.btn-intent-ok]="autoRefreshing()" [attr.aria-pressed]="autoRefreshing()"
+                    (click)="toggleLive()" [title]="autoRefreshing() ? 'Following this run — checking every 5s' : 'Not following; refresh by hand'">
+              <span class="live-dot" [class.live-on]="autoRefreshing()"></span>{{ autoRefreshing() ? 'Live' : 'Paused' }}
+            </button>
           }
-        </p>
-
-        <app-ranked-bar [data]="topGaps()" [max]="8" [showPercent]="false" [sorted]="false" />
-
-        @if (lateEntries()) {
-          <p class="flex items-start gap-1.5 mt-2 text-[11px] text-warn-500">
-            <app-icon name="alert" size="0.9em" class="icon-warn mt-px shrink-0" />
-            {{ lateEntries() }} {{ lateEntries() === 1 ? 'entry was' : 'entries were' }} recorded
-            after this run finished, so the gap before {{ lateEntries() === 1 ? 'it' : 'them' }}
-            is not time the run spent working.
-          </p>
-        }
-
-        @if (stallCount()) {
-          <p class="flex items-center gap-1.5 mt-2 text-[11px] text-[color:var(--text-muted)]">
-            <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0 bg-warn-500"
-                 ></span>
-            {{ stallCount() }} {{ stallCount() === 1 ? 'gap is' : 'gaps are' }} more than twice the
-            average and over five seconds — waiting rather than working.
-          </p>
-        }
-      </div>
-    }
-  }
-
-  <app-table-shell heading="Log entries" [loading]="loading()" [error]="error()" [errorRetryable]="!missing()"
-                   [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="logs().length"
-                   [emptyMessage]="search() ? 'No entries match your search.' : 'This run reported no log entries.'"
-                   (retry)="load()">
-    @if (missing()) {
-      <a error-action routerLink="/pipelines/schedules" class="btn btn-default btn-sm mt-4">Back to schedules</a>
-    }
-    <ng-container toolbar>
-      <app-segmented [(value)]="view" [options]="views" ariaLabel="Log layout" />
-
-      <div class="search-field max-w-56">
-        <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search entries" aria-label="Search log entries"
-               [value]="search()" (input)="search.set($any($event.target).value)" />
-      </div>
-      @if (search()) {
-        <button type="button" class="btn btn-ghost btn-sm" (click)="search.set('')"><app-icon name="close" />Clear</button>
-      }
-
-      @if (hasInsights()) {
-        <button type="button" class="btn btn-default btn-sm" [class.text-accent]="showInsights()"
-                [attr.aria-expanded]="showInsights()"
-                (click)="showInsights.set(!showInsights())" title="Where this run waited between entries">
-          <app-icon name="chart" />{{ showInsights() ? 'Hide timing' : 'Timing' }}
-        </button>
-      }
-      @if (stillRunning()) {
-        <button type="button" class="btn btn-default btn-sm" [class.btn-intent-ok]="autoRefreshing()"
-                [attr.aria-pressed]="autoRefreshing()"
-                (click)="toggleLive()"
-                [title]="autoRefreshing() ? 'Following this run — checking every 5s'
-                                          : 'Not following; refresh by hand'">
-          <span class="live-dot" [class.live-on]="autoRefreshing()"></span>
-          {{ autoRefreshing() ? 'Live' : 'Paused' }}
-        </button>
-      }
-    </ng-container>
-
-    @if (hiddenEarlier() > 0) {
-      <!-- The newest entries are drawn; earlier ones a step at a time, so a huge log cannot freeze the tab. -->
-      <div class="flex flex-wrap items-center gap-2 px-4 py-2 text-xs text-[color:var(--text-muted)]" data-earlier>
-        <span>{{ hiddenEarlier() }} earlier {{ hiddenEarlier() === 1 ? 'entry is' : 'entries are' }} not shown.</span>
-        <button type="button" class="btn btn-default btn-sm" (click)="showEarlier()">
-          Show {{ hiddenEarlier() < renderStep ? hiddenEarlier() : renderStep }} earlier
-        </button>
-      </div>
-    }
-
-    @switch (view()) {
-      @case ('timeline') {
-        <ul class="log-timeline" [appStickToBottom]="filtered().length">
-          @for (log of visible(); track $index) {
-            <li class="log-tl-item">
-              <span class="log-tl-rail">
-                <span class="log-tl-dot tone-fill" [class]="toneClass(toneOf(log.logsDetail))"></span>
-              </span>
-              <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap tabular shrink-0 pt-0.5">
-                {{ log.dateCreated ? (log.dateCreated | serverTime:'timeSec') : '—' }}
-              </span>
-              <span class="text-sm mono log-message min-w-0"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></span>
-            </li>
-          }
-        </ul>
-      }
-
-      @case ('table') {
-        <div class="overflow-x-auto">
-          <table class="table-modern">
-            <thead>
-              <tr>
-                <th class="w-12 text-right">#</th>
-                <th class="w-28">Time</th>
-                <th>Message</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (log of visible(); track $index) {
-                <tr>
-                  <td class="text-right tabular text-[color:var(--text-muted)]">{{ entryNo().get(log) ?? '—' }}</td>
-                  <td class="tabular whitespace-nowrap">
-                    {{ log.dateCreated ? (log.dateCreated | serverTime:'timeSec') : '—' }}
-                  </td>
-                  <td class="mono log-message"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></td>
-                </tr>
+        </ng-container>
+        @if (hasInsights() && showInsights()) {
+          <div above class="chart-card border-b border-subtle px-4 py-3">
+            <div class="flex flex-wrap items-baseline gap-2">
+              <h3 class="chart-title">Where this run waited</h3>
+              @if (gapSummary(); as summary) {
+                <span class="ml-auto text-[11px] tabular text-[color:var(--text-muted)]">{{ summary.entries }} entries · {{ summary.totalLabel }} between first and last</span>
               }
-            </tbody>
-          </table>
-        </div>
-      }
-
-      @case ('console') {
-        <div class="log-console" [appStickToBottom]="filtered().length">
-          @for (log of visible(); track $index) {
-            <div class="log-console-line">
-              <span class="log-console-time">[{{ log.dateCreated ? (log.dateCreated | serverTime:'dateTimeSec') : '—' }}]</span>
-              <span class="log-message"><ng-container [ngTemplateOutlet]="message" [ngTemplateOutletContext]="{ $implicit: log }" /></span>
             </div>
-          }
-        </div>
-      }
-    }
-  </app-table-shell>
+            <p class="chart-sub">The longest pauses between one log entry and the next.
+              @if (gapSummary(); as summary) { These {{ topGaps().length }} account for {{ summary.shownShare }}% of the time between the first entry and the last. }
+            </p>
+            <app-ranked-bar [data]="topGaps()" [max]="8" [showPercent]="false" [sorted]="false" />
+            @if (lateEntries()) {
+              <p class="flex items-start gap-1.5 mt-2 text-[11px] text-warn-500">
+                <app-icon name="alert" size="0.9em" class="icon-warn mt-px shrink-0" />
+                {{ lateEntries() }} {{ lateEntries() === 1 ? 'entry was' : 'entries were' }} recorded after this run finished, so the gap before
+                {{ lateEntries() === 1 ? 'it' : 'them' }} is not time the run spent working.
+              </p>
+            }
+            @if (stallCount()) {
+              <p class="flex items-center gap-1.5 mt-2 text-[11px] text-[color:var(--text-muted)]">
+                <span class="inline-block w-2.5 h-2.5 rounded-sm shrink-0 bg-warn-500"></span>
+                {{ stallCount() }} {{ stallCount() === 1 ? 'gap is' : 'gaps are' }} more than twice the average and over five seconds — waiting rather than working.
+              </p>
+            }
+          </div>
+        }
+      </app-run-log>
     }
   }
-
-  <!-- A line as text and paths; a path opens its folder in the Object Browser and wraps only
-       between names, so "orders_2026-09-a.csv" is never split at its hyphen. -->
-  <ng-template #message let-log>@for (seg of segmentsOf(log); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/documents/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</span>}} @else {{{ seg.text }}}}</ng-template>
+  }
 </div>

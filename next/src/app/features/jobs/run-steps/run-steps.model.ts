@@ -28,6 +28,8 @@ export interface StepExecution {
   stepExecutionId: number | null;
   index: number;
   key: string;
+  /** The step's name in its pipeline ("Vision model: DRAFT label"); null when it has none. */
+  name?: string | null;
   task: string;
   /** A JobStatus name: Queue, Running, Completed, Failed, Skip or Interrupt. */
   status: string | null;
@@ -80,6 +82,8 @@ export interface StepApproval {
   expiresAt?: string | null;
   decidedAt?: string | null;
   decidedBy?: string | null;
+  /** Who decided, for their picture. */
+  decidedByUserId?: number | null;
   comment?: string | null;
 }
 

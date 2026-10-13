@@ -3,15 +3,16 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { RunSteps } from './run-steps';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { RunOutputs } from './run-outputs';
+import { RunTimelineStore } from './run-timeline.store';
 import { attachmentName } from './run-steps.model';
 
 /**
- * Wave 4 (Core 0691705 + ce8e421): a run's datasets download as csv, json or jsonl (sourceJob.json/runDataset), and the
- * run's page lists what the run put out (sourceJob.json/runOutputs): the files it kept, which download until they
- * expire, and the bucket uploads, which download from storage like any other object.
+ * Wave 4 (Core 0691705 + ce8e421), on the run page's Outputs tab: the files the run kept download through their dataset
+ * until they expire, the bucket uploads from storage like any other object; a datasets downloads as csv, json or jsonl
+ * (sourceJob.json/runDataset). Run page fix: each says what it is -- a PDF by pages and size, never "1 row".
  */
 const step = (index: number, key: string, task: string, datasets: unknown[] = []) => ({
   stepExecutionId: 1048 + index, index, key, task, status: 'Completed', durationMs: 20, recordsIn: 3, recordsOut: 3,
@@ -38,21 +39,21 @@ const UPLOAD = { runOutputId: 1001, stepExecutionId: 1053, attempt: 1, stepIndex
 function mount(outputs: unknown[] | 'fail' = [KEPT, UPLOAD]) {
   const errors: string[] = [];
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ imports: [RunSteps], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-    { provide: ToastService, useValue: { success: () => {}, info: () => {}, error: (m: string) => errors.push(m) } }] });
-  const fixture = TestBed.createComponent(RunSteps);
-  fixture.componentRef.setInput('jobQueueId', '7405');
-  fixture.detectChanges();
+  TestBed.configureTestingModule({ imports: [RunOutputs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+    RunTimelineStore, { provide: ToastService, useValue: { success: () => {}, info: () => {}, error: (m: string) => errors.push(m) } }] });
+  const fixture = TestBed.createComponent(RunOutputs);
+  const store = TestBed.inject(RunTimelineStore);
   const http = TestBed.inject(HttpTestingController);
+  store.load('7405');
   http.expectOne(r => r.url.endsWith('/sourceJob.json/stepExecutions')).flush({ status: API_SUCCESS, data: ENGINE });
   const files = http.expectOne(r => r.url.endsWith('/sourceJob.json/runOutputs'));
   if (outputs === 'fail') files.flush({ status: 'ERROR', message: 'No.' });
   else files.flush({ status: API_SUCCESS, data: { jobQueueId: 7405, jobId: 2849, attempt: 1, outputs } });
   fixture.detectChanges();
-  return { fixture, http, files, errors, el: fixture.nativeElement as HTMLElement, component: fixture.componentInstance };
+  return { fixture, http, files, errors, store, el: fixture.nativeElement as HTMLElement };
 }
 
-describe('RunSteps: downloads', () => {
+describe('Run page: downloads', () => {
   const saved: string[] = [];
   const original = { create: URL.createObjectURL, revoke: URL.revokeObjectURL };
   const capture = () => {
@@ -74,17 +75,10 @@ describe('RunSteps: downloads', () => {
     expect(attachmentName(null)).toBe('');
   });
 
-  it('offers each step dataset in csv, json and jsonl', () => {
-    const { el } = mount();
-    const out = el.querySelector<HTMLElement>('.exec-step[data-step="out"]')!;
-    expect(out.querySelector('[aria-label="Download customers-clean.json from step out"]')).not.toBeNull();
-    expect(el.querySelectorAll('.exec-step [aria-label^="Download"]').length).toBe(2);
-  });
-
   it('downloads a dataset as a blob, named as the server names it', async () => {
     capture();
-    const { component, http } = mount();
-    component.downloadDataset(1051, 'csv', 'customers-clean.json');
+    const { store, http } = mount();
+    store.downloadDataset(1051, 'csv', 'customers-clean.json');
     const req = http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'));
     expect(req.request.params.get('runDatasetId')).toBe('1051');
     expect(req.request.params.get('format')).toBe('csv');
@@ -96,39 +90,39 @@ describe('RunSteps: downloads', () => {
 
   it('falls back to the dataset\'s name with the format when the server gives none', async () => {
     capture();
-    const { component, http } = mount();
-    component.downloadDataset(1048, 'jsonl', 'output');
+    const { store, http } = mount();
+    store.downloadDataset(1048, 'jsonl', 'output');
     http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush(new Blob(['{}\n']));
     await tick();
     expect(saved).toEqual(['output.jsonl']);
   });
 
   it('shows the server\'s refusal, read out of the blob', async () => {
-    const { component, http, errors } = mount();
-    component.downloadDataset(1051, 'csv', 'customers-clean.json');
+    const { store, http, errors } = mount();
+    store.downloadDataset(1051, 'csv', 'customers-clean.json');
     http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush(
       new Blob([JSON.stringify({ status: 'ERROR', message: 'This dataset expired on 30 Sep.' })]), { status: 410, statusText: 'Gone' });
     await tick();
     await tick();
     expect(errors).toEqual(['This dataset expired on 30 Sep.']);
-    expect(component.busy()).toBe('');
+    expect(store.busy()).toBe('');
   });
 });
 
-describe('RunSteps: the run\'s Files', () => {
+describe('Run page: the Outputs tab', () => {
   it('asks for the shown attempt\'s outputs', () => {
     const { files } = mount();
     expect(files.request.params.get('jobQueueId')).toBe('7405');
     expect(files.request.params.get('attempt')).toBe('1');
   });
 
-  it('lists the kept file and the bucket upload', () => {
+  it('lists the kept file and the bucket upload, each by type, rows and size', () => {
     const { el } = mount();
     const rows = [...el.querySelectorAll<HTMLElement>('.exec-file')];
     expect(rows.map(r => r.dataset['kind'])).toEqual(['file', 'bucket']);
     expect(rows[0].textContent).toContain('customers-clean.json');
-    expect(rows[0].textContent).toContain('3 rows');
-    expect(rows[0].textContent).toContain('Kept until');
+    expect(rows[0].querySelector('[data-test="output-label"]')?.textContent).toBe('JSON · 3 rows · 169 B');
+    expect(rows[0].textContent).toContain('kept until');
     expect(rows[1].textContent).toContain('ui-review-s3');
     expect(rows[1].textContent).toContain('registry-live-check/customers-clean.json');
   });
@@ -141,12 +135,16 @@ describe('RunSteps: the run\'s Files', () => {
     expect(req.request.params.get('format')).toBe('json');
   });
 
-  // MIG-255: a render_pdf report is kept like a file, and downloads only as the PDF it is.
-  it('offers a PDF report only as its PDF', () => {
-    const report = { ...KEPT, runOutputId: 1002, stepKey: 'report', task: 'render_pdf', name: 'wound-report.pdf', format: 'pdf', runDatasetId: 1060 };
-    const { el, http } = mount([report]);
-    const buttons = [...el.querySelectorAll<HTMLButtonElement>('.exec-file[data-kind="file"] [data-format]')];
-    expect(buttons.map(b => b.dataset['format'])).toEqual(['pdf']);
+  // MIG-255: a render_pdf report is kept like a file, and downloads only as the PDF it is -- and reads as one.
+  it('offers a PDF report only as its PDF, said by its pages and size', () => {
+    const report = { ...KEPT, runOutputId: 1002, stepKey: 'report', task: 'render_pdf', name: 'wound-report.pdf', format: 'pdf',
+      rowCount: 1, byteCount: 22359, pageCount: 2, runDatasetId: 1060 };
+    const { el, http } = mount([report, { ...report, runOutputId: 1003, pageCount: null }]);
+    const labels = [...el.querySelectorAll('[data-test="output-label"]')].map(l => l.textContent);
+    expect(labels).toEqual(['PDF · 2 pages · 21.8 KB', 'PDF · 21.8 KB']);
+    expect(el.textContent).not.toContain('1 row');
+    const buttons = [...el.querySelectorAll<HTMLButtonElement>('.exec-file[data-kind="file"]')][0].querySelectorAll<HTMLButtonElement>('[data-format]');
+    expect([...buttons].map(b => b.dataset['format'])).toEqual(['pdf']);
     buttons[0].click();
     const req = http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'));
     expect(req.request.params.get('runDatasetId')).toBe('1060');
@@ -175,11 +173,11 @@ describe('RunSteps: the run\'s Files', () => {
 
   it('says so when the run recorded no files', () => {
     const { el } = mount([]);
-    expect(el.querySelector('.exec-files')?.textContent).toContain('No files were recorded for this run.');
+    expect(el.textContent).toContain('No files were recorded for this run.');
   });
 
   it('says so when the files could not be read', () => {
     const { el } = mount('fail');
-    expect(el.querySelector('.exec-files')?.textContent).toContain('The run\'s files could not be read.');
+    expect(el.textContent).toContain('The run\'s files could not be read.');
   });
 });

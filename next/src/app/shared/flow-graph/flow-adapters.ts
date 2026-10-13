@@ -392,7 +392,7 @@ export function runGraph<S extends RunStepLike>(steps: readonly S[], basis: MapB
     };
   });
   const edges: FlowEdge[] = steps.slice(1).map((s, i) => ({ from: steps[i].key, to: s.key,
-    label: steps[i].recordsOut != null ? `${countText(steps[i].recordsOut)} rows` : null, tone: steps[i].status === 'Failed' ? 'crit' : null }));
+    label: steps[i].recordsOut != null ? `${countText(steps[i].recordsOut)} ${steps[i].recordsOut === 1 ? 'row' : 'rows'}` : null, tone: steps[i].status === 'Failed' ? 'crit' : null }));
   return { nodes, edges, hot };
 }
 

@@ -1,33 +1,34 @@
-import { toneClass } from '../../../shared/ui/tone';
-import { Component, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { NgTemplateOutlet } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { Location } from '@angular/common';
+import { ActivatedRoute, NavigationEnd, Router, RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
-import { TableShell } from '../../../shared/ui/data-table';
-import { StickToBottom } from '../../../shared/ui/stick-to-bottom';
 import { Icon } from '../../../shared/ui/icon';
 import { RankedBar } from '../../../shared/charts/ranked-bar';
-import { StatusPill } from '../../../shared/ui/status-pill';
 import { isMissingRecord } from '../../../core/api/missing-record';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { Subscription } from 'rxjs';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { formatDuration } from '../../../shared/ui/time-format';
-import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
-import { LogSegment, logSegments, pathParts } from './log-segments';
-import { RunSteps } from '../run-steps/run-steps';
 import { RunDecision } from '../run-steps/run-decision';
+import { RunReviewView } from '../run-steps/run-review';
 import { RunAiAnswers } from './run-ai-answers';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { Crumb } from '../../../core/nav/nav-tree';
+import { RunTimelineStore } from '../run-steps/run-timeline.store';
+import { RunStepsTable } from '../run-steps/run-steps-table';
+import { RunMap } from '../run-steps/run-map';
+import { RunOutputs } from '../run-steps/run-outputs';
+import { RunAiTrace } from '../run-steps/run-ai-trace';
+import { RunLog } from './run-log';
+import { RUN_TABS, RunTab, runFacts, runStatusLook, runTabFromUrl, runTabUrl, startedBy } from '../run-steps/run-page.model';
 
-/** The run page's tabs (UX review 2026-10-12, R1). */
-export type RunTab = 'steps' | 'ai' | 'outputs' | 'log';
+export type { RunTab } from '../run-steps/run-page.model';
+/** The tab a `?tab=` value names on the bare run address (kept for the callers that read it). */
 export function runTabOf(value: string | null): RunTab {
-  return value === 'ai' || value === 'outputs' || value === 'log' ? value : 'steps';
+  return runTabFromUrl(null, value);
 }
 
 interface AuditLog {
@@ -38,24 +39,39 @@ interface AuditLog {
   dateCreated?: string;
 }
 
-/** Log entries drawn at once, and how many more each Show earlier adds. */
-const RENDER_STEP = 2000;
+/** What the strip says for a run that has not ended. */
+function stillRunningWord(status: string | null | undefined): string {
+  return status && !['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'].includes(status) ? 'Still running' : '—';
+}
 
 @Component({
   selector: 'app-job-logs',
-  imports: [PageHeader, RefreshButton, StickToBottom, Icon, ServerTimePipe, NgTemplateOutlet, RouterLink, TableShell, RankedBar, StatusPill, Segmented, RunSteps,
-    RunDecision, RunAiAnswers],
+  imports: [PageHeader, RefreshButton, Icon, RouterLink, RankedBar, RunDecision, RunAiAnswers, RunStepsTable, RunMap,
+    RunOutputs, RunAiTrace, RunLog],
   templateUrl: './job-logs.html',
+  // One read of the run's steps and outputs for the whole page: the summary, every tab, the step log panel.
+  providers: [RunTimelineStore],
   styles: `
-    .run-facts dt { font-size: 11px; color: var(--text-muted); margin-bottom: 0.125rem; }
-    .run-facts dd { font-size: 0.8125rem; color: var(--text-primary); min-width: 0; }
+    .run-top { display: grid; gap: 1rem; align-items: stretch; }
+    @media (min-width: 1024px) { .run-top.has-next { grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); } }
+    /* Six facts: one row on their own, three by two beside the Next steps, so the strip fills the box's height evenly. */
+    .run-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr)); height: 100%; }
+    @media (min-width: 1024px) { .has-next .run-facts { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+    .run-fact { padding: 0.75rem 1rem; box-shadow: inset -1px 0 0 var(--border-subtle); min-width: 0;
+      display: flex; flex-direction: column; justify-content: center; }
+    .run-fact:last-child { box-shadow: none; }
+    @media (min-width: 1024px) {
+      .has-next .run-fact:nth-child(3n) { box-shadow: none; }
+      .has-next .run-fact:nth-child(n+4) { border-top: 1px solid var(--border-subtle); }
+    }
+    .run-fact dt { font-size: 11px; color: var(--text-muted); margin-bottom: 0.125rem; white-space: nowrap; }
+    .run-fact dd { font-size: 0.875rem; font-weight: 500; color: var(--text-primary); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .run-related a { color: var(--text-secondary); }
     .run-related a:hover { color: var(--text-primary); }
+    .run-status-pill { font-size: 0.75rem; }
   `,
 })
 export class JobLogs implements OnInit, OnDestroy {
-  /** The class that paints a colour helper's token (MIG-257); see shared/ui/tone.ts. */
-  readonly toneClass = toneClass;
   readonly jobId = input.required<string>();
   readonly jobQueueId = input.required<string>();
 
@@ -75,7 +91,6 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly logs = signal<AuditLog[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
-  readonly search = signal('');
 
   readonly showInsights = signal(false);
   /** The run's own start time anchors the first gap, so time spent before the first log shows. */
@@ -107,63 +122,96 @@ export class JobLogs implements OnInit, OnDestroy {
   ]);
 
   /**
-   * UX review 2026-10-12 (R3): the run's way forward and back -- its pipeline, the dashboards its results feed, and what it
-   * cost -- each where the reader may open it.
+   * UX review 2026-10-12 (R3, run page fix): the header's link row -- the run's schedule, its pipeline, the dashboards
+   * its results feed and what it cost -- each where the reader may open it. The title names the run and its schedule;
+   * these say where to go from it, and nothing on the page says the schedule or the pipeline a second time.
    */
-  readonly related = computed<{ label: string; icon: string; link: string; query?: Record<string, string> }[]>(() => {
+  readonly related = computed<{ label: string; icon: string; link: string; query?: Record<string, string>; test: string }[]>(() => {
     const job = this.job();
-    const out: { label: string; icon: string; link: string; query?: Record<string, string> }[] = [];
+    const out: { label: string; icon: string; link: string; query?: Record<string, string>; test: string }[] = [];
+    if (this.canOpenSchedule()) out.push({ label: 'All runs of this schedule', icon: 'history', link: `/pipelines/schedules/${this.jobId()}/executions`, test: 'schedule' });
     const taskDetailId = job?.taskDetail?.taskDetailId;
+    const pipeline = job?.taskDetail?.taskName;
     if (taskDetailId && this.auth.isTenantAdmin?.() && this.auth.canOpen('tasks')) {
-      out.push({ label: 'Pipeline', icon: 'layers', link: `/pipelines/${taskDetailId}/edit`, query: { tab: 'steps' } });
+      out.push({ label: pipeline ? `Pipeline: ${pipeline}` : 'Pipeline', icon: 'layers', link: `/pipelines/${taskDetailId}/edit`, query: { tab: 'steps' }, test: 'pipeline' });
     }
-    if (this.canOpenSchedule()) out.push({ label: 'All runs of this schedule', icon: 'history', link: `/pipelines/schedules/${this.jobId()}/executions` });
-    if (this.auth.canOpen('analytics-dashboards')) out.push({ label: 'Dashboards', icon: 'chart', link: '/data/analytics/dashboards' });
+    if (this.auth.canOpen('analytics-dashboards')) out.push({ label: 'Dashboards', icon: 'chart', link: '/data/analytics/dashboards', test: 'dashboards' });
     // UX review B9: the run's own cost, shared out of the month's priced lines.
-    if (this.auth.isTenantAdmin?.()) out.push({ label: 'What this run cost', icon: 'database', link: '/billing/usage', query: { run: String(this.jobQueueId()) } });
+    if (this.auth.isTenantAdmin?.()) out.push({ label: 'What this run cost', icon: 'database', link: '/billing/usage', query: { run: String(this.jobQueueId()) }, test: 'cost' });
     return out;
   });
+  /** The pipeline's name when its page is not the reader's to open: said once, in the link row, as text. */
+  readonly pipelineText = computed(() => this.related().some(r => r.test === 'pipeline') ? null : this.job()?.taskDetail?.taskName ?? null);
 
-  /** UX review 2026-10-12 (R1): Steps · AI answers · Outputs · Log, kept in the address (?tab=). */
-  readonly tab = signal<RunTab>(runTabOf(this.activated.snapshot?.queryParamMap?.get('tab') ?? null));
-  readonly tabs = computed(() => [
-    { id: 'steps' as RunTab, label: 'Steps', icon: 'layers' },
-    { id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' },
-    { id: 'outputs' as RunTab, label: 'Outputs', icon: 'file' },
-    { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length})` : 'Log', icon: 'terminal' },
-  ]);
-  setTab(tab: RunTab): void {
-    this.tab.set(tab);
-    this.router.navigate([], { relativeTo: this.activated, queryParams: { tab: tab === 'steps' ? null : tab }, queryParamsHandling: 'merge', replaceUrl: true });
+  /** The run's steps and outputs, read once for the page (summary, tabs, step log panel). */
+  readonly store = inject(RunTimelineStore);
+  /** The run's review as Next steps read it, for the header's one pill. */
+  readonly review = signal<RunReviewView | null>(null);
+  /** The Next steps box is drawn (the run's results need a review): the strip shares the row with it. */
+  readonly hasNext = computed(() => !!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED');
+  /** UX review 2026-10-12 (run page fix): the header's one status -- "Completed · waiting for review". */
+  readonly statusLook = computed(() => runStatusLook(this.run()?.jobStatus, this.review()?.reviewStatus, !!this.store.timeline()?.waitingForApproval));
+  /** The summary strip: only what the header does not say (no status, schedule or pipeline). */
+  readonly facts = computed(() => {
+    const run = this.run();
+    return runFacts({
+      start: run?.startTime ? this.clock.transform(run.startTime, 'dateTimeSec') ?? '—' : '—',
+      end: run?.endTime ? this.clock.transform(run.endTime, 'dateTimeSec') ?? '—' : stillRunningWord(run?.jobStatus),
+      duration: this.duration(),
+      startedBy: startedBy(run, this.job()),
+      timeline: this.store.timeline(),
+    });
+  });
+  /** The run's closing message, when it says something the strip and the steps do not (a failure, a skip). */
+  readonly closingMessage = computed(() => {
+    const run = this.run();
+    if (!run?.jobStatusMessage || run.jobStatus === 'Completed') return null;
+    // A step that failed says it on its own row; the run's message would only say it again.
+    const steps = this.store.timeline()?.steps ?? [];
+    if (steps.some(s => s.status === 'Failed' || s.status === 'Interrupt')) return null;
+    return run.jobStatusMessage as string;
+  });
+
+  /** UX review 2026-10-12 (R1, run page fix): Steps · Map · AI answers · Outputs · Log, kept in the address. */
+  private readonly location = inject(Location);
+  readonly tab = signal<RunTab>(this.tabOfAddress());
+  /** The tab the address names: the child's path ('' or 'logs') and ?tab=. */
+  private tabOfAddress(): RunTab {
+    const snapshot = this.activated.snapshot;
+    return runTabFromUrl(snapshot?.firstChild?.url?.at(-1)?.path ?? snapshot?.url?.at(-1)?.path, snapshot?.queryParamMap?.get('tab'));
   }
+  readonly tabs = computed(() => [
+    { id: 'steps' as RunTab, label: 'Steps', icon: 'list' },
+    { id: 'map' as RunTab, label: 'Map', icon: 'layers' },
+    { id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' },
+    { id: 'outputs' as RunTab, label: this.store.outputList().length ? `Outputs (${this.store.outputList().length})` : 'Outputs', icon: 'file' },
+    { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length.toLocaleString('en-GB')})` : 'Log', icon: 'terminal' },
+  ]);
+  /** The step the Log shows (the panel's "Open in Log"); null for the whole run. */
+  readonly logStep = signal<string | null>(null);
+
+  /**
+   * A tab is an address: the Log at /runs/8134/logs, the Steps at /runs/8134, any other at /runs/8134?tab=outputs -- so
+   * a link and a refresh keep it. The address is replaced, not navigated, so the run is not read again for a tab.
+   */
+  setTab(tab: RunTab): void {
+    if (!RUN_TABS.includes(tab)) return;
+    this.tab.set(tab);
+    const { commands, queryParams } = runTabUrl(this.jobId(), this.jobQueueId(), tab);
+    const url = this.router.serializeUrl(this.router.createUrlTree(commands, { queryParams }));
+    this.location.replaceState(url);
+  }
+
+  showStepInLog(stepKey: string): void {
+    this.logStep.set(stepKey);
+    this.setTab('log');
+  }
+
   /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
   readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
-  readonly showDetail = signal(true);
 
   /** The bucket the run's task reads and writes, which a path in a log line is relative to. */
   readonly bucket = computed<string | null>(() => this.job()?.taskDetail?.bucket ?? null);
-  /** Each entry split into text and the paths it names, once per load rather than per render. */
-  readonly segments = computed(() => {
-    const bucket = this.bucket();
-    // The rendered lines only: a long log split whole on every arriving line was the other half of the freeze.
-    return new Map(this.visible().map(log => [log, logSegments(log.logsDetail ?? '', bucket)] as [AuditLog, LogSegment[]]));
-  });
-  segmentsOf(log: AuditLog): LogSegment[] { return this.segments().get(log) ?? [{ text: log.logsDetail ?? '' }]; }
-  readonly pathParts = pathParts;
-  /** A model's answer in JSON mode is data, shown as it came; anything else is the markdown it wrote. */
-  isJson(output: string | null | undefined): boolean { return /^\s*[[{]/.test(output ?? ''); }
-
-  /**
-   * Three ways to read the same entries, as the legacy screen had. Timeline for following a
-   * run step by step, table for scanning and sorting by eye, console for the raw stream when
-   * you want it to look like the log file it came from.
-   */
-  readonly view = signal<'timeline' | 'table' | 'console'>('timeline');
-  readonly views: SegmentOption<'timeline' | 'table' | 'console'>[] = [
-    { id: 'timeline', label: 'Timeline', icon: 'clock' },
-    { id: 'table',    label: 'Table',    icon: 'list' },
-    { id: 'console',  label: 'Console',  icon: 'terminal' },
-  ];
 
   readonly refreshing = signal(false);
   /** How many times the run has been read: the steps card (MIG-251) re-reads its steps with the run's own poll. */
@@ -183,6 +231,25 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly autoRefreshing = computed(() => this.live() && this.stillRunning());
 
   constructor() {
+    // A link to this page's other address (/logs, ?tab=) or to another run lands on this same page: it follows the address.
+    const navigations = this.router.events.subscribe(event => {
+      if (event instanceof NavigationEnd) this.tab.set(this.tabOfAddress());
+    });
+    inject(DestroyRef).onDestroy(() => navigations.unsubscribe());
+    let shown: string | null = null;
+    effect(() => {
+      const key = `${this.jobId()}/${this.jobQueueId()}`;
+      if (shown !== null && shown !== key) untracked(() => {
+        this.logs.set([]); this.job.set(null); this.run.set(null); this.review.set(null); this.aiSteps.set([]);
+        this.aiStepsLoadedFor = null; this.missing.set(false);
+        this.load();
+      });
+      shown = key;
+    });
+    // The run's steps are read with each read of the run, so a running run's steps move with its entries.
+    effect(() => {
+      if (this.loads() > 0 && !this.missing()) untracked(() => this.store.load(this.jobQueueId().trim()));
+    });
     // Starts and stops the poll when the reader toggles Live, or when the run reaches a terminal
     // status. It does NOT re-arm the timer between polls -- see arm().
     effect(() => {
@@ -368,12 +435,6 @@ export class JobLogs implements OnInit, OnDestroy {
     .filter(row => !!row.dateCreated)
     .sort((a, b) => new Date(a.dateCreated!).getTime() - new Date(b.dateCreated!).getTime()));
 
-  /**
-   * Each entry's number in time order, for the table's # column. It counted the rows on screen,
-   * so a search renumbered them 1, 2, 3 and the chart's "(#16)" matched nothing.
-   */
-  readonly entryNo = computed(() => new Map(this.timeOrdered().map((row, index) => [row, index + 1])));
-
   /** The same clock the views print entry times with: API times are Chicago wall-clock. */
   private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
 
@@ -416,28 +477,6 @@ export class JobLogs implements OnInit, OnDestroy {
   });
 
   readonly hasInsights = computed(() => this.gaps().length > 1);
-
-  readonly filtered = computed(() => {
-    const term = this.search().trim().toLowerCase();
-    if (!term) return this.logs();
-    return this.logs().filter(log => (log.logsDetail ?? '').toLowerCase().includes(term));
-  });
-
-  /**
-   * How many of the entries are drawn (scale review P1 #22). A run that writes tens of thousands of
-   * lines drew every one in three layouts at once and froze the tab; the newest RENDER_STEP are drawn
-   * -- the end of the run is what a reader follows -- and Show earlier adds RENDER_STEP more above.
-   */
-  readonly renderLimit = signal(RENDER_STEP);
-  readonly renderStep = RENDER_STEP;
-  readonly visible = computed(() => {
-    const all = this.filtered();
-    const limit = this.renderLimit();
-    return all.length > limit ? all.slice(all.length - limit) : all;
-  });
-  /** Entries matching the view that are not drawn yet. */
-  readonly hiddenEarlier = computed(() => this.filtered().length - this.visible().length);
-  showEarlier(): void { this.renderLimit.update(limit => limit + RENDER_STEP); }
 
   ngOnInit(): void {
     this.load();
@@ -545,19 +584,4 @@ export class JobLogs implements OnInit, OnDestroy {
     this.error.set(`Run #${this.jobQueueId().trim()} of job #${this.jobId().trim()} does not exist or was deleted.`);
   }
 
-  /**
-   * Workers prefix nothing, so severity is inferred from the wording.
-   *
-   * The words are matched with their endings: workers write "Failed:", "failed", "Completed:",
-   * and bare stems matched none of them, so every dot was grey. Checked in this order so "Attempt 1
-   * of 3 failed ... Queued for attempt 2" stays red. "rejected" is left out on purpose: "40
-   * accepted, 0 rejected" is a good run.
-   */
-  toneOf(detail?: string): string {
-    const text = (detail ?? '').toLowerCase();
-    if (/\b(fail\w*|errors?|exceptions?|could not|unable|interrupt\w*)\b/.test(text)) return 'var(--color-crit-500)';
-    if (/\b(warn\w*|skip\w*|missed|retr(y|ying|ied|ies))\b/.test(text)) return 'var(--color-warn-500)';
-    if (/\b(complet(e|ed)|succe(ss|ssful|ssfully|eded)|done|finished)\b/.test(text)) return 'var(--color-ok-500)';
-    return 'var(--border-strong)';
-  }
 }

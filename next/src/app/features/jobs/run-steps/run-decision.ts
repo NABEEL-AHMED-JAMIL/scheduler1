@@ -1,4 +1,5 @@
-import { Component, DestroyRef, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
+import { Avatar } from '../../../shared/ui/avatar';
 import { HttpClient } from '@angular/common/http';
 import { RouterLink } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -35,34 +36,44 @@ export type DecisionRoute =
  */
 @Component({
   selector: 'app-run-decision',
-  imports: [Icon, ServerTimePipe, RouterLink],
+  imports: [Icon, ServerTimePipe, RouterLink, Avatar],
   host: { class: 'contents' },
   template: `
     @if (review(); as r) {
       @if (r.reviewStatus !== 'NOT_REQUIRED') {
-        <section class="card p-4 flex flex-col gap-3 run-next" data-test="next-steps" aria-labelledby="next-steps-heading">
+        <section class="card p-4 flex flex-col gap-3 h-full run-next" data-test="next-steps" aria-labelledby="next-steps-heading">
           <div class="flex flex-wrap items-center gap-2">
             <h2 id="next-steps-heading" class="text-sm font-semibold mr-auto">{{ r.reviewStatus === 'PENDING' ? 'Next steps' : 'Review' }}</h2>
             <span class="pill {{ status().tone }}" data-test="review-status"><app-icon [name]="status().icon" size="0.85em" />{{ status().label }}</span>
           </div>
-          <p class="text-xs text-[color:var(--text-muted)]">Results need review by {{ parties() }}.</p>
+          @if (r.reviewStatus === 'PENDING') {
+            <p class="flex items-center gap-1.5 text-sm text-[color:var(--text-secondary)]" data-test="waiting-on">
+              <app-icon name="users" size="0.95em" class="icon-muted shrink-0" />
+              <span>Waiting on <span class="font-medium text-[color:var(--text-primary)]">{{ waitingOn() }}</span></span>
+            </p>
+          }
           @if (r.decisions?.length) {
-            <ul class="flex flex-col gap-1.5 text-sm" data-test="decisions-made">
+            <ul class="flex flex-col gap-2 text-sm" data-test="decisions-made">
               @for (d of r.decisions; track d.runReviewDecisionId) {
-                <li class="flex flex-wrap items-baseline gap-x-2">
-                  <span class="font-medium">{{ partyOf(d.party) }}</span>
-                  <span [class]="d.decision === 'APPROVED' ? 'text-[color:var(--ok-text)]' : 'text-[color:var(--crit-text)]'">
-                    {{ d.decision === 'APPROVED' ? 'approved' : 'rejected' }}</span>
-                  @if (d.reviewer) { <span class="text-[color:var(--text-muted)]">by {{ d.reviewer }}</span> }
-                  @if (d.decidedAt) { <span class="text-xs text-[color:var(--text-muted)]">{{ d.decidedAt | serverTime:'recent' }}</span> }
-                  @if (d.reason) { <span class="w-full text-[color:var(--text-secondary)]">Reason: {{ d.reason }}</span> }
-                  @if (d.comment) { <span class="w-full text-[color:var(--text-secondary)]">{{ d.comment }}</span> }
+                <li class="flex items-start gap-2">
+                  <app-avatar [appUserId]="d.reviewerUserId" [name]="d.reviewer" [size]="1.75" [decorative]="true" />
+                  <div class="min-w-0">
+                    <div class="flex flex-wrap items-baseline gap-x-1.5">
+                      <span [class]="d.decision === 'APPROVED' ? 'text-[color:var(--ok-text)] font-medium' : 'text-[color:var(--crit-text)] font-medium'">
+                        {{ d.decision === 'APPROVED' ? 'Approved' : 'Rejected' }}</span>
+                      <span>by {{ d.reviewer || 'a reviewer' }}</span>
+                      @if (r.required.length > 1) { <span class="text-[color:var(--text-muted)]">({{ partyOf(d.party).toLowerCase() }})</span> }
+                    </div>
+                    @if (d.decidedAt) { <div class="text-xs text-[color:var(--text-muted)] tabular" data-test="decided-at">{{ d.decidedAt | serverTime:'dateTime' }}</div> }
+                    @if (d.reason) { <div class="text-[color:var(--text-secondary)]">Reason: {{ d.reason }}</div> }
+                    @if (d.comment && d.comment !== d.reason) { <div class="text-[color:var(--text-secondary)] break-words">“{{ d.comment }}”</div> }
+                  </div>
                 </li>
               }
             </ul>
           }
           @if (r.rerunJobQueueId) {
-            <p class="text-sm">Run again as <a class="link" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.rerunJobQueueId, 'logs']">run #{{ r.rerunJobQueueId }}</a>.</p>
+            <p class="text-sm">Run again as <a class="link" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.rerunJobQueueId]">run #{{ r.rerunJobQueueId }}</a>.</p>
           }
           @if (r.reviewStatus === 'PENDING') {
             @switch (route().by) {
@@ -71,7 +82,7 @@ export type DecisionRoute =
                 @if (canOpenInbox()) { <a class="link-inline text-sm self-start" routerLink="/workflows/inbox">Open the Task inbox</a> }
               }
               @default {
-                <label class="flex flex-col gap-1">
+                <label class="flex flex-col gap-1 mt-auto">
                   <span class="label">{{ rejecting() ? 'Why are these results rejected?' : 'Comment' }}
                     @if (rejecting()) { <span class="text-[color:var(--crit-text)]">*</span> } @else { <span class="font-normal normal-case text-[color:var(--text-muted)]">(optional)</span> }</span>
                   <textarea id="runDecisionComment" class="input" rows="2" maxlength="2000" [value]="comment()" data-test="decision-comment"
@@ -103,10 +114,12 @@ export type DecisionRoute =
     }
   `,
 })
-export class RunDecision implements OnInit {
+export class RunDecision {
   readonly jobQueueId = input.required<string>();
   /** The review changed (decided here): the page re-reads the run. */
   readonly decided = output<void>();
+  /** The review as read, for the page's header pill ("Completed · waiting for review"); null for none. */
+  readonly reviewChange = output<RunReviewView | null>();
 
   private readonly http = inject(HttpClient);
   private readonly inbox = inject(WorkflowsApi);
@@ -143,8 +156,9 @@ export class RunDecision implements OnInit {
       ? 'The pipeline\'s reviewers decide this in their Task inbox.' : why || 'The pipeline\'s reviewers decide this in their Task inbox.';
   });
 
-  ngOnInit(): void {
-    this.load();
+  constructor() {
+    // Read again for another run (a link from this page to its re-run lands on this same page).
+    effect(() => { this.jobQueueId(); untracked(() => this.load()); });
   }
 
   partyOf(party: string): string {
@@ -158,13 +172,43 @@ export class RunDecision implements OnInit {
         next: r => {
           const review = r.status === API_SUCCESS ? r.data ?? null : null;
           this.review.set(review);
+          this.reviewChange.emit(review);
+          if (review?.reviewStatus === 'PENDING' && review.reviewers?.kind === 'group') this.nameGroup(review.reviewers.value ?? null);
           if (review?.reviewStatus === 'PENDING' && !review.you?.canDecide) this.findTask();
           else this.task.set(null);
         },
         // A run whose review cannot be read shows no box: the run page is about the run.
-        error: () => this.review.set(null),
+        error: () => { this.review.set(null); this.reviewChange.emit(null); },
       });
   }
+
+  /** A reviewer group's name (an access profile), which a workspace administrator may read; others see "the reviewer group". */
+  readonly groupName = signal<string | null>(null);
+  private nameGroup(id: string | null): void {
+    if (!id || !this.auth.isTenantAdmin?.()) return;
+    this.http.get<ApiResponse<{ pageAccessProfileId: number; profileName: string }[]>>(`${API_BASE}/pageAccess.json/listProfiles`)
+      .pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+        next: r => this.groupName.set((r.data ?? []).find(p => String(p.pageAccessProfileId) === id)?.profileName ?? null),
+        error: () => {},
+      });
+  }
+
+  /** Who the review waits on: the reader when they may decide it, else the pipeline's reviewers in words. */
+  readonly waitingOn = computed(() => {
+    const r = this.review();
+    const route = this.route();
+    const who = r?.reviewers;
+    const group = this.groupName();
+    const named = !who?.kind || (who.kind === 'role' && who.value !== 'TENANT_USER') ? 'the workspace administrators'
+      : who.kind === 'role' ? 'the workspace users'
+      : group ? `the ${group} group` : 'the pipeline\'s reviewer group';
+    const decided = new Set((r?.decisions ?? []).map(d => d.party));
+    const open = (r?.required ?? []).filter(p => !decided.has(p));
+    if (open.length && !open.includes('internal')) return 'the customer';
+    const internal = route.by === 'task' ? `you (${named.replace(/^the /, '')})`
+      : route.by === 'admin' ? `${named} (you can decide here)` : named;
+    return open.includes('customer') ? `${internal} and the customer` : internal;
+  });
 
   /** The reader's open Task inbox task about this run, if they have one (a reviewer the pipeline names). */
   private findTask(): void {

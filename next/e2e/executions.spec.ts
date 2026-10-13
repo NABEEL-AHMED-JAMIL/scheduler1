@@ -103,50 +103,39 @@ test.describe('Executions', () => {
     }
   });
 
-  test('a step-engine run: every step on the Timeline, a step\'s lines in the Console', async ({ browser }) => {
+  test('a step-engine run: every step in the Steps table, a step\'s lines in the side panel and the Log', async ({ browser }) => {
     const page = await pageAs(browser, s);
-    await page.goto(`/pipelines/schedules/${ENGINE.job}/runs/${ENGINE.run}/logs`);
+    // Run page fix (UX review 2026-10-12): the bare run opens on Steps; /logs on the Log.
+    await page.goto(`/pipelines/schedules/${ENGINE.job}/runs/${ENGINE.run}`);
     const keys = STEPS.map(step => step.key);
     const read = STEPS.find(step => step.task === 'read_file') ?? STEPS[0];
     const saved = STEPS.find(step => step.task === 'save_file' && step.datasets?.length)!;
     expect(saved, `run ${ENGINE.run} has a save_file step`).toBeTruthy();
 
-    const card = page.locator('.exec-steps');
+    const card = page.locator('[data-test="run-steps"]');
     await expect(card).toBeVisible();
     await expect(card.getByRole('heading', { name: /^Steps/ })).toContainText(`${keys.length} of ${keys.length} completed`);
-    const rows = card.locator('.exec-step');
+    const rows = card.locator('tr.exec-step');
     await expect(rows).toHaveCount(keys.length);
     expect(await rows.evaluateAll(els => els.map(e => e.getAttribute('data-step')))).toEqual(keys);
     for (let i = 0; i < keys.length; i++) {
       const row = rows.nth(i);
       await expect(row).toContainText(STEPS[i].task);
       await expect(row.locator('app-status')).toContainText('Completed');
-      await expect(row).toContainText(/[\d,]+ → [\d,]+ records/);
+      await expect(row).toContainText(/[\d,—]+ → [\d,—]+/);
     }
     // The read step's counts are Core's own; save_file names the file it wrote.
-    await expect(rows.nth(keys.indexOf(read.key)))
-      .toContainText(new RegExp(`${count(read.recordsIn)} → ${count(read.recordsOut)} records`));
+    await expect(rows.nth(keys.indexOf(read.key))).toContainText(`${count(read.recordsIn)} → ${count(read.recordsOut)}`);
     await expect(rows.nth(keys.indexOf(saved.key))).toContainText(KEPT_FILE);
 
-    // The Console: the read step's own lines, then another step's.
-    await card.getByRole('button', { name: 'Console' }).click();
-    await expect(card.getByRole('button', { name: 'Console' })).toHaveAttribute('aria-pressed', 'true');
-    await card.getByLabel('Step to show').selectOption(read.key);
-    const lines = card.locator('.log-console-line');
-    await expect(lines.first()).toContainText(/Try 1 of \d+\./);
-    await expect(lines.nth(1)).toBeVisible();
-    await card.getByLabel('Step to show').selectOption(saved.key);
-    await expect(card.locator('.log-console-line', { hasText: KEPT_FILE }).first()).toBeVisible();
-
-    // A step's Log button opens the Console on it.
-    const last = keys[keys.length - 1];
-    await card.getByRole('button', { name: 'Timeline' }).click();
-    await card.getByRole('button', { name: `Show the log of step ${last}` }).click();
-    await expect(card.getByLabel('Step to show')).toHaveValue(last);
-    await expect(lines.first()).toBeVisible();
-
-    // The run's own entries are still there, below the steps.
-    await expect(page.getByRole('heading', { name: 'Log entries' })).toBeVisible();
+    // A step's Log button: its own lines in the side panel, then in the Log with the run's entries about it.
+    await card.getByRole('button', { name: `Show the log of step ${read.key}` }).click();
+    const panel = page.locator('app-run-step-log-panel');
+    await expect(panel.locator('.run-log-line').first()).toContainText(/Try 1 of \d+\./);
+    await panel.getByRole('button', { name: 'Open in Log' }).click();
+    await expect(page).toHaveURL(new RegExp(`/runs/${ENGINE.run}/logs$`));
+    await expect(page.getByLabel('Step')).toHaveValue(read.key);
+    await expect(page.locator('app-run-log .run-log-line', { hasText: /Try 1 of \d+\./ }).first()).toBeVisible();
     await page.context().close();
   });
 
@@ -159,9 +148,9 @@ test.describe('Executions', () => {
     const keptDataset = savedStep.datasets!.find(d => d.name === KEPT_FILE)!;
 
     const page = await pageAs(browser, s);
-    await page.goto(`/pipelines/schedules/${FILES.job}/runs/${FILES.run}/logs`);
-    const files = page.locator('.exec-files');
-    await expect(files.getByText('Files', { exact: true })).toBeVisible();
+    await page.goto(`/pipelines/schedules/${FILES.job}/runs/${FILES.run}?tab=outputs`);
+    const files = page.locator('[data-test="run-outputs"]');
+    await expect(files.getByRole('heading', { name: /^Files/ })).toBeVisible();
     const kept = files.locator('.exec-file[data-kind="file"]', { hasText: KEPT_FILE });
     const upload = files.locator('.exec-file[data-kind="bucket"]', { hasText: uploadOut.key! });
     await expect(kept).toContainText(new RegExp(`${count(keptDataset.rowCount)} rows`));
@@ -178,7 +167,8 @@ test.describe('Executions', () => {
     const text = readFileSync(await csv.path(), 'utf8');
     expect(text.split(/\r?\n/)[0].split(',').map((c: string) => c.replace(/^"|"$/g, ''))).toEqual(keptDataset.columns);
 
-    // The same dataset from its step on the Timeline, through the format menu.
+    // The same dataset from its step in the Steps table, through the format menu.
+    await page.locator('[data-tab="steps"]').click();
     await page.getByRole('button', { name: `Download ${KEPT_FILE} from step ${savedStep.key}` }).click();
     await expect(page.getByRole('menu').getByRole('menuitem')).toHaveText([/CSV/, /JSON/, /JSONL/]);
     const [jsonl] = await Promise.all([page.waitForEvent('download'), page.getByRole('menuitem', { name: 'JSONL' }).click()]);
@@ -186,25 +176,24 @@ test.describe('Executions', () => {
 
     // An older run of the same job recorded no outputs (when the job is old enough to have one).
     if (NO_FILES.run) {
-      await page.goto(`/pipelines/schedules/${NO_FILES.job}/runs/${NO_FILES.run}/logs`);
-      await expect(page.locator('.exec-files')).toContainText('No files were recorded for this run.');
+      await page.goto(`/pipelines/schedules/${NO_FILES.job}/runs/${NO_FILES.run}?tab=outputs`);
+      await expect(page.locator('[data-test="run-outputs"]')).toContainText('No files were recorded for this run.');
     } else {
       test.info().annotations.push({ type: 'note', description: `job ${NO_FILES.job} has no run from before MIG-236` });
     }
     await page.context().close();
   });
 
-  test('a legacy run: the page as it was, with no steps card', async ({ browser }) => {
+  test('a legacy run: its entries on the Log, no steps table', async ({ browser }) => {
     test.skip(!LEGACY.run, 'The rebuilt platform has no run the legacy worker ran (service-1/2/3 are retired; every rebuilt'
       + ' pipeline runs on the step engine), and one cannot be made: pin E2E_LEGACY_JOB and E2E_LEGACY_RUN to check one.');
     const page = await pageAs(browser, s);
     const answered = stepsAnswer(page);
     await page.goto(`/pipelines/schedules/${LEGACY.job}/runs/${LEGACY.run}/logs`);
     await answered;
-    await expect(page.getByRole('heading', { name: 'Run logs' })).toBeVisible();
-    await expect(page.locator('.log-timeline li').first()).toBeVisible();
-    await expect(page.locator('.exec-steps')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Timeline' })).toHaveCount(1);
+    await expect(page.getByRole('heading', { name: new RegExp(`^Run #${LEGACY.run}`) })).toBeVisible();
+    await expect(page.locator('app-run-log .run-log-line').first()).toBeVisible();
+    await expect(page.locator('[data-test="run-steps"]')).toHaveCount(0);
     await page.context().close();
   });
 

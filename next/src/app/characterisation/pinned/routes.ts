@@ -254,13 +254,23 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId/logs",
+      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId",
       "title": "Run",
       "pageKey": "jobs",
       "guards": [
         "pageGuard"
       ],
       "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId/",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/runs/:jobQueueId/logs",
+      "guards": [],
+      "lazy": false
     },
     {
       "path": "/pipelines/executions",

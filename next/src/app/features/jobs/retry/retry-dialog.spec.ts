@@ -8,7 +8,8 @@ import { RetryDialog } from './retry-dialog';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { attemptSentence, planOf, resumeLabel, stepLabel } from './run-retry';
-import { RunSteps } from '../run-steps/run-steps';
+import { RunStepsTable } from '../run-steps/run-steps-table';
+import { RunTimelineStore } from '../run-steps/run-timeline.store';
 import { failedStep } from '../run-steps/run-steps.model';
 
 /**
@@ -148,11 +149,11 @@ const step = (index: number, key: string, status: string, extra: Record<string, 
 
 function mountSteps(timeline: unknown) {
   TestBed.resetTestingModule();
-  TestBed.configureTestingModule({ imports: [RunSteps], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()] });
-  const fixture = TestBed.createComponent(RunSteps);
-  fixture.componentRef.setInput('jobQueueId', '7701');
-  fixture.detectChanges();
+  TestBed.configureTestingModule({ imports: [RunStepsTable],
+    providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(), RunTimelineStore] });
+  const fixture = TestBed.createComponent(RunStepsTable);
   const http = TestBed.inject(HttpTestingController);
+  TestBed.inject(RunTimelineStore).load('7701');
   http.expectOne(r => r.url.endsWith('/sourceJob.json/stepExecutions')).flush({ status: API_SUCCESS, data: timeline });
   fixture.detectChanges();
   return { fixture, el: fixture.nativeElement as HTMLElement };

@@ -63,9 +63,12 @@ async function land(url: string): Promise<{ url: string; title: string | undefin
   const harness = await RouterTestingHarness.create();
   await harness.navigateByUrl(url);
   const router = TestBed.inject(Router);
-  let leaf = router.routerState.snapshot.root;
-  while (leaf.firstChild) leaf = leaf.firstChild;
-  return { url: router.url, title: leaf.routeConfig?.title as string | undefined };
+  // The deepest title on the way down, as Angular's title strategy names the page: the run page's /logs is a child
+  // with no title of its own (run page fix).
+  let node: typeof router.routerState.snapshot.root | null = router.routerState.snapshot.root;
+  let title: string | undefined;
+  while (node) { title = (node.routeConfig?.title as string | undefined) ?? title; node = node.firstChild; }
+  return { url: router.url, title };
 }
 
 /**
@@ -190,7 +193,8 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/pipelines/schedules/:jobId/edit', 'Schedule', 'jobs', undefined],
     ['/pipelines/schedules/:jobId/assistant', 'Schedule assistant', 'jobs', undefined],
     ['/pipelines/schedules/:jobId/executions', 'Schedule runs', 'jobs', undefined],
-    ['/pipelines/schedules/:jobId/runs/:jobQueueId/logs', 'Run', 'jobs', undefined],
+    // Run page fix: /logs is the same page at its Log, a child of the run's address.
+    ['/pipelines/schedules/:jobId/runs/:jobQueueId', 'Run', 'jobs', undefined],
     ['/pipelines/executions', 'Runs', 'jobs', undefined],
     ['/pipelines/queue', 'Runs by date', 'queue', undefined],
     ['/pipelines/run-analytics', 'Run analytics', 'reports', undefined],
