@@ -2570,3 +2570,15 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 
 /* The top bar's active link (Home): unlayered, so it outranks the link's own colour utilities. */
 .nav-top-active { color: var(--accent-text); background: var(--accent-soft); }
+
+/* The mark over the sidebar (≥1440px, owner 2026-10-12): the bar loses its page padding and the 24px "E" sits on
+   the sidebar icons' centre line -- 26px from the left expanded (8px rail padding + 10px link padding + half a 16px
+   icon), 27.5px on the 56px collapsed rail -- and "ETL Console" starts where the labels do (44px). Unlayered, so it
+   outranks the bar's px-* utilities at 2xl. Pinned by e2e/brand-alignment.spec.ts. */
+@media (min-width: 90rem) {
+  .shell-bar { max-width: none; padding-left: 0; }
+  .brand-slot { padding-left: 0.875rem; }
+  .brand-slot.is-collapsed { padding-left: 0.96875rem; }
+  .brand-slot app-brand-mark { gap: 0.375rem; }
+  .brand-slot .brand-e { width: 1.5rem; height: 1.5rem; }
+}

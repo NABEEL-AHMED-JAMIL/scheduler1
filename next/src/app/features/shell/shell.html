@@ -2,9 +2,12 @@
   <!-- The header holds a dozen tab stops before the page starts; a keyboard user skips them here. -->
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-default btn-sm">Skip to content</a>
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
-    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 wide:pl-4 h-14 flex items-center gap-1">
+    <div class="shell-bar mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
 
-      <a routerLink="/" class="mr-4 shrink-0">
+      <!-- From 1440px the mark stands over the sidebar: the "E" on the nav icons' centre line, the wordmark on their
+           labels' left edge, expanded or collapsed (owner, 2026-10-12; styles.css .brand-slot). Below, it lines up with
+           the page, as the bar's padding is the page's. -->
+      <a routerLink="/" class="brand-slot mr-4 shrink-0" [class.is-collapsed]="collapsed()">
         <app-brand-mark [hideOnMobile]="true" [hideBesideNav]="true" />
       </a>
 
