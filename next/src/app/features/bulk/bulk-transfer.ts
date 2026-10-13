@@ -48,7 +48,7 @@ const ROUTES: Record<Kind, Endpoints> = {
     upload: '/sourceJob.json/uploadSourceJob',
     noun: 'schedules',
     backTo: '/pipelines/schedules',
-    trail: [{ label: 'Run & review' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' }],
+    trail: [{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' }],
     // Wave 4 (Core 6f9261e): the sheet keeps its eleven columns; JobDetailValidation reads a Cron row's Recurrence.
     templateNote: 'For a Cron row, put the cron expression in the Recurrence cell, e.g. 0 3 * * * for 03:00 daily '
       + '(server time). Five fields, or six with seconds 0.',
@@ -58,8 +58,8 @@ const ROUTES: Record<Kind, Endpoints> = {
     exportAll: '/sourceTask.json/downloadListSourceTask',
     upload: '/sourceTask.json/uploadSourceTask',
     noun: 'pipelines',
-    backTo: '/pipelines',
-    trail: [{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines' }],
+    backTo: '/pipelines/list',
+    trail: [{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines/list' }],
   },
 };
 

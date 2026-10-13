@@ -114,7 +114,7 @@ const LEVEL_WORDS: Record<LogLevel, string> = { ERROR: 'Errors', WARN: 'Warnings
         <span class="run-log-time" [title]="line.at ? (line.at | serverTime:'dateTimeSec') : ''">{{ line.at ? (line.at | serverTime:'timeSec') : '—' }}</span>
         <span class="run-log-level" [class]="levelClass(line.level)">{{ line.level }}</span>
         <span class="run-log-step" [title]="line.step ? 'Step ' + line.step : ''">{{ line.step }}</span>
-        <span class="run-log-msg">@for (seg of segmentsOf(line); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/documents/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">{{ seg.text }}</span>}} @else {{{ seg.text }}}}</span>
+        <span class="run-log-msg">@for (seg of segmentsOf(line); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/data/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">{{ seg.text }}</span>}} @else {{{ seg.text }}}}</span>
       </div>
     </ng-template>
   `,

@@ -216,7 +216,7 @@ export class PromptEdit implements OnInit {
     this.http.get<ApiResponse<Prompt>>(`${API_BASE}/aiPrompt.json/get`, { params: { promptId: this.promptId()! } }).subscribe({
       next: r => {
         this.loading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); this.router.navigate(['/ai/prompts']); return; }
+        if (r.status !== API_SUCCESS || !r.data) { this.toast.error(r.message); this.router.navigate(['/pipelines/prompts']); return; }
         const p = r.data;
         this.loaded.set(p);
         this.form.patchValue({
@@ -305,7 +305,7 @@ export class PromptEdit implements OnInit {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; }
         this.toast.success(r.message);
-        this.router.navigate(['/ai/prompts']);
+        this.router.navigate(['/pipelines/prompts']);
       },
       error: err => { this.saving.set(false); this.toast.error(err?.error?.message || 'The prompt could not be saved.'); },
     });

@@ -51,9 +51,9 @@ describe('JobLogs', () => {
     const links = [...el.querySelectorAll<HTMLAnchorElement>('.run-log-lines a.log-path')];
     expect(links.map(a => a.textContent!.replace(/\s+/g, ''))).toEqual(['etl-bucket/sales/in', 'sales/in/orders_2026-09-a.csv', 'e2e/json/orders_2026-09-a.json']);
     expect(links.map(a => a.getAttribute('href'))).toEqual([
-      '/documents/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
-      '/documents/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
-      '/documents/files?bucket=etl-bucket&prefix=e2e%2Fjson%2F',
+      '/data/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
+      '/data/files?bucket=etl-bucket&prefix=sales%2Fin%2F',
+      '/data/files?bucket=etl-bucket&prefix=e2e%2Fjson%2F',
     ]);
     // A long path may wrap, but only between its names.
     expect(links[2].querySelectorAll('wbr').length).toBe(2);

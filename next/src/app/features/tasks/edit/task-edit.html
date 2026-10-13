@@ -13,7 +13,7 @@
     <div class="card">
       <app-load-error [message]="loadError()" [retryable]="!loadMissing()" (retry)="retryLoad()">
         @if (loadMissing()) {
-          <a routerLink="/pipelines" class="btn btn-default btn-sm mt-4">Back to pipelines</a>
+          <a routerLink="/pipelines/list" class="btn btn-default btn-sm mt-4">Back to pipelines</a>
         }
       </app-load-error>
     </div>
@@ -69,7 +69,7 @@
                           clearLabel="None" [selectedLabel]="loadedTopicLabel()"
                           [options]="topicOptions()" />
             @if (noTopicsHere()) {
-              <a routerLink="/configuration/kafka" class="link-inline text-xs mt-1 inline-block">Add a topic</a>
+              <a routerLink="/settings/kafka" class="link-inline text-xs mt-1 inline-block">Add a topic</a>
             }
           </app-field>
 
@@ -216,7 +216,7 @@
       <!-- UX review 2026-10-12 (A5, G6, P6): one save bar, stuck to the editor's foot: the change state on the left, Cancel
            then the primary on the right. -->
       <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [state]="form.dirty ? 'Unsaved changes' : 'No changes'" label="Save the pipeline">
-        <a routerLink="/pipelines" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
+        <a routerLink="/pipelines/list" class="btn btn-ghost"><app-icon name="close" />Cancel</a>
         <button type="submit" class="btn btn-primary" [disabled]="saving() || locked()">
           {{ saving() ? 'Saving…' : (isEdit() ? 'Save changes' : 'Create pipeline') }}
         </button>

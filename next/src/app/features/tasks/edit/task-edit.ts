@@ -898,7 +898,7 @@ export class TaskEdit implements OnInit {
           // MIG-324: a new pipeline opens on its own page, where its steps are built next. Core names the new id only
           // in its message ("... saved with ID 1877."); without one, the list as before.
           const created = this.isEdit() ? null : /\bID (\d+)\b/.exec(response.message ?? '');
-          this.router.navigate(created ? ['/pipelines', Number(created[1]), 'edit'] : ['/pipelines']);
+          this.router.navigate(created ? ['/pipelines', Number(created[1]), 'edit'] : ['/pipelines/list']);
         } else {
           this.toast.error(response.message || 'The task could not be saved.');
         }

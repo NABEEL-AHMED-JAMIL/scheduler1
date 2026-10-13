@@ -96,7 +96,7 @@ describe('TaskEdit, a new organisation\'s first hour (MIG-324)', () => {
     const { component, navigate } = editor({ id: '', added: 'Task created.' });
     component.form.patchValue({ taskName: 'Orders', sourceTaskTypeId: 11831, taskStatus: 'Active', taskPayload: '<pipeline/>' });
     component.save();
-    expect(navigate).toHaveBeenCalledWith(['/pipelines']);
+    expect(navigate).toHaveBeenCalledWith(['/pipelines/list']);
   });
 
   it('says where topics are added when the picked connection has none', () => {

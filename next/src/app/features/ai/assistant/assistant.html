@@ -190,7 +190,7 @@
                           @case ('output') {
                             @if (filesQuery(l); as q) {
                               <div class="flex flex-wrap items-center gap-2 min-w-0" data-link="output">
-                                <a class="btn btn-default btn-sm" routerLink="/documents/files" [queryParams]="q"><app-icon name="folder" />Open report files</a>
+                                <a class="btn btn-default btn-sm" routerLink="/data/files" [queryParams]="q"><app-icon name="folder" />Open report files</a>
                                 <span class="mono text-xs text-[color:var(--text-muted)] break-all">{{ q.bucket }}/{{ q.prefix }}</span>
                                 @if (l.note) { <span class="text-xs text-[color:var(--text-secondary)] basis-full">{{ l.note }}</span> }
                               </div>
@@ -199,7 +199,7 @@
                           @case ('file') {
                             <div class="flex flex-wrap items-center gap-2 min-w-0" data-link="file">
                               @if (filesQuery(l); as q) {
-                                <a class="btn btn-default btn-sm" routerLink="/documents/files" [queryParams]="q"><app-icon name="file" />Open file</a>
+                                <a class="btn btn-default btn-sm" routerLink="/data/files" [queryParams]="q"><app-icon name="file" />Open file</a>
                               }
                               <span class="mono text-xs break-all">{{ l.fileName || l.key }}</span>
                               <span class="text-xs text-[color:var(--text-muted)]">{{ l.format ? l.format.toUpperCase() + ' · ' : '' }}{{ size(l.size) }}</span>
@@ -390,7 +390,7 @@
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Model</dt><dd class="text-right truncate min-w-0" [title]="tip(modelLabel())">{{ modelLabel() }}</dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Data policy</dt><dd class="text-right min-w-0"><a class="link-inline" routerLink="/administration/data-policies" [title]="policyError() || 'The workspace\'s data policy'">{{ policyHeadline() }}</a></dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Tools allowed</dt>
-                  <dd class="text-right"><a class="link-inline" routerLink="/ai/tools">{{ allowed().length }} of {{ tools().length }}</a></dd></div>
+                  <dd class="text-right"><a class="link-inline" routerLink="/settings/tools">{{ allowed().length }} of {{ tools().length }}</a></dd></div>
                 <div class="flex items-baseline justify-between gap-3"><dt class="text-[color:var(--text-muted)] shrink-0">Asks first for</dt>
                   <dd class="text-right mono text-xs break-words min-w-0">{{ askFirst().length ? askFirst().join(', ') : '—' }}</dd></div>
               </dl>

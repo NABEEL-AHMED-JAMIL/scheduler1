@@ -42,7 +42,7 @@ describe('console review 2026-10-07: layout', () => {
 
   it('keeps the run analytics\' last-run day and a model connection\'s prompt names on one line', async () => {
     expect(tagWith(await read('src/app/features/reports/reports.html'), "task.lastDay ? dayLabel")).toContain('whitespace-nowrap');
-    expect(tagWith(await read('src/app/features/ai/connections/connections.html'), "[routerLink]=\"['/ai/prompts', r.promptId, 'edit']\""))
+    expect(tagWith(await read('src/app/features/ai/connections/connections.html'), "[routerLink]=\"['/pipelines/prompts', r.promptId, 'edit']\""))
       .toContain('truncate');
   });
 

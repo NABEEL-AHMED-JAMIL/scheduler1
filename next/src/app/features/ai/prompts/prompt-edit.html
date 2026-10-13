@@ -187,7 +187,7 @@
         <!-- UX review 2026-10-12 (A5, G6): the editor saves from one bar stuck to its foot -- Cancel, then the version save,
              then the primary on the right -- not from the page's header. -->
         <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [state]="form.dirty ? 'Unsaved changes' : 'No changes'" label="Save the prompt">
-            <a routerLink="/ai/prompts" class="btn btn-ghost btn-sm">Cancel</a>
+            <a routerLink="/pipelines/prompts" class="btn btn-ghost btn-sm">Cancel</a>
             <button type="button" class="btn btn-default btn-sm" (click)="save(false)" [disabled]="saving() || !!loadError() || locked()">
               {{ isEdit() ? 'Save as v' + ((loaded()?.version ?? 0) + 1) : 'Save draft' }}
             </button>

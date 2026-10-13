@@ -8,7 +8,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <a class="btn btn-primary btn-sm" routerLink="/documents/converter"><app-icon name="plus" />Make a document</a>
+        <a class="btn btn-primary btn-sm" routerLink="/tools/converter"><app-icon name="plus" />Make a document</a>
       </div>
     </div>
   </app-page-header>
@@ -63,7 +63,7 @@
             <td class="max-w-56">
               @if (r.jobQueueId) {
                 <div class="truncate" [title]="r.pipeline || r.jobName || ''">{{ r.pipeline || r.jobName || '—' }}</div>
-                <a class="link-inline text-xs" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId, 'logs']"
+                <a class="link-inline text-xs" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId]"
                    [title]="'Open run #' + r.jobQueueId + ' of ' + (r.jobName || 'its schedule')">Run #{{ r.jobQueueId }}</a>
               } @else {
                 <span class="text-[color:var(--text-muted)]">—</span>
@@ -99,7 +99,7 @@
                   <app-icon name="send" size="0.9em" />
                 </button>
                 @if (storageParams(r); as at) {
-                  <a class="btn-circle btn-circle-info" routerLink="/documents/files" [queryParams]="at"
+                  <a class="btn-circle btn-circle-info" routerLink="/data/files" [queryParams]="at"
                      title="Open in storage" [attr.aria-label]="'Open ' + r.name + ' in storage'">
                     <app-icon name="folder" size="0.9em" />
                   </a>

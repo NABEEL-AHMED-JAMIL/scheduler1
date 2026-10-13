@@ -31,7 +31,7 @@ describe('Bulk import / export', () => {
   it('links back to its own list rather than to the browser history', () => {
     const { el } = page();
     const back = [...el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].find(a => a.textContent!.trim() === 'Pipelines');
-    expect(back?.getAttribute('href')).toBe('/pipelines');
+    expect(back?.getAttribute('href')).toBe('/pipelines/list');
   });
 
   /**

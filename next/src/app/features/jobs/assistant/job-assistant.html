@@ -2,7 +2,7 @@
      [class.gap-3]="compact()" [class.min-h-0]="compact()" [class.p-3]="compact()">
   <!-- UX review 2026-10-12 (A2): the breadcrumb leads back to the schedule's runs. Docked beside the runs (compact),
        the page has no header at all. -->
-  <app-page-header [class.hidden]="compact()" [trail]="[{ label: 'Run & review' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' },
+  <app-page-header [class.hidden]="compact()" [trail]="[{ label: 'Build' }, { label: 'Pipelines', link: '/pipelines' }, { label: 'Schedules & triggers', link: '/pipelines/schedules' },
                     { label: (facts()?.jobName ? facts()!.jobName + ' · runs' : 'Schedule runs'), link: '/pipelines/schedules/' + jobId() + '/executions' }]">
     <div class="page-head">
       <div>
