@@ -7,7 +7,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
 import { Backfills } from './backfills';
 import { BackfillDetail } from './backfill-detail';
-import { Backfill, durationText, lookOf, money, periodsText, progressParts } from './backfills.api';
+import { Backfill, doneOf, durationText, lookOf, money, periodsText, progressParts } from './backfills.api';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -105,5 +105,7 @@ describe('backfill words', () => {
     expect(durationText(7800)).toBe('about 2 h 10 min');
     expect(lookOf('PAUSED')).toEqual({ tone: 'warn', icon: 'pause', word: 'Paused' });
     expect(lookOf('QUEUED').word).toBe('Running');
+    // A cancelled period never ran: not done.
+    expect(doneOf({ counts: { ...ROW.counts, cancelled: 3 } })).toBe(6);
   });
 });

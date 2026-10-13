@@ -169,6 +169,11 @@ export function periodsText(count: number, step: BackfillStep): string {
   return `${count} ${count === 1 ? w.unit : w.units}`;
 }
 
+/** The periods that ran or were skipped as done; a cancelled one never ran, so it is not counted as done. */
+export function doneOf(b: Pick<Backfill, 'counts'>): number {
+  return b.counts.completed + b.counts.failed + b.counts.skipped;
+}
+
 /** A money amount to a cent or, below a cent, to its first figures: "$1.42", "$0.0031". */
 export function money(amount: number | string | null | undefined, currency: string | null | undefined): string {
   const n = Number(amount);

@@ -15,7 +15,7 @@ import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { valuesText } from '../../jobs/run-parameters/run-parameters';
 import {
-  Backfill, BackfillStatus, BackfillsApi, STEP_WORDS, durationText, isOpen, lookOf, periodsText, progressParts, refusalOf, statusWord,
+  Backfill, BackfillStatus, BackfillsApi, STEP_WORDS, doneOf, durationText, isOpen, lookOf, periodsText, progressParts, refusalOf, statusWord,
 } from './backfills.api';
 import { BackfillDetail, BackfillDetailData } from './backfill-detail';
 
@@ -83,16 +83,17 @@ const LIMIT = 25;
                   @if (paramText(b)) { · <span class="mono">{{ paramText(b) }}</span> }</div>
               </div>
               <div class="min-w-0">
-                <div class="bf-bar" role="img" [attr.aria-label]="b.done + ' of ' + b.total + ' done'">
+                <div class="bf-bar" role="img" [attr.aria-label]="doneOf(b) + ' of ' + b.total + ' done'">
                   <span class="bf-done" [style.width.%]="parts(b).completed"></span>
                   <span class="bf-failed" [style.width.%]="parts(b).failed"></span>
                   <span class="bf-running" [style.width.%]="parts(b).running"></span>
                 </div>
                 <div class="bf-meta mt-1" data-test="backfill-progress">
-                  <span class="text-[color:var(--text-secondary)] font-medium">{{ b.done }} of {{ b.total }}</span>
+                  <span class="text-[color:var(--text-secondary)] font-medium">{{ doneOf(b) }} of {{ b.total }}</span>
                   @if (b.counts.failed) { · <span class="text-crit-500">{{ b.counts.failed }} failed</span> }
                   @if (b.counts.queued) { · {{ b.counts.queued }} running }
                   @if (b.counts.skipped) { · {{ b.counts.skipped }} skipped }
+                  @if (b.counts.cancelled) { · {{ b.counts.cancelled }} cancelled }
                   @if (b.holdReason) { · <span [title]="b.holdReason">waiting</span> }
                 </div>
               </div>
@@ -172,6 +173,7 @@ export class Backfills implements OnInit {
 
   protected readonly statusWord = statusWord;
   protected readonly lookOf = lookOf;
+  protected readonly doneOf = doneOf;
   protected readonly durationText = durationText;
   protected readonly periodsText = periodsText;
   protected readonly isOpen = isOpen;

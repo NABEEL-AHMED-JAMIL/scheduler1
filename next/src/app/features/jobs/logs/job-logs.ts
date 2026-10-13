@@ -192,7 +192,8 @@ export class JobLogs implements OnInit, OnDestroy {
       startHint: run?.startTime ? this.clock.transform(run.startTime, 'dateTimeSec') ?? undefined : undefined,
       endHint: run?.endTime ? this.clock.transform(run.endTime, 'dateTimeSec') ?? undefined : undefined,
       duration: this.duration(),
-      startedBy: startedBy(run, this.job()),
+      // MIG-347: a backfill's run was started by its backfill, not the timetable.
+      startedBy: this.backfill() ? `Backfill #${this.backfill()!.backfillId}` : startedBy(run, this.job()),
       timeline: this.store.timeline(),
       cost: this.cost(),
     });

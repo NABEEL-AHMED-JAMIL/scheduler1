@@ -9,7 +9,7 @@ import { SegmentOption, Segmented } from '../../../shared/ui/segmented';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { valuesText } from '../../jobs/run-parameters/run-parameters';
 import {
-  Backfill, BackfillPeriod, BackfillsApi, STEP_WORDS, durationText, isOpen, lookOf, money, periodLabel, progressParts, refusalOf, statusWord,
+  Backfill, BackfillPeriod, BackfillsApi, STEP_WORDS, doneOf, durationText, isOpen, lookOf, money, periodLabel, progressParts, refusalOf, statusWord,
 } from './backfills.api';
 
 export interface BackfillDetailData {
@@ -51,13 +51,14 @@ type PeriodFilter = '' | 'FAILED' | 'QUEUED' | 'PENDING' | 'COMPLETED' | 'SKIPPE
             @if (lookOf(b.status); as l) {
               <span class="pill pill-{{ l.tone }}" data-test="backfill-status"><app-icon [name]="l.icon" size="0.85em" />{{ l.word }}</span>
             }
-            <span class="text-sm text-[color:var(--text-secondary)]">{{ b.done }} of {{ b.total }} done
+            <span class="text-sm text-[color:var(--text-secondary)]">{{ doneOf(b) }} of {{ b.total }} done
               @if (b.counts.failed) { · <span class="text-crit-500">{{ b.counts.failed }} failed</span> }
               @if (b.counts.queued) { · {{ b.counts.queued }} running }
-              @if (b.counts.skipped) { · {{ b.counts.skipped }} skipped }</span>
+              @if (b.counts.skipped) { · {{ b.counts.skipped }} skipped }
+              @if (b.counts.cancelled) { · {{ b.counts.cancelled }} cancelled }</span>
             @if (b.eta) { <span class="text-xs text-[color:var(--text-muted)] ml-auto">Ends in {{ durationText(b.eta.seconds) }}</span> }
           </div>
-          <div class="bf-bar" role="img" [attr.aria-label]="b.done + ' of ' + b.total + ' done'">
+          <div class="bf-bar" role="img" [attr.aria-label]="doneOf(b) + ' of ' + b.total + ' done'">
             <span class="bf-done" [style.width.%]="parts().completed"></span>
             <span class="bf-failed" [style.width.%]="parts().failed"></span>
             <span class="bf-running" [style.width.%]="parts().running"></span>
@@ -189,6 +190,7 @@ export class BackfillDetail implements OnInit {
 
   protected readonly statusWord = statusWord;
   protected readonly lookOf = lookOf;
+  protected readonly doneOf = doneOf;
   protected readonly money = money;
   protected readonly durationText = durationText;
   protected readonly valuesText = valuesText;

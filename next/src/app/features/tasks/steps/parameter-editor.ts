@@ -1,5 +1,7 @@
 import { Component, computed, input, output } from '@angular/core';
 import { Icon } from '../../../shared/ui/icon';
+import { DateField } from '../../../shared/ui/date-field';
+import { TimeField } from '../../../shared/ui/time-field';
 import { PARAMETER_TYPES, ParameterType, RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { Problem } from './steps.model';
 
@@ -15,7 +17,7 @@ export const MAX_PARAMETERS = 20;
  */
 @Component({
   selector: 'app-parameter-editor',
-  imports: [Icon],
+  imports: [Icon, DateField, TimeField],
   styles: `
     .param-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .param-table th { text-align: left; font-size: 11px; font-weight: 600; color: var(--text-muted); padding: 0 0.375rem 0.375rem; white-space: nowrap; }
@@ -56,6 +58,19 @@ export const MAX_PARAMETERS = 20;
                         <option value="">None</option>
                         @for (c of p.choices || []; track c) { <option [value]="c" [selected]="text(p.default) === c">{{ c }}</option> }
                       </select>
+                    }
+                    @case ('date') {
+                      <!-- The console's own date control: a day as 1 Jan 1900, never the browser's order. -->
+                      <app-date-field [label]="'Default of ' + (p.name || 'parameter')" [value]="text(p.default)" [clearable]="true"
+                                      [inactive]="disabled()" (valueChange)="setDefault(i, $event)" />
+                    }
+                    @case ('datetime') {
+                      <div class="flex gap-1">
+                        <app-date-field [label]="'Default day of ' + (p.name || 'parameter')" [value]="text(p.default).slice(0, 10)" [clearable]="true"
+                                        [inactive]="disabled()" (valueChange)="setDefault(i, $event ? $event + 'T' + (text(p.default).slice(11, 16) || '00:00') : '')" />
+                        <app-time-field [label]="'Default time of ' + (p.name || 'parameter')" [value]="text(p.default).slice(11, 16)" [inactive]="disabled()"
+                                        (valueChange)="text(p.default) && setDefault(i, text(p.default).slice(0, 10) + 'T' + ($event || '00:00'))" />
+                      </div>
                     }
                     @default {
                       <input class="input" [type]="inputType(p.type)" [value]="text(p.default)" [disabled]="disabled()"
@@ -118,7 +133,7 @@ export class ParameterEditor {
   }
 
   inputType(type: ParameterType): string {
-    return type === 'date' ? 'date' : type === 'datetime' ? 'datetime-local' : type === 'number' ? 'number' : 'text';
+    return type === 'number' ? 'number' : 'text';
   }
 
   add(): void {

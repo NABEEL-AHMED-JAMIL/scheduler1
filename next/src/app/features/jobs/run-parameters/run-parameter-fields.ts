@@ -1,6 +1,7 @@
 import { Component, computed, input, model } from '@angular/core';
 import { Field } from '../../../shared/ui/field';
 import { DateField } from '../../../shared/ui/date-field';
+import { TimeField } from '../../../shared/ui/time-field';
 import { ParameterValues, RunParameter, defaultText, parameterLabel, valueProblems } from './run-parameters';
 
 /**
@@ -10,7 +11,7 @@ import { ParameterValues, RunParameter, defaultText, parameterLabel, valueProble
  */
 @Component({
   selector: 'app-run-parameter-fields',
-  imports: [Field, DateField],
+  imports: [Field, DateField, TimeField],
   template: `
     <div class="form-grid" data-test="run-parameters">
       @for (p of parameters(); track p.name) {
@@ -22,8 +23,13 @@ import { ParameterValues, RunParameter, defaultText, parameterLabel, valueProble
                               [clearable]="!p.required" [inactive]="disabled()" (valueChange)="set(p.name, $event)" />
             }
             @case ('datetime') {
-              <input [id]="idPrefix() + '-' + p.name" class="input" type="datetime-local" step="60" [value]="values()[p.name] || ''"
-                     [disabled]="disabled()" (input)="set(p.name, $any($event.target).value)" />
+              <!-- A day and a 24-hour time, the console's own controls (never the browser's order or 12-hour clock). -->
+              <div class="flex flex-wrap gap-2">
+                <app-date-field [inputId]="idPrefix() + '-' + p.name" [label]="label(p)" [value]="dayOf(values()[p.name])"
+                                [inactive]="disabled()" (valueChange)="setDay(p.name, $event)" />
+                <app-time-field [label]="label(p)" [value]="timeOf(values()[p.name])" [inactive]="disabled()"
+                                (valueChange)="setTime(p.name, $event)" />
+              </div>
             }
             @case ('number') {
               <input [id]="idPrefix() + '-' + p.name" class="input" type="number" inputmode="decimal" [value]="values()[p.name] || ''"
@@ -79,5 +85,24 @@ export class RunParameterFields {
 
   set(name: string, value: string): void {
     this.values.update(v => ({ ...v, [name]: value }));
+  }
+
+  /** A date and time's day ("2026-10-01T09:30" -> "2026-10-01") and time ("09:30"). */
+  dayOf(value: string | undefined): string {
+    return (value ?? '').slice(0, 10);
+  }
+
+  timeOf(value: string | undefined): string {
+    return (value ?? '').slice(11, 16);
+  }
+
+  setDay(name: string, day: string): void {
+    const time = this.timeOf(this.values()[name]) || '00:00';
+    this.set(name, day ? `${day}T${time}` : '');
+  }
+
+  setTime(name: string, time: string): void {
+    const day = this.dayOf(this.values()[name]);
+    if (day) this.set(name, `${day}T${time || '00:00'}`);
   }
 }
