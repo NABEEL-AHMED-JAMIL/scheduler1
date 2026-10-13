@@ -34,9 +34,9 @@ export function reviewersWords(reviewers: StepApproval['reviewers'], groupNames:
   return name ? `the ${name} group` : 'the pipeline\'s reviewer group';
 }
 
-/** A span as a person says it, coarse enough to read at a glance: "under a minute", "45 min", "7 h", "2 d 17 h". */
+/** A span as a person says it, coarse enough to read at a glance (and to fit the strip): "<1 min", "45 min", "7 h", "2 d 17 h". */
 export function spanWords(ms: number): string {
-  if (!Number.isFinite(ms) || ms < 60_000) return 'under a minute';
+  if (!Number.isFinite(ms) || ms < 60_000) return '<1 min';
   const minutes = Math.floor(ms / 60_000);
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);

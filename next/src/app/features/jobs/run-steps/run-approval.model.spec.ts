@@ -40,7 +40,7 @@ describe('A run waiting at an Approval step', () => {
 
   it('says a span coarsely, and a moment next to now', () => {
     expect([spanWords(20_000), spanWords(45 * 60_000), spanWords(7 * HOUR + 5 * 60_000), spanWords(65 * HOUR), spanWords(48 * HOUR)])
-      .toEqual(['under a minute', '45 min', '7 h', '2 d 17 h', '2 d']);
+      .toEqual(['<1 min', '45 min', '7 h', '2 d 17 h', '2 d']);
     expect(fromNow(APPROVAL.requestedAt, NOW)).toBe('7 h ago');
     expect(fromNow(APPROVAL.expiresAt, NOW)).toBe('in 2 d 17 h');
     expect(fromNow(new Date(NOW - 10_000).toISOString(), NOW)).toBe('just now');

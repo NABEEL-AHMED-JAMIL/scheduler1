@@ -84,6 +84,8 @@ export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unkno
       .has-next .run-facts.is-wide { grid-template-columns: repeat(4, minmax(0, 1fr)); }
       .has-next .run-facts:not(.is-wide) .run-fact:nth-child(3n),
       .has-next .run-facts.is-wide .run-fact:nth-child(4n) { box-shadow: none; }
+      /* Seven facts four across: the last fills the row, so no empty cell is left beside it. */
+      .has-next .run-facts.is-wide .run-fact:last-child:nth-child(4n+3) { grid-column: span 2; }
       .has-next .run-facts:not(.is-wide) .run-fact:nth-child(n+4),
       .has-next .run-facts.is-wide .run-fact:nth-child(n+5) { border-top: 1px solid var(--border-subtle); }
     }
