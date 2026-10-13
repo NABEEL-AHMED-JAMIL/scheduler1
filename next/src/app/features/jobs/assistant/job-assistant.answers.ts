@@ -161,10 +161,10 @@ function scheduleSentence(facts: JobFacts): string {
   const s = facts.schedule;
   if (facts.execution === 'Manual') {
     return s
-      ? 'It runs only when someone triggers it — its stored timetable is held, and would resume if this job were set back to Auto.'
+      ? 'It runs only when someone triggers it — its stored timetable is held, and would resume if this schedule were set back to Auto.'
       : 'It runs only when someone triggers it — there is no schedule.';
   }
-  if (!s) return 'No schedule is attached to this job.';
+  if (!s) return 'No timetable is set for this schedule.';
   const at = s.startTime ? ` at ${clockTime(s.startTime)}` : '';
   const when = s.frequency === 'Cron'
     ? `on the cron schedule ${s.cronExpression ?? ''} (server time)`
@@ -210,8 +210,8 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
         blocks: [{
           kind: 'text',
           text: mentionedJobId
-            ? `I only know about job #${facts.jobId}. For job #${mentionedJobId}, open its own assistant.`
-            : `I only know about job #${facts.jobId} — "${facts.jobName}". I cannot answer about other jobs, tenants or users from here.`,
+            ? `I only know about schedule #${facts.jobId}. For schedule #${mentionedJobId}, open its own assistant.`
+            : `I only know about schedule #${facts.jobId} — "${facts.jobName}". I cannot answer about other schedules, workspaces or users from here.`,
         }],
       };
 
@@ -225,16 +225,16 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
         refused: true,
         blocks: [{
           kind: 'text',
-          text: `I can only read job #${facts.jobId}. Running, pausing, editing and deleting it are done from the job's own page — I cannot do them from here.`,
+          text: `I can only read schedule #${facts.jobId}. Running, pausing, editing and deleting it are done from the schedule's own page — I cannot do them from here.`,
         }],
       };
 
     case 'summary': {
       const rows = [
-        { label: 'Job', value: `#${facts.jobId} · ${facts.jobName}` },
+        { label: 'Schedule', value: `#${facts.jobId} · ${facts.jobName}` },
         { label: 'State', value: facts.jobStatus },
         { label: 'Runs how', value: facts.execution === 'Manual' ? 'On demand' : 'On a schedule' },
-        { label: 'Task', value: facts.taskName ?? '—' },
+        { label: 'Pipeline', value: facts.taskName ?? '—' },
         { label: 'Writes to', value: targetPath(facts) },
         { label: 'Runs recorded', value: String(stats.total) },
       ];
@@ -254,7 +254,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
     }
 
     case 'stats':
-      if (!stats.total) return { blocks: [{ kind: 'text', text: 'This job has never run, so there is nothing to count yet.' }] };
+      if (!stats.total) return { blocks: [{ kind: 'text', text: 'This schedule has never run, so there is nothing to count yet.' }] };
       return {
         blocks: [
           { kind: 'text', text: verdictSentence(stats) },
@@ -307,7 +307,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
     case 'failures': {
       const failed = runs.filter(r => r.jobStatus === 'Failed');
       if (!failed.length) {
-        return { blocks: [{ kind: 'text', text: `No run of this job has failed across ${stats.total} recorded ${stats.total === 1 ? 'run' : 'runs'}.` }] };
+        return { blocks: [{ kind: 'text', text: `No run of this schedule has failed across ${stats.total} recorded ${stats.total === 1 ? 'run' : 'runs'}.` }] };
       }
       // Grouped on the message with its run ids blanked: workers name the run in the message
       // ("run-7400", "#7400"), so no two were ever equal and "most common first" never grouped.
@@ -331,7 +331,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
     }
 
     case 'history':
-      if (!stats.total) return { blocks: [{ kind: 'text', text: 'This job has no recorded runs yet.' }] };
+      if (!stats.total) return { blocks: [{ kind: 'text', text: 'This schedule has no recorded runs yet.' }] };
       return {
         blocks: [
           { kind: 'text', text: `${stats.total} ${stats.total === 1 ? 'run' : 'runs'} recorded, most recent first.` },
@@ -342,7 +342,7 @@ export function answerFor(intent: Intent, facts: JobFacts, runs: JobRun[],
     case 'task':
       return {
         blocks: [
-          { kind: 'text', text: facts.taskName ? `This job runs the task "${facts.taskName}".` : 'No task is attached to this job.' },
+          { kind: 'text', text: facts.taskName ? `This schedule runs the pipeline "${facts.taskName}".` : 'No pipeline is attached to this schedule.' },
           {
             kind: 'facts',
             rows: [
@@ -400,7 +400,7 @@ export function runsToCsv(facts: JobFacts, runs: JobRun[]): string {
     if (isText && FORMULA_LEAD.test(text)) text = `'${text}`;
     return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
-  const header = ['Run', 'Job', 'Status', 'Queued', 'Started', 'Ended', 'Duration (s)', 'Message'];
+  const header = ['Run', 'Schedule', 'Status', 'Queued', 'Started', 'Ended', 'Duration (s)', 'Message'];
   const rows = runs.map(run => {
     const seconds = run.startTime && run.endTime
       ? Math.round(((new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000) * 10) / 10

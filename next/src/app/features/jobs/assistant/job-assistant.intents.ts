@@ -39,9 +39,9 @@ export type Intent =
  * The bare-hash pattern deliberately has no leading \b: '#' is not a word character, so a
  * boundary before it never matches and "#999" slipped through as an ordinary question.
  */
-const OTHER_JOB_ID = /\bjob\s*#?(\d+)\b|#(\d{3,})\b/i;
+const OTHER_JOB_ID = /\b(?:job|schedule)\s*#?(\d+)\b|#(\d{3,})\b/i;
 /** The plural alone counts: a question about "jobs" is a question about more than this one. */
-const FLEET_WORDS = /\b(all|other|every|another|each)\s+(jobs?|tasks?|tenants?|users?)\b|\bjobs\b/i;
+const FLEET_WORDS = /\b(all|other|every|another|each)\s+(jobs?|schedules?|tasks?|tenants?|workspaces?|users?)\b|\bjobs\b/i;
 /** Users and tenants are never this assistant's business, qualified or not. */
 const OTHER_SUBJECT = /\b(users?|tenants?|organisations?|organizations?|accounts?)\b/i;
 
@@ -62,8 +62,8 @@ const CAPABILITY = /^\s*(hi|hiya|hello|hey|yo|thanks|thank you|help|help me|what
  */
 const ACTION = new RegExp([
   '\\b(?:trigger|re-?run)\\b',
-  '\\b(?:run|start|stop|kill)\\s+(?:it|this|that|the\\s+job|now|again)\\b',
-  '\\b(?:delete|remove|disable|enable|rename|edit|modify|pause|resume|restart|cancel|abort)\\s+(?:it|this|that|the\\s+job)\\b',
+  '\\b(?:run|start|stop|kill)\\s+(?:it|this|that|the\\s+(?:job|schedule)|now|again)\\b',
+  '\\b(?:delete|remove|disable|enable|rename|edit|modify|pause|resume|restart|cancel|abort)\\s+(?:it|this|that|the\\s+(?:job|schedule))\\b',
 ].join('|'), 'i');
 
 /**
@@ -135,7 +135,7 @@ export interface PresetPrompt {
 
 /** The questions worth a single click, in the order someone tends to want them. */
 export const PRESETS: PresetPrompt[] = [
-  { id: 'summary',  label: 'Summary',      question: 'Summarise this job',            icon: 'file' },
+  { id: 'summary',  label: 'Summary',      question: 'Summarise this schedule',       icon: 'file' },
   { id: 'stats',    label: 'Quick stats',  question: 'Show the run statistics',       icon: 'chart' },
   { id: 'schedule', label: 'Schedule',     question: 'When does it run next?',        icon: 'clock' },
   { id: 'target',   label: 'Where it writes', question: 'Where does it write files?', icon: 'folder' },

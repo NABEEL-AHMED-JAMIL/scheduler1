@@ -56,10 +56,10 @@
                about what is on screen, and leaving the page to ask them lost that context. -->
           <!-- "Ask" alone below sm: the full label left the card heading cut to "Job &…" at
                phone width. The accessible name stays whole. -->
-          <button type="button" class="btn btn-default btn-sm shrink-0" aria-label="Ask about this job"
+          <button type="button" class="btn btn-default btn-sm shrink-0" aria-label="Ask about this schedule"
                   [class.btn-intent-ok]="assistantOpen()" [attr.aria-expanded]="assistantOpen()"
                   (click)="assistantOpen.set(!assistantOpen())">
-            <app-icon name="chat" /><span class="hidden sm:inline">Ask about this job</span><span class="sm:hidden">Ask</span>
+            <app-icon name="chat" /><span class="hidden sm:inline">Ask about this schedule</span><span class="sm:hidden">Ask</span>
           </button>
         }
 

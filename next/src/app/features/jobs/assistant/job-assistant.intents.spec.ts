@@ -142,7 +142,7 @@ describe('failures', () => {
 describe('csv export', () => {
   it('has a header and one row per run', () => {
     const lines = runsToCsv(facts, runs).split('\n');
-    expect(lines[0]).toContain('Run,Job,Status');
+    expect(lines[0]).toContain('Run,Schedule,Status');
     expect(lines).toHaveLength(runs.length + 1);
   });
 

@@ -18,8 +18,8 @@ import { JobAssistant } from './job-assistant';
          [style.height]="minimised() ? 'auto' : 'min(40rem, calc(100vh - 3rem))'">
       <div class="flex items-center gap-2 px-3.5 py-2.5 border-b shrink-0 border-subtle">
         <app-icon name="chat" size="0.95em" class="icon-info shrink-0" />
-        <span class="text-sm font-medium mr-auto truncate" [title]="jobName() || 'Job assistant'">
-          {{ jobName() || 'Job assistant' }}
+        <span class="text-sm font-medium mr-auto truncate" [title]="jobName() || 'Schedule assistant'">
+          {{ jobName() || 'Schedule assistant' }}
           <span class="text-[color:var(--text-muted)] font-normal">#{{ jobId() }}</span>
         </span>
         <!-- Never wraps or shrinks: on a phone the squeeze belongs to the truncating title, and
@@ -50,7 +50,7 @@ import { JobAssistant } from './job-assistant';
 })
 export class AssistantDock {
   readonly jobId = input.required<string>();
-  /** The job's name when the screen knows it; the panel falls back to "Job assistant". */
+  /** The job's name when the screen knows it; the panel falls back to "Schedule assistant". */
   readonly jobName = input('');
   /** Owned by the screen, so opening the panel on another job can show it expanded again. */
   readonly minimised = model(false);

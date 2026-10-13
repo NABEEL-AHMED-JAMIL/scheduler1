@@ -14,27 +14,31 @@
           Answers about schedule #{{ jobId() }} only, built from its own record and runs.
         </p>
       </div>
-      <div class="flex items-center gap-2">
-        <!-- Bordered rather than ghost: these are real actions, and a ghost button in a page
-             header reads as a caption. Not brand-filled -- they are secondary to asking. -->
-        <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
-                [title]="runs().length ? 'Download this job\'s runs as CSV' : 'There are no runs to export yet'"
-                (click)="exportRuns('csv')">
-          <app-icon name="download" />CSV
-        </button>
-        <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
-                [title]="runs().length ? 'Download this job\'s runs as an Excel workbook' : 'There are no runs to export yet'"
-                (click)="exportRuns('xlsx')">
-          <app-icon name="table" [busy]="exporting() === 'xlsx'" />
-          {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
-        </button>
-      </div>
+      <!-- UX final SAS1: the run exports appear once there is an answer on the page -- before it they sat beside the
+           title as if they were what the page was for. -->
+      @if (turns().length) {
+        <div class="flex items-center gap-2" data-test="exports">
+          <!-- Bordered rather than ghost: these are real actions, and a ghost button in a page
+               header reads as a caption. Not brand-filled -- they are secondary to asking. -->
+          <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+                  [title]="runs().length ? 'Download this schedule\'s runs as CSV' : 'There are no runs to export yet'"
+                  (click)="exportRuns('csv')">
+            <app-icon name="download" />CSV
+          </button>
+          <button type="button" class="btn btn-default btn-sm" [disabled]="!runs().length || exporting()"
+                  [title]="runs().length ? 'Download this schedule\'s runs as an Excel workbook' : 'There are no runs to export yet'"
+                  (click)="exportRuns('xlsx')">
+            <app-icon name="table" [busy]="exporting() === 'xlsx'" />
+            {{ exporting() === 'xlsx' ? 'Building…' : 'Excel' }}
+          </button>
+        </div>
+      }
     </div>
   </app-page-header>
 
   @if (loading()) {
     <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
-      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Reading the job…
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Reading the schedule…
     </div>
   } @else if (error()) {
     <div class="card p-10 text-center">
@@ -48,15 +52,13 @@
          reading happen in the same place. In a panel the presets become one scrolling row
          rather than a wrapping block that eats a third of the height. -->
     <div class="card shrink-0" [class.p-4]="!compact()" [class.p-2.5]="compact()">
-      <div class="flex items-center gap-2"
-           [class.mb-3]="!compact()" [class.mb-2]="compact()">
-        <div class="search-field flex-1">
-          <app-icon name="chat" size="0.95em" />
-          <input class="input" [value]="question()" aria-label="Ask about this job"
-                 placeholder="Ask about this job — its schedule, files, failures or history"
-                 (input)="question.set($any($event.target).value)"
-                 (keydown.enter)="ask(question())" />
-        </div>
+      <!-- UX final SAS1: the shared composer the AI Assistant, Ask your data and the file chat use (.chat-composer):
+           the box, then its actions at its foot, right. Enter asks; Shift+Enter starts a new line. -->
+      <div class="chat-composer" data-test="chat-composer" [class.mb-3]="!compact()" [class.mb-2]="compact()">
+        <textarea class="input text-sm" [rows]="compact() ? 1 : 2" [value]="question()" aria-label="Ask about this schedule"
+                  placeholder="Ask about this schedule — when it runs, its files, failures or history"
+                  (input)="question.set($any($event.target).value)"
+                  (keydown)="onComposerKey($event)"></textarea>
         @if (voiceSupported) {
           <button type="button" class="btn btn-ghost btn-icon btn-sm"
                   [class.btn-intent-crit]="listening()"
@@ -66,7 +68,7 @@
             <app-icon [name]="listening() ? 'stop' : 'mic'" [class.pulse]="listening()" />
           </button>
         }
-        <button type="button" class="btn btn-primary btn-sm"
+        <button type="button" class="btn btn-primary btn-sm" data-test="chat-send"
                 [disabled]="!question().trim() || asking()"
                 (click)="ask(question())">
           <app-icon name="send" [busy]="asking()" />{{ asking() ? 'Asking…' : 'Ask' }}
@@ -77,18 +79,24 @@
            with no provider at all; the agent is what picks up the questions those patterns do
            not match, so with none configured there is nothing here to choose. -->
       @if (agents().length) {
-        <div class="flex items-center gap-2 mb-2.5">
-          <!-- G11, SAS1: says what the picker does, as a label rather than small caps. -->
+        <!-- UX final SAS1 (was "ANYTHING ELSE, ASK [picker]"): a labelled control that says what it does -- the
+             buttons answer from the schedule's own record, and a question they do not cover goes to the prompt
+             chosen here. -->
+        <div class="flex flex-wrap items-center gap-x-2 gap-y-1 mb-2.5" data-test="agent-picker">
           <label class="text-sm font-medium text-[color:var(--text-primary)]"
-                 [attr.for]="'assistant-agent-' + jobId()">Ask with a saved prompt</label>
-          <select class="input max-w-52 shrink-0" [attr.id]="'assistant-agent-' + jobId()"
+                 [attr.for]="'assistant-agent-' + jobId()">Other questions are answered by</label>
+          <select class="input max-w-64 shrink-0" [attr.id]="'assistant-agent-' + jobId()"
+                  [attr.aria-describedby]="'assistant-agent-help-' + jobId()"
                   [value]="agentId()"
                   (change)="agentId.set(+$any($event.target).value || null)">
             @for (agent of agents(); track agent.aiAgentId) {
               <option [value]="agent.aiAgentId">{{ agent.agentName }}</option>
             }
-            <option [value]="0">No AI — answers from the job's own data</option>
+            <option [value]="0">No AI — only this schedule's own record</option>
           </select>
+          <span class="text-xs text-[color:var(--text-muted)] basis-full" [attr.id]="'assistant-agent-help-' + jobId()">
+            The buttons below answer from this schedule's record and runs. A question they do not cover goes to the saved prompt chosen here.
+          </span>
         </div>
       }
 
@@ -116,10 +124,10 @@
            [class.px-4]="compact()" [class.py-8]="compact()">
         <app-icon name="chat" [size]="compact() ? '1.4em' : '1.8em'" class="icon-muted" />
         <p class="mt-2 text-sm text-[color:var(--text-secondary)]">
-          Ask about job #{{ f.jobId }}, or pick a question above.
+          Ask about schedule #{{ f.jobId }}, or pick a question above.
         </p>
         <p class="mt-1 text-xs text-[color:var(--text-muted)]">
-          This job alone — schedule, storage, runs, failures and statistics.
+          This schedule alone — when it runs, where it writes, its runs, failures and statistics.
         </p>
       </div>
     }
@@ -163,7 +171,7 @@
                   <p class="text-sm leading-relaxed whitespace-pre-wrap">{{ block.text }}</p>
                   <p class="text-[11px] text-[color:var(--text-muted)] mt-2 flex items-center gap-1">
                     <app-icon name="chat" size="0.85em" />
-                    Answered by {{ block.agent }} — generated, not read from the job record.
+                    Answered by {{ block.agent }} — generated, not read from the schedule's record.
                   </p>
                 </div>
               }
@@ -196,7 +204,7 @@
                 @if (slowestRuns().length) {
                   <div class="rounded-lg border p-3 border-subtle">
                     <h3 class="chart-title">Slowest runs</h3>
-                    <p class="chart-sub">Where this job spent the most time.</p>
+                    <p class="chart-sub">Where this schedule's runs spent the most time.</p>
                     <app-ranked-bar [data]="slowestRuns()" [max]="6" [showPercent]="false" [sorted]="false" />
                   </div>
                 }

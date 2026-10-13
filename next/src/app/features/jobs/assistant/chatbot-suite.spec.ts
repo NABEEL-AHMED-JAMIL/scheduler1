@@ -177,7 +177,7 @@ describe('assistant export', () => {
   });
 
   it('emits a header even when there are no runs', () => {
-    expect(runsToCsv(facts, []).split('\n')[0]).toContain('Run,Job,Status');
+    expect(runsToCsv(facts, []).split('\n')[0]).toContain('Run,Schedule,Status');
   });
 
   it('keeps the job name intact when it contains a comma', () => {

@@ -248,7 +248,7 @@ describe('QA — answer content', () => {
   it('says plainly that nothing has failed', () => {
     const clean = runs.filter(r => r.jobStatus !== 'Failed');
     expect(textOf(answerFor('failures', facts, clean).blocks))
-      .toMatch(/no run of this job has failed across 2 recorded runs/i);
+      .toMatch(/no run of this schedule has failed across 2 recorded runs/i);
   });
 
   // 49. Every intent the classifier can produce must have an answer. A new Intent added without
@@ -430,5 +430,73 @@ describe('QA — the assistant component', () => {
     // including the second job load that used to follow it.
     http.match(r => r.url.includes('fetchAllAgents')).forEach(r => r.flush(ok([])));
     http.verify({ ignoreCancelled: true });
+  });
+});
+
+// =============================================================================================
+// 6. UX final SAS1: the shared composer, exports once there is an answer, the agent picker in words
+// =============================================================================================
+describe('Schedule assistant layout (UX final SAS1)', () => {
+  let http: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
+    });
+    http = TestBed.inject(HttpTestingController);
+  });
+
+  function mount() {
+    const fixture = TestBed.createComponent(JobAssistant);
+    fixture.componentRef.setInput('jobId', String(JOB));
+    fixture.detectChanges();
+    http.expectOne(r => r.url.includes('fetchSourceJobDetailWithSourceJobId'))
+      .flush(ok({ jobId: JOB, jobName: facts.jobName, jobStatus: 'Active', execution: 'Manual',
+                  priority: 1, taskDetail: { taskName: facts.taskName, bucket: facts.bucket } }));
+    http.expectOne(r => r.url.includes('fetchSourceJobQueueListWithJobId')).flush(ok({ jobQueues: runs }));
+    http.expectOne(r => r.url.includes('fetchAllAgents')).flush(ok([{ aiAgentId: 1022, agentName: 'Vision Assistant' }]));
+    fixture.detectChanges();
+    return { fixture, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('asks from the shared chat composer: Enter asks, Shift+Enter does not', () => {
+    const { fixture, component, el } = mount();
+    const box = el.querySelector<HTMLTextAreaElement>('[data-test="chat-composer"] textarea')!;
+    expect(box.getAttribute('aria-label')).toBe('Ask about this schedule');
+    expect(el.querySelector('[data-test="chat-composer"] [data-test="chat-send"]')).not.toBeNull();
+    component.question.set('when does it run next?');
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, cancelable: true }));
+    expect(component.turns().length).toBe(0);
+    box.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', cancelable: true }));
+    fixture.detectChanges();
+    expect(component.turns().length).toBe(1);
+  });
+
+  it('shows CSV and Excel only once there is an answer', () => {
+    const { fixture, component, el } = mount();
+    expect(el.querySelector('[data-test="exports"]')).toBeNull();
+    component.askPreset('summary', 'Summarise this schedule');
+    fixture.detectChanges();
+    const exports = el.querySelector('[data-test="exports"]')!;
+    expect(exports.textContent).toContain('CSV');
+    expect(exports.textContent).toContain('Excel');
+  });
+
+  it('labels the saved-prompt picker with what it does, and speaks of the schedule, not the job', () => {
+    const { el } = mount();
+    const picker = el.querySelector('[data-test="agent-picker"]')!;
+    expect(picker.querySelector('label')!.textContent!.trim()).toBe('Other questions are answered by');
+    expect(picker.textContent).toContain('A question they do not cover goes to the saved prompt chosen here.');
+    expect(el.textContent).not.toMatch(/ANYTHING ELSE/i);
+    expect(el.textContent!.replace(/\s+/g, ' ')).toContain(`Ask about schedule #${JOB}, or pick a question above.`);
+    // The schedule's own name may say 'job' (this one does); none of the page's own words do.
+    expect(el.textContent!.split(facts.jobName).join('')).not.toMatch(/\bjob\b/i);
+  });
+
+  it('answers out of scope and refused actions about the schedule', () => {
+    expect(answerFor('out-of-scope', facts, runs, 12).blocks[0]).toMatchObject({ text: `I only know about schedule #${JOB}. For schedule #12, open its own assistant.` });
+    expect((answerFor('action', facts, runs).blocks[0] as { text: string }).text).toContain(`I can only read schedule #${JOB}.`);
+    expect(classify('what about schedule 12?', JOB)).toEqual({ intent: 'out-of-scope', mentionedJobId: 12 });
+    expect(classify('compare all schedules', JOB).intent).toBe('out-of-scope');
   });
 });

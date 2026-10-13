@@ -186,12 +186,12 @@ describe('Run history and assistant dock on a phone', () => {
     expect(tag).toContain('shrink-0');
   });
 
-  it('shortens "Ask about this job" below sm so the card heading is not cut to "Job &…"', async () => {
+  it('shortens "Ask about this schedule" below sm so the card heading is not cut to "Job &…"', async () => {
     const source = await read('history/job-history.html');
     const at = source.indexOf('<app-icon name="chat" />');
     const button = source.slice(source.lastIndexOf('<button', at), source.indexOf('</button>', at));
-    expect(button).toContain('aria-label="Ask about this job"');
-    expect(button).toMatch(/<span class="hidden sm:inline">Ask about this job<\/span>/);
+    expect(button).toContain('aria-label="Ask about this schedule"');
+    expect(button).toMatch(/<span class="hidden sm:inline">Ask about this schedule<\/span>/);
     expect(button).toMatch(/<span class="sm:hidden">Ask<\/span>/);
   });
 });

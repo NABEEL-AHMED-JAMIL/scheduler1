@@ -255,7 +255,7 @@
                   <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'edit']"><app-icon name="edit" />Edit</a>
                   <a cdkMenuItem class="menu-item" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']"><app-icon name="clock" />Executions</a>
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAssistant(job)">
-                    <app-icon name="chat" />Ask about this job
+                    <app-icon name="chat" />Ask about this schedule
                   </button>
                   @if (!locked()) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="clone(job)">

@@ -96,7 +96,7 @@ export const PINNED: Record<string, unknown> = {
       "Runs (1 of 1)"
     ],
     "buttons": [
-      "Ask about this job",
+      "Ask about this schedule",
       "Collapse job detail",
       "Columns",
       "Completed 1",
@@ -364,8 +364,6 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Ask",
-      "CSV",
-      "Excel",
       "Failures",
       "Quick stats",
       "Recent runs",
@@ -375,9 +373,9 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "Ask about this job",
-      "Ask about this job — its schedule, files, failures or history",
-      "Ask with a saved prompt"
+      "Ask about this schedule",
+      "Ask about this schedule — when it runs, its files, failures or history",
+      "Other questions are answered by"
     ],
     "links": [
       "/pipelines",
@@ -497,7 +495,7 @@ export const PINNED: Record<string, unknown> = {
   "the row menu, as a tenant user with five pages": {
     "headings": [],
     "buttons": [
-      "Ask about this job",
+      "Ask about this schedule",
       "Deactivate",
       "Delete",
       "Duplicate",
@@ -518,7 +516,7 @@ export const PINNED: Record<string, unknown> = {
       "Skip next run",
       "Edit",
       "Executions",
-      "Ask about this job",
+      "Ask about this schedule",
       "Duplicate",
       "Email notifications 3",
       "Deactivate",
@@ -528,7 +526,7 @@ export const PINNED: Record<string, unknown> = {
   "the row menu, as a workspace administrator": {
     "headings": [],
     "buttons": [
-      "Ask about this job",
+      "Ask about this schedule",
       "Deactivate",
       "Delete",
       "Duplicate",
@@ -549,7 +547,7 @@ export const PINNED: Record<string, unknown> = {
       "Skip next run",
       "Edit",
       "Executions",
-      "Ask about this job",
+      "Ask about this schedule",
       "Duplicate",
       "Email notifications 3",
       "Deactivate",
