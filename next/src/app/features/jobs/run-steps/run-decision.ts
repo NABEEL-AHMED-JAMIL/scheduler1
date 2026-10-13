@@ -79,7 +79,7 @@ export type DecisionRoute =
             @switch (route().by) {
               @case ('none') {
                 <p class="text-sm text-[color:var(--text-secondary)]" data-test="who-decides">{{ noneWhy() }}</p>
-                @if (canOpenInbox()) { <a class="link-inline text-sm self-start" routerLink="/workflows/inbox">Open the Task inbox</a> }
+                @if (canOpenInbox()) { <a class="link-inline text-sm self-start" routerLink="/review/approvals">Open Review › Approvals</a> }
               }
               @default {
                 <label class="flex flex-col gap-1 mt-auto">
@@ -98,7 +98,7 @@ export type DecisionRoute =
                 }
                 <!-- Reject, then Approve: the primary is rightmost (review G3). -->
                 @if (route().by === 'task') {
-                  <p class="text-xs text-[color:var(--text-muted)]">Recorded as your Task inbox decision.</p>
+                  <p class="text-xs text-[color:var(--text-muted)]">Recorded as your decision in Review › Approvals.</p>
                 }
                 <div class="flex flex-wrap items-center justify-end gap-2" data-test="decision-buttons">
                   <button type="button" class="btn btn-default btn-sm" data-test="reject" [disabled]="busy()" (click)="reject()">
@@ -153,7 +153,7 @@ export class RunDecision {
     const why = route.by === 'none' ? route.why : null;
     // Core's sentence is for a person who may decide somewhere; one with no task about this run is told plainly.
     return why && /Task inbox/.test(why) && !this.canOpenInbox()
-      ? 'The pipeline\'s reviewers decide this in their Task inbox.' : why || 'The pipeline\'s reviewers decide this in their Task inbox.';
+      ? 'The pipeline\'s reviewers decide this in Review.' : why || 'The pipeline\'s reviewers decide this in Review.';
   });
 
   constructor() {

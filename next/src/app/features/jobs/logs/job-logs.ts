@@ -47,7 +47,7 @@ interface AuditLog {
 /**
  * The trail to a run, from the menu's tree (run page polish 2026-10-12): Build › Pipelines › Schedules & triggers › <the
  * schedule's runs> for whoever may open Schedules; Run & review › Runs for a reader who holds only the runs (a reviewer);
- * else Run & review › Review inbox. The page header adds "Run #8298".
+ * else Run & review › Review › Runs. The page header adds "Run #8298".
  */
 export function runTrail(jobId: string, jobName: string | null | undefined, can: { schedules: boolean; runs: boolean; inbox: boolean }): Crumb[] {
   const above = (url: string) => crumbsFor(url, 'here').slice(0, -1);
@@ -56,7 +56,7 @@ export function runTrail(jobId: string, jobName: string | null | undefined, can:
       { label: jobName ? `${jobName} · runs` : 'Schedule runs', link: `/pipelines/schedules/${jobId}/executions` }];
   }
   if (can.runs) return above('/runs/run');
-  return can.inbox ? above('/workflows/inbox/run') : [{ label: 'Run & review' }];
+  return can.inbox ? above('/review/runs/run') : [{ label: 'Run & review' }];
 }
 
 /** UX review R3: the boards a schedule's outputs feed (analytics lists the schedules behind each board), by name. */

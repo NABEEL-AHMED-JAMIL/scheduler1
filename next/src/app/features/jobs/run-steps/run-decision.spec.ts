@@ -71,7 +71,7 @@ describe('Run page: Next steps', () => {
       refusal: 'Only a tenant administrator can approve or reject a run\'s results here; the pipeline\'s reviewers decide it in the Task inbox.' }),
       tasks: [TASK] });
     expect(api.forSubject).toHaveBeenCalledWith('pipeline-run:8209');
-    expect(el.textContent).toContain('Recorded as your Task inbox decision.');
+    expect(el.textContent).toContain('Recorded as your decision in Review › Approvals.');
     click('approve');
     expect(api.act).toHaveBeenCalledWith(1121, 'approve', null, '1121:approve:run-page');
     expect(post).not.toHaveBeenCalled();

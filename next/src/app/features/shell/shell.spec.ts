@@ -56,11 +56,11 @@ describe('shell navigation', () => {
       '/ai/assistant', '/connections/api-collections', '/connections/connectors', '/connections/contracts',
       '/connections/databases', '/connections/sources', '/data/analytics', '/data/analytics/dashboards', '/data/ask',
       '/data/catalog', '/data/files', '/data/reports', '/developers/portal', '/documents/datasets', '/documents/email-in',
-      '/documents/file-drop', '/documents/in', '/documents/review', '/documents/types', '/forms/builder', '/forms/submissions',
-      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/runs/analytics', '/runs/backfills', '/runs/by-date', '/runs/failed',
+      '/documents/file-drop', '/documents/in', '/documents/types', '/forms/builder', '/forms/submissions',
+      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/review/all', '/review/approvals', '/review/documents',
+      '/review/requests', '/review/runs', '/runs/analytics', '/runs/backfills', '/runs/by-date', '/runs/failed',
       '/runs/latest',
-      '/settings/tools', '/tools/converter', '/tools/transcript', '/workflows/designer', '/workflows/inbox',
-      '/workflows/requests',
+      '/settings/tools', '/tools/converter', '/tools/transcript', '/workflows/designer',
     ]);
     expect(HUBS.every(hub => !('pageKey' in hub && hub.pageKey) && !('pageKeys' in hub && hub.pageKeys))).toBe(true);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();

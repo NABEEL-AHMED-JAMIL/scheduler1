@@ -102,7 +102,7 @@ describe('DocumentIntelligence -- overview', () => {
     expect(Object.fromEntries(screen.kpis().map(k => [k.label, k.value]))).toEqual({
       Documents: 5, 'Auto-approved': '50%', 'In review': 2, 'Field accuracy': '45%',
     });
-    expect(screen.kpis().find(k => k.label === 'In review')?.link).toBe('/documents/review');
+    expect(screen.kpis().find(k => k.label === 'In review')?.link).toBe('/review/documents');
   });
 
   it('shows the active types with their documents, and a custom type for an administrator', async () => {
@@ -180,7 +180,7 @@ describe('DocumentIntelligence -- overview', () => {
       ['ocr-live-check.png', 'In review'], ['ocr-live-check.png', 'Approved'], ['second.png', 'Read'],
     ]);
     const recent = el.querySelector('[data-test="recent"]')!;
-    expect(recent.querySelector('a')?.getAttribute('href')).toBe('/documents/review/1005');
+    expect(recent.querySelector('a')?.getAttribute('href')).toBe('/review/documents/1005');
     expect(recent.textContent).toContain('4 to check');
     expect(recent.textContent).toContain('Not extracted');
   });
@@ -205,7 +205,7 @@ describe('DocumentIntelligence -- overview', () => {
     expect(opened[0].component).toBe(ReadDocumentDialog);
     expect((opened[0].data as { types: DocumentType[] }).types).toHaveLength(3);
     expect(api.extractions).toHaveBeenCalledTimes(2);
-    expect(router.navigate).toHaveBeenCalledWith(['/documents/review', 1020]);
+    expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1020]);
   });
 
   it('extracts a read again as the type it was', async () => {
@@ -273,7 +273,7 @@ describe('DocumentIntelligence -- intake', () => {
     const table = el.querySelector('[data-test="intake"]')!;
     expect(table.textContent).toContain('Email from bob@supplier.example: March');
     expect(table.textContent).toContain('The same file as document 1010');
-    expect(table.querySelector('a')?.getAttribute('href')).toBe('/documents/review/1020');
+    expect(table.querySelector('a')?.getAttribute('href')).toBe('/review/documents/1020');
     screen.pickChannel('email');
     expect(api.intakes).toHaveBeenLastCalledWith('email');
   });

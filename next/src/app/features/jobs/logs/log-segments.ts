@@ -38,8 +38,8 @@ export function nameIds(segments: LogSegment[], names: LogNames | null | undefin
       else if (request && names.requests.has(request)) {
         out.push({ text: text + segment.text.slice(from, match.index) });
         text = '';
-        out.push({ text: whole, link: { url: '/workflows/inbox', query: { task: String(names.requests.get(request)!.taskId) },
-          title: 'Open this request in your Review inbox' } });
+        out.push({ text: whole, link: { url: '/review/approvals', query: { task: String(names.requests.get(request)!.taskId) },
+          title: 'Open this request in Review › Approvals' } });
         from = match.index! + whole.length;
         continue;
       }

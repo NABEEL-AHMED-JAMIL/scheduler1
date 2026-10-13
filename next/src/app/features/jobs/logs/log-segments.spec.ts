@@ -61,7 +61,7 @@ describe('nameIds', () => {
   it('puts the group\'s name for its id, and links the request to the reader\'s task', () => {
     expect(nameIds([{ text: LINE }], NAMES)).toEqual([
       { text: 'Step 2/3 <approve> (approval) waits for approval by the Reviewer group (' },
-      { text: 'request 1006', link: { url: '/workflows/inbox', query: { task: '1136' }, title: 'Open this request in your Review inbox' } },
+      { text: 'request 1006', link: { url: '/review/approvals', query: { task: '1136' }, title: 'Open this request in Review › Approvals' } },
       { text: '): Approve 3 bulk-review test rows of run 8298' },
     ]);
   });

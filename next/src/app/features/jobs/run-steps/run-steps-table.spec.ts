@@ -161,7 +161,7 @@ describe('Run page: an Approval step (MIG-346)', () => {
     const row = el.querySelector<HTMLElement>('[data-step="approve"]')!;
     expect(row.querySelector('[data-test="step-waiting-approval"]')?.textContent).toContain('Waiting for approval');
     expect(row.querySelector('app-status')).toBeNull();
-    expect(row.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the workspace administrators in their Review inbox, until');
+    expect(row.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the workspace administrators in Review, until');
   });
 
   it('says who approved, with their picture, and what they said', () => {

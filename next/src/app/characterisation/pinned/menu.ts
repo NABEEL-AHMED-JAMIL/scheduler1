@@ -10,14 +10,13 @@ export const PINNED: Record<string, unknown> = {
     "Build › AI Assistant — Describe a pipeline in plain language and run it -> /ai/assistant",
     "Build › Approval workflows — Who approves what, and what runs after -> /workflows/designer",
     "Run & review › Runs — Recent runs, runs by date, how they measure up, and the ones that failed -> /runs",
-    "Run & review › Review inbox — Approvals and reviews waiting for you or your groups -> /workflows/inbox",
-    "Run & review › Document review — Check the fields a document was least sure of -> /documents/review",
+    "Run & review › Review — Approvals, run results and documents waiting for your decision -> /review",
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Tools — Convert documents, and turn speech into text -> /tools",
     "Administration & billing › Administration — Users, page access, sign-in security, data policies and appearance -> /administration",
     "Administration & billing › Billing — What the workspace used, what it costs, and its bills -> /billing",
-    "Administration & billing › Settings — Models, tools, tasks, Kafka, the values a task reads, and alerts -> /settings",
+    "Administration & billing › Settings — Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts -> /settings",
     "Administration & billing › Developers — Your systems on the API, and its reference -> /developers"
   ],
   "the menu for a tenant user with every page": [
@@ -30,7 +29,7 @@ export const PINNED: Record<string, unknown> = {
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Tools — Convert documents, and turn speech into text -> /tools",
-    "Administration & billing › Settings — Models, tools, tasks, Kafka, the values a task reads, and alerts -> /settings"
+    "Administration & billing › Settings — Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts -> /settings"
   ],
   "the menu for a tenant user with five pages (api-check TU)": [
     "Home -> /dashboard",
@@ -51,14 +50,13 @@ export const PINNED: Record<string, unknown> = {
     "Build › AI Assistant — Describe a pipeline in plain language and run it -> /ai/assistant",
     "Build › Approval workflows — Who approves what, and what runs after -> /workflows/designer",
     "Run & review › Runs — Recent runs, runs by date, how they measure up, and the ones that failed -> /runs",
-    "Run & review › Review inbox — Approvals and reviews waiting for you or your groups -> /workflows/inbox",
-    "Run & review › Document review — Check the fields a document was least sure of -> /documents/review",
+    "Run & review › Review — Approvals, run results and documents waiting for your decision -> /review",
     "See results › Dashboards — Boards of tiles over your pipelines' results -> /data/analytics/dashboards",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data",
     "See results › Tools — Convert documents, and turn speech into text -> /tools",
     "Administration & billing › Administration — Users, page access, sign-in security, data policies and appearance -> /administration",
     "Administration & billing › Billing — What the workspace used, what it costs, and its bills -> /billing",
-    "Administration & billing › Settings — Models, tools, tasks, Kafka, the values a task reads, and alerts -> /settings",
+    "Administration & billing › Settings — Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts -> /settings",
     "Administration & billing › Developers — Your systems on the API, and its reference -> /developers"
   ]
 };

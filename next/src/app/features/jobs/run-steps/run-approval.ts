@@ -63,7 +63,7 @@ import { approvalRoute, fromNow, reviewersWords } from './run-approval.model';
                         (input)="comment.set($any($event.target).value)"></textarea>
               @if (needsReason()) { <span class="field-note text-[color:var(--crit-text)]" role="alert">Say why, then press Reject again.</span> }
             </label>
-            <p class="text-xs text-[color:var(--text-muted)]">Recorded as your Review inbox decision. Rejected, the run fails.</p>
+            <p class="text-xs text-[color:var(--text-muted)]">Recorded as your decision in Review › Approvals. Rejected, the run fails.</p>
             <!-- Reject, then Approve: the primary is rightmost, as the run review's decision is. -->
             <div class="flex flex-wrap items-center justify-end gap-2" data-test="approval-buttons">
               <button type="button" class="btn btn-default btn-sm" data-test="approval-reject" [disabled]="busy()" (click)="reject()">
@@ -73,8 +73,8 @@ import { approvalRoute, fromNow, reviewersWords } from './run-approval.model';
             </div>
           }
           @case ('inbox') {
-            <a class="link-inline inline-flex items-center gap-1 text-sm self-start mt-auto" routerLink="/workflows/inbox" data-test="approval-inbox">
-              <app-icon name="inbox" size="0.95em" />Open the Review inbox</a>
+            <a class="link-inline inline-flex items-center gap-1 text-sm self-start mt-auto" routerLink="/review/approvals" data-test="approval-inbox">
+              <app-icon name="inbox" size="0.95em" />Open Review › Approvals</a>
           }
         }
       </section>

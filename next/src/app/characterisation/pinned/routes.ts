@@ -372,24 +372,6 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/documents/review",
-      "title": "Document review",
-      "pageKey": "document-review",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/documents/review/:extractionId",
-      "title": "Review a document",
-      "pageKey": "document-review",
-      "guards": [
-        "pageGuard"
-      ],
-      "lazy": true
-    },
-    {
       "path": "/tools/converter",
       "title": "Document Converter",
       "pageKey": "tools-converter",
@@ -502,8 +484,16 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/workflows/inbox",
-      "title": "Review inbox",
+      "path": "/review/all",
+      "title": "Review",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/review/approvals",
+      "title": "Approvals",
       "pageKey": "task-inbox",
       "guards": [
         "pageGuard"
@@ -511,9 +501,36 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/workflows/requests",
+      "path": "/review/requests",
       "title": "My requests",
       "pageKey": "task-inbox",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/review/runs",
+      "title": "Runs to review",
+      "pageKey": "task-inbox",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/review/documents",
+      "title": "Document review",
+      "pageKey": "document-review",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/review/documents/:extractionId",
+      "title": "Review a document",
+      "pageKey": "document-review",
       "guards": [
         "pageGuard"
       ],
@@ -867,6 +884,11 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
+      "path": "/review",
+      "guards": [],
+      "lazy": false
+    },
+    {
       "path": "/data",
       "guards": [],
       "lazy": false
@@ -898,6 +920,30 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/platform",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/workflows/inbox",
+      "redirectTo": "review/approvals",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/workflows/requests",
+      "redirectTo": "review/requests",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/review",
+      "redirectTo": "review/documents",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/review/:extractionId",
+      "redirectTo": "review/documents/:extractionId",
       "guards": [],
       "lazy": false
     },
@@ -1692,6 +1738,14 @@ export const PINNED: Record<string, unknown> = {
     "lands": "/data/reports",
     "heading": "Generated reports"
   },
+  "old address /documents/review": {
+    "lands": "/review/documents",
+    "heading": "Document review"
+  },
+  "old address /documents/review/:extractionId": {
+    "lands": "/review/documents/:extractionId",
+    "heading": "Document"
+  },
   "old address /documents/transcript": {
     "lands": "/tools/transcript",
     "heading": "Audio Transcript"
@@ -1903,5 +1957,13 @@ export const PINNED: Record<string, unknown> = {
   "old address /tasks/new": {
     "lands": "/pipelines/new",
     "heading": "New pipeline"
+  },
+  "old address /workflows/inbox": {
+    "lands": "/review/approvals",
+    "heading": "Approvals"
+  },
+  "old address /workflows/requests": {
+    "lands": "/review/requests",
+    "heading": "Approvals"
   }
 };

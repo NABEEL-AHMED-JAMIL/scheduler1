@@ -9,6 +9,7 @@ import { EMPTY } from 'rxjs';
 import { routes } from '../app.routes';
 import { JobEventsService } from '../core/socket/job-events.service';
 import { fixtureFor } from './fixtures';
+import { BADGE_READ } from '../features/review/review-sources';
 
 /**
  * The characterisation harness (MIG-222 Wave 4, MIG-266 Wave 5).
@@ -207,7 +208,9 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
         const described = describeRequest(req);
         // The top bar's picture is the shell's, not the screen's, and when it is asked for depends on the image's own
         // timing: recorded, it moved about the list between runs (2026-10-12). It is answered and left out of the pin.
-        if (!SHELL_PICTURE.test(described)) {
+        // So are the reads behind the menu's Review badge (DR2, 2026-10-13): the shell's, made when their lazily loaded
+        // file arrives, so they too moved about the list.
+        if (!SHELL_PICTURE.test(described) && !req.request.context.get(BADGE_READ)) {
           if (!seen.includes(described)) seen.push(described);
           made.push(described);
         }

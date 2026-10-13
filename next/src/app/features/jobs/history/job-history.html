@@ -185,7 +185,7 @@
                     @for (a of recentApprovals(); track a.extractionId + '-' + (a.typeVersion ?? '') + '-' + (a.dateCreated ?? '')) {
                       <li class="flex items-baseline gap-1.5 min-w-0">
                         <app-icon name="file" size="0.85em" class="icon-muted shrink-0" />
-                        <a class="link-inline mono truncate min-w-0" [routerLink]="['/documents/review', a.extractionId]"
+                        <a class="link-inline mono truncate min-w-0" [routerLink]="['/review/documents', a.extractionId]"
                            [title]="'Document #' + a.extractionId + ', ' + approvalWord(a.approval)">Document #{{ a.extractionId }}</a>
                         @if (a.outcome === 'Started' && a.jobQueueId) {
                           <a class="link-inline shrink-0 whitespace-nowrap"
@@ -439,7 +439,7 @@
               <!-- MIG-364: a run an approved document started links to the document's review screen (a batch: its first). -->
               @if (startedByDocument().get(run.jobQueueId); as documents) {
                 <a class="flex items-center gap-1 mt-0.5 text-[11px] link-inline w-fit" data-test="started-by-document"
-                   [routerLink]="['/documents/review', documents[0].extractionId]" [title]="startedChip(documents).title">
+                   [routerLink]="['/review/documents', documents[0].extractionId]" [title]="startedChip(documents).title">
                   <app-icon name="file" size="0.9em" class="shrink-0" />
                   <span class="truncate max-w-48">{{ startedChip(documents).text }}</span>
                 </a>

@@ -252,8 +252,12 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/documents/types', 'Document types', 'document-intelligence', undefined],
     ['/documents/datasets', 'Datasets', 'document-intelligence', undefined],
     ['/documents/email-in', 'Email-in', 'document-intelligence', undefined],
-    ['/documents/review', 'Document review', 'document-review', undefined],
-    ['/documents/review/:extractionId', 'Review a document', 'document-review', undefined],
+    // UX review DR2 (2026-10-13): Document review is the Review hub's Documents tab, same key.
+    ['/review/documents', 'Document review', 'document-review', undefined],
+    ['/review/documents/:extractionId', 'Review a document', 'document-review', undefined],
+    ['/review/approvals', 'Approvals', 'task-inbox', undefined],
+    ['/review/requests', 'My requests', 'task-inbox', undefined],
+    ['/review/runs', 'Runs to review', 'task-inbox', undefined],
     ['/data/files', 'Browse files', 'objects', 'TENANT_USER'],
     // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
     ['/documents/file-drop', 'File drop', 'objects', 'TENANT_USER'],
@@ -382,8 +386,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const AI_ASSISTANT = 'Build › AI Assistant -> /ai/assistant';
   const APPROVALS = 'Build › Approval workflows -> /workflows/designer';
   const RUNS = 'Run & review › Runs -> /runs';
-  const REVIEW_INBOX = 'Run & review › Review inbox -> /workflows/inbox';
-  const DOCUMENT_REVIEW = 'Run & review › Document review -> /documents/review';
+  // UX review DR2 (2026-10-13): one Review entry, its tabs All waiting, Approvals, Runs and Documents.
+  const REVIEW = 'Run & review › Review -> /review';
   const DASHBOARDS = 'See results › Dashboards -> /data/analytics/dashboards';
   const ANALYSIS = 'See results › Analysis -> /data';
   const TOOLS = 'See results › Tools -> /tools';
@@ -392,7 +396,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const SETTINGS = 'Administration & billing › Settings -> /settings';
   const DEVELOPERS = 'Administration & billing › Developers -> /developers';
   const EVERY_MEMBER_PAGE = [
-    ...HOME, CONNECTIONS, DOCUMENTS, FORMS, PIPELINES, AI_ASSISTANT, APPROVALS, RUNS, REVIEW_INBOX, DOCUMENT_REVIEW,
+    ...HOME, CONNECTIONS, DOCUMENTS, FORMS, PIPELINES, AI_ASSISTANT, APPROVALS, RUNS, REVIEW,
     DASHBOARDS, ANALYSIS, TOOLS,
   ];
   const ADMIN_MENU = [...EVERY_MEMBER_PAGE, ADMINISTRATION, BILLING, SETTINGS, DEVELOPERS];
@@ -432,6 +436,14 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   it('a tenant user with two pages keeps only those, and drops every empty hub and menu', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'queue'])).toEqual([...HOME, PIPELINES, RUNS]);
+  });
+
+  // UX review DR2: Review for whoever decides something -- the Task inbox or Document review -- and never for a viewer.
+  it('shows Review to a reviewer and to a member holding only Document review, never to a viewer', () => {
+    expect(menuFor('TENANT_USER', ['queue', 'reports', 'analytics-dashboards', 'document-review', 'form-submissions', 'task-inbox',
+      'dashboards-edit'])).toEqual([...HOME, FORMS, RUNS, REVIEW, DASHBOARDS]);
+    expect(menuFor('TENANT_USER', ['document-review'])).toEqual([...HOME, REVIEW]);
+    expect(menuFor('TENANT_USER', ['reports', 'analytics-dashboards'])).not.toContain(REVIEW);
   });
 
   it('a tenant user with no page', () => {

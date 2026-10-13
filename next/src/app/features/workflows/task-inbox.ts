@@ -17,7 +17,6 @@ import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativ
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
 import { ValueView, labelOf, valueKind } from './value-kind';
-import { ReviewWaiting } from '../jobs/history/review-waiting';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { BulkBar } from '../../shared/ui/bulk/bulk-bar';
@@ -45,7 +44,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, ReviewWaiting, BulkBar],
+  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -60,8 +59,6 @@ export interface FieldView { label: string; value: string; view: ValueView; }
 export class TaskInbox implements OnInit {
   private readonly api = inject(WorkflowsApi);
   readonly auth = inject(AuthService);
-  /** An administrator decides any run's review (Core's run review); the runs waiting for one are listed above the tasks. */
-  readonly canDecideRuns = computed(() => typeof this.auth.isTenantAdmin === 'function' && this.auth.isTenantAdmin());
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);

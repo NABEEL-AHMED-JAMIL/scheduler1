@@ -50,7 +50,7 @@ interface Draft { runs: boolean; documents: boolean; ruleFailures: boolean; }
               } @else {
                 <p class="text-sm"><span class="font-medium">Bulk approve of runs:</span> {{ d.runs ? 'On' : 'Off' }}</p>
               }
-              <p class="field-note text-[color:var(--text-muted)]">Off: runs are approved one by one on their page or in the Review inbox.</p>
+              <p class="field-note text-[color:var(--text-muted)]">Off: runs are approved one by one on their page or in Review.</p>
             </li>
             <li>
               @if (canEdit()) {

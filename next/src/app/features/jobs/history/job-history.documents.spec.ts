@@ -84,7 +84,7 @@ describe('Executions: runs an approved document started', () => {
     const { el } = open();
     const chip = chipOf(el, 7387)!;
     expect(chip.textContent!.trim()).toBe('Document #812');
-    expect(chip.getAttribute('href')).toBe('/documents/review/812');
+    expect(chip.getAttribute('href')).toBe('/review/documents/812');
     expect(chipOf(el, 7385)).toBeNull();
   });
 
@@ -93,7 +93,7 @@ describe('Executions: runs an approved document started', () => {
     const chip = chipOf(el, 7390)!;
     expect(chip.textContent!.trim()).toBe('2 documents');
     expect(chip.getAttribute('title')).toBe('Started by documents #813, #814 being approved');
-    expect(chip.getAttribute('href')).toBe('/documents/review/813');
+    expect(chip.getAttribute('href')).toBe('/review/documents/813');
   });
 
   it('says which type starts it, and what the last documents did', () => {
@@ -102,7 +102,7 @@ describe('Executions: runs an approved document started', () => {
     expect(block.textContent).toContain('Every document of \'Intake form\' that is approved starts this schedule.');
     expect(block.textContent).toContain('Document #815');
     expect(block.textContent).toContain('The job is inactive.');
-    expect(block.querySelector('a[href="/documents/review/812"]')).not.toBeNull();
+    expect(block.querySelector('a[href="/review/documents/812"]')).not.toBeNull();
     expect(block.querySelector('a[href*="/runs/7387"]')).not.toBeNull();
   });
 

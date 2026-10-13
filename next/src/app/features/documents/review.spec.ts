@@ -171,7 +171,7 @@ describe('DocumentReview -- reading', () => {
     const rules = el.querySelector('[data-test="rules"]')!;
     expect(rules.textContent).toContain('No other document has the same vendor, total');
     expect(rules.textContent).toContain('Possible duplicate of INV-NW-1002.pdf: the same Vendor and Total.');
-    expect(rules.querySelector('[data-test="related-document"]')?.getAttribute('href')).toBe('/documents/review/1003');
+    expect(rules.querySelector('[data-test="related-document"]')?.getAttribute('href')).toBe('/review/documents/1003');
   });
 
   it('says so when the document cannot be read', async () => {
@@ -262,7 +262,7 @@ describe('DocumentReview -- corrections and decisions', () => {
     expect(api.correct).toHaveBeenCalledWith(1005, 0, [{ fieldId: 1014, value: 'Dock Supplies Ltd' }, { fieldId: 1019, value: '9820.00' }]);
     expect(api.approve).toHaveBeenCalledWith(1005, 1, false);
     // 1006 is claimed by someone else: the next free one is 1008.
-    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/documents/review', 1008]));
+    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1008]));
     expect(screen.dirty()).toBe(false);
   });
 
@@ -288,14 +288,14 @@ describe('DocumentReview -- corrections and decisions', () => {
     await screen.reject();
     expect(opened).toContain(RejectDialog);
     expect(api.reject).toHaveBeenCalledWith(1005, 'A duplicate of 1000.');
-    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/documents/review', 1008]));
+    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1008]));
   });
 
   it('goes back to the queue when nothing else is waiting', async () => {
     const api = stubApi(CORRECTED, { queue: vi.fn(() => ok({ total: 1, page: 0, size: 50, items: [{ extractionId: 1005, ocrDocumentId: 1001, status: 'Review', revision: 1 }] })) });
     const { screen, router, toast } = await screenWith({ api });
     await screen.approve();
-    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/documents/review']));
+    await vi.waitFor(() => expect(router.navigate).toHaveBeenCalledWith(['/review/documents']));
     expect(toast.info).toHaveBeenCalledWith('Nothing else is waiting for review.');
   });
 

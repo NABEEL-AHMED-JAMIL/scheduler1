@@ -102,12 +102,12 @@ describe('Run page: waiting for approval', () => {
     expect(api.act).toHaveBeenCalledWith(1136, 'reject', 'Totals do not match', '1136:reject:run-page');
   });
 
-  it('tells an administrator outside the group who it waits on, by the group\'s name, and points to the Review inbox', () => {
+  it('tells an administrator outside the group who it waits on, by the group\'s name, and points to Review › Approvals', () => {
     const { el, text, get } = box({ admin: true });
     expect(get).toHaveBeenCalledWith(expect.stringContaining('/pageAccess.json/listProfiles'));
     expect(text('approval-who')).toBe('The Reviewer group');
     expect(el.querySelector('[data-test="approval-buttons"]')).toBeNull();
-    expect(el.querySelector('[data-test="approval-inbox"]')?.getAttribute('href')).toBe('/workflows/inbox');
+    expect(el.querySelector('[data-test="approval-inbox"]')?.getAttribute('href')).toBe('/review/approvals');
   });
 
   it('gives a viewer who decides, and nothing to press', () => {

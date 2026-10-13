@@ -381,21 +381,6 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        // MIG-272: the review queue, and one document under review beside its page image.
-        path: 'documents/review',
-        title: 'Document review',
-        loadComponent: () => import('./features/documents/review-queue').then(m => m.ReviewQueue),
-        data: { pageKey: 'document-review' },
-        canActivate: [pageGuard],
-      },
-      {
-        path: 'documents/review/:extractionId',
-        title: 'Review a document',
-        loadComponent: () => import('./features/documents/review').then(m => m.DocumentReview),
-        data: { pageKey: 'document-review' },
-        canActivate: [pageGuard],
-      },
-      {
         path: 'tools/converter',
         title: 'Document Converter',
         loadComponent: () => import('./features/tools/converter/converter').then(m => m.Converter),
@@ -518,20 +503,55 @@ export const routes: Routes = [
         data: { pageKey: 'form-submissions' },
         canActivate: [pageGuard],
       },
+      // ---------------------------------------------------------------------------------------------
+      // UX review DR2 (2026-10-13): the Review hub -- All waiting, Approvals, Runs and Documents. Each tab its own page
+      // key: All waiting opens with either the Task inbox or Document review and lists only what each source answers
+      // the reader; Runs is the Task inbox's (a reviewer decides a run through their task about it).
+      // ---------------------------------------------------------------------------------------------
+      {
+        path: 'review/all',
+        title: 'Review',
+        loadComponent: () => import('./features/review/review-home').then(m => m.ReviewHome),
+        data: { pageKeys: ['task-inbox', 'document-review'] },
+        canActivate: [pageGuard],
+      },
       {
         // Wave 5 Workflows (MIG-276): the approvals and tasks waiting for the reader, page 'task-inbox'. My requests is
         // the same screen on its own tab, where a requester follows what they started.
-        path: 'workflows/inbox',
-        title: 'Review inbox',
+        path: 'review/approvals',
+        title: 'Approvals',
         loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
         data: { pageKey: 'task-inbox' },
         canActivate: [pageGuard],
       },
       {
-        path: 'workflows/requests',
+        path: 'review/requests',
         title: 'My requests',
         loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
         data: { pageKey: 'task-inbox' },
+        canActivate: [pageGuard],
+      },
+      {
+        // MIG-325: the runs whose results wait for review; a reviewer's are decided through their task about each run.
+        path: 'review/runs',
+        title: 'Runs to review',
+        loadComponent: () => import('./features/review/runs-to-review').then(m => m.RunsToReview),
+        data: { pageKey: 'task-inbox' },
+        canActivate: [pageGuard],
+      },
+      {
+        // MIG-272: the review queue, and one document under review beside its page image.
+        path: 'review/documents',
+        title: 'Document review',
+        loadComponent: () => import('./features/documents/review-queue').then(m => m.ReviewQueue),
+        data: { pageKey: 'document-review' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'review/documents/:extractionId',
+        title: 'Review a document',
+        loadComponent: () => import('./features/documents/review').then(m => m.DocumentReview),
+        data: { pageKey: 'document-review' },
         canActivate: [pageGuard],
       },
       {
@@ -844,8 +864,8 @@ export const routes: Routes = [
       // reader may open (core/nav/nav-access.ts), and the console's 403 page when there is none. The tabs are the
       // routes above, each with its own guard: the redirect only picks one, it never opens one.
       // ---------------------------------------------------------------------------------------------
-      ...['connections', 'documents', 'forms', 'pipelines', 'runs', 'data', 'tools', 'administration', 'billing', 'settings',
-        'developers', 'platform'].map(path => ({ path, pathMatch: 'full' as const, redirectTo: toFirstTab })),
+      ...['connections', 'documents', 'forms', 'pipelines', 'runs', 'review', 'data', 'tools', 'administration', 'billing',
+        'settings', 'developers', 'platform'].map(path => ({ path, pathMatch: 'full' as const, redirectTo: toFirstTab })),
       // ---------------------------------------------------------------------------------------------
       // Old addresses. Every one a full match: a prefix redirect also catches every longer address
       // under it and rewrites only its own part (administration/billing sent .../invoices to
@@ -853,6 +873,13 @@ export const routes: Routes = [
       // ---------------------------------------------------------------------------------------------
       // Tab hubs (2026-10-12): each page moved under its hub's address. Old links land on the tab, whose own guard
       // decides -- a reader without the page gets the 403 page there, never more than the page would have shown.
+      // UX review DR2 (2026-10-13): the Review hub. The services' stored links (a task's bell, a document's) keep working.
+      ...moved([
+        ['workflows/inbox', 'review/approvals'],
+        ['workflows/requests', 'review/requests'],
+        ['documents/review', 'review/documents'],
+        ['documents/review/:extractionId', 'review/documents/:extractionId'],
+      ]),
       ...moved([
         ['integration/connectors', 'connections/connectors'],
         ['integration/connectors/storage', 'connections/storage'],

@@ -103,7 +103,7 @@ import { BULK_CAP, BulkSelection } from '../../shared/ui/bulk/bulk.model';
                   </td>
                 }
                 <td class="max-w-72">
-                  <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/documents/review', e.extractionId]">{{ nameOf(e) }}</a>
+                  <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/review/documents', e.extractionId]">{{ nameOf(e) }}</a>
                   <span class="block text-xs text-[color:var(--text-muted)]">Extraction {{ e.extractionId }} · OCR {{ e.ocrDocumentId }}</span>
                 </td>
                 <td class="text-xs whitespace-nowrap">{{ e.documentTypeName || e.documentTypeKey || 'Not classified' }}@if (e.documentTypeVersion) {&ngsp;<span class="text-[color:var(--text-muted)]">v{{ e.documentTypeVersion }}</span>}</td>
@@ -256,7 +256,7 @@ export class ReviewQueue implements OnInit {
 
   start(): void {
     const first = this.firstFree();
-    if (first) this.router.navigate(['/documents/review', first.extractionId]);
+    if (first) this.router.navigate(['/review/documents', first.extractionId]);
     else this.toast.info('Nothing is waiting that someone else has not claimed.');
   }
 

@@ -92,7 +92,7 @@
             @for (r of dataset(); track r.datasetRowId) {
               <tr>
                 <td class="whitespace-nowrap">
-                  <a class="link-inline mono text-xs" [routerLink]="['/documents/review', r.extractionId]">#{{ r.extractionId }}</a>
+                  <a class="link-inline mono text-xs" [routerLink]="['/review/documents', r.extractionId]">#{{ r.extractionId }}</a>
                   <span class="block text-xs text-[color:var(--text-muted)]">v{{ r.documentTypeVersion }}</span>
                 </td>
                 <td class="text-xs whitespace-nowrap">
@@ -179,7 +179,7 @@
                   @if (i.extractionNote) { <span class="block text-[color:var(--warn-text)] mt-0.5">{{ i.extractionNote }}</span> }
                 </td>
                 <td class="text-xs whitespace-nowrap">
-                  @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/documents/review', i.extractionId]">#{{ i.extractionId }}</a> }
+                  @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/review/documents', i.extractionId]">#{{ i.extractionId }}</a> }
                   @else if (i.ocrDocumentId) { <span class="mono">OCR {{ i.ocrDocumentId }}</span> } @else { — }
                 </td>
                 <td class="text-xs whitespace-nowrap">@if (i.dateCreated) { {{ i.dateCreated | serverTime: 'recent' }} } @else { — }</td>
@@ -271,7 +271,7 @@
               <tr>
                 <td class="max-w-72">
                   @if (r.extraction) {
-                    <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/documents/review', r.extraction.extractionId]">{{ r.name }}</a>
+                    <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/review/documents', r.extraction.extractionId]">{{ r.name }}</a>
                   } @else { <span class="font-medium [overflow-wrap:anywhere]">{{ r.name }}</span> }
                   @if (r.where) { <span class="block text-xs text-[color:var(--text-muted)]">{{ r.where }}</span> }
                 </td>

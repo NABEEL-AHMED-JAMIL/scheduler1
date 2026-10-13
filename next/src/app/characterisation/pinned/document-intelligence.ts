@@ -74,7 +74,7 @@ export const PINNED: Record<string, unknown> = {
     "items": []
   },
   "a document in review": {
-    "url": "/documents/review/1005",
+    "url": "/review/documents/1005",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -108,11 +108,12 @@ export const PINNED: Record<string, unknown> = {
       "Vendor"
     ],
     "links": [
-      "/documents/review"
+      "/review",
+      "/review/documents"
     ]
   },
   "a document in review, as a tenant user with the page": {
-    "url": "/documents/review/1005",
+    "url": "/review/documents/1005",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -145,11 +146,12 @@ export const PINNED: Record<string, unknown> = {
       "Vendor"
     ],
     "links": [
-      "/documents/review"
+      "/review",
+      "/review/documents"
     ]
   },
   "an approved document, read-only": {
-    "url": "/documents/review/1000",
+    "url": "/review/documents/1000",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -184,7 +186,8 @@ export const PINNED: Record<string, unknown> = {
       "Supplier"
     ],
     "links": [
-      "/documents/review"
+      "/review",
+      "/review/documents"
     ]
   },
   "read a document": {
@@ -250,8 +253,8 @@ export const PINNED: Record<string, unknown> = {
       "/documents/email-in",
       "/documents/file-drop",
       "/documents/in",
-      "/documents/review/1000",
-      "/documents/types"
+      "/documents/types",
+      "/review/documents/1000"
     ]
   },
   "the document types, as a workspace administrator": {
@@ -344,10 +347,10 @@ export const PINNED: Record<string, unknown> = {
       "/documents/email-in",
       "/documents/file-drop",
       "/documents/in",
-      "/documents/review",
-      "/documents/review/1000",
-      "/documents/review/1005",
-      "/documents/types"
+      "/documents/types",
+      "/review/documents",
+      "/review/documents/1000",
+      "/review/documents/1005"
     ]
   },
   "the overview, as a tenant user without the page": {
@@ -417,10 +420,10 @@ export const PINNED: Record<string, unknown> = {
       "/documents/email-in",
       "/documents/file-drop",
       "/documents/in",
-      "/documents/review",
-      "/documents/review/1000",
-      "/documents/review/1005",
-      "/documents/types"
+      "/documents/types",
+      "/review/documents",
+      "/review/documents/1000",
+      "/review/documents/1005"
     ]
   },
   "the review queue, as a tenant user without the page": {
@@ -442,7 +445,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the review queue, as a workspace administrator": {
-    "url": "/documents/review",
+    "url": "/review/documents",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -482,7 +485,12 @@ export const PINNED: Record<string, unknown> = {
       "Waiting"
     ],
     "links": [
-      "/documents/review/1005"
+      "/review",
+      "/review/all",
+      "/review/approvals",
+      "/review/documents",
+      "/review/documents/1005",
+      "/review/runs"
     ]
   }
 };

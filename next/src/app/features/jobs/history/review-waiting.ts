@@ -1,4 +1,4 @@
-import { Component, DestroyRef, Injector, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, Injector, OnInit, computed, inject, input, output, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
@@ -78,17 +78,17 @@ interface WaitingAnswer {
             </li>
           }
         </ul>
-        @if (runs().length > FIRST) {
+        @if (runs().length > FIRST && !all()) {
           <button type="button" class="btn btn-ghost btn-sm" (click)="expanded.set(!expanded())" [attr.aria-expanded]="expanded()">
             {{ expanded() ? 'Show the newest ' + FIRST : 'Show all ' + runs().length }}
           </button>
         }
-        @if (more() && expanded()) {
+        @if (more() && (expanded() || all())) {
           <p class="text-xs text-[color:var(--text-muted)]">Showing the newest {{ runs().length }}. Review these to see older ones.</p>
         }
         @if (canBulk()) {
           <app-bulk-bar [selection]="bulk" [pageRows]="pageRows()" [moreMatch]="selectable().length > pageRows().length"
-                        [matchTotal]="selectable().length" (decided)="load()" />
+                        [matchTotal]="selectable().length" (decided)="load(); decided.emit()" />
         }
       </section>
     }
@@ -102,10 +102,16 @@ export class ReviewWaiting implements OnInit {
 
   readonly runs = signal<WaitingRun[]>([]);
   readonly more = signal(false);
+  /** The list has answered once (Review › Runs says "nothing waits" only then). */
+  readonly loaded = signal(false);
+  /** Every run listed, not the newest five: Review › Runs, where the list is the page (UX review DR2). */
+  readonly all = input(false);
+  /** A bulk decision was made here (the page around it reads its counts again). */
+  readonly decided = output<void>();
   /** The newest few, so a long backlog never pushes Executions' own table off the screen; the rest on request. */
   readonly FIRST = 5;
   readonly expanded = signal(false);
-  readonly shown = computed(() => this.expanded() ? this.runs() : this.runs().slice(0, this.FIRST));
+  readonly shown = computed(() => this.expanded() || this.all() ? this.runs() : this.runs().slice(0, this.FIRST));
 
   /**
    * Bulk review (2026-10-12): a workspace administrator decides runs through Core's run review; anyone else who decides
@@ -144,9 +150,10 @@ export class ReviewWaiting implements OnInit {
           const ok = answer?.status === API_SUCCESS && answer.data;
           this.runs.set(ok ? answer.data!.runs ?? [] : []);
           this.more.set(ok ? !!answer.data!.more : false);
+          this.loaded.set(true);
         },
         // A list that cannot load is left out rather than shown as an error: Executions is still the page.
-        error: () => { this.runs.set([]); this.more.set(false); },
+        error: () => { this.runs.set([]); this.more.set(false); this.loaded.set(true); },
       });
   }
 

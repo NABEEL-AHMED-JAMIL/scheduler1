@@ -107,7 +107,7 @@ export function approvalOutcome(approval: StepApproval, groupNames?: ReadonlyMap
     case 'REJECTED': return `Rejected by ${approval.decidedBy ?? 'a reviewer'}${said}`;
     case 'EXPIRED': return 'Nobody decided in time; the request expired';
     case 'CANCELLED': return 'The run was closed before anyone decided';
-    default: return `Waiting for approval by ${approvalReviewers(approval, groupNames)} in their Review inbox`;
+    default: return `Waiting for approval by ${approvalReviewers(approval, groupNames)} in Review`;
   }
 }
 

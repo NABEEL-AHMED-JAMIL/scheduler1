@@ -54,7 +54,7 @@ describe('ReviewQueue', () => {
     expect(rows).toHaveLength(2);
     expect(rows[1].textContent).toContain('ocr-live-check.png');
     expect(rows[1].textContent).toContain('4 of 9');
-    expect(rows[1].querySelector('a')?.getAttribute('href')).toBe('/documents/review/1005');
+    expect(rows[1].querySelector('a')?.getAttribute('href')).toBe('/review/documents/1005');
   });
 
   it('shows whose claim a document is under', async () => {
@@ -91,7 +91,7 @@ describe('ReviewQueue', () => {
     const { fixture, screen, router } = screenWith();
     await fixture.whenStable();
     screen.start();
-    expect(router.navigate).toHaveBeenCalledWith(['/documents/review', 1005]);
+    expect(router.navigate).toHaveBeenCalledWith(['/review/documents', 1005]);
   });
 
   it('says so when nothing is waiting', async () => {

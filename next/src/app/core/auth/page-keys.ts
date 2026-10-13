@@ -44,7 +44,8 @@ export interface PageCatalogueEntry {
  *
  * MIG-218 renamed the screens, not the keys: 'jobs' is Schedules, 'tasks' is Pipelines and 'reports' is
  * Run analytics, and an existing grant keeps opening the same screen under its new name. The UX review of 2026-10-12
- * renamed more (one name per thing, nav-tree.ts): 'task-inbox' is the Review inbox, 'connector-hub' Connections.
+ * renamed more (one name per thing, nav-tree.ts): 'task-inbox' is the Review inbox, 'connector-hub' Connections; DR2 (2026-10-13)
+ * made the Review inbox the Review hub's Approvals tab.
  */
 export const PAGE_LABELS: Record<PageKey, string> = {
   'jobs': 'Schedules',
@@ -66,7 +67,7 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'data-catalog': 'Data Catalog',
   'forms': 'Forms',
   'form-submissions': 'Form submissions',
-  'task-inbox': 'Review inbox',
+  'task-inbox': 'Approvals',
   'workflow-designer': 'Approval workflows',
   'developer-portal': 'Developer portal',
   'dashboards-edit': 'Edit dashboards',

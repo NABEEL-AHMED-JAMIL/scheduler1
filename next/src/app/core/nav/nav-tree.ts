@@ -56,8 +56,8 @@ export interface NavChild extends NavGate {
    * sits underneath it, because the default prefix match would then light both.
    */
   exact?: boolean;
-  /** MIG-276: the entry shows the reader's open task count beside its label. */
-  badge?: 'tasks';
+  /** UX review DR2: the entry shows how much waits for the reader's review beside its label (TaskCountService.waiting). */
+  badge?: 'review';
   /** Never on the menu: a page that belongs to this group for the breadcrumb only. */
   crumbOnly?: boolean;
   /** A hub: one menu entry, its pages as tabs (shared/ui/tab-hub.ts). */
@@ -83,11 +83,11 @@ export type NavHub = (NavChild | NavItem) & { path: string; tabs: NavTab[] };
  *
  * Tab hubs (owner 2026-10-12, "group a lot of stuff so we can make a nice, understandable flow, but also think about
  * security and roles for tabs"): related pages are one menu entry with tabs -- Connections, Documents, Forms, Pipelines,
- * Runs, Analysis, Tools, Administration, Billing, Settings, Developers and Platform. Each tab is still its own page:
+ * Runs, Review, Analysis, Tools, Administration, Billing, Settings, Developers and Platform. Each tab is still its own page:
  * its own address, its own access-profile key and least role, its own lazy chunk. The hub shows the tabs the reader
  * may open, the page itself when that is one, and is off the menu when it is none. What a role uses every day stays an
- * entry of its own where a tab would add a click: Home, the AI Assistant, Approval workflows, the Review inbox, Document
- * review and Dashboards.
+ * entry of its own where a tab would add a click: Home, the AI Assistant, Approval workflows and Dashboards; Review opens
+ * on All waiting, the reviewer's list, in one click.
  *
  * This one tree is the menu, the hubs, their tabs and the breadcrumbs (page-header.ts): "Get data in › Connections ›
  * Storage".
@@ -175,12 +175,23 @@ export const NAV: NavItem[] = [
           { label: 'Backfills', path: '/runs/backfills', pageKey: 'jobs', icon: 'layers' },
         ],
       },
-      // The reviewer's home: its own entry, never a tab (a tab would add a click to the page they open every day).
-      { label: 'Review inbox', path: '/workflows/inbox', pageKey: 'task-inbox', icon: 'inbox', badge: 'tasks',
-        hint: 'Approvals and reviews waiting for you or your groups' },
-      { label: 'My requests', path: '/workflows/requests', pageKey: 'task-inbox', icon: 'inbox', crumbOnly: true },
-      { label: 'Document review', path: '/documents/review', pageKey: 'document-review', icon: 'checkCircle',
-        hint: 'Check the fields a document was least sure of' },
+      {
+        // UX review DR2 (owner 2026-10-13): one Review home. What waits for a person lived in three places -- Approval
+        // tasks (workflow-service), runs waiting for review (Core) and documents in review (ai-service). All waiting
+        // lists the three together with one count (the badge, and Home's "N waiting for your review"); each kind keeps
+        // its own tab, page key and guard, so a reviewer sees only what their profile lets them decide. Runs are
+        // decided through the reader's own task about them (a reviewer) or Core's run review (an administrator), so
+        // their tab is the Task inbox's.
+        label: 'Review', path: '/review', icon: 'inbox', badge: 'review',
+        hint: 'Approvals, run results and documents waiting for your decision',
+        tabs: [
+          { label: 'All waiting', path: '/review/all', pageKeys: ['task-inbox', 'document-review'], icon: 'inbox' },
+          { label: 'Approvals', path: '/review/approvals', pageKey: 'task-inbox', icon: 'checkCircle' },
+          { label: 'Runs', path: '/review/runs', pageKey: 'task-inbox', icon: 'history' },
+          { label: 'Documents', path: '/review/documents', pageKey: 'document-review', icon: 'file' },
+        ],
+      },
+      { label: 'My requests', path: '/review/requests', pageKey: 'task-inbox', icon: 'send', crumbOnly: true },
     ],
   },
   {
@@ -241,7 +252,7 @@ export const NAV: NavItem[] = [
       },
       {
         label: 'Settings', path: '/settings', icon: 'settings',
-        hint: 'Models, tools, tasks, Kafka, the values a task reads, and alerts',
+        hint: 'Models, tools, registry tasks, Kafka, the values a pipeline reads, and alerts',
         tabs: [
           { label: 'Model connections', path: '/settings/model-connections', icon: 'server', adminOnly: true },
           // Open to a member holding the Prompts page, as before: the list is TENANT_USER.

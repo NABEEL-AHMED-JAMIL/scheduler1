@@ -6,7 +6,7 @@
         <p class="page-subtitle">Lay out who approves, what is checked and what runs. Publishing makes a new version; requests already running keep theirs.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <a routerLink="/workflows/inbox" class="btn btn-default btn-sm"><app-icon name="inbox" />Task inbox</a>
+        <a routerLink="/review/approvals" class="btn btn-default btn-sm"><app-icon name="inbox" />Approvals</a>
         @if (canEdit()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="startNew()" data-test="new-workflow"><app-icon name="plus" />New workflow</button>
         }
@@ -145,7 +145,7 @@
           @switch (wf.subjectType) {
             @case ('pipeline_run') {
               <p class="designer-desc" data-test="pipeline-link">Used when a pipeline's results need our team's review: a pipeline's
-                <a class="link-inline" routerLink="/pipelines/list">Settings › Review</a> switches it on, and the run waits in the Review inbox.
+                <a class="link-inline" routerLink="/pipelines/list">Settings › Review</a> switches it on, and the run waits in Review.
                 For a pause at one step instead, a pipeline adds an Approval step (Pipeline step approval).</p>
             }
             @case ('pipeline_step') {
@@ -409,7 +409,7 @@
               <div class="flex items-center gap-3 flex-wrap">
                 <button type="button" class="btn btn-primary" [disabled]="busy() || wf.status !== 'Active'" (click)="testRun()" data-test="start-test"><app-icon name="play" />Start test request</button>
                 @if (testStarted(); as t) {
-                  <a class="text-sm text-accent hover:underline" [routerLink]="['/workflows/requests']" [queryParams]="{ id: t.id }" data-test="test-link">{{ t.title }} · request #{{ t.id }} is {{ t.state.toLowerCase() }} — open it</a>
+                  <a class="text-sm text-accent hover:underline" [routerLink]="['/review/requests']" [queryParams]="{ id: t.id }" data-test="test-link">{{ t.title }} · request #{{ t.id }} is {{ t.state.toLowerCase() }} — open it</a>
                 }
               </div>
             </section>

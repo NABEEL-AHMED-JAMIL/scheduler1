@@ -209,8 +209,19 @@ describe('tab hubs: the breadcrumb reads group › hub › tab', () => {
   });
 
   it('an entry of its own keeps group › entry', () => {
-    expect(crumbsFor('/workflows/inbox', 'Review inbox')).toEqual([{ label: 'Run & review' }, { label: 'Review inbox' }]);
-    expect(crumbsFor('/documents/review', 'Document review')).toEqual([{ label: 'Run & review' }, { label: 'Document review' }]);
     expect(crumbsFor('/data/analytics/dashboards', 'Dashboards')).toEqual([{ label: 'See results' }, { label: 'Dashboards' }]);
+    expect(crumbsFor('/review/requests', 'My requests')).toEqual([{ label: 'Run & review' }, { label: 'My requests' }]);
+  });
+
+  /** UX review DR2 (2026-10-13): the Review hub -- its tabs, and a document opened from its Documents tab. */
+  it('reads Run & review › Review › the tab, and the document under Documents', () => {
+    expect(crumbsFor('/review/all', 'Review')).toEqual([{ label: 'Run & review' }, { label: 'Review', link: '/review' }, { label: 'All waiting' }]);
+    expect(crumbsFor('/review/approvals', 'Approvals')).toEqual([{ label: 'Run & review' }, { label: 'Review', link: '/review' }, { label: 'Approvals' }]);
+    expect(crumbsFor('/review/documents/1133', 'invoice-0412.pdf')).toEqual([
+      { label: 'Run & review' }, { label: 'Review', link: '/review' }, { label: 'Documents', link: '/review/documents' }, { label: 'invoice-0412.pdf' },
+    ]);
+    expect(crumbsFor('/review/runs/run', 'here').slice(0, -1)).toEqual([
+      { label: 'Run & review' }, { label: 'Review', link: '/review' }, { label: 'Runs', link: '/review/runs' },
+    ]);
   });
 });

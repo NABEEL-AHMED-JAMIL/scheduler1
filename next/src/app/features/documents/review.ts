@@ -369,10 +369,10 @@ export class DocumentReview {
       next: r => {
         const free = (r.data?.items ?? []).filter(i => !(i.claimActive && i.claimedBy != null && i.claimedBy !== this.me()));
         const next = r.status === API_SUCCESS ? nextInQueue(free, current) : null;
-        if (next) this.router.navigate(['/documents/review', next]);
-        else { this.toast.info('Nothing else is waiting for review.'); this.router.navigate(['/documents/review']); }
+        if (next) this.router.navigate(['/review/documents', next]);
+        else { this.toast.info('Nothing else is waiting for review.'); this.router.navigate(['/review/documents']); }
       },
-      error: () => this.router.navigate(['/documents/review']),
+      error: () => this.router.navigate(['/review/documents']),
     });
   }
 

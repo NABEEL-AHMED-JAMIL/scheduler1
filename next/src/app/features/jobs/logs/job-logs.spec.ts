@@ -444,7 +444,7 @@ describe('Run page: the breadcrumb', () => {
 
   it('takes a reader who holds only the runs through Runs, and one with only the inbox through it', () => {
     expect(runTrail('2977', 'x', { schedules: false, runs: true, inbox: true })).toEqual([{ label: 'Run & review' }, { label: 'Runs', link: '/runs' }]);
-    expect(runTrail('2977', 'x', { schedules: false, runs: false, inbox: true })).toEqual([{ label: 'Run & review' }, { label: 'Review inbox', link: '/workflows/inbox' }]);
+    expect(runTrail('2977', 'x', { schedules: false, runs: false, inbox: true })).toEqual([{ label: 'Run & review' }, { label: 'Review', link: '/review' }, { label: 'Runs', link: '/review/runs' }]);
     expect(runTrail('2977', 'x', { schedules: false, runs: false, inbox: false })).toEqual([{ label: 'Run & review' }]);
   });
 });
@@ -552,12 +552,12 @@ describe('Run page: a run waiting at an Approval step', () => {
     const line = el.querySelector('.run-log-msg')!;
     expect(line.textContent).toContain('waits for approval by the Reviewer group (request 1006)');
     expect(line.textContent).not.toContain('group 1063');
-    expect(line.querySelector('a.log-ref')?.getAttribute('href')).toBe('/workflows/inbox?task=1136');
+    expect(line.querySelector('a.log-ref')?.getAttribute('href')).toBe('/review/approvals?task=1136');
   });
 
   it('names the group in the steps table too', () => {
     const { el } = waiting(null, 'admin');
-    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer group in their Review inbox');
+    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer group in Review');
   });
 
   it('walks the reviewer through Runs, and the administrator through Build › Pipelines', () => {

@@ -79,9 +79,9 @@ import type { Shell } from './shell';
                      class="nav-child side-link" [attr.title]="child.hint || null">
                     <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
                     <span class="side-label text-sm">{{ child.label }}</span>
-                    @if (child.badge === 'tasks' && shell().tasks.count()) {
-                      <span class="pill ml-auto !px-1.5 !py-0 !text-[11px]" [class.pill-crit]="shell().tasks.overdue()"
-                            [class.pill-neutral]="!shell().tasks.overdue()">{{ shell().tasks.count() }}</span>
+                    @if (child.badge === 'review' && shell().tasks.review()?.total) {
+                      <span class="pill ml-auto !px-1.5 !py-0 !text-[11px]" [class.pill-crit]="shell().tasks.review()?.overdue"
+                            [class.pill-neutral]="!shell().tasks.review()?.overdue">{{ shell().tasks.review()?.total }}{{ shell().tasks.review()?.more ? '+' : '' }}</span>
                     }
                   </a>
                 }
@@ -102,7 +102,7 @@ import type { Shell } from './shell';
          class="nav-child">
         <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
         <span class="min-w-0">
-          <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && shell().tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="shell().tasks.overdue()" [class.pill-neutral]="!shell().tasks.overdue()">{{ shell().tasks.count() }}</span>}</span>
+          <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'review' && shell().tasks.review()?.total) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="shell().tasks.review()?.overdue" [class.pill-neutral]="!shell().tasks.review()?.overdue">{{ shell().tasks.review()?.total }}{{ shell().tasks.review()?.more ? '+' : '' }}</span>}</span>
           @if (child.hint) { <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">{{ child.hint }}</span> }
         </span>
       </a>

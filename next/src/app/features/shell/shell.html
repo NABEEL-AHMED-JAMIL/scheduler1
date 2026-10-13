@@ -197,7 +197,7 @@
   </div>
 </div>
 
-<!-- One menu entry: the label, the open-task badge and the one-line hint, for the bar's panels, the collapsed
+<!-- One menu entry: the label, the Review badge (what waits for the reader) and the one-line hint, for the bar's panels, the collapsed
      sidebar's flyouts and the phone panel. -->
 <ng-template #entry let-child>
   <a [routerLink]="child.path" [queryParams]="child.query ?? null" (click)="openMenu.set(null); mobileOpen.set(false)"
@@ -205,7 +205,7 @@
      class="nav-child">
     <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
     <span class="min-w-0">
-      <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+      <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'review' && tasks.review()?.total) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.review()?.overdue" [class.pill-neutral]="!tasks.review()?.overdue" data-test="task-badge">{{ tasks.review()?.total }}{{ tasks.review()?.more ? '+' : '' }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
       @if (child.hint) {
         <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
           {{ child.hint }}

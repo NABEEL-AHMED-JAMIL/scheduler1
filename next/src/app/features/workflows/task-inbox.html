@@ -2,13 +2,13 @@
   <app-page-header>
     <div class="page-head">
       <div>
-        <!-- The heading follows the tab: /workflows/requests is titled "My requests" and read "Task inbox" (UI review U11). -->
+        <!-- The heading follows the tab: /review/requests is titled "My requests" (UI review U11); the inbox is Review › Approvals. -->
         @if (tab() === 'requests') {
           <h1 class="page-title">My requests</h1>
           <p class="page-subtitle">What you asked for, newest first, and where each request stands. Open one to see its history.</p>
         } @else {
-          <h1 class="page-title">Review inbox</h1>
-          <p class="page-subtitle">Approvals and tasks for you or your groups, the soonest due first. Open one to see the request, its history, and decide.</p>
+          <h1 class="page-title">Approvals</h1>
+          <p class="page-subtitle">Approval steps and tasks for you or your groups, run reviews among them, the soonest due first. Open one to see the request, its history, and decide.</p>
         }
       </div>
       <div class="flex items-center gap-2 flex-wrap">
@@ -31,11 +31,8 @@
       <a routerLink="/platform/work-in-workspace" class="btn btn-default btn-sm mt-2"><app-icon name="external" />Work in a workspace</a>
     </div>
   } @else {
-  <!-- UX review B6 (W1): the runs whose results wait for a review -- the AI Assistant's runs among them -- are part of the
-       review work, so an administrator finds them here as on Home and Runs; each opens its run page's Next steps. -->
-  @if (canDecideRuns() && tab() !== 'requests') {
-    <app-review-waiting data-test="inbox-runs-waiting" />
-  }
+  <!-- UX review DR2 (2026-10-13): the runs waiting for an administrator's review are Review's own tab (Runs) and in All
+       waiting, no longer a second list above the tasks. -->
   <div class="tabs inbox-tabs" role="tablist" aria-label="Which tasks">
     <button type="button" class="tab" role="tab" [attr.aria-selected]="tab() === 'mine'" [class.tab-active]="tab() === 'mine'" (click)="pick('mine')" data-test="tab-mine">
       <app-icon name="inbox" />Waiting for me
@@ -233,7 +230,7 @@
               <!-- P2 #36: in a one-person workspace there is no one else, and the request would wait for ever. -->
               @if (aloneInWorkspace()) {
                 <span>This is your own request, and no one may approve their own. You are the only person in this workspace, so it waits
-                  until someone else joins: add a person under Administration › Users, then they decide it from their Task inbox.</span>
+                  until someone else joins: add a person under Administration › Users, then they decide it from Review › Approvals.</span>
               } @else {
                 <span>This is your own request: someone else decides it.</span>
               }

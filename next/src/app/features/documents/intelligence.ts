@@ -123,7 +123,7 @@ export class DocumentIntelligence implements OnInit {
       { label: 'Auto-approved', value: pct(t.autoRate), icon: 'checkCircle', tone: t.autoRate ? 'ok' : 'muted', quiet: !t.autoRate,
         foot: `${t.autoApproved} of those decided` },
       { label: 'In review', value: t.inReview, icon: 'eye', tone: t.inReview ? 'warn' : 'muted', quiet: !t.inReview,
-        foot: t.inReview ? 'waiting for a reviewer' : 'nothing waiting', link: '/documents/review' },
+        foot: t.inReview ? 'waiting for a reviewer' : 'nothing waiting', link: '/review/documents' },
       { label: 'Field accuracy', value: pct(t.accuracy), icon: 'zap', tone: t.accuracy == null ? 'muted' : 'info', quiet: t.accuracy == null,
         foot: 'values reviewers left as read' },
     ];
@@ -269,7 +269,7 @@ export class DocumentIntelligence implements OnInit {
     this.dialog.open<ReadDocumentResult>(ReadDocumentDialog, { data, hasBackdrop: true }).closed.subscribe(result => {
       if (!result?.changed) return;
       this.load();
-      if (result.openExtractionId) this.router.navigate(['/documents/review', result.openExtractionId]);
+      if (result.openExtractionId) this.router.navigate(['/review/documents', result.openExtractionId]);
     });
   }
 
@@ -328,7 +328,7 @@ export class DocumentIntelligence implements OnInit {
     navigator.clipboard?.writeText(address).then(() => this.toast.success('Address copied.'), () => this.toast.error('Could not copy the address.'));
   }
 
-  openReview(extractionId: number): void { this.router.navigate(['/documents/review', extractionId]); }
+  openReview(extractionId: number): void { this.router.navigate(['/review/documents', extractionId]); }
 
   extractAgain(row: RecentRow): void {
     if (row.ocr) this.readDocument(row.ocr, row.extraction?.documentTypeId ?? null);

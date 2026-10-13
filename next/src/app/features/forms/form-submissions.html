@@ -96,7 +96,7 @@
                           [title]="s.workflowReason || (s.workflowInstanceId ? 'Request #' + s.workflowInstanceId : '')">{{ approvalText(s.workflowStatus) }}</span>
                   } @else { <span class="text-[color:var(--text-muted)]">—</span> }
                   @if (s.workflowInstanceId && canOpenRequests()) {
-                    <a class="text-xs text-accent hover:underline ml-2" routerLink="/workflows/requests" [queryParams]="{ id: s.workflowInstanceId }"
+                    <a class="text-xs text-accent hover:underline ml-2" routerLink="/review/requests" [queryParams]="{ id: s.workflowInstanceId }"
                        data-open-request>Open request</a>
                   }
                 </td>
