@@ -705,7 +705,7 @@ export class Dashboards implements OnInit, OnDestroy {
     return {
       name: first.name || `Schedule #${first.jobId}`,
       run: first.lastRunId,
-      link: first.lastRunId ? ['/pipelines/schedules', first.jobId, 'runs', first.lastRunId, 'logs'] : ['/pipelines/schedules', first.jobId, 'executions'],
+      link: first.lastRunId ? ['/pipelines/schedules', first.jobId, 'runs', first.lastRunId] : ['/pipelines/schedules', first.jobId, 'executions'],
       more: pipelines.length - 1,
       all: pipelines.map(p => (p.name || `Schedule #${p.jobId}`) + (p.lastRunId ? ` · run #${p.lastRunId}` : '')).join('\n'),
     };

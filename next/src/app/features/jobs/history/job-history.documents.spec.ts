@@ -101,7 +101,7 @@ describe('Executions: runs an approved document started', () => {
     expect(block.textContent).toContain('Document #815');
     expect(block.textContent).toContain('The job is inactive.');
     expect(block.querySelector('a[href="/documents/review/812"]')).not.toBeNull();
-    expect(block.querySelector('a[href*="/runs/7387/logs"]')).not.toBeNull();
+    expect(block.querySelector('a[href*="/runs/7387"]')).not.toBeNull();
   });
 
   it('shows a waiting document with its place in line, and how many wait', () => {

@@ -354,7 +354,7 @@
                     <div>
                       <dt class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)]">Storage</dt>
                       <dd class="mt-1">
-                        <a class="link-inline" routerLink="/documents/files"
+                        <a class="link-inline" routerLink="/data/files"
                            [queryParams]="{ bucket: target.bucket, prefix: target.prefix }">
                           <app-icon name="folder" size="0.85em" class="icon-info" />View in bucket
                         </a>
@@ -422,7 +422,7 @@
                                text-[color:var(--text-secondary)]">Recent runs</h3>
                     @if (runsByJob()[job.jobId]?.length) {
                       <span class="text-[11px] text-[color:var(--text-muted)]">
-                        Last {{ recentRunBars }} runs, oldest first · how long each took — click a bar for its logs
+                        Last {{ recentRunBars }} runs, oldest first · how long each took — click a bar to open the run
                       </span>
                     }
                     <a class="link-inline text-xs ml-auto" [routerLink]="['/pipelines/schedules', job.jobId, 'executions']">

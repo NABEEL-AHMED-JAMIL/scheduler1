@@ -27,7 +27,7 @@ describe('waiting for review', () => {
     expect(el.querySelector('[data-review-waiting]')?.textContent).toContain('Waiting for review');
     expect(el.textContent).toContain('Wound follow-up');
     expect(el.textContent).toContain('Needs the internal review');
-    expect(el.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2853/runs/7542/logs');
+    expect(el.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2853/runs/7542');
   });
 
   it('shows the newest five and the rest on request, so Executions keeps its own table in view', () => {

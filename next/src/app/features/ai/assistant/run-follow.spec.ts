@@ -79,13 +79,13 @@ describe('RunFollow (the assistant run card)', () => {
     answer(timeline('Completed', [step('read', 0, 'Completed')]));
     http.expectOne(r => r.url.endsWith('/analyticsWorkspace.json/fetchAllDashboards')).flush({ status: 'SUCCESS', message: '', data: [] });
     fixture.detectChanges();
-    expect(el.querySelector('[data-test="see-results"]')?.getAttribute('href')).toBe('/pipelines/schedules/2905/runs/8228/logs?tab=outputs');
+    expect(el.querySelector('[data-test="see-results"]')?.getAttribute('href')).toBe('/pipelines/schedules/2905/runs/8228?tab=outputs');
 
     const waiting = card('Running');
     waiting.answer(timeline('Completed', [step('read', 0, 'Completed')], 'PENDING'));
     waiting.fixture.detectChanges();
     expect(waiting.el.querySelector('[data-test="see-results"]')).toBeNull();
-    expect(waiting.el.querySelector('[data-test="review-run"]')?.getAttribute('href')).toBe('/pipelines/schedules/2905/runs/8228/logs');
+    expect(waiting.el.querySelector('[data-test="review-run"]')?.getAttribute('href')).toBe('/pipelines/schedules/2905/runs/8228');
   });
 
   it('reads again on a job-status push for its job, not for another job', () => {

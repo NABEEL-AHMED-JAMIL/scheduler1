@@ -39,7 +39,7 @@ describe('Run history layout', () => {
     expect(classesOf(html, 'data-test="run-logs"', 'td')).toContain('col-pin-right');
     expect(classesOf(html, '<app-status [label]="run.jobStatus"')).not.toContain('col-pin-right');
     const cell = html.slice(html.indexOf('data-test="run-logs"'));
-    expect(cell.slice(0, cell.indexOf('</td>'))).toContain("'runs', run.jobQueueId, 'logs'");
+    expect(cell.slice(0, cell.indexOf('</td>'))).toContain("'runs', run.jobQueueId]");
   });
 
   it('waits for a wide screen before showing Queued', async () => {

@@ -75,7 +75,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
             </ul>
           }
           @if (r.rerunJobQueueId) {
-            <p class="text-sm">Run again as <a class="link" [href]="'/pipelines/schedules/' + r.jobId + '/runs/' + r.rerunJobQueueId + '/logs'">run #{{ r.rerunJobQueueId }}</a>.</p>
+            <p class="text-sm">Run again as <a class="link" [href]="'/pipelines/schedules/' + r.jobId + '/runs/' + r.rerunJobQueueId">run #{{ r.rerunJobQueueId }}</a>.</p>
           }
           @if (r.reviewStatus === 'PENDING') {
             @if (r.you?.canDecide) {

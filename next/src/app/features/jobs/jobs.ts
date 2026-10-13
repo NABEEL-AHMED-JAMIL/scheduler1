@@ -546,7 +546,7 @@ export class Jobs implements OnInit {
   }
 
   openRunLogs(job: SourceJob, bar: Bar): void {
-    this.router.navigate(['/pipelines/schedules', job.jobId, 'runs', bar.meta, 'logs']);
+    this.router.navigate(['/pipelines/schedules', job.jobId, 'runs', bar.meta]);
   }
 
   /**

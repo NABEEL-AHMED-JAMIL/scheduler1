@@ -98,7 +98,7 @@ describe('assistant model -- the confirmation card', () => {
 
 describe('assistant model -- links', () => {
   it('opens an execution on its run page', () => {
-    expect(runLink({ kind: 'execution', jobId: 2848, jobQueueId: 7404 })).toEqual(['/pipelines/schedules', 2848, 'runs', 7404, 'logs']);
+    expect(runLink({ kind: 'execution', jobId: 2848, jobQueueId: 7404 })).toEqual(['/pipelines/schedules', 2848, 'runs', 7404]);
     expect(runLink({ kind: 'execution', jobId: 2848 })).toEqual(['/pipelines/schedules', 2848, 'executions']);
   });
 

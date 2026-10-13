@@ -54,7 +54,7 @@ describe('Storage file details', () => {
     expect(d.run()?.jobQueueId).toBe(7405);
     expect(text()).toContain('Run #7405');
     expect(text()).toContain('UI-CHECK registry chain task 0929');
-    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href*="/runs/7405/logs"]');
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href*="/runs/7405"]');
     expect(link).not.toBeNull();
   });
 

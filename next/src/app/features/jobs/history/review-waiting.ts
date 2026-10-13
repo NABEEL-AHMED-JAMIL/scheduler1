@@ -72,7 +72,7 @@ interface WaitingAnswer {
                   <app-icon name="user" size="0.85em" />Individual review</span>
               }
               <a class="btn btn-default btn-sm ml-auto"
-                 [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId, 'logs']">
+                 [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId]">
                 <app-icon name="check" />Review
               </a>
             </li>

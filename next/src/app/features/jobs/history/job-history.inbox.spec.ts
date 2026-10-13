@@ -74,7 +74,7 @@ describe('Executions: runs a file started', () => {
     expect(inbox.textContent).toContain('live-customers.csv');
     expect(inbox.textContent).toContain('late.csv');
     expect(inbox.textContent).toContain('still in flight');
-    const link = inbox.querySelector<HTMLAnchorElement>('a[href*="/runs/7387/logs"]');
+    const link = inbox.querySelector<HTMLAnchorElement>('a[href*="/runs/7387"]');
     expect(link).not.toBeNull();
   });
 

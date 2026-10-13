@@ -66,7 +66,7 @@ describe('conversation list: badges and chips', () => {
     expect(badgeOf(row(1, '', { outcome: 'pipeline_draft', pipelineErrors: 1 }))!.label).toBe('Not saved · 1 error');
     expect(badgeOf(row(1, '', { outcome: 'pipeline_draft' }))).toEqual({ label: 'Not saved', tone: 'warn', link: null });
     expect(badgeOf(row(1, '', { outcome: 'run_completed', runJobId: 2905, runJobQueueId: 8238 })))
-      .toEqual({ label: 'Run completed', tone: 'ok', link: ['/pipelines/schedules', 2905, 'runs', 8238, 'logs'] });
+      .toEqual({ label: 'Run completed', tone: 'ok', link: ['/pipelines/schedules', 2905, 'runs', 8238] });
     expect(badgeOf(row(1, '', { outcome: 'run_failed', runJobId: 2905 }))!.link).toEqual(['/pipelines/schedules', 2905, 'executions']);
     expect(badgeOf(row(1, '', { outcome: 'answered' }))!.label).toBe('Answered');
     expect(badgeOf(row(1, '', { outcome: 'waiting' }))!.tone).toBe('warn');

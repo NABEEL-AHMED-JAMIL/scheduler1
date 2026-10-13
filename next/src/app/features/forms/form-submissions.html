@@ -82,7 +82,7 @@
               <td class="text-xs whitespace-nowrap">@if (s.submittedAt) { {{ s.submittedAt | serverTime: 'dateTime' }} }</td>
               <td class="whitespace-nowrap">
                 @if (s.status === 'RunStarted' && s.jobId && s.jobQueueId) {
-                  <a class="pill pill-ok" [routerLink]="['/pipelines/schedules', s.jobId, 'runs', s.jobQueueId, 'logs']"
+                  <a class="pill pill-ok" [routerLink]="['/pipelines/schedules', s.jobId, 'runs', s.jobQueueId]"
                      [title]="'Open the run log for #' + s.jobQueueId">{{ statusText(s) }}</a>
                 } @else {
                   <span class="pill" [class]="'pill-' + tone(s.status)">{{ statusText(s) }}</span>
@@ -138,7 +138,7 @@
                                 @switch (reads()[file.key ?? '']) {
                                   @case ('reading') { <span class="text-xs text-[color:var(--text-muted)]">Sending…</span> }
                                   @case ('sent') {
-                                    <a class="text-xs text-accent hover:underline" routerLink="/documents/intelligence" [queryParams]="{ tab: 'documents' }">
+                                    <a class="text-xs text-accent hover:underline" routerLink="/documents/in" [queryParams]="{ tab: 'documents' }">
                                       Being read — open Document Intelligence</a>
                                   }
                                   @case (undefined) {

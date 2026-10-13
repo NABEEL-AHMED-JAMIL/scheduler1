@@ -6,7 +6,7 @@ import { shortTime } from './history';
  * value's shape and never by its field's name, so a workflow nobody has seen yet reads as well as the ones we know:
  * a list of records is a small table, a short list is chips, a yes/no is Yes or No, a file name is a file chip, a long
  * text wraps, an id or a technical key is set quietly so it does not read as the request's data, and a page of this
- * console ("/pipelines/schedules/2908/runs/8071/logs", MIG-361: the run a review task is about) opens it.
+ * console ("/pipelines/schedules/2908/runs/8071", MIG-361: the run a review task is about) opens it.
  */
 export type ValueView =
   | { kind: 'text'; text: string }
@@ -90,7 +90,9 @@ function cell(value: unknown): string {
  */
 function pageOf(text: string): ValueView | null {
   if (text.length > 300 || !/^\/[a-z][a-z0-9-]*(\/[A-Za-z0-9._~-]+)+(\?[A-Za-z0-9._~=&%-]*)?$/.test(text)) return null;
-  const [path, search] = text.split('?');
+  const [stored, search] = text.split('?');
+  // A run's page opens on its Steps: a task stored before the run page's tabs names its Log ("/runs/8071/logs").
+  const path = stored.replace(/^(\/pipelines\/schedules\/[^/]+\/runs\/[^/]+)\/logs$/, '$1');
   const query: Record<string, string> = {};
   new URLSearchParams(search ?? '').forEach((v, k) => (query[k] = v));
   return { kind: 'page', path, query };

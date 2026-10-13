@@ -53,7 +53,7 @@ export function shareOf(cost: number, total: number): number {
           </div>
           <span class="text-lg font-semibold tabular">{{ money(r.cost) }}</span>
           @if (r.jobId) {
-            <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId, 'logs']"><app-icon name="file" />Open the run</a>
+            <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId]"><app-icon name="file" />Open the run</a>
           }
         </div>
       } @else if (runError()) {
@@ -100,7 +100,7 @@ export function shareOf(cost: number, total: number): number {
               @for (r of runs(); track r.jobQueueId) {
                 <tr [class.is-focused]="r.jobQueueId === runId()">
                   <td class="mono whitespace-nowrap">
-                    @if (r.jobId) { <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId, 'logs']">#{{ r.jobQueueId }}</a> }
+                    @if (r.jobId) { <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId]">#{{ r.jobQueueId }}</a> }
                     @else { #{{ r.jobQueueId }} }
                   </td>
                   <td class="max-w-72">

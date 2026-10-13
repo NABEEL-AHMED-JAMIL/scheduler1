@@ -308,7 +308,7 @@ export function confirmLabel(tool: string): string {
 export function runLink(link: AssistantLink): (string | number)[] | null {
   if (link.jobId == null) return null;
   return link.jobQueueId != null
-    ? ['/pipelines/schedules', link.jobId, 'runs', link.jobQueueId, 'logs']
+    ? ['/pipelines/schedules', link.jobId, 'runs', link.jobQueueId]
     : ['/pipelines/schedules', link.jobId, 'executions'];
 }
 

@@ -75,10 +75,10 @@ export function runState(t: Pick<Timeline, 'runStatus'> & { reviewStatus?: strin
           <a class="btn btn-primary btn-sm" data-test="see-results" [routerLink]="r.link" [queryParams]="r.query"><app-icon name="chart" />{{ r.label }}</a>
         }
         @if (state().label === 'Waiting for review' && jobQueueId() != null) {
-          <a class="btn btn-primary btn-sm" data-test="review-run" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId(), 'logs']"><app-icon name="checkCircle" />Review it</a>
+          <a class="btn btn-primary btn-sm" data-test="review-run" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId()]"><app-icon name="checkCircle" />Review it</a>
         }
         @if (jobQueueId() != null) {
-          <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId(), 'logs']"><app-icon name="list" />Open the run</a>
+          <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'runs', jobQueueId()]"><app-icon name="list" />Open the run</a>
         }
         <a class="btn btn-ghost btn-sm" [routerLink]="['/pipelines/schedules', jobId(), 'executions']"><app-icon name="history" />All runs</a>
         @if (state().label === 'Failed' && jobQueueId() != null) {
@@ -114,7 +114,7 @@ export class RunFollow implements OnInit {
     const board = this.board();
     return board
       ? { label: 'See results', link: ['/data/analytics/dashboards'], query: { board: board.id } as Record<string, unknown> }
-      : { label: 'See results', link: ['/pipelines/schedules', this.jobId(), 'runs', this.jobQueueId(), 'logs'], query: { tab: 'outputs' } as Record<string, unknown> };
+      : { label: 'See results', link: ['/pipelines/schedules', this.jobId(), 'runs', this.jobQueueId()], query: { tab: 'outputs' } as Record<string, unknown> };
   });
   private boardAsked = false;
 

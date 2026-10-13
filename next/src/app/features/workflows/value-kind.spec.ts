@@ -28,7 +28,10 @@ describe('A request value, by its shape', () => {
 
   // MIG-361: a review task names the run it is about by its page; the reviewer opens it from the task.
   it('reads a page of this console as a link to it, and nothing that could leave the console', () => {
-    expect(valueKind('/pipelines/schedules/2908/runs/8071/logs')).toEqual({ kind: 'page', path: '/pipelines/schedules/2908/runs/8071/logs',
+    expect(valueKind('/pipelines/schedules/2908/runs/8071')).toEqual({ kind: 'page', path: '/pipelines/schedules/2908/runs/8071',
+      query: {} });
+    // A task stored before the run page's tabs names the run's Log: it opens the run, on its Steps.
+    expect(valueKind('/pipelines/schedules/2908/runs/8071/logs')).toEqual({ kind: 'page', path: '/pipelines/schedules/2908/runs/8071',
       query: {} });
     expect(valueKind('/workflows/inbox?task=12')).toEqual({ kind: 'page', path: '/workflows/inbox', query: { task: '12' } });
     expect(valueKind('//evil.example/x').kind).not.toBe('page');

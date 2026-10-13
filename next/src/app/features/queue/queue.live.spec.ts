@@ -124,7 +124,7 @@ describe('Queue rows lead somewhere', () => {
 
   it('links the run to its logs and the job to its history', () => {
     const hrefs = [...render().querySelectorAll('table a')].map(a => a.getAttribute('href'));
-    expect(hrefs).toContain('/pipelines/schedules/2838/runs/7359/logs');
+    expect(hrefs).toContain('/pipelines/schedules/2838/runs/7359');
     expect(hrefs).toContain('/pipelines/schedules/2838/executions');
   });
 

@@ -92,7 +92,7 @@ export function badgeOf(c: ConversationRow): Badge | null {
   const runLink = (): (string | number)[] | null => {
     const job = c.runJobId ?? c.jobId;
     if (job == null) return null;
-    return c.runJobQueueId != null ? ['/pipelines/schedules', job, 'runs', c.runJobQueueId, 'logs'] : ['/pipelines/schedules', job, 'executions'];
+    return c.runJobQueueId != null ? ['/pipelines/schedules', job, 'runs', c.runJobQueueId] : ['/pipelines/schedules', job, 'executions'];
   };
   switch (c.outcome) {
     case 'pipeline_saved':

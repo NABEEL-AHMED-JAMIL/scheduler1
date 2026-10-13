@@ -1053,7 +1053,7 @@ export class Reports implements OnInit {
 
   openRunLogs(failure: FailureRow): void {
     if (failure.jobId && failure.jobQueueId) {
-      this.router.navigate(['/pipelines/schedules', failure.jobId, 'runs', failure.jobQueueId, 'logs']);
+      this.router.navigate(['/pipelines/schedules', failure.jobId, 'runs', failure.jobQueueId]);
     }
   }
 

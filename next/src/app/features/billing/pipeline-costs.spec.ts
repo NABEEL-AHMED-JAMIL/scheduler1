@@ -55,7 +55,7 @@ describe('Cost & usage: cost by pipeline and run', () => {
     expect(pipelines[0]).toContain('$9.82');
     expect(pipelines[0]).toContain('13%');
     const run = el.querySelector('[data-test="cost-by-run"] tbody tr')!;
-    expect(run.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2907/runs/8214/logs');
+    expect(run.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2907/runs/8214');
     expect(run.textContent).toContain('$0.84');
     expect(el.querySelector('[data-test="more-run-costs"]')).not.toBeNull();
   });
