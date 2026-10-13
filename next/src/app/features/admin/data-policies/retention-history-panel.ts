@@ -26,6 +26,8 @@ const LABELS: Record<string, string> = {
 @Component({
   selector: 'app-retention-history-panel',
   imports: [SidePanel, ServerTimePipe],
+  styles: `.retention-history-table th, .retention-history-table td { text-align: left; }
+    .retention-history-table tbody th { text-transform: none; letter-spacing: normal; font-weight: 500; }`,
   template: `
     <app-side-panel heading="Retention history" subtitle="The last passes and every change, with who made it" data-test="retention-history-panel">
       @if (error()) {
@@ -45,7 +47,7 @@ const LABELS: Record<string, string> = {
                       <span class="ml-auto">Removed {{ p.deleted.toLocaleString('en-US') }}{{ p.bytes ? ', ' + formatSize(p.bytes) : '' }}</span>
                     </div>
                     @if (p.classes?.length) {
-                      <table class="table-modern text-sm" aria-label="What the pass did per kind of data">
+                      <table class="table-modern text-sm retention-history-table" aria-label="What the pass did per kind of data">
                         <thead><tr><th scope="col">Data</th><th scope="col">Cutoff</th><th scope="col">Eligible</th><th scope="col">Removed</th><th scope="col">Result</th></tr></thead>
                         <tbody>
                           @for (c of p.classes; track c.dataClass) {

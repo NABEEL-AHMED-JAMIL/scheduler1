@@ -35,6 +35,9 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
   styles: `
     .retention-table { table-layout: fixed; min-width: 52rem; }
     .retention-table .retention-class-col { width: 34%; }
+    .retention-table th, .retention-table td { text-align: left; vertical-align: top; }
+    .retention-table tbody th { text-transform: none; letter-spacing: normal; font-weight: 400; padding: 0.625rem 1rem;
+      border-bottom: 1px solid var(--border-subtle); }
   `,
   template: `
     @if (visible()) {
@@ -78,7 +81,7 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
             <button type="button" class="link-inline ml-2" (click)="load()">Try again</button>
           </p>
         } @else if (view(); as v) {
-          <div class="stat-strip stat-row" role="list" data-retention-stats>
+          <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list" data-retention-stats>
             <app-stat-tile label="Kept for a limited time" [value]="limitedCount() + ' of ' + configurableCount()" icon="clock"
                            [foot]="v.enabled ? 'removed by the daily pass' : 'retention is off: nothing is removed'" [tone]="v.enabled ? 'info' : 'muted'" />
             <app-stat-tile label="Legal holds" [value]="activeHolds().length" icon="lock"

@@ -207,7 +207,6 @@
           </section>
         }
         <app-review-policy-card />
-        <app-retention-card [tenantId]="tenantId()" />
         @if (canEdit() && levels().length) {
           <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2 sticky bottom-3 z-10">
             @if (saveError()) {
@@ -223,6 +222,7 @@
             </button>
           </div>
         }
+        <app-retention-card [tenantId]="tenantId()" />
       </div>
     </app-blur-loader>
   }

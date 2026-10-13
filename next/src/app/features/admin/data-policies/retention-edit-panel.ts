@@ -26,6 +26,8 @@ interface Row { c: RetentionClass; value: string; }
 @Component({
   selector: 'app-retention-edit-panel',
   imports: [SidePanel, Icon],
+  styles: `.retention-edit-table th, .retention-edit-table td { text-align: left; vertical-align: top; }
+    .retention-edit-table tbody th { text-transform: none; letter-spacing: normal; font-weight: 400; }`,
   template: `
     <app-side-panel heading="Edit retention" subtitle="Days per kind of data; empty keeps it forever" data-test="retention-edit-panel">
       <div class="form-lock flex flex-col gap-4">
@@ -40,7 +42,7 @@ interface Row { c: RetentionClass; value: string; }
           </span>
         </label>
 
-        <table class="table-modern" aria-label="Days per kind of data">
+        <table class="table-modern retention-edit-table" aria-label="Days per kind of data">
           <thead><tr><th scope="col">Data</th><th scope="col" class="w-44">Keep for (days)</th><th scope="col" class="w-48">If saved, a pass now removes</th></tr></thead>
           <tbody>
             @for (r of rows(); track r.c.dataClass; let i = $index) {
