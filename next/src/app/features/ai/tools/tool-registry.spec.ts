@@ -70,7 +70,7 @@ describe('Tool Registry', () => {
     expect(run[0]).toContain('run_pipeline');
     expect(run[1]).toBe('Pipelines');
     expect(run[2]).toBe('jobId → result');
-    expect(run[3]).toContain('Tenant user');
+    expect(run[3]).toContain('Workspace member');
     expect(run[4]).toBe('Asks first');
     expect(run[5]).toContain('Enabled');
     expect(run[6]).toBe('28 Sep, 06:05');
@@ -96,7 +96,7 @@ describe('Tool Registry', () => {
     expect(cells('join_data')[5]).toContain('Blocked');
     expect(cells('join_data')[5]).toContain('No user-facing endpoint.');
     expect(cells('join_data')[1]).toBe('Pipeline engine');
-    expect(cells('call_api')[5]).toContain('Needs the Tenant administrator role.');
+    expect(cells('call_api')[5]).toContain('Needs the Workspace administrator role.');
     expect(row('join_data').querySelector<HTMLInputElement>('input[role="switch"]')!.disabled).toBe(true);
     expect(cells('get_reports')[5]).toContain('Off');
   });

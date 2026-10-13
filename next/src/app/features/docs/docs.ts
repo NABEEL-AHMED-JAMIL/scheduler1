@@ -240,8 +240,8 @@ interface Step {
               </table>
             </div>
             <p class="mt-3 text-sm text-[color:var(--text-secondary)]">
-              The roles nest: a platform administrator has everything a tenant administrator has,
-              and a tenant administrator everything a tenant user has. The server enforces this
+              The roles nest: a platform administrator has everything a workspace administrator has,
+              and a workspace administrator everything a workspace member has. The server enforces this
               regardless of what the interface shows.
             </p>
 
@@ -343,7 +343,7 @@ export class Docs implements AfterViewInit {
       notes: [
         'Give each tenant at least two administrators, so nobody is locked out when one is away.',
         'The Tenants screen shows each workspace\'s code under its name — click it to copy, since the code is what '
-          + 'bucket names, IAM policies and scripts are written against — and its first tenant administrator, so you know who to contact.',
+          + 'bucket names, IAM policies and scripts are written against — and its first workspace administrator, so you know who to contact.',
         'Every person has a copyable email and phone on Administration → Users, in the table as well as on the cards. '
           + 'Pick the country code first when entering a phone; the number is stored in international form.',
       ],
@@ -361,7 +361,7 @@ export class Docs implements AfterViewInit {
         { name: 'Default', required: false, note: 'The bundle anyone without a profile of their own gets. The first profile you make becomes it.' },
       ],
       notes: [
-        'Admins are never restricted: a profile only ever applies to a tenant user.',
+        'Admins are never restricted: a profile only ever applies to a workspace member.',
         'A withheld page leaves the menu, a direct link to it lands on a page that says so and offers "Request access", '
           + 'which notifies every admin of the workspace — and the server refuses the calls behind it whatever the browser shows.',
         'A profile that people still hold cannot be deleted; move them first. Changing a profile\'s pages notifies everyone on it.',
@@ -397,7 +397,7 @@ export class Docs implements AfterViewInit {
         { name: 'Name', required: true, note: 'How the topic appears when a task picks it — usually the consumer’s name. For example Orders intake.' },
         { name: 'Kafka topic', required: true, note: 'Letters and hyphens only. Digits, dots and underscores are rejected.' },
         { name: 'Partition', required: false, note: '* for every partition, or one index from 0 to 10. A comma-separated list is not supported.' },
-        { name: 'Workspace', required: true, note: 'Which workspace owns it. A tenant administrator gets their own and is not asked; a platform administrator has to say.' },
+        { name: 'Workspace', required: true, note: 'Which workspace owns it. A workspace administrator gets their own and is not asked; a platform administrator has to say.' },
       ],
       notes: ['A topic publishes through the connection it was added under — there is nothing to pick. To move one, add it under the other connection.',
               'Topics do not cross workspaces. A platform administrator creating one has to '

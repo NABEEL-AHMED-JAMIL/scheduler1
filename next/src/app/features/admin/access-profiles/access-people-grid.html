@@ -93,7 +93,7 @@
         }
         @if (shown() === 0) {
           <tr><td [attr.colspan]="columns().length + 2" class="text-center text-[color:var(--text-muted)] py-10">
-            @if (search()) { Nobody matches “{{ search() }}”. } @else { No tenant users in this workspace yet. }
+            @if (search()) { Nobody matches “{{ search() }}”. } @else { No workspace members yet. }
           </td></tr>
         }
       </tbody>

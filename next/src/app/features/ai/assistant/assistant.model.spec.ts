@@ -130,7 +130,7 @@ describe('assistant model -- the registry', () => {
     expect(toolState(tool({ available: false, unavailableReason: 'No endpoint.' }))).toEqual({ label: 'Blocked', tone: 'crit', reason: 'No endpoint.' });
     expect(toolState(tool({ enabledInWorkspace: false }))).toEqual({ label: 'Off', tone: 'neutral', reason: 'Switched off in this workspace.' });
     expect(toolState(tool({ youMayUse: false, requiredRole: 'TENANT_ADMIN' })))
-      .toEqual({ label: 'Blocked', tone: 'crit', reason: 'Needs the Tenant administrator role.' });
+      .toEqual({ label: 'Blocked', tone: 'crit', reason: 'Needs the Workspace administrator role.' });
   });
 
   it('allows a tool that is available, on, and yours to use', () => {

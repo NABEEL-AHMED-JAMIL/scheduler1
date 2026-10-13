@@ -3,8 +3,8 @@ import { roleLabel } from './auth.models';
 describe('roleLabel', () => {
   it('names each role in words, sentence case, never by its enum', () => {
     expect(roleLabel('PLATFORM_ADMIN')).toBe('Platform administrator');
-    expect(roleLabel('TENANT_ADMIN')).toBe('Tenant administrator');
-    expect(roleLabel('TENANT_USER')).toBe('Tenant user');
+    expect(roleLabel('TENANT_ADMIN')).toBe('Workspace administrator');
+    expect(roleLabel('TENANT_USER')).toBe('Workspace member');
   });
 
   it('says so when there is no role rather than printing nothing', () => {

@@ -27,13 +27,14 @@ export function isUserRole(role: string | null | undefined): role is UserRole {
  */
 export const ROLE_META: Record<UserRole, { label: string; hint: string; pill: string; accent: string }> = {
   TENANT_USER: {
-    label: 'Tenant user',
+    // UX review B (G12): the console's word is workspace; TENANT_USER / TENANT_ADMIN stay the API's values.
+    label: 'Workspace member',
     hint: 'Runs and monitors work.',
     pill: 'pill pill-neutral',
     accent: 'var(--border-subtle)',
   },
   TENANT_ADMIN: {
-    label: 'Tenant administrator',
+    label: 'Workspace administrator',
     hint: 'Also configures tasks, connections and users.',
     pill: 'pill pill-brand',
     // The flipping mark token: brand-500 is the dark card's own colour, so the rule vanished there.
@@ -41,7 +42,7 @@ export const ROLE_META: Record<UserRole, { label: string; hint: string; pill: st
   },
   PLATFORM_ADMIN: {
     label: 'Platform administrator',
-    hint: 'Operates across every tenant.',
+    hint: 'Operates across every workspace.',
     pill: 'pill pill-crit',
     accent: 'var(--color-crit-500)',
   },

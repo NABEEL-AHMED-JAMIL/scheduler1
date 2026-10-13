@@ -356,7 +356,7 @@ export class Users implements OnInit {
   }
 
   /** Said on the row in place of the controls, so the absence is a rule rather than a gap. */
-  readonly managedByPlatformOnly = 'Only a platform administrator can manage another tenant administrator.';
+  readonly managedByPlatformOnly = 'Only a platform administrator can manage another workspace administrator.';
 
   async toggleStatus(user: AppUser): Promise<void> {
     const activating = user.status !== 'Active';

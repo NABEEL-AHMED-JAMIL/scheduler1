@@ -36,7 +36,7 @@ interface PageSection {
   template: `
     <app-form-dialog
         [heading]="isEdit() ? 'Edit access profile' : 'New access profile'"
-        subtitle="A named bundle of pages. Give each tenant user one; admins always open everything."
+        subtitle="A named bundle of pages. Give each workspace member one; administrators always open everything."
         [confirmLabel]="isEdit() ? 'Save changes' : 'Create'"
         [saving]="saving()"
         (cancelled)="ref.close(false)" (confirmed)="save()">
