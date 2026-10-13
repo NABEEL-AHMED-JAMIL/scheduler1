@@ -207,13 +207,33 @@ function short(value: unknown): string | null {
   return null;
 }
 
-/** Up to two of a step's settings, in the order the step has them: the node's summary under its name. */
-export function stepSummary(step: PipelineStepLike, max = 2): FlowMetric[] {
+/**
+ * UX review 2026-10-12: the setting formats whose value is the id of something with a name -- a saved API request, an
+ * environment, a prompt, a webhook, a document type, a contract, a database connection, a pipeline. A node read
+ * "reque… 1083" and "envir… 1072"; it names them now ("API request  Patients by ward").
+ */
+export const NAMED_FORMATS = new Set(['api-request', 'api-environment', 'prompt', 'webhook', 'document-type', 'data-contract',
+  'db-connection', 'pipeline']);
+
+/** The name of what a setting's id points at (by its schema format), or null while it is not known. */
+export type StepNameLookup = (format: string, value: unknown, step: PipelineStepLike) => string | null;
+
+/**
+ * Up to two of a step's settings, in the order the step has them: the node's summary under its name. A setting is called
+ * by its schema title ("Environment", not environmentId), and an id is shown as the name of what it points at -- or as
+ * "#1072" until the name is read.
+ */
+export function stepSummary(step: PipelineStepLike, max = 2, schema?: SchemaLike | null, names?: StepNameLookup): FlowMetric[] {
   const out: FlowMetric[] = [];
   for (const [name, value] of Object.entries(step.config ?? {})) {
-    const text = short(value);
+    const property = schema?.properties?.[name];
+    const format = typeof property?.format === 'string' ? property.format : '';
+    let text = short(value);
     if (text === null) continue;
-    out.push({ label: name, value: text });
+    if (NAMED_FORMATS.has(format) && (typeof value === 'number' || typeof value === 'string')) {
+      text = names?.(format, value, step) ?? `#${value}`;
+    }
+    out.push({ label: property?.title || name, value: text });
     if (out.length >= max) break;
   }
   return out;
@@ -232,6 +252,8 @@ export interface PipelineGraphOptions extends PipelineEdgeOptions {
   change?: (step: PipelineStepLike, index: number) => StepChange;
   /** Settings shown on a node; 0 shows none. */
   summary?: number;
+  /** UX review 2026-10-12: the names of what a step's ids point at (stepSummary). */
+  names?: StepNameLookup;
 }
 
 /**
@@ -253,7 +275,7 @@ export function pipelineGraph(steps: readonly PipelineStepLike[], opts: Pipeline
     const tone: FlowTone | null = problems ? 'crit' : change ? 'info' : null;
     nodes.push({
       id: step.key, label: step.name || step.key, sub: step.task, kind: stepKind(step.task, entry),
-      icon: TASK_ICONS[step.task] ?? null, tone, badges, metrics: opts.summary === 0 ? [] : stepSummary(step, opts.summary ?? 2),
+      icon: TASK_ICONS[step.task] ?? null, tone, badges, metrics: opts.summary === 0 ? [] : stepSummary(step, opts.summary ?? 2, entry?.configSchema, opts.names),
       pending: !!change,
     });
   });

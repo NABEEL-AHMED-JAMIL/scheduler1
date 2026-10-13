@@ -68,8 +68,8 @@ let seq = 0;
                   @for (d of n.glyph; track $index) { <path [attr.d]="d" /> }
                 </g>
               </g>
-              <text class="fg-label" x="50" [attr.y]="n.subText ? 28 : 32">{{ n.title }}</text>
-              @if (n.subText) { <text class="fg-sub" x="50" y="44">{{ n.subText }}</text> }
+              <text class="fg-label" x="50" [attr.y]="n.subText ? 29 : 33">{{ n.title }}</text>
+              @if (n.subText) { <text class="fg-sub" x="50" y="46">{{ n.subText }}</text> }
               @if (n.pills.length) {
                 <g class="fg-badges">
                   @for (b of n.pills; track $index) {
@@ -167,10 +167,10 @@ let seq = 0;
     .fg-pill-bg { fill: var(--pb); }
     .fg-pill-fg { fill: var(--pf); }
     .fg-glyph { fill: none; stroke: var(--pf); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
-    .fg-label { fill: var(--text-primary); font-size: 13px; font-weight: 600; }
-    .fg-sub, .fg-mvalue { fill: var(--text-muted); font-family: var(--font-mono); font-size: 11px; }
+    .fg-label { fill: var(--text-primary); font-size: 14px; font-weight: 600; }
+    .fg-sub, .fg-mvalue { fill: var(--text-muted); font-family: var(--font-mono); font-size: 12px; }
     .fg-mvalue { fill: var(--text-primary); }
-    .fg-mlabel { fill: var(--text-muted); font-size: 11px; }
+    .fg-mlabel { fill: var(--text-muted); font-size: 12px; }
     .fg-badge { font-size: 11px; font-weight: 600; }
     .fg-sep { stroke: var(--border-subtle); }
     .fg-track { fill: var(--surface-sunken); }
@@ -250,10 +250,10 @@ export class FlowGraph {
       const cellW = (n.w - 24) / FLOW_METRICS_PER_ROW;
       const rows = nodeRows(n);
       const cells = (n.metrics ?? []).map((m, i) => {
-        const label = fitText(m.label, cellW * 0.45, 11, 0.6);
+        const label = fitText(m.label, cellW * 0.45, 12, 0.6);
         return {
-          label, value: fitText(m.value, cellW - label.length * 6 - 8, 11, 0.62),
-          x: 12 + (i % FLOW_METRICS_PER_ROW) * cellW, y: rows.metricsY + Math.floor(i / FLOW_METRICS_PER_ROW) * FLOW_ROW.metric + 12,
+          label, value: fitText(m.value, cellW - label.length * 7.2 - 8, 12, 0.62),
+          x: 12 + (i % FLOW_METRICS_PER_ROW) * cellW, y: rows.metricsY + Math.floor(i / FLOW_METRICS_PER_ROW) * FLOW_ROW.metric + 13,
         };
       });
       const aria = [n.label, n.sub, ...badges, ...(n.metrics ?? []).map(m => `${m.label} ${m.value}`)].filter(Boolean).join(', ');
@@ -261,8 +261,8 @@ export class FlowGraph {
         ...n, tone, rows, pills, cells, aria,
         accent: n.accent ?? (FLOW_KINDS[n.kind] ?? FLOW_KINDS.other).accent,
         glyph: flowIconPaths(n.icon, n.kind),
-        title: fitText(n.label, textW, 13),
-        subText: n.sub ? fitText(n.sub, textW, 11, 0.62) : '',
+        title: fitText(n.label, textW, 14),
+        subText: n.sub ? fitText(n.sub, textW, 12, 0.62) : '',
         shareW: n.share == null ? null : Math.round((n.w - 24) * Math.min(1, Math.max(0, n.share))),
       };
     });

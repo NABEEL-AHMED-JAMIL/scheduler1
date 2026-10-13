@@ -38,10 +38,11 @@ export interface FlowLayout { nodes: PlacedFlowNode[]; edges: PlacedFlowEdge[]; 
 
 /** Margin kept around the drawing, so a selected node's ring is never clipped. */
 export const FLOW_PAD = 16;
-export const FLOW_NODE_WIDTH = 224;
+// UX review 2026-10-12: a little wider and taller, for 14 px names and 12 px lines (they were 13 and 11).
+export const FLOW_NODE_WIDTH = 240;
 /** Icon, label and sub line. */
-export const FLOW_NODE_BASE = 54;
-export const FLOW_ROW = { badges: 22, metric: 18, share: 10 } as const;
+export const FLOW_NODE_BASE = 56;
+export const FLOW_ROW = { badges: 22, metric: 20, share: 10 } as const;
 export const FLOW_METRICS_PER_ROW = 2;
 /** The breadth of an edge's lane through a layer it skips, the gap beside one, and how many lanes a layout makes at most. */
 const LANE = 16, LANE_GAP = 14, MAX_LANES = 4000;

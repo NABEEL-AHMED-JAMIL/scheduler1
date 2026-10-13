@@ -1,8 +1,9 @@
-import { ChangeDetectionStrategy, Component, computed, input, linkedSignal, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, linkedSignal, output } from '@angular/core';
 import { FlowGraph } from '../../../shared/flow-graph/flow-graph';
 import { FLOW_REVIEW, FLOW_START, StepChange, pipelineGraph } from '../../../shared/flow-graph/flow-adapters';
 import { Icon } from '../../../shared/ui/icon';
 import { Definition, Step, StepProblem, StepTaskEntry, canonicalStep } from './steps.model';
+import { StepNames } from './step-names';
 
 /**
  * Whether a draft step is saved as it is shown: not saved at all (no saved step has its key), or changed since. Every
@@ -68,7 +69,10 @@ export class StepFlow {
     computation: (count, previous) => previous?.value ?? (count > 6 ? 'TB' : 'LR'),
   });
 
+  private readonly names = inject(StepNames);
+
   readonly graph = computed(() => {
+    this.names.names();
     const d = this.definition();
     const saved = this.saved();
     const problems = this.problems();
@@ -80,6 +84,8 @@ export class StepFlow {
       review,
       problems: i => problems[i]?.length ?? 0,
       change: s => stepChange(s as Step, saved),
+      // UX review 2026-10-12: an id a step names is shown as the name of what it points at.
+      names: this.names.lookup,
     });
   });
 
