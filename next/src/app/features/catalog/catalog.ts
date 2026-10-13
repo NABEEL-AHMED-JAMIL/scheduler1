@@ -188,6 +188,6 @@ export class Catalog implements OnInit {
   }
 
   open(assetId: number, name: string): void {
-    this.dialog.open<void>(CatalogPanel, sidePanelConfig<CatalogPanelData>({ assetId, name, changed: () => this.refresh() }, 'wide'));
+    this.dialog.open<void>(CatalogPanel, sidePanelConfig<CatalogPanelData>({ assetId, name, changed: () => this.refresh() }, 'wide', 'right'));
   }
 }

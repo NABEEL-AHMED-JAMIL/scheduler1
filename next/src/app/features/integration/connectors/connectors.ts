@@ -164,7 +164,7 @@ export class Connectors implements OnInit {
     if (card && this.blocked(card)) return;
     this.dialog.open<void>(ConnectPanel, sidePanelConfig<ConnectPanelData>({
       cards: this.cards().filter(c => !this.blocked(c)), card, connection: null, changed: () => this.load(),
-    }, 'wide'));
+    }, 'wide', 'right'));
   }
 
   /** "Build custom (REST)": the REST connector, over one of the workspace's API Collections. */
@@ -176,6 +176,6 @@ export class Connectors implements OnInit {
   open(connectionId: number, name: string): void {
     this.dialog.open<void>(ConnectionPanel, sidePanelConfig<ConnectionPanelData>({
       connectionId, name, cards: this.cards(), changed: () => this.load(),
-    }, 'wide'));
+    }, 'wide', 'right'));
   }
 }

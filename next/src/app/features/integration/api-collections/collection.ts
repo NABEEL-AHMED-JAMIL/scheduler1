@@ -162,7 +162,7 @@ export class Collection implements OnChanges {
       defaultAuth: this.defaultAuth(), canManage: this.canManage(),
     };
     // Reloaded whatever the panel says on closing: the X and the backdrop close it without an answer.
-    this.dialog.open<boolean>(RequestPanel, sidePanelConfig(data, 'wide')).closed.subscribe(() => this.load());
+    this.dialog.open<boolean>(RequestPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(() => this.load());
   }
 
   openRequest(r: RequestRow): void { this.panel(r.requestId, r.folderId); }

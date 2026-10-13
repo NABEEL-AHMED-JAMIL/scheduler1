@@ -1,4 +1,6 @@
 import { Component, computed, input } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Params, RouterLink } from '@angular/router';
 import { Icon } from './icon';
 
 /** The intent tints shared by the stat tile and the stat strip: the icon-* helpers in styles.css. */
@@ -10,30 +12,38 @@ export function figure(value: string | number | null | undefined): string {
 }
 
 /**
- * The KPI tile that sits above a page's table. Six screens had hand-rolled copies of the
- * same three divs, which is how they drifted apart in the first place -- one class per
- * page, four different paddings. The icon carries the tile's meaning at a glance so the
- * label does not have to be read; the tone tints it, defaulting to the muted glyph used
- * for a plain count.
+ * One KPI tile, for a page that lays its tiles out in its own template rather than handing app-stat-strip a list.
+ *
+ * UX review 2026-10-12 (A7, G5): there were two KPI components -- this one as separate cards with the icon on the
+ * right, app-stat-strip as a joined strip with the icon on the left -- and they read as two systems. This tile now
+ * draws exactly a strip cell (icon left, label, figure, foot) and sits in a `.stat-strip.stat-row` container, so every
+ * KPI row in the console is the same component on screen. `link` (and `queryParams`) make the tile the filter it
+ * counts ("3 in review" opens the review filter).
  */
 @Component({
   selector: 'app-stat-tile',
-  imports: [Icon],
-  host: { class: 'stat-tile' },
+  imports: [Icon, RouterLink, NgTemplateOutlet],
+  host: { class: 'stat-strip-cell stat-tile-cell', role: 'listitem' },
   template: `
-    <div class="flex items-start justify-between gap-2">
-      <div class="min-w-0">
-        <div class="stat-label">{{ label() }}</div>
-        <div class="stat-value">{{ shown() }}</div>
-      </div>
+    @if (link()) {
+      <a class="stat-strip-item is-action" [routerLink]="link()" [queryParams]="queryParams()"
+         [attr.title]="hint() || null" [attr.aria-label]="name()">
+        <ng-container *ngTemplateOutlet="body" />
+      </a>
+    } @else {
+      <div class="stat-strip-item" [attr.title]="hint() || null"><ng-container *ngTemplateOutlet="body" /></div>
+    }
+    <ng-template #body>
       @if (icon()) {
-        <span class="stat-glyph" [class]="'icon-' + tone()">
-          <app-icon [name]="icon()" size="1.05em" />
-        </span>
+        <span class="stat-strip-glyph" [class]="'icon-' + tone()"><app-icon [name]="icon()" size="1.05em" /></span>
       }
-    </div>
-    <!-- Two lines before an ellipsis: a phone-width tile cut "forecast $0.03 · Aug $0.02" at "Aug $…". -->
-    @if (foot()) { <div class="stat-foot line-clamp-2" [title]="foot()">{{ foot() }}</div> }
+      <span class="stat-strip-text">
+        <span class="stat-strip-label">{{ label() }}</span>
+        <span class="stat-strip-value">{{ shown() }}</span>
+        <!-- Two lines before an ellipsis: a narrow tile cut "forecast $0.03 · Aug $0.02" at "Aug $…". -->
+        @if (foot()) { <span class="stat-strip-foot line-clamp-2" [title]="foot()">{{ foot() }}</span> }
+      </span>
+    </ng-template>
   `,
 })
 export class StatTile {
@@ -45,4 +55,11 @@ export class StatTile {
   readonly icon = input('');
   /** Matches the icon-* helpers in styles.css, so the tint follows the same palette as everywhere else. */
   readonly tone = input<StatTone>('muted');
+  /** Makes the tile a link to the list it counts, filtered. */
+  readonly link = input<string | readonly unknown[] | null>(null);
+  readonly queryParams = input<Params | null>(null);
+  /** Tooltip, and part of the accessible name when the tile is a link. */
+  readonly hint = input('');
+  protected readonly name = computed(() =>
+    [`${this.label()}: ${this.shown()}`, this.foot(), this.hint()].filter(Boolean).join(', '));
 }

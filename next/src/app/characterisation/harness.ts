@@ -273,12 +273,15 @@ export async function menuOf(v: Visit): Promise<string[]> {
   for (const link of Array.from(nav.querySelectorAll(':scope > a[href]'))) {
     out.push(`${text(link)} -> ${link.getAttribute('href')}`);
   }
-  const sections = Array.from(nav.querySelectorAll('[data-nav-menu]')).map(s => s.getAttribute('data-nav-menu') ?? '');
-  for (const label of sections) {
-    const button = nav.querySelector(`[data-nav-menu="${label}"] > button`) as HTMLElement;
+  // Found by walking rather than by a [data-nav-menu="..."] selector: jsdom's selector engine trips on the "&" of
+  // "Run & review" (UX review 2026-10-12 groups).
+  const sections = Array.from(nav.querySelectorAll<HTMLElement>('[data-nav-menu]'));
+  for (const section of sections) {
+    const label = section.getAttribute('data-nav-menu') ?? '';
+    const button = section.querySelector(':scope > button') as HTMLElement;
     button.click();
     await v.settle();
-    const panel = nav.querySelector(`[data-nav-menu="${label}"] [id^="nav-menu-"]`);
+    const panel = section.querySelector('[id^="nav-menu-"]');
     for (const entry of Array.from(panel?.querySelectorAll('a[href]') ?? [])) {
       const parts = Array.from(entry.querySelectorAll('span.block')).map(el => text(el));
       out.push(`${label} › ${parts.join(' — ')} -> ${entry.getAttribute('href')}`);

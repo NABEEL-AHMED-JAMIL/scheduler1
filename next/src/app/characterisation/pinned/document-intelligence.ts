@@ -344,13 +344,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the overview, as a tenant user without the page": {
-    "url": "/unauthorized?page=document-intelligence&title=Document%20Intelligence",
+    "url": "/unauthorized?page=document-intelligence&title=Documents%20in",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Document Intelligence isn't part of your access"
+      "Documents in isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -414,13 +414,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the review queue, as a tenant user without the page": {
-    "url": "/unauthorized?page=document-review&title=Review%20queue",
+    "url": "/unauthorized?page=document-review&title=Document%20review",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Review queue isn't part of your access"
+      "Document review isn't part of your access"
     ],
     "buttons": [
       "Request access"

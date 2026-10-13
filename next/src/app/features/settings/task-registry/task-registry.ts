@@ -200,7 +200,7 @@ export class TaskRegistry implements OnInit {
       isAdmin: this.isWorkspaceAdmin() && !this.locked(),
       onSwitched: line => this.tasks.update(list => withSwitchedLine(list, line)),
     };
-    this.dialog.open<TaskPanelResult>(TaskPanel, sidePanelConfig(data, 'wide')).closed.subscribe(result => {
+    this.dialog.open<TaskPanelResult>(TaskPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(result => {
       if (result === 'edit' && target.pipeline && !this.locked()) this.edit(target.pipeline);
     });
   }

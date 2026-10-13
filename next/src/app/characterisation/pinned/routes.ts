@@ -68,13 +68,13 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/dashboard",
-      "title": "Dashboard",
+      "title": "Home",
       "guards": [],
       "lazy": true
     },
     {
       "path": "/integration/storage-connections",
-      "title": "Storage Connections",
+      "title": "Storage connections",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -128,7 +128,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/integration/connectors",
-      "title": "Connector Hub",
+      "title": "Connections",
       "pageKey": "connector-hub",
       "guards": [
         "pageGuard"
@@ -178,7 +178,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/:taskDetailId/edit",
-      "title": "Edit pipeline",
+      "title": "Pipeline",
       "pageKey": "tasks",
       "minRole": "TENANT_ADMIN",
       "guards": [
@@ -189,7 +189,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/schedules",
-      "title": "Schedules",
+      "title": "Schedules & triggers",
       "pageKey": "jobs",
       "guards": [
         "pageGuard"
@@ -217,7 +217,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/schedules/:jobId/edit",
-      "title": "Edit schedule",
+      "title": "Schedule",
       "pageKey": "jobs",
       "guards": [
         "pageGuard"
@@ -235,7 +235,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/schedules/:jobId/executions",
-      "title": "Executions",
+      "title": "Schedule runs",
       "pageKey": "jobs",
       "guards": [
         "pageGuard"
@@ -244,7 +244,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/schedules/:jobId/runs/:jobQueueId/logs",
-      "title": "Run logs",
+      "title": "Run",
       "pageKey": "jobs",
       "guards": [
         "pageGuard"
@@ -253,7 +253,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/executions",
-      "title": "Executions",
+      "title": "Runs",
       "pageKey": "jobs",
       "guards": [
         "pageGuard"
@@ -262,7 +262,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/pipelines/queue",
-      "title": "Queue",
+      "title": "Runs by date",
       "pageKey": "queue",
       "guards": [
         "pageGuard"
@@ -280,7 +280,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/intelligence",
-      "title": "Document Intelligence",
+      "title": "Documents in",
       "pageKey": "document-intelligence",
       "guards": [
         "pageGuard"
@@ -289,7 +289,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/review",
-      "title": "Review queue",
+      "title": "Document review",
       "pageKey": "document-review",
       "guards": [
         "pageGuard"
@@ -316,7 +316,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/reports",
-      "title": "Reports",
+      "title": "Generated reports",
       "pageKey": "tools-converter",
       "guards": [
         "pageGuard"
@@ -336,7 +336,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/inbox",
-      "title": "Inbox",
+      "title": "File drop",
       "pageKey": "objects",
       "minRole": "TENANT_USER",
       "guards": [
@@ -383,7 +383,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/data/analytics/dashboards",
-      "title": "Saved Analyses",
+      "title": "Dashboards",
       "pageKey": "analytics-dashboards",
       "guards": [
         "pageGuard"
@@ -410,7 +410,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/forms/submissions",
-      "title": "Submissions",
+      "title": "Form submissions",
       "pageKey": "form-submissions",
       "guards": [
         "pageGuard"
@@ -419,7 +419,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/workflows/inbox",
-      "title": "Task inbox",
+      "title": "Review inbox",
       "pageKey": "task-inbox",
       "guards": [
         "pageGuard"
@@ -437,7 +437,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/workflows/designer",
-      "title": "Workflow designer",
+      "title": "Approval workflows",
       "pageKey": "workflow-designer",
       "guards": [
         "pageGuard"
@@ -466,7 +466,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/ai/prompts/:promptId/edit",
-      "title": "Edit prompt",
+      "title": "Prompt",
       "pageKey": "ai-prompts",
       "minRole": "TENANT_ADMIN",
       "guards": [
@@ -627,7 +627,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/access-profiles",
-      "title": "Access profiles",
+      "title": "Page access",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -645,7 +645,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/security",
-      "title": "Security",
+      "title": "Sign-in security",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
@@ -654,7 +654,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/tenants",
-      "title": "Tenants",
+      "title": "Workspaces",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -723,7 +723,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/account/security",
-      "title": "Security",
+      "title": "My security",
       "guards": [],
       "lazy": true
     },

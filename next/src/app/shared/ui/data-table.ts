@@ -3,6 +3,51 @@ import { Icon } from './icon';
 import { BlurLoader } from './blur-loader';
 import { LoadError } from './load-error';
 import { RowSnap } from './row-snap';
+import { EmptyState } from './empty-state';
+
+/**
+ * A cell that reads as a quantity: a count (1,204), an amount ($12.50, €3), a percentage (82%), a size (3.4 MB), a
+ * duration (1s, 35m 35s, 120 ms) or a row count (12 rows). Dates, ids with letters, names and pills do not.
+ */
+const QUANTITY = /^[-+−]?[$€£]?\s?\d[\d,]*(\.\d+)?\s?(%|[kKMGT]?B|ms|rows?|tokens?|calls?)?$/;
+const DURATION = /^(\d+(\.\d+)?\s?(ms|s|m|min|h|d)\s*){1,3}$/;
+
+export function isQuantity(text: string): boolean {
+  const t = text.replace(/\s+/g, ' ').trim();
+  return QUANTITY.test(t) || DURATION.test(t);
+}
+
+/**
+ * UX review 2026-10-12 (A6, G4): numbers, durations, percentages and money right-aligned in tabular figures, the
+ * heading too. A column is a number column when every filled cell in it is a quantity (an empty cell or a dash does
+ * not count either way) and its heading is not an id. A heading the template marks itself (`.num`, or `.text-col` to
+ * keep a column as text) is left as written.
+ */
+export function markNumberColumns(table: HTMLTableElement, labels: string[]): void {
+  const heads = Array.from(table.querySelectorAll<HTMLElement>(':scope > thead > tr:first-child > th'));
+  const rows = Array.from(table.querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr'))
+    .filter(row => row.children.length === labels.length);
+  labels.forEach((label, i) => {
+    const head = heads[i];
+    if (!head || !label || /^(id|actions)$/i.test(label) || head.classList.contains('text-col')) return;
+    if (head.classList.contains('num') && !head.hasAttribute('data-auto-num')) return;
+    let numbers = 0;
+    let other = 0;
+    for (const row of rows) {
+      const cell = row.children[i] as HTMLElement;
+      if (cell.querySelector('input, select, textarea, button')) { other++; break; }
+      const text = (cell.textContent ?? '').trim();
+      if (!text || /^[—–-]$/.test(text)) continue;
+      if (isQuantity(text)) numbers++; else { other++; break; }
+    }
+    const numeric = numbers > 0 && other === 0;
+    for (const el of [head, ...rows.map(row => row.children[i] as HTMLElement)]) {
+      if (el.classList.contains('num') === numeric) continue;
+      el.classList.toggle('num', numeric);
+      el.toggleAttribute('data-auto-num', numeric);
+    }
+  });
+}
 
 /**
  * Shared chrome for the list screens: a titled card with a filter slot, plus consistent
@@ -12,7 +57,7 @@ import { RowSnap } from './row-snap';
  */
 @Component({
   selector: 'app-table-shell',
-  imports: [Icon, BlurLoader, LoadError, RowSnap],
+  imports: [Icon, BlurLoader, LoadError, RowSnap, EmptyState],
   styles: `
     .table-toolbar-controls {
       display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end;
@@ -99,12 +144,12 @@ import { RowSnap } from './row-snap';
           <ng-content select="[error-action]" />
         </app-load-error>
       } @else if (isEmpty() && !loading()) {
-        <div class="px-6 py-14 text-center">
-          <app-icon [name]="emptyIcon()" size="1.75rem"
-                    class="icon-muted block mx-auto mb-3" />
-          <p class="text-sm text-[color:var(--text-secondary)]">{{ emptyMessage() }}</p>
-          <div class="mt-4"><ng-content select="[empty-action]" /></div>
-        </div>
+        <!-- A8: what the list holds, why it is empty, and the next step ([empty-action]: the primary, then a link to
+             the step before). -->
+        <app-empty-state class="px-6 py-14" [icon]="emptyIcon()" [message]="emptyMessage()">
+          @if (emptyHint()) { <p hint class="empty-state-hint">{{ emptyHint() }}</p> }
+          <ng-content select="[empty-action]" />
+        </app-empty-state>
       } @else {
         <!-- The rows scroll inside their own box so the toolbar above and the pager below
              stay put. Without it a 369-entry log ran the page to 15,000px and the view
@@ -133,6 +178,8 @@ export class TableShell implements AfterViewInit {
   readonly errorRetryable = input(true);
   readonly isEmpty = input(false);
   readonly emptyMessage = input('Nothing here yet.');
+  /** Why the list is empty and what fills it, under the message (A8). */
+  readonly emptyHint = input('');
   /** Something that suggests what is missing beats a generic box on every screen. */
   readonly emptyIcon = input('inbox');
   /**
@@ -234,6 +281,7 @@ export class TableShell implements AfterViewInit {
       } catch { this.hidden.set([]); }
     }
     if (!table) return;
+    markNumberColumns(table, labels);
     const hide = labels.map(label => !!label && label.toLowerCase() !== 'actions' && this.hidden().includes(label));
     // The footer too: without it a total row kept every cell and each figure sat under the wrong heading.
     table.querySelectorAll<HTMLTableRowElement>(':scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr').forEach(row => {

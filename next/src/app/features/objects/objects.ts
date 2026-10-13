@@ -588,7 +588,7 @@ export class Objects implements OnInit {
     this.dialog.open(FileDetails, sidePanelConfig<FileDetailsData>({
       bucket: this.bucket(), key: entry.key, name: entry.name,
       size: entry.size, lastModified: entry.lastModified, contentType: entry.contentType,
-    }));
+    }, 'narrow', 'right'));
   }
 
   /** The FileChat instance currently rendered behind `@if (chatFile(); ...)`, if any. */

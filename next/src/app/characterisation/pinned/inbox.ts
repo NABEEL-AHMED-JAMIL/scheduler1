@@ -80,13 +80,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the inbox, as a tenant user without the page": {
-    "url": "/unauthorized?page=objects&title=Inbox",
+    "url": "/unauthorized?page=objects&title=File%20drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Inbox isn't part of your access"
+      "File drop isn't part of your access"
     ],
     "buttons": [
       "Request access"

@@ -153,13 +153,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "saved analyses, as a tenant user without the page": {
-    "url": "/unauthorized?page=analytics-dashboards&title=Saved%20Analyses",
+    "url": "/unauthorized?page=analytics-dashboards&title=Dashboards",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Saved Analyses isn't part of your access"
+      "Dashboards isn't part of your access"
     ],
     "buttons": [
       "Request access"

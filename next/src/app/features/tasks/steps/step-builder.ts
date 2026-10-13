@@ -376,7 +376,7 @@ export class StepBuilder {
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.
     const restoreFocus = this.layout() === 'flow' ? `[data-node][data-id="${step.key}"]` : `.step-list > li:nth-child(${index + 1}) .step-open`;
-    const config = { ...sidePanelConfig(data, 'wide'), restoreFocus };
+    const config = { ...sidePanelConfig(data, 'wide', 'right'), restoreFocus };
     this.dialog.open<Step>(StepPanel, config).closed.subscribe(edited => {
       if (!edited) return;
       this.draft.update(d => replaceStep(d, index, edited));
@@ -625,7 +625,7 @@ export class StepBuilder {
             const newest = (q.data?.jobQueues ?? []).reduce<number | null>((max, row) => (max === null || row.jobQueueId > max ? row.jobQueueId : max), null);
             if (newest === null) { this.toast.success(`${job?.jobName ?? 'The job'} queued to run.`); return; }
             const data: RunDrawerData = { jobQueueId: newest, jobId, jobName: job?.jobName ?? `Job #${jobId}` };
-            this.dialog.open(RunDrawer, sidePanelConfig(data, 'wide'));
+            this.dialog.open(RunDrawer, sidePanelConfig(data, 'wide', 'right'));
           },
           error: () => { this.busy.set(''); this.toast.success(`${job?.jobName ?? 'The job'} queued to run.`); },
         });

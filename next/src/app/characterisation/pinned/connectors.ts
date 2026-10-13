@@ -172,13 +172,13 @@ export const PINNED: Record<string, unknown> = {
     "links": []
   },
   "the page, as a tenant user without it": {
-    "url": "/unauthorized?page=connector-hub&title=Connector%20Hub",
+    "url": "/unauthorized?page=connector-hub&title=Connections",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Connector Hub isn't part of your access"
+      "Connections isn't part of your access"
     ],
     "buttons": [
       "Request access"

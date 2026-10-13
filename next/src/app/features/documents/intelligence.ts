@@ -291,7 +291,7 @@ export class DocumentIntelligence implements OnInit {
 
   openType(t: DocumentType | null): void {
     const data: TypePanelData = { documentTypeId: t?.documentTypeId ?? null, canManage: this.canManage(), types: this.types() };
-    this.dialog.open<boolean>(TypePanel, sidePanelConfig(data, 'wide')).closed.subscribe(() => this.loadTypes());
+    this.dialog.open<boolean>(TypePanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(() => this.loadTypes());
   }
 
   // -------------------------------------------------------------------------------------------- dataset

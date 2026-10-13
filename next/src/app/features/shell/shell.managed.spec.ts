@@ -9,7 +9,9 @@ const bar = (v: Visit) => v.root.querySelector('[data-managed-session]') as HTML
 const said = (el: Element | null) => el?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 
 async function openAdministration(v: Visit): Promise<string[]> {
-  const button = v.root.querySelector('[data-nav-menu="Administration"] > button') as HTMLElement;
+  const group = Array.from(v.root.querySelectorAll('[data-nav-menu]'))
+    .find(el => el.getAttribute('data-nav-menu') === 'Administration & billing')!;
+  const button = group.querySelector(':scope > button') as HTMLElement;
   button.click();
   const made = await v.settle();
   button.click();
@@ -52,9 +54,10 @@ describe('MIG-254: the shell and the managed service', () => {
     }
   });
 
-  it('a platform administrator finds the managed service in Administration', async () => {
+  // UX review 2026-10-12 (A10, PL2): the platform's pages are one group of their own.
+  it('a platform administrator finds the managed service under Platform', async () => {
     const v = await visit('/dashboard', 'PLATFORM_ADMIN', null);
-    const menu = (await menuOf(v)).filter(e => e.startsWith('Administration'));
+    const menu = (await menuOf(v)).filter(e => e.startsWith('Platform') || e.startsWith('Administration'));
     expect(menu.some(e => e.includes('Managed service') && e.endsWith('-> /administration/managed-service'))).toBe(true);
     expect(menu.some(e => e.includes('Staff activity') && e.endsWith('-> /administration/staff-activity'))).toBe(true);
     expect(menu.some(e => e.includes('Work in a workspace') && e.endsWith('-> /administration/work-in-workspace'))).toBe(true);

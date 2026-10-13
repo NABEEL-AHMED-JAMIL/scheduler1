@@ -89,7 +89,7 @@ export const routes: Routes = [
       },
       {
         path: 'dashboard',
-        title: 'Dashboard',
+        title: 'Home',
         loadComponent: () => import('./features/dashboard/dashboard').then(m => m.Dashboard),
       },
       // ---------------------------------------------------------------------------------------------
@@ -103,7 +103,7 @@ export const routes: Routes = [
         // Infrastructure a pipeline reads from and writes to. Role-gated, not page-keyed: every call
         // behind it is TENANT_ADMIN.
         path: 'integration/storage-connections',
-        title: 'Storage Connections',
+        title: 'Storage connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
         data: { minRole: 'TENANT_ADMIN' },
@@ -166,7 +166,7 @@ export const routes: Routes = [
         // sync health, from integration-service's /connectorHub.json, gated by connector-hub at the gateway. Every member
         // holding the page reads; connecting and changing are a workspace administrator's (the page hides them otherwise).
         path: 'integration/connectors',
-        title: 'Connector Hub',
+        title: 'Connections',
         loadComponent: () => import('./features/integration/connectors/connectors').then(m => m.Connectors),
         data: { pageKey: 'connector-hub' },
         canActivate: [pageGuard],
@@ -215,14 +215,14 @@ export const routes: Routes = [
       },
       {
         path: 'pipelines/:taskDetailId/edit',
-        title: 'Edit pipeline',
+        title: 'Pipeline',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
         data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'pipelines/schedules',
-        title: 'Schedules',
+        title: 'Schedules & triggers',
         loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
@@ -243,7 +243,7 @@ export const routes: Routes = [
       },
       {
         path: 'pipelines/schedules/:jobId/edit',
-        title: 'Edit schedule',
+        title: 'Schedule',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
@@ -259,7 +259,7 @@ export const routes: Routes = [
       {
         // One schedule's executions (was its Run history).
         path: 'pipelines/schedules/:jobId/executions',
-        title: 'Executions',
+        title: 'Schedule runs',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
         data: { pageKey: 'jobs' },
@@ -267,7 +267,7 @@ export const routes: Routes = [
       },
       {
         path: 'pipelines/schedules/:jobId/runs/:jobQueueId/logs',
-        title: 'Run logs',
+        title: 'Run',
         loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
         data: { pageKey: 'jobs' },
         canActivate: [pageGuard],
@@ -276,7 +276,7 @@ export const routes: Routes = [
         // Same screen without a schedule: the dashboard's TOTAL row drills into an hour across
         // every schedule, which has no single id to put in the path.
         path: 'pipelines/executions',
-        title: 'Executions',
+        title: 'Runs',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
         data: { pageKey: 'jobs' },
@@ -284,7 +284,7 @@ export const routes: Routes = [
       },
       {
         path: 'pipelines/queue',
-        title: 'Queue',
+        title: 'Runs by date',
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
         data: { pageKey: 'queue' },
         canActivate: [pageGuard],
@@ -304,7 +304,7 @@ export const routes: Routes = [
         // MIG-272: documents read into structured data -- the overview, the document types with their editor, and each
         // type's dataset. Every member holding the page reads, reads documents and extracts; a type is an administrator's.
         path: 'documents/intelligence',
-        title: 'Document Intelligence',
+        title: 'Documents in',
         loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
         data: { pageKey: 'document-intelligence' },
         canActivate: [pageGuard],
@@ -312,7 +312,7 @@ export const routes: Routes = [
       {
         // MIG-272: the review queue, and one document under review beside its page image.
         path: 'documents/review',
-        title: 'Review queue',
+        title: 'Document review',
         loadComponent: () => import('./features/documents/review-queue').then(m => m.ReviewQueue),
         data: { pageKey: 'document-review' },
         canActivate: [pageGuard],
@@ -335,7 +335,7 @@ export const routes: Routes = [
         // MIG-253: generated outputs -- renders saved to a bucket and what recent runs put out. Behind the
         // converter's key: it lists what the converter makes, and there is no page key of its own yet.
         path: 'documents/reports',
-        title: 'Reports',
+        title: 'Generated reports',
         loadComponent: () => import('./features/documents/generated/generated-reports').then(m => m.GeneratedReports),
         data: { pageKey: 'tools-converter' },
         canActivate: [pageGuard],
@@ -358,7 +358,7 @@ export const routes: Routes = [
         // floor: the gateway leaves /storage.json open, storage-service lets every member read and upload, and only
         // configuring it is an administrator's (gated inside the page).
         path: 'documents/inbox',
-        title: 'Inbox',
+        title: 'File drop',
         loadComponent: () => import('./features/documents/inbox/inbox').then(m => m.Inbox),
         data: { pageKey: 'objects', minRole: 'TENANT_USER' },
         canActivate: [pageGuard, roleGuard],
@@ -414,7 +414,7 @@ export const routes: Routes = [
         // rule the server already enforces per request -- and it would be the wrong one, since
         // dashboards are read and built by the same TENANT_USER who may open a dataset.
         path: 'data/analytics/dashboards',
-        title: 'Saved Analyses',
+        title: 'Dashboards',
         loadComponent: () => import('./features/analytics/dashboard').then(m => m.Dashboards),
         data: { pageKey: 'analytics-dashboards' },
         canActivate: [pageGuard],
@@ -442,7 +442,7 @@ export const routes: Routes = [
       {
         // What the forms collected (/formSubmission.json), page 'form-submissions': who, when, and the run each started.
         path: 'forms/submissions',
-        title: 'Submissions',
+        title: 'Form submissions',
         loadComponent: () => import('./features/forms/form-submissions').then(m => m.FormSubmissions),
         data: { pageKey: 'form-submissions' },
         canActivate: [pageGuard],
@@ -451,7 +451,7 @@ export const routes: Routes = [
         // Wave 5 Workflows (MIG-276): the approvals and tasks waiting for the reader, page 'task-inbox'. My requests is
         // the same screen on its own tab, where a requester follows what they started.
         path: 'workflows/inbox',
-        title: 'Task inbox',
+        title: 'Review inbox',
         loadComponent: () => import('./features/workflows/task-inbox').then(m => m.TaskInbox),
         data: { pageKey: 'task-inbox' },
         canActivate: [pageGuard],
@@ -466,7 +466,7 @@ export const routes: Routes = [
       {
         // The workflows' steps, page 'workflow-designer': an administrator edits and publishes, everyone else reads.
         path: 'workflows/designer',
-        title: 'Workflow designer',
+        title: 'Approval workflows',
         loadComponent: () => import('./features/workflows/workflow-designer').then(m => m.WorkflowDesigner),
         data: { pageKey: 'workflow-designer' },
         canActivate: [pageGuard],
@@ -493,7 +493,7 @@ export const routes: Routes = [
       },
       {
         path: 'ai/prompts/:promptId/edit',
-        title: 'Edit prompt',
+        title: 'Prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
         data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
         canActivate: [pageGuard, roleGuard],
@@ -640,7 +640,7 @@ export const routes: Routes = [
       },
       {
         path: 'administration/access-profiles',
-        title: 'Access profiles',
+        title: 'Page access',
         loadComponent: () =>
           import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
         data: { minRole: 'TENANT_ADMIN' },
@@ -662,14 +662,14 @@ export const routes: Routes = [
         // single sign-on and the sign-in history. Role-gated like Users: every call behind it is TENANT_ADMIN, and a platform
         // administrator also sets the platform's defaults here.
         path: 'administration/security',
-        title: 'Security',
+        title: 'Sign-in security',
         loadComponent: () => import('./features/admin/security/workspace-security').then(m => m.WorkspaceSecurity),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
         path: 'administration/tenants',
-        title: 'Tenants',
+        title: 'Workspaces',
         loadComponent: () => import('./features/admin/tenants/tenants').then(m => m.Tenants),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
@@ -736,7 +736,7 @@ export const routes: Routes = [
       {
         // MIG-353: My account › Security -- the person's own password, two-factor login, sessions and sign-in history.
         path: 'account/security',
-        title: 'Security',
+        title: 'My security',
         loadComponent: () => import('./features/account/account-security').then(m => m.AccountSecurity),
       },
       {

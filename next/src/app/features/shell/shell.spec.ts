@@ -50,7 +50,9 @@ describe('shell navigation', () => {
     const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
     expect(tagged).toEqual([
       '/ai/assistant', '/ai/prompts', '/ai/tools', '/data/analytics', '/data/analytics/dashboards', '/data/ask', '/data/catalog',
-      '/documents/converter', '/documents/files', '/documents/inbox', '/documents/intelligence', '/documents/reports', '/documents/review',
+      // Documents in and Document types (its tab) are one page, behind one key.
+      '/documents/converter', '/documents/files', '/documents/inbox', '/documents/intelligence', '/documents/intelligence',
+      '/documents/reports', '/documents/review',
       '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
       '/integration/connectors', '/integration/sources', '/pipelines', '/pipelines/executions', '/pipelines/queue', '/pipelines/run-analytics',
       '/pipelines/schedules', '/workflows/designer', '/workflows/inbox',
@@ -85,16 +87,16 @@ describe('shell navigation', () => {
     localStorage.removeItem('etl_auth_user');
   });
 
-  it('offers the saved-analysis library, which had a route and no way to reach it', () => {
+  it('offers the saved-analysis library, which had a route and no way to reach it, as Dashboards (G12)', () => {
     const saved = children().find(child => child.path === '/data/analytics/dashboards');
     expect(saved).toBeDefined();
-    expect(saved?.label).toBe('Saved Analyses');
+    expect(saved?.label).toBe('Dashboards');
   });
 
   it('names an icon the icon set actually has', () => {
     // An unknown name renders nothing, which reads as a layout bug rather than a missing glyph.
     const saved = children().find(child => child.path === '/data/analytics/dashboards');
-    expect(saved?.icon).toBe('save');
+    expect(saved?.icon).toBe('template');
   });
 
   it('marks a parent route exact, so standing on the child does not light both', () => {
@@ -127,7 +129,8 @@ describe('shell navigation', () => {
       });
       const built = TestBed.createComponent(Shell).componentInstance;
       localStorage.removeItem('etl_auth_user');
-      return (built.nav().find(item => item.label === 'Configuration')?.children ?? []).map(child => child.path);
+      return built.nav().flatMap(item => item.children ?? []).filter(child => child.path.startsWith('/configuration/'))
+        .map(child => child.path);
     };
 
     const tenant = configurationFor('TENANT_ADMIN');
@@ -164,9 +167,9 @@ describe('shell navigation', () => {
   describe('header menus and the keyboard', () => {
     it('puts focus back on the trigger when Escape closes a menu', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Pipelines');
+      s.toggleMenu('Build');
       await fixture.whenStable();
-      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Pipelines"]')!;
+      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Build"]')!;
       const link = menu.querySelector<HTMLElement>('a')!;
       link.focus();
       expect(document.activeElement).toBe(link);
@@ -192,13 +195,13 @@ describe('shell navigation', () => {
 
     it('closes a menu when focus tabs out of it, and keeps it open while focus moves inside', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Pipelines');
+      s.toggleMenu('Build');
       await fixture.whenStable();
-      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Pipelines"]')!;
+      const menu = el.querySelector<HTMLElement>('[data-nav-menu="Build"]')!;
       const [first, second] = Array.from(menu.querySelectorAll<HTMLElement>('a'));
 
       first.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: second }));
-      expect(s.openMenu()).toBe('Pipelines');
+      expect(s.openMenu()).toBe('Build');
 
       const outside = el.querySelector<HTMLElement>('main')!;
       second.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: outside }));
@@ -207,24 +210,24 @@ describe('shell navigation', () => {
 
     it('describes the panels as disclosures: expanded and controls, not a menu popup', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Documents');
+      s.toggleMenu('Get data in');
       await fixture.whenStable();
       expect(el.querySelector('[aria-haspopup]')).toBeNull();
-      const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Documents"] > button')!;
+      const trigger = el.querySelector<HTMLElement>('[data-nav-menu="Get data in"] > button')!;
       const panel = el.querySelector<HTMLElement>('#' + trigger.getAttribute('aria-controls'));
       expect(panel).not.toBeNull();
-      expect(panel!.querySelector('a[href="/documents/files"]')).not.toBeNull();
+      expect(panel!.querySelector('a[href="/documents/inbox"]')).not.toBeNull();
     });
 
     it('marks an entry whose page is not built yet as coming, and only those', async () => {
       const { fixture, shell: s, el } = await rendered();
-      s.toggleMenu('Data');
+      s.toggleMenu('Get data in');
       await fixture.whenStable();
-      // Every Data entry is marked exactly when its page is not built; Ask your data is built (Wave 5).
-      const data = s.nav().find(item => item.label === 'Data')!.children ?? [];
-      expect(data.find(c => c.path === '/data/ask')?.soon).toBeFalsy();
+      // Every entry is marked exactly when its page is not built; Connections is built (Wave 5).
+      const data = s.nav().find(item => item.label === 'Get data in')!.children ?? [];
+      expect(data.find(c => c.path === '/integration/connectors')?.soon).toBeFalsy();
       for (const entry of data) {
-        const link = el.querySelector<HTMLElement>(`[data-nav-menu="Data"] a[href="${entry.path}"]`)!;
+        const link = el.querySelector<HTMLElement>(`[data-nav-menu="Get data in"] a[href="${entry.path}"]`)!;
         if (entry.soon) expect(link.querySelector('.pill')?.textContent?.trim(), entry.path).toBe('Soon');
         else expect(link.querySelector('.pill'), entry.path).toBeNull();
       }
@@ -280,10 +283,10 @@ describe('shell navigation', () => {
       const { el } = await rendered();
       const wordmark = el.querySelector<HTMLElement>('header app-brand-mark span')!;
       expect(wordmark.className).toContain('nav:hidden');
-      expect(wordmark.className).toContain('2xl:block');
+      expect(wordmark.className).toContain('wide:block');
       expect(el.querySelector<HTMLElement>('header nav')!.className).toContain('nav:flex');
       expect(el.querySelector<HTMLElement>('header button[aria-label="Menu"]')!.className).toContain('nav:hidden');
-      const trigger = el.querySelector<HTMLElement>('header nav [data-nav-menu="Pipelines"] > button')!;
+      const trigger = el.querySelector<HTMLElement>('header nav [data-nav-menu="Build"] > button')!;
       expect(trigger.className).toContain('px-1');
       expect(trigger.className).toContain('xl:px-2');
       expect(trigger.className).toContain('2xl:px-2.5');
@@ -295,7 +298,7 @@ describe('shell navigation', () => {
       expect(name).not.toBeNull();
       expect(name!.className).toContain('max-w-36');
       expect(name!.className).toContain('nav:hidden');
-      expect(name!.className).toContain('2xl:block');
+      expect(name!.className).toContain('wide:block');
       expect(name!.hasAttribute('title')).toBe(true);
     });
   });

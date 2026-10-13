@@ -5,8 +5,8 @@ import { Icon } from './icon';
 /**
  * A panel for work too long for a table row or a small dialog -- a topic's fifty pipelines, a source's settings, a
  * step's configuration: a head with the title and Close, a body that scrolls, a foot that stays. Opened through the
- * CDK Dialog with {@link sidePanelConfig}. Centred, like every dialog (owner, 2026-09-30: a drawer pinned to the right
- * edge of a wide screen read as a dialog opened in the wrong place).
+ * CDK Dialog with {@link sidePanelConfig}: centred for a picker or a form (owner, 2026-09-30), or sliding over the
+ * right for a row's detail (UX review 2026-10-12, A9, after the owner's reference screens of 10-12).
  */
 @Component({
   selector: 'app-side-panel',
@@ -33,7 +33,12 @@ export class SidePanel {
   readonly subtitle = input('');
 }
 
-/** Dialog config for a panel: centred, narrow (36rem) or wide (58rem), up to 85% of the window's height. */
-export function sidePanelConfig<D>(data: D, width: 'narrow' | 'wide' = 'narrow') {
-  return { data, panelClass: width === 'wide' ? ['side-panel-host', 'side-panel-wide'] : 'side-panel-host', hasBackdrop: true, autoFocus: 'first-tabbable' as const };
+/**
+ * Dialog config for a panel: narrow (36rem) or wide (58rem). Centred, up to 85% of the window's height -- a picker, a
+ * settings form -- or, `place: 'right'`, a row's detail sliding over the right of the screen at full height (UX review
+ * 2026-10-12, A9 and G9: the catalog asset, a pipeline's step, a connection, a run), with the list still beside it.
+ */
+export function sidePanelConfig<D>(data: D, width: 'narrow' | 'wide' = 'narrow', place: 'center' | 'right' = 'center') {
+  const panelClass = ['side-panel-host', ...(width === 'wide' ? ['side-panel-wide'] : []), ...(place === 'right' ? ['side-panel-right'] : [])];
+  return { data, panelClass: panelClass.length === 1 ? panelClass[0] : panelClass, hasBackdrop: true, autoFocus: 'first-tabbable' as const };
 }

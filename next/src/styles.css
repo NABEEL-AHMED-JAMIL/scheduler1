@@ -50,6 +50,8 @@
      had it behind the menu button at xl (review 2026-10-07). A named breakpoint, not min-[1180px]: Tailwind writes
      arbitrary ones before sm/md/lg, so sm:block outranked them. */
   --breakpoint-nav: 73.75rem;
+  /* UX review 2026-10-12 (N2): from 1440px the menu is a sidebar on the left; below it the top bar's groups. */
+  --breakpoint-wide: 90rem;
   --color-ink-50:  #f9fafb;
   --color-ink-100: #f3f4f6;
   --color-ink-200: #e5e7eb;
@@ -468,7 +470,10 @@
    overlays, toasts -- is a real component built on the CDK.
    --------------------------------------------------------------------------- */
 @layer components {
+  /* UX review 2026-10-12 (A1, G2): every button carries a 1px border, transparent where the variant has none, so a
+     primary sits at exactly the height of the bordered default button beside it (it was 2px shorter on 61 screens). */
   .btn {
+    border: 1px solid transparent;
     @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5
            text-sm font-medium transition-colors select-none
            disabled:pointer-events-none;
@@ -525,7 +530,8 @@
     color: var(--btn-danger-fg);
     @apply hover:brightness-110;
   }
-  .btn-sm { @apply px-2.5 py-1 text-xs; }
+  /* One control height for a header, a toolbar and a panel: 28px (A1). */
+  .btn-sm { min-height: 1.75rem; @apply px-2.5 py-1 text-xs; }
   /* For a panel toolbar, where btn-sm still wraps onto a second row. */
   .btn-xs { @apply px-2 py-0.5 text-[11px] gap-1; }
   /* A round, bordered icon button for row-level add/remove. The ghost variant carried almost
@@ -1195,8 +1201,14 @@
   }
   .table-modern tbody td {
     border-color: var(--border-subtle);
+    font-variant-numeric: tabular-nums;
     @apply border-b px-4 py-2.5 align-middle;
   }
+  /* UX review 2026-10-12 (A6, G4): a number, a duration, a percentage or an amount reads right-aligned in tabular
+     figures, its heading too, so a column of them lines up by place value. app-table-shell marks such columns on its
+     own; a table outside it writes .num on the th and the td. */
+  .num, .table-modern :is(th, td).num { text-align: right; font-variant-numeric: tabular-nums; }
+  .table-modern th.num .th-sort { flex-direction: row-reverse; }
   .table-modern tbody tr:last-child td { @apply border-b-0; }
 
   /* tfoot had no rule at all, so total rows rendered with zero padding and their
@@ -1417,6 +1429,48 @@ html.dark .btn-intent-warn:focus app-icon { color: var(--color-warn-400); }
     color: var(--accent-text);
   }
   .nav-child-active .nav-child-icon { color: var(--accent-text); }
+
+  /* A group's panel under its top-bar menu, or beside the collapsed sidebar's icon. A group with sub-headings
+     (Administration & billing) lays them out in columns rather than one list taller than the screen. */
+  .nav-panel {
+    @apply absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle;
+    max-height: calc(100dvh - 4.5rem);
+    overflow-y: auto;
+  }
+  .nav-panel-end { left: auto; right: 0; }
+  .nav-panel-columns { display: grid; grid-template-columns: repeat(2, minmax(16rem, 1fr)); column-gap: 0.25rem; width: max-content; }
+  .nav-panel-columns > .nav-section { grid-column: 1 / -1; }
+  .nav-section {
+    @apply px-2.5 pt-2 pb-0.5 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)];
+  }
+
+  .app-sidebar {
+    display: none;
+    position: sticky;
+    top: 3.5rem;
+    height: calc(100dvh - 3.5rem);
+    width: 15rem;
+    flex: none;
+    flex-direction: column;
+    border-right: 1px solid var(--border-subtle);
+    background: var(--surface-raised);
+  }
+  @media (min-width: 90rem) { .app-sidebar { display: flex; } }
+  .app-sidebar.is-collapsed { width: 3.5rem; }
+  .app-sidebar-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0.75rem 0.5rem; }
+  .app-sidebar.is-collapsed .app-sidebar-scroll { overflow: visible; }
+  .side-group { margin-top: 0.875rem; }
+  .side-group-label {
+    @apply px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)];
+  }
+  .side-group .nav-section { @apply pt-1.5 normal-case tracking-normal font-medium; }
+  .side-link { @apply items-center py-1.5; }
+  .side-link .nav-child-icon { margin-top: 0; }
+  .side-label { @apply truncate leading-5; }
+  .app-sidebar.is-collapsed .side-link { justify-content: center; padding-inline: 0; }
+  .app-sidebar.is-collapsed .side-label { display: none; }
+  .side-collapse { @apply m-2 mt-0 border-t border-subtle rounded-none pt-2.5; }
+  .side-flyout { left: calc(100% + 0.5rem); top: 0; margin-top: 0; }
 
   /* Compact key/value pairs for the context panels. */
   .detail-head {
@@ -1690,7 +1744,11 @@ html.dark {
      took the full 2.25rem .input and stood a third taller than the buttons beside it. Same padding,
      line and border as .btn-sm, so the row lines up by construction (vertical only: horizontal
      padding stays the field's, so a search box's icon inset survives). */
-  .page-head:has(.btn-sm) .input { min-height: 0; @apply py-1 text-xs; }
+  .page-head:has(.btn-sm) .input { min-height: 1.75rem; @apply py-1 text-xs; }
+  /* A select or a segmented control among a header's or a toolbar's buttons takes their height too (A1: the
+     assistant's model select stood 19px beside 26px buttons). */
+  :is(.page-head, .table-toolbar) .seg-btn { padding-block: 0.1875rem; }
+  :is(.page-head, .table-toolbar) select.input { min-height: 1.75rem; }
   /* A list's toolbar (app-table-shell) held a 30px view toggle, 36px filters and 26px buttons in one
      row. Every control there is the view toggle's height, and the filters take the compact type. */
   /* Height and type only: horizontal padding is the field's own (a search box keeps pl-8 for its
@@ -1698,8 +1756,7 @@ html.dark {
   /* When the toolbar wraps (tablet), what wraps lines up under the controls on the right instead of stranding one
      or two of them flush left; the heading keeps the left with its mr-auto. */
   .table-toolbar > div[toolbar] { justify-content: flex-end; }
-  .table-toolbar .input { min-height: 1.875rem; @apply py-1 text-xs; }
-  .table-toolbar .btn-sm { min-height: 1.875rem; }
+  .table-toolbar .input { min-height: 1.75rem; @apply py-1 text-xs; }
   /* A toolbar combobox's list follows its compact 12px box, as a form's follows its 14px one. */
   .table-toolbar [role="listbox"] { @apply text-xs; }
   /* Joined controls: a stepper such as "< September 2026 >" built from .btn-sm pieces, one box. */
@@ -1709,6 +1766,13 @@ html.dark {
   .btn-join > .btn:last-child { @apply rounded-r-md; }
   .btn-join > .btn + .btn { margin-left: -1px; }
   .btn-join > .btn-label { @apply cursor-default font-medium; pointer-events: none; }
+  /* UX review 2026-10-12, Batch A: the page header, section, form row, actions bar and empty state carry their own
+     styles (shared/ui/*.ts), so they load with the pages rather than in the first paint. */
+  /* A7: a row of app-stat-tile, drawn as app-stat-strip: one surface, hairlines between the tiles, and no blank
+     square of border colour when the last row is short. */
+  .stat-strip.stat-row { gap: 0; background: var(--surface-raised); }
+  .stat-row > .stat-strip-cell { box-shadow: -1px 0 0 var(--border-subtle), 0 -1px 0 var(--border-subtle); }
+
   .page-title      { @apply text-2xl font-semibold tracking-tight; }
   .page-subtitle   { @apply text-sm text-[color:var(--text-secondary)] mt-1; }
 
@@ -2028,6 +2092,12 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
    global wrapper is a centred flex box); the panel keeps its head, scrolling body and pinned foot, sized to its content
    up to 85% of the window's height, as the form dialogs are (the same card, border and shadow). */
 .side-panel-host { width: min(36rem, calc(100vw - 2rem)); max-height: 85vh; }
+/* UX review 2026-10-12 (A9, G9): a row's detail slides over the right of the screen, as the reference products' detail
+   panel does, rather than a modal over the middle of the list. Full height; the list stays readable beside it. */
+.side-panel-host.side-panel-right { position: fixed !important; top: 0; right: 0; bottom: 0; margin: 0 !important; max-height: none; height: 100dvh; }
+.side-panel-right .side-panel { max-height: none; height: 100%; border-radius: 0; border-width: 0 0 0 1px; animation: side-panel-slide 180ms ease-out; }
+@keyframes side-panel-slide { from { transform: translateX(1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .side-panel-right .side-panel { animation: none; } }
 .side-panel-host > * { display: block; }
 .side-panel-host.side-panel-wide { width: min(58rem, calc(100vw - 2rem)); }
 .side-panel { max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; background: var(--surface-raised);

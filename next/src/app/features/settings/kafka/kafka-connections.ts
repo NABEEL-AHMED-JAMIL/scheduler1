@@ -361,7 +361,7 @@ export class KafkaConnections implements OnInit {
       topicName: type.serviceName,
       kafkaTopic: parseTopicPartition(type.queueTopicPartition).topic,
       pipelines: this.pipelinesOf(type),
-    }));
+    }, 'narrow', 'right'));
   }
 
   /**

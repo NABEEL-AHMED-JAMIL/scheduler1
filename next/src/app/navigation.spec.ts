@@ -14,8 +14,8 @@ import { useMemoryStorage } from './shared/testing/memory-storage';
 /**
  * MIG-246 (Wave 4) and MIG-267 (Wave 5): the console's top navigation after the MIG-218 renames.
  *
- * Menu groups: Dashboard, Integration, Pipelines, Documents, Data, Forms, AI,
- * Configuration, Billing, Administration. The renames are UI labels only -- database and API names
+ * UX review 2026-10-12 (A10): menu groups by job -- Home, Get data in, Build, Run & review, See results,
+ * Administration & billing, Platform. The renames are UI labels only -- database and API names
  * and the access-profile page keys keep their meaning -- and every address the console ever had
  * still lands on its page: a bookmark, a document link or a stored notification link never ends on
  * "Page not found".
@@ -181,18 +181,18 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/pipelines', 'Pipelines', 'tasks', undefined],
     ['/pipelines/new', 'New pipeline', 'tasks', 'TENANT_ADMIN'],
     ['/pipelines/bulk', 'Bulk pipelines', 'tasks', 'TENANT_ADMIN'],
-    ['/pipelines/:taskDetailId/edit', 'Edit pipeline', 'tasks', 'TENANT_ADMIN'],
-    ['/pipelines/schedules', 'Schedules', 'jobs', undefined],
+    ['/pipelines/:taskDetailId/edit', 'Pipeline', 'tasks', 'TENANT_ADMIN'],
+    ['/pipelines/schedules', 'Schedules & triggers', 'jobs', undefined],
     ['/pipelines/schedules/new', 'New schedule', 'jobs', undefined],
     ['/pipelines/schedules/bulk', 'Bulk schedules', 'jobs', undefined],
-    ['/pipelines/schedules/:jobId/edit', 'Edit schedule', 'jobs', undefined],
+    ['/pipelines/schedules/:jobId/edit', 'Schedule', 'jobs', undefined],
     ['/pipelines/schedules/:jobId/assistant', 'Schedule assistant', 'jobs', undefined],
-    ['/pipelines/schedules/:jobId/executions', 'Executions', 'jobs', undefined],
-    ['/pipelines/schedules/:jobId/runs/:jobQueueId/logs', 'Run logs', 'jobs', undefined],
-    ['/pipelines/executions', 'Executions', 'jobs', undefined],
-    ['/pipelines/queue', 'Queue', 'queue', undefined],
+    ['/pipelines/schedules/:jobId/executions', 'Schedule runs', 'jobs', undefined],
+    ['/pipelines/schedules/:jobId/runs/:jobQueueId/logs', 'Run', 'jobs', undefined],
+    ['/pipelines/executions', 'Runs', 'jobs', undefined],
+    ['/pipelines/queue', 'Runs by date', 'queue', undefined],
     ['/pipelines/run-analytics', 'Run analytics', 'reports', undefined],
-    ['/integration/storage-connections', 'Storage Connections', undefined, 'TENANT_ADMIN'],
+    ['/integration/storage-connections', 'Storage connections', undefined, 'TENANT_ADMIN'],
     // MIG-332: the customer API's clients and event routes, an administrator's.
     ['/integration/api-clients', 'API Clients', undefined, 'TENANT_ADMIN'],
     // MIG-336: the developer portal; its pages are lazy children (features/developer/developer.routes.ts).
@@ -203,27 +203,27 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     // MIG-248: built. Sources, database connections and data contracts, on the one page key Identity serves.
     ['/integration/sources', 'Sources', 'sources', undefined],
     // MIG-292: built. Connector Hub, and the page an OAuth provider sends the browser back to.
-    ['/integration/connectors', 'Connector Hub', 'connector-hub', undefined],
+    ['/integration/connectors', 'Connections', 'connector-hub', undefined],
     ['/integration/connectors/oauth/callback', 'Connecting', 'connector-hub', undefined],
     // MIG-272: built. Every member holding the page reads, extracts and reviews; a type's editor hides its save.
-    ['/documents/intelligence', 'Document Intelligence', 'document-intelligence', undefined],
-    ['/documents/review', 'Review queue', 'document-review', undefined],
+    ['/documents/intelligence', 'Documents in', 'document-intelligence', undefined],
+    ['/documents/review', 'Document review', 'document-review', undefined],
     ['/documents/review/:extractionId', 'Review a document', 'document-review', undefined],
     ['/documents/files', 'Browse files', 'objects', 'TENANT_USER'],
     // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
-    ['/documents/inbox', 'Inbox', 'objects', 'TENANT_USER'],
+    ['/documents/inbox', 'File drop', 'objects', 'TENANT_USER'],
     ['/documents/converter', 'Document Converter', 'tools-converter', undefined],
     // MIG-253: generated outputs, behind the converter's key (no key of its own yet).
-    ['/documents/reports', 'Reports', 'tools-converter', undefined],
+    ['/documents/reports', 'Generated reports', 'tools-converter', undefined],
     ['/documents/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],
-    ['/data/analytics/dashboards', 'Saved Analyses', 'analytics-dashboards', undefined],
+    ['/data/analytics/dashboards', 'Dashboards', 'analytics-dashboards', undefined],
     // MIG-252: built. The assistant and its tools ride the Prompts key.
     ['/ai/assistant', 'AI Assistant', 'ai-prompts', undefined],
     ['/ai/tools', 'Tool Registry', 'ai-prompts', undefined],
     ['/ai/prompts', 'Prompts', 'ai-prompts', undefined],
     ['/ai/prompts/new', 'New prompt', 'ai-prompts', 'TENANT_ADMIN'],
-    ['/ai/prompts/:promptId/edit', 'Edit prompt', 'ai-prompts', 'TENANT_ADMIN'],
+    ['/ai/prompts/:promptId/edit', 'Prompt', 'ai-prompts', 'TENANT_ADMIN'],
     ['/ai/connections', 'Model connections', undefined, 'TENANT_ADMIN'],
     ['/configuration/task-registry', 'Task Registry', undefined, 'TENANT_ADMIN'],
   ];
@@ -262,9 +262,9 @@ describe('MIG-246 / MIG-267: pages still to be built get a gated entry point', (
     expect(route!.loadComponent).toBeDefined();
   });
 
-  it('/integration/connectors is the built Connector Hub: titled and gated by connector-hub', () => {
+  it('/integration/connectors is the built Connector Hub, titled Connections: gated by connector-hub', () => {
     const route = byPath('/integration/connectors');
-    expect(route?.title).toBe('Connector Hub');
+    expect(route?.title).toBe('Connections');
     expect(route?.data?.['pageKey']).toBe('connector-hub');
     expect(route?.canActivate).toContain(pageGuard);
   });
@@ -314,153 +314,128 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       : (item.children ?? []).map(c => `${item.label} › ${c.label}${c.soon ? ' (soon)' : ''} -> ${c.path}`));
   }
 
-  const DASHBOARD = ['Dashboard -> /dashboard'];
-  const INTEGRATION_SOON = [
-    'Integration › Connector Hub -> /integration/connectors',
-    'Integration › API Collections -> /integration/api-collections',
-    'Integration › Sources -> /integration/sources',
+  // UX review 2026-10-12 (A10): grouped by job, one name per thing; every entry keeps its page key and least role.
+  const HOME = ['Home -> /dashboard'];
+  const CONNECTIONS = 'Get data in › Connections -> /integration/connectors';
+  const STORAGE = 'Get data in › Storage connections -> /integration/storage-connections';
+  const API_AND_SOURCES = [
+    'Get data in › API Collections -> /integration/api-collections',
+    'Get data in › Sources -> /integration/sources',
   ];
-  const PIPELINES = [
-    'Pipelines › Pipelines -> /pipelines',
-    'Pipelines › Schedules -> /pipelines/schedules',
-    'Pipelines › Executions -> /pipelines/executions',
-    'Pipelines › Queue -> /pipelines/queue',
-    'Pipelines › Run analytics -> /pipelines/run-analytics',
-  ];
-  const DOCUMENT_INTELLIGENCE = [
-    'Documents › Document Intelligence -> /documents/intelligence',
-    'Documents › Review queue -> /documents/review',
-  ];
-  const DOCUMENTS = [
-    'Documents › Document Converter -> /documents/converter',
-    'Documents › Reports -> /documents/reports',
-    'Documents › Browse files -> /documents/files',
-    'Documents › Inbox -> /documents/inbox',
-    'Documents › Audio Transcript -> /documents/transcript',
-  ];
-  const DATA_SOON = [
-    'Data › Ask your data -> /data/ask',
-    'Data › Data Catalog -> /data/catalog',
-  ];
-  const DATA = [
-    'Data › Analytics Studio -> /data/analytics',
-    'Data › Saved Analyses -> /data/analytics/dashboards',
-  ];
-  const FORMS_AND_WORKFLOWS = [
-    'Forms › All forms -> /forms/builder',
-    'Forms › Submissions -> /forms/submissions',
-    'Workflows › Task inbox -> /workflows/inbox',
-    'Workflows › Workflow designer -> /workflows/designer',
-  ];
-  const CONFIGURATION = [
-    'Configuration › Task Registry -> /configuration/task-registry',
-    'Configuration › Kafka & Topics -> /configuration/kafka',
-    'Configuration › Configuration values -> /configuration/values',
-    'Configuration › Home pages -> /configuration/home-pages',
-    'Configuration › Task groups -> /configuration/task-groups',
-  ];
-  const BILLING = [
-    'Billing › Cost & usage -> /billing/usage',
-    'Billing › Invoices -> /billing/invoices',
-    'Billing › Billing documents -> /billing/documents',
-  ];
-  const ADMINISTRATION = [
-    'Administration › Users -> /administration/users',
-    'Administration › Access profiles -> /administration/access-profiles',
+  const DOCUMENTS_IN = 'Get data in › Documents in -> /documents/intelligence';
+  const FILE_DROP = 'Get data in › File drop -> /documents/inbox';
+  const FORMS = ['Get data in › Forms -> /forms/builder', 'Get data in › Form submissions -> /forms/submissions'];
+  const PIPELINES = 'Build › Pipelines -> /pipelines';
+  const AI_BUILD = ['Build › AI Assistant -> /ai/assistant', 'Build › Prompts -> /ai/prompts'];
+  const DOCUMENT_TYPES = 'Build › Document types -> /documents/intelligence';
+  const APPROVALS = 'Build › Approval workflows -> /workflows/designer';
+  const RUNS = 'Run & review › Runs -> /pipelines/executions';
+  const RUNS_BY_DATE = 'Run & review › Runs by date -> /pipelines/queue';
+  const SCHEDULES = 'Run & review › Schedules & triggers -> /pipelines/schedules';
+  const REVIEW_INBOX = 'Run & review › Review inbox -> /workflows/inbox';
+  const DOCUMENT_REVIEW = 'Run & review › Document review -> /documents/review';
+  const RUN_ANALYTICS = 'Run & review › Run analytics -> /pipelines/run-analytics';
+  const DASHBOARDS = 'See results › Dashboards -> /data/analytics/dashboards';
+  const ASK_AND_CATALOG = ['See results › Ask your data -> /data/ask'];
+  const STUDIO = 'See results › Analytics Studio -> /data/analytics';
+  const CATALOG = 'See results › Data Catalog -> /data/catalog';
+  const GENERATED = 'See results › Generated reports -> /documents/reports';
+  const BROWSE = 'See results › Browse files -> /documents/files';
+  const TOOLS = ['See results › Document Converter -> /documents/converter', 'See results › Audio Transcript -> /documents/transcript'];
+  const ADMIN_WORKSPACE = [
+    'Administration & billing › Users -> /administration/users',
+    'Administration & billing › Page access -> /administration/access-profiles',
     // MIG-353: password rules, lockout, idle sign-out, two-factor, single sign-on, sign-in history.
-    'Administration › Security -> /administration/security',
-    'Administration › Data policies -> /administration/data-policies',
+    'Administration & billing › Sign-in security -> /administration/security',
+    'Administration & billing › Data policies -> /administration/data-policies',
+    'Administration & billing › Cost & usage -> /billing/usage',
+    'Administration & billing › Invoices -> /billing/invoices',
+    'Administration & billing › Billing documents -> /billing/documents',
+    'Administration & billing › Model connections -> /ai/connections',
+  ];
+  const TOOL_REGISTRY = 'Administration & billing › Tool Registry -> /ai/tools';
+  const ADMIN_SETTINGS = [
+    'Administration & billing › Task Registry -> /configuration/task-registry',
+    'Administration & billing › Kafka & Topics -> /configuration/kafka',
+    'Administration & billing › Configuration values -> /configuration/values',
+    'Administration & billing › Home pages -> /configuration/home-pages',
+    'Administration & billing › Task groups -> /configuration/task-groups',
+    'Administration & billing › API Clients -> /integration/api-clients',
+  ];
+  const DEVELOPER_PORTAL = 'Administration & billing › Developer portal -> /integration/developer';
+  const EVERY_MEMBER_PAGE = [
+    ...HOME,
+    CONNECTIONS, ...API_AND_SOURCES, DOCUMENTS_IN, FILE_DROP, ...FORMS,
+    PIPELINES, ...AI_BUILD, DOCUMENT_TYPES, APPROVALS,
+    RUNS, RUNS_BY_DATE, SCHEDULES, REVIEW_INBOX, DOCUMENT_REVIEW, RUN_ANALYTICS,
+    DASHBOARDS, ...ASK_AND_CATALOG, STUDIO, CATALOG, GENERATED, BROWSE, ...TOOLS,
+  ];
+  const ADMIN_MENU = [
+    ...HOME,
+    CONNECTIONS, STORAGE, ...API_AND_SOURCES, DOCUMENTS_IN, FILE_DROP, ...FORMS,
+    PIPELINES, ...AI_BUILD, DOCUMENT_TYPES, APPROVALS,
+    RUNS, RUNS_BY_DATE, SCHEDULES, REVIEW_INBOX, DOCUMENT_REVIEW, RUN_ANALYTICS,
+    DASHBOARDS, ...ASK_AND_CATALOG, STUDIO, CATALOG, GENERATED, BROWSE, ...TOOLS,
+    ...ADMIN_WORKSPACE, TOOL_REGISTRY, ...ADMIN_SETTINGS, DEVELOPER_PORTAL,
   ];
 
   it('a platform administrator: every menu, platform screens included', () => {
     expect(menuFor('PLATFORM_ADMIN', null)).toEqual([
-      ...DASHBOARD,
-      ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
-      'Integration › API Clients -> /integration/api-clients',
-      'Integration › Developer portal -> /integration/developer',
-      ...PIPELINES,
-      ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
-      ...DATA_SOON, ...DATA,
-      ...FORMS_AND_WORKFLOWS,
-      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
-      ...CONFIGURATION, 'Configuration › Engine settings -> /configuration/engine',
-      ...BILLING, 'Billing › Billing analytics -> /billing/analytics', 'Billing › Rate cards -> /billing/rates',
-      ...ADMINISTRATION, 'Administration › Tenants -> /administration/tenants',
-      'Administration › Workspace requests -> /administration/tenant-requests',
+      ...ADMIN_MENU,
+      'Platform › Workspaces -> /administration/tenants',
+      'Platform › Workspace requests -> /administration/tenant-requests',
       // MIG-254: the managed service.
-      'Administration › Managed service -> /administration/managed-service',
-      'Administration › Staff activity -> /administration/staff-activity',
-      'Administration › Work in a workspace -> /administration/work-in-workspace',
+      'Platform › Managed service -> /administration/managed-service',
+      'Platform › Work in a workspace -> /administration/work-in-workspace',
+      'Platform › Staff activity -> /administration/staff-activity',
       // MIG-196: the reliability objectives.
-      'Administration › Reliability -> /administration/reliability',
+      'Platform › Reliability -> /administration/reliability',
+      'Platform › Billing analytics -> /billing/analytics',
+      'Platform › Rate cards -> /billing/rates',
+      'Platform › Engine settings -> /configuration/engine',
     ]);
   });
 
   it('a workspace administrator: the same, without the platform screens', () => {
-    expect(menuFor('TENANT_ADMIN', null)).toEqual([
-      ...DASHBOARD,
-      ...INTEGRATION_SOON, 'Integration › Storage Connections -> /integration/storage-connections',
-      'Integration › API Clients -> /integration/api-clients',
-      'Integration › Developer portal -> /integration/developer',
-      ...PIPELINES,
-      ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
-      ...DATA_SOON, ...DATA,
-      ...FORMS_AND_WORKFLOWS,
-      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts', 'AI › Model connections -> /ai/connections',
-      ...CONFIGURATION,
-      ...BILLING,
-      ...ADMINISTRATION,
-    ]);
+    expect(menuFor('TENANT_ADMIN', null)).toEqual(ADMIN_MENU);
   });
 
   it('a tenant user with every page their profile can hold today', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'tasks', 'queue', 'reports', 'objects', 'analytics',
       'analytics-dashboards', 'tools-converter', 'tools-transcript', 'ai-prompts', 'api-collections', 'sources'])).toEqual([
-      ...DASHBOARD,
-      'Integration › API Collections -> /integration/api-collections',
-      'Integration › Sources -> /integration/sources',
-      ...PIPELINES,
-      ...DOCUMENTS,
-      ...DATA,
-      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts',
+      ...HOME,
+      ...API_AND_SOURCES, FILE_DROP,
+      PIPELINES, ...AI_BUILD,
+      RUNS, RUNS_BY_DATE, SCHEDULES, RUN_ANALYTICS,
+      DASHBOARDS, STUDIO, GENERATED, BROWSE, ...TOOLS,
+      // The Tool Registry rides the Prompts key, as it did under AI: a member holding Prompts still reads it.
+      TOOL_REGISTRY,
     ]);
   });
 
   // MIG-336: only a profile that names it gives a tenant user the developer portal; having no profile does not.
   it('a tenant user whose profile names the developer portal', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'developer-portal'])).toEqual([
-      ...DASHBOARD, 'Integration › Developer portal -> /integration/developer',
-      'Pipelines › Schedules -> /pipelines/schedules', 'Pipelines › Executions -> /pipelines/executions',
+      ...HOME, RUNS, SCHEDULES, DEVELOPER_PORTAL,
     ]);
   });
 
   it('a tenant user with five pages (api-check TU)', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'tasks', 'queue', 'reports', 'objects'])).toEqual([
-      ...DASHBOARD, ...PIPELINES, 'Documents › Browse files -> /documents/files', 'Documents › Inbox -> /documents/inbox',
+      ...HOME, FILE_DROP, PIPELINES, RUNS, RUNS_BY_DATE, SCHEDULES, RUN_ANALYTICS, BROWSE,
     ]);
   });
 
   it('a tenant user with two pages keeps only those, and drops every empty menu', () => {
-    expect(menuFor('TENANT_USER', ['jobs', 'queue'])).toEqual([
-      ...DASHBOARD, 'Pipelines › Schedules -> /pipelines/schedules',
-      'Pipelines › Executions -> /pipelines/executions', 'Pipelines › Queue -> /pipelines/queue',
-    ]);
+    expect(menuFor('TENANT_USER', ['jobs', 'queue'])).toEqual([...HOME, RUNS, RUNS_BY_DATE, SCHEDULES]);
   });
 
   it('a tenant user with no page', () => {
-    expect(menuFor('TENANT_USER', [])).toEqual(DASHBOARD);
+    expect(menuFor('TENANT_USER', [])).toEqual(HOME);
   });
 
   it('a tenant user with no profile at all holds every page, but still no administrator screen', () => {
-    expect(menuFor('TENANT_USER', null)).toEqual([
-      ...DASHBOARD,
-      ...INTEGRATION_SOON,
-      ...PIPELINES,
-      ...DOCUMENT_INTELLIGENCE, ...DOCUMENTS,
-      ...DATA_SOON, ...DATA,
-      ...FORMS_AND_WORKFLOWS,
-      'AI › AI Assistant -> /ai/assistant', 'AI › Tool Registry -> /ai/tools', 'AI › Prompts -> /ai/prompts',
-    ]);
+    expect(menuFor('TENANT_USER', null)).toEqual([...EVERY_MEMBER_PAGE, TOOL_REGISTRY]);
   });
 
   it('points every menu entry at a page that exists, never at a redirect', () => {

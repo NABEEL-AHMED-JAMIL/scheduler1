@@ -2,17 +2,16 @@
   <!-- The header holds a dozen tab stops before the page starts; a keyboard user skips them here. -->
   <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-2 focus:z-[60] btn btn-default btn-sm">Skip to content</a>
   <header class="sticky top-0 z-40 border-b bg-raised border-subtle">
-    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 h-14 flex items-center gap-1">
+    <div class="mx-auto max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 wide:pl-4 h-14 flex items-center gap-1">
 
       <a routerLink="/" class="mr-4 shrink-0">
         <app-brand-mark [hideOnMobile]="true" [hideBesideNav]="true" />
       </a>
 
-      <!-- Primary navigation -->
-      <!-- From nav (1180px), not xl (1280): the owner's 1187px window had the whole menu behind the ☰ (review 2026-10-07).
-           Up to xl the items sit tighter (px-1); from xl as before. -->
-      <nav class="hidden nav:flex items-center gap-0.5 flex-1">
-        @for (item of nav(); track item.label) {
+      <!-- Primary navigation: the same groups as the sidebar, on the bar from 1180px (nav) up to 1440px (wide), where
+           the sidebar takes over (UX review 2026-10-12, N2). -->
+      <nav class="hidden nav:flex wide:hidden items-center gap-0.5 flex-1" aria-label="Main menu">
+        @for (item of nav(); track item.label; let i = $index, count = $count) {
           @if (item.path) {
             <a [routerLink]="item.path"
                routerLinkActive="!text-accent !bg-accent-soft"
@@ -39,23 +38,16 @@
                           [class.rotate-180]="openMenu() === item.label" />
               </button>
               @if (openMenu() === item.label) {
-                <div [id]="menuId(item.label)"
-                     class="absolute left-0 top-full mt-1 min-w-72 rounded-lg border shadow-lg p-1 z-50 bg-raised border-subtle">
-                  @for (child of item.children; track child.path) {
-                    <a [routerLink]="child.path" (click)="openMenu.set(null)"
-                       routerLinkActive="nav-child-active"
-                       [routerLinkActiveOptions]="{ exact: !!child.exact }"
-                       class="nav-child">
-                      <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
-                      <span class="min-w-0">
-                        <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
-                        @if (child.hint) {
-                          <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
-                            {{ child.hint }}
-                          </span>
-                        }
-                      </span>
-                    </a>
+                <!-- The last two groups open leftwards so a wide panel stays on the screen. -->
+                <div [id]="menuId(item.label)" class="nav-panel" [class.nav-panel-end]="i >= count - 2"
+                     [class.nav-panel-columns]="item.blocks.length > 2">
+                  @for (block of item.blocks; track $index) {
+                    <div class="nav-block">
+                      @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
+                      @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
+                        <ng-container *ngTemplateOutlet="entry; context: { $implicit: child }" />
+                      }
+                    </div>
                   }
                 </div>
               }
@@ -64,7 +56,7 @@
         }
       </nav>
 
-      <div class="flex-1 nav:hidden"></div>
+      <div class="flex-1 nav:hidden wide:block"></div>
 
       <!-- Right side -->
       <div class="flex items-center gap-1 shrink-0">
@@ -88,10 +80,9 @@
             } @else {
               <span class="avatar-initials size-7 text-[11px]">{{ auth.initials() }}</span>
             }
-            <!-- Between xl and 2xl the full nav and a name do not both fit, so only the avatar shows;
-                 the name is in the panel's header. The cap stops a long name or an email
-                 fallback pushing the page wider than the screen. -->
-            <span class="text-sm font-medium hidden sm:block nav:hidden 2xl:block max-w-36 truncate"
+            <!-- Beside the top bar's menus (1180-1440px) only the avatar shows; the name is in the panel's header.
+                 The cap stops a long name or an email fallback pushing the page wider than the screen. -->
+            <span class="text-sm font-medium hidden sm:block nav:hidden wide:block max-w-36 truncate"
                   [title]="auth.displayName()">{{ auth.displayName() }}</span>
           </button>
           @if (openMenu() === '__user') {
@@ -114,10 +105,11 @@
                    class="menu-item text-sm">
                   <app-icon name="user" size="0.95em" />Your profile
                 </a>
-                <!-- MIG-353: My account › Security -- password, two-factor, sessions and sign-in history. -->
+                <!-- MIG-353: password, two-factor, sessions and sign-in history. "My security", so it is not mistaken
+                     for the workspace's Sign-in security (G12, AC1). -->
                 <a routerLink="/account/security" (click)="openMenu.set(null)"
                    class="menu-item text-sm">
-                  <app-icon name="lock" size="0.95em" />Security
+                  <app-icon name="lock" size="0.95em" />My security
                 </a>
               }
               <a routerLink="/notifications" (click)="openMenu.set(null)"
@@ -175,20 +167,11 @@
               <div class="px-2.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-[color:var(--text-muted)]">
                 {{ item.label }}
               </div>
-              @for (child of item.children; track child.path) {
-                <a [routerLink]="child.path" (click)="mobileOpen.set(false)"
-                   routerLinkActive="nav-child-active"
-                   [routerLinkActiveOptions]="{ exact: !!child.exact }" class="nav-child">
-                  <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
-                  <span class="min-w-0">
-                    <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
-                    @if (child.hint) {
-                      <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
-                        {{ child.hint }}
-                      </span>
-                    }
-                  </span>
-                </a>
+              @for (block of item.blocks; track $index) {
+                @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
+                @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
+                  <ng-container *ngTemplateOutlet="entry; context: { $implicit: child }" />
+                }
               }
             </div>
           }
@@ -197,7 +180,95 @@
     }
   </header>
 
-  <main id="main" tabindex="-1" class="outline-none flex-1 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
-    <router-outlet />
-  </main>
+  <div class="flex flex-1 min-w-0">
+    <!-- UX review 2026-10-12 (N2): from 1440px the menu is a sidebar, as in the reference screens. Collapsed, it shows
+         each group's icon, which opens the group beside it. -->
+    <aside class="app-sidebar" [class.is-collapsed]="collapsed()" aria-label="Main menu">
+      <nav class="app-sidebar-scroll">
+        @for (item of nav(); track item.label) {
+          @if (item.path) {
+            <a [routerLink]="item.path" routerLinkActive="nav-child-active" [routerLinkActiveOptions]="{ exact: false }"
+               class="nav-child side-link font-medium" [attr.title]="collapsed() ? item.label : null">
+              <app-icon [name]="item.icon || 'chart'" size="1em" class="nav-child-icon" />
+              <span class="side-label text-sm">{{ item.label }}</span>
+            </a>
+          } @else if (collapsed()) {
+            <div class="relative" [attr.data-nav-menu]="'side:' + item.label"
+                 (focusout)="onMenuFocusOut($event, 'side:' + item.label)">
+              <button type="button" class="nav-child side-link w-full" [title]="item.label"
+                      [class.nav-child-active]="isSectionActive(item)"
+                      [attr.aria-expanded]="openMenu() === 'side:' + item.label"
+                      [attr.aria-controls]="menuId('side ' + item.label)"
+                      (click)="toggleMenu('side:' + item.label)">
+                <app-icon [name]="item.icon || 'list'" size="1em" class="nav-child-icon" />
+                <span class="sr-only">{{ item.label }}</span>
+              </button>
+              @if (openMenu() === 'side:' + item.label) {
+                <div [id]="menuId('side ' + item.label)" class="nav-panel side-flyout"
+                     [class.nav-panel-columns]="item.blocks.length > 2">
+                  <div class="nav-section !pt-1">{{ item.label }}</div>
+                  @for (block of item.blocks; track $index) {
+                    <div class="nav-block">
+                      @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
+                      @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
+                        <ng-container *ngTemplateOutlet="entry; context: { $implicit: child }" />
+                      }
+                    </div>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <div class="side-group">
+              <div class="side-group-label">{{ item.label }}</div>
+              @for (block of item.blocks; track $index) {
+                @if (block.section) { <div class="nav-section">{{ block.section }}</div> }
+                @for (child of block.children; track child.path + (child.query?.['tab'] ?? '')) {
+                  <a [routerLink]="child.path" [queryParams]="child.query ?? null"
+                     routerLinkActive="nav-child-active" [routerLinkActiveOptions]="{ exact: !!child.exact }"
+                     class="nav-child side-link" [attr.title]="child.hint || null">
+                    <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+                    <span class="side-label text-sm">{{ child.label }}</span>
+                    @if (child.badge === 'tasks' && tasks.count()) {
+                      <span class="pill ml-auto !px-1.5 !py-0 !text-[11px]" [class.pill-crit]="tasks.overdue()"
+                            [class.pill-neutral]="!tasks.overdue()">{{ tasks.count() }}</span>
+                    }
+                  </a>
+                }
+              }
+            </div>
+          }
+        }
+      </nav>
+      <button type="button" class="nav-child side-link side-collapse" (click)="toggleCollapsed()"
+              [attr.aria-label]="collapsed() ? 'Expand the menu' : 'Collapse the menu'"
+              [attr.aria-pressed]="collapsed()">
+        <app-icon [name]="collapsed() ? 'chevronRight' : 'chevronLeft'" size="1em" class="nav-child-icon" />
+        <span class="side-label text-sm">Collapse</span>
+      </button>
+    </aside>
+
+    <main id="main" tabindex="-1" class="outline-none flex-1 min-w-0 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
+      <router-outlet />
+    </main>
+  </div>
 </div>
+
+<!-- One menu entry: the label, the open-task badge and the one-line hint, for the bar's panels, the collapsed
+     sidebar's flyouts and the phone panel. -->
+<ng-template #entry let-child>
+  <a [routerLink]="child.path" [queryParams]="child.query ?? null" (click)="openMenu.set(null); mobileOpen.set(false)"
+     routerLinkActive="nav-child-active"
+     [routerLinkActiveOptions]="{ exact: !!child.exact }"
+     class="nav-child">
+    <app-icon [name]="child.icon" size="1em" class="nav-child-icon" />
+    <span class="min-w-0">
+      <span class="block text-sm leading-tight">{{ child.label }}@if (child.badge === 'tasks' && tasks.count()) {&ngsp;<span class="pill ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]" [class.pill-crit]="tasks.overdue()" [class.pill-neutral]="!tasks.overdue()" data-test="task-badge">{{ tasks.count() }}</span>}@if (child.soon) {&ngsp;<span class="pill pill-neutral ml-0.5 !px-1.5 !py-0 !text-[11px] align-[1px]">Soon</span>}</span>
+      @if (child.hint) {
+        <span class="block text-[11px] leading-tight mt-0.5 text-[color:var(--text-muted)]">
+          {{ child.hint }}
+        </span>
+      }
+    </span>
+  </a>
+</ng-template>

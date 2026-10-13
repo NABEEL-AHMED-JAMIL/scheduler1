@@ -239,7 +239,7 @@ export class Sources implements OnInit {
     const data: SourcePanelData = {
       sourceId, canManage: this.canManage(), tenants: this.isPlatformAdmin() ? this.tenants() : undefined,
     };
-    this.dialog.open<boolean>(SourcePanel, sidePanelConfig(data, 'wide')).closed.subscribe(changed => {
+    this.dialog.open<boolean>(SourcePanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(changed => {
       if (changed) { this.load(); if (this.connectionsRead) this.loadConnections(); }
     });
   }
@@ -299,7 +299,7 @@ export class Sources implements OnInit {
 
   openContract(c: ContractRow): void {
     const data: ContractPanelData = { contract: c, canManage: this.canManage() };
-    this.dialog.open<boolean>(ContractPanel, sidePanelConfig(data, 'wide')).closed.subscribe(changed => { if (changed) this.loadContracts(); });
+    this.dialog.open<boolean>(ContractPanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(changed => { if (changed) this.loadContracts(); });
   }
 
   installTemplate(): void {
