@@ -35,7 +35,7 @@
         } @else if (canPayByCard() && !isPlatformAdmin()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="payNow()" [disabled]="busy() === 'card'" title="Pay by card on Stripe's secure page" data-pay-now><app-icon name="external" [busy]="busy() === 'card'" />Pay now</button>
         } @else if (isOpen()) {
-          <button type="button" class="btn btn-primary btn-sm" (click)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record payment' : 'Upload payment slip' }}</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="openPayment()" [disabled]="paying()" data-pay-open><app-icon [name]="isPlatformAdmin() ? 'plus' : 'upload'" />{{ isPlatformAdmin() ? 'Record payment' : 'Upload payment slip' }}</button>
         } @else if (pdfDocument()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="pdf()"><app-icon name="file" />PDF</button>
         }
@@ -50,7 +50,7 @@
               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copyPayLink()"><app-icon name="link" />Copy card pay link</button>
             }
             @if (isOpen()) {
-              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="paying.set(!paying())"><app-icon name="upload" />{{ isPlatformAdmin() ? 'Record a payment' : 'Upload a payment slip' }}</button>
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openPayment()"><app-icon [name]="isPlatformAdmin() ? 'plus' : 'upload'" />{{ isPlatformAdmin() ? 'Record a payment' : 'Upload a payment slip' }}</button>
             }
             @if (isPlatformAdmin() && i.status === 'draft') {
               <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="redraft()"><app-icon name="refresh" />Rebuild from the meter</button>
@@ -112,27 +112,6 @@
         <button type="button" class="btn btn-ghost btn-sm" (click)="crediting.set(false)">Cancel</button>
       </div>
     }
-    @if (paying()) {
-      <div class="bill-form flex-col items-stretch">
-        <div>
-          <h3 class="font-semibold text-sm">{{ isPlatformAdmin() ? 'Record a payment' : 'Tell us you paid' }}</h3>
-          <p class="text-xs text-[color:var(--text-muted)]">{{ isPlatformAdmin() ? 'It counts once verified.' : 'Attach the transfer slip; the platform verifies it and issues a receipt.' }}</p>
-        </div>
-        <div class="flex items-end gap-2 flex-wrap">
-          <label><span class="label">Amount</span><input class="input w-28" type="number" min="0" step="0.01" [value]="payAmount()" (input)="payAmount.set($any($event.target).value)" /></label>
-          <label><span class="label">Method</span>
-            <select class="input" [value]="payMethod()" (change)="payMethod.set($any($event.target).value)">
-              @for (m of paymentMethods; track m.value) { <option [value]="m.value">{{ m.label }}</option> }
-            </select></label>
-          <label><span class="label">Reference</span><input class="input w-40 mono" [value]="payReference()" (input)="payReference.set($any($event.target).value)" placeholder="TRF-88213" /></label>
-          <label class="flex-1 min-w-48"><span class="label">Note</span><input class="input" [value]="payNote()" (input)="payNote.set($any($event.target).value)" /></label>
-          <label><span class="label">Slip</span><input class="input" type="file" accept=".pdf,.png,.jpg,.jpeg" (change)="slipPicked($event)" /></label>
-          <button type="button" class="btn btn-primary btn-sm" (click)="submitPayment()" [disabled]="busy() === 'pay'"><app-icon name="check" [busy]="busy() === 'pay'" />Submit</button>
-          <button type="button" class="btn btn-ghost btn-sm" (click)="paying.set(false)">Cancel</button>
-        </div>
-      </div>
-    }
-
     <!-- Lines, as frozen on the bill. -->
     <section class="lookup-entries">
       <div class="lookup-entries-head">
@@ -213,22 +192,24 @@
           <div class="lookup-entries-empty"><p>None yet.</p></div>
         } @else {
           <table class="table-modern lookup-entry-table">
-            <thead><tr><th>Date</th><th>Method</th><th class="hidden md:table-cell">Reference</th><th class="hidden md:table-cell">By</th><th class="text-right">Amount</th><th class="text-right">State</th></tr></thead>
+            <thead><tr><th>Received</th><th>Method</th><th class="hidden md:table-cell">Reference</th><th class="hidden md:table-cell">By</th><th class="text-right">Amount</th><th class="text-right">State</th></tr></thead>
             <tbody>
               @for (p of i.payments; track p.paymentId) {
                 <tr>
-                  <td class="tabular text-xs">{{ p.dateCreated | serverTime: 'day' }}</td>
+                  <td class="tabular text-xs" [title]="'Filed ' + (p.dateCreated | serverTime: 'recent')">{{ paymentDay(p) }}</td>
                   <td>{{ methodLabel(p.method) }}@if (p.provider === 'stripe') { <span class="text-xs text-[color:var(--text-muted)]"> · Stripe</span> }</td>
                   <td class="mono text-xs hidden md:table-cell">{{ p.reference || '—' }}</td>
                   <td class="text-xs text-[color:var(--text-muted)] hidden md:table-cell">{{ p.submittedBy || 'System' }}</td>
                   <td class="text-right tabular">{{ money(p.amount) }}</td>
                   <td class="text-right whitespace-nowrap">
-                    @if (p.status === 'verified') { <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'Applied' : 'Verified' }}</span> }
+                    @if (p.status === 'verified') {
+                      @if (p.receiptNumber && receiptOf(p); as doc) { <button type="button" class="link-inline mono text-xs mr-1.5" (click)="openDocument(doc)" [title]="'Open receipt ' + p.receiptNumber" data-receipt-link>{{ p.receiptNumber }}</button> }
+                      <span class="pill pill-ok">{{ p.method === 'credit_note' ? 'Applied' : 'Verified' }}</span> }
                     @else if (p.status === 'rejected') { <span class="pill pill-crit" [title]="p.note || ''">{{ p.method === 'card' && p.provider ? 'Declined' : 'Rejected' }}</span> }
                     @else if (isPlatformAdmin()) {
                       <button type="button" class="btn btn-primary btn-xs" (click)="verify(p, true)" [disabled]="busy() === 'verify' + p.paymentId">Verify</button>
                       <button type="button" class="btn btn-ghost btn-xs" (click)="verify(p, false)" [disabled]="busy() === 'verify' + p.paymentId">Reject</button>
-                    } @else { <span class="pill pill-warn">Pending verification</span> }
+                    } @else { <span class="pill pill-warn">Awaiting verification</span> }
                   </td>
                 </tr>
               }

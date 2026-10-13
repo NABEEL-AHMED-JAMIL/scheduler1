@@ -61,6 +61,10 @@ export interface RateCardDraft {
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
   receiptNumber?: string; submittedBy?: string; verifiedBy?: string; verifiedAt?: string; receivedAt?: string; dateCreated: string; hasSlip: boolean;
+  /** The day the money was received, YYYY-MM-DD in the workspace's billing time zone (payment review 2026-10-12). */
+  receivedOn?: string | null;
+  /** Answered by payment/submit and payment/verify: the invoice after the payment. */
+  invoiceStatus?: string; invoiceBalance?: number;
   /** MIG-359: a card payment's provider and ids -- never card data, which Billing never sees. */
   currency?: string | null; provider?: string | null; providerPaymentId?: string | null; providerChargeId?: string | null;
   providerSessionId?: string | null; refundedAmount?: number | null;
@@ -185,13 +189,23 @@ export class BillingApi {
   creditNote(invoiceId: number, amount: number, reason: string): Observable<ApiResponse<InvoiceRow>> {
     return this.http.post<ApiResponse<InvoiceRow>>(`${this.base}/invoice/creditNote`, null, { params: { invoiceId: String(invoiceId), amount: String(amount), reason } });
   }
-  submitPayment(invoiceId: number, amount: number, method: string, reference: string, note: string, slip: File | null): Observable<ApiResponse<PaymentRow>> {
+  /**
+   * A payment against an invoice: a workspace's slip, or the platform's record of money received (`verified`: counted at
+   * once, with its receipt). `idempotencyKey` is sent as the Idempotency-Key header: the same key for every try of one
+   * form, so a double click or a retry records it once. Refusals come back as 4xx with the sentence (payment review 2026-10-12).
+   */
+  submitPayment(invoiceId: number, amount: number | string, method: string, reference: string, note: string, slip: File | null,
+                extra: { currency?: string; receivedOn?: string; verified?: boolean; idempotencyKey?: string } = {}): Observable<ApiResponse<PaymentRow>> {
     const form = new FormData();
     form.append('invoiceId', String(invoiceId)); form.append('amount', String(amount)); form.append('method', method);
     if (reference) form.append('reference', reference);
     if (note) form.append('note', note);
     if (slip) form.append('slip', slip, slip.name);
-    return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/submit`, form);
+    if (extra.currency) form.append('currency', extra.currency);
+    if (extra.receivedOn) form.append('receivedOn', extra.receivedOn);
+    if (extra.verified) form.append('verified', 'true');
+    const headers: Record<string, string> = extra.idempotencyKey ? { 'Idempotency-Key': extra.idempotencyKey } : {};
+    return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/submit`, form, { headers });
   }
   verifyPayment(paymentId: number, accept: boolean, note: string): Observable<ApiResponse<PaymentRow>> {
     return this.http.post<ApiResponse<PaymentRow>>(`${this.base}/payment/verify`, null, { params: { paymentId: String(paymentId), accept: String(accept), note } });

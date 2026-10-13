@@ -14,7 +14,10 @@ import { CopyButton } from '../../shared/ui/copy-button';
 import { copyText } from '../../shared/ui/clipboard.util';
 import { formatSize } from '../../shared/ui/format-size';
 import { DOC_VIEW_TITLE_ID, DocumentViewDialog } from './document-view-dialog';
-import { BillingApi, cardPaymentChip, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, PAYMENT_METHODS, paymentMethodLabel } from './billing.service';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
+import { dayText } from '../../shared/ui/date-field';
+import { PaymentPanel, PaymentPanelData, PaymentPanelResult } from './payment-panel';
+import { BillingApi, cardPaymentChip, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, paymentMethodLabel } from './billing.service';
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -59,17 +62,12 @@ export class InvoicePane implements OnDestroy {
   readonly statusTone = INVOICE_STATUS_TONE;
   readonly kindLabel = DOCUMENT_KIND_LABEL;
   readonly humanSize = formatSize;
-  readonly paymentMethods = PAYMENT_METHODS;
   readonly methodLabel = paymentMethodLabel;
   private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
 
-  // ---- the payment form (a workspace admin's slip) ----
+  // ---- the payment panel: a platform administrator's record, a workspace administrator's slip (payment review 2026-10-12) ----
+  /** True while the panel is open, so a second click on the action does not open a second one. */
   readonly paying = signal(false);
-  readonly payAmount = signal('');
-  readonly payMethod = signal('bank');
-  readonly payReference = signal('');
-  readonly payNote = signal('');
-  readonly paySlip = signal<File | null>(null);
 
   // ---- a manual line, a credit note (platform administrator) ----
   readonly addingLine = signal(false);
@@ -120,6 +118,11 @@ export class InvoicePane implements OnDestroy {
           : `Card payment of ${this.money(Number(p.amount))} declined${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
         continue;
       }
+      // A payment the platform recorded as verified in one step reads as one entry, not "submitted" then "verified" by the same person.
+      if (p.method !== 'credit_note' && p.status === 'verified' && !!p.submittedBy && p.submittedBy === p.verifiedBy) {
+        out.push({ at: p.verifiedAt ?? p.dateCreated, text: `Payment of ${this.money(Number(p.amount))} recorded and verified by ${p.verifiedBy}${p.reference ? ' · ' + p.reference : ''} · receipt ${p.receiptNumber}`, tone: 'ok' });
+        continue;
+      }
       out.push({ at: p.dateCreated, text: `Payment of ${this.money(Number(p.amount))} ${p.method === 'credit_note' ? 'credited (' + p.reference + ')' : 'submitted' + (p.submittedBy ? ' by ' + p.submittedBy : '') + (p.reference ? ' · ' + p.reference : '')}`, tone: 'muted' });
       if (p.verifiedAt && p.method !== 'credit_note') out.push({ at: p.verifiedAt, text: p.status === 'verified' ? `Verified${p.verifiedBy ? ' by ' + p.verifiedBy : ''} · receipt ${p.receiptNumber}` : `Rejected${p.verifiedBy ? ' by ' + p.verifiedBy : ''}${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
     }
@@ -140,7 +143,7 @@ export class InvoicePane implements OnDestroy {
     // The previous invoice goes with its number: left in place, its Issue / Void / Record
     // payment stayed live under the new number until the new one arrived.
     this.invoice.set(null);
-    this.paying.set(false); this.addingLine.set(false); this.crediting.set(false); this.payAmount.set(''); this.payReference.set(''); this.payNote.set(''); this.paySlip.set(null);
+    this.addingLine.set(false); this.crediting.set(false);
   }
 
   load(): void {
@@ -160,7 +163,6 @@ export class InvoicePane implements OnDestroy {
           // crashing the page: every list the pane reads is filled in here, once.
           documents: d.documents ?? [], payments: d.payments ?? [],
           lines: (d.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice), amount: Number(l.amount) })) });
-        if (!this.payAmount()) this.payAmount.set(String(Number(d.balance).toFixed(2)));
         this.afterCheckout(d);
         if ((d.lines ?? []).some(l => !!l.breakdown)) this.loadClientNames(d.tenantId);
       },
@@ -239,23 +241,45 @@ export class InvoicePane implements OnDestroy {
   }
 
   // ---- payments ----
-  slipPicked(event: Event): void { const f = (event.target as HTMLInputElement).files?.[0] ?? null; this.paySlip.set(f); }
-  submitPayment(): void {
-    const i = this.invoice(); if (!i) return;
-    const amount = Number(this.payAmount());
-    if (!(amount > 0)) { this.toast.error('Enter the amount paid.'); return; }
-    this.busy.set('pay');
-    this.api.submitPayment(i.invoiceId, amount, this.payMethod(), this.payReference(), this.payNote(), this.paySlip()).subscribe({
-      next: r => { this.busy.set(''); if (r.status !== API_SUCCESS) { this.toast.error(r.message); return; } this.toast.success(r.message); this.paying.set(false); this.payReference.set(''); this.payNote.set(''); this.paySlip.set(null); this.refresh(); },
-      error: err => { this.busy.set(''); this.toast.error(err?.error?.message || 'The payment could not be recorded.'); },
+  /** The money still open to a payment: the balance less slips awaiting verification. */
+  readonly pendingAmount = computed(() => this.pending().reduce((n, p) => n + Number(p.amount), 0));
+
+  /**
+   * Record a payment (platform) or upload a slip (workspace), in the side panel over the right of the screen with the
+   * invoice still beside it (payment review 2026-10-12). Saved: the invoice is read again -- paid, balance, status, the
+   * payment in Payments and History, its receipt under Documents -- and the list beside it is told.
+   */
+  openPayment(): void {
+    const i = this.invoice();
+    if (!i || this.paying()) return;
+    this.paying.set(true);
+    const data: PaymentPanelData = { invoice: i, paid: this.paid(), credited: this.credited(), pending: this.pendingAmount(), platformAdmin: this.isPlatformAdmin() };
+    this.dialog.open<PaymentPanelResult>(PaymentPanel, sidePanelConfig(data, 'narrow', 'right')).closed.subscribe(result => {
+      this.paying.set(false);
+      if (!result) return;
+      this.toast.success(result.message);
+      this.refresh();
     });
   }
+
+  /** The receipt document of a verified payment, to open from its row. */
+  receiptOf(p: PaymentRow): number | null {
+    return this.invoice()?.documents.find(d => d.kind === 'receipt' && (d.paymentId === p.paymentId || (!!p.receiptNumber && d.number === p.receiptNumber)))?.documentId ?? null;
+  }
+
+  /** The day a payment arrived (in the billing time zone), else the day it was filed. */
+  paymentDay(p: PaymentRow): string { return p.receivedOn ? dayText(p.receivedOn) : this.serverTime.transform(p.dateCreated, 'date') ?? ''; }
+
   /** Both directions ask first, in the app's own dialog: accepting marks money received, rejecting wants the reason the payer will read. */
   verify(p: PaymentRow, accept: boolean): void {
+    const i = this.invoice(); if (!i) return;
     const amount = this.money(Number(p.amount));
+    // The same facts in both dialogs: what was claimed, how, by whom, and what it does to the balance.
+    const facts = `${this.methodLabel(p.method)}${p.reference ? ' ' + p.reference : ''}${p.submittedBy ? ', filed by ' + p.submittedBy : ''}${p.hasSlip ? ', with a slip' : ''}.`;
+    const after = Math.max(0, Number(i.balance) - Number(p.amount));
     const asked: Promise<string | null> = accept
-      ? confirmWith(this.dialog, { title: `Verify this payment of ${amount}?`, body: 'The slip is accepted as received and a receipt is issued against the invoice. This cannot be undone from here.', confirmLabel: 'Verify payment' }).then(ok => ok ? '' : null)
-      : askReason(this.dialog, { title: `Reject this payment of ${amount}?`, subtitle: 'The claim is refused and the balance stays open. The note is shown to whoever filed it.', label: 'Why it is rejected', placeholder: 'The slip does not match the amount claimed.', confirmLabel: 'Reject payment', danger: true });
+      ? confirmWith(this.dialog, { title: `Verify the payment of ${amount}?`, body: `${facts} It counts as received: the balance of ${i.number} goes from ${this.money(i.balance)} to ${this.money(after)}${after === 0 ? ' (Paid)' : ''} and a receipt is issued. This cannot be undone from here.`, confirmLabel: 'Verify payment' }).then(ok => ok ? '' : null)
+      : askReason(this.dialog, { title: `Reject the payment of ${amount}?`, subtitle: `${facts} The balance of ${i.number} stays ${this.money(i.balance)}. The reason is shown to whoever filed it.`, label: 'Why it is rejected', placeholder: 'The slip does not match the amount claimed.', confirmLabel: 'Reject payment', required: true, danger: true });
     asked.then(note => {
       if (note === null) return;
       this.busy.set('verify' + p.paymentId);

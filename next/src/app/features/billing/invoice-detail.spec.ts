@@ -5,6 +5,7 @@ import { provideRouter } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
 import { NEVER, of } from 'rxjs';
 import { InvoicePane } from './invoice-detail';
+import { PaymentPanel } from './payment-panel';
 import { BillingApi } from './billing.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
@@ -33,19 +34,23 @@ class Host { number = 'INV-2026-08-0006'; changes = 0; @ViewChild(InvoicePane) p
 function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listOf: vi.fn(() => of({ status: API_SUCCESS, data: [] })) }) {
   // jsdom has no object URLs; the QR code and the documents are blobs shown through one.
   vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:qr', revokeObjectURL: () => {} }));
+  const opened: { component: any; config: any }[] = [];
   const api = { invoice: vi.fn(() => of({ status: API_SUCCESS, data: detail })), submitPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'recorded' })), verifyPayment: vi.fn(() => of({ status: API_SUCCESS, message: 'verified' })), documentBlob: vi.fn(() => of(new Blob(['%PDF']))), qrBlob: vi.fn(() => of(new Blob(['png']))),
     payLink: vi.fn(() => of({ status: API_SUCCESS, data: { invoiceId: 7, number: 'INV-2026-08-0006', url: 'https://checkout.stripe.com/c/pay/cs_test_1', sessionId: 'cs_test_1', amount: 202.75, currency: 'USD', provider: 'stripe', testMode: true } })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ imports: [Host], providers: [provideRouter([]),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
     // Every dialog answers yes: verify and void are asked first now, in the app's own dialog.
-    { provide: Dialog, useValue: { open: () => ({ closed: of(true) }) } }, { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
+    // The payment panel closes with what Billing answered.
+    { provide: Dialog, useValue: { open: (component: unknown, config: unknown) => { opened.push({ component, config }); return { closed: of(
+      component === PaymentPanel ? { message: 'Payment slip sent.', payment: null } : true) }; } } },
+    { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
     { provide: ApiClientsApi, useValue: clients },
   ] });
   const fixture = TestBed.createComponent(Host);
   fixture.detectChanges();
   const component = fixture.componentInstance.pane;
-  return { component, api, host: fixture.componentInstance, fixture };
+  return { component, api, host: fixture.componentInstance, fixture, opened };
 }
 
 describe('InvoicePane', () => {
@@ -80,7 +85,7 @@ describe('InvoicePane', () => {
     expect(component.paid()).toBe(200);
     expect(component.pending()).toHaveLength(1);
     expect(component.isOpen()).toBe(true);
-    expect(component.payAmount()).toBe('202.75');
+    expect(component.pendingAmount()).toBe(166.75);
     expect(component.quantity(component.invoice()!.lines[0])).toBe('122 GB');
     expect(component.rate(component.invoice()!.lines[0])).toBe('$0.01 per GB');
     // A frozen line keeps the calculation it was priced with: the tier bands come back as numbers.
@@ -93,12 +98,15 @@ describe('InvoicePane', () => {
     expect(story[story.length - 1]).toContain('166.75');
   });
 
-  it('a tenant administrator can submit a slip; verifying and voiding are the platform\'s', async () => {
+  it('a tenant administrator uploads a slip in the side panel; verifying and voiding are the platform\'s', async () => {
     const tenant = page(false);
     expect(tenant.component.canVoid()).toBe(false);
-    tenant.component.payAmount.set('50');
-    tenant.component.submitPayment();
-    expect(tenant.api.submitPayment).toHaveBeenCalledWith(7, 50, 'bank', '', '', null);
+    tenant.component.openPayment();
+    expect(tenant.opened[0].component).toBe(PaymentPanel);
+    expect(tenant.opened[0].config.panelClass).toContain('side-panel-right');
+    expect(tenant.opened[0].config.data).toMatchObject({ paid: 200, pending: 166.75, platformAdmin: false });
+    expect(tenant.api.invoice).toHaveBeenCalledTimes(2);           // saved: the invoice is read again
+    expect(tenant.host.changes).toBe(1);
     const admin = page(true);
     admin.component.verify(DETAIL.payments[1] as any, true);
     await new Promise(r => setTimeout(r));                // the confirm dialog answers on the microtask queue
@@ -115,7 +123,7 @@ describe('InvoicePane', () => {
     expect(text).toContain('Bank transfer');
     expect(text).not.toMatch(/\bbank\b/);
     expect(text).toContain('Verified');
-    expect(text).toContain('Pending verification');
+    expect(text).toContain('Awaiting verification');
     expect(text).toMatch(/Issued \d{1,2} Sep 2026/);
     expect(text).toMatch(/Due 30 Sep 2026 \(net 30\)/);
     expect(text).toMatch(/Paid \$200\.00 · balance \$202\.75/);
