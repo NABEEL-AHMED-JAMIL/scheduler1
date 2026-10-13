@@ -32,7 +32,12 @@ export type WidgetState = 'idle' | 'queued' | 'running' | 'failed' | 'stopped' |
       <div class="widget-body">
         @switch (state()) {
           @case ('queued') {
-            <p class="widget-note text-center py-4">Waiting its turn. Widgets run one at a time.</p>
+            <!-- Waiting for a place among the tiles running now (a board runs three at once): the same skeleton, so
+                 the board is drawn whole from the start and nothing moves when a tile's turn comes. -->
+            <div class="py-3 flex flex-col gap-2" aria-busy="true" [attr.aria-label]="'Waiting to run ' + title()">
+              <span class="sr-only">Waiting to run {{ title() }}…</span>
+              @for (line of skeletonLines; track line) { <span class="block h-3 rounded bg-sunken" [style.width.%]="line" aria-hidden="true"></span> }
+            </div>
           }
           @case ('running') {
             <!-- A skeleton that keeps the tile's height, so a board does not reflow under a reader as each widget lands. -->

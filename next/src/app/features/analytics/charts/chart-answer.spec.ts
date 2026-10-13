@@ -44,7 +44,7 @@ function answer(over: Partial<ChartAnswer> = {}, chart: Partial<NonNullable<Char
 
 describe('chart answer -- the kinds', () => {
   it('names exactly the 51 kinds the picker offers, in its order, as the server\'s schema does', () => {
-    expect(ANSWER_KINDS).toEqual(KIND_IDS);
+    expect(ANSWER_KINDS).toEqual(KIND_IDS.filter(id => id !== 'kpiTrend'));
     expect(ANSWER_KINDS.length).toBe(51);
     expect([...ANSWER_KINDS]).toEqual(SERVER_KINDS);
   });

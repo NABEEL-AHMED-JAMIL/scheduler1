@@ -14,6 +14,11 @@ describe('date range helpers', () => {
     expect(presetRange('7d', today)).toEqual({ from: '2026-10-06', to: '2026-10-12' });
     expect(presetRange('30d', today)).toEqual({ from: '2026-09-13', to: '2026-10-12' });
     expect(presetRange('month', today)).toEqual({ from: '2026-10-01', to: '2026-10-12' });
+    // A dashboard over years of data: the longer presets, and All time as no range at all.
+    expect(presetRange('90d', today)).toEqual({ from: '2026-07-15', to: '2026-10-12' });
+    expect(presetRange('12m', today)).toEqual({ from: '2025-10-13', to: '2026-10-12' });
+    expect(presetRange('ytd', today)).toEqual({ from: '2026-01-01', to: '2026-10-12' });
+    expect(presetRange('all', today)).toEqual({ from: '', to: '' });
   });
 
   it('writes a range as a subtitle says it', () => {

@@ -44,7 +44,7 @@ export interface KindInfo {
  * screen agree. Distinct, so two tiles never read the same.
  */
 const SHORT: Record<WidgetVisualization, string> = {
-  kpi: 'Figure', table: 'Table', pivot: 'Cross-tab', comparison: 'Two figures',
+  kpi: 'Figure', kpiTrend: 'With trend', table: 'Table', pivot: 'Cross-tab', comparison: 'Two figures',
   ranked: 'Ranked', rankedShare: 'Ranked share', bar: 'Bars', stacked: 'Stacked', shareStacked: 'Share stack',
   groupedBar: 'Side by side', barH: 'Horizontal', waterfall: 'Waterfall', pareto: 'Pareto', barLine: 'Bars + line',
   polarBar: 'Polar', pictorialBar: 'Pictorial',
@@ -76,6 +76,7 @@ const SERIES = 'An ordered column, a number, and a second column or number for t
 
 export const KINDS: KindInfo[] = [
   svg('kpi', 'Single figure', 'Figures and tables', 'One row with one number'),
+  svg('kpiTrend', 'Figure with its trend', 'Figures and tables', `${ORDERED}: the latest, its change on the one before, a sparkline`),
   svg('table', 'Table', 'Figures and tables', 'Anything'),
   svg('pivot', 'Cross-tab grid', 'Figures and tables', 'Two text columns and a number'),
   svg('comparison', 'Two figures compared', 'Figures and tables', 'Exactly two rows'),

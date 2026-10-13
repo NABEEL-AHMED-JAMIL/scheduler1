@@ -77,6 +77,15 @@ export interface ChartSettings {
 export interface BoardSettings {
   /** The theme every tile draws in, unless a widget overrides it. Absent: the console's own. */
   theme?: string;
+  /**
+   * The filter bar's definitions (board/board-filters.ts, read through parseFilterDefs). Kept here as stored so a
+   * change of theme never drops them, and validated where they are read.
+   */
+  filters?: unknown[];
+  /** Headings that open a section of the board, each before a widget (board/board-sections.ts). */
+  sections?: unknown[];
+  /** Whether each value takes one colour across every tile (charts/board-colors.ts). Absent: on. */
+  colorByValue?: boolean;
 }
 
 /** The panel's sections. Each kind shows only the ones that change how IT is drawn. */
@@ -211,7 +220,13 @@ export function parseBoardSettings(text: string | null | undefined): BoardSettin
   if (!text) return {};
   try {
     const raw = JSON.parse(text);
-    return isObject(raw) && str(raw['theme'], 40) ? { theme: str(raw['theme'], 40) } : {};
+    if (!isObject(raw)) return {};
+    const settings: BoardSettings = {};
+    if (str(raw['theme'], 40)) settings.theme = str(raw['theme'], 40);
+    if (Array.isArray(raw['filters']) && raw['filters'].length) settings.filters = raw['filters'];
+    if (Array.isArray(raw['sections']) && raw['sections'].length) settings.sections = raw['sections'];
+    if (raw['colorByValue'] === false) settings.colorByValue = false;
+    return settings;
   } catch {
     return {};
   }
@@ -219,5 +234,10 @@ export function parseBoardSettings(text: string | null | undefined): BoardSettin
 
 /** A board's settings as stored, or null when there is nothing to keep -- never '{}'. */
 export function boardSettingsString(settings: BoardSettings): string | null {
-  return settings.theme && settings.theme !== 'console' ? JSON.stringify({ theme: settings.theme }) : null;
+  const kept: BoardSettings = {};
+  if (settings.theme && settings.theme !== 'console') kept.theme = settings.theme;
+  if (settings.filters?.length) kept.filters = settings.filters;
+  if (settings.sections?.length) kept.sections = settings.sections;
+  if (settings.colorByValue === false) kept.colorByValue = false;
+  return Object.keys(kept).length ? JSON.stringify(kept) : null;
 }

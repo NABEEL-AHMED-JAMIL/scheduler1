@@ -1,3 +1,4 @@
+import type { BoardFilterOutcome, BoardFilterWire } from './board/board-filters';
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of, tap } from 'rxjs';
@@ -212,6 +213,8 @@ export interface QueryRequest {
   sql: string;
   connection2?: string;
   path2?: string;
+  /** A dashboard tile's board filters (board/board-filters.ts): the server narrows the dataset before the statement. */
+  boardFilters?: BoardFilterWire[];
 }
 
 /**
@@ -231,6 +234,8 @@ export interface QueryRequest {
  * short one, and will go and act on it.
  */
 export interface QueryResult {
+  /** What each board filter did to this run, when it carried any. */
+  boardFilters?: BoardFilterOutcome[];
   columns: string[];
   /** A null cell is a real null, not an empty string -- the same distinction a preview draws. */
   rows: (string | null)[][];
@@ -501,6 +506,8 @@ export interface AnalysisRequest {
   sort?: AnalysisSort;
   /** Minted by the client, for the same reason query() mints one: so a run can be stopped. */
   queryId?: string;
+  /** A dashboard tile's board filters: the dataset is narrowed by them before the analysis reads it. */
+  boardFilters?: BoardFilterWire[];
   /**
    * The drill steps already taken, oldest first, echoed back exactly as the server sent them.
    *
@@ -607,6 +614,8 @@ export interface PivotGrid {
 }
 
 export interface AnalysisResult {
+  /** What each board filter did to this run, when it carried any. */
+  boardFilters?: BoardFilterOutcome[];
   columns: AnalysisColumn[];
   /** Strings on the wire, rendered faithfully on screen. See plainDecimal/dateOnly in analytics.ts. */
   rows: (string | null)[][];
@@ -742,7 +751,7 @@ export interface DashboardPipeline { jobId: number; name: string | null; lastRun
  */
 export type WidgetVisualization =
   | 'table' | 'ranked' | 'rankedShare' | 'bar' | 'donut'
-  | 'kpi' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
+  | 'kpi' | 'kpiTrend' | 'line' | 'area' | 'cumulative' | 'stacked' | 'shareStacked' | 'histogram' | 'scatter'
   | 'comparison' | 'pivot' | 'groupedBar'
   | 'dimensionSummary' | 'trendSummary' | 'distributionSummary'
   | EChartKind;
@@ -857,6 +866,7 @@ function analysisBody(request: AnalysisRequest): Record<string, unknown> {
   if (request.topN) body['topN'] = { ...request.topN };
   if (request.sort) body['sort'] = { ...request.sort };
   if (request.queryId) body['queryId'] = request.queryId;
+  if (request.boardFilters?.length) body['boardFilters'] = request.boardFilters;
   // Echoed, not rebuilt. Sent even on a plain /analyze, because a re-run of a drilled analysis
   // is still the drilled analysis -- dropping the trail there would climb back out of it while
   // the breadcrumb bar went on saying otherwise.
@@ -1004,9 +1014,11 @@ export class AnalyticsService {
    * either half being present as "there is a join here", and an empty string is present.
    */
   query(request: QueryRequest & { queryId?: string }): Observable<ApiResponse<QueryResult>> {
-    const body: Record<string, string> = {
+    const body: Record<string, unknown> = {
       connection: request.connection, path: request.path, sql: request.sql,
     };
+    // Only on a filtered board: a tile with none posts exactly the body it always did.
+    if (request.boardFilters?.length) body['boardFilters'] = request.boardFilters;
     // The CLIENT names the run, forced by this endpoint being synchronous: a server-minted id
     // would arrive with the rows, which is after there is anything left to stop. The server keys
     // its registry on (tenant, user, id), so a chosen id is scoped to the caller and can neither

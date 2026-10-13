@@ -9,7 +9,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
 import { confirmWith } from '../../shared/ui/confirm';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, ParamMap, Router, RouterLink } from '@angular/router';
 import { CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger } from '@angular/cdk/menu';
 import { LoadError } from '../../shared/ui/load-error';
 import { WidgetTableDialog, WidgetTableData } from './widget-table';
@@ -20,7 +20,7 @@ import { FilterBuilder, countFilterClauses, describeClause, emptyFilterGroup, pr
 import { AnalysisRequest, AnalyticsService, Dashboard, DashboardWidget, DatasetColumn, FilterGroup, SavedAnalysis, SavedQuery, WidgetVisualization, EChartKind } from './analytics.service';
 import { tableOf } from './charts/chart-table';
 import { rowsDrawn } from './charts/chart-fit';
-import { ChartSettings, boardSettingsString, parseBoardSettings, parseSettings } from './charts/chart-settings';
+import { BoardSettings, ChartSettings, boardSettingsString, parseBoardSettings, parseSettings } from './charts/chart-settings';
 import { KindPicker } from './charts/kind-picker';
 import { ChartSettingsData, ChartSettingsPanel } from './charts/chart-settings-panel';
 import { KindPickerData, KindPickerPanel } from './charts/kind-picker-panel';
@@ -32,7 +32,25 @@ import { KindMenu, kindMenu } from './charts/kind-menu';
 import { KIND_ICONS } from './charts/kind-icons';
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
-import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName } from './widget-view';
+import { BoardFilterBar } from './board/board-filter-bar';
+import { BoardFilterEditor, BoardFilterEditorData, FilterSourceOption } from './board/board-filter-editor';
+import { BoardTable, TableRead, TableSource } from './board/board-table';
+import {
+  BoardFilterDef, BoardFilterState, crossFilterOf, defaultRange, emptyFilterState, parseFilterDefs, restoreState, saveState,
+  stateFromParams, stateKey, stateToParams, tileFilterNote, toggleValue, wireFilters, withCrossFilterOperands,
+} from './board/board-filters';
+import { BoardSection, parseSections, sectionsByWidget, segmentsOf, withSection } from './board/board-sections';
+import { colorKeysOf } from './charts/board-colors';
+import { CHART_SLOTS } from '../../shared/charts/status-color';
+import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName, SPANS } from './widget-view';
+
+/**
+ * How many of a board's tiles run at once (owner 2026-10-12: tiles load in parallel). Three of the four permits the
+ * analytics governor admits, so one board never holds them all.
+ */
+const BOARD_PARALLEL = 3;
+/** The governor's "too busy right now" refusal, which a tile retries once rather than shows. */
+const BUSY = /Too many analytics queries are running/i;
 
 // The pure view-model (widget-view.ts) and the dataset registry (dataset-registry.ts) live in files of their own, so a
 // screen that needs only them (Analytics) does not load the Dashboards component with them.
@@ -57,12 +75,14 @@ export { DatasetRegistry } from './dataset-registry';
  * ceiling and queue everyone else behind it, and a board of a hundred tiles would be a denial of
  * service written in a UI.
  *
- * So the tiles run STRICTLY ONE AT A TIME, in display order, and the queue is visible while it
- * drains. A board therefore holds at most ONE of the four permits no matter how many tiles are
- * on it: it takes longer to draw, and it can never be the reason somebody else's query waits.
- * The exchange is stated on the board itself rather than left to be discovered, and there are
- * three ways out of the wait -- Stop abandons the rest and cancels the one in flight, each tile
- * re-runs on its own, and adding a tile runs only that tile rather than the board again.
+ * So the tiles run AT MOST THREE AT ONCE (BOARD_PARALLEL; owner 2026-10-12: tiles load in parallel,
+ * with skeletons), in display order, and the queue is visible while it drains. A board therefore
+ * holds at most three of the four permits no matter how many tiles are on it, and always leaves
+ * one for somebody else; a tile the governor turns away for being busy retries once. The exchange
+ * is stated on the board itself, and there are three ways out of the wait -- Stop abandons the rest
+ * and cancels what is in flight, each tile re-runs on its own, and adding a tile runs only that
+ * tile rather than the board again. A table widget pages itself (board/board-table.ts) and is not
+ * queued at all. The filter bar (board/board-filters.ts) travels with every run; the server applies it.
  *
  * Changing a tile's chart kind runs NOTHING. It draws the result already in hand a different
  * way, which is the whole reason a widget is a reference plus a visualization choice and not a
@@ -72,9 +92,9 @@ export { DatasetRegistry } from './dataset-registry';
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [PageHeader, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker],
+  imports: [PageHeader, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
   templateUrl: './dashboard.html',
-  styleUrl: './dashboard.css',
+  styleUrls: ['./dashboard.css', './board/board.css'],
 })
 export class Dashboards implements OnInit, OnDestroy {
 
@@ -86,6 +106,37 @@ export class Dashboards implements OnInit, OnDestroy {
    * and filter them, and the gateway refuses every write with a 403 besides.
    */
   readonly canEdit = computed(() => this.auth.canEditDashboards());
+
+  // ---- the filter bar (board/board-filters.ts) ----------------------------------------------------------------------
+  //
+  // A board's editor defines its filters (a date range, and dimensions with their values); a reader sets them. They
+  // travel with every tile's run and the SERVER applies them -- before the tile's own statement, its values bound, under
+  // masking -- and says per tile what each did. The state is in the URL (a filtered board is a link) and kept per viewer.
+
+  /** The board's settings, read once per change of the board. */
+  private readonly boardSettings = computed(() => parseBoardSettings(this.board()?.dashboardConfig));
+  readonly filterDefs = computed<BoardFilterDef[]>(() => parseFilterDefs(this.boardSettings().filters));
+  readonly filterState = signal<BoardFilterState>(emptyFilterState());
+  /** What every tile's run carries: the filters that are on. */
+  readonly filterWire = computed(() => wireFilters(this.filterDefs(), this.filterState()));
+  /** The board's section headings, by the widget each stands before. */
+  readonly sections = computed(() => parseSections(this.boardSettings().sections));
+  private readonly sectionMap = computed(() => sectionsByWidget(this.sections()));
+  /** One colour per value across the board's tiles, from its filters' saved value order (charts/board-colors.ts). */
+  readonly colorKeys = computed<ReadonlyMap<string, number> | null>(() => {
+    if (this.boardSettings().colorByValue === false) return null;
+    const keys = colorKeysOf(this.filterDefs().map(def => def.colorOrder ?? []), CHART_SLOTS);
+    return keys.size ? keys : null;
+  });
+  /** Bumped to read every table widget again; one entry per table to read just that one. */
+  private readonly tableEpoch = signal(0);
+  private readonly tableBumps = signal<Record<number, number>>({});
+  /** What each table widget last said: running, done (with what the filters did), failed. */
+  readonly tableReads = signal<Record<number, TableRead>>({});
+  /** When the board's run started, for the facts line's load time. */
+  private runStartedAt = 0;
+  readonly loadMs = signal<number | null>(null);
+  private readonly viewerId = computed(() => this.auth.user()?.appUserId ?? null);
   /** Server times, read and written as the rest of the console does. */
   private readonly serverTime = new ServerTimePipe(inject(LOCALE_ID));
   /** A time in the given format, or the text as it came when it is not a time at all. */
@@ -251,6 +302,15 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /** The filter off and the board re-run: the tiles are back at their own sizes, so nothing is held. */
+  /** The board's load time: from the start of its run to the last tile and table landing (the facts line says it). */
+  protected readonly measureLoad = effect(() => {
+    const busy = this.running() || Object.values(this.tableReads()).some(read => read.state === 'running');
+    if (!busy && this.runStartedAt && this.board()) {
+      this.loadMs.set(Math.round(performance.now() - this.runStartedAt));
+      this.runStartedAt = 0;
+    }
+  });
+
   protected readonly releaseHeights = effect(() => {
     if (!this.running() && !this.boardFilterCount() && (this.heldHeights().size || this.heldSpans().size)) {
       this.heldHeights.set(new Map());
@@ -311,6 +371,9 @@ export class Dashboards implements OnInit, OnDestroy {
    * bar will not click.
    */
   narrows(widget: DashboardWidget, view: WidgetView): boolean {
+    // The filter bar's cross-filter: a mark whose column is one of the board's filters sets that filter.
+    const defs = this.filterDefs();
+    if (defs.length && view.marks.some(mark => !!crossFilterOf(defs, mark))) return true;
     if (!this.datasetKeyFor(widget)) return false;
     return view.marks.some(mark => !!mark.operands?.length);
   }
@@ -334,6 +397,12 @@ export class Dashboards implements OnInit, OnDestroy {
    * reader has not finished asking.
    */
   narrowTo(widget: DashboardWidget, mark: Mark): void {
+    // A board with a filter bar: the click toggles that value in the bar's filter (a second click takes it off).
+    const hit = crossFilterOf(this.filterDefs(), mark);
+    if (hit) {
+      this.setFilterState(toggleValue(this.filterState(), hit.key, hit.value));
+      return;
+    }
     const operands = mark.operands;
     // Defensive rather than expected -- `narrows` above already un-buttons these -- but the Other
     // row a chart rolls up on its own has no operands and reaches here if a max is ever set.
@@ -365,6 +434,206 @@ export class Dashboards implements OnInit, OnDestroy {
     this.holdTileHeights();
     this.boardFilter.set(emptyFilterGroup());
     this.runAll();
+  }
+
+  // ---- the filter bar: open, change, edit ----------------------------------------------------------------------------
+
+  /** The state a board opens on: the link's, else this viewer's last on this board, else the board's defaults. */
+  private openFilters(board: Dashboard): void {
+    const defs = parseFilterDefs(parseBoardSettings(board.dashboardConfig).filters);
+    const id = board.analyticsDashboardId;
+    if (!defs.length || id === undefined) {
+      this.filterState.set(emptyFilterState());
+      return;
+    }
+    const fromUrl = stateFromParams(defs, this.route.snapshot.queryParamMap);
+    const state = fromUrl ?? restoreState(stateKey(id, this.viewerId()), defs) ?? { values: {}, range: defaultRange(defs) };
+    this.filterState.set(state);
+    if (!fromUrl) this.writeFilterUrl(defs, state);
+  }
+
+  /** A link to the same board with other filters (pasted, or Back): the board follows it. */
+  private followFilters(params: ParamMap): void {
+    const defs = this.filterDefs();
+    if (!defs.length || !this.board()) return;
+    const fromUrl = stateFromParams(defs, params);
+    if (!fromUrl || JSON.stringify(wireFilters(defs, fromUrl)) === JSON.stringify(this.filterWire())) return;
+    this.filterState.set(fromUrl);
+    this.runAll();
+  }
+
+  /** The reader changed the bar (or clicked a mark): kept, put in the URL, and the board runs again under it. */
+  setFilterState(next: BoardFilterState): void {
+    const board = this.board();
+    if (!board?.analyticsDashboardId) return;
+    this.filterState.set(next);
+    saveState(stateKey(board.analyticsDashboardId, this.viewerId()), next);
+    this.writeFilterUrl(this.filterDefs(), next);
+    this.holdTileHeights();
+    this.runAll();
+  }
+
+  private writeFilterUrl(defs: BoardFilterDef[], state: BoardFilterState): void {
+    if (!defs.length) return;
+    this.router.navigate([], { relativeTo: this.route, queryParams: stateToParams(defs, state), queryParamsHandling: 'merge', replaceUrl: true })
+      .catch(() => {});
+  }
+
+  /** The datasets the board's tiles read: where a filter's values may come from. */
+  filterSources(): FilterSourceOption[] {
+    const seen = new Map<string, FilterSourceOption>();
+    const add = (connection?: string | null, path?: string | null) => {
+      if (!connection || !path) return;
+      const key = connection + '\u0000' + path;
+      if (!seen.has(key)) seen.set(key, { connection, path, label: `${fileName(path)} · ${connection}` });
+    };
+    for (const widget of this.widgets()) {
+      if (widget.analyticsAnalysisId) {
+        const saved = this.analyses().find(a => a.analyticsAnalysisId === widget.analyticsAnalysisId);
+        add(saved?.connectionAlias, saved?.datasetPath);
+      } else {
+        const saved = this.queries().find(q => q.analyticsQueryId === widget.analyticsQueryId);
+        add(saved?.connectionAlias, saved?.datasetPath);
+        add(saved?.secondConnectionAlias, saved?.secondDatasetPath);
+      }
+    }
+    return [...seen.values()];
+  }
+
+  /** "Edit filters": what the bar offers every reader, saved on the board. */
+  openFilterEditor(): void {
+    const ref = this.dialog.open<BoardFilterDef[], BoardFilterEditorData>(BoardFilterEditor,
+      sidePanelConfig({ defs: this.filterDefs(), sources: this.filterSources() }, 'wide', 'right'));
+    ref.closed.subscribe(defs => {
+      if (defs) this.saveBoardSettings({ filters: defs.length ? defs : undefined }, 'The filters could not be saved.', true);
+    });
+  }
+
+  /**
+   * One part of the board's settings changed and saved, the rest kept as they are -- a theme change never drops the
+   * filters or the sections. `rerun` when the change alters what the tiles are asked.
+   */
+  saveBoardSettings(change: Partial<BoardSettings>, failure: string, rerun = false): void {
+    const board = this.board();
+    if (!board?.analyticsDashboardId) return;
+    const previous = board.dashboardConfig ?? null;
+    // '{}' rather than null when nothing is left: the server keeps a stored value a save leaves out.
+    const config = boardSettingsString({ ...parseBoardSettings(previous), ...change }) ?? '{}';
+    this.board.update(open => open ? { ...open, dashboardConfig: config } : open);
+    if (rerun) {
+      this.openFilters({ ...board, dashboardConfig: config });
+      this.runAll();
+    }
+    this.analytics.saveDashboard({ ...board, dashboardConfig: config }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS) {
+          this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+          this.widgetError.set(response.message || failure);
+        }
+      },
+      error: err => {
+        this.board.update(open => open ? { ...open, dashboardConfig: previous } : open);
+        this.widgetError.set(err?.error?.message || failure);
+      },
+    });
+  }
+
+  // ---- sections ------------------------------------------------------------------------------------------------------
+
+  /** The heading that opens a section at this widget, if one does. */
+  sectionBefore(widget: DashboardWidget): BoardSection | null {
+    return this.sectionMap().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
+  }
+
+  /** The widget whose heading is being edited (a new heading starts in this state). */
+  readonly editingSection = signal<number | null>(null);
+
+  editSection(widget: DashboardWidget): void {
+    this.editingSection.set(widget.analyticsDashboardWidgetId ?? null);
+  }
+
+  /** Saves a heading's words; an empty title removes it. */
+  saveSection(widget: DashboardWidget, title: string, subtitle: string): void {
+    const before = widget.analyticsDashboardWidgetId;
+    this.editingSection.set(null);
+    if (before === undefined) return;
+    const next = withSection(this.sections(), { before, title, subtitle: subtitle.trim() || undefined });
+    this.saveBoardSettings({ sections: next.length ? next : undefined }, 'The heading could not be saved.');
+  }
+
+  // ---- table widgets: paged by the server -----------------------------------------------------------------------------
+
+  /**
+   * The statement a table widget pages through, or null when the widget is not one. A saved query drawn as a table is
+   * paged, sorted and filtered by the server (board/board-table.ts) instead of being run whole into the browser.
+   */
+  private readonly tableSources = computed(() => {
+    const sources = new Map<number, TableSource>();
+    for (const widget of this.widgets()) {
+      if (widget.visualizationType !== 'table' || !widget.analyticsQueryId || widget.analyticsDashboardWidgetId === undefined) continue;
+      const saved = this.queries().find(q => q.analyticsQueryId === widget.analyticsQueryId);
+      if (!saved) continue;
+      sources.set(widget.analyticsDashboardWidgetId, {
+        connection: saved.connectionAlias, path: saved.datasetPath, sql: saved.queryText,
+        connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : null, path2: saved.secondDatasetPath || null,
+      });
+    }
+    return sources;
+  });
+
+  pagedTable(widget: DashboardWidget): TableSource | null {
+    return this.tableSources().get(widget.analyticsDashboardWidgetId ?? -1) ?? null;
+  }
+
+  tableReload(widget: DashboardWidget): number {
+    return this.tableEpoch() + (this.tableBumps()[widget.analyticsDashboardWidgetId ?? -1] ?? 0);
+  }
+
+  tableKey(widget: DashboardWidget): string {
+    return `etl.board-table.${this.openId() ?? 0}.${widget.analyticsDashboardWidgetId}.${this.viewerId() ?? 'anon'}`;
+  }
+
+  onTableRead(widget: DashboardWidget, read: TableRead): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (id === undefined) return;
+    this.tableReads.update(all => ({ ...all, [id]: read }));
+  }
+
+  /** What the board's filters did to this tile: its "Filtered" marker and the filters that could not land. */
+  tileNote(widget: DashboardWidget): { filtered: boolean; label: string; notApplied: string[] } | null {
+    if (!this.filterWire().length) return null;
+    const id = widget.analyticsDashboardWidgetId ?? -1;
+    const outcomes = this.pagedTable(widget) ? this.tableReads()[id]?.outcomes : this.runs()[id]?.outcomes;
+    return outcomes ? tileFilterNote(this.filterDefs(), outcomes) : null;
+  }
+
+  /** A tile's width in the board's twelve columns, or back to the width its kind takes (null). */
+  setWidth(widget: DashboardWidget, span: number | null): void {
+    const id = widget.analyticsDashboardWidgetId;
+    if (!id) return;
+    const config = widgetConfigOf(widget);
+    const next = widgetConfigString({ ...config, span: span ?? undefined });
+    this.letGoOf(widget);
+    this.analytics.saveWidget({ ...widget, widgetConfig: next }).subscribe({
+      next: response => {
+        if (response.status !== API_SUCCESS || !response.data) {
+          this.widgetError.set(response.message || 'That width could not be saved.');
+          return;
+        }
+        const saved = response.data;
+        this.board.update(board => board ? {
+          ...board, widgets: (board.widgets ?? []).map(item => item.analyticsDashboardWidgetId === id ? { ...item, ...saved } : item),
+        } : board);
+      },
+      error: err => this.widgetError.set(err?.error?.message || 'That width could not be saved.'),
+    });
+  }
+
+  /** The widths a tile's menu offers. */
+  readonly widths = SPANS.map(span => ({ span, label: ({ 3: 'A quarter', 4: 'A third', 6: 'Half', 8: 'Two thirds', 9: 'Three quarters', 12: 'The whole row' } as Record<number, string>)[span] }));
+
+  ownWidth(widget: DashboardWidget): number | null {
+    return widgetConfigOf(widget).span ?? null;
   }
 
   readonly dashboards = signal<Dashboard[]>([]);
@@ -514,9 +783,12 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly addError = signal('');
 
   readonly runs = signal<Record<number, WidgetRun>>({});
-  /** Widget ids still waiting. The head of it is what runs next, and only when nothing is. */
+  /** Widget ids still waiting. The head of it is what runs next, when fewer than BOARD_PARALLEL are running. */
   readonly queue = signal<number[]>([]);
-  readonly runningId = signal<number | null>(null);
+  /** The widgets running now, at most BOARD_PARALLEL of them. */
+  readonly runningIds = signal<number[]>([]);
+  /** The first of them: what the progress line names. */
+  readonly runningId = computed(() => this.runningIds()[0] ?? null);
   /**
    * How many widgets THIS pass set out to run.
    *
@@ -537,7 +809,9 @@ export class Dashboards implements OnInit, OnDestroy {
   private epoch = 0;
   /** The board read that is allowed to land. See loadBoard. */
   private boardToken = 0;
-  private inFlight: Subscription | null = null;
+  private readonly inFlight = new Map<number, Subscription>();
+  /** The tiles retried once after the governor turned them away for being busy, in this pass. */
+  private readonly retried = new Set<number>();
   /** Set once the board is loaded and waiting for the sources it needs to run its widgets. */
   private pending: 'all' | number[] | null = null;
 
@@ -581,7 +855,7 @@ export class Dashboards implements OnInit, OnDestroy {
     if (run.state === 'done') return run.view && !run.view.rowCount ? 'empty' : 'ready';
     return run.state;
   }
-  readonly running = computed(() => this.runningId() !== null || this.queue().length > 0);
+  readonly running = computed(() => this.runningIds().length > 0 || this.queue().length > 0);
 
   readonly canCreate = computed(() => !!this.newName().trim() && !this.creating());
 
@@ -610,13 +884,13 @@ export class Dashboards implements OnInit, OnDestroy {
     if (!count) return 'An empty board costs nothing to open.';
     return `${count} ${count === 1 ? 'widget' : 'widgets'}, and opening this board runs `
       + `${count === 1 ? 'it' : 'each of them'} again — nothing here is stored from last time. `
-      + 'They run one at a time, in order, so this board never holds more than one of the '
-      + 'server\'s query permits however many widgets are on it.';
+      + 'They run three at a time, in order, so this board never holds more than three of the '
+      + 'server\'s four query permits however many widgets are on it.';
   });
 
   readonly progress = computed(() => {
     const total = this.batch();
-    const left = this.queue().length + (this.runningId() === null ? 0 : 1);
+    const left = this.queue().length + this.runningIds().length;
     const at = Math.min(Math.max(total - left + 1, 1), total);
     const current = this.widgets().find(
       widget => widget.analyticsDashboardWidgetId === this.runningId());
@@ -631,7 +905,11 @@ export class Dashboards implements OnInit, OnDestroy {
     // between a board and the cards. A change this page made itself is already in openId, so it
     // is not loaded twice.
     this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(params => this.followUrl(params.get('board')));
+      .subscribe(params => {
+        const before = this.openId();
+        this.followUrl(params.get('board'));
+        if (before !== null && before === this.openId()) this.followFilters(params);
+      });
   }
 
   /** Opens or leaves a board to match the URL's ?board=. Anything but a whole number is none. */
@@ -855,6 +1133,11 @@ export class Dashboards implements OnInit, OnDestroy {
     this.boardFilterOn.set('');
     this.boardFilter.set(emptyFilterGroup());
     this.boardColumns.set([]);
+    this.filterState.set(emptyFilterState());
+    this.tableReads.set({});
+    this.tableBumps.set({});
+    this.editingSection.set(null);
+    this.loadMs.set(null);
   }
 
   private setUrl(id: number | null): void {
@@ -889,6 +1172,8 @@ export class Dashboards implements OnInit, OnDestroy {
         }
         this.board.set(response.data);
         this.cardWidgets.update(all => ({ ...all, [analyticsDashboardId]: response.data!.widgets ?? [] }));
+        // The filters before the run: every tile's first run carries them.
+        if (run === 'all') this.openFilters(response.data);
         if (run === null) return;
         this.pending = run;
         this.start();
@@ -992,9 +1277,12 @@ export class Dashboards implements OnInit, OnDestroy {
     // were reflowed into new rows (layout shift 0.11, 2026-10-06).
     const held = this.heldSpans().get(widget.analyticsDashboardWidgetId ?? -1);
     if (held !== undefined) return held;
+    // The width its editor chose, when one did.
+    const own = widgetConfigOf(widget).span;
+    if (own && SPANS.includes(own)) return own as WidgetSpan;
     const view = this.runs()[widget.analyticsDashboardWidgetId!]?.view;
     const kind = view ? this.drawn(widget, view) : (widget.visualizationType ?? 'table');
-    if (kind === 'kpi') return 3;
+    if (kind === 'kpi' || kind === 'kpiTrend') return 3;
     return ROW_KINDS.has(kind) || !KINDS.some(known => known.id === kind) ? 12 : 6;
   }
 
@@ -1002,14 +1290,21 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly filledSpans = computed(() => {
     const widgets = this.widgets();
     const natural = widgets.map(widget => this.spanOf(widget));
-    const sm = fillRows(natural.map(span => (span === 3 ? 6 : 12)));
-    const lg = fillRows(natural);
+    // A section heading starts a new row, so each run of widgets between two headings fills its own rows.
+    const sm: number[] = [];
+    const lg: number[] = [];
+    for (const segment of segmentsOf(widgets.map(widget => widget.analyticsDashboardWidgetId), this.sections())) {
+      const spans = segment.map(i => natural[i]);
+      const smFilled = fillRows(spans.map(span => (span <= 4 ? 6 : 12)));
+      const lgFilled = fillRows(spans);
+      segment.forEach((at, j) => { sm[at] = smFilled[j]; lg[at] = lgFilled[j]; });
+    }
     return new Map(widgets.map((widget, i) => [widget, { sm: sm[i], lg: lg[i] }]));
   });
 
   spanClass(widget: DashboardWidget): string {
     const filled = this.filledSpans().get(widget);
-    const sm = filled?.sm ?? (this.spanOf(widget) === 3 ? 6 : 12);
+    const sm = filled?.sm ?? (this.spanOf(widget) <= 4 ? 6 : 12);
     const lg = filled?.lg ?? this.spanOf(widget);
     return `min-w-0 ${SM_SPAN[sm] ?? 'sm:col-span-12'} ${LG_SPAN[lg] ?? 'lg:col-span-12'}`;
   }
@@ -1330,7 +1625,7 @@ export class Dashboards implements OnInit, OnDestroy {
   setBoardTheme(theme: string | null): void {
     const board = this.board();
     if (!board?.analyticsDashboardId || (theme ?? null) === this.boardTheme()) return;
-    const config = boardSettingsString({ theme: theme ?? undefined });
+    const config = boardSettingsString({ ...parseBoardSettings(board.dashboardConfig), theme: theme ?? undefined }) ?? '{}';
     const previous = board.dashboardConfig ?? null;
     this.board.update(open => open ? { ...open, dashboardConfig: config } : open);
     this.analytics.saveDashboard({ ...board, dashboardConfig: config }).subscribe({
@@ -1588,20 +1883,26 @@ export class Dashboards implements OnInit, OnDestroy {
     if (!this.board()) return;
     this.abandon();
     this.pending = 'all';
+    // Every table widget reads its first page again too: it pages itself (board/board-table.ts), outside the queue.
+    this.tableEpoch.update(n => n + 1);
     this.start();
   }
 
   runOne(widget: DashboardWidget): void {
     const id = widget.analyticsDashboardWidgetId;
     if (!id) return;
-    if (this.queue().includes(id)) return;
-    const idle = this.runningId() === null && !this.queue().length;
+    if (this.pagedTable(widget)) {
+      this.tableBumps.update(all => ({ ...all, [id]: (all[id] ?? 0) + 1 }));
+      return;
+    }
+    if (this.queue().includes(id) || this.runningIds().includes(id)) return;
+    const idle = !this.runningIds().length && !this.queue().length;
     // Appended rather than jumped in front of: a queue that reordered itself under a click would
     // make "run this one" mean "and stop that one", which is a second action nobody asked for.
     this.queue.update(queue => [...queue, id]);
     this.batch.update(size => idle ? 1 : size + 1);
     this.mark(id, { state: 'queued', error: '', view: null, queryId: '' });
-    if (idle) this.next(this.epoch);
+    this.next(this.epoch);
   }
 
   /**
@@ -1613,18 +1914,14 @@ export class Dashboards implements OnInit, OnDestroy {
    * nothing here to interpret: the screen stops waiting either way.
    */
   stopRun(): void {
-    const queryId = this.runningId() === null ? ''
-      : this.runs()[this.runningId()!]?.queryId ?? '';
+    const current = [...this.runningIds()];
+    const queryIds = current.map(id => this.runs()[id]?.queryId ?? '').filter(Boolean);
     const waiting = [...this.queue()];
-    const current = this.runningId();
     this.abandon();
-    for (const id of waiting) {
+    for (const id of [...waiting, ...current]) {
       this.mark(id, { state: 'stopped', error: '', view: null, queryId: '' });
     }
-    if (current !== null) {
-      this.mark(current, { state: 'stopped', error: '', view: null, queryId: '' });
-    }
-    if (queryId) {
+    for (const queryId of queryIds) {
       this.analytics.cancel(queryId).subscribe({ next: () => {}, error: () => {} });
     }
   }
@@ -1634,10 +1931,11 @@ export class Dashboards implements OnInit, OnDestroy {
     this.epoch++;
     this.queue.set([]);
     this.batch.set(0);
-    this.runningId.set(null);
+    this.runningIds.set([]);
     this.pending = null;
-    this.inFlight?.unsubscribe();
-    this.inFlight = null;
+    this.inFlight.forEach(subscription => subscription.unsubscribe());
+    this.inFlight.clear();
+    this.retried.clear();
   }
 
   /**
@@ -1652,10 +1950,17 @@ export class Dashboards implements OnInit, OnDestroy {
     const pending = this.pending;
     if (pending === null || !this.sourcesReady()) return;
     this.pending = null;
-    const ids = pending === 'all'
+    // A table widget pages itself and is not queued (pagedTable).
+    const ids = (pending === 'all'
       ? this.widgets().map(widget => widget.analyticsDashboardWidgetId).filter(
           (id): id is number => typeof id === 'number')
-      : pending;
+      : pending).filter(id => !this.tableSources().has(id));
+    this.runStartedAt = performance.now();
+    this.loadMs.set(null);
+    if (pending === 'all') {
+      // Each table is reading its first page again: counted as running until it says otherwise.
+      this.tableReads.set(Object.fromEntries([...this.tableSources().keys()].map(id => [id, { state: 'running' as const }])));
+    }
     if (!ids.length) return;
     this.epoch++;
     this.queue.set(ids);
@@ -1667,60 +1972,56 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /**
-   * Takes the next widget off the queue and runs it. ONE AT A TIME, and that is the whole point.
+   * Starts widgets off the queue until BOARD_PARALLEL are running (owner 2026-10-12: tiles load in parallel).
    *
-   * Every analytics query in this application passes one JVM-wide fair semaphore that admits
-   * four at once, shared with every other user and with the ETL work on the same box. A board
-   * that fired its tiles together would hold that ceiling for as long as it took to draw itself;
-   * serially it holds one permit, and takes longer instead.
+   * Three at once, not all: every analytics query passes one fair semaphore of four permits shared with every other
+   * reader and the ETL work, so a board holds at most three of them and leaves one free however many tiles it has. A
+   * tile the governor turns away for being busy is put back at the head of the queue once, a moment later, rather
+   * than shown as an error for a wait of a second.
    */
   private next(epoch: number): void {
     if (epoch !== this.epoch) return;
-    const queue = this.queue();
-    if (!queue.length) {
-      this.runningId.set(null);
-      return;
-    }
-    const id = queue[0];
-    this.queue.set(queue.slice(1));
-    const widget = this.widgets().find(item => item.analyticsDashboardWidgetId === id);
-    if (!widget) {
-      // The board changed under the queue. Nothing to run and nothing to report on a tile that
-      // is not there any more.
-      this.next(epoch);
-      return;
-    }
-    this.runningId.set(id);
-    /*
-     * A tile that throws must fail alone.
-     *
-     * run() marks the tile running and only then builds the request, so anything that throws
-     * between those two points -- a saved configuration in a shape a reader here did not expect,
-     * a column that has since been renamed -- unwound out of the queue with the tile still
-     * marked running and next() never reached. The board stopped dead: one tile on "Running…"
-     * for ever and every tile behind it on "Waiting its turn", with nothing on screen saying
-     * anything had gone wrong. That is exactly what dashboard "15 Regional analysis" did.
-     *
-     * The JSON.parse inside run() was already guarded this carefully; everything after it was
-     * not. This makes the guarantee structural rather than a list of the failures somebody
-     * happened to think of: whatever one tile does, the other tiles still run.
-     */
-    try {
-      this.run(widget, id, epoch);
-    } catch (thrown) {
-      // The exception goes to the console and never onto the tile: its message is minified code
-      // ("n.value.trim is not a function"), which tells a reader nothing they can act on.
-      console.error(`Dashboard widget ${id} could not be prepared`, thrown);
-      this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
-        error: `"${widget.widgetTitle}" could not be run: something in its saved setup is not in a `
-          + 'shape this page can read. Open it in the Analytics Studio and save it again.' });
+    while (this.runningIds().length < BOARD_PARALLEL && this.queue().length) {
+      const [id, ...rest] = this.queue();
+      this.queue.set(rest);
+      const widget = this.widgets().find(item => item.analyticsDashboardWidgetId === id);
+      // The board changed under the queue: nothing to run and nothing to report on a tile that is not there any more.
+      if (!widget) continue;
+      this.runningIds.update(ids => [...ids, id]);
+      /*
+       * A tile that throws must fail alone: whatever one tile's saved setup does, the other tiles still run (dashboard
+       * "15 Regional analysis" once stopped dead on one tile marked running for ever).
+       */
+      try {
+        this.run(widget, id, epoch);
+      } catch (thrown) {
+        // The exception goes to the console and never onto the tile: its message is minified code.
+        console.error(`Dashboard widget ${id} could not be prepared`, thrown);
+        this.settle(id, epoch, { state: 'failed', view: null, queryId: '',
+          error: `"${widget.widgetTitle}" could not be run: something in its saved setup is not in a `
+            + 'shape this page can read. Open it in the Analytics Studio and save it again.' });
+      }
     }
   }
 
   private run(widget: DashboardWidget, id: number, epoch: number): void {
     const queryId = mintQueryId(id);
+    const started = performance.now();
     this.mark(id, { state: 'running', error: '', view: null, queryId });
-    this.inFlight = this.runSource(widget, queryId, run => this.settle(id, epoch, run));
+    const subscription = this.runSource(widget, queryId,
+      run => this.settle(id, epoch, this.decorate({ ...run, ms: Math.round(performance.now() - started) })));
+    if (subscription && this.runningIds().includes(id)) this.inFlight.set(id, subscription);
+  }
+
+  /**
+   * A saved query's marks given the operands a click on them sets, where their label column is one of the board's
+   * filters (withCrossFilterOperands): its bar or slice can then narrow the board. An analysis's marks carry their own.
+   */
+  private decorate(run: WidgetRun): WidgetRun {
+    const defs = this.filterDefs();
+    if (!run.view || !defs.length) return run;
+    const marks = withCrossFilterOperands(run.view.marks, run.view.columns[0], defs);
+    return marks === run.view.marks ? run : { ...run, view: { ...run.view, marks } };
   }
 
   /**
@@ -1770,6 +2071,9 @@ export class Dashboards implements OnInit, OnDestroy {
       if (config.grains && config.grains.some(grain => !!grain)) {
         request.grains = config.grains;
       }
+      // The board's filter bar, applied by the server to the dataset before the analysis reads it.
+      const boardFilters = this.filterWire();
+      if (boardFilters.length) request.boardFilters = boardFilters;
       return this.analytics.analyze(request).subscribe({
         next: response => {
           if (response.status !== API_SUCCESS || !response.data) {
@@ -1777,7 +2081,7 @@ export class Dashboards implements OnInit, OnDestroy {
               error: response.message || 'That analysis could not be run.' });
             return;
           }
-          done({ state: 'done', error: '', queryId,
+          done({ state: 'done', error: '', queryId, outcomes: response.data.boardFilters,
             view: analysisView(response.data, aggregation, {
               sortedBy: config.sort?.by ?? 'MEASURE',
               // The direction travels with the axis. Without it a dimension sorted Z-A looked
@@ -1818,6 +2122,7 @@ export class Dashboards implements OnInit, OnDestroy {
       connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : undefined,
       path2: saved.secondDatasetPath || undefined,
       queryId,
+      boardFilters: this.filterWire(),
     }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
@@ -1825,7 +2130,7 @@ export class Dashboards implements OnInit, OnDestroy {
             error: response.message || 'That query could not be run.' });
           return;
         }
-        done({ state: 'done', error: '', queryId,
+        done({ state: 'done', error: '', queryId, outcomes: response.data.boardFilters,
           view: queryView(response.data, widgetConfigOf(widget).additive) });
       },
       error: err => {
@@ -1844,9 +2149,21 @@ export class Dashboards implements OnInit, OnDestroy {
    */
   private settle(id: number, epoch: number, run: WidgetRun): void {
     if (epoch !== this.epoch) return;
+    this.inFlight.delete(id);
+    if (run.state === 'failed' && BUSY.test(run.error) && !this.retried.has(id)) {
+      // The governor was full for a moment: once more, at the head of the queue, after a breath. The tile keeps its
+      // place among the running meanwhile, so the board does not read as finished while it waits.
+      this.retried.add(id);
+      setTimeout(() => {
+        if (epoch !== this.epoch) return;
+        this.runningIds.update(ids => ids.filter(running => running !== id));
+        this.queue.update(queue => [id, ...queue]);
+        this.next(epoch);
+      }, 700);
+      return;
+    }
+    this.runningIds.update(ids => ids.filter(running => running !== id));
     this.mark(id, run);
-    this.inFlight = null;
-    this.runningId.set(null);
     this.next(epoch);
   }
 

@@ -21,7 +21,7 @@ describe('AnalyticsWidget', () => {
     expect(mount('ready').text()).toContain('THE CHART');
     expect(mount('running').text()).not.toContain('THE CHART');
     expect(mount('running').fixture.nativeElement.querySelector('[aria-busy="true"]')).toBeTruthy();
-    expect(mount('queued').text()).toContain('Waiting its turn');
+    expect(mount('queued').text()).toContain('Waiting to run');
     expect(mount('failed').text()).toContain('The engine refused.');
     expect(mount('failed').text()).toContain('Try again');
     expect(mount('empty').text()).toContain('No rows in this result');

@@ -166,6 +166,7 @@
               @else if (lastRun()) {
                 <span class="dash-run" [title]="'Last run: ' + lastRun() + ' · ' + lastRunText()"><span [class.text-crit-500]="failedCount() > 0">Last run: {{ lastRun() }}</span> · {{ lastRunText() }}</span>
               }
+              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ (loadMs()! / 1000).toFixed(1) }} s</span> }
               @if (boardFilterCount()) {
                 <!-- In the facts line, which is there anyway: a click on a mark that narrows the board
                      changes this line's words and nothing's position. -->
@@ -201,6 +202,7 @@
             <ng-template #boardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
                 @if (canEdit()) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button> }
+                @if (canEdit()) { <button cdkMenuItem class="menu-item" data-test="edit-filter-bar" (cdkMenuItemTriggered)="openFilterEditor()"><app-icon name="filter" />{{ filterDefs().length ? 'Edit the filter bar' : 'Add a filter bar' }}</button> }
                 @if (boardDatasets().length) {
                   <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="filterOpen.set(!filterOpen())"><app-icon name="filter" />{{ filterOpen() ? 'Hide the board filter' : 'Filter this board' }}</button>
                 }
@@ -210,6 +212,12 @@
           </div>
         </div>
         </app-page-header>
+
+        <!-- The filter bar (board/board-filter-bar.ts): a date range and the dimensions the board's editor chose. Every tile
+             runs under it, applied by the server; the state is in the URL and kept for this viewer. -->
+        @if (filterDefs().length) {
+          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEdit()" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
+        }
 
         <!-- Reference, not the work: folded away so the widgets start near the top. -->
         @if (boardFiles().length) {
@@ -325,9 +333,27 @@
             @for (widget of widgets(); track widget.analyticsDashboardWidgetId) {
               @let run = runs()[widget.analyticsDashboardWidgetId!];
               @let shown = shownView(run);
+              @let table = pagedTable(widget);
+              <!-- A section heading opens a new row (board/board-sections.ts); its editor writes it in place. -->
+              @if (editingSection() === widget.analyticsDashboardWidgetId) {
+                @let editing = sectionBefore(widget);
+                <form class="dash-section dash-section-edit" (submit)="$event.preventDefault(); saveSection(widget, sTitle.value, sSub.value)">
+                  <input #sTitle class="input text-base font-semibold" aria-label="Section heading" placeholder="Heading (empty removes it)" [value]="editing?.title ?? ''" />
+                  <input #sSub class="input text-sm" aria-label="Section description" placeholder="What this part of the board shows (optional)" [value]="editing?.subtitle ?? ''" />
+                  <div class="flex gap-2"><button type="submit" class="btn btn-primary btn-xs">Save</button><button type="button" class="btn btn-ghost btn-xs" (click)="editingSection.set(null)">Cancel</button></div>
+                </form>
+              } @else if (sectionBefore(widget); as section) {
+                <div class="dash-section" role="heading" aria-level="2" data-test="board-section">
+                  <div class="min-w-0">
+                    <h2 class="dash-section-title">{{ section.title }}</h2>
+                    @if (section.subtitle) { <p class="dash-section-sub">{{ section.subtitle }}</p> }
+                  </div>
+                  @if (canEdit()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Edit the heading ' + section.title" (click)="editSection(widget)"><app-icon name="edit" size="0.9em" /></button> }
+                </div>
+              }
               <app-analytics-widget [class]="spanClass(widget)" [attr.data-span]="spanOf(widget)" [attr.data-widget]="widget.analyticsDashboardWidgetId"
                                     [style.height.px]="heldHeight(widget)" [class.is-held]="heldHeight(widget) !== null" [title]="widget.widgetTitle" [subtitle]="shortSourceOf(widget)" [subtitleTitle]="sourceOf(widget)"
-                                    [state]="stateOf(run)" [busy]="updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
+                                    [state]="table ? 'ready' : stateOf(run)" [busy]="table ? tableReads()[widget.analyticsDashboardWidgetId!]?.state === 'running' : updating(run)" [error]="run?.error || ''" (refresh)="runOne(widget)">
                 <ng-container actions>
                   @if (canEdit() || (shown && hasMoreRows(shown))) {
                     <button type="button" class="btn btn-ghost btn-icon btn-xs" [cdkMenuTriggerFor]="tileMenu" [attr.aria-label]="'Actions for ' + widget.widgetTitle"
@@ -408,18 +434,36 @@
                         @if (shown; as view) {
                           @if (hasMoreRows(view)) { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="expandTable(widget, view)"><app-icon name="table" />Open every row in a window</button> }
                         }
-                        @if (canEdit()) { <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button> }
+                        @if (canEdit()) {
+                          <div cdkMenuGroup class="dash-width" role="group" aria-label="Width">
+                            <p class="dash-kinds-heading">Width</p>
+                            <div class="dash-width-row">
+                              <button cdkMenuItemRadio class="dash-width-opt" [cdkMenuItemChecked]="ownWidth(widget) === null" (cdkMenuItemTriggered)="setWidth(widget, null)">Auto</button>
+                              @for (w of widths; track w.span) {
+                                <button cdkMenuItemRadio class="dash-width-opt" [title]="w.label" [cdkMenuItemChecked]="ownWidth(widget) === w.span" (cdkMenuItemTriggered)="setWidth(widget, w.span)">{{ w.span }}/12</button>
+                              }
+                            </div>
+                          </div>
+                          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="editSection(widget)"><app-icon name="layers" />{{ sectionBefore(widget) ? 'Edit the section heading above' : 'Start a section here' }}</button>
+                          <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWidget(widget)"><app-icon name="trash" class="icon-crit" />Remove from board</button>
+                        }
                       </div>
                       </div>
                     </div>
                   </ng-template>
                 </ng-container>
 
-                @if (shown; as view) {
+                @if (table) {
+                  <!-- A table widget pages, sorts and filters on the server (board/board-table.ts): the browser holds a page. -->
+                  <app-board-table [source]="table" [boardFilters]="filterWire()" [reload]="tableReload(widget)" [name]="widget.widgetTitle"
+                                   [storageKey]="tableKey(widget)" [maxHeight]="hasOwnHeight(widget) ? heightOf(widget) : 560" (read)="onTableRead(widget, $event)" />
+                  @if (captionOf(widget); as caption) { <p class="text-xs text-[color:var(--text-secondary)] mt-2">{{ caption }}</p> }
+                } @else if (shown; as view) {
                   @if (view.truncated) { <p><span class="pill pill-warn">Partial result — stopped at the server's row ceiling</span></p> }
                   <div [class.dash-rows-open]="isExpanded(widget)">
                     <app-widget-chart [view]="view" [kind]="drawn(widget, view)" [height]="heightOf(widget)" [maxRows]="rowLimit(widget)" [layout]="spanOf(widget) === 3 ? 'row' : 'tile'" [clickable]="narrows(widget, view)" (picked)="narrowTo(widget, $event)"
-                                      [settings]="settingsOf(widget)" [boardTheme]="boardTheme()" [interactive]="true" [name]="widget.widgetTitle" [autoHeight]="!hasOwnHeight(widget)" />
+                                      [settings]="settingsOf(widget)" [boardTheme]="boardTheme()" [interactive]="true" [name]="widget.widgetTitle" [autoHeight]="!hasOwnHeight(widget)"
+                                      [colorKeys]="colorKeys()" />
                   </div>
                   @if (fallbackNote(widget, view); as why) {
                     <p class="text-xs text-[color:var(--text-muted)] mt-2 flex items-start gap-1.5" data-test="tile-fallback"><app-icon name="info" size="0.95em" class="shrink-0 mt-px" /><span>{{ why }}</span></p>
@@ -428,6 +472,15 @@
                 }
 
                 <div foot class="widget-foot">
+                  <!-- What the filter bar did here: "Filtered", and each filter this tile's data cannot take. -->
+                  @if (tileNote(widget); as note) {
+                    @if (note.filtered) {
+                      <span class="pill pill-brand dash-filtered" data-test="tile-filtered" [title]="note.label + (note.notApplied.length ? ' · ' + note.notApplied.join(' ') : '')"><app-icon name="filter" size="0.75em" />Filtered</span>
+                    }
+                    @if (note.notApplied.length) {
+                      <span class="dash-filter-note text-[11px] text-[color:var(--text-muted)] min-w-0 flex-1 truncate" data-test="tile-not-filtered" [title]="note.notApplied.join(' ')">{{ note.notApplied.join(' ') }}</span>
+                    }
+                  }
                   @if (shown; as view) {
                     @let kind = drawn(widget, view);
                     @if (hiddenRowTotal(view, kind); as total) {

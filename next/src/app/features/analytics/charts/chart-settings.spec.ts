@@ -35,6 +35,10 @@ describe('chart settings, as stored', () => {
     expect(boardSettingsString({ theme: 'roma' })).toBe('{"theme":"roma"}');
     expect(boardSettingsString({ theme: 'console' })).toBeNull();
     expect(boardSettingsString({})).toBeNull();
+    // A theme change keeps the filter bar and the sections: they travel in the same document.
+    const board = '{"theme":"roma","filters":[{"key":"region"}],"sections":[{"before":3,"title":"Detail"}]}';
+    expect(boardSettingsString({ ...parseBoardSettings(board), theme: 'console' }))
+      .toBe('{"filters":[{"key":"region"}],"sections":[{"before":3,"title":"Detail"}]}');
   });
 });
 

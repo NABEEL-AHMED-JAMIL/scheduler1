@@ -12,6 +12,7 @@ import { RankedBar } from '../../shared/charts/ranked-bar';
 import { CHART_SLOTS, chartColor } from '../../shared/charts/status-color';
 import { GroupedBar, GroupedSeries } from '../../shared/charts/grouped-bar';
 import { WidgetTable } from './widget-table';
+import { KpiTrend } from './charts/kpi-trend';
 import { DataText } from '../../shared/ui/data-text';
 import { KINDS, kindInfo } from './widget-kinds';
 import type { EChartKind, PivotGrid, WidgetVisualization } from './analytics.service';
@@ -44,7 +45,7 @@ export const WIDGET_HEIGHT_MAX = 600;
  */
 @Component({
   selector: 'app-widget-chart',
-  imports: [BarChart, Donut, KpiCard, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText, EChart, ChartPalette],
+  imports: [BarChart, Donut, KpiCard, KpiTrend, LineChart, ScatterPlot, Comparison, Histogram, ResultSummary, RankedBar, GroupedBar, WidgetTable, DataText, EChart, ChartPalette],
   template: `
     @if (view(); as v) {
       <!-- In a row layout a compact kind (a figure, a ring, ranked bars, a summary) is capped and
@@ -62,6 +63,7 @@ export const WIDGET_HEIGHT_MAX = 600;
           <app-kpi-card [value]="kpiValue(v)" [label]="measureName(v)" [caption]="kpiCaption(v)"
                         [align]="layout() === 'row' ? 'center' : 'start'" [size]="layout() === 'row' ? 'lg' : 'md'" />
         }
+        @case ('kpiTrend') { <app-kpi-trend [marks]="v.marks" [label]="measureName(v)" [format]="figure" /> }
         @case ('line') { <app-line-chart [data]="points(v)" [height]="height()" [format]="figure" /> }
         @case ('area') { <app-line-chart [data]="points(v)" [filled]="true" [height]="height()" [format]="figure" /> }
         @case ('cumulative') { <app-line-chart [data]="cumulativePoints(v)" [height]="height()" [format]="figure" /> }
@@ -171,6 +173,8 @@ export class WidgetChart {
    * to give each bar a readable row, up to WIDGET_HEIGHT_MAX. Off where the author set a height.
    */
   readonly autoHeight = input(true);
+  /** A board's colour per value (charts/board-colors.ts), so a value is one colour on every tile. */
+  readonly colorKeys = input<ReadonlyMap<string, number> | null>(null);
 
   /** The tallest a row-per-category SVG kind draws before it scrolls inside the tile. */
   protected readonly scrollCap = WIDGET_HEIGHT_MAX;
@@ -207,7 +211,8 @@ export class WidgetChart {
     if (!kind) return null;
     const theme = this.theme();
     return optionFor(this.view(), kind, this.settings(), { palette: theme.palette, tokens: theme.tokens },
-      { interactive: this.interactive(), name: this.name(), height: this.drawHeight(), clickable: this.clickable() });
+      { interactive: this.interactive(), name: this.name(), height: this.drawHeight(), clickable: this.clickable(),
+        colorKeys: this.colorKeys() });
   });
 
   /**
@@ -247,6 +252,7 @@ export class WidgetChart {
     if (this.layout() !== 'row') return 'min-w-0';
     const kind = this.drawn();
     if (kind === 'kpi') return 'min-w-0 mx-auto max-w-2xl';
+    if (kind === 'kpiTrend') return 'min-w-0';
     return WidgetChart.COMPACT.has(kind) ? 'min-w-0 max-w-3xl' : 'min-w-0';
   });
 

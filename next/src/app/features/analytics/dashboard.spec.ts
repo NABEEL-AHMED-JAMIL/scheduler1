@@ -25,12 +25,12 @@ import {
  * THE FIRST IS THE COST OF OPENING A BOARD, and it is the reason this file leads with it. A
  * widget holds a reference and never a result, so every tile on a board is a live query against
  * a governor that admits four at once across the whole application -- shared with every other
- * user and with the ETL work on the same JVM. The rule that makes that safe is that tiles run
- * STRICTLY ONE AT A TIME, and it is a rule with no visible symptom when it breaks: a board that
- * fired its ten queries together looks faster on a developer's laptop and takes the ceiling away
- * from everybody else on a real box. So the serial queue is pinned directly -- one request in
- * flight, the next starting only when the first has settled -- and so is every path that could
- * quietly widen it: adding a widget runs one widget, changing a chart kind runs nothing at all,
+ * user and with the ETL work on the same JVM. The rule that makes that safe is that a board runs
+ * AT MOST THREE TILES AT ONCE (owner 2026-10-12: tiles load in parallel), and it is a rule with no
+ * visible symptom when it breaks: a board that fired its ten queries together looks faster on a
+ * developer's laptop and takes the ceiling away from everybody else on a real box. So the queue is
+ * pinned directly -- three requests in flight, the next starting only as one settles -- and so is
+ * every path that could quietly widen it: adding a widget runs one widget, changing a chart kind runs nothing at all,
  * and Stop both empties the queue and cancels what is already out.
  *
  * THE SECOND IS THE PAIR OF COPIED RENDERING RULES. plainDecimal and dateOnly exist twice in
@@ -194,13 +194,24 @@ function stubbedApi(over: BoardOptions = {}) {
     api, analyzes, queryRuns, analyze, query, cancel, fetchDashboardById, saveWidget, schema,
     deleteWidget, saveDashboard, deleteDashboard,
     /** Settles whichever request is currently out, as a success. */
+    /**
+     * Settles the oldest request still being listened to (a board runs three at once, and they land in the order they
+     * were asked), else the newest -- a response nobody waits for any more is dropped, which is what those tests test.
+     */
     finishAnalysis(result: AnalysisResult = analysisResult()) {
-      analyzes[analyzes.length - 1].next(SERVER_RESPONSE(result));
+      oldestOpen(analyzes).next(SERVER_RESPONSE(result));
     },
     finishQuery(result: QueryResult = queryResult()) {
-      queryRuns[queryRuns.length - 1].next(SERVER_RESPONSE(result));
+      oldestOpen(queryRuns).next(SERVER_RESPONSE(result));
     },
   };
+}
+
+const settledRequests = new WeakSet<Subject<any>>();
+function oldestOpen(requests: Subject<any>[]): Subject<any> {
+  const open = requests.find(request => request.observed && !settledRequests.has(request)) ?? requests[requests.length - 1];
+  settledRequests.add(open);
+  return open;
 }
 
 function configure(over: BoardOptions) {
@@ -253,33 +264,35 @@ function renderedBoard(over: BoardOptions = {}) {
 
 describe('what a board costs to open', () => {
 
-  it('runs the widgets ONE AT A TIME, never all at once', () => {
+  it('runs three widgets at once, never all of them, and the next as one lands (owner 2026-10-12: in parallel)', () => {
     const harness = boardWith({
       widgets: [
         widgetOn({ analyticsDashboardWidgetId: 100 }),
         widgetOn({ analyticsDashboardWidgetId: 101 }),
         widgetOn({ analyticsDashboardWidgetId: 102 }),
+        widgetOn({ analyticsDashboardWidgetId: 103 }),
       ],
     });
     harness.board.openDashboard(BOARD);
 
-    // Three tiles, ONE query. The other two are waiting their turn, and "waiting" is a state
-    // they are actually in rather than a spinner standing in for one.
-    expect(harness.analyze).toHaveBeenCalledTimes(1);
-    expect(harness.runOf(100).state).toBe('running');
-    expect(harness.runOf(101).state).toBe('queued');
-    expect(harness.runOf(102).state).toBe('queued');
-
-    harness.finishAnalysis();
-    expect(harness.analyze).toHaveBeenCalledTimes(2);
-    expect(harness.runOf(100).state).toBe('done');
-    expect(harness.runOf(101).state).toBe('running');
-    expect(harness.runOf(102).state).toBe('queued');
-
-    harness.finishAnalysis();
-    harness.finishAnalysis();
+    // Four tiles, THREE queries: a board holds at most three of the server's four permits. The fourth is waiting, and
+    // "waiting" is a state it is actually in.
     expect(harness.analyze).toHaveBeenCalledTimes(3);
+    expect(harness.runOf(100).state).toBe('running');
+    expect(harness.runOf(102).state).toBe('running');
+    expect(harness.runOf(103).state).toBe('queued');
+
+    harness.finishAnalysis();
+    expect(harness.analyze).toHaveBeenCalledTimes(4);
+    expect(harness.runOf(100).state).toBe('done');
+    expect(harness.runOf(103).state).toBe('running');
+
+    harness.finishAnalysis();
+    harness.finishAnalysis();
+    harness.finishAnalysis();
+    expect(harness.analyze).toHaveBeenCalledTimes(4);
     expect(harness.board.running()).toBe(false);
+    expect([100, 101, 102, 103].map(id => harness.runOf(id).state)).toEqual(['done', 'done', 'done', 'done']);
   });
 
   it('keeps no result: opening the same board again runs everything again', () => {
@@ -297,7 +310,7 @@ describe('what a board costs to open', () => {
     expect(harness.runOf(100).view!.ranAt).toBeGreaterThanOrEqual(first);
   });
 
-  it('says on the board that the tiles run one at a time', () => {
+  it('says on the board how many tiles run at once', () => {
     const harness = boardWith({ widgets: [widgetOn({ analyticsDashboardWidgetId: 100 }),
       widgetOn({ analyticsDashboardWidgetId: 101 })] });
     harness.board.openDashboard(BOARD);
@@ -305,7 +318,7 @@ describe('what a board costs to open', () => {
     // expense. It is on the board rather than in a release note because nothing about a tile
     // reveals that it is a live query.
     expect(harness.board.cost()).toContain('2 widgets');
-    expect(harness.board.cost()).toContain('one at a time');
+    expect(harness.board.cost()).toContain('three at a time');
     expect(harness.board.cost()).toContain('nothing here is stored from last time');
   });
 
@@ -316,26 +329,25 @@ describe('what a board costs to open', () => {
     expect(harness.analyze).not.toHaveBeenCalled();
   });
 
-  it('stops the queue and cancels the one already out', () => {
+  it('stops the queue and cancels every one already out', () => {
     const harness = boardWith({
       widgets: [
         widgetOn({ analyticsDashboardWidgetId: 100 }),
         widgetOn({ analyticsDashboardWidgetId: 101 }),
         widgetOn({ analyticsDashboardWidgetId: 102 }),
+        widgetOn({ analyticsDashboardWidgetId: 103 }),
       ],
     });
     harness.board.openDashboard(BOARD);
-    const running = harness.runOf(100).queryId;
-    expect(running).not.toBe('');
+    const running = [100, 101, 102].map(id => harness.runOf(id).queryId);
+    expect(running.every(Boolean)).toBe(true);
 
     harness.board.stopRun();
 
-    expect(harness.cancel).toHaveBeenCalledWith(running);
-    expect(harness.runOf(100).state).toBe('stopped');
-    expect(harness.runOf(101).state).toBe('stopped');
-    expect(harness.runOf(102).state).toBe('stopped');
+    for (const queryId of running) expect(harness.cancel).toHaveBeenCalledWith(queryId);
+    expect([100, 101, 102, 103].map(id => harness.runOf(id).state)).toEqual(['stopped', 'stopped', 'stopped', 'stopped']);
     // And nothing else was started on the way out.
-    expect(harness.analyze).toHaveBeenCalledTimes(1);
+    expect(harness.analyze).toHaveBeenCalledTimes(3);
   });
 
   it('drops a response that arrives after the reader has stopped', () => {
@@ -378,6 +390,8 @@ describe('what a board costs to open', () => {
     harness.board.addTitle.set('Monthly totals');
     harness.board.pickSourceKind('query');
     harness.board.addSourceId.set('21');
+    // A chart: a saved query drawn as a table pages itself instead (board-table) and runs no tile query.
+    harness.board.addVisualization.set('bar');
     harness.board.addWidget();
 
     // One new run, and it is the query the new tile points at. The tile that was already drawn
@@ -770,18 +784,13 @@ describe('the board on screen', () => {
 
   it('tells a reader which tiles are waiting and why they are waiting', () => {
     const rendered = renderedBoard({
-      widgets: [
-        widgetOn({ analyticsDashboardWidgetId: 100, visualizationType: 'table' }),
-        widgetOn({ analyticsDashboardWidgetId: 101, visualizationType: 'table' }),
-      ],
+      widgets: [100, 101, 102, 103].map(id => widgetOn({ analyticsDashboardWidgetId: id, visualizationType: 'table' })),
     });
 
     const screen = rendered.text();
-    // Not a spinner on every tile. Two of them genuinely have not started, and saying so is the
-    // difference between a slow board and a board that looks broken.
-    expect(screen).toContain('Waiting its turn');
-    expect(screen).toContain('Widgets run one at a time');
-    expect(screen).toContain('Running 1 of 2');
+    // Three run at once; the fourth genuinely has not started, and says so to a screen reader under its skeleton.
+    expect(screen).toContain('Waiting to run');
+    expect(screen).toContain('Running 1 of 4');
   });
 
   it('says a result is partial, loudly, before it shows the figures', () => {

@@ -53,8 +53,11 @@ export interface Fitted {
   reason: string;
 }
 
-/** The kinds the server's chart answer may name: the picker's, in its order (ai-service AskChart.KINDS pins the same list). */
-export const ANSWER_KINDS: readonly string[] = KINDS.map(kind => kind.id);
+/**
+ * The kinds the server's chart answer may name: the picker's, in its order (ai-service AskChart.KINDS pins the same list),
+ * less a board's KPI-strip kind -- a figure with its trend is a dashboard's choice, not one an answer makes.
+ */
+export const ANSWER_KINDS: readonly string[] = KINDS.filter(kind => kind.id !== 'kpiTrend').map(kind => kind.id);
 
 /** The kinds the console's own SVG components draw as ONE series of one column of names. */
 const ONE_SERIES: ReadonlySet<string> = new Set(['kpi', 'line', 'area', 'cumulative', 'bar', 'ranked', 'rankedShare', 'donut',

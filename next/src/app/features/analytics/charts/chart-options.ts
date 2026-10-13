@@ -1,3 +1,4 @@
+import { applyColorKeys } from './board-colors';
 import type { EChartKind } from '../analytics.service';
 import type { WidgetView } from '../widget-view';
 import { compactNumber, readableCell } from '../../../shared/charts/number-format';
@@ -53,6 +54,8 @@ export interface OptionContext {
   name?: string;
   /** Whether a click on a mark narrows something: the pointer says so only where it does. */
   clickable?: boolean;
+  /** A board's colour per value (board-colors.ts): the same value, the same colour, on every tile. */
+  colorKeys?: ReadonlyMap<string, number> | null;
 }
 
 // ---- what a click picked --------------------------------------------------------------------
@@ -1374,7 +1377,9 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
   const builder = BUILDERS[kind];
   if (!builder || !table0.length) return {};
   const table = table0;
-  const option = builder(table, settings, theme, context);
+  const built = builder(table, settings, theme, context);
+  // The board's colour per value, before the labels are inked against the colours they sit on.
+  const option = applyColorKeys(built, context.colorKeys, theme.palette);
   const animate = settings.animation ?? pointCount(table) < ANIMATE_BELOW;
   const out: EOption = {
     color: theme.palette,
@@ -1413,7 +1418,7 @@ export function chartOption(table0: ChartTable, kind: EChartKind, settings: Char
       },
     };
   }
-  const picker = PICKERS.get(option);
+  const picker = PICKERS.get(built);
   return picker ? withPicker(out, picker) : out;
 }
 

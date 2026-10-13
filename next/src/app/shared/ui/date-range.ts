@@ -3,13 +3,19 @@ import { DateField, dayText } from './date-field';
 import { Icon } from './icon';
 import { localIsoDay } from './local-day';
 
-/** A range's preset: the rolling ones follow the clock, Custom keeps its two days. */
-export type RangePreset = 'today' | '7d' | '30d' | 'month' | 'custom';
+/**
+ * A range's preset: the rolling ones follow the clock, Custom keeps its two days. 'all' is no range at all (both days
+ * empty): a dashboard over years of data opens on everything (showcase boards, 2026-10-12).
+ */
+export type RangePreset = 'today' | '7d' | '30d' | 'month' | '90d' | '12m' | 'ytd' | 'all' | 'custom';
 
 /** A range as a page reads it: two calendar days, "yyyy-MM-dd", both included. */
 export interface DateRange { from: string; to: string; preset: RangePreset; }
 
-const LABELS: Record<RangePreset, string> = { today: 'Today', '7d': '7 days', '30d': '30 days', month: 'This month', custom: 'Custom' };
+const LABELS: Record<RangePreset, string> = {
+  today: 'Today', '7d': '7 days', '30d': '30 days', month: 'This month', '90d': '90 days', '12m': '12 months', ytd: 'This year',
+  all: 'All time', custom: 'Custom',
+};
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The two days a preset stands for on `today` (the reader's own calendar). Custom answers today alone. */
@@ -20,6 +26,10 @@ export function presetRange(preset: RangePreset, today: Date = new Date()): { fr
     case '7d': return { from: back(6), to };
     case '30d': return { from: back(29), to };
     case 'month': return { from: to.slice(0, 8) + '01', to };
+    case '90d': return { from: back(89), to };
+    case '12m': { const d = new Date(today); d.setFullYear(d.getFullYear() - 1); d.setDate(d.getDate() + 1); return { from: localIsoDay(d), to }; }
+    case 'ytd': return { from: to.slice(0, 5) + '01-01', to };
+    case 'all': return { from: '', to: '' };
     default: return { from: to, to };
   }
 }

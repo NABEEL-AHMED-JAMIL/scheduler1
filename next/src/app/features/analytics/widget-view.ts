@@ -1,3 +1,4 @@
+import type { BoardFilterOutcome } from './board/board-filters';
 import { WIDGET_HEIGHT } from './widget-chart';
 import { asFilterGroup, isNumericType, pruneFilters } from './filter-builder';
 import { Aggregation, AnalysisColumn, AnalysisResult, AnalysisSort, DashboardWidget, FilterGroup, FilterNode, Grain, PivotGrid, QueryResult, TopN, WidgetVisualization, ClassicKind } from './analytics.service';
@@ -71,6 +72,11 @@ export interface WidgetConfig {
    * statement. Absent: unknown, as for every saved query (queryView), so the part-of-a-whole kinds stay refused.
    */
   additive?: boolean;
+  /**
+   * The tile's width in a board's twelve columns, where its editor chose one (a third, two thirds). Absent: by what it
+   * draws -- a figure a quarter, a chart a half, a table the row (Dashboards.spanOf).
+   */
+  span?: number;
 }
 
 /**
@@ -109,6 +115,7 @@ export function widgetConfigString(config: WidgetConfig): string | null {
   const chart = config.chart ? compactSettings(config.chart) : undefined;
   if (chart) kept.chart = chart;
   if (typeof config.additive === 'boolean') kept.additive = config.additive;
+  if (config.span && SPANS.includes(config.span)) kept.span = config.span;
   return Object.keys(kept).length ? JSON.stringify(kept) : null;
 }
 
@@ -652,6 +659,20 @@ export function issuesFor(marks: Mark[], reason: string, additive: boolean | 'un
           ? 'These are ordered newest-first, so "first" and "last" are the wrong way round. '
             + 'Sort the dimension ascending to summarise a trend.'
           : marks.length < 2 ? 'A trend needs at least two points.' : ''),
+    /*
+     * A figure with its trend (a KPI card): the latest point, its change on the one before, and a sparkline. "Latest"
+     * and "the one before" mean something only in the dimension's own order -- the trend summary's rule, its words.
+     */
+    kpiTrend: categorical
+      || (multiDimension
+        ? 'These rows carry two dimensions, so "the latest" would be the last of an interleaving rather than the end '
+          + 'of a series.'
+        : rankOrdered
+        ? 'These are ordered biggest-first, so "the latest" would be the smallest. Sort by the dimension to show a '
+          + 'figure with its trend.'
+        : reversed
+          ? 'These are ordered newest-first, so "the latest" would be the oldest. Sort the dimension ascending.'
+          : marks.length < 2 ? 'A trend needs at least two points.' : ''),
     /* A spread of one figure has no spread. */
     distributionSummary: categorical
       || (marks.length < 3
@@ -1060,6 +1081,10 @@ export interface WidgetRun {
    * on a stop or a failure, where the old figure would no longer be what the tile says.
    */
   previous?: WidgetView | null;
+  /** What each of the board's filters did to this run (board/board-filters.ts), when it carried any. */
+  outcomes?: BoardFilterOutcome[];
+  /** How long the run took, in ms: the board measures its own load. */
+  ms?: number;
 }
 
 /** What a saved analysis's one JSON column holds. Written by the Canvas, read here. */
@@ -1101,7 +1126,7 @@ export function mintQueryId(widgetId: number): string {
 export const TILE_ROWS = 5;
 
 /** A widget's width in a board's twelve columns: a single figure, a chart, or a table. */
-export type WidgetSpan = 3 | 6 | 12;
+export type WidgetSpan = 3 | 4 | 6 | 8 | 9 | 12;
 
 /**
  * Widths within a row of twelve, in board order: the last tile of a row stretches to the row's end
@@ -1130,8 +1155,12 @@ export function fillRows(spans: readonly number[]): number[] {
  */
 export const SM_SPAN: Record<number, string> = { 6: 'sm:col-span-6', 12: 'sm:col-span-12' };
 export const LG_SPAN: Record<number, string> = {
-  3: 'lg:col-span-3', 6: 'lg:col-span-6', 9: 'lg:col-span-9', 12: 'lg:col-span-12',
+  1: 'lg:col-span-1', 2: 'lg:col-span-2', 3: 'lg:col-span-3', 4: 'lg:col-span-4', 5: 'lg:col-span-5', 6: 'lg:col-span-6',
+  7: 'lg:col-span-7', 8: 'lg:col-span-8', 9: 'lg:col-span-9', 10: 'lg:col-span-10', 11: 'lg:col-span-11', 12: 'lg:col-span-12',
 };
+
+/** The widths an editor may give a tile: a quarter, a third, a half, two thirds, three quarters, the row. */
+export const SPANS: readonly number[] = [3, 4, 6, 8, 9, 12];
 
 /** The kinds that are a grid of rows, and so need the whole width to be read. */
 export const ROW_KINDS: ReadonlySet<string> = new Set(['table', 'pivot']);

@@ -9,6 +9,7 @@ import type { WidgetVisualization } from '../analytics.service';
  */
 export const KIND_ICONS: Record<WidgetVisualization, string> = {
   kpi: 'M5 9l2-1v9M10 9h4l-4 8M16 8h3l-2 4c2 0 2 5-1 5',
+  kpiTrend: 'M5 5l2-1v7M10 5h4l-4 6M4 19l4-3 4 2 4-4 4 1',
   table: 'M4 6h16v12H4zM4 10h16M4 14h16M10 6v12',
   pivot: 'M4 6h16v12H4zM4 10h16M9 6v12M14 10v8',
   comparison: 'M7 18V9M17 18V5M4 18h16',
