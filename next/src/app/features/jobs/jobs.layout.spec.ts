@@ -32,12 +32,13 @@ describe('Run history layout', () => {
     expect(tag).not.toContain('lgCols');
   });
 
-  it('pins the Status and Logs cell to the right edge', async () => {
+  /** Owner 2026-10-12: the status by the message it explains; the pinned cell keeps the run's actions, which cannot scroll away. */
+  it('pins the actions cell to the right edge, the status in its own column before the message', async () => {
     const html = await read('history/job-history.html');
-    expect(classesOf(html, '>Status · Logs</th>', 'th')).toContain('col-pin-right');
-    expect(classesOf(html, '<app-status [label]="run.jobStatus"')).toContain('col-pin-right');
-    // The Logs link shares the pinned cell, so the row's one action cannot scroll away either.
-    const cell = html.slice(html.indexOf('<app-status [label]="run.jobStatus"'));
+    expect(classesOf(html, '<span class="sr-only">Actions</span></th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, 'data-test="run-logs"', 'td')).toContain('col-pin-right');
+    expect(classesOf(html, '<app-status [label]="run.jobStatus"')).not.toContain('col-pin-right');
+    const cell = html.slice(html.indexOf('data-test="run-logs"'));
     expect(cell.slice(0, cell.indexOf('</td>'))).toContain("'runs', run.jobQueueId, 'logs'");
   });
 
