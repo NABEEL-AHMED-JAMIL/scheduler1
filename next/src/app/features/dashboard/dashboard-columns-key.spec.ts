@@ -14,15 +14,17 @@ describe('the hour drill-down\'s column choice', () => {
 });
 
 /**
- * The Unread tile sat inside a link, so it only matched its neighbours' height when told to fill it. UX review
- * 2026-10-12 (A7): the tile is the link itself, a cell of the row like the others.
+ * The Unread tile sat among the run figures. UX review B1 (D2): the count lives on the bell, and the tiles say
+ * Schedules, the menu's word, not jobs.
  */
-describe('the Unread tile', () => {
-  it('is a linked tile of the row, not a tile inside a link', async () => {
+describe('the Home tiles', () => {
+  it('leave Unread to the bell and say Schedules', async () => {
     const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
     const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
     const html = fs.readFileSync(`${root}/src/app/features/dashboard/dashboard.html`, 'utf8');
-    expect(html).not.toMatch(/<a routerLink="\/notifications" class="block h-full/);
-    expect(html).toMatch(/<app-stat-tile label="Unread"[^>]*link="\/notifications"/);
+    expect(html).not.toMatch(/<app-stat-tile label="Unread"/);
+    expect(html).not.toMatch(/label="[^"]*jobs?"/i);
+    expect(html).toMatch(/<app-stat-tile label="Schedules"/);
+    expect(html).not.toMatch(/foot="/);
   });
 });

@@ -37,10 +37,26 @@ describe('Home: waiting for your review', () => {
     expect(get).not.toHaveBeenCalled();
   });
 
-  it('adds the runs waiting for review for an administrator', () => {
+  it('leads with the runs waiting for review for an administrator, their own tasks as the small line', () => {
     const { el, get } = card({ admin: true, inbox: true, mine: 1, groups: 0, runs: 4 });
     expect(get).toHaveBeenCalledWith(expect.stringContaining('/sourceJob.json/review/waiting'));
-    expect(el.querySelector('[data-test="waiting-runs"]')?.textContent).toContain('4 runs waiting for review');
+    expect(el.querySelector('[data-test="waiting-runs"]')?.textContent).toContain('4 runs are waiting for review');
+    expect(el.querySelector('[data-test="waiting-tasks"]')?.textContent).toContain('1 approval waits for you or your groups');
+  });
+
+  it('never says "nothing is waiting" beside an administrator\'s waiting runs (owner 2026-10-12)', () => {
+    const { el } = card({ admin: true, inbox: true, mine: 0, groups: 0, runs: 50 });
+    expect(el.textContent).not.toContain('Nothing is waiting for your review');
+    expect(el.querySelector('[data-test="waiting-runs"]')?.textContent).toContain('50 runs are waiting for review');
+    expect(el.querySelector('[data-test="waiting-none"]')?.textContent).toContain('Nothing waits for you personally.');
+    const lead = el.querySelector('.flex-col')!.firstElementChild!;
+    expect(lead.getAttribute('data-test')).toBe('waiting-runs');
+  });
+
+  it('reads like a reviewer\'s card for an administrator with no runs waiting', () => {
+    const { el } = card({ admin: true, inbox: true, mine: 2, groups: 1, runs: 0 });
+    expect(el.querySelector('[data-test="waiting-runs"]')).toBeNull();
+    expect(el.querySelector('[data-test="waiting-tasks"]')?.textContent).toContain('3 waiting for your review');
   });
 
   it('says nothing waits when nothing does', () => {

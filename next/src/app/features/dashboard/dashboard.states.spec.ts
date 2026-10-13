@@ -171,8 +171,9 @@ describe('Dashboard default range', () => {
     vi.setSystemTime(now);
     const { dashboard: d } = dashboard();
     const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 6);
-    expect(d.endDate()).toBe(localDay(now));
-    expect(d.startDate()).toBe(localDay(weekAgo));
+    expect(d.appliedEnd()).toBe(localDay(now));
+    expect(d.appliedStart()).toBe(localDay(weekAgo));
+    expect(d.range().preset).toBe('7d');
   });
 });
 
@@ -204,18 +205,15 @@ describe('Dashboard drill-down into a cell covering several dates', () => {
   it('names the date and the hour it drills into as the console writes them', () => {
     const { dashboard: d } = dashboard();
     d.onHeatCell({ day: 'Thursday', hour: 22, key: '2026-09-24', keys: thursdays, value: 28 });
-    expect(d.drillHeading()).toBe('Jobs on Thursday 24 Sep 2026, 22:00–23:00');
+    expect(d.drillHeading()).toBe('Schedules on Thursday 24 Sep 2026, 22:00–23:00');
     d.onHeatCell({ day: 'Thursday', hour: 0, key: '2026-09-03', keys: ['2026-09-03'], value: 1 });
-    expect(d.drillHeading()).toBe('Jobs on Thursday 3 Sep 2026, 00:00–01:00');
+    expect(d.drillHeading()).toBe('Schedules on Thursday 3 Sep 2026, 00:00–01:00');
   });
 
   it('writes the range in the subtitle as days, not ISO strings', () => {
     const { dashboard: d } = dashboard();
-    d.startDate.set('2026-09-18');
-    d.endDate.set('2026-09-24');
-    d.applyRange();
-    expect(d.dayLabel(d.appliedStart())).toBe('18 Sep 2026');
-    expect(d.dayLabel(d.appliedEnd())).toBe('24 Sep 2026');
+    d.applyRange({ from: '2026-09-18', to: '2026-09-24', preset: 'custom' });
+    expect(d.rangeLabel()).toBe('18 Sep – 24 Sep 2026');
   });
 
   it('ignores a date the cell does not hold', () => {
@@ -241,48 +239,40 @@ describe('Dashboard running-now tile', () => {
 });
 
 /**
- * The date boxes had no check: From after To answered SUCCESS with zeros that read like a quiet
- * week, a cleared box sent an empty date the server refused, and the subtitle claimed the half-typed
- * range before Apply was pressed. The page now says what is wrong and keeps showing the range it
- * last read.
+ * The date boxes had no check: From after To answered SUCCESS with zeros that read like a quiet week, and a cleared box
+ * sent an empty date the server refused. Owner 2026-10-12 (B1, D3): one range control whose presets apply on choice;
+ * Custom checks its own fields (shared/ui/date-range.spec.ts), and the page still refuses a range it cannot read.
  */
 describe('Dashboard date range', () => {
-  it('refuses an inverted range, says why, and sends nothing', () => {
+  it('refuses an inverted or half range and sends nothing', () => {
     const { dashboard: d, calls } = dashboard();
-    d.startDate.set('2026-09-24');
-    d.endDate.set('2026-09-20');
-    expect(d.rangeError()).toBe('From must be on or before To.');
-    d.applyRange();
+    d.applyRange({ from: '2026-09-24', to: '2026-09-20', preset: 'custom' });
+    d.applyRange({ from: '', to: '2026-09-20', preset: 'custom' });
     expect(calls).toEqual([]);
   });
 
-  it('refuses a cleared date', () => {
-    const { dashboard: d, calls } = dashboard();
-    d.startDate.set('');
-    expect(d.rangeError()).toBe('Pick a date in both fields.');
-    d.applyRange();
-    expect(calls).toEqual([]);
-  });
-
-  it('keeps describing the applied range until Apply is pressed', () => {
-    const { dashboard: d } = dashboard();
-    const shown = d.appliedStart();
-    d.startDate.set('2026-01-01');
-    expect(d.appliedStart()).toBe(shown);
-    d.applyRange();
-    expect(d.appliedStart()).toBe('2026-01-01');
-  });
-
-  it('reads the applied range on Try again, not a half-edited one', () => {
+  it('reads a chosen range at once, with no Apply', () => {
     const { dashboard: d, ranges } = dashboard();
-    d.startDate.set('2026-09-01');
-    d.endDate.set('2026-09-07');
-    d.applyRange();
-    d.startDate.set('');
+    d.applyRange({ from: '2026-09-01', to: '2026-09-07', preset: 'custom' });
+    expect(d.appliedStart()).toBe('2026-09-01');
+    expect(ranges.length).toBeGreaterThan(0);
+    expect(ranges.every(r => r === '2026-09-01..2026-09-07')).toBe(true);
+  });
+
+  it('reads the applied range on Try again', () => {
+    const { dashboard: d, ranges } = dashboard();
+    d.applyRange({ from: '2026-09-01', to: '2026-09-07', preset: 'custom' });
     ranges.length = 0;
     d.load();
     expect(ranges.every(r => r === '2026-09-01..2026-09-07')).toBe(true);
     expect(ranges.length).toBeGreaterThan(0);
+  });
+
+  it('goes back to the last seven days', () => {
+    const { dashboard: d } = dashboard();
+    d.applyRange({ from: '2026-09-01', to: '2026-09-07', preset: 'custom' });
+    d.resetRange();
+    expect(d.range().preset).toBe('7d');
   });
 });
 
@@ -299,9 +289,7 @@ describe('Dashboard queue volume by day', () => {
       hourly: () => of({ status: 'SUCCESS', data: [
         cell('2026-09-18', 'Friday', 9, 4), cell('2026-09-24', 'Thursday', 22, 30), cell('2026-09-24', 'Thursday', 23, 5)] }),
     });
-    d.startDate.set('2026-09-18');
-    d.endDate.set('2026-09-24');
-    d.applyRange();
+    d.applyRange({ from: '2026-09-18', to: '2026-09-24', preset: 'custom' });
     const bars = d.dayBars();
     expect(bars.map(b => b.value)).toEqual([4, 0, 0, 0, 0, 0, 35]);
     expect(bars[0].name).toBe('Fri 18');
@@ -312,9 +300,7 @@ describe('Dashboard queue volume by day', () => {
     const { dashboard: d } = dashboard({
       hourly: () => of({ status: 'SUCCESS', data: [cell('2026-09-03', 'Thursday', 9, 1), cell('2026-09-10', 'Thursday', 9, 2)] }),
     });
-    d.startDate.set('2026-09-01');
-    d.endDate.set('2026-09-30');
-    d.applyRange();
+    d.applyRange({ from: '2026-09-01', to: '2026-09-30', preset: 'custom' });
     const names = d.dayBars().map(b => b.name);
     expect(names).toHaveLength(30);
     expect(new Set(names).size).toBe(30);
@@ -338,8 +324,7 @@ describe('Dashboard answers that arrive out of order', () => {
     const pending: Subject<unknown>[] = [];
     const { dashboard: d } = dashboard({ jobStatus: () => { const s = new Subject<unknown>(); pending.push(s); return s; } });
     d.load();
-    d.startDate.set('2026-09-01');
-    d.applyRange();
+    d.applyRange({ from: '2026-09-01', to: d.appliedEnd(), preset: 'custom' });
     const [older, newer] = pending;
     newer.next({ status: 'SUCCESS', data: [{ name: 'All', value: 7 }] });
     older.next({ status: 'SUCCESS', data: [{ name: 'All', value: 99 }] });
@@ -411,9 +396,7 @@ describe('Dashboard view in the address', () => {
 
   it('writes the applied range, the hour and the search into the address, in place', () => {
     const { dashboard: d, navigations } = dashboard();
-    d.startDate.set('2026-09-18');
-    d.endDate.set('2026-09-24');
-    d.applyRange();
+    d.applyRange({ from: '2026-09-18', to: '2026-09-24', preset: 'custom' });
     expect(lastQuery(navigations)).toMatchObject({ replaceUrl: true,
       queryParams: { from: '2026-09-18', to: '2026-09-24', date: null, hr: null, q: null } });
     d.selectCell('2026-09-24', 22, 5, 'Thursday');
@@ -429,7 +412,7 @@ describe('Dashboard view in the address', () => {
       from: '2026-09-22', to: '2026-09-24', date: '2026-09-24', hr: '22', q: 'UI-REVIEW' });
     d.ngOnInit();
     expect(d.appliedStart()).toBe('2026-09-22');
-    expect(d.startDate()).toBe('2026-09-22');
+    expect(d.range()).toEqual({ from: '2026-09-22', to: '2026-09-24', preset: 'custom' });
     expect(ranges[0]).toBe('2026-09-22..2026-09-24');
     expect(d.selectedCell()).toMatchObject({ date: '2026-09-24', hr: 22, day: 'Thursday' });
     expect(breakdownDates).toEqual(['2026-09-24']);
@@ -448,9 +431,9 @@ describe('Dashboard view in the address', () => {
 
   it('ignores an address it cannot read', () => {
     const { dashboard: d, breakdownDates } = dashboard({}, { from: '2026-09-24', to: '2026-09-01', date: 'soon', hr: '31' });
-    const start = d.startDate();
+    const start = d.appliedStart();
     d.ngOnInit();
-    expect(d.startDate()).toBe(start);
+    expect(d.appliedStart()).toBe(start);
     expect(d.selectedCell()).toBeNull();
     expect(breakdownDates).toEqual([]);
   });
@@ -464,13 +447,11 @@ describe('Dashboard view in the address', () => {
 describe('Dashboard staying current', () => {
   afterEach(() => vi.useRealTimers());
 
-  it('shows the same unread count the bell does', () => {
+  it('keeps the bell\'s unread count fresh (the count itself is on the bell, not a tile)', () => {
     const { dashboard: d } = dashboard();
+    const refresh = vi.spyOn(TestBed.inject(UnreadCountService), 'refresh');
     d.load();
-    TestBed.inject(UnreadCountService).count.set(7);
-    expect(d.unread()).toBe(7);
-    TestBed.inject(UnreadCountService).clear();
-    expect(d.unread()).toBe(0);
+    expect(refresh).toHaveBeenCalled();
   });
 
   it('re-reads the figures once, quietly, after a burst of job events', () => {

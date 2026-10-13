@@ -21,22 +21,28 @@ import { TaskCountService } from '../workflows/task-count.service';
   imports: [Icon, RouterLink],
   template: `
     @if (shown()) {
-      <section class="card p-4 flex flex-wrap items-center gap-x-6 gap-y-2" data-test="waiting-for-review" aria-label="Waiting for your review">
+      <section class="card p-4 flex flex-wrap items-center gap-x-6 gap-y-2" data-test="waiting-for-review" aria-label="Waiting for review">
         <span class="stat-glyph"><app-icon name="inbox" /></span>
         <div class="flex flex-col min-w-0 mr-auto">
-          @if (tasks() > 0) {
+          <!-- Owner 2026-10-12: lead with what is waiting. An administrator's runs come first; what waits for them
+               personally is the small line under it, never a "nothing" beside a count. -->
+          @if (leadsWithRuns()) {
+            <a class="text-base font-semibold link-inline" routerLink="/pipelines/executions" data-test="waiting-runs">{{ runsLabel() }}</a>
+            @if (tasks() > 0) {
+              <a class="text-xs link-inline" routerLink="/workflows/inbox" data-test="waiting-tasks">{{ tasksLabel() }} for you or your groups</a>
+            } @else {
+              <span class="text-xs text-[color:var(--text-muted)]" data-test="waiting-none">Nothing waits for you personally.</span>
+            }
+          } @else if (tasks() > 0) {
             <a class="text-base font-semibold link-inline" routerLink="/workflows/inbox" data-test="waiting-tasks">
               {{ tasks() }} waiting for your review</a>
-            @if (overdue() > 0) { <span class="text-xs text-crit-500">{{ overdue() }} overdue</span> }
+            <span class="text-xs text-[color:var(--text-muted)]">Approvals and run reviews for you and your groups, in the Review inbox.</span>
           } @else {
             <span class="text-base font-semibold" data-test="waiting-none">Nothing is waiting for your review</span>
+            <span class="text-xs text-[color:var(--text-muted)]">Approvals and run reviews for you and your groups arrive in the Review inbox.</span>
           }
-          <span class="text-xs text-[color:var(--text-muted)]">Approvals and run reviews for you and your groups, in the Review inbox.</span>
+          @if (overdue() > 0) { <span class="text-xs text-crit-500">{{ overdue() }} overdue</span> }
         </div>
-        @if (admin() && runs() !== null) {
-          <a class="text-sm link-inline inline-flex items-center gap-1.5" routerLink="/pipelines/executions" data-test="waiting-runs">
-            <app-icon name="history" size="0.95em" />{{ runsLabel() }}</a>
-        }
         <a class="btn btn-primary btn-sm" routerLink="/workflows/inbox">Open the Review inbox</a>
       </section>
     }
@@ -64,8 +70,11 @@ export class WaitingForReview implements OnInit {
     const r = this.runs();
     if (!r) return '';
     const n = `${r.count}${r.more ? '+' : ''}`;
-    return r.count === 0 ? 'No run is waiting for review' : `${n} run${r.count === 1 && !r.more ? '' : 's'} waiting for review`;
+    return r.count === 1 && !r.more ? '1 run is waiting for review' : `${n} runs are waiting for review`;
   });
+  /** An administrator with runs waiting: they lead the card. */
+  readonly leadsWithRuns = computed(() => this.admin() && (this.runs()?.count ?? 0) > 0);
+  readonly tasksLabel = computed(() => `${this.tasks()} ${this.tasks() === 1 ? 'approval waits' : 'approvals wait'}`);
 
   ngOnInit(): void {
     if (!this.shown()) return;
