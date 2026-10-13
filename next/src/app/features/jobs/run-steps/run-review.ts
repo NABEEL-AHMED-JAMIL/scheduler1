@@ -23,7 +23,8 @@ export interface RunReviewView {
   jobId: number;
   reviewStatus: 'NOT_REQUIRED' | 'PENDING' | 'APPROVED' | 'REJECTED';
   required: ('internal' | 'customer')[];
-  decisions: ReviewDecision[];
+  /** Absent in some answers (a run whose review row is new): read as none. */
+  decisions?: ReviewDecision[];
   rerunJobQueueId?: number | null;
   you?: { party?: string | null; canDecide?: boolean; refusal?: string | null };
 }
@@ -54,9 +55,9 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
             <span class="pill {{ status().tone }}"><app-icon [name]="status().icon" size="0.85em" />{{ status().label }}</span>
             <span class="text-xs text-[color:var(--text-muted)]">Needs: {{ parties() }}</span>
           </div>
-          @if (r.decisions.length) {
+          @if (r.decisions?.length) {
             <ul class="space-y-1.5 text-sm">
-              @for (d of r.decisions; track d.runReviewDecisionId) {
+              @for (d of r.decisions ?? []; track d.runReviewDecisionId) {
                 <li class="flex flex-wrap items-baseline gap-x-2">
                   <span class="font-medium">{{ partyOf(d.party) }}</span>
                   <span [class]="d.decision === 'APPROVED' ? 'text-[color:var(--ok-text)]' : 'text-[color:var(--crit-text)]'">

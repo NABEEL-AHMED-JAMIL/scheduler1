@@ -46,9 +46,9 @@ export type DecisionRoute =
             <span class="pill {{ status().tone }}" data-test="review-status"><app-icon [name]="status().icon" size="0.85em" />{{ status().label }}</span>
           </div>
           <p class="text-xs text-[color:var(--text-muted)]">Results need review by {{ parties() }}.</p>
-          @if (r.decisions.length) {
+          @if (r.decisions?.length) {
             <ul class="flex flex-col gap-1.5 text-sm" data-test="decisions-made">
-              @for (d of r.decisions; track d.runReviewDecisionId) {
+              @for (d of r.decisions ?? []; track d.runReviewDecisionId) {
                 <li class="flex flex-wrap items-baseline gap-x-2">
                   <span class="font-medium">{{ partyOf(d.party) }}</span>
                   <span [class]="d.decision === 'APPROVED' ? 'text-[color:var(--ok-text)]' : 'text-[color:var(--crit-text)]'">
