@@ -41,41 +41,9 @@
 
     <!-- History: beside the thread on wide screens; over it, on asking, below. -->
     <aside class="ai-history card p-0" aria-labelledby="assistant-recent" [class.open]="historyOpen()" [class.shadow-xl]="historyOpen()">
-      <div class="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-subtle">
-        <h2 id="assistant-recent" class="font-semibold text-sm">Conversations</h2>
-        <div class="flex items-center">
-          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Refresh the conversations" [disabled]="conversationsLoading()" (click)="loadConversations()">
-            <app-icon name="refresh" [class.spin]="conversationsLoading()" />
-          </button>
-          <button type="button" class="btn btn-ghost btn-icon btn-sm xl:hidden" aria-label="Close the conversations" (click)="historyOpen.set(false)">
-            <app-icon name="close" />
-          </button>
-        </div>
-      </div>
-      @if (!conversations().length) {
-        <p class="text-xs text-[color:var(--text-muted)] px-3 py-2">{{ conversationsLoading() ? 'Loading…' : 'None yet. A question starts one.' }}</p>
-      }
-      <ul class="ai-list flex flex-col overflow-y-auto" data-conversations>
-        @for (c of conversations(); track c.conversationId) {
-          @let active = conversation()?.conversationId === c.conversationId;
-          <li class="flex items-center gap-1 min-w-0" [attr.data-conversation]="c.conversationId">
-            <button type="button" class="flex-1 min-w-0 text-left rounded-md px-2 py-1.5 hover:bg-sunken" [class.bg-sunken]="active"
-                    [attr.aria-current]="active ? 'true' : null" [disabled]="!!working()" (click)="open(c.conversationId)">
-              <span class="block text-sm truncate" [class.font-medium]="active" [title]="tip(c.title)">{{ c.title }}</span>
-              @if (c.dateUpdated) { <span class="block text-xs text-[color:var(--text-muted)]">{{ c.dateUpdated | serverTime: 'recent' }}</span> }
-            </button>
-            <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="convMenu" [attr.aria-label]="'Actions for ' + c.title">
-              <app-icon name="dots" size="1.05em" />
-            </button>
-            <ng-template #convMenu>
-              <div cdkMenu class="card shadow-xl py-1 min-w-44 text-sm">
-                <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="open(c.conversationId)"><app-icon name="chat" />Open</button>
-                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(c)"><app-icon name="trash" class="icon-crit" />Delete</button>
-              </div>
-            </ng-template>
-          </li>
-        }
-      </ul>
+      <app-conversation-list [recent]="conversations()" [activeId]="conversation()?.conversationId ?? null" [disabled]="!!working()"
+                             (opened)="open($event)" (remove)="remove($event)" (closed)="historyOpen.set(false)"
+                             (renamed)="conversation()?.conversationId === $event.conversationId && conversation.set($event)" />
     </aside>
 
     <!-- The conversation. -->

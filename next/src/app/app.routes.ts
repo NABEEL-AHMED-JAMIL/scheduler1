@@ -509,6 +509,15 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // The AI Assistant's conversations, all of them (2026-10-12): facets, a table and a detail panel -- the
+        // Explorer pattern. The same aiPrompt.json calls as the assistant, so the same page key.
+        path: 'ai/assistant/conversations',
+        title: 'All conversations',
+        loadComponent: () => import('./features/ai/assistant/conversations-page').then(m => m.ConversationsPage),
+        data: { pageKey: 'ai-prompts' },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'ai/tools',
         title: 'Tool Registry',
         loadComponent: () => import('./features/ai/tools/tool-registry').then(m => m.ToolRegistry),

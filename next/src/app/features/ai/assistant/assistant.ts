@@ -2,7 +2,6 @@ import { ModelSetupBanner } from '../model-setup-banner';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Dialog } from '@angular/cdk/dialog';
-import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription, TimeoutError, firstValueFrom } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -30,6 +29,7 @@ import {
 import { DatasetPanel } from './dataset-panel';
 import { RunFollow } from './run-follow';
 import { FlowPanel } from './flow-panel';
+import { ConversationList } from './conversation-list';
 import { ChartAnswerSlot } from '../../analytics/charts/chart-answer-slot';
 import { TracePanel, TraceRun } from './trace-panel';
 import { PipelineFlowArtifact, flowVerdict, isFlow, newestFlow } from './flow.model';
@@ -72,8 +72,8 @@ export const PROGRESS_MS = [1000, 2000] as const;
  */
 @Component({
   selector: 'app-assistant',
-  imports: [Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, ModelSetupBanner, RunFollow,
-    FlowPanel, TracePanel, ChartAnswerSlot],
+  imports: [Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, RunFollow,
+    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList],
   templateUrl: './assistant.html',
   // The page's own layout, kept with the page (lazy) rather than as new global utilities.
   styles: [`

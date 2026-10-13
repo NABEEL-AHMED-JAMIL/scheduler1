@@ -1,11 +1,13 @@
 import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { Router } from '@angular/router';
 import { firstValueFrom } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { SERVER_ZONE } from '../../../core/instant';
 import { Icon } from '../../../shared/ui/icon';
 import { FlowDefinition, FlowTrigger, PipelineFlowArtifact, pipelineIdOf } from './flow.model';
+import { ConversationApi } from './conversation.api';
 
 export interface CreatePipelineData {
   flow: PipelineFlowArtifact;
@@ -129,6 +131,8 @@ export class CreatePipeline implements OnInit {
   readonly ref = inject<DialogRef<CreatedPipeline | null>>(DialogRef);
   readonly data = inject<CreatePipelineData>(DIALOG_DATA);
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router, { optional: true });
+  private readonly conversations = inject(ConversationApi);
 
   readonly name = signal(this.data.flow.name || 'AI pipeline');
   readonly pipelineId = signal(pipelineIdOf(this.data.flow.name));
@@ -212,11 +216,23 @@ export class CreatePipeline implements OnInit {
         });
       }
       this.created.set({ pipelineId: pid, pipelineKey, taskDetailId, jobId, jobName: name });
+      this.report(this.created()!);
     } catch {
       // The failing step says why; whatever was created before it stays (and is named there).
     } finally {
       this.busy.set(false);
     }
+  }
+
+  /**
+   * The conversation list says the design was created, and links to it (2026-10-12). The conversation is the one open on
+   * the page (?c=, which the assistant keeps in the address). Best effort: the pipeline stands whether or not this lands.
+   */
+  private report(c: CreatedPipeline): void {
+    const id = Number(this.router?.parseUrl(this.router.url).queryParams['c']);
+    if (!Number.isInteger(id) || id <= 0) return;
+    this.conversations.pipelineCreated(id, { pipelineKey: c.pipelineKey, pipelineId: c.pipelineId, taskDetailId: c.taskDetailId, jobId: c.jobId,
+      name: c.jobName }).subscribe({ error: () => undefined });
   }
 
   private async step(label: string, work: () => Promise<string>): Promise<void> {
