@@ -5,6 +5,7 @@ import { firstValueFrom } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
+import { PageHeader } from '../../../shared/ui/page-header';
 import { PIPELINE_FIELDS, Topic } from '../../ai/assistant/create-pipeline';
 import { pipelineIdOf } from '../../ai/assistant/flow.model';
 
@@ -29,19 +30,14 @@ export const STEP_PAYLOAD = '<data></data>';
  */
 @Component({
   selector: 'app-new-pipeline',
-  imports: [Icon, RouterLink],
+  imports: [Icon, RouterLink, PageHeader],
   template: `
     <div class="page">
-      <div class="page-head">
-        <div>
-          <h1 class="page-title">New pipeline</h1>
-          <p class="page-subtitle">Start from what it should do. You can add a schedule, triggers and a review after it is made.</p>
-        </div>
-      </div>
+      <app-page-header title="New pipeline" subtitle="Start from what it should do. A schedule, triggers and a review come after it is made." />
 
       <div class="grid gap-4 lg:grid-cols-3 items-start" data-test="start-with">
         <!-- 1. The AI Assistant -->
-        <section class="card p-5 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'assistant'" data-start="assistant">
+        <section class="card p-4 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'assistant'" data-start="assistant">
           <div class="flex items-center gap-2">
             <span class="stat-glyph"><app-icon name="chat" /></span>
             <h2 class="text-base font-semibold">Describe it to the AI Assistant</h2>
@@ -65,7 +61,7 @@ export const STEP_PAYLOAD = '<data></data>';
         </section>
 
         <!-- 2. Steps -->
-        <section class="card p-5 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'steps'" data-start="steps">
+        <section class="card p-4 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'steps'" data-start="steps">
           <div class="flex items-center gap-2">
             <span class="stat-glyph"><app-icon name="layers" /></span>
             <h2 class="text-base font-semibold">Add steps yourself</h2>
@@ -94,7 +90,7 @@ export const STEP_PAYLOAD = '<data></data>';
         </section>
 
         <!-- 3. Copy -->
-        <section class="card p-5 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'copy'" data-start="copy">
+        <section class="card p-4 flex flex-col gap-3 new-start" [class.is-on]="chosen() === 'copy'" data-start="copy">
           <div class="flex items-center gap-2">
             <span class="stat-glyph"><app-icon name="copy" /></span>
             <h2 class="text-base font-semibold">Copy an existing pipeline</h2>

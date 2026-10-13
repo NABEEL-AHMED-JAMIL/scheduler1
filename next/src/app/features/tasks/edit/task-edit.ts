@@ -253,6 +253,14 @@ export class TaskEdit implements OnInit {
   }
 
   ngOnInit(): void {
+    if (!this.isEdit()) {
+      // UX review 2026-10-12 (P3): a new pipeline's topic and XML payload are optional -- Core uses the workspace's own
+      // topic and the empty payload a step pipeline carries.
+      for (const name of ['sourceTaskTypeId', 'taskPayload']) {
+        this.form.get(name)!.clearValidators();
+        this.form.get(name)!.updateValueAndValidity({ emitEvent: false });
+      }
+    }
     this.http.get<ApiResponse<any[]>>(`${API_BASE}/kafkaConnectionProfile.json/fetchAllProfiles`).subscribe({
       next: response => {
         this.profilesLoaded = true;
@@ -568,8 +576,9 @@ export class TaskEdit implements OnInit {
     for (const name of Object.keys(this.formData.controls)) {
       this.formData.removeControl(name, { emitEvent: false });
     }
-    // No form to generate a payload from any more -- back to requiring a hand-written one.
-    this.form.get('taskPayload')!.setValidators(Validators.required);
+    // No form to generate a payload from any more -- back to requiring a hand-written one, for a saved pipeline. A new
+    // one's event source is optional (UX review 2026-10-12, P3): Core gives it the empty payload and the workspace's topic.
+    this.form.get('taskPayload')!.setValidators(this.isEdit() ? Validators.required : []);
     this.form.get('taskPayload')!.updateValueAndValidity({ emitEvent: false });
   }
 
@@ -866,7 +875,8 @@ export class TaskEdit implements OnInit {
       taskDetailId: value.taskDetailId,
       // Stored without the spaces around it, so the list and search see the name that was meant.
       taskName: (value.taskName ?? '').trim(),
-      sourceTaskType: { sourceTaskTypeId: value.sourceTaskTypeId },
+      // A new pipeline without a topic leaves it out; Core picks the workspace's own (UX review 2026-10-12, P3).
+      ...(value.sourceTaskTypeId != null ? { sourceTaskType: { sourceTaskTypeId: value.sourceTaskTypeId } } : {}),
       taskPayload: value.taskPayload,
       taskStatus: value.taskStatus,
       homePageId: value.homePageId,

@@ -1,3 +1,4 @@
+import { Validators } from '@angular/forms';
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
@@ -152,7 +153,11 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
     expect(post).toHaveBeenCalledWith(`${API_BASE}/sourceTask.json/addSourceTask`, expect.anything());
   });
 
-  it('still requires a hand-written payload when no pipeline form applies', () => {
+  /**
+   * UX review 2026-10-12 (P3): a NEW pipeline's event source -- topic and XML payload -- is optional; Core gives it the
+   * workspace's topic and the empty payload. A blank payload is sent as it is (Core fills it in).
+   */
+  it('lets a new pipeline go without a hand-written payload or a topic', () => {
     const { component, post, toast } = taskEditWith((url, opts) => {
       if (url.endsWith('/setting.json/topics')) return noTopics;
       if (url.endsWith('/setting.json/taskReferences')) return references(opts);
@@ -161,6 +166,27 @@ describe('TaskEdit -- payload generated from the pipeline form on save', () => {
     });
     component.ngOnInit();
     settle();
+    component.form.patchValue({ taskName: 'AC', taskStatus: 'Active' });
+
+    component.save();
+
+    expect(toast.error).not.toHaveBeenCalledWith('Check the highlighted fields.');
+    expect(post).toHaveBeenCalledWith(`${API_BASE}/sourceTask.json/addSourceTask`,
+      expect.not.objectContaining({ sourceTaskType: expect.anything() }));
+  });
+
+  it('still requires a hand-written payload when no pipeline form applies -- on a saved pipeline', () => {
+    const { component, post, toast } = taskEditWith((url, opts) => {
+      if (url.endsWith('/setting.json/topics')) return noTopics;
+      if (url.endsWith('/setting.json/taskReferences')) return references(opts);
+      if (url.endsWith('/pipeline.json/listForTopic')) return forTopic([], opts);
+      throw new Error(`unexpected GET ${url}`);
+    });
+    component.ngOnInit();
+    settle();
+    // As a saved pipeline's editor has it: its payload required once no form applies (clearForm, isEdit).
+    component.form.get('taskPayload')!.setValidators(Validators.required);
+    component.form.get('taskPayload')!.updateValueAndValidity();
     component.form.patchValue({ taskName: 'AC', sourceTaskTypeId: 1, taskStatus: 'Active' });
     // pipelineId left empty -> no form -> taskPayload stays required and, here, blank.
 

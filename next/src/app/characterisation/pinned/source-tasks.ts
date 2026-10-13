@@ -6,40 +6,33 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /kafkaConnectionProfile.json/fetchAllProfiles",
-      "GET /setting.json/taskReferences?kind=TASK_GROUP",
-      "GET /setting.json/taskReferences?kind=HOME_PAGE",
-      "GET /setting.json/topics?kafkaConnectionProfileId=1009"
+      "GET /setting.json/topics?limit=50&q=",
+      "POST /sourceTask.json/listSourceTask?limit=1000&page=1 {}"
     ],
     "headings": [
       "New pipeline",
-      "Basics",
-      "Payload"
+      "Describe it to the AI Assistant",
+      "Add steps yourself",
+      "Copy an existing pipeline"
     ],
     "buttons": [
-      "Clear",
-      "Create pipeline"
+      "Copy it",
+      "Create and add steps",
+      "Open the AI Assistant"
     ],
     "columns": [],
     "fields": [
-      "<pipeline>...</pipeline>",
-      "Daily orders import",
-      "Group",
-      "Home page",
-      "Kafka connection",
-      "Pick a topic first",
-      "Pipeline name *(required)",
-      "Registry task",
-      "Search connections…",
-      "Search groups…",
-      "Search home pages…",
-      "Search this connection’s topics…",
-      "Status *(required)",
-      "Topic *(required)",
-      "XML configuration *(required)"
+      "Name *",
+      "Name of the copy",
+      "Pipeline to copyChoose…Reference: CSV check and summariseUI-REVIEW Clean customers CSV check",
+      "Read the daily admissions file, flag readmissions within 30 days, and keep a dataset for the dashboard.",
+      "Readmission risk (daily)",
+      "Topic (optional)",
+      "What should it do?"
     ],
     "links": [
-      "/pipelines"
+      "/pipelines",
+      "/pipelines/new/form"
     ]
   },
   "a task's XML payload, opened in the list": {

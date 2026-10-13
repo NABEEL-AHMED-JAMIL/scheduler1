@@ -197,7 +197,16 @@ export const routes: Routes = [
         // The editor is nothing but writes, and addSourceTask/updateSourceTask are TENANT_ADMIN.
         // Ungated, a tenant user could fill in a name, type and the whole XML payload and only be
         // told no when they pressed Save, with the work lost.
+        // UX review 2026-10-12 (P3): a new pipeline starts from a choice -- the AI Assistant, steps, or a copy.
         path: 'pipelines/new',
+        title: 'New pipeline',
+        loadComponent: () => import('./features/tasks/new/new-pipeline').then(m => m.NewPipeline),
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        canActivate: [pageGuard, roleGuard],
+      },
+      {
+        // The full form (event source topic, registry task, XML payload), for a pipeline a Kafka message starts.
+        path: 'pipelines/new/form',
         title: 'New pipeline',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
         data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },

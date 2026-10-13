@@ -61,7 +61,7 @@
                           [options]="profileOptions()" />
           </app-field>
 
-          <app-field label="Topic" for="taskType" [required]="true"
+          <app-field label="Topic" for="taskType" [required]="isEdit()"
                      [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()"
                      [hint]="topicHint()">
             <app-combobox id="taskType" formControlName="sourceTaskTypeId" [numeric]="true"
@@ -202,7 +202,7 @@
              predates one, not a second way to configure a pipeline that has one. -->
         <div class="form-section">
           <h2 class="form-section-title">Payload</h2>
-          <app-field label="XML configuration" for="payload" [required]="true"
+          <app-field label="XML configuration" for="payload" [required]="isEdit()"
                      [control]="form.get('taskPayload')" [submitted]="submitted()"
                      hint="This pipeline has no form, so this is sent to the consumer as-is. Define the pipeline’s fields under Configuration › Task Registry to fill this in field by field instead.">
             <textarea id="payload" class="input mono text-xs resize-y min-h-40"

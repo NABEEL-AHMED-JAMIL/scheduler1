@@ -165,6 +165,17 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/pipelines/new/form",
+      "title": "New pipeline",
+      "pageKey": "tasks",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/pipelines/bulk",
       "title": "Bulk pipelines",
       "pageKey": "tasks",
