@@ -335,6 +335,8 @@ export interface TileFilterNote {
   label: string;
   /** One line per filter that is on and could not land here, in the reader's words. */
   notApplied: string[];
+  /** The labels of those filters: the foot's short "Not by Department, Date". */
+  notAppliedLabels: string[];
 }
 
 /** A tile's filter marker and its notes, from what the server said each filter did to it. */
@@ -343,7 +345,8 @@ export function tileFilterNote(defs: readonly BoardFilterDef[], outcomes: readon
   const applied = (outcomes ?? []).filter(o => o.applied).map(o => byKey.get(o.key)?.label ?? o.key);
   const notApplied = (outcomes ?? []).filter(o => !o.applied)
     .map(o => `${byKey.get(o.key)?.label ?? o.key} is not applied here: ${lowerFirst(o.reason ?? 'this data cannot take it.')}`);
-  return { filtered: applied.length > 0, label: applied.length ? 'Filtered: ' + applied.join(', ') : '', notApplied };
+  const notAppliedLabels = (outcomes ?? []).filter(o => !o.applied).map(o => byKey.get(o.key)?.label ?? o.key);
+  return { filtered: applied.length > 0, label: applied.length ? 'Filtered: ' + applied.join(', ') : '', notApplied, notAppliedLabels };
 }
 
 function lowerFirst(text: string): string {

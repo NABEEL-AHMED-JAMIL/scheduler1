@@ -478,7 +478,8 @@
                       <span class="pill pill-brand dash-filtered" data-test="tile-filtered" [title]="note.label + (note.notApplied.length ? ' · ' + note.notApplied.join(' ') : '')"><app-icon name="filter" size="0.75em" />Filtered</span>
                     }
                     @if (note.notApplied.length) {
-                      <span class="dash-filter-note text-[11px] text-[color:var(--text-muted)] min-w-0 flex-1 truncate" data-test="tile-not-filtered" [title]="note.notApplied.join(' ')">{{ note.notApplied.join(' ') }}</span>
+                      <span class="dash-filter-note text-[11px] text-[color:var(--text-muted)] min-w-0 flex-1 truncate" data-test="tile-not-filtered" [title]="note.notApplied.join(' ')"
+                            [attr.aria-label]="note.notApplied.join(' ')">Not by {{ note.notAppliedLabels.join(', ') }}</span>
                     }
                   }
                   @if (shown; as view) {

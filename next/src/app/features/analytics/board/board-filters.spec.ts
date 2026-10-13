@@ -154,7 +154,8 @@ describe('what a tile says', () => {
     expect(note.filtered).toBe(true);
     expect(note.label).toBe('Filtered: Region');
     expect(note.notApplied).toEqual(['Date is not applied here: this data has no order_date or issue_date column.']);
-    expect(tileFilterNote(DEFS, null)).toEqual({ filtered: false, label: '', notApplied: [] });
+    expect(note.notAppliedLabels).toEqual(['Date']);
+    expect(tileFilterNote(DEFS, null)).toEqual({ filtered: false, label: '', notApplied: [], notAppliedLabels: [] });
   });
 
   it('a chip says All, one value, or one and how many more', () => {

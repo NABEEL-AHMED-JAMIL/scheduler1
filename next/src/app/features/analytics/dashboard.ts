@@ -600,7 +600,7 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /** What the board's filters did to this tile: its "Filtered" marker and the filters that could not land. */
-  tileNote(widget: DashboardWidget): { filtered: boolean; label: string; notApplied: string[] } | null {
+  tileNote(widget: DashboardWidget): { filtered: boolean; label: string; notApplied: string[]; notAppliedLabels: string[] } | null {
     if (!this.filterWire().length) return null;
     const id = widget.analyticsDashboardWidgetId ?? -1;
     const outcomes = this.pagedTable(widget) ? this.tableReads()[id]?.outcomes : this.runs()[id]?.outcomes;
