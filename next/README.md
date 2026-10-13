@@ -2,30 +2,40 @@
 
 The ETL Console. It replaced the Angular 8 console that lived in `../src`, which was retired and removed in 2026-09 (MIG-260); this is the only frontend.
 
-What it holds as of 2026-10-07 is summarised under [What the console has](#what-the-console-has-as-of-2026-10-07).
+What it holds as of 2026-10-13 is summarised under [What the console has](#what-the-console-has-as-of-2026-10-13).
 
 ## Running
+
+The running console is etl-platform's `next-app` container, at `http://localhost:4400/`. Every service, the console
+included, is started and deployed from etl-platform (`../../etl-platform`): `scripts/up.sh` brings the platform up, and
+after a change is pushed
+
+```bash
+cd ../../etl-platform && scripts/deploy.sh next-app
+```
+
+builds the console from this repository's pulled main checkout and replaces the container (check its health,
+RestartCount and Created time afterwards). Its settings live in `etl-platform/config/`, not here.
+
+For development against that platform:
 
 ```bash
 npm install
 ng serve
 ```
 
-`http://localhost:4200`. The backend must be running: the app calls `http://<hostname>:9098/api/v1` (the API gateway), set in `src/app/core/api/api.config.ts`. Every service is started from etl-platform (`../../etl-platform`: `scripts/up.sh`, `scripts/deploy.sh <service>`), where the console itself runs as `next-app`.
-
-### In Docker
-
-```bash
-docker compose up -d --build
-```
-
-`http://localhost:4400/` — 4400, not 4200: it's the port the backend's `app.console.url` default and `WEBSOCKET_ALLOWED_ORIGINS` already assume (email links, websocket CORS), see `docker-compose.yml`. `API_BASE` is derived from `window.location.hostname` at build-independent runtime, so the container needs no environment variable or build arg to find the backend — it only has to be reachable at the same hostname on `:9098`.
+`http://localhost:4200`. The app calls `http://<hostname>:9098/api/v1` (the API gateway), set in
+`src/app/core/api/api.config.ts`; `API_BASE` follows `window.location.hostname`, so neither the dev server nor the
+container needs an environment variable to find the backend.
 
 ```bash
 curl http://localhost:4400/health   # → 200 OK
 ```
 
-Full detail, including the two build gotchas specific to the newer Angular builder (`dist/next/browser/`, not `dist/next/`; SPA fallback for path-based routing), is in [`../DEPLOYMENT.md`](../DEPLOYMENT.md).
+`docker-compose.yml` here still builds the image on its own for standalone work, but it does not configure the running
+container. The build's two gotchas (`dist/next/browser/`, not `dist/next/`; SPA fallback for path-based routing) are in
+[`../DEPLOYMENT.md`](../DEPLOYMENT.md). 4400, not 4200, is the port the backend's `app.console.url` default and
+`WEBSOCKET_ALLOWED_ORIGINS` assume (email links, websocket CORS).
 
 ## Tests
 
@@ -33,13 +43,13 @@ Full detail, including the two build gotchas specific to the newer Angular build
 npx ng test --watch=false
 ```
 
-355 spec files (2026-10-07).
+413 spec files (2026-10-13).
 
 **Run them through `ng test`, not `npx vitest`.** The `test` target uses the `@angular/build:unit-test` builder, which is what applies the Angular compiler plugin. Running vitest directly leaves components uncompiled and produces a screenful of `Cannot read properties of null (reading 'ngModule')` failures that have nothing to do with your change.
 
 ### End-to-end (Playwright)
 
-`e2e/` holds the Playwright suite (36 specs, Chromium), run against a running console and backend:
+`e2e/` holds the Playwright suite (40 specs, Chromium), run against a running console and backend:
 
 ```bash
 npx playwright install chromium   # once
@@ -84,17 +94,43 @@ src/app/
 
 Routing is in `src/app/app.routes.ts`; every route lazy-loads a standalone component, and authenticated routes sit behind the guard in `src/app/core/auth`.
 
-## What the console has (as of 2026-10-07)
+## What the console has (as of 2026-10-13)
 
-- **Charts.** 51 chart kinds for dashboards and Analytics Studio: 19 drawn as SVG and 32 with ECharts (`src/app/features/analytics/widget-kinds.ts`: `KINDS`, `ECHART_KIND_IDS`). Each kind declares what it needs and has a fit rule (`charts/chart-fit.ts`); a kind that cannot draw a result stays listed, dimmed, with the reason. Chart settings and themes: the console's own theme (from the design tokens, following light/dark) and nine named palettes from ECharts' theme files; a board has a theme (analytics-service's `dashboard_config`) and a widget may override it. A tile's **Show as** menu is a grid of chart glyphs with a search and "Suggested for this data" (`charts/kind-menu.ts`). Every chart's text uses one type scale, 11, 12 and 14 px, figures aside (`shared/charts/chart-type.ts`). A click on a mark narrows the board.
-- **Task inbox** (`/workflows/inbox`): a mail-client layout -- tabs with totals (Waiting for me, My groups, Done, My requests), a searchable list beside the open task, each pane scrolling on its own; the lists page by cursor, 100 at a time, with Load more, and Search all asks the service.
-- **Workflow designer** (`/workflows/designer`): the inbox's two-pane layout -- a searchable list grouped under Built in and This workspace, then the workflow's tabs with canvas and properties side by side.
-- **Reliability** (Administration › Reliability): a status card per objective (pipeline runs, billing) with the error budget left, one plain alert line per objective, full-width charts, meters with problems first, the burn-rate table behind For engineers.
-- **Customer API** (Integration): API Clients (scopes, secrets shown once, rate limits, the frame allow-list, sandbox test keys), webhooks with their delivery log and Send again, event routes, and API limits and the month's calls against the quota (platform bounds per tenant in Administration › Tenants). The **developer portal** at `/integration/developer` (API reference, guides, event and problem types, changelog, OpenAPI and Postman downloads), bundled at build time by `scripts/sync-developer-docs.mjs` from etl-platform's `docs/api/`. The **embedded run view** at `/embed/runs/:token`, outside the shell, for a customer's portal to frame.
-- **API editor**: paging modes `NEXT_URL` ("Next URL in the answer") and `OFFSET`, besides PAGE, CURSOR and LINK, checked before saving.
-- **Billing.** Pay now on an issued, unpaid invoice goes to Stripe's hosted Checkout page (no card data passes through the console); card payment chips and "Paid by card on"; the platform's payments on Billing analytics. Cost & usage and the invoice count days in the workspace's billing time zone ("days in America/Chicago"; the invoice period states its zone), set by a platform administrator in Administration › Tenants › Billing time zone. Lines priced from the default card say so; API lines show each client's share.
-- **Data Catalog** (`/data/catalog`, platform files hidden unless an administrator shows them), **Connector Hub** (`/integration/connectors`) and **Forms** (builder, fill, Submissions, share by link at `/f/:token`).
-- **Tablets.** Below 1024 px, list/detail pages (Task inbox, Model connections, Invoices, Kafka) show one pane: the list at full width, the item opened over it with Back to list (`shared/ui/one-pane`). Table toolbars fit beside the heading or wrap as one group.
+The menu follows the user's job (UX review 2026-10-12): **Home · Get data in · Build · Run & review · See results ·
+Administration & billing**, and **Platform** for platform administrators. `src/app/core/nav/nav-tree.ts` holds every
+group, hub and tab; the paths below are today's (old addresses redirect).
+
+- **Get data in.** Connections (`/connections`: Connectors, Storage, Databases, API collections, Sources, Data
+  contracts), Documents (`/documents`: Documents in, Document types, Datasets, Email-in, File drop) and Forms (builder,
+  Submissions, share by link at `/f/:token`). A new connection is a stepper in a side panel: Connector, Credentials,
+  Tables, Sync, Schedule. An API collection's page keeps its versions under a History tab.
+- **Build.** Pipelines (`/pipelines/list`, Schedules & triggers, Prompts), the AI Assistant (`/ai/assistant`: a
+  pipeline described in words is drawn step by step, then Create pipeline; a MANAGED workspace sees the managed banner
+  and no Create pipeline) and Approval workflows (`/workflows/designer`). A schedule's assistant
+  (`/pipelines/schedules/:id/assistant`) uses the same chat composer as the AI Assistant and Ask your data.
+- **Run & review.** Runs (`/runs`: Latest, By date, Analytics), the Review inbox (`/workflows/inbox`, a mail-client
+  layout with Waiting for me, My groups, Done, My requests, and an administrator's runs waiting for review) and Document
+  review (`/documents/review`, a document beside its fields and line items).
+- **See results.** Dashboards (`/data/analytics/dashboards`: 51 chart kinds, 19 SVG and 32 ECharts, each with a fit
+  rule; favourites first, grouped by the pipeline that feeds them), Ask your data (`/data/ask`: answers with sources or
+  the query they ran, a chart answer pinned to a dashboard; the viewer's recent questions and pinned answers are kept in
+  their browser), Analytics Studio, the Data Catalog, Generated reports (`/data/reports`), Files (`/data/files`) and
+  the tools: Document Converter (`/tools/converter`; its "PDF from a dataset" is Generated reports' button of the same
+  name) and Audio Transcript.
+- **Administration & billing.** Users, Page access, Sign-in security, Data policies, Activity; Billing (Cost & usage by
+  day, pipeline and run, in the workspace's billing time zone; Invoices with Pay now on Stripe's hosted page and the
+  payments side panel; Billing documents); Settings (Model connections, Tool Registry, Task Registry, Kafka & Topics,
+  Configuration values, Home pages, Task groups); Developers (API Clients with scopes, webhooks, event routes and API
+  limits, and the Developer portal at `/developers/portal`, bundled by `scripts/sync-developer-docs.mjs` from
+  etl-platform's `docs/api/`). The embedded run view at `/embed/runs/:token` sits outside the shell for a customer's
+  portal to frame.
+- **Platform.** Workspaces (`/platform/workspaces`: a table with every action in the row's ⋮, among them API limits and
+  Billing time zone), Requests, Managed service, Work in a workspace, Staff activity, Reliability (a status card per
+  objective with its error budget), Billing analytics, Rate cards, Engine settings.
+- **Shared page pieces.** `app-page-header` (breadcrumb, title, pills, actions in a fixed order with the primary
+  rightmost), `app-section`, the field grid, `app-actions-bar`, `app-table-shell` (heading, then the filters, Columns at
+  the right; numbers right-aligned), `app-stat-strip`, `app-empty-state` and `app-side-panel` (a row's detail on the
+  right). Light and dark; 1920/2560 and 1187/1024/768 wide. Below 1024 px a list/detail page shows one pane at a time.
 
 ## Conventions
 

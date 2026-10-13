@@ -8,13 +8,14 @@ The older console (Angular 8, Webpack 4, served at `http://localhost/scheduler/`
 
 ## Running
 
-```bash
-cd next && npm install && ng serve
-```
+The running console is etl-platform's `next-app` container at `http://localhost:4400/`: deploy a pushed change with
+`../etl-platform/scripts/deploy.sh next-app` (it builds from this repository's pulled main checkout), then check the
+container's health, RestartCount and Created time. Its settings are in `etl-platform/config/`.
 
-`http://localhost:4200`. It expects the backend at `http://localhost:9098/api/v1` (the API gateway; see `next/src/app/core/api/api.config.ts`).
-
-To run it in Docker instead — the way it deploys — see [DEPLOYMENT.md](DEPLOYMENT.md). Briefly: `cd next && docker compose up -d --build`, then `http://localhost:4400/`. 4400, not 4200 — that port is what the backend's `app.console.url` default and `WEBSOCKET_ALLOWED_ORIGINS` already assume.
+For development, `cd next && npm install && ng serve` serves `http://localhost:4200` against the same backend at
+`http://localhost:9098/api/v1` (the API gateway; see `next/src/app/core/api/api.config.ts`). 4400 is the port the
+backend's `app.console.url` default and `WEBSOCKET_ALLOWED_ORIGINS` assume. `next/docker-compose.yml` and
+[DEPLOYMENT.md](DEPLOYMENT.md) describe building the image on its own; they do not configure the running container.
 
 Tests:
 
