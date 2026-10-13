@@ -132,6 +132,14 @@ export class JobLogs implements OnInit, OnDestroy {
   /** The job and the specific run, so a log line has the context the old screen showed. */
   readonly job = signal<any | null>(null);
   readonly run = signal<any | null>(null);
+  /** MIG-354: when the workspace's retention policy removed this run's outputs and its log lines (null: kept). */
+  readonly retention = signal<{ outputsRemovedAt: string | null; logsRemovedAt: string | null } | null>(null);
+  /** The sentence the log shows above its lines once retention removed them. */
+  readonly logsRemovedNote = computed(() => {
+    const at = this.retention()?.logsRemovedAt;
+    return at ? `This run's log lines were removed by the workspace's retention policy on ${this.clock.transform(at, 'date') ?? at}. `
+      + 'The run and its steps stay.' : '';
+  });
   /** UX review 2026-10-12 (A2, R1): the run's number and its schedule as the title, not "Run logs". */
   readonly heading = computed(() => {
     const name = this.job()?.jobName;
@@ -667,6 +675,7 @@ export class JobLogs implements OnInit, OnDestroy {
           // The same call already carries both -- there is no reason to fetch them again.
           this.job.set(data?.sourceJob ?? null);
           this.run.set(data?.sourceJobQueue ?? null);
+          this.retention.set(data?.retention ?? null);
           this.now.set(Date.now());
           this.loads.update(n => n + 1);
           this.loadAiSteps();

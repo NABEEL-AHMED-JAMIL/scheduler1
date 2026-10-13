@@ -87,6 +87,9 @@
       <app-run-log [entries]="logs()" [loading]="loading()" [error]="error()" [bucket]="bucket()" [follow]="autoRefreshing()"
                    [fileName]="'run-' + jobQueueId()" [(step)]="logStep"
                    [names]="approvals.logNames()">
+        @if (logsRemovedNote()) {
+          <p above class="px-4 py-2 text-xs text-[color:var(--text-secondary)] border-b border-subtle" data-test="log-retention">{{ logsRemovedNote() }}</p>
+        }
         <ng-container toolbar>
           @if (hasInsights()) {
             <button type="button" class="btn btn-default btn-xs" [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"

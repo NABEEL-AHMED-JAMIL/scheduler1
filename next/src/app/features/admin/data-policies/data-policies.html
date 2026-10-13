@@ -139,7 +139,7 @@
                 }
               </tr>
               <tr>
-                <th scope="row"><span class="block text-sm font-medium">Keep run files</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Days, 1 to 3650. Blank: the pipeline's own retention (24 hours unless it sets another).</span></th>
+                <th scope="row"><span class="block text-sm font-medium">Keep run files</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">The working copies a run keeps for its next steps and downloads. Days, 1 to 3650. Blank: the pipeline's own (24 hours unless it sets another). How long records are kept is under Retention below.</span></th>
                 @for (c of columns(); track c.d.sensitivity) {
                   <td [attr.data-level]="c.d.sensitivity" data-row="retention">
                     @if (canEdit()) {
@@ -207,6 +207,7 @@
           </section>
         }
         <app-review-policy-card />
+        <app-retention-card [tenantId]="tenantId()" />
         @if (canEdit() && levels().length) {
           <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2 sticky bottom-3 z-10">
             @if (saveError()) {

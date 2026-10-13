@@ -31,6 +31,16 @@ const ANSWERS: Record<string, unknown> = {
   'GET /sourceJob.json/review/policy': { status: 'SUCCESS', message: 'The review policy.', data: { bulkApproveRuns: true, saved: false, updatedBy: null, updatedAt: null } },
   'GET /documentReview.json/policy': { status: 'SUCCESS', message: 'The review policy.',
     data: { bulkApprove: true, bulkApproveRuleFailures: false, saved: false, updatedBy: null, updatedAt: null } },
+  // MIG-354: a workspace whose retention was never turned on, as Core answers it -- off, every class forever, no hold, no pass.
+  'GET /setting.json/retention': { status: 'SUCCESS', message: 'Retention policy.', data: { tenantId: 2924, enabled: false, updatedAt: null,
+    updatedBy: null, platform: { auditFloorDays: 2190, maxSharePct: 20, updatedAt: null }, holds: [], lastPass: null, running: false,
+    classes: [
+      ['RUN_OUTPUTS', 'Run outputs and datasets', 'workspace, pipeline, run'], ['RUN_LOGS', 'Run logs', 'workspace, pipeline, run'],
+      ['FILES', 'Uploaded files', 'workspace, pipeline, run'], ['DOCUMENTS', 'Documents', 'workspace'],
+      ['FORM_SUBMISSIONS', 'Form submissions', 'workspace, pipeline, run'], ['AI_CONVERSATIONS', 'AI conversations', 'workspace'],
+      ['NOTIFICATIONS', 'Notifications', 'workspace'], ['ANALYTICS', 'Analytics copies and cache', 'workspace'], ['AUDIT', 'Audit records', 'workspace'],
+    ].map(([dataClass, label, holds]) => ({ dataClass, label, covers: label + '.', owner: 'core', configurable: dataClass !== 'ANALYTICS', holds,
+      keepDays: null, minDays: dataClass === 'AUDIT' ? 2190 : null, confirmedCount: null, confirmedAt: null, last: null })) } },
 };
 
 const clean = (text: string | null | undefined) => (text ?? '').replace(/\s+/g, ' ').trim();

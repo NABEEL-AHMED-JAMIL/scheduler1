@@ -103,6 +103,28 @@ describe('JobLogs', () => {
  * now carry the entry's time (which every view shows) with its number, and the # column counts
  * the same way the chart does.
  */
+describe('JobLogs after retention removed the run\'s lines (MIG-354)', () => {
+  it('says so above the log, and nothing when they are kept', () => {
+    const kept = page();
+    expect(kept.el.querySelector('[data-test="log-retention"]')).toBeNull();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2808');
+    fixture.componentRef.setInput('jobQueueId', '6839');
+    fixture.componentInstance.tab.set('log');
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).flush({ status: API_SUCCESS,
+      data: { ...LOGS, auditLogs: [], retention: { outputsRemovedAt: '2026-10-13T03:40:12', logsRemovedAt: '2026-10-13T03:40:12' } } });
+    http.match(r => r.url.endsWith('/aiPrompt.json/runsForJob')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    fixture.detectChanges();
+    const note = (fixture.nativeElement as HTMLElement).querySelector('[data-test="log-retention"]');
+    expect(note?.textContent).toContain('removed by the workspace\'s retention policy on 13 Oct 2026');
+  });
+});
+
 describe('JobLogs timing chart names', () => {
   const at = (time: string) => `2026-09-20T${time}`;
   const ENTRIES = [

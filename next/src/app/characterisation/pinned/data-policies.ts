@@ -242,6 +242,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /aiConnection.json/list",
       "GET /sourceJob.json/review/policy",
       "GET /documentReview.json/policy",
+      "GET /setting.json/retention",
       "GET /managedService.json/actions?limit=1"
     ],
     "headings": [
@@ -250,12 +251,19 @@ export const PINNED: Record<string, unknown> = {
       "Internal",
       "Public",
       "How a call's level is decided",
-      "Bulk review"
+      "Bulk review",
+      "Retention Off",
+      "Legal holds"
     ],
     "buttons": [
       "Discard",
       "Discard changes",
+      "Edit retention",
+      "History",
+      "Place a hold",
+      "Preview",
       "Refresh",
+      "Run now",
       "Save policy",
       "Save review policy"
     ],
@@ -265,6 +273,12 @@ export const PINNED: Record<string, unknown> = {
         "Sensitive Personal, health or confidential data (PHI, PII, confidential, restricted).Default",
         "Internal The workspace's everyday data. A call is internal when nothing says otherwise.Default",
         "Public Data anyone may see: published figures, open datasets and APIs.Default"
+      ],
+      [
+        "Data",
+        "Keep for",
+        "Last pass",
+        "Holds reach"
       ]
     ],
     "fields": [
