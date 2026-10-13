@@ -1,28 +1,28 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Submissions</h1>
-      <p class="page-subtitle">
-        What each form collected, who sent it and when, and whether it started the form's pipeline.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Form submissions</h1>
+        <p class="page-subtitle">
+          What each form collected, who sent it and when, and whether it started the form's pipeline.
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        @if (forms().length) {
+          <label class="sr-only" for="submissionsForm">Form</label>
+          <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
+            @for (f of forms(); track f.formId) {
+              <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
+            }
+          </select>
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+          <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
+            <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}
+          </button>
+        }
+      </div>
     </div>
-    <div class="flex flex-wrap items-center gap-2">
-      @if (forms().length) {
-        <label class="sr-only" for="submissionsForm">Form</label>
-        <select id="submissionsForm" class="input w-auto" (change)="choose(+$any($event.target).value)">
-          @for (f of forms(); track f.formId) {
-            <option [value]="f.formId" [selected]="selected() === f.formId">{{ f.name }}{{ f.status !== 'Active' ? ' (' + f.status + ')' : '' }}</option>
-          }
-        </select>
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
-        <button type="button" class="btn btn-default btn-sm" (click)="exportCsv()" [disabled]="exporting() || !submissions().length" data-export>
-          <app-icon name="download" />{{ exporting() ? 'Exporting…' : 'Export CSV' }}
-        </button>
-      }
-    </div>
-  </div>
+  </app-page-header>
 
   @if (formsLoading()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Reading the forms…</div>

@@ -19,6 +19,7 @@ import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi } 
 import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, toJson } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /** The platform made it -- a service's built-in workflow (builtIn, or createdBy 0 from a service that predates it). */
 export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): boolean {
@@ -42,7 +43,7 @@ export function isBuiltIn(w: Pick<WorkflowSummary, 'builtIn' | 'createdBy'>): bo
  */
 @Component({
   selector: 'app-workflow-designer',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph],
+  imports: [PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, ManagedBanner, FlowGraph],
   templateUrl: './workflow-designer.html',
   host: { '(document:keydown)': 'onKey($event)' },
 })

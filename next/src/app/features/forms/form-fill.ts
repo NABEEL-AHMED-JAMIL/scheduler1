@@ -7,6 +7,7 @@ import { LoadError } from '../../shared/ui/load-error';
 import { AnswerChange, FormRenderer, UploadWanted } from './form-renderer';
 import { Answers, FormSummary, Submission, UploadRef, answerProblems, answersForSubmit, submissionStatusText } from './forms.model';
 import { FormsApi } from './forms.service';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /**
  * Forms › Fill in (Wave 5 Forms lite; page 'forms'): a member of the workspace fills in one of its Active forms. The
@@ -16,18 +17,17 @@ import { FormsApi } from './forms.service';
  */
 @Component({
   selector: 'app-form-fill',
-  imports: [FormRenderer, Icon, LoadError, RouterLink],
+  imports: [PageHeader, FormRenderer, Icon, LoadError, RouterLink],
   template: `
     <div class="page max-w-3xl">
-      <div class="page-head">
-        <div class="min-w-0">
-          <p class="text-xs text-[color:var(--text-muted)]">
-            <a class="link-inline" routerLink="/forms/builder">Forms</a> › Fill in
-          </p>
-          <h1 class="page-title">{{ form()?.name || 'Fill in a form' }}</h1>
-          @if (form()?.description) { <p class="page-subtitle whitespace-pre-line">{{ form()?.description }}</p> }
+      <app-page-header [trail]="[{ label: 'Get data in' }, { label: 'Forms', link: '/forms/builder' }]">
+        <div class="page-head">
+          <div class="min-w-0">
+            <h1 class="page-title">{{ form()?.name || 'Fill in a form' }}</h1>
+            @if (form()?.description) { <p class="page-subtitle whitespace-pre-line">{{ form()?.description }}</p> }
+          </div>
         </div>
-      </div>
+      </app-page-header>
 
       @if (loading()) {
         <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" role="status">Opening the form…</div>

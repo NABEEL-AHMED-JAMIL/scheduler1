@@ -16,6 +16,8 @@ import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativ
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
 import { ValueView, labelOf, valueKind } from './value-kind';
+import { PageHeader } from '../../shared/ui/page-header';
+import { RefreshButton } from '../../shared/ui/refresh-button';
 
 export type InboxTab = 'mine' | 'groups' | 'done' | 'requests';
 
@@ -38,7 +40,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox],
+  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
 })
@@ -571,6 +573,8 @@ export class TaskInbox implements OnInit {
   readonly aloneInWorkspace = computed(() => this.colleaguesLoaded() && !this.colleagues().some(c => c.userId !== this.me()));
   readonly mineCount = computed(() => this.tabCount(this.mine().length, this.badge.mine(), this.complete('mine')));
   readonly groupsCount = computed(() => this.tabCount(this.groups().length, this.badge.groups(), this.complete('groups')));
+  /** Whether anything waits for the reader's groups: the empty "Waiting for me" tab then points there (G10, W1). */
+  readonly groupsWaiting = computed(() => this.groups().length > 0 || this.badge.groups() > 0);
   readonly doneCount = computed(() => this.tabCount(this.done().length, this.badge.done(), this.complete('done')));
   readonly requestsCount = computed(() => this.tabCount(this.requests().length, this.badge.requests(), this.complete('requests')));
   readonly mineOverdue = computed(() => this.mine().some(t => t.overdue));

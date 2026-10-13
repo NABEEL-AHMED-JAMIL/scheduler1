@@ -1,16 +1,18 @@
 <div class="page inbox-page designer-page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Workflow designer</h1>
-      <p class="page-subtitle">Lay out who approves, what is checked and what runs. Publishing makes a new version; requests already running keep theirs.</p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Approval workflows</h1>
+        <p class="page-subtitle">Lay out who approves, what is checked and what runs. Publishing makes a new version; requests already running keep theirs.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <a routerLink="/workflows/inbox" class="btn btn-default btn-sm"><app-icon name="inbox" />Task inbox</a>
+        @if (canEdit()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="startNew()" data-test="new-workflow"><app-icon name="plus" />New workflow</button>
+        }
+      </div>
     </div>
-    <div class="flex items-center gap-2 flex-wrap">
-      <a routerLink="/workflows/inbox" class="btn btn-default btn-sm"><app-icon name="inbox" />Task inbox</a>
-      @if (canEdit()) {
-        <button type="button" class="btn btn-primary btn-sm" (click)="startNew()" data-test="new-workflow"><app-icon name="plus" />New workflow</button>
-      }
-    </div>
-  </div>
+  </app-page-header>
 
   <app-managed-banner />
 
