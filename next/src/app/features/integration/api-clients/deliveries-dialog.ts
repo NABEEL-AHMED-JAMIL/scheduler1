@@ -47,7 +47,7 @@ const PAGE = 50;
                 <th>State</th>
                 <th class="text-right">Attempts</th>
                 <th>Last answer</th>
-                <th><span class="sr-only">Actions</span></th>
+                <th class="th-actions">Actions</th>
               </tr>
             </thead>
             <tbody>

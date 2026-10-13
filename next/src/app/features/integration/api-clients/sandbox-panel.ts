@@ -61,7 +61,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
                     <th>Scopes</th>
                     <th>Last used</th>
                     <th class="text-right">State</th>
-                    <th class="w-12"><span class="sr-only">Actions</span></th>
+                    <th class="w-12 th-actions">Actions</th>
                   </tr>
                 </thead>
                 <tbody>

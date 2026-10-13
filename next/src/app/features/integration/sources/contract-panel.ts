@@ -48,7 +48,7 @@ export interface ContractPanelData {
           </div>
           <div class="overflow-x-auto">
             <table class="table-modern">
-              <thead><tr><th>Version</th><th>State</th><th>Saved</th><th class="text-right"><span class="sr-only">Actions</span></th></tr></thead>
+              <thead><tr><th>Version</th><th>State</th><th>Saved</th><th class="text-right th-actions">Actions</th></tr></thead>
               <tbody>
                 @for (v of versions(); track v.version) {
                   <tr [class.bg-sunken]="v.version === selected()">

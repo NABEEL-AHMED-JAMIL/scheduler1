@@ -113,7 +113,7 @@
                      the table scrolls inside its card instead. -->
                 <div class="overflow-x-auto relative">
                   <table class="table-modern prompt-vars min-w-[36rem]" formArrayName="variables">
-                    <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20"><span class="sr-only">Actions</span></th></tr></thead>
+                    <thead><tr><th>Name</th><th>Type</th><th>Required</th><th>Sample value <span class="font-normal text-[color:var(--text-muted)]">· or a file</span></th><th class="w-20 th-actions">Actions</th></tr></thead>
                     <tbody>
                       @for (g of variables.controls; track g; let i = $index) {
                         <tr [formGroupName]="i">

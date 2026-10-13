@@ -24,7 +24,7 @@ describe('Storage connections table layout (MIG-320)', () => {
   it('pins the row menu to the right edge', async () => {
     const html = await read();
     const table = html.indexOf('<thead>');
-    expect(classesOf(html, '<span class="sr-only">Actions</span>', 'th', table)).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th', table)).toContain('col-pin-right');
     expect(classesOf(html, '[cdkMenuTriggerFor]="menu"', 'td', table)).toContain('col-pin-right');
   });
 

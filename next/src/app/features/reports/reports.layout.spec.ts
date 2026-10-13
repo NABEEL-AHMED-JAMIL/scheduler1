@@ -25,7 +25,7 @@ describe('status columns stay on screen', () => {
     const html = await read('queue/queue.html');
     expect(html.indexOf('<th class="w-32">Status</th>')).toBeGreaterThan(-1);
     expect(html.indexOf('<th class="w-32">Status</th>')).toBeLessThan(html.indexOf('<th>Message</th>'));
-    expect(classesOf(html, '<span class="sr-only">Actions</span></th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
     expect(classesOf(html, '[cdkMenuTriggerFor]="menu"', 'td')).toContain('col-pin-right');
   });
 

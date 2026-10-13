@@ -34,7 +34,7 @@ describe('Tasks table layout', () => {
     const html = await read('tasks.html');
     const table = html.indexOf('<table class="table-modern">');
     expect(classesOf(html, '[cdkMenuTriggerFor]="taskMenu"', 'td', table)).toContain('col-pin-right');
-    expect(classesOf(html, '<span class="sr-only">Actions</span>', 'th', table)).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th', table)).toContain('col-pin-right');
   });
 
   it('does not break a bucket name at its hyphens', async () => {

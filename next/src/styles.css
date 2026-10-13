@@ -2629,3 +2629,9 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .rules-chip:focus-visible { outline: 2px solid var(--accent-mark); outline-offset: 2px; }
   .rules-chip-ok { color: var(--ok-text); border-color: color-mix(in srgb, var(--ok-text) 45%, transparent); }
 }
+
+/* Owner 10-13: a table's actions column says "Actions" -- a blank last header read as a missing label. Right-aligned over
+   the icon buttons, and never wrapped or cut, whatever width the column was given. */
+@layer components {
+  th.th-actions { text-align: right; white-space: nowrap; }
+}

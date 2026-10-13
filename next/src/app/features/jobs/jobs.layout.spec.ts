@@ -35,7 +35,7 @@ describe('Run history layout', () => {
   /** Owner 2026-10-12: the status by the message it explains; the pinned cell keeps the run's actions, which cannot scroll away. */
   it('pins the actions cell to the right edge, the status in its own column before the message', async () => {
     const html = await read('history/job-history.html');
-    expect(classesOf(html, '<span class="sr-only">Actions</span></th>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
     expect(classesOf(html, 'data-test="run-logs"', 'td')).toContain('col-pin-right');
     expect(classesOf(html, '<app-status [label]="run.jobStatus"')).not.toContain('col-pin-right');
     const cell = html.slice(html.indexOf('data-test="run-logs"'));
@@ -65,7 +65,7 @@ describe('Jobs table layout', () => {
 
   it('keeps the actions pinned to the right edge', async () => {
     const html = await read('jobs.html');
-    expect(classesOf(html, '<span class="sr-only">Actions</span>', 'th')).toContain('col-pin-right');
+    expect(classesOf(html, '>Actions</th>', 'th')).toContain('col-pin-right');
     expect(classesOf(html, '[cdkMenuTriggerFor]="menu"')).toContain('col-pin-right');
   });
 });
