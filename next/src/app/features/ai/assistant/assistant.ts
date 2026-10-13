@@ -95,7 +95,9 @@ export const PROGRESS_MS = [1000, 2000] as const;
   host: { '(document:keydown.escape)': 'historyOpen.set(false)' },
   // The page's own layout, kept with the page (lazy) rather than as new global utilities.
   styles: [`
-    .ai-grid { position: relative; display: grid; gap: 1rem; align-items: stretch; }
+    /* One column below 1024 that never grows past the page: an implicit column is as wide as its widest content (the
+       flow canvas, the composer), which pushed a phone's page 215px sideways (e2e assistant, 2026-10-13). */
+    .ai-grid { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; align-items: stretch; }
     .ai-history { display: none; flex-direction: column; min-height: 0; }
     /* Below 1280 the list opens as the console's side panels do (Batch A's app-side-panel, place 'right'): over the whole
        window, its full height, flush with the right edge, a scrim over everything behind it that closes it, and the

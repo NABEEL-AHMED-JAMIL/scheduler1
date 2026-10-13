@@ -230,3 +230,13 @@ describe('AI Assistant -- the data policy it works under', () => {
     expect(el.querySelector('[data-policy]')).toBeNull();
   });
 });
+
+describe('AI Assistant -- its width', () => {
+  it('keeps its one narrow column within the page: an implicit grid column grows to its widest content', () => {
+    // A phone's page scrolled 215px sideways (e2e assistant, 2026-10-13): below 1024 the grid had no columns, so its one
+    // implicit column took the flow canvas's and the composer's width.
+    const styles = ((Assistant as unknown as { ɵcmp: { styles: string[] } }).ɵcmp.styles ?? []).join('\n');
+    const base = styles.slice(0, styles.indexOf('@media'));
+    expect(base).toMatch(/\.ai-grid[^{]*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\)/);
+  });
+});
