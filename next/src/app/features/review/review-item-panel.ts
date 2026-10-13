@@ -83,8 +83,8 @@ interface RunReview { reviewStatus?: string; required?: string[]; decisions?: { 
       @if (doc(); as d) {
         <section class="mt-5" data-test="panel-document">
           <h3 class="text-sm font-semibold mb-1">To check</h3>
-          <p class="text-sm m-0">{{ d.reviewCount ?? lowFields().length }} of {{ d.fieldCount ?? d.fields.length }} values
-            @if (d.minConfidence != null) { <span class="text-[color:var(--text-secondary)]"> · least sure {{ pct(d.minConfidence) }}%</span> }</p>
+          <p class="text-sm m-0">{{ lowCount() }} of {{ d.fields.length || d.fieldCount || 0 }} values
+            @if (leastSure() != null) { <span class="text-[color:var(--text-secondary)]"> · least sure {{ leastSure() }}%</span> }</p>
           @if (lowFields().length) {
             <ul class="mt-2 mb-0 p-0 list-none flex flex-col gap-1 text-sm">
               @for (f of lowFields(); track f.fieldId) {
@@ -136,15 +136,20 @@ export class ReviewItemPanel implements OnInit {
     .slice(0, 12)
     .map(([k, v]) => ({ label: labelOf(k), value: typeof v === 'object' ? JSON.stringify(v) : String(v) })));
 
-  /** The values the reviewer should look at, least sure first (at most eight; the review page has them all). */
-  readonly lowFields = computed<ExtractedField[]>(() => {
+  /** Every value the reviewer should look at, least sure first, as the review screen flags them. */
+  private readonly allLow = computed<ExtractedField[]>(() => {
     const d = this.doc();
     if (!d) return [];
     const line = lowLine(d.autoApproveThreshold);
-    return (d.fields ?? [])
-      .filter(f => isLow(f, line))
-      .sort((a, b) => (a.confidence ?? 0) - (b.confidence ?? 0))
-      .slice(0, 8);
+    return (d.fields ?? []).filter(f => isLow(f, line)).sort((a, b) => (a.confidence ?? 0) - (b.confidence ?? 0));
+  });
+  /** The first eight of them; the review page has them all. */
+  readonly lowFields = computed(() => this.allLow().slice(0, 8));
+  readonly lowCount = computed(() => this.allLow().length);
+  /** The least sure value's confidence, from the values themselves (the summary can leave out a value never found). */
+  readonly leastSure = computed(() => {
+    const known = (this.doc()?.fields ?? []).map(f => f.confidence).filter((c): c is number => c != null);
+    return known.length ? percent(Math.min(...known)) : null;
   });
 
   readonly openLabel = computed(() => ({ approval: 'Open in Approvals', run: 'Open the run', document: 'Open the document' })[this.item.kind]);

@@ -79,6 +79,8 @@ describe('Review: an item\'s side panel', () => {
     p.fixture.detectChanges();
     expect(p.el.querySelector('[data-test="panel-document"]')?.textContent).toContain('Total');
     expect(p.el.querySelector('[data-test="panel-document"]')?.textContent).not.toContain('Acme');
+    expect(p.el.querySelector('[data-test="panel-document"]')?.textContent).toContain('1 of 2 values');
+    expect(p.el.querySelector('[data-test="panel-document"]')?.textContent).toContain('least sure 41%');
     expect(p.el.querySelector('[data-test="panel-open"]')?.getAttribute('href')).toBe('/review/documents/1133');
     (p.el.querySelector('[data-test="panel-approve"]') as HTMLButtonElement).click();
     expect(p.close).toHaveBeenCalledWith({ act: 'approve' });
