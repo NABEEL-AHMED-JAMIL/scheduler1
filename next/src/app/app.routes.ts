@@ -504,16 +504,8 @@ export const routes: Routes = [
         // tool's switch is gated inside the page on auth.canManageAgents (setEnabled is TENANT_ADMIN).
         path: 'ai/assistant',
         title: 'AI Assistant',
-        loadComponent: () => import('./features/ai/assistant/assistant').then(m => m.Assistant),
-        data: { pageKey: 'ai-prompts' },
-        canActivate: [pageGuard],
-      },
-      {
-        // The AI Assistant's conversations, all of them (2026-10-12): facets, a table and a detail panel -- the
-        // Explorer pattern. The same aiPrompt.json calls as the assistant, so the same page key.
-        path: 'ai/assistant/conversations',
-        title: 'All conversations',
-        loadComponent: () => import('./features/ai/assistant/conversations-page').then(m => m.ConversationsPage),
+        // Its pages (the assistant, and All conversations) are in its own lazy route table.
+        loadChildren: () => import('./features/ai/assistant/assistant.routes').then(m => m.routes),
         data: { pageKey: 'ai-prompts' },
         canActivate: [pageGuard],
       },

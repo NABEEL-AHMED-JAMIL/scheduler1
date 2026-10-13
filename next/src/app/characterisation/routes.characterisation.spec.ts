@@ -30,7 +30,7 @@ function inventory(rs: any[], prefix = ''): Row[] {
       ...(r.data?.kind ? { kind: r.data.kind } : {}),
       ...(typeof r.redirectTo === 'string' ? { redirectTo: r.redirectTo } : {}),
       guards: [...(r.canMatch ?? []), ...(r.canActivate ?? []), ...(r.canActivateChild ?? [])].map((g: any) => g.name || '?'),
-      lazy: !!r.loadComponent || !!r.component,
+      lazy: !!r.loadComponent || !!r.component || !!r.loadChildren,
     });
     if (r.children) out.push(...inventory(r.children, path));
   }

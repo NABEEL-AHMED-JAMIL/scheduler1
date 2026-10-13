@@ -34,7 +34,7 @@ const DAYS: DayGroup[] = ['today', 'yesterday', 'week', 'older'];
     .cp-grid { display: grid; gap: 1rem; align-items: start; }
     .cp-facets { display: flex; flex-direction: column; gap: 1rem; }
     .cp-facet legend { font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); margin-bottom: 0.375rem; }
-    .cp-opt { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0.25rem; border-radius: 0.375rem; font-size: 0.8125rem; cursor: pointer; }
+    .cp-opt { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0.25rem; border-radius: var(--radius-md); font-size: 0.8125rem; cursor: pointer; }
     .cp-opt:hover { background: var(--surface-sunken); }
     .cp-count { margin-left: auto; font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
     .cp-title { max-width: 28rem; }

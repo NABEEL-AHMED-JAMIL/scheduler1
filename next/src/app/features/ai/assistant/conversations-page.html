@@ -80,7 +80,7 @@
         </span>
       </div>
       @if (error()) {
-        <div class="m-4 rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2" role="alert">
+        <div class="mt-4 mx-1 rounded-lg px-3 py-2 text-sm bg-crit-500/12 text-crit-500 flex items-start gap-2" role="alert">
           <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" /><span class="flex-1">{{ error() }}</span>
           <button type="button" class="link-inline" (click)="load()">Retry</button>
         </div>
@@ -153,7 +153,7 @@
       @let b = badge(c);
       <aside class="cp-detail card p-0" aria-label="Conversation detail" data-detail>
         <header class="flex items-start gap-3 px-4 py-3 border-b border-subtle">
-          <span class="grid place-items-center rounded-lg size-8 bg-[color:var(--surface-inset)] shrink-0"><app-icon [name]="icon(c)" /></span>
+          <span class="grid place-items-center rounded-lg size-7 bg-[color:var(--surface-inset)] shrink-0"><app-icon [name]="icon(c)" /></span>
           <div class="min-w-0 flex-1">
             <h2 class="font-semibold text-sm break-words">{{ title(c) }}</h2>
             <p class="text-xs text-[color:var(--text-muted)]">{{ kindLabel[kindOf(c)] }} · {{ c.dateUpdated | serverTime: 'dateTime' }}</p>

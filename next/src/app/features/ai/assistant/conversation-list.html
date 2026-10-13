@@ -38,7 +38,7 @@
       <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Refresh the conversations" title="Refresh" [disabled]="loading()" (click)="load()">
         <app-icon name="refresh" [class.spin]="loading()" />
       </button>
-      <button type="button" class="btn btn-ghost btn-icon btn-sm hidden xl:inline-flex" aria-label="Fold the conversations to icons"
+      <button type="button" class="btn btn-ghost btn-icon btn-sm hidden xl:flex" aria-label="Fold the conversations to icons"
               title="Fold to icons, for more chat room" (click)="toggleRail()">
         <ng-container [ngTemplateOutlet]="railGlyph" />
       </button>
@@ -64,7 +64,7 @@
 
   <div class="cl-scroll" data-conversations>
     @if (error()) {
-      <div class="rounded-lg px-3 py-2 text-xs bg-crit-500/12 text-crit-500 flex items-start gap-2 m-1" role="alert">
+      <div class="rounded-lg px-3 py-2 text-xs bg-crit-500/12 text-crit-500 flex items-start gap-2 mx-1 my-1" role="alert">
         <app-icon name="alert" class="icon-crit mt-0.5 shrink-0" size="0.9em" /><span class="flex-1">{{ error() }}</span>
         <button type="button" class="link-inline" (click)="load()">Retry</button>
       </div>

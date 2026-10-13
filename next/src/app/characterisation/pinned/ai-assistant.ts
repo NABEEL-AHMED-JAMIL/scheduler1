@@ -6,6 +6,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
+      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
@@ -15,22 +16,29 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "AI Assistant",
       "Conversations",
+      "Today",
       "New conversation"
     ],
     "buttons": [
       "Actions for Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "All",
       "Close the conversations",
       "Context",
       "Design a pipeline: every night read orders.csv from storage, keep the paid orders, and save them as a CSV.",
       "Design a pipeline: pull patients and observations from FHIR daily, compute risk flags, summarise with AI, approve, dashboard.",
       "Design a pipeline: when a lab results CSV lands in the inbox, validate it against the lab contract, flag abnormal values, ask the reviewer to approve, then save a PDF and notify the doctor.",
       "Flow",
+      "Fold the conversations to icons",
       "History",
       "How did my last run go?",
       "List the data sources in this workspace.",
       "New chat",
+      "Pin Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "Pipelines",
+      "Questions",
       "Refresh the conversations",
-      "Run the job named \"UI-CHECK step engine job 0928\" now.29 Sep, 06:58",
+      "Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "Runs",
       "Send",
       "Tool calls",
       "What can a pipeline step point at here?",
@@ -41,9 +49,13 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Describe a pipeline, or ask about runs, sources or files…",
       "Message the assistant",
-      "Model connection"
+      "Model connection",
+      "Search the conversations, titles and messages",
+      "Search titles and messages"
     ],
-    "links": [],
+    "links": [
+      "/ai/assistant/conversations"
+    ],
     "thread": {
       "messages": [],
       "cards": [],
@@ -59,6 +71,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
+      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
@@ -71,21 +84,28 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "AI Assistant",
       "Conversations",
+      "Today",
       "Run the job named \"UI-CHECK step engine job 0928\" now."
     ],
     "buttons": [
       "1get_jobsAllowed436 ms",
       "2run_pipelineConfirmed612 ms",
       "Actions for Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "All",
       "Close the conversations",
       "Context",
       "Delete this conversation",
       "Flow",
+      "Fold the conversations to icons",
       "History",
       "New chat",
+      "Pin Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "Pipelines",
+      "Questions",
       "Refresh the conversations",
       "Rename this conversation",
-      "Run the job named \"UI-CHECK step engine job 0928\" now.29 Sep, 06:58",
+      "Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "Runs",
       "Send",
       "Tool calls"
     ],
@@ -93,9 +113,12 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "Describe a pipeline, or ask about runs, sources or files…",
       "Message the assistant",
-      "Model connection"
+      "Model connection",
+      "Search the conversations, titles and messages",
+      "Search titles and messages"
     ],
     "links": [
+      "/ai/assistant/conversations",
       "/pipelines/schedules/2848/executions",
       "/pipelines/schedules/2848/runs/7404/logs"
     ],
@@ -134,6 +157,7 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
+      "GET /aiPrompt.json/assistant/conversationList?limit=50&zone=America/Chicago",
       "GET /aiPrompt.json/assistant/conversations?limit=30",
       "GET /aiPrompt.json/tools/list",
       "GET /appUser.json/me",
@@ -142,22 +166,29 @@ export const PINNED: Record<string, unknown> = {
     "headings": [
       "AI Assistant",
       "Conversations",
+      "Today",
       "New conversation"
     ],
     "buttons": [
       "Actions for Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "All",
       "Close the conversations",
       "Context",
       "Design a pipeline: every night read orders.csv from storage, keep the paid orders, and save them as a CSV.",
       "Design a pipeline: pull patients and observations from FHIR daily, compute risk flags, summarise with AI, approve, dashboard.",
       "Design a pipeline: when a lab results CSV lands in the inbox, validate it against the lab contract, flag abnormal values, ask the reviewer to approve, then save a PDF and notify the doctor.",
       "Flow",
+      "Fold the conversations to icons",
       "History",
       "How did my last run go?",
       "List the data sources in this workspace.",
       "New chat",
+      "Pin Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "Pipelines",
+      "Questions",
       "Refresh the conversations",
-      "Run the job named \"UI-CHECK step engine job 0928\" now.29 Sep, 06:58",
+      "Run the job named \"UI-CHECK step engine job 0928\" now.",
+      "Runs",
       "Send",
       "Tool calls",
       "What can a pipeline step point at here?",
@@ -167,9 +198,13 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [
       "Describe a pipeline, or ask about runs, sources or files…",
-      "Message the assistant"
+      "Message the assistant",
+      "Search the conversations, titles and messages",
+      "Search titles and messages"
     ],
-    "links": [],
+    "links": [
+      "/ai/assistant/conversations"
+    ],
     "thread": {
       "messages": [],
       "cards": [],

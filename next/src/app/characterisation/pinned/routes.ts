@@ -97,7 +97,7 @@ export const PINNED: Record<string, unknown> = {
       "guards": [
         "pageGuard"
       ],
-      "lazy": false
+      "lazy": true
     },
     {
       "path": "/integration/api-collections",

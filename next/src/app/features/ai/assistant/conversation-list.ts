@@ -52,16 +52,16 @@ export const RAIL_ITEMS = 12;
     .cl-group { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); padding: 0.5rem 0.5rem 0.25rem;
       font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
     .cl-row { position: relative; display: grid; grid-template-columns: 1.75rem minmax(0, 1fr) auto; column-gap: 0.5rem; row-gap: 0.2rem;
-      align-items: center; padding: 0.45rem 0.5rem; border-radius: 0.5rem; }
+      align-items: center; padding: 0.45rem 0.5rem; border-radius: var(--radius-lg); }
     .cl-row:hover, .cl-row:focus-within { background: var(--surface-sunken); }
     .cl-row.cl-active { background: var(--surface-sunken); box-shadow: inset 2px 0 0 var(--accent-mark); }
-    .cl-kind { grid-row: span 2; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: 0.5rem;
+    .cl-kind { grid-row: span 2; display: grid; place-items: center; width: 1.75rem; height: 1.75rem; border-radius: var(--radius-lg);
       background: var(--surface-inset); color: var(--text-secondary); }
     .cl-kind.cl-pipeline { background: var(--pill-brand-bg); color: var(--pill-brand-fg); }
     .cl-kind.cl-run { background: var(--pill-info-bg); color: var(--pill-info-fg); }
     .cl-open { text-align: left; min-width: 0; font-size: 0.875rem; line-height: 1.25rem; color: var(--text-primary);
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .cl-open::after { content: ''; position: absolute; inset: 0; border-radius: 0.5rem; }
+    .cl-open::after { content: ''; position: absolute; inset: 0; border-radius: var(--radius-lg); }
     .cl-open:focus-visible { outline: none; }
     .cl-open:focus-visible::after { outline: 2px solid var(--accent-mark); outline-offset: -2px; }
     .cl-active .cl-open { font-weight: 600; }
