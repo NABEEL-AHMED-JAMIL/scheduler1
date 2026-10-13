@@ -269,26 +269,6 @@
     </div>
   }
 
-  @if (summary().length) {
-    <div class="flex flex-wrap gap-2">
-      @for (item of summary(); track item.status) {
-        <app-status-filter-chip [status]="item.status" [count]="item.count"
-                                 [selected]="statusFilter() === item.status"
-                                 (toggle)="setStatusFilter(statusFilter() === item.status ? '' : item.status)" />
-      }
-    </div>
-  }
-
-  @if (hasInsights()) {
-    <div class="flex">
-      <button type="button" class="btn btn-ghost btn-sm -ml-2"
-              [class.text-accent]="showInsights()"
-              (click)="showInsights.set(!showInsights())">
-        <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
-      </button>
-    </div>
-  }
-
   @if (showInsights() && hasInsights()) {
     <!-- Spans must tile the 3-column grid or every row is left part-empty: the donut (1) and
          the duration card (2) fill one row, the full-width flag split takes the next. -->
@@ -342,6 +322,20 @@
         <input class="input" placeholder="Search run id or message" aria-label="Search runs"
                [value]="search()" (input)="setSearch($any($event.target).value)" />
       </div>
+      <!-- Owner 2026-10-12: the outcome chips and the Charts toggle are filters of this list, in its toolbar after the
+           search -- one height -- rather than floating between the review box and the table. -->
+      @for (item of summary(); track item.status) {
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="statusFilter() === item.status"
+                                 (toggle)="setStatusFilter(statusFilter() === item.status ? '' : item.status)" />
+      }
+      @if (hasInsights()) {
+        <button type="button" class="btn btn-ghost btn-sm" data-test="runs-charts"
+                [class.text-accent]="showInsights()" [attr.aria-pressed]="showInsights()"
+                (click)="showInsights.set(!showInsights())">
+          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
+        </button>
+      }
       @if (statusFilter() || search()) {
         <button type="button" class="btn btn-ghost btn-sm"
                 (click)="clearFilters()">
@@ -354,17 +348,18 @@
       <thead>
         <tr>
           <th>Run</th>
-          @if (isAllJobs()) { <th>Job</th> }
+          @if (isAllJobs()) { <th>Schedule</th> }
           <!-- Queued waits for xl: at 1024 it pushed Status and Logs past the card edge, and
                Started is the time that matters. -->
           <th class="hidden xl:table-cell">Queued</th>
           <th>Started</th>
           <th>Ended</th>
-          <th>Duration</th>
+          <th class="text-right">Duration</th>
+          <!-- Owner 2026-10-12: the status sits right before the message it explains, a fixed width so the badges line
+               up; the pinned column keeps only the actions. -->
+          <th class="w-32">Status</th>
           <th>Message</th>
-          <!-- Status and the Logs link share one cell pinned to the right edge, as Failed runs on
-               Reports does, so a narrow screen scrolls the times away rather than the outcome. -->
-          <th class="text-right col-pin-right">Status · Logs</th>
+          <th class="text-right col-pin-right"><span class="sr-only">Actions</span></th>
         </tr>
       </thead>
       <tbody>
@@ -420,9 +415,10 @@
             <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
               {{ run.endTime ? (run.endTime | serverTime:'recentSec') : '—' }}
             </td>
-            <td class="tabular text-[color:var(--text-secondary)] whitespace-nowrap">
+            <td class="text-right tabular text-[color:var(--text-secondary)] whitespace-nowrap">
               {{ duration(run) || '—' }}
             </td>
+            <td class="w-32 whitespace-nowrap" data-test="run-status"><app-status [label]="run.jobStatus" /></td>
             <td class="max-w-72 xl:max-w-96">
               @if (run.jobStatusMessage) {
                 <!-- A truncated line with a tooltip is unreadable for the messages that matter:
@@ -449,7 +445,6 @@
             </td>
             <td class="text-right col-pin-right">
               <div class="flex items-center justify-end gap-1">
-                <app-status [label]="run.jobStatus" />
                 <!-- run.jobId, not jobId(). This screen serves TWO routes: jobs/:jobId/history for
                      one job, and jobs/history for the dashboard's TOTAL row, which drills into an
                      hour ACROSS EVERY JOB and therefore has no id in the path. On that view every
@@ -461,14 +456,15 @@
                      Logs button that cannot say whose logs is worse than no button. -->
                 <!-- MIG-345: a failed run is retried as its next attempt, from its failed step or from the start. -->
                 @if (run.jobStatus === 'Failed') {
-                  <button type="button" class="btn btn-ghost btn-sm" data-test="run-retry"
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" data-test="run-retry"
                           [attr.aria-label]="'Retry run #' + run.jobQueueId"
                           title="Retry from the step that failed, or run again from the start"
-                          (click)="retry(run)"><app-icon name="play" />Retry</button>
+                          (click)="retry(run)"><app-icon name="play" /></button>
                 }
                 @if (run.jobId) {
-                  <a class="btn btn-ghost btn-sm"
-                     [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" />Logs</a>
+                  <a class="btn btn-ghost btn-icon btn-sm" data-test="run-logs" title="Open the run: its steps, outputs and logs"
+                     [attr.aria-label]="'Open run #' + run.jobQueueId"
+                     [routerLink]="['/pipelines/schedules', run.jobId, 'runs', run.jobQueueId, 'logs']"><app-icon name="file" /></a>
                 }
               </div>
             </td>
@@ -476,7 +472,7 @@
 
           @if (isMessageOpen(run.jobQueueId) && run.jobStatusMessage) {
             <tr>
-              <td [attr.colspan]="isAllJobs() ? 8 : 7" class="!p-0">
+              <td [attr.colspan]="isAllJobs() ? 9 : 8" class="!p-0">
                 <div class="detail-panel">
                   <div class="flex items-baseline gap-2 mb-1.5">
                     <h3 class="text-xs font-semibold uppercase tracking-wider

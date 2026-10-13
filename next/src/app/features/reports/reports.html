@@ -379,14 +379,14 @@
           <table class="table-modern">
             <thead>
               <tr>
-                <th>Job</th>
-                <th>Error</th>
+                <th>Schedule</th>
                 <th class="hidden lg:table-cell">When</th>
                 <th class="text-right hidden md:table-cell">Took</th>
-                <!-- Status and Logs each under their own header (owner, 2026-10-01): one "Outcome"
-                     header sat over both, so the pill had none. Logs stays pinned right. -->
-                <th>Status</th>
-                <th class="text-right col-pin-right">Logs</th>
+                <!-- Owner 2026-10-12: as on every run list, the status right before the message (the error), then the
+                     actions pinned right. -->
+                <th class="w-32">Status</th>
+                <th>Error</th>
+                <th class="text-right col-pin-right"><span class="sr-only">Actions</span></th>
               </tr>
             </thead>
             <tbody>
@@ -406,25 +406,25 @@
                     <div class="text-xs text-[color:var(--text-muted)] truncate"
                          [title]="failure.task">{{ failure.task || '#' + failure.jobQueueId }}</div>
                   </td>
-                  <td class="max-w-md">
-                    <div class="mono text-xs text-[color:var(--text-secondary)] line-clamp-2"
-                         [title]="failure.message">{{ failure.message }}</div>
-                  </td>
                   <td class="hidden lg:table-cell mono text-xs
                              text-[color:var(--text-muted)] whitespace-nowrap">{{ failure.when ? (failure.when | serverTime: 'recentSec') : '—' }}</td>
                   <td class="text-right hidden md:table-cell mono text-xs">
                     {{ formatDuration(failure.seconds) }}
                   </td>
-                  <td class="whitespace-nowrap"><app-status [label]="failure.status" /></td>
+                  <td class="w-32 whitespace-nowrap"><app-status [label]="failure.status" /></td>
+                  <td class="max-w-md">
+                    <div class="mono text-xs text-[color:var(--text-secondary)] line-clamp-2"
+                         [title]="failure.message">{{ failure.message }}</div>
+                  </td>
                   <td class="text-right col-pin-right">
                     <!-- Only rendered when the run has an id to open. Every run in this system now
                          has audit lines, but a control that can open nothing must not be drawn as
                          though it can. -->
                     @if (failure.jobId && failure.jobQueueId) {
-                      <button type="button" class="btn btn-ghost btn-xs"
-                              (click)="openRunLogs(failure)"
-                              [title]="'Open the run log for #' + failure.jobQueueId">
-                        <app-icon name="history" size="0.85em" />Logs
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm"
+                              (click)="openRunLogs(failure)" [attr.aria-label]="'Open run #' + failure.jobQueueId"
+                              [title]="'Open run #' + failure.jobQueueId + ': its steps, outputs and logs'">
+                        <app-icon name="file" />
                       </button>
                     }
                   </td>
