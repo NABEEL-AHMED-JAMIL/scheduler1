@@ -121,3 +121,22 @@ describe('Model connections -- what the selected connection has been doing', () 
     expect(screen.kindLabel('something-new')).toBe('something-new');
   });
 });
+
+describe('Model connections -- a failed run says why in words (UX final MC1)', () => {
+  it('turns the stored error into a sentence, keeping the raw text for Details', () => {
+    const { screen } = screenAt(null);
+    expect(screen.runError(ACTIVITY.recent[0].error)).toEqual({ text: 'Model not found.', raw: null });
+    expect(screen.runError('HTTP 400: {"error":"{\\"error\\":\\"model not found\\"}"}')!.text).toBe('Model not found (HTTP 400).');
+  });
+
+  it('draws it wrapped with its icon, never cut, and the raw text under Details', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { readFileSync(p: string, e: 'utf8'): string };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd();
+    const html = fs.readFileSync(`${root}/src/app/features/ai/connections/connections.html`, 'utf8');
+    const block = html.slice(html.indexOf('data-test="run-error"') - 200, html.indexOf('data-test="run-error-details"') + 400);
+    expect(block).toContain('runError(r.error)');
+    expect(block).not.toContain('truncate');
+    expect(block).toContain('<details');
+    expect(html).not.toContain('{{ r.error }}');
+  });
+});

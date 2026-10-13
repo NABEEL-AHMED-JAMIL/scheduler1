@@ -224,7 +224,19 @@
                               @if (r.promptId) {
                                 <a class="link-inline block truncate max-w-64" [title]="r.promptName || 'Prompt ' + r.promptId" [routerLink]="['/pipelines/prompts', r.promptId, 'edit']">{{ r.promptName || 'Prompt ' + r.promptId }}</a>
                               } @else { <span class="text-[color:var(--text-secondary)]">{{ kindLabel(r.kind) }}</span> }
-                              @if (r.error) { <div class="text-xs text-crit-500 truncate max-w-[28rem]" [title]="r.error">{{ r.error }}</div> }
+                              <!-- UX final MC1: the provider's answer as a sentence (no raw HTTP/JSON), wrapped not cut; the
+                                   stored text in full on hover and under Details. -->
+                              @if (runError(r.error); as e) {
+                                <div class="text-xs text-crit-500 flex items-start gap-1 mt-0.5 max-w-[28rem] [overflow-wrap:anywhere]" data-test="run-error" [title]="e.raw ?? e.text">
+                                  <app-icon name="alert" size="0.9em" class="shrink-0 mt-px" /><span>{{ e.text }}</span>
+                                </div>
+                                @if (e.raw) {
+                                  <details class="text-xs max-w-[28rem]" data-test="run-error-details">
+                                    <summary class="cursor-pointer text-[color:var(--text-muted)]">Details</summary>
+                                    <pre class="mono whitespace-pre-wrap [overflow-wrap:anywhere] text-[11px] text-[color:var(--text-secondary)] mt-1">{{ e.raw }}</pre>
+                                  </details>
+                                }
+                              }
                             </td>
                             <td class="hidden xl:table-cell mono text-xs">{{ r.model || '—' }}</td>
                             <td><app-status [label]="r.status === 'ok' ? 'Completed' : 'Failed'" [quiet]="true" /></td>

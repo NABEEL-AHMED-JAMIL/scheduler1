@@ -22,6 +22,7 @@ import { Bar, BarChart } from '../../../shared/charts/bar-chart';
 import { statusColor } from '../../../shared/charts/status-color';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { readableRunError } from './run-error';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -89,6 +90,8 @@ export class Connections implements OnInit {
   });
 
   /** What the selected connection has been doing: runs per day, its latest runs, the prompts that name it. */
+  /** UX final MC1: a run's stored error as a readable sentence, the raw text kept for Details. */
+  readonly runError = readableRunError;
   readonly activity = signal<ConnectionActivity | null>(null);
   readonly activityLoading = signal(false);
   readonly activityError = signal('');
