@@ -205,6 +205,37 @@ describe('Connect stepper', () => {
   });
 });
 
+describe('Connect stepper wording (UX final I2)', () => {
+  it('numbers the chooser as step 1 of 5, and says what each step is instead of repeating the title', () => {
+    const { el, screen, fixture } = connect(null);
+    const steps = () => Array.from(el.querySelectorAll('.connect-step')).map(li => li.textContent!.replace(/\s+/g, ' ').trim());
+    expect(steps()).toEqual(['1 Connector', '2 Credentials', '3 Tables', '4 Sync', '5 Schedule']);
+    expect(screen.subtitle()).toBe('Step 1 of 5 · Choose what to connect');
+    expect(screen.subtitle()).not.toBe(screen.heading());
+    (el.querySelector('[data-choose="files"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(screen.subtitle()).toBe('Step 2 of 5 · Sign in, and say where its data lands');
+  });
+
+  it('counts from Credentials when opened on a connector, and names the connection when adding tables', () => {
+    expect(connect(CARDS[0]).screen.subtitle()).toBe('Step 1 of 4 · Sign in, and say where its data lands');
+    const adding = connect(CARDS[0], CONNECTION).screen;
+    expect(adding.shownSteps().map(s => s.label)).toEqual(['Tables', 'Sync', 'Schedule']);
+    expect(adding.subtitle()).toBe(`${CONNECTION.name} · Step 1 of 3 · Choose the tables to sync`);
+  });
+
+  it('never leaves the footer empty: Cancel on the chooser, Cancel and the primary after it', () => {
+    const { el, close, fixture } = connect(null);
+    const foot = () => Array.from(el.querySelectorAll('[foot] button')).map(b => b.textContent!.trim());
+    expect(foot()).toEqual(['Cancel']);
+    (el.querySelector('[data-choose="files"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(foot()).toEqual(['Back', 'Cancel', 'Next: tables']);
+    (el.querySelector('[data-cancel]') as HTMLButtonElement).click();
+    expect(close).toHaveBeenCalled();
+  });
+});
+
 describe('Connection panel', () => {
   function panel() {
     const fake = api();
