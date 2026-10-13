@@ -1,5 +1,5 @@
 import { Component, Injector, OnInit, computed, inject, signal } from '@angular/core';
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, catchError, forkJoin, of } from 'rxjs';
 import { API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { instantOf } from '../../../core/instant';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -155,7 +155,11 @@ export class ReviewPolicyCard implements OnInit {
 
   discard(): void { this.draft.set(this.saved()); }
 
-  /** Saves what changed: Core's part, ai-service's part, or both. */
+  /**
+   * Saves what changed: Core's part, ai-service's part, or both. Each service refuses with a 4xx and its sentence (Core's
+   * since 2026-10-12, as ai-service's), so each call's refusal is caught on its own: the other part's save is kept, and the
+   * refusal's message is shown.
+   */
   save(): void {
     const d = this.draft();
     if (!d || !this.canEdit() || !this.changed() || this.saving()) return;
@@ -163,7 +167,8 @@ export class ReviewPolicyCard implements OnInit {
     if (this.runsChanged()) calls.push(this.api.saveRunPolicy({ bulkApproveRuns: d.runs }));
     if (this.documentsChanged()) calls.push(this.api.saveDocumentPolicy({ bulkApprove: d.documents, bulkApproveRuleFailures: d.ruleFailures }));
     this.saving.set(true);
-    forkJoin(calls).subscribe({
+    forkJoin(calls.map(call => call.pipe(catchError(err =>
+      of<ApiResponse<RunReviewPolicy | DocumentReviewPolicy>>({ status: 'ERROR', message: refusal(err, 'The review policy could not be saved.') }))))).subscribe({
       next: answers => {
         this.saving.set(false);
         const refused = answers.find(a => a?.status !== API_SUCCESS);

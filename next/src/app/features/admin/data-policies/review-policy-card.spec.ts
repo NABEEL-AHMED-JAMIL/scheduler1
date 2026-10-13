@@ -64,6 +64,36 @@ describe('ReviewPolicyCard', () => {
       .toEqual({ bulkApprove: true, bulkApproveRuleFailures: true });
   });
 
+  it('shows a refused save\'s own sentence (a 4xx) and keeps the other part\'s save', () => {
+    const { el, http, toast, answer, refresh } = render({ admin: true });
+    answer();
+    el.querySelector<HTMLInputElement>('[data-policy-runs]')!.click();
+    el.querySelector<HTMLInputElement>('[data-policy-rule-failures]')!.click();
+    refresh();
+    el.querySelector<HTMLButtonElement>('[data-review-policy-save]')!.click();
+    http.expectOne(r => r.method === 'POST' && r.url.endsWith('/sourceJob.json/review/policy'))
+      .flush({ status: 'ERROR', message: 'bulkApproveRuns is true or false.' }, { status: 400, statusText: 'Bad Request' });
+    http.expectOne(r => r.method === 'POST' && r.url.endsWith('/documentReview.json/policy'))
+      .flush({ status: 'SUCCESS', message: '', data: { bulkApprove: true, bulkApproveRuleFailures: true, saved: true } });
+    refresh();
+    expect(toast.error).toHaveBeenCalledWith('bulkApproveRuns is true or false.');
+    expect(toast.success).not.toHaveBeenCalled();
+    // The documents' part is saved; only the runs' change is still waiting.
+    expect(el.querySelector<HTMLInputElement>('[data-policy-rule-failures]')!.checked).toBe(true);
+    expect(el.querySelector<HTMLInputElement>('[data-policy-runs]')!.checked).toBe(false);
+    expect(el.querySelector<HTMLButtonElement>('[data-review-policy-save]')!.disabled).toBe(false);
+  });
+
+  it('shows a refused read\'s own sentence', () => {
+    const { el, http, refresh } = render({ admin: true });
+    http.expectOne(r => r.method === 'GET' && r.url.endsWith('/sourceJob.json/review/policy'))
+      .flush({ status: 'ERROR', message: 'The review policy belongs to a workspace; this account is not attached to one.' },
+        { status: 400, statusText: 'Bad Request' });
+    http.match(r => r.method === 'GET' && r.url.endsWith('/documentReview.json/policy'));
+    refresh();
+    expect(el.textContent).toContain('The review policy belongs to a workspace; this account is not attached to one.');
+  });
+
   it('is read-only, with the lock note, for any other member', () => {
     const { el, answer } = render({ admin: false });
     answer();
