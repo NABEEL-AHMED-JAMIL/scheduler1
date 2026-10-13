@@ -45,14 +45,14 @@ const DAYS: DayGroup[] = ['today', 'yesterday', 'week', 'older'];
     .cp-wide { display: none; }
     @media (min-width: 1024px) {
       .cp-grid { grid-template-columns: 14rem minmax(0, 1fr); }
-      .cp-grid.cp-open { grid-template-columns: 14rem minmax(0, 1fr) 22rem; }
+      .cp-grid.cp-open { grid-template-columns: 13rem minmax(0, 1fr) 20rem; }
     }
     @media (min-width: 1536px) {
       .cp-grid.cp-open { grid-template-columns: 15rem minmax(0, 1fr) 26rem; }
       .cp-wide { display: table-cell; }
     }
     @media (min-width: 1280px) { .cp-grid:not(.cp-open) .cp-wide { display: table-cell; } }
-    @media (max-width: 1535px) { .cp-grid.cp-open .cp-title { max-width: 17rem; } }
+    @media (max-width: 1535px) { .cp-grid.cp-open .cp-title { max-width: 14rem; } }
   `],
 })
 export class ConversationsPage {
