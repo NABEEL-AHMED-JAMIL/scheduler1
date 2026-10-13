@@ -300,3 +300,18 @@ describe('AI Assistant -- a drafted pipeline', () => {
     expect(toast.info).toHaveBeenCalled();
   });
 });
+
+describe('AI Assistant -- the thread\'s title', () => {
+  it('reads the short title, with the first question in full as its tooltip; a title the person gave wins', () => {
+    const { screen } = screenWith({ query: { c: '1000' } });
+    expect(screen.threadTitle()).toBe('Run the job');
+    screen.conversations.set([{ ...CONV, shortTitle: 'Run UI-CHECK', firstQuestion: 'Please run the UI-CHECK job now and tell me when it is done',
+      title: 'Please run the UI-CHECK job now and tell me when it is done' } as never]);
+    expect(screen.threadTitle()).toBe('Run UI-CHECK');
+    expect(screen.threadTip()).toBe('Please run the UI-CHECK job now and tell me when it is done');
+    screen.conversations.set([{ ...CONV, title: 'My nightly check', shortTitle: 'My nightly check', renamed: true } as never]);
+    expect(screen.threadTitle()).toBe('My nightly check');
+    screen.conversation.set(null);
+    expect(screen.threadTitle()).toBe('New conversation');
+  });
+});

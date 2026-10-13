@@ -58,7 +58,8 @@
           <button type="button" class="btn btn-ghost btn-sm" (click)="renaming.set(false)">Cancel</button>
         } @else {
           <app-icon name="chat" class="shrink-0 text-[color:var(--text-muted)]" />
-          <h2 class="font-semibold truncate flex-1 min-w-0" [title]="tip(conversation()?.title)">{{ conversation()?.title || 'New conversation' }}</h2>
+          <!-- Coordinator 2026-10-12: the conversation's short title (a renamed one wins), the first question in full beneath it. -->
+          <h2 class="font-semibold truncate flex-1 min-w-0" data-test="thread-title" [title]="tip(threadTip())">{{ threadTitle() }}</h2>
           @if (conversation(); as c) {
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="!!working()" aria-label="Rename this conversation" (click)="startRename()">
               <app-icon name="edit" />
