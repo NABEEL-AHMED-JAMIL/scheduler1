@@ -127,12 +127,16 @@ describe('Billing', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date('2026-09-19T10:00:00'));
     try {
       const { component } = page();
-      expect(component.dayBars().map(b => b.name)).toEqual(['16 Sep', '17 Sep', '18 Sep']);
-      expect(component.dayBars()[2].segments?.map(s => s.label)).toEqual(['Seats', 'Storage', 'Model calls']);
+      // The chart is handed the metered days; it draws every day of the month (cost-by-day-model.spec.ts).
+      expect(component.days().map(d => d.day)).toEqual(['2026-09-16', '2026-09-17', '2026-09-18']);
+      expect(Object.keys(component.days()[2].byService)).toEqual(['Seats', 'Storage', 'Model calls']);
+      expect(component.barsTotal()).toBeCloseTo(20.8, 6);
       expect(component.yesterday()).toBe(9.8);                                   // the 18th, by date
       // Seven calendar days back from the 19th: the 12th..18th -- four quiet days count as zero.
       const perDay = (5 + 6 + 9.8) / 7;
       expect(component.forecast()).toBeCloseTo(component.total() + perDay * (component.daysInMonth() - 19), 6);
+      // One pace for the tile and the chart's forecast line.
+      expect(component.pace()).toBeCloseTo(perDay, 6);
       component.shiftMonth(-1);
       expect(component.forecast()).toBeNull();
     } finally { vi.useRealTimers(); }
@@ -401,5 +405,86 @@ describe('Billing, cost per run', () => {
     component.retryRuns();
     expect(component.runsError()).toBe('');
     expect(component.runs()).toHaveLength(2);
+  });
+});
+
+// Owner review 2026-10-12: a day clicked on Cost by day filters Line by line to that day, with a chip to clear it.
+describe('Billing, a day picked on the chart', () => {
+  const OCT_DAYS = [
+    { day: '2026-10-06', amount: '10.13', byService: { 'Model calls': '9.0', 'Analytics & tools': '1.13' },
+      byMeter: { 'ai.tokens.in': { quantity: '180000', amount: '9.0' }, 'analytics.queries': { quantity: '1130', amount: '1.13' } } },
+    { day: '2026-10-12', amount: '0.5', byService: { Storage: '0.5' }, byMeter: { 'storage.gb_hours': { quantity: '15625', amount: '0.5' } } },
+  ];
+  const OCT_LINES = [
+    ...LINES,
+    { meter: 'analytics.queries', label: 'Analytics queries', service: 'Analytics & tools', unit: 'query', per: 1, unitPrice: '0.001', quantity: '9000', amount: '9.0', days: 4 },
+  ];
+
+  it('shows the picked day\'s lines, before the month\'s allowances, and the month again when it is cleared', () => {
+    const { component, api } = page(false, OCT_LINES, OCT_DAYS, { timeZone: 'America/Chicago', today: '2026-10-12', currentMonth: '2026-10' });
+    expect(component.tableLines().length).toBe(6);
+    component.pickDay('2026-10-06');
+    expect(component.selectedDay()).toBe('2026-10-06');
+    expect(component.dayChip('2026-10-06')).toBe('6 Oct');
+    expect(component.dayTitle('2026-10-06')).toBe('Tue 6 Oct 2026');
+    const lines = component.tableLines();
+    expect(lines.map(l => l.meter)).toEqual(['ai.tokens.in', 'analytics.queries']);
+    // The day's own quantity and flat amount; the month's allowance and tiers are the month's, not the day's.
+    expect(lines[0]).toMatchObject({ quantity: 180000, amount: 9, label: 'Model tokens in', includedQuantity: 0, tiers: [] });
+    expect(component.tableTotal()).toBeCloseTo(10.13, 6);
+    // A line opened on the day reads that day's subjects.
+    component.toggleLine(lines[1]);
+    expect(api.subjects).toHaveBeenLastCalledWith(expect.objectContaining({ from: '2026-10-06', to: '2026-10-06' }), 'analytics.queries', 25);
+    component.pickDay(null);
+    expect(component.tableLines().length).toBe(6);
+    expect(component.tableTotal()).toBeCloseTo(component.total(), 6);
+  });
+
+  it('says which figure is which: the days before allowances, the month to date after them', () => {
+    const { component } = page(false, OCT_LINES, OCT_DAYS, { timeZone: 'America/Chicago', today: '2026-10-12', currentMonth: '2026-10' });
+    expect(component.barsTotal()).toBeCloseTo(10.63, 6);
+    expect(component.allowanceCredit()).toBeCloseTo(10.63 - component.total(), 6);
+    // Every service the lines name is in By service, API included, each in its fixed colour.
+    expect(component.byService().map(s => [s.service, s.color])).toEqual([
+      ['Storage', 'var(--chart-0)'], ['Model calls', 'var(--chart-1)'], ['Analytics & tools', 'var(--chart-3)'], ['Seats', 'var(--chart-6)'],
+    ]);
+  });
+
+  it('starts the month again with no day picked', () => {
+    const { component } = page(false, OCT_LINES, OCT_DAYS, { timeZone: 'America/Chicago', today: '2026-10-12', currentMonth: '2026-10' });
+    component.pickDay('2026-10-12');
+    component.shiftMonth(-1);
+    expect(component.selectedDay()).toBeNull();
+  });
+});
+
+// Owner review 2026-10-12 ("date repeat in the cost"): the model calls by billing day, the rate and the person said once.
+describe('Billing, cost per model call by day', () => {
+  const late = (run: string, last: string, actor: string | null = null) => ({ ...RUNS[0], run, last, first: last, actor_name: actor, actor_user_id: actor ? 4640 : null });
+  function withRuns(rows: object[], days: object[] = []) {
+    const harness = page(false, LINES, DAYS, { timeZone: 'America/Chicago', today: '2026-10-12', currentMonth: '2026-10' });
+    harness.api.runs.mockReturnValue(of({ status: API_SUCCESS, data: { total: 870, page: 1, limit: 25, rows, days } }) as unknown as ReturnType<typeof harness.api.runs>);
+    harness.component.retryRuns();
+    return harness;
+  }
+
+  it('cuts the runs into Chicago days, each header counting and totalling the whole day, each row its time', () => {
+    // 04:30 UTC on the 13th is 23:30 on the 12th in Chicago: the 12th's.
+    const { component } = withRuns([late('ai-run#3', '2026-10-13T04:30:00Z'), late('ai-run#2', '2026-10-13T03:50:00Z'), late('ai-run#1', '2026-10-11T15:00:00Z')],
+      [{ day: '2026-10-12', runs: 868, amount: '67.30' }, { day: '2026-10-11', runs: 2, amount: '0.35' }]);
+    const groups = component.runGroups();
+    expect(groups.map(g => [g.day, g.rows.length, g.count, g.amount])).toEqual([['2026-10-12', 2, 868, 67.3], ['2026-10-11', 1, 2, 0.35]]);
+    expect(component.dayTitle(groups[0].day!)).toBe('Mon 12 Oct 2026');
+    expect(component.runTime(groups[0].rows[0])).toBe('23:30');
+    expect(component.runTime(groups[0].rows[1])).toBe('22:50');
+  });
+
+  it('says the rates once above the table, keeps the full pricing on each row, and drops By when one person made every call', () => {
+    const { component } = withRuns([late('ai-run#2', '2026-10-13T03:50:00Z', 'Riverside Health admin'), late('ai-run#1', '2026-10-12T15:00:00Z', 'Riverside Health admin')]);
+    expect(component.runRateNote()).toEqual(['in $0.05 / out $0.15 per 1,000 tokens (llama3.2:3b)']);
+    expect(component.runRates(component.runs()[0])).toContain('2,000 in at $0.05 per 1,000 tokens');
+    expect(component.runActors()).toEqual(['Riverside Health admin']);
+    const mixed = withRuns([late('ai-run#2', '2026-10-13T03:50:00Z', 'Riverside Health admin'), late('ai-run#1', '2026-10-12T15:00:00Z')]).component;
+    expect(mixed.runActors()).toEqual(['Riverside Health admin', 'Pipeline']);
   });
 });

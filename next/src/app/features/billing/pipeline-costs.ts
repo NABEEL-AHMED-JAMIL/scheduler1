@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { Component, DestroyRef, LOCALE_ID, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
@@ -6,8 +6,9 @@ import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { instantOf } from '../../core/instant';
 import { BillingApi, PipelineCostRow, PipelineCosts as Costs, RunCost, RunCostRow, UsageQuery } from './billing.service';
-import { formatMoney, moneyDigits } from './billing-format';
+import { dayHeading, formatMoney, groupByDay, moneyDigits, zonedDay, zonedTime } from './billing-format';
 
 const RUNS_PAGE = 25;
 
@@ -32,6 +33,7 @@ export function shareOf(cost: number, total: number): number {
 @Component({
   selector: 'app-pipeline-costs',
   imports: [Icon, TableShell, StatusPill, ServerTimePipe, RouterLink],
+  styleUrl: './day-table.css',
   template: `
     <section class="flex flex-col gap-3" data-test="pipeline-costs" aria-labelledby="pipeline-costs-heading">
       <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
@@ -92,13 +94,21 @@ export function shareOf(cost: number, total: number): number {
 
         <app-table-shell heading="By run" [shown]="runs().length" [total]="runsTotal()" [loading]="loading() && !costs()" [error]="error()" (retry)="load()"
                          [isEmpty]="!runs().length" emptyMessage="No pipeline run was billed in this month yet." emptyIcon="history">
-          <table class="table-modern" data-test="cost-by-run">
+          <!-- Owner review 2026-10-12: the runs by the billing day they started, a header per day, the time on each row. -->
+          <div class="day-table-scroll">
+          <table class="table-modern day-table" data-test="cost-by-run">
             <thead>
-              <tr><th>Run</th><th>Pipeline</th><th>Started</th><th class="w-28">Status</th><th class="text-right">Cost</th></tr>
+              <tr><th class="w-20">Started</th><th>Run</th><th>Pipeline</th><th class="w-28">Status</th><th class="text-right">Cost</th></tr>
             </thead>
+            @for (g of runGroups(); track g.day) {
             <tbody>
-              @for (r of runs(); track r.jobQueueId) {
+              <tr class="day-group" data-test="run-day-group">
+                <th colspan="5" scope="colgroup"><div class="day-group-line"><span>{{ g.day ? heading(g.day) : 'Start not known' }}</span>
+                  <span class="day-group-sum">{{ g.count }} {{ g.count === 1 ? 'run' : 'runs' }} · {{ money(g.cost) }}</span></div></th>
+              </tr>
+              @for (r of g.rows; track r.jobQueueId) {
                 <tr [class.is-focused]="r.jobQueueId === runId()">
+                  <td class="whitespace-nowrap tabular text-[color:var(--text-secondary)]" data-test="run-started" [title]="r.startedAt ? (r.startedAt | serverTime: 'dateTime') : ''">{{ time(r) || '—' }}</td>
                   <td class="mono whitespace-nowrap">
                     @if (r.jobId) { <a class="link-inline" [routerLink]="['/pipelines/schedules', r.jobId, 'runs', r.jobQueueId]">#{{ r.jobQueueId }}</a> }
                     @else { #{{ r.jobQueueId }} }
@@ -107,13 +117,14 @@ export function shareOf(cost: number, total: number): number {
                     <span class="block truncate" [title]="r.pipeline ?? ''">{{ r.pipeline || '—' }}</span>
                     <span class="block text-[11px] text-[color:var(--text-muted)] truncate" [title]="meterSummary(r)">{{ meterSummary(r) }}</span>
                   </td>
-                  <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ r.startedAt ? (r.startedAt | serverTime: 'recent') : '—' }}</td>
                   <td class="w-28">@if (r.status) { <app-status [label]="r.status" [quiet]="true" /> }</td>
                   <td class="text-right tabular font-medium" [title]="exact(r.cost)">{{ money(r.cost) }}</td>
                 </tr>
               }
             </tbody>
+            }
           </table>
+          </div>
           @if (moreRuns()) {
             <div class="flex justify-center px-4 py-2">
               <button type="button" class="btn btn-default btn-sm" data-test="more-run-costs" (click)="loadMore()" [disabled]="loadingMore()">
@@ -144,6 +155,21 @@ export class PipelineCosts {
   readonly pipelines = computed<PipelineCostRow[]>(() => this.costs()?.pipelines ?? []);
   readonly moreRuns = computed(() => this.runs().length < this.runsTotal());
   readonly meterSummary = (r: RunCostRow) => meterSummary(r, this.costs()?.currency ?? this.currency());
+  private readonly locale = inject(LOCALE_ID);
+  /** The workspace's billing zone the period's days are counted in (H9). */
+  readonly zone = computed(() => this.costs()?.zone ?? null);
+  /** The runs by the billing day they started on; each header counts and totals the whole day (Billing's, every page). */
+  readonly runGroups = computed(() => {
+    const zone = this.zone();
+    const totals = new Map((this.costs()?.runs?.days ?? []).map(d => [d.day ?? null, d]));
+    return groupByDay(this.runs(), r => { const at = instantOf(r.startedAt); return at ? zonedDay(at, zone) : null; }).map(g => {
+      const total = totals.get(g.day);
+      return { ...g, count: total?.runs ?? g.rows.length, cost: Number(total?.cost ?? g.rows.reduce((n, r) => n + Number(r.cost), 0)) };
+    });
+  });
+  heading(day: string): string { return dayHeading(day, this.locale); }
+  /** A run's start, 24-hour, in the workspace's zone. */
+  time(r: RunCostRow): string { const at = instantOf(r.startedAt); return at ? zonedTime(at, this.zone()) : ''; }
   private page = 1;
   private reading?: Subscription;
 

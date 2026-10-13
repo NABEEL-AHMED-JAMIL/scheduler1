@@ -68,17 +68,20 @@
       <app-stat-tile label="Seats" [value]="seats()" icon="users" tone="muted" [foot]="fmtMoney(seatsAmount()) + ' this month'" />
     </div>
 
-    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] mt-4">
-      <div class="card p-4">
-        <h2 class="font-semibold text-sm">Cost by day</h2>
-        <p class="text-xs text-[color:var(--text-muted)] mb-2">Stacked by service, before monthly allowances and tiers — the month's total above is after them. Measured items (storage kept, seats, topics) land on the night they were measured.</p>
+    <!-- Owner review 2026-10-12: the chart and By service are one height; the chart fills its card. -->
+    <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] items-stretch mt-4">
+      <div class="card p-4 flex flex-col min-w-0" data-test="cost-by-day-card">
         @if (loading() && !days().length) {
-          <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
+          <h2 class="font-semibold text-sm">Cost by day</h2>
+          <div class="flex-1 py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>
         } @else {
-          <app-bar-chart [data]="dayBars()" [height]="200" [format]="money" emptyMessage="Nothing metered in this month yet." />
+          <app-cost-by-day class="flex-1" [month]="month()" [today]="isCurrentMonth() ? today() : null" [days]="days()"
+                           [previousDays]="previousDays()" [previousLabel]="previousLabel()" [pace]="pace()" [monthToDate]="total()"
+                           [currency]="currency()" [timeZone]="timeZone()" [monthLabel]="monthLabel()" [height]="300"
+                           [selected]="selectedDay()" (selectedChange)="pickDay($event)" [(view)]="costView" />
         }
       </div>
-      <div class="card p-4">
+      <div class="card p-4 flex flex-col" data-test="by-service">
         <h2 class="font-semibold text-sm mb-2">By service</h2>
         @if (!byService().length) {
           <p class="text-sm text-[color:var(--text-muted)]">Nothing metered yet.</p>
@@ -86,24 +89,37 @@
           <table class="table-modern">
             <tbody>
               @for (s of byService(); track s.service) {
-                <tr>
+                <tr [attr.data-service]="s.service">
                   <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}</td>
-                  <td class="text-right tabular">{{ fmtMoney(s.amount) }}</td>
+                  <td class="text-right tabular" [title]="fmtExact(s.amount)">{{ fmtAmount(s.amount) }}</td>
                   <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ s.share }}%</td>
                 </tr>
               }
-              <tr class="border-t-2 border-strong"><td class="font-semibold">Month to date</td><td class="text-right tabular font-semibold">{{ fmtMoney(total()) }}</td><td></td></tr>
             </tbody>
           </table>
+          <!-- Which figure is which: the day bars are before the month's allowances and tiers; Month to date is after them. -->
+          <dl class="allowance-sum" data-test="allowance-reconcile">
+            <dt class="text-[color:var(--text-secondary)]">Days added up, before allowances</dt><dd class="text-right tabular">{{ fmtMoney(barsTotal()) }}</dd>
+            <dt class="text-[color:var(--text-secondary)]">Allowances and tiers</dt><dd class="text-right tabular">{{ allowanceLabel() }}</dd>
+            <dt class="font-semibold">Month to date, as the invoice lists it</dt><dd class="text-right tabular font-semibold">{{ fmtMoney(total()) }}</dd>
+          </dl>
         }
       </div>
     </div>
 
     <div class="mt-4">
-      <app-table-shell heading="Line by line" [shown]="shownLines().length" [total]="lines().length" [loading]="loading()"
-                       [isEmpty]="!lines().length" emptyMessage="Nothing metered in this month yet — run a pipeline, open a file, delete something." emptyIcon="chart">
+      <app-table-shell heading="Line by line" [shown]="shownLines().length" [total]="tableLines().length" [loading]="loading()"
+                       [isEmpty]="!tableLines().length" [emptyMessage]="selectedDay() ? 'Nothing metered on this day.' : 'Nothing metered in this month yet — run a pipeline, open a file, delete something.'" emptyIcon="chart">
         <ng-container toolbar>
-          <span class="text-xs text-[color:var(--text-muted)]">Click a line for what is behind it — which bucket, which prompt, who deleted what.</span>
+          @if (selectedDay(); as day) {
+            <!-- A day picked on the chart: its lines, before the month's allowances and tiers. -->
+            <span class="pill pill-brand inline-flex items-center gap-1" data-test="day-chip">{{ dayChip(day) }}
+              <button type="button" class="btn btn-ghost btn-icon btn-xs -mr-1" (click)="pickDay(null)" [attr.aria-label]="'Show the whole month, not only ' + dayChip(day)" data-test="day-chip-clear"><app-icon name="close" size="0.85em" /></button>
+            </span>
+            <span class="text-xs text-[color:var(--text-muted)]">{{ dayTitle(day) }}'s use, before the month's allowances and tiers.</span>
+          } @else {
+            <span class="text-xs text-[color:var(--text-muted)]">Click a line for what is behind it — which bucket, which prompt, who deleted what.</span>
+          }
           @if (tinyLines().length) {
             <!-- Lines under half a cent wait here rather than fill the table with "$0.0000" (UI review U12). -->
             <button type="button" class="btn btn-default btn-sm" data-tiny-toggle [attr.aria-pressed]="showTinyLines()"
@@ -171,15 +187,15 @@
                 </tr>
               }
             }
-            @if (lines().length) {
+            @if (tableLines().length) {
               <tr class="border-t-2 border-strong">
                 <!-- One cell per column, hidden with the same breakpoints as the header: a colspan
                      counts hidden columns too, which pushed the total past Amount on a phone. -->
-                <td class="font-semibold">Month to date</td>
+                <td class="font-semibold">{{ selectedDay() ? dayChip(selectedDay()!) + ', before allowances' : 'Month to date' }}</td>
                 <td class="hidden md:table-cell"></td>
                 <td></td>
                 <td class="hidden md:table-cell"></td>
-                <td class="text-right tabular font-semibold" [title]="fmtExact(total())">{{ fmtAmount(total()) }}</td>
+                <td class="text-right tabular font-semibold" [title]="fmtExact(tableTotal())">{{ fmtAmount(tableTotal()) }}</td>
                 <td></td>
               </tr>
             }
@@ -199,37 +215,52 @@
         <ng-container toolbar>
           <span class="text-xs text-[color:var(--text-muted)]">Each model call at its own model's rate — before the month's allowances and tiers, which the lines above apply.</span>
         </ng-container>
-        <table class="table-modern">
+        @if (runRateNote().length) {
+          <!-- Owner review 2026-10-12: the rate is said once here, not on every row; a row's tooltip has its full pricing. -->
+          <p class="px-4 py-2 text-xs text-[color:var(--text-secondary)] border-b border-subtle" data-test="run-rates">
+            <b class="font-medium">Rates:</b> {{ runRateNote().join(' · ') }}
+            @if (runActors().length === 1) { <span class="text-[color:var(--text-muted)]"> · every call by {{ runActors()[0] }}</span> }
+          </p>
+        }
+        <div class="day-table-scroll" data-test="model-call-scroll">
+        <table class="table-modern day-table" data-test="model-calls">
           <thead>
             <tr>
-              <th>When</th>
+              <th class="w-20">Time</th>
               <th>Run</th>
               <th>Model</th>
               <th class="text-right">Tokens in</th>
               <th class="text-right">Tokens out</th>
-              <th class="hidden xl:table-cell">Priced at</th>
-              <th class="hidden lg:table-cell">By</th>
+              @if (runActors().length > 1) { <th class="hidden lg:table-cell">By</th> }
               <th class="text-right">Cost</th>
             </tr>
           </thead>
-          <tbody>
-            @for (r of runs(); track r.run) {
-              <tr>
-                <td class="text-xs tabular whitespace-nowrap">{{ r.last | serverTime: 'recent' }}</td>
-                <td>
-                  <div class="font-medium">{{ runLabel(r) }}</div>
-                  <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}@if (r.job_queue_id) { · run {{ r.job_queue_id }} }</div>
-                </td>
-                <td class="mono text-xs">{{ r.model || '—' }}</td>
-                <td class="text-right tabular">{{ r.tokens_in | number: '1.0-0' }}</td>
-                <td class="text-right tabular">{{ r.tokens_out | number: '1.0-0' }}</td>
-                <td class="hidden xl:table-cell text-xs text-[color:var(--text-muted)]">{{ runRates(r) }}</td>
-                <td class="hidden lg:table-cell text-xs text-[color:var(--text-muted)]">{{ runActor(r) }}</td>
-                <td class="text-right tabular font-medium">{{ fmtRunAmount(r.amount) }}</td>
+          @for (g of runGroups(); track g.day) {
+            <tbody>
+              <tr class="day-group" data-test="day-group">
+                <th [attr.colspan]="runActors().length > 1 ? 7 : 6" scope="colgroup">
+                  <div class="day-group-line"><span>{{ g.day ? dayTitle(g.day) : 'Time not known' }}</span>
+                    <span class="day-group-sum">{{ g.count | number: '1.0-0' }} {{ g.count === 1 ? 'call' : 'calls' }} · {{ fmtMoney(g.amount) }}</span></div>
+                </th>
               </tr>
-            }
-          </tbody>
+              @for (r of g.rows; track r.run) {
+                <tr [title]="runRates(r)">
+                  <td class="text-xs tabular whitespace-nowrap" data-test="run-time">{{ runTime(r) }}</td>
+                  <td>
+                    <div class="font-medium">{{ runLabel(r) }}</div>
+                    <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}@if (r.job_queue_id) { · run {{ r.job_queue_id }} }</div>
+                  </td>
+                  <td class="mono text-xs">{{ r.model || '—' }}</td>
+                  <td class="text-right tabular">{{ r.tokens_in | number: '1.0-0' }}</td>
+                  <td class="text-right tabular">{{ r.tokens_out | number: '1.0-0' }}</td>
+                  @if (runActors().length > 1) { <td class="hidden lg:table-cell text-xs text-[color:var(--text-muted)]">{{ runActor(r) }}</td> }
+                  <td class="text-right tabular font-medium">{{ fmtRunAmount(r.amount) }}</td>
+                </tr>
+              }
+            </tbody>
+          }
         </table>
+        </div>
         @if (moreRuns()) {
           <div class="p-3 text-center">
             <button type="button" class="btn btn-default btn-sm" (click)="loadRuns()" [disabled]="runsLoading()">{{ runsLoading() ? 'Reading…' : 'Show more runs' }}</button>

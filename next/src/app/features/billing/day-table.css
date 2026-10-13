@@ -1,0 +1,18 @@
+/* Owner review 2026-10-12 ("date repeat in the cost"): a long table of one month's rows, cut into billing days. The rows
+   scroll in their own box; the column headings and the day being scrolled stay on top -- the day's header holds its date,
+   its count and its total, and each row only its time. --day-table-head is the headings' height (measured: 35px). */
+
+.day-table-scroll { max-height: min(36rem, 70vh); overflow: auto; overscroll-behavior: contain; --day-table-head: 2.2rem; }
+.day-table thead th { position: sticky; top: 0; z-index: 2; background: var(--surface-raised); }
+.day-table .day-group > th {
+  position: sticky; top: var(--day-table-head); z-index: 1; padding: 0.4rem 1rem; text-align: left;
+  background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle);
+  font-size: 0.75rem; font-weight: 600; color: var(--text-primary); text-transform: none; letter-spacing: normal;
+}
+.day-table tbody tr.day-group:hover { background: transparent; }
+.day-group-line { display: flex; align-items: baseline; gap: 0.75rem; }
+.day-group-sum { margin-left: auto; font-weight: 500; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+/* By service's foot: the day bars before allowances, the allowances, and Month to date as the invoice lists it. */
+.allowance-sum { margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle); font-size: 0.75rem;
+  display: grid; grid-template-columns: 1fr auto; column-gap: 0.75rem; row-gap: 0.25rem; }

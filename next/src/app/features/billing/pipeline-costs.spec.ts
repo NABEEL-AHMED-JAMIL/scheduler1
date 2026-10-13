@@ -54,7 +54,7 @@ describe('Cost & usage: cost by pipeline and run', () => {
     expect(pipelines[0]).toContain('Patient 360');
     expect(pipelines[0]).toContain('$9.82');
     expect(pipelines[0]).toContain('13%');
-    const run = el.querySelector('[data-test="cost-by-run"] tbody tr')!;
+    const run = el.querySelector('[data-test="cost-by-run"] tbody tr:not(.day-group)')!;
     expect(run.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2907/runs/8214');
     expect(run.textContent).toContain('$0.84');
     expect(el.querySelector('[data-test="more-run-costs"]')).not.toBeNull();
@@ -66,6 +66,24 @@ describe('Cost & usage: cost by pipeline and run', () => {
     expect(api.runCost).toHaveBeenCalledWith(8214, null);
     expect(el.querySelector('[data-test="run-cost"]')?.textContent).toContain('Run #8214');
     expect(el.querySelector('[data-test="run-cost"]')?.textContent).toContain('$0.84');
+  });
+
+  // Owner review 2026-10-12: By run by the Chicago day each run started, a header per day counting and totalling all of
+  // it (Billing's runs.days, every page), and only the time on the row.
+  it('groups the runs by billing day, the time of day on each row', async () => {
+    const late = { ...COSTS.runs.rows[0], jobQueueId: 8215, startedAt: '2026-10-13T04:30:00Z', cost: 0.1 };
+    const costs = { ...COSTS, runs: { ...COSTS.runs, rows: [late, COSTS.runs.rows[0]],
+      days: [{ day: '2026-10-12', runs: 12, cost: 1.23 }] } };
+    const { fixture, el, api } = mount();
+    api.pipelineCosts.mockReturnValue(of({ status: 'SUCCESS', message: '', data: costs as typeof COSTS }));
+    fixture.componentInstance.q.set({ from: '2026-10-01', to: '2026-10-31', tenantId: '2960' });
+    fixture.detectChanges();
+    await fixture.whenStable();
+    const headers = [...el.querySelectorAll('[data-test="run-day-group"]')].map(h => [...h.querySelectorAll('span')].map(x => x.textContent!.trim()).join(' | '));
+    // 04:30 UTC on the 13th is 23:30 on the 12th in Chicago: one day, both runs.
+    expect(headers).toEqual(['Mon 12 Oct 2026 | 12 runs · $1.23']);
+    const times = [...el.querySelectorAll('[data-test="run-started"]')].map(t => t.textContent!.trim());
+    expect(times).toEqual(['23:30', '06:08']);
   });
 
   it('words a run\'s meters, the costliest first, and a share of the total', () => {

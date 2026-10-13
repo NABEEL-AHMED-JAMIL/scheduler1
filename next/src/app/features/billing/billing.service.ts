@@ -100,7 +100,13 @@ export interface PricedWith {
   /** A workspace's own card: the default card the meters it does not name are priced from. */
   fallback?: { version: number; name: string; effectiveFrom: string } | null;
 }
-export interface DayRow { day: string; amount: number; byService: Record<string, number>; }
+export interface DayRow {
+  day: string; amount: number; byService: Record<string, number>;
+  /** Each meter's quantity and flat amount that day, before the month's allowances and tiers (a day picked on Cost by day). */
+  byMeter?: Record<string, { quantity: number; amount: number }>;
+}
+/** A billing day's count and total over a whole range, every page included: a day header of Cost per model call or By run. */
+export interface DayTotal { day: string | null; runs: number; amount?: number; cost?: number; }
 /**
  * H9: the billing calendar a usage answer was counted in -- the workspace's billing time zone, today there, the month under
  * way there, and the instants the range covers. Days are the workspace's, never the browser's or UTC's.
@@ -137,7 +143,7 @@ export interface RunCostRow {
 export interface PipelineCostRow { taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null; }
 export interface PipelineCosts {
   from: string; to: string; zone: string | null; currency: string | null; total: number; attributed: number; notTiedToRun: number;
-  namesResolved?: boolean; pipelines: PipelineCostRow[]; runs: { total: number; page: number; limit: number; rows: RunCostRow[] };
+  namesResolved?: boolean; pipelines: PipelineCostRow[]; runs: { total: number; page: number; limit: number; rows: RunCostRow[]; days?: DayTotal[] };
 }
 export interface RunCost extends RunCostRow { from: string | null; to: string | null; currency: string | null; namesResolved?: boolean; }
 
@@ -223,8 +229,8 @@ export class BillingApi {
     return this.http.get<ApiResponse<{ rows: SubjectRow[] }>>(`${this.base}/subjects`, { params: { ...this.usageParams(q, 'meter'), meter, limit: String(limit) } });
   }
   /** Cost per run (MIG-308): the month's model-call runs, newest first, a page at a time. */
-  runs(q: UsageQuery, page: number, limit: number): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[] }>> {
-    return this.http.get<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[] }>>(`${this.base}/runs`, {
+  runs(q: UsageQuery, page: number, limit: number): Observable<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>> {
+    return this.http.get<ApiResponse<{ total: number; page: number; limit: number; rows: RunRow[]; days?: DayTotal[] }>>(`${this.base}/runs`, {
       params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
   }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
@@ -275,7 +281,7 @@ export function paymentMethodLabel(method: string): string {
   return PAYMENT_METHODS.find(m => m.value === method)?.label ?? (method ? method[0].toUpperCase() + method.slice(1) : '');
 }
 /** The services a meter rolls up under, in the order the screens list them. */
-export const SERVICES = ['Storage', 'Model calls', 'Seats', 'Pipelines', 'Analytics & tools', 'Other'];
+export { SERVICES } from './cost-by-day-model';
 /** The meters a card may price per model, as `<meter>@<model>` items (MIG-308). */
 export const MODEL_PRICED_METERS = ['ai.tokens.in', 'ai.tokens.out'];
 /** The model a per-model item names; null for a meter's own item. */
