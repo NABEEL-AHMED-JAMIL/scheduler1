@@ -19,7 +19,7 @@ const FULL: BucketSummary = {
 };
 const BARE: BucketSummary = { label: 'Archive', bucket: 'archive', provider: 'MINIO', connectionStatus: 'FAILED' };
 
-function cards(list: BucketSummary[]) {
+function screen(list: BucketSummary[]) {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
@@ -34,7 +34,12 @@ function cards(list: BucketSummary[]) {
   const fixture = TestBed.createComponent(Objects);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
-  return [...el.querySelectorAll<HTMLElement>('.connection-card')].map(card => card.textContent!.replace(/\s+/g, ' ').trim());
+  const shown = () => [...el.querySelectorAll<HTMLElement>('.connection-card')].map(card => card.textContent!.replace(/\s+/g, ' ').trim());
+  return { fixture, el, shown };
+}
+
+function cards(list: BucketSummary[]) {
+  return screen(list).shown();
 }
 
 describe('Object Browser connection cards', () => {
@@ -54,5 +59,31 @@ describe('Object Browser connection cards', () => {
     expect(card).toContain('Last test failed');
     expect(card).not.toContain('Created by');
     expect(card).not.toContain('Region');
+  });
+});
+
+describe('Object Browser connection search (UX final BF1)', () => {
+  it('sits in the list\'s toolbar after the heading, not in the page header', () => {
+    const { el } = screen([FULL, BARE]);
+    expect(el.querySelector('app-page-header app-combobox, app-page-header input')).toBeNull();
+    const toolbar = el.querySelector('[data-test="connections"] .table-toolbar')!;
+    expect(toolbar.querySelector('h2')!.textContent!.replace(/\s+/g, ' ').trim()).toBe('Connections (2 of 2)');
+    expect(toolbar.querySelector('h2 + .search-field input')!.getAttribute('aria-label')).toBe('Search connections');
+  });
+
+  it('narrows the cards by name, bucket or provider, and says when nothing matches', () => {
+    const { fixture, el, shown } = screen([FULL, BARE]);
+    const input = el.querySelector<HTMLInputElement>('[data-test="connections"] input')!;
+    input.value = 'minio';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(shown().length).toBe(1);
+    expect(shown()[0]).toMatch(/^Archive/);
+    expect(el.querySelector('[data-test="connections"] h2')!.textContent).toContain('(1 of 2)');
+    input.value = 'nothing-like-it';
+    input.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+    expect(shown()).toEqual([]);
+    expect(el.querySelector('[data-test="no-connection-match"]')!.textContent).toContain('No connection matches');
   });
 });

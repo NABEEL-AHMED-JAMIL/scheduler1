@@ -135,10 +135,10 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Columns",
-      "Dataset → PDF",
       "Delete this conversion",
       "From a bucket",
-      "From an execution",
+      "PDF from a dataset",
+      "PDF from a run",
       "Refresh",
       "Supported formats",
       "Upload a file",
@@ -160,6 +160,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",
+      "/data/reports",
       "/tools",
       "/tools/converter",
       "/tools/transcript"
@@ -275,15 +276,14 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Browse files",
-      "Connections"
+      "Connections (1 of 1)"
     ],
     "buttons": [
       "Browse UI-REVIEW LocalStack S3 (fake keys)"
     ],
     "columns": [],
     "fields": [
-      "Connection",
-      "Search connections…"
+      "Search connections"
     ],
     "links": [
       "/data",
