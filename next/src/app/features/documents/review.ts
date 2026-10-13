@@ -15,6 +15,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import {
   ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, fieldName, fileName, isLow, lowLine,
   nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, skippedWhy, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
+  isNumberColumn, linesMinWidthRem,
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
 import { PageViewer, ViewerBox } from './page-viewer';
@@ -71,7 +72,13 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
     .kbd { font-family: ui-monospace, monospace; font-size: 0.6875rem; padding: 0 0.25rem; border-radius: var(--radius-sm);
       border: 1px solid var(--border-strong); border-bottom-width: 2px; color: var(--text-secondary); }
     .doc-field .input { min-height: 0; padding-top: 0.3rem; padding-bottom: 0.3rem; }
-    .doc-cell { min-width: 8.5rem; }
+    /* UX final DR1: the line items fit the card at 1187 and 1024 -- no clipped Amount. */
+    .doc-lines { table-layout: fixed; }
+    .doc-lines .doc-col-index { width: 1.75rem; }
+    .doc-lines .doc-col-num { width: 5.75rem; }
+    .doc-lines :is(th, td) { padding-left: 0.375rem; padding-right: 0.375rem; }
+    .doc-lines th { overflow: hidden; text-overflow: ellipsis; }
+    .doc-lines td.num .input { text-align: right; }
     .doc-cell-active .input { box-shadow: 0 0 0 2px var(--info-mark); }
     @media (max-width: 640px) { .doc-field { grid-template-columns: minmax(0, 1fr) 4.25rem; } .doc-field-name { grid-column: 1 / -1; } }
   `],
@@ -105,6 +112,9 @@ export class DocumentReview {
   readonly line = computed(() => lowLine(this.detail()?.autoApproveThreshold ?? this.definition()?.autoApproveThreshold));
   readonly fields = computed(() => documentFields(this.detail()?.fields ?? [], this.definition()));
   readonly tables = computed<TableView[]>(() => tableViews(this.detail()?.fields ?? [], this.definition()));
+  /** A number column (UX final DR1): right-aligned, tabular, a set width. */
+  readonly isNumber = isNumberColumn;
+  linesMinWidth(t: TableView): number { return linesMinWidthRem(t.columns); }
   /** ↑/↓ order: the document's fields, then each table's cells row by row. */
   readonly order = computed<number[]>(() => [
     ...this.fields().map(f => f.fieldId),

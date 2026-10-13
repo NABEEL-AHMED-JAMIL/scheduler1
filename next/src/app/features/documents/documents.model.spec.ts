@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
   TypeDefinition, blankDefinition, boxPercent, correctionsOf, definitionProblems, definitionToSave, documentFields,
-  editableDefinition, fieldName, fileName, isLow, listName, lowLine, nextInQueue, nextRowIndex, percent, recentRows, refusalText, ruleText,
+  editableDefinition, fieldName, fileName, isLow, isNumberColumn, linesMinWidthRem, listName, lowLine, nextInQueue, nextRowIndex, percent, recentRows, refusalText, ruleText,
   shortcutOf, skippedWhy, statusLabel, stepIndex, tableViews, textList, totalsOf, typeLabel,
 } from './documents.model';
 import { PO_DEFINITION, PO_FIELDS } from './documents.fixtures';
@@ -281,5 +281,19 @@ describe('refusals', () => {
     expect(refusalText(refused(429, null), 'x')).toBe('Document Intelligence is busy. Try again in a few minutes.');
     expect(refusalText(refused(404, null), 'x')).toBe('It is not there any more: it may have been removed.');
     expect(refusalText(refused(500, null), 'Could not load.')).toBe('Could not load.');
+  });
+});
+
+describe('the line-items table (UX final DR1)', () => {
+  it('right-aligns number, integer and money columns only', () => {
+    expect(['number', 'integer', 'money'].map(isNumberColumn)).toEqual([true, true, true]);
+    expect(['text', 'date', 'choice', '', null].map(isNumberColumn)).toEqual([false, false, false, false, false]);
+  });
+
+  it('fits an invoice\'s four columns in the review card at 1024 and scrolls a wider table instead of clipping it', () => {
+    const invoice = [{ type: 'text' }, { type: 'number' }, { type: 'money' }, { type: 'money' }];
+    // 26rem = 416px: the line-items card's inner width at a 1024 window is about 417px.
+    expect(linesMinWidthRem(invoice)).toBe(26);
+    expect(linesMinWidthRem([...invoice, { type: 'text' }, { type: 'date' }])).toBe(40);
   });
 });

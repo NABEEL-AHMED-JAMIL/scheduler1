@@ -135,16 +135,19 @@
               }
             </div>
             <div class="overflow-x-auto">
-              <table class="table-modern">
-                <thead><tr><th class="w-8">#</th>@for (c of t.columns; track c.key) { <th>{{ c.label }}</th> }</tr></thead>
+              <!-- UX final DR1: a fixed layout that fits the card (numbers right-aligned at a set width, text columns take
+                   the rest), and scrolls sideways only once a table is wider than its narrowest readable width. -->
+              <table class="table-modern doc-lines" [style.min-width.rem]="linesMinWidth(t)">
+                <colgroup><col class="doc-col-index" />@for (c of t.columns; track c.key) { <col [class.doc-col-num]="isNumber(c.type)" /> }</colgroup>
+                <thead><tr><th>#</th>@for (c of t.columns; track c.key) { <th [class.num]="isNumber(c.type)" [attr.title]="c.label">{{ c.label }}</th> }</tr></thead>
                 <tbody>
                   @for (row of t.rows; track row.index) {
                     <tr>
                       <td class="text-[color:var(--text-muted)]">{{ row.index + 1 }}</td>
-                      @for (cell of row.cells; track $index) {
-                        <td class="doc-cell" [class.doc-cell-active]="cell && selected() === cell.fieldId" [attr.data-field]="cell?.fieldId ?? null">
+                      @for (cell of row.cells; track $index; let ci = $index) {
+                        <td class="doc-cell" [class.num]="isNumber(t.columns[ci].type)" [class.doc-cell-active]="cell && selected() === cell.fieldId" [attr.data-field]="cell?.fieldId ?? null">
                           @if (cell) {
-                            <div class="flex flex-col gap-1">
+                            <div class="flex flex-col gap-1" [class.items-end]="isNumber(t.columns[ci].type)">
                               <input class="input mono text-xs w-full" [class.doc-field-low]="isFlagged(cell)" [value]="valueOf(cell)" [readOnly]="!editable()"
                                      [attr.aria-label]="nameOf(cell)" (focus)="select(cell.fieldId)" (input)="edit(cell.fieldId, $any($event.target).value)" />
                               <app-confidence-bar [value]="cell.confidence" [low]="isFlagged(cell)" />
@@ -159,7 +162,7 @@
                       <tr data-test="new-row">
                         <td class="text-[color:var(--text-muted)]">{{ nr.rowIndex + 1 }}</td>
                         @for (c of t.columns; track c.key) {
-                          <td class="doc-cell"><input class="input mono text-xs" [value]="nr.values[c.key]" [attr.aria-label]="'New row · ' + c.label" (input)="editNewRow(c.key, $any($event.target).value)" /></td>
+                          <td class="doc-cell" [class.num]="isNumber(c.type)"><input class="input mono text-xs w-full" [value]="nr.values[c.key]" [attr.aria-label]="'New row · ' + c.label" (input)="editNewRow(c.key, $any($event.target).value)" /></td>
                         }
                       </tr>
                     }

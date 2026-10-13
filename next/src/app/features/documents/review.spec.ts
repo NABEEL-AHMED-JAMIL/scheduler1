@@ -332,6 +332,27 @@ describe('DocumentReview -- corrections and decisions', () => {
     ]);
   });
 
+  it('draws the line items to fit the card: Amount right-aligned at a set width, nothing clipped (UX final DR1)', async () => {
+    const withRow: ReviewDetail = { ...INVOICE, fields: [...INVOICE.fields,
+      { fieldId: 1031, fieldKey: 'description', tableKey: 'line_items', rowIndex: 0, value: '40 pallets', confidence: 0.91, page: 1,
+        problems: [], corrected: false, label: 'Description', type: 'text', required: false },
+      { fieldId: 1032, fieldKey: 'amount', tableKey: 'line_items', rowIndex: 0, value: '9820.00', confidence: 0.92, page: 1,
+        problems: [], corrected: false, label: 'Amount', type: 'money', required: false },
+    ] };
+    const { el } = await screenWith({ api: stubApi(withRow) });
+    const table = el.querySelector<HTMLTableElement>('[data-test="line-items"] table')!;
+    expect(table.classList).toContain('doc-lines');
+    // 1.75rem (#) + 7rem (Description) + 5.75rem (Amount).
+    expect(table.style.minWidth).toBe('14.5rem');
+    const heads = [...table.querySelectorAll('thead th')];
+    expect(heads.map(h => h.classList.contains('num'))).toEqual([false, false, true]);
+    expect(table.querySelectorAll('col.doc-col-num').length).toBe(1);
+    const amount = table.querySelector<HTMLTableCellElement>('td[data-field="1032"]')!;
+    expect(amount.classList).toContain('num');
+    expect(amount.querySelector('input')!.value).toBe('9820.00');
+    expect(table.querySelector('td[data-field="1031"]')!.classList).not.toContain('num');
+  });
+
   it('claims the document and lets it go', async () => {
     const { fixture, screen, api, el } = await screenWith();
     screen.claim();

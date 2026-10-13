@@ -467,6 +467,20 @@ export function tableViews(fields: ExtractedField[], definition?: TypeDefinition
   });
 }
 
+/** A column of numbers (number, integer, money): right-aligned in tabular figures, at a narrower fixed width. */
+export function isNumberColumn(type: string | null | undefined): boolean {
+  return type === 'number' || type === 'integer' || type === 'money';
+}
+
+/**
+ * The narrowest a line-items table is drawn before it scrolls sideways, in rem (UX final DR1): the row number, each
+ * number column at 5.75rem, each text column at least 7rem. Narrower than its card, the table fits the card and its
+ * text columns take the rest; wider (a table of many columns), it scrolls instead of clipping a column.
+ */
+export function linesMinWidthRem(columns: { type: string }[]): number {
+  return 1.75 + columns.reduce((sum, c) => sum + (isNumberColumn(c.type) ? 5.75 : 7), 0);
+}
+
 /** The row index a new row of this table is added as: after the last one. */
 export function nextRowIndex(fields: ExtractedField[], tableKey: string): number {
   const rows = fields.filter(f => f.tableKey === tableKey).map(f => f.rowIndex ?? 0);
