@@ -159,8 +159,10 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly facts = computed(() => {
     const run = this.run();
     return runFacts({
-      start: run?.startTime ? this.clock.transform(run.startTime, 'dateTimeSec') ?? '—' : '—',
-      end: run?.endTime ? this.clock.transform(run.endTime, 'dateTimeSec') ?? '—' : stillRunningWord(run?.jobStatus),
+      start: run?.startTime ? this.clock.transform(run.startTime, 'recentSec') ?? '—' : '—',
+      end: run?.endTime ? this.clock.transform(run.endTime, 'recentSec') ?? '—' : stillRunningWord(run?.jobStatus),
+      startHint: run?.startTime ? this.clock.transform(run.startTime, 'dateTimeSec') ?? undefined : undefined,
+      endHint: run?.endTime ? this.clock.transform(run.endTime, 'dateTimeSec') ?? undefined : undefined,
       duration: this.duration(),
       startedBy: startedBy(run, this.job()),
       timeline: this.store.timeline(),

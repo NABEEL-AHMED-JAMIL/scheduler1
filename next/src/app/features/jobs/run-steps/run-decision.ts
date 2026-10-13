@@ -97,10 +97,10 @@ export type DecisionRoute =
                   </label>
                 }
                 <!-- Reject, then Approve: the primary is rightmost (review G3). -->
+                @if (route().by === 'task') {
+                  <p class="text-xs text-[color:var(--text-muted)]">Recorded as your Task inbox decision.</p>
+                }
                 <div class="flex flex-wrap items-center justify-end gap-2" data-test="decision-buttons">
-                  @if (route().by === 'task') {
-                    <span class="text-xs text-[color:var(--text-muted)] mr-auto">Recorded as your Task inbox decision.</span>
-                  }
                   <button type="button" class="btn btn-default btn-sm" data-test="reject" [disabled]="busy()" (click)="reject()">
                     <app-icon name="xCircle" />Reject</button>
                   <button type="button" class="btn btn-primary btn-sm" data-test="approve" [disabled]="busy()" (click)="approve()">
@@ -198,14 +198,15 @@ export class RunDecision {
     const r = this.review();
     const route = this.route();
     const who = r?.reviewers;
-    const group = this.groupName();
+    // A reviewer reads their own group's name from their session; an administrator from the access profiles.
+    const group = this.groupName() ?? (this.route().by === 'task' ? this.auth.user?.()?.pageAccessProfileName ?? null : null);
     const named = !who?.kind || (who.kind === 'role' && who.value !== 'TENANT_USER') ? 'the workspace administrators'
       : who.kind === 'role' ? 'the workspace users'
       : group ? `the ${group} group` : 'the pipeline\'s reviewer group';
     const decided = new Set((r?.decisions ?? []).map(d => d.party));
     const open = (r?.required ?? []).filter(p => !decided.has(p));
     if (open.length && !open.includes('internal')) return 'the customer';
-    const internal = route.by === 'task' ? `you (${named.replace(/^the /, '')})`
+    const internal = route.by === 'task' ? `you (${named})`
       : route.by === 'admin' ? `${named} (you can decide here)` : named;
     return open.includes('customer') ? `${internal} and the customer` : internal;
   });

@@ -42,6 +42,8 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
     .rs-row.is-warn td:first-child { box-shadow: inset 3px 0 0 var(--warn-text); }
     .rs-no { width: 2.5rem; color: var(--text-muted); text-align: right; }
     .rs-name { font-weight: 500; color: var(--text-primary); line-height: 1.15rem; max-width: 34rem; }
+    /* At a laptop's width (1187) the table fits without a sideways scroll: the step and its files take less room. */
+    @media (max-width: 1439px) { .rs-name, .rs-sub { max-width: 21rem; } .rs-out-col { min-width: 0; max-width: 15rem; } .rs-step-col { min-width: 12rem; } }
     .rs-dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 9999px; vertical-align: middle; margin-right: 0.25rem; background: var(--color-warn-500); }
     .rs-sub { font-size: 11px; line-height: 0.875rem; color: var(--text-muted); }
     .rs-problem { font-size: 11px; line-height: 1rem; margin-top: 0.125rem; white-space: normal; overflow-wrap: anywhere; }
@@ -51,6 +53,7 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
     .rs-chip { display: inline-flex; align-items: center; gap: 0.25rem; max-width: 100%; min-width: 0; padding: 0.0625rem 0.375rem;
       border-radius: var(--radius-md); background: var(--surface-sunken); font-size: 11px; color: var(--text-secondary); }
     .rs-step-col { min-width: 16rem; }
+    .rs-chip-detail { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
     .rs-out-col { min-width: 13rem; max-width: 24rem; }
   `,
   template: `
@@ -158,7 +161,7 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
                           <span class="rs-chip" [title]="o.name + (o.detail ? ' · ' + o.detail : '')">
                             <app-icon [name]="o.kind === 'bucket' ? 'upload' : o.pdf ? 'file' : 'table'" size="0.85em" class="shrink-0" />
                             <span class="truncate">{{ o.name }}</span>
-                            @if (o.detail) { <span class="text-[color:var(--text-muted)] whitespace-nowrap">· {{ o.detail }}</span> }
+                            @if (o.detail) { <span class="rs-chip-detail text-[color:var(--text-muted)] whitespace-nowrap">· {{ o.detail }}</span> }
                           </span>
                           @if (o.kind === 'bucket') {
                             <button type="button" class="btn btn-ghost btn-xs shrink-0" [disabled]="store.busy() !== ''"

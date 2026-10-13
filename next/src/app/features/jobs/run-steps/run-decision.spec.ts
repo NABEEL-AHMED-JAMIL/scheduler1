@@ -35,7 +35,7 @@ function box(opts: { review: unknown; tasks?: unknown[]; inbox?: boolean }) {
       { provide: HttpClient, useValue: { get, post } },
       { provide: WorkflowsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { canOpen: (p: string) => p !== 'task-inbox' || opts.inbox !== false, user: signal({ appUserId: 4641 }) } },
+      { provide: AuthService, useValue: { canOpen: (p: string) => p !== 'task-inbox' || opts.inbox !== false, user: signal({ appUserId: 4641, pageAccessProfileName: 'Reviewer' }) } },
     ],
   });
   const fixture = TestBed.createComponent(RunDecision);
@@ -91,6 +91,31 @@ describe('Run page: Next steps', () => {
     const { el } = box({ review: PENDING({ canDecide: false, refusal: 'Only a tenant administrator can approve or reject a run\'s results here; the pipeline\'s reviewers decide it in the Task inbox.' }), tasks: [] });
     expect(el.querySelector('[data-test="decision-buttons"]')).toBeNull();
     expect(el.querySelector('[data-test="who-decides"]')?.textContent).toContain('Task inbox');
+  });
+
+  it('says who it waits on: the reviewer themselves, by their group\'s name', () => {
+    const review = PENDING({ party: 'internal', canDecide: false, refusal: 'The pipeline\'s reviewers decide it in the Task inbox.' });
+    (review.data as Record<string, unknown>)['reviewers'] = { kind: 'group', value: '1063' };
+    const { el } = box({ review, tasks: [TASK] });
+    expect(el.querySelector('[data-test="waiting-on"]')?.textContent).toContain('you (the Reviewer group)');
+  });
+
+  it('says the workspace administrators when the pipeline names no reviewers, and that an administrator decides here', () => {
+    const { el } = box({ review: PENDING({ party: 'internal', canDecide: true }) });
+    expect(el.querySelector('[data-test="waiting-on"]')?.textContent).toContain('the workspace administrators (you can decide here)');
+  });
+
+  it('once decided, says who decided and when, with their picture', () => {
+    const { el } = box({ review: { status: 'SUCCESS', message: '', data: { jobQueueId: 8134, jobId: 2908, reviewStatus: 'APPROVED', required: ['internal'],
+      decisions: [{ runReviewDecisionId: 1109, party: 'internal', decision: 'APPROVED', comment: 'Checked', reviewer: 'Ana Ruiz', reviewerUserId: 4640,
+        decidedAt: '2026-10-12T21:14:33.456872' }], you: { canDecide: false } } } });
+    const made = el.querySelector('[data-test="decisions-made"]')!;
+    expect(made.textContent).toContain('Approved');
+    expect(made.textContent).toContain('by Ana Ruiz');
+    expect(made.querySelector('[data-test="decided-at"]')?.textContent).toMatch(/12 Oct 2026, \d{2}:\d{2}/);
+    expect(made.querySelector('app-avatar')).not.toBeNull();
+    expect(el.querySelector('[data-test="waiting-on"]')).toBeNull();
+    expect(el.querySelector('[data-test="decision-buttons"]')).toBeNull();
   });
 
   it('draws nothing for a run that needs no review', () => {

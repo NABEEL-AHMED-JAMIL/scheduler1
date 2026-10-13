@@ -78,12 +78,14 @@ export interface RunFact { label: string; value: string; hint?: string; }
  */
 export function runFacts(input: {
   start: string; end: string; duration: string; startedBy: string; timeline: StepTimeline | null;
+  /** The full date and time, for the start's and end's tooltips (the strip says day, month and time). */
+  startHint?: string; endHint?: string;
   /** What the run cost (Billing's runCost, an administrator's read), already in words; null when not known. */
   cost?: string | null;
 }): RunFact[] {
   const facts: RunFact[] = [
-    { label: 'Started', value: input.start },
-    { label: 'Ended', value: input.end },
+    { label: 'Started', value: input.start, ...(input.startHint ? { hint: input.startHint } : {}) },
+    { label: 'Ended', value: input.end, ...(input.endHint ? { hint: input.endHint } : {}) },
     { label: 'Duration', value: input.duration },
     { label: 'Started by', value: input.startedBy },
   ];
