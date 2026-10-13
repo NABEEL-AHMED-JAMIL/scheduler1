@@ -32,6 +32,7 @@ import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { PipelineRead, PipelineReads, readsSentence } from './pipeline-reads';
 
 export type SourcesTab = 'sources' | 'connections' | 'contracts';
 const TABS: SourcesTab[] = ['sources', 'connections', 'contracts'];
@@ -53,7 +54,7 @@ export const SOURCES_VIEW_PATHS: Record<SourcesTab, string> = {
  */
 @Component({
   selector: 'app-sources',
-  imports: [RouterLink, RefreshButton, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [RouterLink, RefreshButton, PipelineReads, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {
@@ -99,8 +100,20 @@ export class Sources implements OnInit {
     .map(r => this.named(r)));
   readonly hasFilters = computed(() => !!this.search().trim() || !!this.kindFilter());
   readonly emptyMessage = computed(() => this.hasFilters() ? 'No source matches the current filters.'
-    : this.canManage() ? 'No sources yet. Add one: an API from API Collections, a file or folder in your storage, or a database query.'
-      : 'No sources yet. A workspace administrator adds them.');
+    // UX review 2026-10-13 (I1): never "nothing" while the pipelines read data directly.
+    : this.pipelineReads().length ? readsSentence(this.pipelineReads())
+      : this.canManage() ? 'No sources yet. Add one: an API from API Collections, a file or folder in your storage, or a database query.'
+        : 'No sources yet. A workspace administrator adds them.');
+  readonly emptyHint = computed(() => this.hasFilters() || this.pipelineReads().length ? ''
+    : 'Pipelines also read API Collections and storage directly, without a source; add one here to test and preview it.');
+
+  // -------------------------------------------------------------------------------------------- what pipelines read
+
+  /** UX review 2026-10-13 (I1): what the workspace's pipelines read (Core); a platform administrator has no workspace. */
+  readonly showPipelineReads = computed(() => !this.isPlatformAdmin());
+  readonly pipelineReads = signal<PipelineRead[]>([]);
+  readonly pipelineReadsLoading = signal(false);
+  readonly pipelineReadsError = signal('');
 
   readonly kpis = computed((): StatStripItem[] => {
     const rows = this.rows();
@@ -176,7 +189,7 @@ export class Sources implements OnInit {
 
   /** A tab's list is read the first time it is opened, and again on Refresh. */
   private readTab(tab: SourcesTab): void {
-    if (tab === 'sources' && !this.sourcesRead) this.load();
+    if (tab === 'sources' && !this.sourcesRead) { this.load(); this.loadPipelineReads(); }
     if (tab === 'connections' && !this.connectionsRead) this.loadConnections();
     if (tab === 'contracts' && !this.contractsRead) this.loadContracts();
   }
@@ -184,7 +197,25 @@ export class Sources implements OnInit {
   refresh(): void {
     if (this.tab() === 'connections') this.loadConnections();
     else if (this.tab() === 'contracts') this.loadContracts();
-    else this.load();
+    else { this.load(); this.loadPipelineReads(); }
+  }
+
+  /** What the pipelines read: once with the Sources tab, and again on Refresh. */
+  loadPipelineReads(): void {
+    if (!this.showPipelineReads()) return;
+    this.pipelineReadsLoading.set(true);
+    this.pipelineReadsError.set('');
+    this.api.pipelineReads().subscribe({
+      next: r => {
+        this.pipelineReadsLoading.set(false);
+        if (r.status !== API_SUCCESS) { this.pipelineReadsError.set(r.message); return; }
+        this.pipelineReads.set(r.data ?? []);
+      },
+      error: err => {
+        this.pipelineReadsLoading.set(false);
+        this.pipelineReadsError.set(err?.error?.message || 'Could not load what the pipelines read.');
+      },
+    });
   }
 
   load(): void {

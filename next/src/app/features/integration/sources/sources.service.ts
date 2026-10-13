@@ -6,6 +6,7 @@ import {
   BucketRow, ConnectionRow, ContractDetail, ContractRow, ContractSaved, ContractVersionDetail, PreviewResult, Proposal, Saved,
   SourceDetail, SourceRow, TemplateRow, ValidationResult,
 } from './sources.model';
+import { PipelineRead } from './pipeline-reads';
 
 /** The list's paging, as the service answers it beside the rows. */
 export interface Paging { totalRecord: number; pageSize: number; currentPage: number; }
@@ -60,6 +61,16 @@ export class SourcesApi {
   /** Infers the schema from a preview and keeps it on the source. */
   schema(sourceId: number): Observable<ApiResponse<PreviewResult>> {
     return this.http.post<ApiResponse<PreviewResult>>(`${SOURCES}/schema`, null, { params: { sourceId } });
+  }
+
+  // ------------------------------------------------------------------------------------------ what pipelines read
+
+  /**
+   * UX review 2026-10-13 (I1): Core's answer to "what do this workspace's pipelines read" -- every place their steps read,
+   * grouped, with the pipelines and steps that read it. Gated as this page (sources).
+   */
+  pipelineReads(): Observable<ApiResponse<PipelineRead[]>> {
+    return this.http.get<ApiResponse<PipelineRead[]>>(`${API_BASE}/pipeline.json/steps/reads`);
   }
 
   // ------------------------------------------------------------------------------------------ connections

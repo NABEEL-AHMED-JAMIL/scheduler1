@@ -130,12 +130,16 @@
     }
 
     @default {
+      @if (showPipelineReads()) {
+        <app-pipeline-reads class="block mb-6" [reads]="pipelineReads()" [loading]="pipelineReadsLoading()" [error]="pipelineReadsError()"
+                            (retry)="loadPipelineReads()" />
+      }
       <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Sources at a glance" />
 
       <app-table-shell data-test="sources" heading="Sources" columnsKey="sources" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="total()"
                        [emptyMessage]="emptyMessage()" emptyIcon="database" (retry)="load()"
-                       [emptyHint]="hasFilters() ? '' : 'Pipelines also read API Collections and storage directly, without a source; add one here to test and preview it.'">
+                       [emptyHint]="emptyHint()">
         <ng-container toolbar>
           <app-view-toggle [(value)]="view" key="sources" cardsIcon="database" />
           <select class="input max-w-40" [value]="kindFilter()" aria-label="Kind" (change)="kindFilter.set($any($event.target).value)">

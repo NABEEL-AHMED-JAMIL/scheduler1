@@ -255,10 +255,13 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /dataSource.json/list?limit=50&page=1"
+      "GET /dataSource.json/list?limit=50&page=1",
+      "GET /pipeline.json/steps/reads"
     ],
     "headings": [
       "Sources",
+      "What your pipelines read",
+      "Places read",
       "Sources (2 of 2)"
     ],
     "buttons": [
@@ -288,7 +291,8 @@ export const PINNED: Record<string, unknown> = {
       "/connections/api-collections",
       "/connections/contracts",
       "/connections/databases",
-      "/connections/sources"
+      "/connections/sources",
+      "/pipelines/list"
     ]
   },
   "the sources, as a tenant user without the page": {
@@ -315,10 +319,13 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /dataSource.json/list?limit=50&page=1"
+      "GET /dataSource.json/list?limit=50&page=1",
+      "GET /pipeline.json/steps/reads"
     ],
     "headings": [
       "Sources",
+      "What your pipelines read",
+      "Places read",
       "Sources (2 of 2)"
     ],
     "buttons": [
@@ -354,7 +361,8 @@ export const PINNED: Record<string, unknown> = {
       "/connections/contracts",
       "/connections/databases",
       "/connections/sources",
-      "/connections/storage"
+      "/connections/storage",
+      "/pipelines/list"
     ]
   }
 };

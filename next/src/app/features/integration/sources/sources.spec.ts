@@ -15,6 +15,7 @@ import { ConnectionDialog } from './connection-dialog';
 import { ContractPanel } from './contract-panel';
 import { TemplateDialog } from './template-dialog';
 import { ContractSampleDialog } from './contract-sample-dialog';
+import { PipelineRead } from './pipeline-reads';
 
 /**
  * MIG-248: the Sources page. Three tabs on one page key: the workspace's sources (paged and searched by the
@@ -48,6 +49,7 @@ function stubApi(overrides: Partial<Record<keyof SourcesApi, unknown>> = {}) {
     deleteConnection: vi.fn(() => of({ status: 'SUCCESS', message: 'Database connection deleted.', data: CONNECTIONS[0] })),
     testConnection: vi.fn(() => of({ status: 'SUCCESS', message: 'Connected.', data: { ok: true, message: 'Connected.' } })),
     contracts: vi.fn(() => of({ status: 'SUCCESS', message: '', data: CONTRACTS })),
+    pipelineReads: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] as PipelineRead[] })),
     ...overrides,
   };
 }
@@ -256,6 +258,98 @@ describe('Sources -- the page', () => {
     screenWith({ api: stubApi({ list: vi.fn(() => pending) }) });
     const fixture = TestBed.createComponent(Sources);
     fixture.detectChanges();
-    expect((fixture.nativeElement as HTMLElement).querySelector('app-table-shell [role="status"]')?.getAttribute('aria-label')).toBe('Loading');
+    expect((fixture.nativeElement as HTMLElement).querySelector('app-table-shell[data-test="sources"] [role="status"]')?.getAttribute('aria-label')).toBe('Loading');
+  });
+});
+
+/** UX review 2026-10-13 (I1): what the pipelines read, above the saved sources. */
+const READS: PipelineRead[] = [
+  { kind: 'storage', task: 'read_file', taskName: 'Read CSV/JSON/Parquet', label: 'riverside-health-s3 › datasets/readmission/diabetic_data.csv',
+    target: { bucket: 'riverside-health-s3', path: 'datasets/readmission/diabetic_data.csv' }, link: '/connections/storage',
+    pipelines: [{ taskDetailId: 1930, taskName: 'Hospital readmission risk', pipelineKey: 100474, steps: ['read'] }] },
+  { kind: 'api', task: 'read_api', taskName: 'Read API', label: 'FHIR sandbox › Observations', target: { requestId: 1084, collectionId: 1079 },
+    link: '/connections/api-collections/1079',
+    pipelines: [
+      { taskDetailId: 1932, taskName: 'Patient 360', pipelineKey: 100478, steps: ['a1c_raw', 'bmi_raw'] },
+      { taskDetailId: 1985, taskName: 'Lab results release', pipelineKey: 100624, steps: ['fhir'] },
+      { taskDetailId: 1936, taskName: 'Partner lab results', pipelineKey: 100486, steps: ['labs'] },
+      { taskDetailId: 1934, taskName: 'Drug safety monitor', pipelineKey: 100482, steps: ['meds'] },
+      { taskDetailId: 1935, taskName: 'Clinical trial finder', pipelineKey: 100484, steps: ['studies'] },
+    ] },
+  { kind: 'other', task: 'sample', taskName: 'Sample rows', label: 'Sample rows (written in the step)', target: { task: 'sample' },
+    pipelines: [{ taskDetailId: 1986, taskName: 'Patient Risk Flag Pipeline', pipelineKey: 100626, steps: ['read_sample'] }] },
+];
+
+describe('Sources -- what the pipelines read (I1)', () => {
+  it('asks Core once with the Sources tab and again on Refresh, and never for a platform administrator', () => {
+    const api = stubApi({ pipelineReads: vi.fn(() => of({ status: 'SUCCESS', message: '', data: READS })) });
+    screenWith({ api });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(api.pipelineReads).toHaveBeenCalledTimes(1);
+    expect(screen.pipelineReads().length).toBe(3);
+    screen.refresh();
+    expect(api.pipelineReads).toHaveBeenCalledTimes(2);
+
+    const platformApi = stubApi();
+    screenWith({ api: platformApi, platform: true });
+    const platform = TestBed.runInInjectionContext(() => new Sources());
+    platform.ngOnInit();
+    expect(platformApi.pipelineReads).not.toHaveBeenCalled();
+    expect(platform.showPipelineReads()).toBe(false);
+  });
+
+  it('never says "no sources" while the pipelines read data: the empty list names what they read', () => {
+    const api = stubApi({
+      list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [], paging: { totalRecord: 0, pageSize: 50, currentPage: 1 } })),
+      pipelineReads: vi.fn(() => of({ status: 'SUCCESS', message: '', data: READS })),
+    });
+    screenWith({ api });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    // Seven pipelines read three places.
+    expect(screen.emptyMessage()).toBe('Your 7 pipelines read 3 places directly, listed above. Add a source here to test and preview one.');
+    expect(screen.emptyHint()).toBe('');
+    screen.kindFilter.set('API');
+    expect(screen.emptyMessage()).toBe('No source matches the current filters.');
+  });
+
+  it('keeps the old words when no pipeline reads anything, and shows Core\'s refusal in its own table', () => {
+    const api = stubApi({ pipelineReads: vi.fn(() => of({ status: 'ERROR', message: 'Sources is not part of your access. Ask your workspace admin.' })) });
+    screenWith({ api });
+    const screen = TestBed.runInInjectionContext(() => new Sources());
+    screen.ngOnInit();
+    expect(screen.pipelineReadsError()).toContain('not part of your access');
+    expect(screen.emptyMessage()).toContain('No sources yet');
+    expect(screen.emptyHint()).toContain('Pipelines also read');
+  });
+
+  it('draws the places above the saved sources: what, kind, and the pipelines that read each, linked to their steps', () => {
+    const api = stubApi({ pipelineReads: vi.fn(() => of({ status: 'SUCCESS', message: '', data: READS })) });
+    screenWith({ api });
+    const fixture = TestBed.createComponent(Sources);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const section = el.querySelector('[data-test="pipeline-reads"]') as HTMLElement;
+    expect(section.querySelector('.section-title')?.textContent).toContain('What your pipelines read');
+    // Above the saved sources.
+    const shells = Array.from(el.querySelectorAll('app-table-shell'));
+    expect(section.contains(shells[0])).toBe(true);
+    expect(Array.from(section.querySelectorAll('thead th')).map(th => th.textContent!.trim())).toEqual(['What', 'Kind', 'Read by']);
+    const what = section.querySelector('tbody tr a') as HTMLAnchorElement;
+    expect(what.textContent).toContain('riverside-health-s3 › datasets/readmission/diabetic_data.csv');
+    expect(what.getAttribute('href')).toBe('/connections/storage');
+    const reader = Array.from(section.querySelectorAll('a')).find(a => a.textContent!.trim() === 'Patient 360') as HTMLAnchorElement;
+    expect(reader.getAttribute('href')).toBe('/pipelines/1932/edit?tab=steps');
+    expect(reader.getAttribute('title')).toBe('Steps: a1c_raw, bmi_raw');
+    const rows = section.querySelectorAll('tbody tr');
+    expect(rows[1].textContent).toContain('+2 more');
+    expect(rows[1].textContent).not.toContain('Clinical trial finder');
+    (Array.from(rows[1].querySelectorAll('button')).find(b => b.textContent!.includes('more')) as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(rows[1].textContent).toContain('Clinical trial finder');
+    // A place with nowhere to open is plain text, and its kind says where the rows come from.
+    expect(rows[2].querySelector('td:first-child a')).toBeNull();
+    expect(rows[2].textContent).toContain('In the step');
   });
 });
