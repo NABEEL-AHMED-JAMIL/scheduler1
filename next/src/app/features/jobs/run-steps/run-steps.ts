@@ -58,6 +58,10 @@ export class RunSteps {
   readonly revision = input(0);
   /** MIG-345: the run was queued again (a retry); the page re-reads the run. */
   readonly retried = output<void>();
+  /** UX review 2026-10-12 (R1): whether the run's review card is drawn here (the run page draws its own at the top). */
+  readonly withReview = input(true);
+  /** Which part a tab shows: the steps (and their AI trace), the outputs, or both as before. */
+  readonly part = input<'all' | 'steps' | 'outputs'>('all');
 
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);

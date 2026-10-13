@@ -120,7 +120,11 @@ export class WorkflowsApi {
   groups(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('groups', page); }
   done(page: InboxQuery = {}): Observable<InboxPage<InboxTask>> { return this.page<InboxTask>('done', page); }
   count(): Observable<ApiResponse<TaskCount>> { return this.http.get<ApiResponse<TaskCount>>(`${this.inbox}/count`); }
-  task(id: number): Observable<ApiResponse<TaskDetail>> { return this.http.get<ApiResponse<TaskDetail>>(`${this.inbox}/task`, { params: { id } }); }
+  /** UX review 2026-10-12: the reader's open tasks about one subject ("pipeline-run:8214"), Mine's and My groups'. */
+  forSubject(subjectId: string): Observable<ApiResponse<(InboxTask & { list?: 'mine' | 'groups' })[]>> {
+    return this.http.get<ApiResponse<(InboxTask & { list?: 'mine' | 'groups' })[]>>(`${this.inbox}/forSubject`, { params: { subjectId } });
+  }
+    task(id: number): Observable<ApiResponse<TaskDetail>> { return this.http.get<ApiResponse<TaskDetail>>(`${this.inbox}/task`, { params: { id } }); }
   colleagues(): Observable<ApiResponse<Colleague[]>> { return this.http.get<ApiResponse<Colleague[]>>(`${this.inbox}/colleagues`); }
 
   /** A decision, keyed so a double click or a retry decides once. */

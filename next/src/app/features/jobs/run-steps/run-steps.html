@@ -1,7 +1,9 @@
 @if (timeline(); as t) {
-  <!-- MIG-237: the run's result review, when its pipeline requires one (nothing is drawn otherwise). -->
-  <app-run-review [jobQueueId]="jobQueueId()" />
-  <section class="card exec-steps overflow-clip" aria-labelledby="run-steps-heading">
+  <!-- MIG-237: the run's result review, when its pipeline requires one (nothing is drawn otherwise). The run page draws
+       its own at the top (UX review 2026-10-12, R1) and asks for none here. -->
+  @if (withReview()) { <app-run-review [jobQueueId]="jobQueueId()" /> }
+  <section class="card exec-steps overflow-clip" aria-labelledby="run-steps-heading" [attr.data-part]="part()">
+    @if (part() !== 'outputs') {
     <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle">
       <app-icon name="layers" class="icon-info shrink-0" />
       <h2 id="run-steps-heading" class="text-sm font-semibold mr-auto">
@@ -181,10 +183,11 @@
       }
     }
 
+    }
     <!-- Wave 4: what the run put out (sourceJob.json/runOutputs): kept files download through their dataset until they
          expire; bucket uploads download from storage, as the object browser does. -->
-    @if (outputs(); as files) {
-      <div class="exec-files border-t border-subtle px-4 py-3" role="region" aria-labelledby="run-files-heading">
+    @if (part() !== 'steps' && outputs(); as files) {
+      <div class="exec-files px-4 py-3" [class.border-t]="part() !== 'outputs'" [class.border-subtle]="part() !== 'outputs'" role="region" aria-labelledby="run-files-heading">
         <div class="detail-head" id="run-files-heading">Files</div>
         @if (files === 'error') {
           <p class="text-xs text-[color:var(--text-muted)]">The run's files could not be read.</p>
@@ -252,7 +255,7 @@
       </div>
     }
 
-    @if (aiSteps().length) {
+    @if (part() !== 'outputs' && aiSteps().length) {
       <div class="exec-ai-trace border-t border-subtle px-4 py-3">
         <div class="detail-head">AI trace</div>
         <ul class="side-panel-list text-xs">
