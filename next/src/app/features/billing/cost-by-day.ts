@@ -71,7 +71,7 @@ function storedView(): CostView {
     </ng-template>
 
     @if (empty()) {
-      <div class="flex-1 grid place-items-center text-sm text-[color:var(--text-muted)] py-10" data-test="cost-by-day-empty">Nothing metered in this month yet.</div>
+      <div class="flex-1 grid place-items-center text-sm text-[color:var(--text-muted)] py-10" data-test="cost-by-day-empty">Nothing metered in {{ monthLabel() || 'this month' }}.</div>
     } @else {
       <app-echart class="flex-1 mt-2" [option]="option()" [theme]="theme().ref" [height]="height()" (clicked)="pick($event)"
                   [label]="'Cost by day, ' + monthLabel()" data-test="cost-by-day-chart" />
@@ -97,7 +97,7 @@ function storedView(): CostView {
           <li class="flex items-center gap-1.5"><span class="cbd-line is-muted"></span>{{ previousLabel() }}</li>
         }
       }
-      <li class="ml-auto text-[color:var(--text-muted)]">Click a day for its lines</li>
+      @if (!empty()) { <li class="ml-auto text-[color:var(--text-muted)]">Click a day for its lines</li> }
     </ul>
   `,
 })
@@ -130,7 +130,8 @@ export class CostByDay {
   readonly monthDays = computed(() => monthDays(this.month(), this.days(), this.today()));
   readonly hasFuture = computed(() => this.monthDays().some(d => d.future));
   readonly barsTotal = computed(() => this.monthDays().reduce((n, d) => n + d.amount, 0));
-  readonly empty = computed(() => !this.days().length);
+  /** Nothing to draw: no day with a cent of use (a month with only free reads is empty too, not an axis of nothing). */
+  readonly empty = computed(() => !this.monthDays().some(d => d.amount !== 0));
   /** The services drawn, with their month's total before allowances; under a cent is greyed in the legend. */
   readonly legend = computed(() => {
     const totals = new Map<string, number>();
