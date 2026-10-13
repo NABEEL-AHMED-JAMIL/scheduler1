@@ -336,4 +336,19 @@ describe('Create pipeline in a MANAGED workspace (UX final MG1)', () => {
     expect(html).toContain('[canCreate]="canCreatePipelines()"');
     expect(html).toContain('<app-managed-banner what="pipelines"');
   });
+
+  it('does not promise Create pipeline in the empty flow where it is not offered', async () => {
+    const { FlowPanel } = await import('./flow-panel');
+    const { StepsApi } = await import('../../tasks/steps/steps.service');
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), { provide: StepsApi, useValue: {} },
+      { provide: Dialog, useValue: { open: vi.fn() } }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }] });
+    const fixture = TestBed.createComponent(FlowPanel);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Nothing is saved from here.');
+    fixture.componentRef.setInput('canCreate', true);
+    fixture.detectChanges();
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('Nothing is saved until you press Create pipeline.');
+  });
 });
+

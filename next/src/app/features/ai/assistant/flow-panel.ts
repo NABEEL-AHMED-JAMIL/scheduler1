@@ -119,7 +119,7 @@ import { RunFollow } from './run-follow';
           <span class="grid place-items-center rounded-full size-10 bg-accent-soft text-accent" aria-hidden="true"><app-icon name="layers" /></span>
           <p class="text-sm font-medium">No flow yet</p>
           <p class="text-sm text-[color:var(--text-muted)]">Describe a pipeline in plain words and it is drawn here, step by step, checked against this
-            workspace's tasks. Nothing is saved until you press Create pipeline.</p>
+            workspace's tasks. @if (canCreate()) { Nothing is saved until you press Create pipeline. } @else { Nothing is saved from here. }</p>
         </div>
       </div>
     }

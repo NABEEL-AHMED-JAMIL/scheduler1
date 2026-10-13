@@ -162,7 +162,7 @@ function scheduleSentence(facts: JobFacts): string {
   if (facts.execution === 'Manual') {
     return s
       ? 'It runs only when someone triggers it — its stored timetable is held, and would resume if this schedule were set back to Auto.'
-      : 'It runs only when someone triggers it — there is no schedule.';
+      : 'It runs only when someone triggers it — there is no timetable.';
   }
   if (!s) return 'No timetable is set for this schedule.';
   const at = s.startTime ? ` at ${clockTime(s.startTime)}` : '';
