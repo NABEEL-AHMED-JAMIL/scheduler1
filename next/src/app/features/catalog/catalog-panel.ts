@@ -10,7 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { CatalogApi } from './catalog.api';
 import {
   AssetDetail, Grant, LineageGraph, SENSITIVITIES, TAGS, freshnessText, grantTone, isSensitive, kindText, lineageSides, nodeIcon, phiHint,
-  sensitivityTone, sourceText, tagText, whereText,
+  sensitivityTone, sourceText, tagText, tagsLevel, whereText,
 } from './catalog.model';
 
 /** What the page hands the panel: the asset to open, and a way to say the list should be read again. */
@@ -245,9 +245,7 @@ export class CatalogPanel implements OnInit {
   });
   /** What the tags alone make it: the highest level a tagged column raises it to. */
   readonly tagLevel = computed(() => {
-    const tags = (this.asset()?.columns ?? []).flatMap(c => c.tags);
-    if (tags.some(t => ['national_id', 'card_number', 'bank_account'].includes(t))) return 'Restricted';
-    return tags.length ? 'Confidential' : 'Unclassified';
+    return tagsLevel((this.asset()?.columns ?? []).flatMap(c => c.tags));
   });
 
   ngOnInit(): void {

@@ -5,12 +5,27 @@ export type AssetKind = 'file' | 'dataset' | 'document_type' | 'connector';
 export type Sensitivity = 'Unclassified' | 'Public' | 'Internal' | 'Confidential' | 'Restricted';
 export const SENSITIVITIES: readonly Sensitivity[] = ['Unclassified', 'Public', 'Internal', 'Confidential', 'Restricted'];
 
-/** What the scanner (MIG-286) finds a column holds, and what a person may say it holds. */
-export const TAGS: readonly { id: string; label: string }[] = [
-  { id: 'email', label: 'email' }, { id: 'phone', label: 'phone' }, { id: 'national_id', label: 'national id' },
-  { id: 'card_number', label: 'card number' }, { id: 'bank_account', label: 'bank account' },
-  { id: 'person_name', label: 'person name' }, { id: 'address', label: 'address' },
+/**
+ * What the scanner (MIG-286) finds a column holds, and what a person may say it holds, with the level a tagged column raises
+ * its asset to (platform-commons SensitiveValues.Kind). Since UX review CT1 the health identifiers too: date of birth,
+ * medical record number, health plan number and ZIP code.
+ */
+export const TAGS: readonly { id: string; label: string; level: 'Confidential' | 'Restricted' }[] = [
+  { id: 'email', label: 'email', level: 'Confidential' }, { id: 'phone', label: 'phone', level: 'Confidential' },
+  { id: 'national_id', label: 'national id', level: 'Restricted' },
+  { id: 'card_number', label: 'card number', level: 'Restricted' }, { id: 'bank_account', label: 'bank account', level: 'Restricted' },
+  { id: 'person_name', label: 'person name', level: 'Confidential' }, { id: 'address', label: 'address', level: 'Confidential' },
+  { id: 'date_of_birth', label: 'date of birth', level: 'Restricted' },
+  { id: 'medical_record_number', label: 'medical record number', level: 'Restricted' },
+  { id: 'health_plan_number', label: 'health plan number', level: 'Restricted' },
+  { id: 'zip_code', label: 'ZIP code', level: 'Confidential' },
 ];
+
+/** The highest level these tags raise an asset to, as the service decides it; Unclassified for none. */
+export function tagsLevel(tags: readonly string[]): Sensitivity {
+  if (tags.some(t => TAGS.find(k => k.id === t)?.level === 'Restricted')) return 'Restricted';
+  return tags.length ? 'Confidential' : 'Unclassified';
+}
 
 export interface CatalogAsset {
   assetId: number;
@@ -124,7 +139,8 @@ const PHI_NAMES: readonly [RegExp, string][] = [
   [/(^|_)(first_?name|last_?name|full_?name|surname|patient_?name|given_?name)($|_)/, 'person name'],
   [/(^|_)(email|e_?mail)($|_)/, 'email'],
   [/(^|_)(phone|mobile|telephone|fax)($|_)/, 'phone'],
-  [/(^|_)(address|street|zip|zip_?code|postcode|postal_?code)($|_)/, 'address'],
+  [/(^|_)(zip|zip_?code|zip5|postcode|postal_?code)($|_)/, 'ZIP code'],
+  [/(^|_)(address|street)($|_)/, 'address'],
   [/(^|_)(diagnos[ie]s|icd(_?10)?|condition|medication|prescription|allergy|procedure|lab_?result)($|_)/, 'health detail'],
   [/(^|_)(admission|admit|discharge|death)_?(date|time|at)($|_)/, 'care date'],
 ];

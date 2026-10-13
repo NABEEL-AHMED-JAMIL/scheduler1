@@ -218,6 +218,36 @@ describe('Data Catalog sensitive data (UX review B5, CT1)', () => {
     expect(el.querySelector('tr[data-column="region"] [data-phi-column]')).toBeNull();
     expect(el.querySelector('[data-phi-hint]')?.textContent).toContain('1 column looks like patient data');
   });
+
+  it('names the scanner\'s health identifier tags and stops flagging the columns it tagged (CT1)', () => {
+    const { el } = panel({ columns: [
+      { position: 0, name: 'patient_id', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: ['medical_record_number'], tagsReviewed: false },
+      { position: 1, name: 'dob', dataType: 'DATE', nullPercent: 0, distinctCount: 3, tags: ['date_of_birth'], tagsReviewed: false },
+      { position: 2, name: 'zip', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: ['zip_code'], tagsReviewed: false },
+      { position: 3, name: 'age', dataType: 'BIGINT', nullPercent: 0, distinctCount: 3, tags: [], tagsReviewed: false }] });
+    expect(el.querySelector('tr[data-column="patient_id"]')!.textContent).toContain('medical record number');
+    expect(el.querySelector('tr[data-column="dob"]')!.textContent).toContain('date of birth');
+    expect(el.querySelector('tr[data-column="zip"]')!.textContent).toContain('ZIP code');
+    expect(el.querySelector('tr[data-column="patient_id"] [data-sensitive-column]')).not.toBeNull();
+    expect(el.querySelector('[data-phi-column]')).toBeNull();
+    expect(el.querySelector('[data-phi-hint]')).toBeNull();
+  });
+});
+
+describe('Data Catalog tags (CT1)', () => {
+  it('labels the health identifier tags and levels them as the service does', async () => {
+    const { TAGS, tagText, tagsLevel } = await import('./catalog.model');
+    expect(TAGS.map(t => t.id)).toEqual(expect.arrayContaining(['date_of_birth', 'medical_record_number', 'health_plan_number', 'zip_code']));
+    expect(tagText('date_of_birth')).toBe('date of birth');
+    expect(tagText('medical_record_number')).toBe('medical record number');
+    expect(tagText('health_plan_number')).toBe('health plan number');
+    expect(tagText('zip_code')).toBe('ZIP code');
+    expect(tagsLevel(['zip_code', 'email'])).toBe('Confidential');
+    expect(tagsLevel(['zip_code', 'date_of_birth'])).toBe('Restricted');
+    expect(tagsLevel(['medical_record_number'])).toBe('Restricted');
+    expect(tagsLevel(['card_number'])).toBe('Restricted');
+    expect(tagsLevel([])).toBe('Unclassified');
+  });
 });
 
 describe('Data Catalog model', () => {
@@ -249,7 +279,8 @@ describe('phiHint (UX review B5, CT1)', () => {
     expect(phiHint('dateOfBirth')).toBe('date of birth');
     expect(phiHint('primary_diagnosis')).toBe('health detail');
     expect(phiHint('discharge_date')).toBe('care date');
-    expect(phiHint('zip_code')).toBe('address');
+    expect(phiHint('zip_code')).toBe('ZIP code');
+    expect(phiHint('home_address')).toBe('address');
     expect(phiHint('risk_level')).toBeNull();
     expect(phiHint('total')).toBeNull();
     expect(phiHint('')).toBeNull();
