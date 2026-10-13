@@ -61,6 +61,7 @@ export const PINNED: Record<string, unknown> = {
       "Basics",
       "Payload",
       "Source",
+      "Run parameters",
       "Run defaults",
       "Data sensitivity",
       "Review"
@@ -71,6 +72,7 @@ export const PINNED: Record<string, unknown> = {
       "3. Review: Optional. Not required: results are final when the run ends",
       "4. Outputs: Missing. Add a Write step: a file, a bucket, a PDF or a webhook",
       "5. Schedule & triggers: Set. 1 schedule · 1 active",
+      "Add a parameter",
       "Clear",
       "Details",
       "History",

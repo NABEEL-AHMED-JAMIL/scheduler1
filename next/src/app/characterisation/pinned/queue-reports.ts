@@ -108,6 +108,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/runs",
       "/runs/analytics",
+      "/runs/backfills",
       "/runs/by-date",
       "/runs/failed",
       "/runs/latest"
@@ -224,6 +225,7 @@ export const PINNED: Record<string, unknown> = {
       "/billing/usage",
       "/runs",
       "/runs/analytics",
+      "/runs/backfills",
       "/runs/by-date",
       "/runs/failed",
       "/runs/latest"
@@ -284,6 +286,7 @@ export const PINNED: Record<string, unknown> = {
       "/pipelines/schedules/2838/runs/7382",
       "/runs",
       "/runs/analytics",
+      "/runs/backfills",
       "/runs/by-date",
       "/runs/failed",
       "/runs/latest"
@@ -335,6 +338,7 @@ export const PINNED: Record<string, unknown> = {
       "/pipelines/schedules/2838/runs/7382",
       "/runs",
       "/runs/analytics",
+      "/runs/backfills",
       "/runs/by-date",
       "/runs/failed",
       "/runs/latest"
@@ -387,6 +391,7 @@ export const PINNED: Record<string, unknown> = {
       "/pipelines/schedules/2838/runs/7382",
       "/runs",
       "/runs/analytics",
+      "/runs/backfills",
       "/runs/by-date",
       "/runs/failed",
       "/runs/latest"

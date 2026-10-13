@@ -242,12 +242,16 @@
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)"
                           [title]="runBlockedReason(job)"
                           (cdkMenuItemTriggered)="runNow(job)"><app-icon name="play" />Run now</button>
-                  <!-- Only where the pipeline has an AI step: elsewhere there is no model to choose (review 2026-10-07). -->
-                  @if (hasAiSteps(job)) {
+                  <!-- Only where the pipeline has an AI step or run parameters: elsewhere there is nothing to choose (review 2026-10-07, MIG-347). -->
+                  @if (hasRunWith(job)) {
                   <button cdkMenuItem class="menu-item" [disabled]="!canRunNow(job)" data-test="run-with"
-                          [title]="runBlockedReason(job) || 'Run now, choosing the model each AI step runs on'"
-                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />Run with a different AI model…</button>
+                          [title]="runBlockedReason(job) || 'Run now, choosing its parameters or the model each AI step runs on'"
+                          (cdkMenuItemTriggered)="runWith(job)"><app-icon name="sparkle" />{{ runWithLabel(job) }}</button>
                   }
+                  <!-- MIG-347: a schedule run for each day of a past range, beside its own runs. -->
+                  <button cdkMenuItem class="menu-item" [disabled]="job.jobStatus !== 'Active'" data-test="backfill"
+                          [title]="job.jobStatus !== 'Active' ? 'Activate this schedule to backfill it' : 'Run it for each day of a past range'"
+                          (cdkMenuItemTriggered)="backfill(job)"><app-icon name="layers" />Backfill…</button>
                   @if (!locked()) {
                   <button cdkMenuItem class="menu-item" [disabled]="isInFlight(job) || !canSkipNext(job)"
                           [title]="skipBlockedReason(job)"

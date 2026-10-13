@@ -1,3 +1,5 @@
+import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
+
 /**
  * MIG-249: the step builder's shapes and the pure rules behind them.
  *
@@ -53,6 +55,8 @@ export interface Source { type?: string; config?: Record<string, unknown>; }
 export interface Definition {
   version?: number;
   source?: Source;
+  /** MIG-347: what a run is given (Run with…, a backfill, the API); every step reads one as {{param.name}}. */
+  parameters?: RunParameter[];
   steps: Step[];
   settings?: Settings;
 }
@@ -234,7 +238,8 @@ export function runFinished(status: string | null | undefined): boolean {
 
 // ---------------------------------------------------------------------------------------------- canonical form
 
-const DEFINITION_ORDER = ['version', 'source', 'steps', 'settings'];
+const DEFINITION_ORDER = ['version', 'source', 'parameters', 'steps', 'settings'];
+const PARAMETER_ORDER = ['name', 'type', 'label', 'description', 'required', 'default', 'choices'];
 const STEP_ORDER = ['key', 'name', 'task', 'input', 'config', 'retry', 'timeoutSeconds', 'onError'];
 const RETRY_ORDER = ['maxAttempts', 'delaySeconds'];
 const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'review'];
@@ -280,7 +285,20 @@ export function canonical(definition: Definition): Definition {
     const settings = ordered(out.settings, SETTINGS_ORDER);
     if (emptyObject(settings)) delete out.settings; else out.settings = settings;
   }
+  if (out.parameters) {
+    // A parameter not required says nothing of it; a choice list only on a choice.
+    const params = out.parameters.map(p => ordered(p, PARAMETER_ORDER,
+      (key, v) => !blank(v) && !(key === 'required' && v !== true) && !(key === 'choices' && (p.type !== 'choice' || !Array.isArray(v)))));
+    if (params.length) out.parameters = params; else delete out.parameters;
+  }
   return out;
+}
+
+/** MIG-347: the definition with these run parameters (none drops the key). */
+export function updateParameters(definition: Definition, parameters: RunParameter[]): Definition {
+  const next: Definition = { ...definition, parameters };
+  if (!parameters.length) delete next.parameters;
+  return next;
 }
 
 /** The JSON tab's text, and what a builder save sends. */

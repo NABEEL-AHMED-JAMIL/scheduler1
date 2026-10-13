@@ -15,6 +15,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { Icon } from '../../shared/ui/icon';
 import { NotifyDialog } from './notify-dialog';
 import { RunWithDialog, RunWithData } from './ai-models/run-with-dialog';
+import { openBackfill } from '../runs/backfills/backfill-open';
 import { InboxTrigger, triggerOf, triggerSentence } from './inbox/inbox-trigger';
 import { JobAction, jobActionRequest } from './job-actions';
 import { parseTopicPartition } from '../../shared/ui/topic';
@@ -192,6 +193,8 @@ export class Jobs implements OnInit {
    * step the dialog had nothing to choose. Absent until read; a failed read leaves it absent, and the item hidden.
    */
   readonly aiSteps = signal<Record<number, boolean>>({});
+  /** MIG-347: how many run parameters each schedule's pipeline declares, read with its AI steps; "Run with…" offers them. */
+  readonly parameterCounts = signal<Record<number, number>>({});
   readonly expanded = signal<Set<number>>(new Set());
   readonly selected = signal<Set<number>>(new Set());
 
@@ -720,15 +723,40 @@ export class Jobs implements OnInit {
   /** On opening a row's menu: whether its pipeline has an AI step, asked once per schedule. */
   checkAiSteps(job: SourceJob): void {
     if (job.jobId in this.aiSteps()) return;
-    this.http.get<ApiResponse<{ steps?: unknown[] }>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params: { jobId: String(job.jobId) } })
+    this.http.get<ApiResponse<{ steps?: unknown[]; parameters?: unknown[] }>>(`${API_BASE}/sourceJob.json/aiModelChoice`, { params: { jobId: String(job.jobId) } })
       .subscribe({
         next: r => {
           if (r?.status !== API_SUCCESS) return;
           const steps = Array.isArray(r.data?.steps) ? r.data!.steps!.length : 0;
           this.aiSteps.update(known => ({ ...known, [job.jobId]: steps > 0 }));
+          const parameters = Array.isArray(r.data?.parameters) ? r.data!.parameters!.length : 0;
+          this.parameterCounts.update(known => ({ ...known, [job.jobId]: parameters }));
         },
         error: () => {},
       });
+  }
+
+  /** MIG-347: whether "Run with…" has something to choose: an AI step's model or the pipeline's run parameters. */
+  hasRunWith(job: SourceJob): boolean {
+    return this.hasAiSteps(job) || (this.parameterCounts()[job.jobId] ?? 0) > 0;
+  }
+
+  /** "Run with…" when the pipeline has parameters; the AI wording when a model is all there is to choose. */
+  runWithLabel(job: SourceJob): string {
+    return (this.parameterCounts()[job.jobId] ?? 0) > 0 ? 'Run with…' : 'Run with a different AI model…';
+  }
+
+  /**
+   * MIG-347: "Backfill…" -- run the schedule for each day of a past range, beside its own runs (so a run in flight does not
+   * stop it); a switched-off schedule cannot start one. A started backfill opens in Runs › Backfills.
+   */
+  backfill(job: SourceJob): void {
+    if (job.jobStatus !== 'Active') return;
+    openBackfill(this.dialog, { jobId: job.jobId, jobName: job.jobName, readsCosts: this.auth.isTenantAdmin() }).then(started => {
+      if (!started) return;
+      this.toast.success(`Backfill #${started.backfillId} of ${job.jobName} started: ${started.total} period(s).`);
+      this.router.navigate(['/runs/backfills'], { queryParams: { backfill: started.backfillId } });
+    });
   }
 
   runWith(job: SourceJob): void {

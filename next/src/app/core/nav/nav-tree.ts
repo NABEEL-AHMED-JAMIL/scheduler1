@@ -171,6 +171,8 @@ export const NAV: NavItem[] = [
           { label: 'Analytics', path: '/runs/analytics', pageKey: 'reports', icon: 'chart' },
           // MIG-355: every failed or timed-out run, grouped by error pattern, retried from the failed step -- the Queue's reads.
           { label: 'Failed', path: '/runs/failed', pageKey: 'queue', icon: 'alert' },
+          // MIG-347: a schedule run for each period of a past range, with its progress -- Schedules' (who may run the schedule).
+          { label: 'Backfills', path: '/runs/backfills', pageKey: 'jobs', icon: 'layers' },
         ],
       },
       // The reviewer's home: its own entry, never a tab (a tab would add a click to the page they open every day).

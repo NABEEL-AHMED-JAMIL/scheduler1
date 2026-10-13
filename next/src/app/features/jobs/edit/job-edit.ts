@@ -31,6 +31,8 @@ import { AiStepChoice, ModelPicks, choiceBody, picksChanged, picksOf, stepsOf } 
 import { AiModelPicks } from '../ai-models/ai-model-picks';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { AuthService } from '../../../core/auth/auth.service';
+import { Dialog } from '@angular/cdk/dialog';
+import { openBackfill } from '../../runs/backfills/backfill-open';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
@@ -218,6 +220,18 @@ export class JobEdit implements OnInit {
   /** UX review 2026-10-12 (A2, S2): the page is titled with the schedule's name, its status beside it. */
   readonly loadedName = signal('');
   readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Schedule') : 'New schedule');
+
+  /** MIG-347: this schedule run for each day of a past range (as saved); a started one opens in Runs › Backfills. */
+  backfill(): void {
+    const jobId = Number(this.jobId());
+    if (!jobId) return;
+    const name = this.loadedName();
+    openBackfill(this.injector.get(Dialog), { jobId, jobName: name, readsCosts: this.injector.get(AuthService).isTenantAdmin() }).then(started => {
+      if (!started) return;
+      this.toast.success(`Backfill #${started.backfillId} of ${name} started: ${started.total} period(s).`);
+      this.router.navigate(['/runs/backfills'], { queryParams: { backfill: started.backfillId } });
+    });
+  }
 
   readonly form: FormGroup = this.fb.group({
     jobId: [null],

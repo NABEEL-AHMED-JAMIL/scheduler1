@@ -42,6 +42,10 @@
       "description": "Starting work and following it."
     },
     {
+      "name": "backfills",
+      "description": "Running a pipeline once for each day, hour or week of a past range."
+    },
+    {
       "name": "files",
       "description": "Uploading and downloading files."
     },
@@ -325,6 +329,183 @@
           },
           "503": {
             "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/backfills": {
+      "post": {
+        "tags": [
+          "backfills"
+        ],
+        "operationId": "startBackfill",
+        "summary": "Run a pipeline once for each day (hour, week) of a past range, a few at a time.",
+        "description": "Makes a backfill: one run of the pipeline for each period of `from`..`to` (both days included), counted in the workspace's billing time zone (America/Chicago unless set) -- a day is midnight to midnight there, so 23 or 25 hours on a daylight-saving day; an hour is a clock hour; a week is seven days from each start day. Each run's steps read `{{run.date}}` (the period's day), `{{run.windowStart}}` and `{{run.windowEnd}}` (its bounds, RFC 3339 with the zone's offset) and every `{{param.name}}` of `parameters`. At most 366 periods, and nothing that has not begun yet. A period that already has a completed run of the pipeline (a scheduled run whose slot falls in it, or an earlier backfill's) is skipped unless `rerunCompleted` is true. Answered once the backfill is made; its runs are queued gradually, at most `concurrency` at a time (1 to 4, as the platform's memory budget allows), beside the pipeline's own runs, and each is billed as any run. Refused (409, the problem's `type` says why) when the workspace already has 3 open backfills (`too-many-backfills`), a period is in another open backfill of the pipeline (`backfill-overlaps`), every period already has a completed run (`nothing-to-run`), the pipeline is inactive (`pipeline-inactive`) or has no steps (`pipeline-not-backfillable`); 422 (`invalid-parameters`) when a value does not suit its parameter.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/PipelineId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BackfillRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The backfill, made; its runs are queued gradually.",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "/v1/backfills/{backfillId}"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backfill"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/TooLarge"
+          },
+          "422": {
+            "$ref": "#/components/responses/Unprocessable"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/backfills/{backfillId}": {
+      "get": {
+        "tags": [
+          "backfills"
+        ],
+        "operationId": "getBackfill",
+        "summary": "A backfill, its progress and its periods.",
+        "description": "The backfill's status (`running`, `paused`, `cancelled`, `completed` -- every period completed or skipped --, or `failed` -- at least one period failed), how many periods are in each state, why it waits when it does (`waitingReason`: the workspace is suspended, the pipeline is switched off), when it should end, and its first 100 periods with each one's run (follow a run as any run, `GET /runs/{runId}`). A failed period keeps its run's last message as `note`.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BackfillId"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The backfill.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backfill"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/backfills/{backfillId}/cancel": {
+      "post": {
+        "tags": [
+          "backfills"
+        ],
+        "operationId": "cancelBackfill",
+        "summary": "Cancel a backfill.",
+        "description": "Nothing more is queued: its waiting periods are cancelled. The runs already started finish and are recorded on their periods. Refused (409 `backfill-closed`) when the backfill has ended already.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:write"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/BackfillId"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The backfill, cancelled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Backfill"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
           }
         }
       }
@@ -2119,6 +2300,14 @@
           "type": "string"
         }
       },
+      "BackfillId": {
+        "name": "backfillId",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
       "FileId": {
         "name": "fileId",
         "in": "path",
@@ -2428,7 +2617,8 @@
         "description": "The pipeline is not active.",
         "operations": [
           "startRun",
-          "retryRun"
+          "retryRun",
+          "startBackfill"
         ]
       },
       "workspace-paused": {
@@ -2478,6 +2668,54 @@
         "description": "There is no step to resume from (the run ran no steps, or every step completed), its inputs cannot be checked, or it has had 20 attempts. Retry with from start, or start a new run.",
         "operations": [
           "retryRun"
+        ]
+      },
+      "too-many-backfills": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The workspace already has 3 open (running or paused) backfills. Wait for one to finish, or cancel one.",
+        "operations": [
+          "startBackfill"
+        ]
+      },
+      "backfill-overlaps": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "A day of the range is already in another open backfill of the pipeline. Pick a range after it, or cancel that backfill.",
+        "operations": [
+          "startBackfill"
+        ]
+      },
+      "nothing-to-run": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "Every period of the range already has a completed run. Ask with rerunCompleted true to run them again.",
+        "operations": [
+          "startBackfill"
+        ]
+      },
+      "pipeline-not-backfillable": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The pipeline has no steps, so it cannot be backfilled.",
+        "operations": [
+          "startBackfill"
+        ]
+      },
+      "backfill-closed": {
+        "status": 409,
+        "title": "Conflict",
+        "description": "The backfill has ended already (completed, failed or cancelled).",
+        "operations": [
+          "cancelBackfill"
+        ]
+      },
+      "invalid-parameters": {
+        "status": 422,
+        "title": "Unprocessable Content",
+        "description": "A parameter value does not suit its parameter (its type, its choices), a required one has no value, or the pipeline has no parameter of that name.",
+        "operations": [
+          "startBackfill"
         ]
       },
       "workspace-not-ready": {
@@ -2679,6 +2917,55 @@
               "type": "string"
             },
             "description": "Event types its runs send."
+          },
+          "parameters": {
+            "type": "array",
+            "description": "Its run parameters (a backfill's `parameters` gives their values; a run takes each one's default otherwise).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "date",
+                    "datetime",
+                    "text",
+                    "number",
+                    "boolean",
+                    "choice"
+                  ]
+                },
+                "label": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "default": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean",
+                    "null"
+                  ]
+                },
+                "choices": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
           }
         }
       },
@@ -2832,6 +3119,232 @@
               "api",
               "console"
             ]
+          }
+        }
+      },
+      "BackfillRequest": {
+        "type": "object",
+        "required": [
+          "from",
+          "to"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date",
+            "description": "The first day, in the workspace's billing time zone."
+          },
+          "to": {
+            "type": "string",
+            "format": "date",
+            "description": "The last day (included); not after today there."
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "hourly",
+              "weekly"
+            ],
+            "default": "daily",
+            "description": "One run per day, hour or week."
+          },
+          "concurrency": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "default": 2,
+            "description": "Runs in flight at once (the platform may allow fewer)."
+          },
+          "rerunCompleted": {
+            "type": "boolean",
+            "default": false,
+            "description": "Run again the periods that already have a completed run."
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "number",
+                "boolean"
+              ]
+            },
+            "description": "The pipeline's parameters by name (GET /pipelines/{pipelineId} lists them); one not given takes its default."
+          }
+        }
+      },
+      "Backfill": {
+        "type": "object",
+        "required": [
+          "backfillId",
+          "pipelineId",
+          "status",
+          "step",
+          "from",
+          "to",
+          "timeZone",
+          "concurrency",
+          "total",
+          "counts"
+        ],
+        "properties": {
+          "backfillId": {
+            "type": "string"
+          },
+          "pipelineId": {
+            "type": "string"
+          },
+          "pipelineName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "paused",
+              "cancelled",
+              "completed",
+              "failed"
+            ]
+          },
+          "step": {
+            "type": "string",
+            "enum": [
+              "daily",
+              "hourly",
+              "weekly"
+            ]
+          },
+          "from": {
+            "type": "string",
+            "format": "date"
+          },
+          "to": {
+            "type": "string",
+            "format": "date"
+          },
+          "timeZone": {
+            "type": "string",
+            "description": "The billing time zone its periods are counted in.",
+            "examples": [
+              "America/Chicago"
+            ]
+          },
+          "concurrency": {
+            "type": "integer"
+          },
+          "rerunCompleted": {
+            "type": "boolean"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The values given (normalised); the rest are the defaults."
+          },
+          "total": {
+            "type": "integer",
+            "description": "Its periods."
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "pending": {
+                "type": "integer"
+              },
+              "queued": {
+                "type": "integer",
+                "description": "Their runs are in flight."
+              },
+              "completed": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "skipped": {
+                "type": "integer",
+                "description": "Already had a completed run."
+              },
+              "cancelled": {
+                "type": "integer"
+              }
+            }
+          },
+          "waitingReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why nothing is queued just now, while it is running."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "estimatedEndAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "periods": {
+            "type": "array",
+            "description": "Its first 100 periods, oldest first (GET only).",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "start": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "queued",
+                    "completed",
+                    "failed",
+                    "skipped",
+                    "cancelled"
+                  ]
+                },
+                "runId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "note": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
           }
         }
       },

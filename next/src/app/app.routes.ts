@@ -330,6 +330,14 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-347: Runs › Backfills -- a schedule run for each period of a past range; Schedules' page (sourceJob.json/backfills).
+        path: 'runs/backfills',
+        title: 'Backfills',
+        loadComponent: () => import('./features/runs/backfills/backfills').then(m => m.Backfills),
+        data: { pageKey: 'jobs' },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'runs/analytics',
         title: 'Run analytics',
         loadComponent: () =>

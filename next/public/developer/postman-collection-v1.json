@@ -480,6 +480,112 @@
       ]
     },
     {
+      "name": "backfills",
+      "description": "Running a pipeline once for each day, hour or week of a past range.",
+      "item": [
+        {
+          "name": "Run a pipeline once for each day (hour, week) of a past range, a few at a time.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pipelines/:pipelineId/backfills",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipelines",
+                ":pipelineId",
+                "backfills"
+              ],
+              "variable": [
+                {
+                  "key": "pipelineId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Run a pipeline once for each day (hour, week) of a past range, a few at a time.\n\nMakes a backfill: one run of the pipeline for each period of `from`..`to` (both days included), counted in the workspace's billing time zone (America/Chicago unless set) -- a day is midnight to midnight there, so 23 or 25 hours on a daylight-saving day; an hour is a clock hour; a week is seven days from each start day. Each run's steps read `{{run.date}}` (the period's day), `{{run.windowStart}}` and `{{run.windowEnd}}` (its bounds, RFC 3339 with the zone's offset) and every `{{param.name}}` of `parameters`. At most 366 periods, and nothing that has not begun yet. A period that already has a completed run of the pipeline (a scheduled run whose slot falls in it, or an earlier backfill's) is skipped unless `rerunCompleted` is true. Answered once the backfill is made; its runs are queued gradually, at most `concurrency` at a time (1 to 4, as the platform's memory budget allows), beside the pipeline's own runs, and each is billed as any run. Refused (409, the problem's `type` says why) when the workspace already has 3 open backfills (`too-many-backfills`), a period is in another open backfill of the pipeline (`backfill-overlaps`), every period already has a completed run (`nothing-to-run`), the pipeline is inactive (`pipeline-inactive`) or has no steps (`pipeline-not-backfillable`); 422 (`invalid-parameters`) when a value does not suit its parameter.\n\noperationId: startBackfill",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"from\": \"2026-10-06\",\n  \"to\": \"2026-10-06\",\n  \"step\": \"daily\",\n  \"concurrency\": 2,\n  \"rerunCompleted\": false,\n  \"parameters\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "A backfill, its progress and its periods.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/backfills/:backfillId",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "backfills",
+                ":backfillId"
+              ],
+              "variable": [
+                {
+                  "key": "backfillId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "A backfill, its progress and its periods.\n\nThe backfill's status (`running`, `paused`, `cancelled`, `completed` -- every period completed or skipped --, or `failed` -- at least one period failed), how many periods are in each state, why it waits when it does (`waitingReason`: the workspace is suspended, the pipeline is switched off), when it should end, and its first 100 periods with each one's run (follow a run as any run, `GET /runs/{runId}`). A failed period keeps its run's last message as `note`.\n\noperationId: getBackfill"
+          },
+          "response": []
+        },
+        {
+          "name": "Cancel a backfill.",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/backfills/:backfillId/cancel",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "backfills",
+                ":backfillId",
+                "cancel"
+              ],
+              "variable": [
+                {
+                  "key": "backfillId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "Cancel a backfill.\n\nNothing more is queued: its waiting periods are cancelled. The runs already started finish and are recorded on their periods. Refused (409 `backfill-closed`) when the backfill has ended already.\n\noperationId: cancelBackfill"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
       "name": "files",
       "description": "Uploading and downloading files.",
       "item": [

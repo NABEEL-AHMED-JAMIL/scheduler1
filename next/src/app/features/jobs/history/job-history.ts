@@ -9,6 +9,7 @@ import { ReviewWaiting } from './review-waiting';
 import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { openBackfill } from '../../runs/backfills/backfill-open';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { isMissingRecord } from '../../../core/api/missing-record';
 import { TableShell } from '../../../shared/ui/data-table';
@@ -153,6 +154,21 @@ export class JobHistory {
   private readonly explorerApi = inject(RunExplorerApi);
   /** Runs opened from the menu: no schedule, no dashboard drill-down. */
   readonly explorer = computed(() => !this.jobId() && !this.isDrillDown());
+
+  /** MIG-347: Backfill… is running the schedule: whoever holds Schedules. */
+  readonly canBackfill = computed(() => this.auth.canOpen?.('jobs') ?? false);
+
+  /** MIG-347: this schedule run for each day of a past range; a started one opens in Runs › Backfills. */
+  backfill(): void {
+    const jobId = Number(this.jobId());
+    if (!jobId) return;
+    const name = this.jobName() || `Schedule #${jobId}`;
+    openBackfill(this.dialog, { jobId, jobName: name, readsCosts: this.auth.isTenantAdmin() }).then(started => {
+      if (!started) return;
+      this.toast.success(`Backfill #${started.backfillId} of ${name} started: ${started.total} period(s).`);
+      this.router.navigate(['/runs/backfills'], { queryParams: { backfill: started.backfillId } });
+    });
+  }
   readonly explorerFilter = signal<ExplorerFilter>(NO_FILTER);
   readonly facets = signal<RunFacets | null>(null);
   readonly facetsLoading = signal(false);

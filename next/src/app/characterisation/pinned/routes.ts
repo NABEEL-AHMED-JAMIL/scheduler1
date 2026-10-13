@@ -318,6 +318,15 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/runs/backfills",
+      "title": "Backfills",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/runs/analytics",
       "title": "Run analytics",
       "pageKey": "reports",

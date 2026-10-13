@@ -29,6 +29,11 @@
             </app-field>
           </div>
         </app-section>
+        <!-- MIG-347: the run parameters every step may read. -->
+        <app-section title="Run parameters" [sub]="parameterHint" id="pipeline-parameters">
+          <app-parameter-editor [parameters]="draft().parameters ?? []" [disabled]="!canManage()" [problems]="problems()"
+                                (changed)="setParameters($event)" />
+        </app-section>
         <app-section title="Run defaults" sub="What every step inherits unless its own panel says otherwise.">
           <div class="form-grid">
             <app-field label="Keep datasets (hours)" for="defRetention" [error]="settingProblem('settings.datasetRetentionHours')"

@@ -151,6 +151,12 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly related = computed<{ label: string; icon: string; link: string; query?: Record<string, string>; test: string }[]>(() => {
     const job = this.job();
     const out: { label: string; icon: string; link: string; query?: Record<string, string>; test: string }[] = [];
+    // MIG-347: a backfill's run says so first: which backfill, and the date it ran for.
+    const backfill = this.backfill();
+    if (backfill) {
+      out.push({ label: `Part of backfill #${backfill.backfillId}${backfill.date ? ` (${backfill.date})` : ''}`, icon: 'layers',
+        link: '/runs/backfills', query: { backfill: String(backfill.backfillId) }, test: 'backfill' });
+    }
     if (this.canOpenSchedule()) out.push({ label: 'All runs of this schedule', icon: 'history', link: `/pipelines/schedules/${this.jobId()}/executions`, test: 'schedule' });
     const taskDetailId = job?.taskDetail?.taskDetailId;
     const pipeline = job?.taskDetail?.taskName;
@@ -555,6 +561,20 @@ export class JobLogs implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.load();
     this.listen();
+    this.readBackfill();
+  }
+
+  /** MIG-347: the backfill this run is part of, if any -- asked once (Schedules' read; nothing for a reader without it). */
+  readonly backfill = signal<{ backfillId: number; date: string | null } | null>(null);
+
+  private readBackfill(): void {
+    const run = Number(this.jobQueueId());
+    if (!run || !this.canOpenSchedule()) return;
+    this.http.get<ApiResponse<{ backfillId: number; date: string | null } | null>>(`${API_BASE}/sourceJob.json/backfills/ofRun`,
+      { params: { jobQueueId: String(run) } }).subscribe({
+        next: r => this.backfill.set(r?.status === 'SUCCESS' && r.data?.backfillId ? r.data : null),
+        error: () => this.backfill.set(null),
+      });
   }
 
   /**

@@ -106,7 +106,8 @@ describe('tab hubs: the strip lists the tabs the reader may open', () => {
   });
 
   it('Latest shows for whoever holds Schedules or Runs by date; By date for Runs by date only', () => {
-    expect(strip('/runs/latest', 'TENANT_USER', ['jobs', 'reports'])).toEqual(['Latest (open)', 'Analytics']);
+    // MIG-347: Backfills is Schedules' (a schedule run for each period of a past range).
+    expect(strip('/runs/latest', 'TENANT_USER', ['jobs', 'reports'])).toEqual(['Latest (open)', 'Analytics', 'Backfills']);
     // MIG-355: Runs › Failed is the Queue's too.
     expect(strip('/runs/by-date', 'TENANT_USER', ['queue', 'reports'])).toEqual(['Latest', 'By date (open)', 'Analytics', 'Failed']);
   });

@@ -3,6 +3,10 @@
        the title names the schedule. The screen people watch while a job runs: it follows the job-status feed (the Live dot
        in Refresh), and Refresh stays for when the feed is down. -->
   <app-page-header [title]="jobId() ? (jobName() ? jobName() + ' · runs' : 'Schedule runs') : 'Runs'">
+    <!-- MIG-347: the schedule's own page offers its backfill, as its row's menu does. -->
+    @if (jobId() && !isDrillDown() && canBackfill()) {
+      <button type="button" class="btn btn-default btn-sm" (click)="backfill()" data-test="backfill-open"><app-icon name="layers" />Backfill…</button>
+    }
     <app-refresh-button [loading]="loading()" [live]="live()" (refresh)="load()" />
     <p subtitle class="page-subtitle">
       @if (isDrillDown()) {

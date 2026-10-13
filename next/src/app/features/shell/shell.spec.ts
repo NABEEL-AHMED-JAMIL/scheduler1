@@ -57,7 +57,8 @@ describe('shell navigation', () => {
       '/connections/databases', '/connections/sources', '/data/analytics', '/data/analytics/dashboards', '/data/ask',
       '/data/catalog', '/data/files', '/data/reports', '/developers/portal', '/documents/datasets', '/documents/email-in',
       '/documents/file-drop', '/documents/in', '/documents/review', '/documents/types', '/forms/builder', '/forms/submissions',
-      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/runs/analytics', '/runs/by-date', '/runs/failed', '/runs/latest',
+      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/runs/analytics', '/runs/backfills', '/runs/by-date', '/runs/failed',
+      '/runs/latest',
       '/settings/tools', '/tools/converter', '/tools/transcript', '/workflows/designer', '/workflows/inbox',
       '/workflows/requests',
     ]);
@@ -84,7 +85,8 @@ describe('shell navigation', () => {
     expect(shown.map(child => child.path)).toEqual(['/pipelines', '/runs']);
     const access = TestBed.inject(NavAccess);
     expect(access.tabsOf(shown[0]).map(t => t.path)).toEqual(['/pipelines/schedules']);
-    expect(access.tabsOf(shown[1]).map(t => t.path)).toEqual(['/runs/latest', '/runs/by-date', '/runs/failed']);
+    // MIG-347: and Backfills, which is Schedules'.
+    expect(access.tabsOf(shown[1]).map(t => t.path)).toEqual(['/runs/latest', '/runs/by-date', '/runs/failed', '/runs/backfills']);
     expect(restricted.nav().map(item => item.label)).not.toContain('See results');
     expect(restricted.nav().map(item => item.label)).not.toContain('Get data in');
     // Dashboard is not a page a profile can take away.

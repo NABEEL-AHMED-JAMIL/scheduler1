@@ -81,6 +81,27 @@ describe('Run with…', () => {
     expect(close).not.toHaveBeenCalled();
   });
 
+  /** MIG-347: a pipeline's run parameters, typed, starting at their defaults; only what differs is sent. */
+  it('asks for the pipeline\'s parameters and sends the values that differ from the defaults', () => {
+    const { fixture, http, ask, el, close } = openDialog();
+    ask.flush({ status: API_SUCCESS, data: { jobId: 2849, taskDetailId: 1865, steps: [], parameters: [
+      { name: 'region', type: 'choice', choices: ['north', 'south'], default: 'north' },
+      { name: 'since', type: 'date', required: true, label: 'Read from' }] } });
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Run with…');
+    expect(el.querySelector('[data-test="run-parameters"]')).toBeTruthy();
+    expect(button(el, 'Run')!.disabled).toBe(true);
+    const component = fixture.componentInstance;
+    component.values.set({ region: 'south', since: '2026-10-01' });
+    fixture.detectChanges();
+    expect(button(el, 'Run')!.disabled).toBe(false);
+    button(el, 'Run')!.click();
+    const run = http.expectOne(r => r.url.endsWith('/sourceJob.json/runSourceJobWith'));
+    expect(run.request.body).toEqual({ jobId: 2849, steps: [], parameters: { region: 'south', since: '2026-10-01' } });
+    run.flush({ status: API_SUCCESS, message: 'SourceJob job successfully added into queue.' });
+    expect(close).toHaveBeenCalledWith(true);
+  });
+
   it('says there is nothing to choose for a pipeline with no AI step, and offers no Run', () => {
     const { fixture, ask, el } = openDialog();
     ask.flush({ status: API_SUCCESS, message: '0 AI step(s).', data: { jobId: 2849, taskDetailId: 1865, steps: [] } });

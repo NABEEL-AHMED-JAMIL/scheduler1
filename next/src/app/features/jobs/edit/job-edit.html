@@ -2,6 +2,10 @@
   <!-- UX review 2026-10-12 (A2): the schedule's name as the title; the breadcrumb leads back to the schedules. -->
   <app-page-header [title]="heading()" subtitle="Choose a pipeline, say when it should run, and who hears how it went.">
     @if (isEdit() && loadedName()) { <app-status pills [label]="jobStatusValue()" /> }
+    <!-- MIG-347: a saved, active schedule's backfill, as its row's menu offers it. -->
+    @if (isEdit() && loadedName() && jobStatusValue() === 'Active') {
+      <button type="button" class="btn btn-default btn-sm" (click)="backfill()" data-test="backfill-open"><app-icon name="layers" />Backfill…</button>
+    }
   </app-page-header>
   <app-managed-banner what="schedules" />
 

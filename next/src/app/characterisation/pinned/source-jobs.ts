@@ -97,6 +97,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "buttons": [
       "Ask about this schedule",
+      "Backfill…",
       "Collapse job detail",
       "Columns",
       "Completed 1",
@@ -190,6 +191,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /sourceJob.json/findSourceJobAuditLog?jobId=2833&jobQueueId=7331",
+      "GET /sourceJob.json/backfills/ofRun?jobQueueId=7331",
       "GET /aiPrompt.json/runsForJob?jobQueueId=7331",
       "GET /billing.json/runCost?jobQueueId=7331",
       "GET /sourceJob.json/stepExecutions?jobQueueId=7331",
@@ -276,6 +278,7 @@ export const PINNED: Record<string, unknown> = {
       "Emails"
     ],
     "buttons": [
+      "Backfill…",
       "Clear",
       "On a timetable",
       "Only when started",
@@ -352,6 +355,7 @@ export const PINNED: Record<string, unknown> = {
       "/pipelines/schedules/2838/runs/7382",
       "/runs",
       "/runs/analytics",
+      "/runs/backfills",
       "/runs/by-date",
       "/runs/failed",
       "/runs/latest"
@@ -504,6 +508,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [],
     "buttons": [
       "Ask about this schedule",
+      "Backfill…",
       "Deactivate",
       "Delete",
       "Duplicate",
@@ -521,6 +526,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "items": [
       "Run now",
+      "Backfill…",
       "Skip next run",
       "Edit",
       "Executions",
@@ -535,6 +541,7 @@ export const PINNED: Record<string, unknown> = {
     "headings": [],
     "buttons": [
       "Ask about this schedule",
+      "Backfill…",
       "Deactivate",
       "Delete",
       "Duplicate",
@@ -552,6 +559,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "items": [
       "Run now",
+      "Backfill…",
       "Skip next run",
       "Edit",
       "Executions",

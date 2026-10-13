@@ -16,8 +16,10 @@ import {
   Definition, DefinitionView, LIMITS, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
-  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, DocumentTypeChoice, usesDocumentType,
+  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
 } from './steps.model';
+import { ParameterEditor } from './parameter-editor';
+import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
 import { PipelineDraftHandoff } from './draft-handoff';
 import { SENSITIVITY_LEVELS, sensitivityText } from '../../../shared/ui/sensitivity';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
@@ -58,7 +60,7 @@ type Tone = 'ok' | 'warn' | 'crit';
  */
 @Component({
   selector: 'app-step-builder',
-  imports: [Icon, Field, Combobox, ServerTimePipe, Segmented, RouterLink, Section],
+  imports: [Icon, Field, Combobox, ServerTimePipe, Segmented, RouterLink, Section, ParameterEditor],
   templateUrl: './step-builder.html',
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
@@ -434,6 +436,12 @@ export class StepBuilder implements OnInit {
   // ------------------------------------------------------------------------------------------ settings
 
   setSource(type: string): void { this.draft.update(d => updateSource(d, type)); }
+
+  /** MIG-347: the pipeline's run parameters, as the editor leaves them. */
+  setParameters(parameters: RunParameter[]): void { this.draft.update(d => updateParameters(d, parameters)); }
+
+  /** The braces a step names a parameter with, said in the section's line (Angular would read them as its own). */
+  readonly parameterHint = 'What a run is given (by Run with…, a backfill or the API); a scheduled run takes the defaults. A step reads one as {{param.name}}, and any run its day as {{run.date}}.';
 
   setSetting(field: keyof Settings, raw: string): void {
     let value: string | number | null = raw;
