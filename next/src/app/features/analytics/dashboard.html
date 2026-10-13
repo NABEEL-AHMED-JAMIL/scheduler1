@@ -21,7 +21,7 @@
 
     @if (!canEdit()) {
       <!-- UX review 2026-10-12: a viewer reads the boards; changing them is another page's. -->
-      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page -- ask your workspace admin.</p>
+      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page; ask your workspace admin.</p>
     }
     @if (createOpen() && canEdit()) {
       <div class="card p-4 flex flex-wrap items-end gap-2">

@@ -77,11 +77,19 @@ export const PROGRESS_MS = [1000, 2000] as const;
   imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, RunFollow,
     FlowPanel, TracePanel, ChartAnswerSlot, ConversationList],
   templateUrl: './assistant.html',
+  // Escape closes the history laid over the thread, as it closes a side panel.
+  host: { '(document:keydown.escape)': 'historyOpen.set(false)' },
   // The page's own layout, kept with the page (lazy) rather than as new global utilities.
   styles: [`
     .ai-grid { position: relative; display: grid; gap: 1rem; align-items: stretch; }
     .ai-history { display: none; flex-direction: column; min-height: 0; }
-    .ai-history.open { display: flex; position: absolute; z-index: 20; top: 0; bottom: 0; left: 0; width: 18rem; }
+    /* Below 1280 the list opens over the thread as the console's side panels do (UX review 2026-10-12, A9): the pane's
+       full height, flush with its edge, a backdrop that closes it, and the same short slide in. */
+    .ai-history.open { display: flex; position: absolute; z-index: 21; top: 0; bottom: 0; left: 0; width: min(22rem, 90%);
+      border-radius: 0 var(--radius-lg) var(--radius-lg) 0; animation: ai-history-slide 180ms ease-out; }
+    .ai-history-backdrop { position: absolute; inset: 0; z-index: 20; background: var(--scrim); border-radius: var(--radius-lg); }
+    @keyframes ai-history-slide { from { transform: translateX(-1.5rem); opacity: 0; } to { transform: none; opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { .ai-history.open { animation: none; } }
     .ai-list { padding: 0.375rem; min-height: 0; }
     .ai-thread { min-height: 30rem; }
     .ai-result { min-height: 34rem; }
@@ -97,7 +105,8 @@ export const PROGRESS_MS = [1000, 2000] as const;
     }
     @media (min-width: 1280px) {
       .ai-grid { grid-template-columns: 15rem minmax(26rem, 0.95fr) minmax(30rem, 1.15fr); }
-      .ai-history, .ai-history.open { display: flex; position: static; width: auto; box-shadow: none; }
+      .ai-history, .ai-history.open { display: flex; position: static; width: auto; box-shadow: none; border-radius: var(--radius-lg); animation: none; }
+      .ai-history-backdrop { display: none; }
     }
     @media (min-width: 1536px) { .ai-facts { display: inline; } }
   `],

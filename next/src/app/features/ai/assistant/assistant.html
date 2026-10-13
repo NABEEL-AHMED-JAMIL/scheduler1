@@ -41,7 +41,8 @@
 
   <div class="ai-grid">
 
-    <!-- History: beside the thread on wide screens; over it, on asking, below. -->
+    <!-- History: beside the thread on wide screens; over it, on asking, below -- with a backdrop that closes it. -->
+    @if (historyOpen()) { <div class="ai-history-backdrop" data-test="history-backdrop" (click)="historyOpen.set(false)"></div> }
     <aside class="ai-history card p-0" aria-labelledby="assistant-recent" [class.open]="historyOpen()" [class.shadow-xl]="historyOpen()">
       <app-conversation-list [recent]="conversations()" [activeId]="conversation()?.conversationId ?? null" [disabled]="!!working()"
                              (opened)="open($event)" (remove)="remove($event)" (closed)="historyOpen.set(false)"
