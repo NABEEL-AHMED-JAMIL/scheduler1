@@ -842,9 +842,12 @@ export class Dashboards implements OnInit, OnDestroy {
   /** How the last pass went, for the board's facts line: "6 of 7 drew, 1 failed". */
   readonly lastRun = computed(() => {
     if (this.running()) return this.progress();
-    if (!this.ranCount() && !this.failedCount()) return '';
-    return `${this.ranCount()} of ${this.widgets().length} drew`
-      + (this.failedCount() ? `, ${this.failedCount()} failed` : '');
+    // A table widget reads its own pages (board-table): it counts as drawn once its page is in.
+    const reads = Object.values(this.tableReads());
+    const drew = this.ranCount() + reads.filter(read => read.state === 'done').length;
+    const failed = this.failedCount() + reads.filter(read => read.state === 'failed').length;
+    if (!drew && !failed) return '';
+    return `${drew} of ${this.widgets().length} drew` + (failed ? `, ${failed} failed` : '');
   });
 
   /** A run's state as the shared tile chrome names it; a result with no rows is 'empty'. */
