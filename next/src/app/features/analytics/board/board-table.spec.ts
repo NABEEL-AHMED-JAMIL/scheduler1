@@ -204,3 +204,14 @@ describe('a figure with its trend', () => {
     expect(sparkPaths([5]).line).toBe('');
   });
 });
+
+describe('a KPI tile over a saved statement', () => {
+  it('is a single figure when the statement returns one row of one number', async () => {
+    const { queryView } = await import('../widget-view');
+    const one = queryView({ columns: ['Encounters'], rows: [['101766']], rowCount: 1, truncated: false });
+    expect(one.issues.kpi).toBe('');
+    const many = queryView({ columns: ['month', 'n'], rows: [['Jan', '1'], ['Feb', '2']], rowCount: 2, truncated: false });
+    expect(many.issues.kpi).toContain('needs one row');
+    expect(many.issues.kpiTrend).toBe('');
+  });
+});

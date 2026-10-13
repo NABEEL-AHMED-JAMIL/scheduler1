@@ -1026,8 +1026,11 @@ export function queryView(result: QueryResult, additive?: boolean | null): Widge
   // MIG-357: unless the caller KNOWS -- a chart answer's query was read for its aggregates (a count or a sum adds up; an
   // average, a rate or a division does not) and a widget pinned from one keeps that verdict (WidgetConfig.additive).
   const known = additive === true || additive === false;
+  // The shape the single figure reads: a statement returning one row of one number IS a single figure, though it has
+  // no label to make a mark of (a KPI tile's `SELECT count(*) FROM dataset` was refused as "returned 0").
   const issues = issuesFor(
-    value && value.negative ? [] : marks, reason, known ? additive : 'unknown', 'this measure');
+    value && value.negative ? [] : marks, reason, known ? additive : 'unknown', 'this measure',
+    { rowCount: allRows.length, columnCount: columns.length });
 
   return withChartTable({
     columns,
