@@ -88,6 +88,19 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('multi') {
+            <!-- UX review 2026-10-12: a list of fixed choices, one checkbox each, in the schema's order. -->
+            <app-field [label]="f.label" [for]="idOf(f) + '-0'" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
+              <div class="flex flex-wrap gap-x-4 gap-y-1.5" role="group" [attr.aria-label]="f.label" [attr.data-multi]="f.name">
+                @for (option of f.options; track $index) {
+                  <label class="flex items-center gap-2 text-sm">
+                    <input type="checkbox" class="checkbox" [id]="idOf(f) + '-' + $index" [checked]="multiHas(f, option)" [disabled]="disabled()"
+                           (change)="toggleMulti(f, option, $any($event.target).checked)" />{{ optionText(option) }}
+                  </label>
+                }
+              </div>
+            </app-field>
+          }
           @case ('step') {
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [hint]="f.description" [error]="errorOf(f)">
               <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" (change)="set(f.name, $any($event.target).value || undefined)">
@@ -314,6 +327,21 @@ export class SchemaForm {
     const next = withValue(this.current(), name, value);
     this.current.set(next);
     this.valueChange.emit(next);
+  }
+
+  /** UX review 2026-10-12: whether a list of fixed choices holds this one. */
+  multiHas(f: FieldSpec, option: unknown): boolean {
+    const value = this.current()[f.name];
+    return Array.isArray(value) && value.includes(option);
+  }
+
+  /** A choice ticked or cleared: the list keeps the schema's order, and an empty list leaves the setting out (its default). */
+  toggleMulti(f: FieldSpec, option: unknown, on: boolean): void {
+    const value = this.current()[f.name];
+    const held = new Set(Array.isArray(value) ? value : []);
+    if (on) held.add(option); else held.delete(option);
+    const next = f.options.filter(o => held.has(o));
+    this.set(f.name, next.length ? next : undefined);
   }
 
   webhookListed(f: FieldSpec): boolean {

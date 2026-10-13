@@ -634,7 +634,7 @@ export function inputColumns(definition: Definition, index: number, tasks: StepT
 
 // ---------------------------------------------------------------------------------------------- a config form
 
-export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'list' | 'objects' | 'object' | 'json'
+export type FieldKind = 'text' | 'textarea' | 'number' | 'integer' | 'boolean' | 'enum' | 'multi' | 'list' | 'objects' | 'object' | 'json'
   | 'scalar' | 'column' | 'step' | 'columns' | 'prompt' | 'bucket' | 'webhook' | 'document-type';
 
 /** MIG-245: a saved AI prompt a step may name: its id, and its name as the choice shows it. */
@@ -715,6 +715,9 @@ function kindOf(schema: JsonSchema): FieldKind {
     case 'boolean': return 'boolean';
     case 'array': {
       const items = schema.items;
+      // UX review 2026-10-12 (MIG-364 leftover): a list of fixed choices -- read_documents' statuses -- is a set of
+      // checkboxes, not a raw JSON box.
+      if (items && Array.isArray(items.enum) && items.enum.length && items.enum.every(v => typeof v === 'string')) return 'multi';
       if (!items || items.enum) return 'json';
       if (typeOf(items) === 'string' && items.format === 'column') return 'columns';
       if (['string', 'number', 'integer'].includes(typeOf(items)) || isScalarMix(items)) return 'list';
@@ -736,7 +739,7 @@ export function fieldsOf(schema: JsonSchema | null | undefined): FieldSpec[] {
       label: property.title || name,
       required: required.includes(name),
       description: property.description ?? '',
-      options: kind === 'enum' ? [...(property.enum ?? [])] : [],
+      options: kind === 'enum' ? [...(property.enum ?? [])] : kind === 'multi' ? [...(property.items?.enum ?? [])] : [],
     };
     if (kind === 'list') {
       const item = property.items;

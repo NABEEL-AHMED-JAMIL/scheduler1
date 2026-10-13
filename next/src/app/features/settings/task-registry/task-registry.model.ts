@@ -149,7 +149,7 @@ export interface ReadableField {
 }
 
 const KIND_WORDS: Record<FieldKind, string> = {
-  text: 'Text', textarea: 'Long text', number: 'Number', integer: 'Whole number', boolean: 'Yes or no', enum: 'One of',
+  text: 'Text', textarea: 'Long text', number: 'Number', integer: 'Whole number', boolean: 'Yes or no', enum: 'One of', multi: 'Any of',
   list: 'List', objects: 'Repeatable group', object: 'Group', json: 'JSON', scalar: 'Text, number or yes/no',
   column: 'Column', step: 'Earlier step', columns: 'Columns', prompt: 'AI prompt', bucket: 'Bucket', webhook: 'Webhook',
   'document-type': 'Document type',
@@ -175,6 +175,7 @@ function notesOf(kind: FieldKind, schema: JsonSchema): string[] {
   const notes: string[] = [];
   if (schema.default !== undefined && schema.default !== '') notes.push(`Default: ${shown(schema.default)}`);
   if (kind === 'enum') notes.push(`Choices: ${(schema.enum ?? []).map(shown).join(', ')}`);
+  if (kind === 'multi') notes.push(`Choices: ${(schema.items?.enum ?? []).map(shown).join(', ')}`);
   if (schema.minimum !== undefined || schema.maximum !== undefined) {
     notes.push(schema.maximum === undefined ? `At least ${schema.minimum}`
       : schema.minimum === undefined ? `At most ${schema.maximum}` : `${schema.minimum} to ${schema.maximum}`);
