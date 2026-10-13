@@ -30,6 +30,7 @@
             <app-icon name="alert" size="0.95em" class="mt-px shrink-0" />{{ message }}</p>
         }
       </section>
+      <app-run-approval [now]="now()" (decided)="decided()" />
       <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" (reviewChange)="review.set($event)" />
     </div>
   }
@@ -75,7 +76,8 @@
     }
     @case ('log') {
       <app-run-log [entries]="logs()" [loading]="loading()" [error]="error()" [bucket]="bucket()" [follow]="autoRefreshing()"
-                   [fileName]="'run-' + jobQueueId()" [(step)]="logStep">
+                   [fileName]="'run-' + jobQueueId()" [(step)]="logStep"
+                   [names]="approvals.logNames()">
         <ng-container toolbar>
           @if (hasInsights()) {
             <button type="button" class="btn btn-default btn-xs" [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"

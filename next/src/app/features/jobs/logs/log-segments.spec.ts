@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { logSegments, pathParts } from './log-segments';
+import { LogNames, logSegments, nameIds, pathParts } from './log-segments';
 
 /**
  * MIG-212: a log line names the files a run read and wrote. They were plain text, broken
@@ -46,5 +46,41 @@ describe('logSegments', () => {
   it('breaks a long path only after a slash', () => {
     expect(pathParts('e2e/verify/json/orders.json')).toEqual(['e2e/', 'verify/', 'json/', 'orders.json']);
     expect(pathParts('sales/in/')).toEqual(['sales/', 'in/']);
+  });
+});
+
+/**
+ * Run page polish 2026-10-12: an Approval step's lines named the group and the request by id ("waits for approval by the
+ * group 1063 (request 1006)"). The group reads by its name and the request opens the reader's task; an id the reader has
+ * no name for stays as written, so an old line reads as it always did.
+ */
+describe('nameIds', () => {
+  const NAMES: LogNames = { groups: new Map([['1063', 'Reviewer']]), requests: new Map([['1006', { taskId: 1136 }]]) };
+  const LINE = 'Step 2/3 <approve> (approval) waits for approval by the group 1063 (request 1006): Approve 3 bulk-review test rows of run 8298';
+
+  it('puts the group\'s name for its id, and links the request to the reader\'s task', () => {
+    expect(nameIds([{ text: LINE }], NAMES)).toEqual([
+      { text: 'Step 2/3 <approve> (approval) waits for approval by the Reviewer group (' },
+      { text: 'request 1006', link: { url: '/workflows/inbox', query: { task: '1136' }, title: 'Open this request in your Review inbox' } },
+      { text: '): Approve 3 bulk-review test rows of run 8298' },
+    ]);
+  });
+
+  it('names a role as its people', () => {
+    expect(nameIds([{ text: 'Waiting for approval by the role TENANT_USER (request 7, in their Task inbox)' }], NAMES))
+      .toEqual([{ text: 'Waiting for approval by the workspace users (request 7, in their Task inbox)' }]);
+  });
+
+  it('keeps an id it has no name for, and a line with no names, as written', () => {
+    const none: LogNames = { groups: new Map(), requests: new Map() };
+    expect(nameIds([{ text: LINE }], none)).toEqual([{ text: LINE }]);
+    expect(nameIds([{ text: LINE }], null)).toEqual([{ text: LINE }]);
+  });
+
+  it('leaves the paths it was given alone', () => {
+    const segments = logSegments('Wrote out/request 1006.csv for the group 1063', 'b');
+    const named = nameIds(segments, NAMES);
+    expect(named.filter(s => s.path).map(s => s.text)).toEqual(segments.filter(s => s.path).map(s => s.text));
+    expect(named.map(s => s.text).join('')).toContain('the Reviewer group');
   });
 });

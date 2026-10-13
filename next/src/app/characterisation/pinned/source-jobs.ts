@@ -200,7 +200,6 @@ export const PINNED: Record<string, unknown> = {
       "Log"
     ],
     "buttons": [
-      "AI answers",
       "Copy the shown lines",
       "Download the shown lines",
       "Errors 0",
@@ -223,6 +222,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/billing/usage?run=7331",
       "/data/analytics/dashboards",
+      "/pipelines",
       "/pipelines/1854/edit?tab=steps",
       "/pipelines/schedules",
       "/pipelines/schedules/2833/executions"

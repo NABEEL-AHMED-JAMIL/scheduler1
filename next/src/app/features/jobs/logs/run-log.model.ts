@@ -162,5 +162,7 @@ export const RUN_LOG_STYLES = `
   .run-log-msg { min-width: 0; }
   .run-log-lines:not(.is-wrap) .run-log-msg { overflow: hidden; text-overflow: ellipsis; }
   .run-log-lines .log-path { color: var(--color-ink-50); text-decoration: underline; text-decoration-color: var(--color-ink-400); }
+  .run-log-lines .log-ref { color: var(--color-info-300); text-decoration: underline; text-decoration-color: var(--color-info-300); text-underline-offset: 2px; }
+  .run-log-lines .log-ref:hover { color: var(--color-ink-50); }
   .run-log-level-on { border-color: var(--accent-mark); }
 `;

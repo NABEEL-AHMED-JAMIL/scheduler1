@@ -87,23 +87,27 @@ export interface StepApproval {
   comment?: string | null;
 }
 
-/** MIG-346: who an approval goes to, in words. */
-export function approvalReviewers(approval: StepApproval): string {
+/**
+ * MIG-346: who an approval goes to, in words -- a group by its name when the reader may read it ("the Reviewer group"),
+ * else "the pipeline's reviewer group"; never its id (run page polish 2026-10-12).
+ */
+export function approvalReviewers(approval: StepApproval, groupNames: ReadonlyMap<string, string> = new Map()): string {
   const who = approval.reviewers;
   if (!who?.kind) return 'the workspace administrators';
   if (who.kind === 'role') return who.value === 'TENANT_USER' ? 'the workspace users' : 'the workspace administrators';
-  return `group ${who.value}`;
+  const name = who.value ? groupNames.get(String(who.value)) : undefined;
+  return name ? `the ${name} group` : 'the pipeline\'s reviewer group';
 }
 
 /** MIG-346: an approval's outcome as a sentence ("Approved by Ana Ruiz (user 4641): totals match"). */
-export function approvalOutcome(approval: StepApproval): string {
+export function approvalOutcome(approval: StepApproval, groupNames?: ReadonlyMap<string, string>): string {
   const said = approval.comment ? `: ${approval.comment}` : '';
   switch (approval.status) {
     case 'APPROVED': return `Approved by ${approval.decidedBy ?? 'a reviewer'}${said}`;
     case 'REJECTED': return `Rejected by ${approval.decidedBy ?? 'a reviewer'}${said}`;
     case 'EXPIRED': return 'Nobody decided in time; the request expired';
     case 'CANCELLED': return 'The run was closed before anyone decided';
-    default: return `Waiting for approval by ${approvalReviewers(approval)} in their Task inbox`;
+    default: return `Waiting for approval by ${approvalReviewers(approval, groupNames)} in their Review inbox`;
   }
 }
 

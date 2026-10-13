@@ -16,7 +16,7 @@ import { RunAiAnswers } from './run-ai-answers';
 import { AuthService } from '../../../core/auth/auth.service';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
-import { Crumb } from '../../../core/nav/nav-tree';
+import { Crumb, crumbsFor } from '../../../core/nav/nav-tree';
 import { RunTimelineStore } from '../run-steps/run-timeline.store';
 import { formatMoney } from '../../billing/billing-format';
 import { RunStepsTable } from '../run-steps/run-steps-table';
@@ -24,6 +24,10 @@ import { RunMap } from '../run-steps/run-map';
 import { RunOutputs } from '../run-steps/run-outputs';
 import { RunAiTrace } from '../run-steps/run-ai-trace';
 import { RunLog } from './run-log';
+import { RunApproval } from '../run-steps/run-approval';
+import { RunApprovalStore } from '../run-steps/run-approval.store';
+import { liveDuration } from '../run-steps/run-approval.model';
+import { stepKind } from '../run-steps/run-map';
 import { RUN_TABS, RunTab, runFacts, runStatusLook, runTabFromUrl, runTabUrl, startedBy } from '../run-steps/run-page.model';
 
 export type { RunTab } from '../run-steps/run-page.model';
@@ -40,18 +44,33 @@ interface AuditLog {
   dateCreated?: string;
 }
 
-/** What the strip says for a run that has not ended. */
-function stillRunningWord(status: string | null | undefined): string {
-  return status && !['Completed', 'Failed', 'Interrupt', 'Skip', 'Missed', 'Stop'].includes(status) ? 'Still running' : '—';
+/**
+ * The trail to a run, from the menu's tree (run page polish 2026-10-12): Build › Pipelines › Schedules & triggers › <the
+ * schedule's runs> for whoever may open Schedules; Run & review › Runs for a reader who holds only the runs (a reviewer);
+ * else Run & review › Review inbox. The page header adds "Run #8298".
+ */
+export function runTrail(jobId: string, jobName: string | null | undefined, can: { schedules: boolean; runs: boolean; inbox: boolean }): Crumb[] {
+  const above = (url: string) => crumbsFor(url, 'here').slice(0, -1);
+  if (can.schedules) {
+    return [...above(`/pipelines/schedules/${jobId}`),
+      { label: jobName ? `${jobName} · runs` : 'Schedule runs', link: `/pipelines/schedules/${jobId}/executions` }];
+  }
+  if (can.runs) return above('/runs/run');
+  return can.inbox ? above('/workflows/inbox/run') : [{ label: 'Run & review' }];
+}
+
+/** Whether the run's pipeline has AI steps: an AI step in its timeline, an AI trace, or an answer of the older AI steps. */
+export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unknown[] } | null, answers: number): boolean {
+  return answers > 0 || !!timeline?.aiSteps?.length || (timeline?.steps ?? []).some(s => stepKind(s.task) === 'ai');
 }
 
 @Component({
   selector: 'app-job-logs',
   imports: [PageHeader, RefreshButton, Icon, RouterLink, RankedBar, RunDecision, RunAiAnswers, RunStepsTable, RunMap,
-    RunOutputs, RunAiTrace, RunLog],
+    RunOutputs, RunAiTrace, RunLog, RunApproval],
   templateUrl: './job-logs.html',
   // One read of the run's steps and outputs for the whole page: the summary, every tab, the step log panel.
-  providers: [RunTimelineStore],
+  providers: [RunTimelineStore, RunApprovalStore],
   styles: `
     .run-top { display: grid; gap: 1rem; align-items: stretch; }
     @media (min-width: 1024px) { .run-top.has-next { grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); } }
@@ -116,14 +135,11 @@ export class JobLogs implements OnInit, OnDestroy {
    * Run & review › Schedules & triggers › <the schedule's runs> › Run #8214; for a reviewer, Run & review › Review inbox ›
    * Run #8214 -- the way they came.
    */
-  readonly trail = computed<Crumb[]>(() => this.canOpenSchedule() ? [
-    { label: 'Run & review' },
-    { label: 'Schedules & triggers', link: '/pipelines/schedules' },
-    { label: this.job()?.jobName ? `${this.job().jobName} · runs` : 'Schedule runs', link: `/pipelines/schedules/${this.jobId()}/executions` },
-  ] : [
-    { label: 'Run & review' },
-    ...(this.auth.canOpen('task-inbox') ? [{ label: 'Review inbox', link: '/workflows/inbox' }] : []),
-  ]);
+  readonly trail = computed<Crumb[]>(() => runTrail(this.jobId(), this.job()?.jobName, {
+    schedules: this.canOpenSchedule(),
+    runs: this.auth.canOpen('queue') || this.auth.canOpen('jobs'),
+    inbox: this.auth.canOpen('task-inbox'),
+  }));
 
   /**
    * UX review 2026-10-12 (R3, run page fix): the header's link row -- the run's schedule, its pipeline, the dashboards
@@ -151,8 +167,12 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly store = inject(RunTimelineStore);
   /** The run's review as Next steps read it, for the header's one pill. */
   readonly review = signal<RunReviewView | null>(null);
-  /** The Next steps box is drawn (the run's results need a review): the strip shares the row with it. */
-  readonly hasNext = computed(() => !!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED');
+  /** The run's Approval steps: the request it waits at, the reader's task about it, the groups' names. */
+  readonly approvals = inject(RunApprovalStore);
+  /** The Next steps box is drawn (the run waits for an approval, or its results need a review): the strip shares the row with it. */
+  readonly hasNext = computed(() => !!this.approvals.waiting() || (!!this.review() && this.review()!.reviewStatus !== 'NOT_REQUIRED'));
+  /** The page's clock: a running run's Duration and the Next steps' "7 h ago" move with it. */
+  readonly now = signal(Date.now());
   /** UX review 2026-10-12 (run page fix): the header's one status -- "Completed · waiting for review". */
   readonly statusLook = computed(() => runStatusLook(this.run()?.jobStatus, this.review()?.reviewStatus, !!this.store.timeline()?.waitingForApproval));
   /** The summary strip: only what the header does not say (no status, schedule or pipeline). */
@@ -160,7 +180,7 @@ export class JobLogs implements OnInit, OnDestroy {
     const run = this.run();
     return runFacts({
       start: run?.startTime ? this.clock.transform(run.startTime, 'recentSec') ?? '—' : '—',
-      end: run?.endTime ? this.clock.transform(run.endTime, 'recentSec') ?? '—' : stillRunningWord(run?.jobStatus),
+      end: run?.endTime ? this.clock.transform(run.endTime, 'recentSec') ?? '—' : '—',
       startHint: run?.startTime ? this.clock.transform(run.startTime, 'dateTimeSec') ?? undefined : undefined,
       endHint: run?.endTime ? this.clock.transform(run.endTime, 'dateTimeSec') ?? undefined : undefined,
       duration: this.duration(),
@@ -190,6 +210,8 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly closingMessage = computed(() => {
     const run = this.run();
     if (!run?.jobStatusMessage || run.jobStatus === 'Completed') return null;
+    // A run waiting at an Approval step is not in trouble: its Next steps say so, in amber, not this line in red.
+    if (this.approvals.waiting() || this.store.timeline()?.waitingForApproval || /^Waiting for approval\b/.test(run.jobStatusMessage)) return null;
     // A step that failed says it on its own row; the run's message would only say it again.
     const steps = this.store.timeline()?.steps ?? [];
     if (steps.some(s => s.status === 'Failed' || s.status === 'Interrupt')) return null;
@@ -204,10 +226,17 @@ export class JobLogs implements OnInit, OnDestroy {
     const snapshot = this.activated.snapshot;
     return runTabFromUrl(snapshot?.firstChild?.url?.at(-1)?.path ?? snapshot?.url?.at(-1)?.path, snapshot?.queryParamMap?.get('tab'));
   }
+  /**
+   * The AI answers tab is there only when the run's pipeline has AI steps (run page polish 2026-10-12): "This run has no AI
+   * steps" was a tab of its own on every other run. Until both reads are in, the tab is kept when the address asks for it.
+   */
+  readonly aiKnown = computed(() => this.aiStepsRead() && (!!this.store.timeline() || this.store.legacy() || this.store.readError()));
+  readonly hasAi = computed(() => runHasAi(this.store.timeline(), this.aiSteps().length));
   readonly tabs = computed(() => [
     { id: 'steps' as RunTab, label: 'Steps', icon: 'list' },
     { id: 'map' as RunTab, label: 'Map', icon: 'layers' },
-    { id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' },
+    ...(this.hasAi() || (!this.aiKnown() && this.tab() === 'ai')
+      ? [{ id: 'ai' as RunTab, label: this.aiSteps().length ? `AI answers (${this.aiSteps().length})` : 'AI answers', icon: 'sparkle' }] : []),
     { id: 'outputs' as RunTab, label: this.store.outputList().length ? `Outputs (${this.store.outputList().length})` : 'Outputs', icon: 'file' },
     { id: 'log' as RunTab, label: this.logs().length ? `Log (${this.logs().length.toLocaleString('en-GB')})` : 'Log', icon: 'terminal' },
   ]);
@@ -233,6 +262,8 @@ export class JobLogs implements OnInit, OnDestroy {
 
   /** The pipeline's AI steps for this run, with what each answered; empty when it has none. */
   readonly aiSteps = signal<{ run: any; promptName?: string }[]>([]);
+  /** The AI answers have been read (or could not be): with the steps, the page knows whether the run has AI steps. */
+  readonly aiStepsRead = signal(false);
 
   /** The bucket the run's task reads and writes, which a path in a log line is relative to. */
   readonly bucket = computed<string | null>(() => this.job()?.taskDetail?.bucket ?? null);
@@ -265,7 +296,7 @@ export class JobLogs implements OnInit, OnDestroy {
       const key = `${this.jobId()}/${this.jobQueueId()}`;
       if (shown !== null && shown !== key) untracked(() => {
         this.logs.set([]); this.job.set(null); this.run.set(null); this.review.set(null); this.aiSteps.set([]);
-        this.aiStepsLoadedFor = null; this.costFor = null; this.cost.set(null); this.missing.set(false);
+        this.aiStepsLoadedFor = null; this.aiStepsRead.set(false); this.costFor = null; this.cost.set(null); this.missing.set(false);
         this.load();
       });
       shown = key;
@@ -274,6 +305,13 @@ export class JobLogs implements OnInit, OnDestroy {
     effect(() => {
       if (this.loads() > 0 && !this.missing()) untracked(() => this.store.load(this.jobQueueId().trim()));
     });
+    // ?tab=ai on a run with no AI steps opens the Steps, quietly, once the page knows (the address follows).
+    effect(() => {
+      if (this.tab() === 'ai' && this.aiKnown() && !this.hasAi()) untracked(() => this.setTab('steps'));
+    });
+    // The clock ticks while the run is going, so its Duration and the Next steps' times move on their own.
+    const ticker = setInterval(() => { if (this.stillRunning()) this.now.set(Date.now()); }, 30_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(ticker));
     // Starts and stops the poll when the reader toggles Live, or when the run reaches a terminal
     // status. It does NOT re-arm the timer between polls -- see arm().
     effect(() => {
@@ -336,8 +374,8 @@ export class JobLogs implements OnInit, OnDestroy {
     this.aiStepsLoadedFor = this.jobQueueId();
     this.http.get<ApiResponse<{ run: any; promptName?: string }[]>>(`${API_BASE}/aiPrompt.json/runsForJob`,
       { params: { jobQueueId: this.jobQueueId() } }).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.aiSteps.set(r.data ?? []); },
-      error: () => {},
+      next: r => { if (r.status === API_SUCCESS) this.aiSteps.set(r.data ?? []); this.aiStepsRead.set(true); },
+      error: () => this.aiStepsRead.set(true),
     });
   }
 
@@ -346,6 +384,7 @@ export class JobLogs implements OnInit, OnDestroy {
   ngOnDestroy(): void {
     this.destroyed = true;
     this.clearTimer();
+    this.laterReads.forEach(clearTimeout);
     this.socket?.unsubscribe();
     this.socket = null;
   }
@@ -362,12 +401,21 @@ export class JobLogs implements OnInit, OnDestroy {
 
   toggleLive(): void { this.live.update(v => !v); }
 
+  /** Decided in the Next steps: the run moves on once Core has the decision, a moment later -- read now and again then. */
+  decided(): void {
+    this.refresh();
+    const later = setTimeout(() => { if (!this.destroyed) this.refresh(); }, 2500);
+    this.laterReads.push(later);
+  }
+  private readonly laterReads: ReturnType<typeof setTimeout>[] = [];
+
   /**
    * How long the run took, written as the history table and the Jobs list write it. This had its
    * own formatter, which said "60m 0s" for an hour-long run where the history said "1h".
    */
   duration(): string {
     const run = this.run();
+    if (run?.startTime && !run?.endTime && this.stillRunning()) return liveDuration(run.startTime, this.approvals.waiting(), this.now());
     if (!run?.startTime || !run?.endTime) return '—';
     return formatDuration((new Date(run.endTime).getTime() - new Date(run.startTime).getTime()) / 1000);
   }
@@ -569,6 +617,7 @@ export class JobLogs implements OnInit, OnDestroy {
           // The same call already carries both -- there is no reason to fetch them again.
           this.job.set(data?.sourceJob ?? null);
           this.run.set(data?.sourceJobQueue ?? null);
+          this.now.set(Date.now());
           this.loads.update(n => n + 1);
           this.loadAiSteps();
           this.loadCost();

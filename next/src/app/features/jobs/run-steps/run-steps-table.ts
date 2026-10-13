@@ -11,6 +11,7 @@ import { RetryDialog, RetryDialogData } from '../retry/retry-dialog';
 import { RetryFrom, attemptSentence, stepLabel } from '../retry/run-retry';
 import { DATASET_FORMATS, PDF_FORMAT, StepApproval, approvalOutcome, failedStep } from './run-steps.model';
 import { OutputChip, StepRow, stepRows } from './run-page.model';
+import { RunApprovalStore } from './run-approval.store';
 import { RunTimelineStore } from './run-timeline.store';
 import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
 
@@ -214,6 +215,8 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
 })
 export class RunStepsTable {
   readonly store = inject(RunTimelineStore);
+  /** The run page's approvals, for the groups' names; absent where the table stands alone. */
+  private readonly approvals = inject(RunApprovalStore, { optional: true });
   private readonly dialog = inject(Dialog);
   /** The step whose lines the reader wants in the Log tab ("Open in Log" in the panel). */
   readonly showInLog = output<string>();
@@ -240,7 +243,7 @@ export class RunStepsTable {
     return t?.attemptDetails?.find(detail => detail.attempt === t.attempt) ?? null;
   });
 
-  outcome(approval: StepApproval): string { return approvalOutcome(approval); }
+  outcome(approval: StepApproval): string { return approvalOutcome(approval, this.approvals?.groupNames()); }
 
   chooseAttempt(value: string): void {
     const attempt = Number(value);

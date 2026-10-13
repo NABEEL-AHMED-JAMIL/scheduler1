@@ -7,7 +7,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { StorageService } from '../../objects/storage.service';
 import { RunTimelineStore } from '../run-steps/run-timeline.store';
-import { LogSegment, logSegments, pathParts } from './log-segments';
+import { LogNames, LogSegment, logSegments, nameIds, pathParts } from './log-segments';
 import {
   AuditEntry, LOG_LEVELS, RUN_LOG_STYLES, LogLevel, LogLine, auditLines, filterLines, levelClass, levelCounts, logText, mergeLines, nextError, stepLines,
 } from './run-log.model';
@@ -114,7 +114,7 @@ const LEVEL_WORDS: Record<LogLevel, string> = { ERROR: 'Errors', WARN: 'Warnings
         <span class="run-log-time" [title]="line.at ? (line.at | serverTime:'dateTimeSec') : ''">{{ line.at ? (line.at | serverTime:'timeSec') : '—' }}</span>
         <span class="run-log-level" [class]="levelClass(line.level)">{{ line.level }}</span>
         <span class="run-log-step" [title]="line.step ? 'Step ' + line.step : ''">{{ line.step }}</span>
-        <span class="run-log-msg">@for (seg of segmentsOf(line); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/data/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">{{ seg.text }}</span>}} @else {{{ seg.text }}}}</span>
+        <span class="run-log-msg">@for (seg of segmentsOf(line); track $index) {@if (seg.path; as p) {@if (p.bucket) {<a class="log-path" routerLink="/data/files" [queryParams]="{ bucket: p.bucket, prefix: p.prefix }" [title]="'Open ' + (p.prefix || '/') + ' in ' + p.bucket">@for (part of pathParts(seg.text); track $index) {{{ part }}@if (part.endsWith('/')) {<wbr>}}</a>} @else {<span class="log-path">{{ seg.text }}</span>}} @else if (seg.link; as k) {<a class="log-ref" [routerLink]="k.url" [queryParams]="k.query ?? null" [title]="k.title">{{ seg.text }}</a>} @else {{{ seg.text }}}}</span>
       </div>
     </ng-template>
   `,
@@ -135,6 +135,8 @@ export class RunLog {
   readonly follow = input(false);
   /** The download's name ("run-8134"). */
   readonly fileName = input('run');
+  /** What the reader may put to the ids the lines name (a group's name, a request's task); null to show them as written. */
+  readonly names = input<LogNames | null>(null);
 
   readonly term = signal('');
   readonly levels = signal<ReadonlySet<LogLevel>>(new Set());
@@ -191,11 +193,15 @@ export class RunLog {
   });
   readonly slice = computed(() => this.shown().slice(this.range().first, this.range().last));
 
-  private readonly segmentCache = new WeakMap<LogLine, LogSegment[]>();
+  private segmentCache = new WeakMap<LogLine, LogSegment[]>();
+  private cachedNames: LogNames | null = null;
   segmentsOf(line: LogLine): LogSegment[] {
+    // Names arrive after the lines (the task and the groups are read once the steps are): the lines are split again.
+    const names = this.names();
+    if (names !== this.cachedNames) { this.cachedNames = names; this.segmentCache = new WeakMap(); }
     let segments = this.segmentCache.get(line);
     if (!segments) {
-      segments = line.source === 'run' ? logSegments(line.message, this.bucket()) : [{ text: line.message }];
+      segments = nameIds(line.source === 'run' ? logSegments(line.message, this.bucket()) : [{ text: line.message }], names);
       this.segmentCache.set(line, segments);
     }
     return segments;

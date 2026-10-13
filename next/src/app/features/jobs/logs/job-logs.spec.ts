@@ -7,7 +7,8 @@ import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/route
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { Subject } from 'rxjs';
-import { JobLogs } from './job-logs';
+import { JobLogs, runHasAi, runTrail } from './job-logs';
+import { AuthService } from '../../../core/auth/auth.service';
 import { JobEventsService } from '../../../core/socket/job-events.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -401,5 +402,145 @@ describe('Run page: the address, the header and the summary', () => {
   it('says who the review waits on beside the summary', () => {
     const { el } = at('');
     expect(el.querySelector('[data-test="waiting-on"]')?.textContent).toContain('the workspace administrators');
+  });
+});
+
+/**
+ * Run page polish 2026-10-12: one trail from the menu's tree -- Build › Pipelines › Schedules & triggers › <the schedule's
+ * runs> for whoever opens Schedules, Run & review › Runs for a reader who holds only the runs -- never the old "Run &
+ * review › Schedules & triggers", which put Schedules under the wrong group.
+ */
+describe('Run page: the breadcrumb', () => {
+  it('walks the menu to the schedule\'s runs for whoever may open Schedules', () => {
+    expect(runTrail('2977', 'Bulk approval step test #4', { schedules: true, runs: true, inbox: true })).toEqual([
+      { label: 'Build' },
+      { label: 'Pipelines', link: '/pipelines' },
+      { label: 'Schedules & triggers', link: '/pipelines/schedules' },
+      { label: 'Bulk approval step test #4 · runs', link: '/pipelines/schedules/2977/executions' },
+    ]);
+  });
+
+  it('takes a reader who holds only the runs through Runs, and one with only the inbox through it', () => {
+    expect(runTrail('2977', 'x', { schedules: false, runs: true, inbox: true })).toEqual([{ label: 'Run & review' }, { label: 'Runs', link: '/runs' }]);
+    expect(runTrail('2977', 'x', { schedules: false, runs: false, inbox: true })).toEqual([{ label: 'Run & review' }, { label: 'Review inbox', link: '/workflows/inbox' }]);
+    expect(runTrail('2977', 'x', { schedules: false, runs: false, inbox: false })).toEqual([{ label: 'Run & review' }]);
+  });
+});
+
+/**
+ * Run page polish 2026-10-12: run 8298 waits at its Approval step. Its status message is the Next steps box, not a red
+ * line; the strip counts the wait live instead of "Still running" and a dash; the AI answers tab is gone from a run with no
+ * AI steps, and ?tab=ai on it opens the Steps.
+ */
+describe('Run page: a run waiting at an Approval step', () => {
+  const HOUR = 3_600_000;
+  const requestedAt = new Date(Date.now() - 7 * HOUR - 60_000).toISOString();
+  const WAITING = { jobQueueId: 8298, jobId: 2977, runStatus: 'Running', attempt: 1, attempts: [1], legacy: false, aiSteps: [], waitingForApproval: true,
+    steps: [
+      { stepExecutionId: 1, index: 0, key: 'rows', task: 'sample', status: 'Completed', durationMs: 8, recordsIn: 0, recordsOut: 3, tries: 1, datasets: [], log: 'step' },
+      { stepExecutionId: 2, index: 1, key: 'approve', name: 'Approve the test rows', task: 'approval', status: 'Running', recordsIn: 3, tries: 1, datasets: [], log: 'step',
+        statusMessage: 'Waiting for approval: Approve 3 bulk-review test rows of run 8298',
+        approval: { approvalId: 1006, status: 'PENDING', waiting: true, title: 'Approve 3 bulk-review test rows of run 8298',
+          reviewers: { kind: 'group', value: '1063' }, requestedAt, expiresAt: new Date(Date.now() + 65 * HOUR).toISOString() } },
+      { stepExecutionId: 3, index: 2, key: 'save', task: 'save_file', status: 'Queue', tries: 0, datasets: [], log: 'step' },
+    ] };
+  const RUN = {
+    auditLogs: [
+      { jobAuditLogId: 1, logsDetail: 'Step 2/3 <approve> (approval) waits for approval by the group 1063 (request 1006): Approve 3 bulk-review test rows of run 8298', dateCreated: '2026-10-12 22:08:36' },
+    ],
+    sourceJob: { jobId: 2977, jobName: 'Bulk approval step test #4', taskDetail: { taskName: 'Bulk approval step test' } },
+    sourceJobQueue: { jobQueueId: 8298, jobStatus: 'Running', startTime: '2026-10-12 22:08:35', endTime: null,
+      jobStatusMessage: 'Waiting for approval at step 2 <approve>: Approve 3 bulk-review test rows of run 8298' },
+  };
+  const TASK = { id: 1136, instanceId: 1130, stepKey: 'approve', stepType: 'approval', state: 'Open', assigneeKind: 'group', assigneeValue: '1063' };
+
+  function waiting(tab: string | null, reader: 'reviewer' | 'admin' = 'reviewer') {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ imports: [JobLogs], providers: [provideRouter([]), provideLocationMocks(), provideHttpClient(), provideHttpClientTesting(),
+      { provide: JobEventsService, useValue: { connected: signal(false), events: new Subject() } },
+      { provide: AuthService, useValue: {
+        canOpen: (p: string) => reader === 'admin' || ['queue', 'task-inbox'].includes(p),
+        isTenantAdmin: () => reader === 'admin',
+        user: signal({ appUserId: reader === 'admin' ? 4640 : 4641, pageAccessProfileName: reader === 'admin' ? null : 'Reviewer' }),
+      } },
+      { provide: ActivatedRoute, useValue: { snapshot: { url: [{ path: '8298' }], firstChild: { url: [] },
+        queryParamMap: convertToParamMap(tab ? { tab } : {}) } } }] });
+    const fixture = TestBed.createComponent(JobLogs);
+    fixture.componentRef.setInput('jobId', '2977');
+    fixture.componentRef.setInput('jobQueueId', '8298');
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/findSourceJobAuditLog')).flush({ status: API_SUCCESS, data: RUN });
+    http.match(r => r.url.endsWith('/aiPrompt.json/runsForJob')).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    fixture.detectChanges();
+    expect(fixture.componentInstance.tab()).toBe(tab === 'ai' ? 'ai' : 'steps');
+    http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions')).forEach(r => r.flush({ status: API_SUCCESS, data: WAITING }));
+    http.match(r => r.url.endsWith('/sourceJob.json/runOutputs')).forEach(r => r.flush({ status: API_SUCCESS, data: { outputs: [] } }));
+    http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { jobQueueId: 8298, jobId: 2977, reviewStatus: 'NOT_REQUIRED', required: [] } }));
+    fixture.detectChanges();
+    http.match(r => r.url.endsWith('/taskInbox.json/forSubject')).forEach(r => r.flush({ status: API_SUCCESS, data: reader === 'admin' ? [] : [TASK] }));
+    http.match(r => r.url.endsWith('/pageAccess.json/listProfiles')).forEach(r => r.flush({ status: API_SUCCESS, data: [{ pageAccessProfileId: 1063, profileName: 'Reviewer' }] }));
+    http.match(r => r.url.endsWith('/billing.json/runCost')).forEach(r => r.flush({ status: API_SUCCESS, data: { cost: 0, currency: 'USD' } }));
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    return { fixture, el, component: fixture.componentInstance, location: TestBed.inject(Location) };
+  }
+
+  it('says it in an amber Next steps box beside the summary, never as a red error', () => {
+    const { el } = waiting(null);
+    expect(el.querySelector('[data-test="run-message"]')).toBeNull();
+    const next = el.querySelector('.run-top.has-next [data-test="approval-next"]');
+    expect(next?.textContent).toContain('Waiting for approval at step 2 · Approve the test rows');
+    expect(el.querySelector('[data-test="run-status"]')?.className).toContain('pill-warn');
+    expect(el.querySelector('[data-test="run-status"]')?.textContent?.trim()).toBe('Running · waiting for approval');
+  });
+
+  it('counts the wait in the strip, live, and leaves Ended blank', () => {
+    const { el, component, fixture } = waiting(null);
+    const fact = (label: string) => el.querySelector(`[data-fact="${label}"] dd`)?.textContent?.trim();
+    expect(fact('Ended')).toBe('—');
+    expect(fact('Duration')).toBe('Running · waiting 7 h');
+    component.now.set(Date.now() + 2 * HOUR);
+    fixture.detectChanges();
+    expect(fact('Duration')).toBe('Running · waiting 9 h');
+  });
+
+  it('hides the AI answers tab on a run with no AI steps', () => {
+    const { el } = waiting(null);
+    expect([...el.querySelectorAll('[data-test="run-tabs"] [role="tab"]')].map(t => t.getAttribute('data-tab'))).toEqual(['steps', 'map', 'outputs', 'log']);
+    expect(runHasAi({ steps: [{ task: 'ai_prompt' }] }, 0)).toBe(true);
+    expect(runHasAi({ steps: [{ task: 'sample' }], aiSteps: [{}] }, 0)).toBe(true);
+    expect(runHasAi(null, 1)).toBe(true);
+    expect(runHasAi({ steps: [{ task: 'sample' }, { task: 'approval' }] }, 0)).toBe(false);
+  });
+
+  it('opens the Steps for ?tab=ai on it, with no error, and the address follows', () => {
+    const { el, component, location } = waiting('ai');
+    expect(component.tab()).toBe('steps');
+    expect(el.querySelector('[data-tab="steps"]')?.getAttribute('aria-selected')).toBe('true');
+    expect(el.querySelector('[data-tab="ai"]')).toBeNull();
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(location.path()).toBe('/pipelines/schedules/2977/runs/8298');
+  });
+
+  it('names the group in the log and links the request to the reviewer\'s task', () => {
+    const { el, component, fixture } = waiting(null);
+    component.setTab('log');
+    fixture.detectChanges();
+    const line = el.querySelector('.run-log-msg')!;
+    expect(line.textContent).toContain('waits for approval by the Reviewer group (request 1006)');
+    expect(line.textContent).not.toContain('group 1063');
+    expect(line.querySelector('a.log-ref')?.getAttribute('href')).toBe('/workflows/inbox?task=1136');
+  });
+
+  it('names the group in the steps table too', () => {
+    const { el } = waiting(null, 'admin');
+    expect(el.querySelector('[data-test="step-approval"]')?.textContent).toContain('Waiting for approval by the Reviewer group in their Review inbox');
+  });
+
+  it('walks the reviewer through Runs, and the administrator through Build › Pipelines', () => {
+    const crumbs = (el: HTMLElement) => [...el.querySelectorAll('.breadcrumbs li')].map(li => li.textContent!.trim());
+    expect(crumbs(waiting(null).el)).toEqual(['Run & review', 'Runs', 'Run #8298']);
+    expect(crumbs(waiting(null, 'admin').el)).toEqual(['Build', 'Pipelines', 'Schedules & triggers', 'Bulk approval step test #4 · runs', 'Run #8298']);
   });
 });
