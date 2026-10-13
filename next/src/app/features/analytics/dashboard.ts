@@ -1,3 +1,5 @@
+import { PageHeader } from '../../shared/ui/page-header';
+import { Crumb } from '../../core/nav/nav-tree';
 import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
@@ -69,7 +71,7 @@ export { DatasetRegistry } from './dataset-registry';
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker],
+  imports: [PageHeader, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css',
 })
@@ -85,6 +87,8 @@ export class Dashboards implements OnInit, OnDestroy {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
+  /** The board's breadcrumb: See results › Dashboards (the cards, on this same address without a board). */
+  readonly boardTrail: Crumb[] = [{ label: 'See results' }, { label: 'Dashboards', link: this.router.url.split(/[?#]/)[0] || '/' }];
   private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 

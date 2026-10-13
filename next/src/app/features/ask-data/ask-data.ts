@@ -11,6 +11,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { AskIndex } from './ask-index';
 import { ChartAnswerSlot } from '../analytics/charts/chart-answer-slot';
 import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
@@ -21,7 +22,7 @@ import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace],
+  imports: [PageHeader, RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {

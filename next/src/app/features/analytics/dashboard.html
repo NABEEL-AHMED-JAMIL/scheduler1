@@ -1,18 +1,21 @@
 <div class="page">
   @if (openId() === null) {
     <!-- ---- the cards: every board in the workspace ------------------------------------------ -->
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Saved Analyses</h1>
-        <p class="page-subtitle">Pages of saved analyses, re-run each time you open them.</p>
+    <!-- UX review 2026-10-12 (A2, G3, G12): Dashboards, the primary rightmost. -->
+    <app-page-header>
+      <div class="page-head">
+        <div>
+          <h1 class="page-title">Dashboards</h1>
+          <p class="page-subtitle">Boards of tiles over your data, re-run each time you open them.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <button type="button" class="btn btn-primary btn-sm" (click)="createOpen() ? createOpen.set(false) : openCreate()" [attr.aria-expanded]="createOpen()">
+            <app-icon name="plus" />New dashboard
+          </button>
+          <a routerLink="/data/analytics" class="btn btn-default btn-sm">Analytics Studio</a>
+        </div>
       </div>
-      <div class="flex items-center gap-2 flex-wrap">
-        <button type="button" class="btn btn-primary btn-sm" (click)="createOpen() ? createOpen.set(false) : openCreate()" [attr.aria-expanded]="createOpen()">
-          <app-icon name="plus" />New dashboard
-        </button>
-        <a routerLink="/data/analytics" class="btn btn-ghost btn-sm">Analytics Studio</a>
-      </div>
-    </div>
+    </app-page-header>
 
     @if (createOpen()) {
       <div class="card p-4 flex flex-wrap items-end gap-2">
@@ -96,12 +99,13 @@
   } @else {
     <!-- ---- one board, the whole width ------------------------------------------------------ -->
     <div class="flex flex-col gap-3">
-      <!-- A real link to the cards (Back does the same); the click also leaves the board at once. -->
-      <a [routerLink]="[]" class="text-sm text-accent hover:underline self-start dash-back" (click)="leaveBoard()">← All dashboards</a>
-
+      <!-- UX review 2026-10-12 (A2): the breadcrumb is the way back to the cards (See results › Dashboards › the board);
+           Back does the same. -->
       @if (boardError()) {
+        <app-page-header title="Dashboard" [trail]="boardTrail" />
         <div class="card"><app-load-error [message]="boardError()" (retry)="retryBoard()" /></div>
       } @else if (board(); as open) {
+        <app-page-header [trail]="boardTrail">
         <div class="page-head">
           <div class="min-w-0">
             <h1 class="page-title break-words">{{ open.dashboardName }}</h1>
@@ -144,7 +148,7 @@
                 <p class="px-2 pt-2 text-[11px] text-[color:var(--text-muted)]">A widget can override it in its Chart settings. Colours are held to 3:1 against the card in light and dark.</p>
               </div>
             </ng-template>
-            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow [cdkMenuTriggerFor]="boardMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
             <ng-template #boardMenu>
               <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
                 <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openAdd()"><app-icon name="plus" />Add a widget</button>
@@ -156,6 +160,7 @@
             </ng-template>
           </div>
         </div>
+        </app-page-header>
 
         <!-- Reference, not the work: folded away so the widgets start near the top. -->
         @if (boardFiles().length) {

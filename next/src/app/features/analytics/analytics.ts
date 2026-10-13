@@ -53,6 +53,7 @@ import {
 import { ToastService } from '../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { formatDuration } from '../../shared/ui/time-format';
+import { PageHeader } from '../../shared/ui/page-header';
 
 /**
  * The tabs a dataset is read through -- document 02's ten.
@@ -616,7 +617,7 @@ export const CANVAS_WRAP_KEY = 'result:canvas';
  */
 @Component({
   selector: 'app-analytics',
-  imports: [
+  imports: [PageHeader, 
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
     CdkMenu, CdkMenuItem, CdkMenuTrigger, DataText, WrapToggle,

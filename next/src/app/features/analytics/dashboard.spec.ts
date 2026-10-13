@@ -2603,7 +2603,7 @@ describe('the cards on the landing page', () => {
     expect(cards()[1].textContent).toContain('No description');
     // The page head is one line now, with no count tiles.
     expect(el.querySelector('app-stat-tile')).toBeNull();
-    expect(text()).toContain('Pages of saved analyses, re-run each time you open them.');
+    expect(text()).toContain('Boards of tiles over your data, re-run each time you open them.');
     // The last card makes a new board.
     const create = el.querySelector<HTMLButtonElement>('button.dash-card-new')!;
     create.click();
@@ -2667,10 +2667,11 @@ describe('opening a board and going back', () => {
     expect(view.analyze).toHaveBeenCalledTimes(1);
   });
 
-  it('goes back to the cards from "All dashboards", stopping the board and clearing the address', async () => {
+  // UX review 2026-10-12 (A2): the way back is the breadcrumb's Dashboards (it was a "← All dashboards" link).
+  it('goes back to the cards from the breadcrumb, stopping the board and clearing the address', async () => {
     const view = await page('/?board=7');
     expect(view.board.openId()).toBe(7);
-    const back = [...view.el.querySelectorAll('a')].find(link => link.textContent!.includes('All dashboards'))!;
+    const back = [...view.el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].find(link => link.textContent!.trim() === 'Dashboards') as HTMLElement;
     back.click();
     await view.settle();
     expect(view.board.openId()).toBeNull();
@@ -2705,7 +2706,7 @@ describe('opening a board and going back', () => {
     await view.router.navigateByUrl('/?board=404');
     await view.settle();
     expect(view.el.textContent).toContain('No such dashboard in this workspace.');
-    expect([...view.el.querySelectorAll('a')].some(link => link.textContent!.includes('All dashboards'))).toBe(true);
+    expect([...view.el.querySelectorAll('nav[aria-label="Breadcrumb"] a')].some(link => link.textContent!.trim() === 'Dashboards')).toBe(true);
   });
 
   it('does not carry one board\'s results or filter to the next', async () => {

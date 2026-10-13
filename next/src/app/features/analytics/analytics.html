@@ -1,15 +1,17 @@
 <div class="page">
   <!-- One line under the title (owner, 2026-09-28). The longer account -- the engine reads the
        object store, the browser only ever receives a page -- is the tooltip. -->
-  <div class="page-head">
-    <div class="min-w-0">
-      <h1 class="page-title">Analytics Studio</h1>
-      <p class="page-subtitle"
-         title="The query engine reads the object store directly; the browser only ever receives a page.">
-        Read and analyse a file where it lives — nothing is copied.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <h1 class="page-title">Analytics Studio</h1>
+        <p class="page-subtitle"
+           title="The query engine reads the object store directly; the browser only ever receives a page.">
+          Read and analyse a file where it lives — nothing is copied.
+        </p>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   <!-- The data has the full width. The storage rail is the same connection -> folder -> file walk
        the Object Browser does, and uses that screen's own service; it slides in from the right, beside the
@@ -327,10 +329,15 @@
           <p class="mt-1 text-xs text-[color:var(--text-muted)]">
             CSV, TSV, JSON and Parquet. A whole folder can be read as one dataset.
           </p>
-          <button type="button" class="btn btn-primary btn-sm mt-4" aria-controls="files-panel"
-                  (click)="openFiles($event.currentTarget)">
-            <app-icon name="folder" />Choose a file
-          </button>
+          <!-- UX review 2026-10-12 (A8, AS1): the next step, and where else the data can be found. -->
+          <div class="mt-4 flex flex-wrap items-center justify-center gap-2">
+            <button type="button" class="btn btn-primary btn-sm" aria-controls="files-panel"
+                    (click)="openFiles($event.currentTarget)">
+              <app-icon name="folder" />Choose a file
+            </button>
+            <a routerLink="/data/analytics/dashboards" class="btn btn-ghost btn-sm">Open a dashboard</a>
+            <a routerLink="/data/catalog" class="btn btn-ghost btn-sm">Find it in the Data Catalog</a>
+          </div>
         </div>
       } @else {
 

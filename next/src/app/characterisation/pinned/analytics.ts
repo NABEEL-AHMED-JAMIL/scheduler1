@@ -69,7 +69,10 @@ export const PINNED: Record<string, unknown> = {
       "Filter the files and folders listed here",
       "Filter this folder"
     ],
-    "links": []
+    "links": [
+      "/data/analytics/dashboards",
+      "/data/catalog"
+    ]
   },
   "Analytics Studio, as a workspace administrator": {
     "url": "/data/analytics",
@@ -100,7 +103,10 @@ export const PINNED: Record<string, unknown> = {
       "Filter the files and folders listed here",
       "Filter this folder"
     ],
-    "links": []
+    "links": [
+      "/data/analytics/dashboards",
+      "/data/catalog"
+    ]
   },
   "a dashboard, opened": {
     "url": "/data/analytics/dashboards?board=1378",
@@ -139,7 +145,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
     ],
     "headings": [
-      "Saved Analyses"
+      "Dashboards"
     ],
     "buttons": [
       "New dashboard"

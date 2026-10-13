@@ -1209,6 +1209,9 @@
      own; a table outside it writes .num on the th and the td. */
   .num, .table-modern :is(th, td).num { text-align: right; font-variant-numeric: tabular-nums; }
   .table-modern th.num .th-sort { flex-direction: row-reverse; }
+  /* A value drawn as data text keeps to the right of its number cell. */
+  .num > .data-text { justify-content: flex-end; margin-left: auto; }
+  .num .data-text-value { text-align: right; }
   .table-modern tbody tr:last-child td { @apply border-b-0; }
 
   /* tfoot had no rule at all, so total rows rendered with zero padding and their

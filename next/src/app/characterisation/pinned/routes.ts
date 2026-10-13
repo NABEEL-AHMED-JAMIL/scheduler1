@@ -1194,7 +1194,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /analytics/dashboards": {
     "lands": "/data/analytics/dashboards",
-    "heading": "Saved Analyses"
+    "heading": "Dashboards"
   },
   "old address /assistants/connections": {
     "lands": "/ai/connections",
@@ -1270,7 +1270,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /objects/analytics/dashboards": {
     "lands": "/data/analytics/dashboards",
-    "heading": "Saved Analyses"
+    "heading": "Dashboards"
   },
   "old address /objects/files": {
     "lands": "/documents/files",

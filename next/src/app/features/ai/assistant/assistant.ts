@@ -36,6 +36,7 @@ import { PipelineFlowArtifact, flowVerdict, isFlow, newestFlow } from './flow.mo
 import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
 import { PolicyLevel, levelSummary, levelsOf, policyState } from '../../admin/data-policies/data-policy.model';
 import { sensitivityText } from '../../../shared/ui/sensitivity';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
@@ -72,7 +73,7 @@ export const PROGRESS_MS = [1000, 2000] as const;
  */
 @Component({
   selector: 'app-assistant',
-  imports: [Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, RunFollow,
+  imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, RunFollow,
     FlowPanel, TracePanel, ChartAnswerSlot, ConversationList],
   templateUrl: './assistant.html',
   // The page's own layout, kept with the page (lazy) rather than as new global utilities.

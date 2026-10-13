@@ -61,7 +61,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
           <colgroup>@for (width of widths(); track $index) { <col [style.width.rem]="width" /> }</colgroup>
           <thead>
             <tr aria-rowindex="1">
-              @for (column of columns(); track column) { <th class="vt-head" [title]="column">{{ column }}</th> }
+              @for (column of columns(); track column) { <th class="vt-head" [class.num]="numberColumn()[$index]" [title]="column">{{ column }}</th> }
             </tr>
           </thead>
           <tbody>
@@ -69,7 +69,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
             @for (row of shown(); track first() + $index; let i = $index) {
               <tr [attr.aria-rowindex]="first() + i + 2">
                 @for (cell of row; track $index) {
-                  <td class="tabular align-top">
+                  <td class="tabular align-top" [class.num]="numberColumn()[$index]">
                     @if (cell === null) { <span class="text-[color:var(--text-muted)]" title="null">—</span> } @else {
                       <app-data-text class="min-w-0" [value]="readable(cell, figureColumn()[$index])"
                                      [hint]="cell" [lines]="wrap() ? wrappedLines : 1" [label]="columns()[$index]" />
@@ -88,7 +88,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
         <thead>
           <tr>
             @for (column of columns(); track column) {
-              <th class="whitespace-nowrap">{{ column }}</th>
+              <th class="whitespace-nowrap" [class.num]="numberColumn()[$index]">{{ column }}</th>
             }
           </tr>
         </thead>
@@ -96,7 +96,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
           @for (row of rows(); track $index) {
             <tr>
               @for (cell of row; track $index) {
-                <td class="tabular align-top">
+                <td class="tabular align-top" [class.num]="numberColumn()[$index]">
                   @if (cell === null) {
                     <!-- A real null, which is not an empty string and is certainly not a zero. -->
                     <span class="text-[color:var(--text-muted)]" title="null">—</span>
@@ -148,6 +148,24 @@ export class WidgetTable {
    * measureColumn, less any column of years (readsAsYears): the saved-query path marks every column a figure, so a
    * year read "2,002" in a tile's table (MIG-367).
    */
+  /**
+   * UX review 2026-10-12 (A6, G4, B1 part): a column whose every value is a number reads right-aligned, heading too --
+   * Patients, Age, HbA1c and BMI on a board sat left like names. A year column is a label, not a quantity.
+   */
+  protected readonly numberColumn = computed(() => {
+    const rows = this.rows();
+    const step = Math.max(1, Math.floor(rows.length / 500));
+    return this.columns().map((name, i) => {
+      let seen = 0;
+      for (let r = 0; r < rows.length; r += step) {
+        const cell = rows[r][i];
+        if (cell === null || cell === '') continue;
+        if (!/^[-+]?\d[\d,]*(\.\d+)?([eE][-+]?\d+)?%?$/.test(String(cell).trim())) return false;
+        seen++;
+      }
+      return seen > 0 && !readsAsYears(name, rows.map(row => row[i] ?? null));
+    });
+  });
   protected readonly figureColumn = computed(() => {
     const flags = this.measureColumn();
     const rows = this.rows();

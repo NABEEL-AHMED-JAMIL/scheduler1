@@ -1,39 +1,41 @@
 <div class="page">
-  <div class="page-head">
-    <div class="min-w-0">
-      <h1 class="page-title">AI Assistant</h1>
-      <p class="page-subtitle">
-        Describe a pipeline and it is drawn, step by step; ask about runs, sources and files. It uses only the Tool Registry, acts
-        as you, and asks before it runs, saves or deletes anything.
-      </p>
-    </div>
-    <div class="flex flex-wrap items-center gap-2">
-      <div class="ai-model flex items-center gap-2 rounded-lg border border-subtle px-2.5 py-1.5 min-w-0" data-model-status
-           [title]="modelStatus().facts || 'The model the assistant runs on'">
-        <span class="ai-dot shrink-0" aria-hidden="true" [class.ok]="modelStatus().tone === 'ok'" [class.warn]="modelStatus().tone === 'warn'"></span>
-        <app-icon name="server" size="0.9em" class="text-[color:var(--text-muted)] shrink-0" />
-        @if (canPickModel() && connectionOptions().length) {
-          <select class="bg-transparent text-sm font-medium min-w-0 max-w-44 truncate" aria-label="Model connection" [disabled]="!!working()"
-                  (change)="connectionId.set($any($event.target).value ? +$any($event.target).value : null)">
-            <option value="" [selected]="connectionId() === null">Workspace default</option>
-            @for (c of connectionOptions(); track c.connectionId) {
-              <option [value]="c.connectionId" [selected]="connectionId() === c.connectionId">{{ c.name }}{{ c.isDefault ? ' (default)' : '' }}</option>
-            }
-          </select>
-        } @else {
-          <span class="text-sm font-medium truncate">{{ modelStatus().name }}</span>
-        }
-        @if (modelStatus().model) { <span class="pill pill-neutral mono shrink-0">{{ modelStatus().model }}</span> }
-        @if (modelStatus().facts) { <span class="ai-facts text-xs text-[color:var(--text-muted)] truncate">{{ modelStatus().facts }}</span> }
+  <app-page-header>
+    <div class="page-head">
+      <div class="min-w-0">
+        <h1 class="page-title">AI Assistant</h1>
+        <p class="page-subtitle">
+          Describe a pipeline and it is drawn, step by step; ask about runs, sources and files. It uses only the Tool Registry, acts
+          as you, and asks before it runs, saves or deletes anything.
+        </p>
       </div>
-      <button type="button" class="btn btn-default btn-sm xl:hidden" [attr.aria-expanded]="historyOpen()" (click)="historyOpen.set(!historyOpen())">
-        <app-icon name="history" />History
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" [disabled]="!!working()" (click)="newChat()">
-        <app-icon name="plus" />New chat
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <div class="ai-model flex items-center gap-2 rounded-md border border-subtle px-2.5 py-0.5 min-h-7 min-w-0" data-model-status
+             [title]="modelStatus().facts || 'The model the assistant runs on'">
+          <span class="ai-dot shrink-0" aria-hidden="true" [class.ok]="modelStatus().tone === 'ok'" [class.warn]="modelStatus().tone === 'warn'"></span>
+          <app-icon name="server" size="0.9em" class="text-[color:var(--text-muted)] shrink-0" />
+          @if (canPickModel() && connectionOptions().length) {
+            <select class="bg-transparent text-xs font-medium min-w-0 max-w-44 truncate" aria-label="Model connection" [disabled]="!!working()"
+                    (change)="connectionId.set($any($event.target).value ? +$any($event.target).value : null)">
+              <option value="" [selected]="connectionId() === null">Workspace default</option>
+              @for (c of connectionOptions(); track c.connectionId) {
+                <option [value]="c.connectionId" [selected]="connectionId() === c.connectionId">{{ c.name }}{{ c.isDefault ? ' (default)' : '' }}</option>
+              }
+            </select>
+          } @else {
+            <span class="text-xs font-medium truncate">{{ modelStatus().name }}</span>
+          }
+          @if (modelStatus().model) { <span class="pill pill-neutral mono shrink-0">{{ modelStatus().model }}</span> }
+          @if (modelStatus().facts) { <span class="ai-facts text-xs text-[color:var(--text-muted)] truncate">{{ modelStatus().facts }}</span> }
+        </div>
+        <button type="button" class="btn btn-default btn-sm xl:hidden" [attr.aria-expanded]="historyOpen()" (click)="historyOpen.set(!historyOpen())">
+          <app-icon name="history" />History
+        </button>
+        <button type="button" class="btn btn-primary btn-sm" [disabled]="!!working()" (click)="newChat()">
+          <app-icon name="plus" />New chat
+        </button>
+      </div>
     </div>
-  </div>
+  </app-page-header>
 
   <app-model-setup-banner what="The assistant" />
 

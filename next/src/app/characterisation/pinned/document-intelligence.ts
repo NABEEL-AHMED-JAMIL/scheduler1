@@ -263,7 +263,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /documentType.json/fetchAll"
     ],
     "headings": [
-      "Documents in",
+      "Document types",
       "Document types"
     ],
     "buttons": [

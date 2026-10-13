@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Dialog } from '@angular/cdk/dialog';
@@ -13,6 +14,7 @@ import {
   ConversationKind, ConversationOutcome, ConversationPage, ConversationRow, DAY_LABEL, DayGroup, KIND_LABEL, OUTCOME_LABEL, badgeOf, kindIcon,
   kindOf, relativeTime, titleOf, viewerZone,
 } from './conversation.model';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 const PAGE = 50;
 const KINDS: ConversationKind[] = ['pipeline', 'question', 'run'];
@@ -28,7 +30,7 @@ const DAYS: DayGroup[] = ['today', 'yesterday', 'week', 'older'];
  */
 @Component({
   selector: 'app-conversations-page',
-  imports: [Icon, RouterLink, ServerTimePipe],
+  imports: [PageHeader, RefreshButton, Icon, RouterLink, ServerTimePipe],
   templateUrl: './conversations-page.html',
   styles: [`
     .cp-grid { display: grid; gap: 1rem; align-items: start; }

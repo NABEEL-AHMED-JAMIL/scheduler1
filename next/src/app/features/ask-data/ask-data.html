@@ -1,18 +1,20 @@
 <!-- The whole width (UI review U13): at 2560 a 72rem column left two-thirds of the screen empty. The answer's sources
      stand beside it from 1280px, and its text keeps a readable measure. -->
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Ask your data</h1>
-      <p class="page-subtitle">
-        Ask in plain language. Answers come only from what you can open in this workspace (documents, forms, pipeline results
-        and datasets), and every answer shows its sources, or the query it ran.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Ask your data</h1>
+        <p class="page-subtitle">
+          Ask in plain language. Answers come only from what you can open in this workspace (documents, forms, pipeline results
+          and datasets), and every answer shows its sources, or the query it ran.
+        </p>
+      </div>
+      @if (searchedLabel()) {
+        <span class="pill pill-neutral !whitespace-normal max-w-full" data-test="searched"><app-icon name="database" size="0.85em" />Searching {{ searchedLabel() }}</span>
+      }
     </div>
-    @if (searchedLabel()) {
-      <span class="pill pill-neutral !whitespace-normal max-w-full" data-test="searched"><app-icon name="database" size="0.85em" />Searching {{ searchedLabel() }}</span>
-    }
-  </div>
+  </app-page-header>
 
   @if (noWorkspace()) {
     <app-needs-workspace what="Ask your data is" todo="ask about its documents and pipeline results" icon="database" />
