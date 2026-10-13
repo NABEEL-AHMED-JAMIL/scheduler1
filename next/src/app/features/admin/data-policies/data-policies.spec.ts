@@ -44,7 +44,15 @@ function render(role: Role, policy: DataPolicy | { error: string } = DEFAULTS) {
   const fixture = TestBed.createComponent(DataPolicies);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
-  const card = (level: string) => el.querySelector(`[data-level="${level}"]`) as HTMLElement;
+  // UX review B8: a level is a column of the comparison table -- its cells, read together, are what a card was.
+  const card = (level: string) => {
+    const cells = () => Array.from(el.querySelectorAll(`[data-level="${level}"]`));
+    return {
+      querySelector: (sel: string) => cells().map(c => c.querySelector(sel)).find(Boolean) ?? null,
+      querySelectorAll: <T extends Element>(sel: string) => cells().flatMap(c => Array.from(c.querySelectorAll<T>(sel))),
+      get textContent() { return cells().map(c => c.textContent).join(' '); },
+    } as unknown as HTMLElement;
+  };
   const text = (node: Element | null) => (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
   const refresh = () => { fixture.detectChanges(); };
   return { fixture, el, api, toast, card, text, refresh, page: fixture.componentInstance };
@@ -101,6 +109,15 @@ describe('Administration › Data policies -- as a workspace administrator', () 
     expect(text(el.querySelector('[data-save-error]'))).toBe('Model connection 1050 is not one this workspace can use.');
     expect(toast.error).toHaveBeenCalled();
     expect((card('public').querySelector('input[role="switch"][name="aiWriteTools"]') as HTMLInputElement).checked).toBe(false);
+  });
+
+  it('compares the levels in one table, Sensitive (PHI) first, a setting a row (UX review B8, DP1)', () => {
+    const { el, text } = render('TENANT_ADMIN');
+    const table = el.querySelector('[data-policy-table] table')!;
+    expect(Array.from(table.querySelectorAll('thead th[data-level]')).map(th => th.getAttribute('data-level'))).toEqual(['sensitive', 'internal', 'public']);
+    expect(Array.from(table.querySelectorAll('tbody th[scope="row"] > span:first-child')).slice(0, 5).map(t => text(t)))
+      .toEqual(['Model rule', 'Allowed models', 'Keep run files', 'AI write tools', 'Minimum-fields warning']);
+    expect(el.querySelectorAll('section[data-level]').length).toBe(0);
   });
 
   it('offers the workspace\'s models, and rules out the ones the level\'s rule would never use', () => {

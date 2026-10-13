@@ -57,109 +57,143 @@
             }
           </div>
         }
-        <div class="grid gap-4 xl:grid-cols-3">
-          @for (d of drafts(); track d.sensitivity; let i = $index) {
-            <section class="card p-4 flex flex-col gap-4 min-w-0" [attr.data-level]="d.sensitivity" [attr.aria-labelledby]="'level-' + d.sensitivity">
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <h2 class="font-semibold" [id]="'level-' + d.sensitivity">{{ text[d.sensitivity].label }}</h2>
-                  <p class="text-xs text-[color:var(--text-muted)]">{{ text[d.sensitivity].blurb }}</p>
-                </div>
-                @if (changed()[i]) { <span class="pill pill-warn shrink-0">Changed</span> }
-                @else if (levels()[i]?.saved) { <span class="pill pill-ok shrink-0">Saved</span> }
-                @else { <span class="pill pill-neutral shrink-0">Default</span> }
-              </div>
-              @if (canEdit()) {
-                <app-field label="Model rule" [for]="'rule-' + d.sensitivity" [hint]="ruleExplain(d.modelRule)">
-                  <select class="input" name="modelRule" [id]="'rule-' + d.sensitivity" [value]="d.modelRule" (change)="setRule(i, $any($event.target).value)">
-                    @for (r of rules; track r.value) { <option [value]="r.value" [selected]="r.value === d.modelRule">{{ r.label }}</option> }
-                  </select>
-                </app-field>
-                <fieldset class="flex flex-col gap-1.5 min-w-0">
-                  <legend class="label">Allowed models</legend>
-                  <div class="max-h-48 overflow-y-auto rounded-md border border-[color:var(--border-subtle)] px-3 py-2 flex flex-col gap-1.5">
-                    @for (c of choices(); track c.value) {
-                      <label class="flex items-start gap-2 text-sm min-w-0" [class.pl-5]="c.model">
-                        <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="c.value"
-                               [checked]="d.allowedModels.includes(c.value)" [disabled]="!!blocked(d.modelRule, c) && !d.allowedModels.includes(c.value)"
-                               (change)="toggleModel(i, c.value, $any($event.target).checked)" />
-                        <span class="min-w-0 break-words" [class.mono]="c.model" [class.text-xs]="c.model">{{ c.model ?? c.label }}</span>
-                        @if (blocked(d.modelRule, c); as why) { <span class="ml-auto shrink-0 text-xs text-[color:var(--text-muted)]">{{ why }}</span> }
-                      </label>
-                    }
-                    @for (entry of unknownAllowed(i); track entry) {
-                      <label class="flex items-start gap-2 text-sm min-w-0">
-                        <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="entry" checked
-                               (change)="toggleModel(i, entry, $any($event.target).checked)" />
-                        <span class="min-w-0 break-words">{{ allowedName(entry) }}</span>
-                      </label>
-                    }
-                    @if (!choices().length && !unknownAllowed(i).length) {
-                      <p class="text-xs text-[color:var(--text-muted)]">{{ connectionsError() || 'No model connections in this workspace yet.' }}</p>
-                    }
-                  </div>
-                  <p class="field-note text-[color:var(--text-muted)]">
-                    None ticked: any model the rule allows. A ticked connection allows each of its models.
-                  </p>
-                </fieldset>
-                <app-field label="Keep run files (days)" [for]="'retention-' + d.sensitivity" [error]="problems()[i] ?? ''"
-                           hint="Caps how long a run keeps this level's files, 1 to 3650 days. Blank: the pipeline's own retention (24 hours unless it sets another).">
-                  <input class="input" type="number" min="1" max="3650" step="1" name="retention" [id]="'retention-' + d.sensitivity"
-                         placeholder="The pipeline's own" [value]="d.retention" (input)="setRetention(i, $any($event.target).value)" />
-                </app-field>
-                <div class="flex flex-col gap-3">
-                  <label class="flex items-start justify-between gap-3">
-                    <span class="min-w-0">
-                      <span class="block text-sm font-medium">AI write tools</span>
-                      <span class="block text-xs text-[color:var(--text-muted)]">The assistant may run pipelines, create PDFs, save or delete files and call APIs that change data. It still asks you first.</span>
-                    </span>
-                    <input type="checkbox" class="checkbox mt-0.5 shrink-0" role="switch" name="aiWriteTools" [checked]="d.aiWriteTools"
-                           (change)="setSwitch(i, 'aiWriteTools', $any($event.target).checked)" />
-                  </label>
-                  <label class="flex items-start justify-between gap-3">
-                    <span class="min-w-0">
-                      <span class="block text-sm font-medium">Minimum-fields warning</span>
-                      <span class="block text-xs text-[color:var(--text-muted)]">Remind whoever builds a step to send a model only the fields it needs.</span>
-                    </span>
-                    <input type="checkbox" class="checkbox mt-0.5 shrink-0" role="switch" name="minFieldsWarning" [checked]="d.minFieldsWarning"
-                           (change)="setSwitch(i, 'minFieldsWarning', $any($event.target).checked)" />
-                  </label>
-                </div>
-                @if (!isDefault(i)) {
-                  <button type="button" class="btn btn-ghost btn-sm self-start" data-use-defaults (click)="useDefaults(i)">
-                    <app-icon name="history" />Use the defaults
-                  </button>
+        <!-- UX review B8 (DP1): one comparison table -- the levels side by side, Sensitive (PHI) first, a setting a row --
+             in place of three stacked forms 2,360 px long. Each level's controls stay its own (data-level on every cell). -->
+        <div class="card p-0 overflow-x-auto" data-policy-table>
+          <table class="table-modern policy-table">
+            <colgroup><col class="policy-setting-col" />@for (c of columns(); track c.d.sensitivity) { <col /> }</colgroup>
+            <thead>
+              <tr>
+                <th scope="col" class="align-bottom">Setting</th>
+                @for (c of columns(); track c.d.sensitivity) {
+                  <th scope="col" class="align-top normal-case" [attr.data-level]="c.d.sensitivity" data-row="head">
+                    <div class="flex items-start justify-between gap-2">
+                      <div class="min-w-0">
+                        <h2 class="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5" [id]="'level-' + c.d.sensitivity">
+                          @if (c.d.sensitivity === 'sensitive') { <app-icon name="shield" size="0.95em" class="icon-warn" /> }
+                          {{ text[c.d.sensitivity].label }}
+                        </h2>
+                        <p class="text-xs font-normal text-[color:var(--text-muted)] tracking-normal">{{ text[c.d.sensitivity].blurb }}</p>
+                      </div>
+                      @if (changed()[c.i]) { <span class="pill pill-warn shrink-0">Changed</span> }
+                      @else if (levels()[c.i]?.saved) { <span class="pill pill-ok shrink-0">Saved</span> }
+                      @else { <span class="pill pill-neutral shrink-0">Default</span> }
+                    </div>
+                  </th>
                 }
-              } @else {
-                <dl class="grid gap-3 text-sm">
-                  <div>
-                    <dt class="text-[color:var(--text-muted)]">Model rule</dt>
-                    <dd class="font-medium">{{ ruleText(d.modelRule) }}</dd>
-                    <dd class="text-xs text-[color:var(--text-muted)]">{{ ruleExplain(d.modelRule) }}</dd>
-                  </div>
-                  <div>
-                    <dt class="text-[color:var(--text-muted)]">Allowed models</dt>
-                    <dd class="flex flex-wrap gap-1 mt-0.5">
-                      @for (entry of d.allowedModels; track entry) { <span class="pill pill-neutral mono">{{ allowedName(entry) }}</span> }
-                      @empty { <span>Any the rule allows</span> }
-                    </dd>
-                  </div>
-                  <div>
-                    <dt class="text-[color:var(--text-muted)]">Keep run files</dt>
-                    <dd>{{ retentionText(d) }}</dd>
-                  </div>
-                  <div class="flex items-baseline justify-between gap-3">
-                    <dt class="text-[color:var(--text-muted)]">AI write tools</dt>
-                    <dd>{{ d.aiWriteTools ? 'On' : 'Off' }}</dd>
-                  </div>
-                  <div class="flex items-baseline justify-between gap-3">
-                    <dt class="text-[color:var(--text-muted)]">Minimum-fields warning</dt>
-                    <dd>{{ d.minFieldsWarning ? 'On' : 'Off' }}</dd>
-                  </div>
-                </dl>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row"><span class="block text-sm font-medium">Model rule</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Which models may see the data.</span></th>
+                @for (c of columns(); track c.d.sensitivity) {
+                  <td [attr.data-level]="c.d.sensitivity" data-row="rule">
+                    @if (canEdit()) {
+                      <label class="sr-only" [for]="'rule-' + c.d.sensitivity">Model rule for {{ text[c.d.sensitivity].label }}</label>
+                      <select class="input" name="modelRule" [id]="'rule-' + c.d.sensitivity" [value]="c.d.modelRule" (change)="setRule(c.i, $any($event.target).value)">
+                        @for (r of rules; track r.value) { <option [value]="r.value" [selected]="r.value === c.d.modelRule">{{ r.label }}</option> }
+                      </select>
+                    } @else {
+                      <span class="font-medium">{{ ruleText(c.d.modelRule) }}</span>
+                    }
+                    <p class="field-note text-[color:var(--text-muted)]">{{ ruleExplain(c.d.modelRule) }}</p>
+                  </td>
+                }
+              </tr>
+              <tr>
+                <th scope="row"><span class="block text-sm font-medium">Allowed models</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">None ticked: any model the rule allows. A ticked connection allows each of its models.</span></th>
+                @for (c of columns(); track c.d.sensitivity) {
+                  <td [attr.data-level]="c.d.sensitivity" data-row="models">
+                    @if (canEdit()) {
+                      <fieldset class="min-w-0">
+                        <legend class="sr-only">Allowed models for {{ text[c.d.sensitivity].label }}</legend>
+                        <div class="max-h-44 overflow-y-auto rounded-md border border-[color:var(--border-subtle)] px-3 py-2 flex flex-col gap-1.5">
+                          @for (m of choices(); track m.value) {
+                            <label class="flex items-start gap-2 text-sm min-w-0" [class.pl-5]="m.model">
+                              <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="m.value"
+                                     [checked]="c.d.allowedModels.includes(m.value)" [disabled]="!!blocked(c.d.modelRule, m) && !c.d.allowedModels.includes(m.value)"
+                                     (change)="toggleModel(c.i, m.value, $any($event.target).checked)" />
+                              <span class="min-w-0 break-words" [class.mono]="m.model" [class.text-xs]="m.model">{{ m.model ?? m.label }}</span>
+                              @if (blocked(c.d.modelRule, m); as why) { <span class="ml-auto shrink-0 text-xs text-[color:var(--text-muted)]">{{ why }}</span> }
+                            </label>
+                          }
+                          @for (entry of unknownAllowed(c.i); track entry) {
+                            <label class="flex items-start gap-2 text-sm min-w-0">
+                              <input type="checkbox" class="checkbox mt-0.5 shrink-0" name="allowedModel" [value]="entry" checked
+                                     (change)="toggleModel(c.i, entry, $any($event.target).checked)" />
+                              <span class="min-w-0 break-words">{{ allowedName(entry) }}</span>
+                            </label>
+                          }
+                          @if (!choices().length && !unknownAllowed(c.i).length) {
+                            <p class="text-xs text-[color:var(--text-muted)]">{{ connectionsError() || 'No model connections in this workspace yet.' }}</p>
+                          }
+                        </div>
+                      </fieldset>
+                    } @else {
+                      <div class="flex flex-wrap gap-1">
+                        @for (entry of c.d.allowedModels; track entry) { <span class="pill pill-neutral mono">{{ allowedName(entry) }}</span> }
+                        @empty { <span>Any the rule allows</span> }
+                      </div>
+                    }
+                  </td>
+                }
+              </tr>
+              <tr>
+                <th scope="row"><span class="block text-sm font-medium">Keep run files</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Days, 1 to 3650. Blank: the pipeline's own retention (24 hours unless it sets another).</span></th>
+                @for (c of columns(); track c.d.sensitivity) {
+                  <td [attr.data-level]="c.d.sensitivity" data-row="retention">
+                    @if (canEdit()) {
+                      <label class="sr-only" [for]="'retention-' + c.d.sensitivity">Keep {{ text[c.d.sensitivity].label }} run files (days)</label>
+                      <input class="input max-w-40" type="number" min="1" max="3650" step="1" name="retention" [id]="'retention-' + c.d.sensitivity"
+                             placeholder="The pipeline's own" [value]="c.d.retention" [class.input-invalid]="!!problems()[c.i]"
+                             [attr.aria-invalid]="problems()[c.i] ? 'true' : null" (input)="setRetention(c.i, $any($event.target).value)" />
+                      @if (problems()[c.i]; as problem) { <p class="field-note text-crit-500">{{ problem }}</p> }
+                    } @else {
+                      {{ retentionText(c.d) }}
+                    }
+                  </td>
+                }
+              </tr>
+              <tr>
+                <th scope="row"><span class="block text-sm font-medium">AI write tools</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">The assistant may run pipelines, create PDFs, save or delete files and call APIs that change data. It still asks first.</span></th>
+                @for (c of columns(); track c.d.sensitivity) {
+                  <td [attr.data-level]="c.d.sensitivity" data-row="write">
+                    @if (canEdit()) {
+                      <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" class="checkbox shrink-0" role="switch" name="aiWriteTools" [checked]="c.d.aiWriteTools"
+                               (change)="setSwitch(c.i, 'aiWriteTools', $any($event.target).checked)" />{{ c.d.aiWriteTools ? 'On' : 'Off' }}
+                      </label>
+                    } @else { {{ c.d.aiWriteTools ? 'On' : 'Off' }} }
+                  </td>
+                }
+              </tr>
+              <tr>
+                <th scope="row"><span class="block text-sm font-medium">Minimum-fields warning</span><span class="block text-xs font-normal text-[color:var(--text-muted)]">Remind whoever builds a step to send a model only the fields it needs.</span></th>
+                @for (c of columns(); track c.d.sensitivity) {
+                  <td [attr.data-level]="c.d.sensitivity" data-row="minfields">
+                    @if (canEdit()) {
+                      <label class="inline-flex items-center gap-2 text-sm">
+                        <input type="checkbox" class="checkbox shrink-0" role="switch" name="minFieldsWarning" [checked]="c.d.minFieldsWarning"
+                               (change)="setSwitch(c.i, 'minFieldsWarning', $any($event.target).checked)" />{{ c.d.minFieldsWarning ? 'On' : 'Off' }}
+                      </label>
+                    } @else { {{ c.d.minFieldsWarning ? 'On' : 'Off' }} }
+                  </td>
+                }
+              </tr>
+              @if (canEdit()) {
+                <tr>
+                  <th scope="row"><span class="sr-only">Defaults</span></th>
+                  @for (c of columns(); track c.d.sensitivity) {
+                    <td [attr.data-level]="c.d.sensitivity" data-row="defaults">
+                      @if (!isDefault(c.i)) {
+                        <button type="button" class="btn btn-ghost btn-sm" data-use-defaults (click)="useDefaults(c.i)"><app-icon name="history" />Use the defaults</button>
+                      }
+                    </td>
+                  }
+                </tr>
               }
-            </section>
-          }
+            </tbody>
+          </table>
         </div>
         @if (rule()) {
           <section class="card p-4 flex flex-col gap-1" aria-labelledby="policy-rule">

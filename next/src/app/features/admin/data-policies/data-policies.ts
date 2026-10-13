@@ -6,7 +6,6 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
-import { Field } from '../../../shared/ui/field';
 import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { SENSITIVITY_TEXT } from '../../../shared/ui/sensitivity';
 import { ModelConnection } from '../../ai/ai-providers';
@@ -31,8 +30,14 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
  */
 @Component({
   selector: 'app-data-policies',
-  imports: [RefreshButton, PageHeader, Icon, LoadError, BlurLoader, Combobox, Field, RouterLink],
+  imports: [RefreshButton, PageHeader, Icon, LoadError, BlurLoader, Combobox, RouterLink],
   templateUrl: './data-policies.html',
+  styles: `
+    .policy-table { table-layout: fixed; min-width: 56rem; }
+    .policy-table .policy-setting-col { width: 15rem; }
+    .policy-table tbody th { text-align: left; vertical-align: top; text-transform: none; letter-spacing: normal; }
+    .policy-table td { vertical-align: top; }
+  `,
 })
 export class DataPolicies implements OnInit {
   private readonly api = inject(DataPolicyApi);
@@ -43,6 +48,11 @@ export class DataPolicies implements OnInit {
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   readonly rules = MODEL_RULES;
   readonly text = SENSITIVITY_TEXT;
+  /** The levels as the table's columns, Sensitive (PHI) first (UX review B8, DP1); `i` is the level's index in drafts(). */
+  readonly columns = computed(() => {
+    const rank: Record<string, number> = { sensitive: 0, internal: 1, public: 2 };
+    return this.drafts().map((d, i) => ({ d, i })).sort((a, b) => (rank[a.d.sensitivity] ?? 9) - (rank[b.d.sensitivity] ?? 9));
+  });
 
   readonly tenantId = signal<number | null>(null);
   readonly tenants = signal<ComboboxOption[]>([]);

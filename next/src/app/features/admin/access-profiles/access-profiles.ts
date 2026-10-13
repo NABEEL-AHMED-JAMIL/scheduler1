@@ -149,6 +149,32 @@ export class AccessProfiles implements OnInit {
     this.view.set('profiles');
   }
 
+  // ---- who can open what (UX review B8, AP1) -------------------------------------------------------------------
+  readonly previewOpen = signal(false);
+  readonly previewId = signal<number | null>(null);
+  /** One member's pages, as the server works them out (profile, default and their own exceptions), by menu section. */
+  readonly preview = computed(() => {
+    const person = this.people().find(p => p.appUserId === this.previewId());
+    if (!person) return null;
+    const catalogue = new Map(this.pages().map(p => [p.key, p]));
+    const extra = new Set(person.allowedExceptions ?? []);
+    const pages = (person.pageKeys ?? []).map(key => ({ key, label: catalogue.get(key)?.label ?? key, section: catalogue.get(key)?.section ?? 'Other',
+      extra: extra.has(key) }));
+    const sections: { section: string; pages: typeof pages }[] = [];
+    for (const page of pages) {
+      const group = sections.find(g => g.section === page.section);
+      if (group) group.pages.push(page); else sections.push({ section: page.section, pages: [page] });
+    }
+    const fallback = this.stats().defaultName ? `the default, ${this.stats().defaultName}` : 'no profile';
+    return { name: person.fullName || person.username, profile: person.pageAccessProfileName || fallback, pages, sections,
+      withheld: (person.withheldExceptions ?? []).map(key => catalogue.get(key)?.label ?? key) };
+  });
+
+  openPreview(): void {
+    this.previewOpen.set(true);
+    if (this.people().length === 0) this.loadPeople();
+  }
+
   showPeople(): void {
     this.view.set('people');
     if (this.people().length === 0) this.loadPeople();
