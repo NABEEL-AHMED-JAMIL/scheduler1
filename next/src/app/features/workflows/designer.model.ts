@@ -3,7 +3,19 @@
  * checks, so what is published is what the engine walks. Only the fields a step's type uses are sent.
  */
 export type StepType = 'approval' | 'task' | 'condition' | 'notify' | 'run_pipeline' | 'save_dataset' | 'wait';
-export type WhoKind = 'user' | 'role' | 'group' | 'manager' | 'requester';
+export type WhoKind = 'user' | 'role' | 'group' | 'manager' | 'requester' | 'subject';
+
+/**
+ * UX review 2026-10-12: who a "subject" assignee is -- workflow-service's AssigneeKind.SUBJECT, a field of the request's
+ * subject that names a role, a group or a person (the built-in run review and step approval: "reviewers", set by the
+ * pipeline). The designer said "someone" and showed a blank "Who approves".
+ */
+export function subjectWho(value: string | null | undefined): string {
+  const field = (value ?? '').trim();
+  if (!field || field === 'reviewers') return 'The reviewers named on the request';
+  const words = field.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').toLowerCase();
+  return `Whoever the request names as its ${words}`;
+}
 
 export interface Who { kind: WhoKind; value?: string | null; }
 
@@ -144,5 +156,6 @@ export function problemStep(problem: string): number | null {
 
 function who(value: Who | null | undefined): Who {
   const kind = value?.kind ?? 'requester';
-  return kind === 'user' || kind === 'role' || kind === 'group' ? { kind, value: value?.value ?? '' } : { kind };
+  // A subject assignee keeps its field ("reviewers"): without it workflow-service refuses the step (WorkflowSteps).
+  return kind === 'user' || kind === 'role' || kind === 'group' || kind === 'subject' ? { kind, value: value?.value ?? '' } : { kind };
 }

@@ -16,7 +16,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi } from './workflows.api';
-import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, toJson } from './designer.model';
+import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -602,9 +602,13 @@ export class WorkflowDesigner implements OnInit {
       }
       case 'manager': return 'the requester\'s manager';
       case 'requester': return 'the requester';
+      case 'subject': return subjectWho(w.value).replace(/^The /, 'the ').replace(/^Whoever/, 'whoever');
       default: return 'someone';
     }
   }
+
+  /** UX review 2026-10-12: a subject assignee in the picker's words. */
+  readonly subjectWho = subjectWho;
 
   jobName(id: number): string {
     return this.jobs().find(j => j.jobId === id)?.jobName ?? `schedule #${id}`;

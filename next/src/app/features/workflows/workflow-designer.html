@@ -474,7 +474,13 @@
         <option value="user">A person</option>
         <option value="role">Everyone with a role</option>
         <option value="group">Everyone in a group</option>
+        <!-- UX review 2026-10-12: a built-in workflow's approver is named on each request (the pipeline's reviewers). -->
+        @if (who?.kind === 'subject') { <option value="subject">{{ subjectWho(who.value) }}</option> }
       </select>
+      @if (who?.kind === 'subject') {
+        <p class="field-note text-[color:var(--text-muted)]" data-test="who-subject">Set on each request by what starts it -- for a pipeline's
+          run review, the reviewers its settings name ("Results need review by").</p>
+      }
     </div>
     @if (who?.kind === 'user') {
       <app-combobox [numeric]="true" placeholder="Search people…" [allowClear]="false" [disabled]="!canEdit()" [ariaLabel]="label + ': person'"
