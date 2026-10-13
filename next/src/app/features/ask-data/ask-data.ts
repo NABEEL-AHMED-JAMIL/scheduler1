@@ -12,17 +12,23 @@ import { AskIndex } from './ask-index';
 import { ChartAnswerSlot } from '../analytics/charts/chart-answer-slot';
 import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { PageHeader } from '../../shared/ui/page-header';
+import { Section } from '../../shared/ui/section';
+import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import type { PinnedChart } from '../analytics/analytics.service';
+import { AskHistory, EXAMPLE_QUESTIONS, clearHistory, historyKey, readHistory, saveHistory, withPin, withQuestion } from './ask-history';
 
 /**
  * Ask your data (Wave 5, Data > Ask your data, page key ask-data): a question in plain language, answered by the
  * workspace's model only from the documents and pipeline results the person can see, with numbered citations that open
  * each source. A workspace administrator also chooses what the workspace's search index holds (MIG-281, AskIndex).
  * The examples are built from what the workspace actually has; the session's questions stay on the page
- * (newest first) until it is left -- nothing is saved but a chart pinned to a dashboard (MIG-357).
+ * (newest first) until it is left -- nothing is saved server-side but a chart pinned to a dashboard (MIG-357).
+ * UX final AD1: below the question, the viewer's own recent questions and the answers they pinned from here (kept in
+ * this browser, ask-history.ts), the hint that a chart answer can be pinned, and on a first visit a few examples.
  */
 @Component({
   selector: 'app-ask-data',
-  imports: [PageHeader, RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace],
+  imports: [PageHeader, RouterLink, Icon, ChartAnswerSlot, AskIndex, ModelSetupBanner, NeedsWorkspace, Section, ServerTimePipe],
   templateUrl: './ask-data.html',
 })
 export class AskData implements OnInit {
@@ -56,6 +62,13 @@ export class AskData implements OnInit {
     return !!s && s.documents === 0 && s.runOutputs === 0;
   });
 
+  /** UX final AD1: this viewer's recent questions and pinned answers, remembered in this browser. */
+  private readonly historyKey = computed(() => historyKey(this.auth.user()?.tenantId, this.auth.user()?.appUserId));
+  readonly history = signal<AskHistory>({ questions: [], pins: [] });
+  readonly examples = EXAMPLE_QUESTIONS;
+  /** A first visit: nothing asked here before, in this session or earlier. */
+  readonly firstVisit = computed(() => !this.turns().length && !this.history().questions.length && !this.history().pins.length);
+
   private nextId = 1;
   private ticker: ReturnType<typeof setInterval> | null = null;
   private inFlight: Subscription | null = null;
@@ -71,7 +84,33 @@ export class AskData implements OnInit {
 
   ngOnInit(): void {
     if (this.noWorkspace()) return;
+    this.history.set(readHistory(this.historyKey()));
     this.loadSuggestions();
+  }
+
+  /** An example fills the box for the person to adjust and ask; it is not asked for them. */
+  useExample(example: string, box?: HTMLTextAreaElement): void {
+    this.question.set(example);
+    box?.focus();
+  }
+
+  /** Remembers a pin made from an answer here, with the question that drew it. */
+  onPinned(turn: AskTurn, pinned: PinnedChart): void {
+    this.remember(withPin(this.history(), {
+      question: turn.question, title: pinned.widget?.widgetTitle || turn.question,
+      dashboardId: pinned.dashboard.analyticsDashboardId, dashboardName: pinned.dashboard.dashboardName,
+      widgetId: pinned.widget?.analyticsDashboardWidgetId ?? null,
+    }));
+  }
+
+  forgetHistory(): void {
+    clearHistory(this.historyKey());
+    this.history.set({ questions: [], pins: [] });
+  }
+
+  private remember(next: AskHistory): void {
+    this.history.set(next);
+    saveHistory(this.historyKey(), next);
   }
 
   loadSuggestions(): void {
@@ -113,6 +152,7 @@ export class AskData implements OnInit {
     if (!q || q.length > this.max || this.asking()) return;
     const id = this.nextId++;
     this.turns.update(ts => [{ id, question: q, state: 'asking' }, ...ts]);
+    this.remember(withQuestion(this.history(), q));
     this.question.set('');
     this.startTicker();
     this.inFlight = this.api.ask(q).subscribe({

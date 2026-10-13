@@ -8,6 +8,7 @@ import { AskDataApi } from './ask-data.api';
 import { AskAnswer, chartAnswerOf, csvOf, refusalText, searchedText, segments } from './ask-data.model';
 import { AskData } from './ask-data';
 import { AuthService } from '../../core/auth/auth.service';
+import { useMemoryStorage } from '../../shared/testing/memory-storage';
 
 const SEARCHED = { documents: 1, runOutputs: 2 };
 
@@ -240,3 +241,48 @@ describe('Ask your data -- a question answered by a query (MIG-283)', () => {
   });
 });
 
+describe('Ask your data -- before the first question (UX final AD1)', () => {
+  useMemoryStorage();
+
+  it('offers healthcare examples on a first visit that fill the box, and says an answer can be pinned', () => {
+    const { el, q, screen, fixture, api } = render();
+    expect(q('[data-test="examples"]')).not.toBeNull();
+    expect(q('[data-test="recent"]')).toBeNull();
+    expect(q('[data-test="pin-hint"]')!.textContent).toContain('Pin to dashboard');
+    const example = [...el.querySelectorAll<HTMLButtonElement>('[data-test="examples"] button')][0];
+    example.click();
+    fixture.detectChanges();
+    expect(screen.question()).toBe(example.textContent!.trim());
+    expect(api.ask).not.toHaveBeenCalled();
+  });
+
+  it('remembers this viewer\'s questions and lists them next time, asked again on a click', () => {
+    const first = render();
+    first.screen.ask('How many readmissions were there each month?');
+    expect(JSON.parse(localStorage.getItem('etl.ask.history.2960.4641')!).questions[0].question)
+      .toBe('How many readmissions were there each month?');
+    const { el, q, api, fixture } = render();
+    expect(q('[data-test="examples"]')).toBeNull();
+    const again = el.querySelector<HTMLButtonElement>('[data-test="recent"] li button')!;
+    expect(again.textContent!.trim()).toBe('How many readmissions were there each month?');
+    again.click();
+    fixture.detectChanges();
+    expect(api.ask).toHaveBeenCalledWith('How many readmissions were there each month?');
+    expect(q('[data-test="ask-start"]')).toBeNull();
+  });
+
+  it('lists an answer pinned from here with a link to its dashboard, and forgets on Clear', () => {
+    const first = render();
+    first.screen.ask('Readmissions by month?');
+    first.screen.onPinned(first.screen.turns()[0], { dashboard: { analyticsDashboardId: 77, dashboardName: 'Quality board', created: false },
+      analyticsQueryId: 5, widget: { analyticsDashboardWidgetId: 9, analyticsDashboardId: 77, widgetTitle: 'Readmissions' } } as never);
+    const { q, fixture } = render();
+    const link = q('[data-test="pinned"] a.link-inline') as HTMLAnchorElement;
+    expect(link.textContent!.trim()).toBe('Readmissions');
+    expect(link.getAttribute('href')).toBe('/data/analytics/dashboards?board=77');
+    (q('[data-test="forget"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(localStorage.getItem('etl.ask.history.2960.4641')).toBeNull();
+    expect(q('[data-test="examples"]')).not.toBeNull();
+  });
+});

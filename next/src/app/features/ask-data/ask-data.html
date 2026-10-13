@@ -25,7 +25,7 @@
     <label class="sr-only" for="ask-question">Your question</label>
     <!-- UX review B6 (AI1): the same composer as the AI Assistant and the file chat. -->
     <div class="chat-composer" data-test="chat-composer">
-      <textarea id="ask-question" class="input" rows="2" data-test="question"
+      <textarea #box id="ask-question" class="input" rows="2" data-test="question"
                 placeholder="For example: which records changed this week?" [attr.maxlength]="max"
                 [value]="question()" (input)="question.set($any($event.target).value)" (keydown)="onKey($event)"></textarea>
       <button type="button" class="btn btn-primary btn-sm" data-test="ask" [disabled]="!canAsk()" (click)="ask()">
@@ -55,6 +55,62 @@
       <p class="text-xs text-warn-600 flex items-start gap-1.5" data-test="warning"><app-icon name="info" size="0.9em" class="mt-0.5 shrink-0" />{{ w }}</p>
     }
   </section>
+
+  <!-- UX final AD1: before the first question of a visit the page is not one card on an empty screen. Two sections
+       side by side from 1024px: this viewer's recent questions (or, on a first visit, a few examples to start from) and
+       the answers they pinned to a dashboard from here, with the one line that says an answer can be pinned. -->
+  @if (!turns().length) {
+    <div class="grid gap-3 lg:grid-cols-2 items-start" data-test="ask-start">
+      @if (firstVisit()) {
+        <app-section [card]="true" title="Start with an example" sub="It fills the box: change it to fit your data, then Ask." data-test="examples">
+          <div class="flex flex-wrap gap-1.5">
+            @for (e of examples; track e) {
+              <button type="button" class="pill pill-neutral hover-brand text-left whitespace-normal break-words max-w-full" (click)="useExample(e, box)">{{ e }}</button>
+            }
+          </div>
+        </app-section>
+      } @else {
+        <app-section [card]="true" title="Your recent questions" sub="Asked by you in this browser. Ask one again to get today's answer." data-test="recent">
+          <button section-actions type="button" class="btn btn-ghost btn-sm" (click)="forgetHistory()" data-test="forget"><app-icon name="trash" />Clear</button>
+          @if (history().questions.length) {
+            <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)] -my-1">
+              @for (r of history().questions; track r.at) {
+                <li class="flex items-center gap-2 py-1.5 min-w-0">
+                  <app-icon name="history" size="0.95em" class="shrink-0 text-[color:var(--text-muted)]" />
+                  <button type="button" class="text-left text-sm min-w-0 flex-1 truncate hover:underline" [title]="r.question" [disabled]="asking()"
+                          (click)="use(r.question)">{{ r.question }}</button>
+                  <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ r.at | serverTime: 'recent' }}</span>
+                </li>
+              }
+            </ul>
+          } @else {
+            <p class="text-sm text-[color:var(--text-muted)]">No questions yet.</p>
+          }
+        </app-section>
+      }
+      <app-section [card]="true" title="Pinned answers" data-test="pinned">
+        <p sub class="section-sub" data-test="pin-hint">
+          An answer drawn as a chart has <strong>Pin to dashboard</strong>: it becomes a tile that reruns its query whenever the dashboard is opened.
+        </p>
+        @if (history().pins.length) {
+          <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)] -my-1">
+            @for (p of history().pins; track p.at) {
+              <li class="flex items-center gap-2 py-1.5 min-w-0">
+                <app-icon name="chart" size="0.95em" class="shrink-0 text-[color:var(--text-muted)]" />
+                <span class="min-w-0 flex-1">
+                  <a class="link-inline text-sm block truncate" routerLink="/data/analytics/dashboards" [queryParams]="{ board: p.dashboardId }" [title]="p.title">{{ p.title }}</a>
+                  <span class="text-xs text-[color:var(--text-muted)] block truncate" [title]="p.dashboardName">on {{ p.dashboardName }}</span>
+                </span>
+                <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ p.at | serverTime: 'recent' }}</span>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p class="text-sm text-[color:var(--text-muted)]">Nothing pinned from here yet. <a class="link-inline" routerLink="/data/analytics/dashboards">See the dashboards</a></p>
+        }
+      </app-section>
+    </div>
+  }
 
   @if (isAdmin()) {
     <app-ask-index />
@@ -97,7 +153,7 @@
                   @if (q.rows.length) {
                     <div class="min-w-0" data-test="query-chart">
                       <!-- MIG-357: the dashboards' chart engine, loaded with the first chart answer and not before. -->
-                      <app-chart-answer-slot [answer]="chartAnswerOf(q)" [canPin]="canPin()" [showCaption]="false" />
+                      <app-chart-answer-slot [answer]="chartAnswerOf(q)" [canPin]="canPin()" [showCaption]="false" (pinnedTo)="onPinned(t, $event)" />
                     </div>
                   }
                   @if (q.rows.length) {

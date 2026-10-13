@@ -1,4 +1,5 @@
-import { Component, ComponentRef, DestroyRef, ViewContainerRef, effect, inject, input, signal } from '@angular/core';
+import { Component, ComponentRef, DestroyRef, ViewContainerRef, effect, inject, input, output, signal } from '@angular/core';
+import type { PinnedChart } from '../analytics.service';
 import type { ChartAnswer } from './chart-answer';
 import type { ChartAnswerCard } from './chart-answer-card';
 
@@ -22,6 +23,8 @@ export class ChartAnswerSlot {
   readonly height = input(320);
   readonly showCaption = input(true);
   readonly ready = signal(false);
+  /** The card's answer was pinned to a dashboard (UX final AD1: Ask your data lists what its viewer pinned). */
+  readonly pinnedTo = output<PinnedChart>();
 
   private card: ComponentRef<ChartAnswerCard> | null = null;
   private gone = false;
@@ -31,6 +34,7 @@ export class ChartAnswerSlot {
     void import('./chart-answer-card').then(({ ChartAnswerCard }) => {
       if (this.gone) return;
       this.card = this.host.createComponent(ChartAnswerCard);
+      this.card.instance.pinnedTo.subscribe(p => this.pinnedTo.emit(p));
       this.pass();
       this.ready.set(true);
     });
