@@ -10,7 +10,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AssistantApi } from './assistant.api';
 import { AssistantMessage } from './assistant.model';
-import { Assistant } from './assistant';
+import { Assistant, openingTab } from './assistant';
 import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
 
 const CONV = { conversationId: 1000, title: 'Run the job', status: 'active' };
@@ -135,6 +135,58 @@ describe('AI Assistant -- as drawn', () => {
     expect(answer.querySelector('script')).toBeNull();
     expect(answer.querySelector('pre')!.textContent).toBe('<script>x()</script>');
     expect(answer.textContent).toContain('<img src=x onerror=alert(1)>');
+  });
+
+  it('formats the assistant\'s Markdown (bold, inline code, nested lists, links) and keeps the person\'s words plain', () => {
+    const answer = 'A pipeline step here can point to:\n\n- **Storage buckets**: `riverside-health-s3`\n- **AI prompts**:\n  - `Drug safety` (promptId 1077)\n'
+      + '\nSee [the guide](https://example.org/guide) or [this](javascript:alert(1)). <b>raw</b>';
+    const { el } = render([
+      m({ messageId: 20, seq: 20, role: 'user', content: 'What does **bold** and `code` do?\n- not a list' }),
+      m({ messageId: 21, seq: 21, content: answer }),
+    ]);
+    const reply = el.querySelector('[data-role="assistant"] [data-answer]')!;
+    expect(reply.textContent).not.toContain('**');
+    expect(reply.textContent).not.toContain('`');
+    expect([...reply.querySelectorAll('strong')].map(b => b.textContent)).toEqual(['Storage buckets', 'AI prompts']);
+    expect([...reply.querySelectorAll('code.md-inline-code')].map(c => c.textContent)).toEqual(['riverside-health-s3', 'Drug safety']);
+    const items = [...reply.querySelectorAll('ul.md-list > li')];
+    expect(items.length).toBe(3);
+    expect(items[2].classList.contains('md-depth-1')).toBe(true);
+    // No space slips in between a span and the text after it ("Storage buckets :").
+    expect(items[0].textContent).toBe('Storage buckets: riverside-health-s3');
+    expect(items[2].textContent).toBe('Drug safety (promptId 1077)');
+    const links = [...reply.querySelectorAll('a')];
+    expect(links.map(a => [a.textContent, a.getAttribute('href'), a.getAttribute('rel')])).toEqual([['the guide', 'https://example.org/guide', 'noopener noreferrer']]);
+    expect(reply.querySelector('b')).toBeNull();
+    expect(reply.textContent).toContain('<b>raw</b>');
+
+    const asked = el.querySelector('[data-role="user"]')!;
+    expect(asked.querySelector('strong, code, ul, app-markdown')).toBeNull();
+    expect(asked.textContent).toContain('What does **bold** and `code` do?');
+  });
+
+  it('opens a question on its tool calls, not on an empty Flow tab', () => {
+    const { el, fixture } = render([m({ messageId: 30, seq: 30, toolRunId: 1004, content: 'Three buckets.' })], [
+      { callId: 1, toolRunId: 1004, seq: 1, toolName: 'get_jobs', toolKind: 'read', arguments: '{}', outcome: 'allowed', httpStatus: 200 },
+    ]);
+    expect(fixture.componentInstance.tab()).toBe('trace');
+    expect(el.querySelector('[role="tab"][aria-selected="true"]')!.textContent).toContain('Tool calls');
+  });
+
+  it('says plainly that a question with no tool calls has nothing to draw', () => {
+    const { el, fixture } = render([m({ messageId: 31, seq: 31, content: 'Hello.' })]);
+    expect(fixture.componentInstance.tab()).toBe('flow');
+    expect(el.querySelector('app-flow-panel [data-flow-empty]')!.getAttribute('data-flow-empty')).toBe('question');
+  });
+
+  it('picks the opening tab: flow, then chart, then a question\'s tool calls; Tool calls and Context stay put', () => {
+    expect(openingTab('context', { flow: true, chart: true, calls: true })).toBe('flow');
+    expect(openingTab('flow', { flow: false, chart: true, calls: true })).toBe('chart');
+    expect(openingTab('flow', { flow: false, chart: false, calls: true })).toBe('trace');
+    expect(openingTab('chart', { flow: false, chart: false, calls: true })).toBe('trace');
+    expect(openingTab('flow', { flow: false, chart: false, calls: false })).toBe('flow');
+    expect(openingTab('context', { flow: false, chart: false, calls: true })).toBe('context');
+    expect(openingTab('trace', { flow: false, chart: false, calls: false })).toBe('trace');
   });
 
   it('offers no step builder to a tenant user, only the copy', () => {

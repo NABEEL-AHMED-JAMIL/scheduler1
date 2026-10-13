@@ -11,6 +11,7 @@ import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { AuthService } from '../../../core/auth/auth.service';
 import { roleLabel } from '../../../core/auth/auth.models';
 import { Icon } from '../../../shared/ui/icon';
+import { Markdown } from '../../../shared/ui/markdown';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -45,6 +46,18 @@ interface TraceState { loading: boolean; error: string; trace: ToolTrace | null;
 export type PanelTab = 'flow' | 'chart' | 'trace' | 'context';
 
 /**
+ * The result tab a conversation opens on (owner 2026-10-13: a question showed "No flow yet"): its flow, else its chart;
+ * a question -- neither -- opens on its tool calls when it made any; Tool calls and Context stay where the person put
+ * them.
+ */
+export function openingTab(current: PanelTab, has: { flow: boolean; chart: boolean; calls: boolean }): PanelTab {
+  if (has.flow) return 'flow';
+  if (has.chart) return 'chart';
+  if (current === 'trace' || current === 'context') return current;
+  return has.calls ? 'trace' : 'flow';
+}
+
+/**
  * What a person can ask first, by what they want. Healthcare shows up only here, as samples: everything the assistant
  * does is generic. Reads never start anything; a design is drawn, never saved.
  */
@@ -76,7 +89,7 @@ export const PROGRESS_MS = [1000, 2000] as const;
 @Component({
   selector: 'app-assistant',
   imports: [PageHeader, Icon, StatusPill, ServerTimePipe, StickToBottom, RouterLink, ModelSetupBanner, ManagedBanner, RunFollow,
-    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList],
+    FlowPanel, TracePanel, ChartAnswerSlot, ConversationList, Markdown],
   templateUrl: './assistant.html',
   // Escape closes the history laid over the thread, as it closes a side panel.
   host: { '(document:keydown.escape)': 'historyOpen.set(false)' },
@@ -225,6 +238,8 @@ export class Assistant implements OnInit {
     return newestFlow(this.messages())?.flow ?? null;
   });
   readonly flowMessageId = computed(() => this.pickedFlow() ?? newestFlow(this.messages())?.messageId ?? null);
+  /** A conversation with answers and no flow: a question (the Flow tab says so rather than "No flow yet"). */
+  readonly isQuestion = computed(() => !this.flow() && this.messages().some(m => m.role === 'assistant'));
 
   /** MIG-357: the message whose chart the Chart tab draws; null: the newest. */
   readonly pickedChart = signal<number | null>(null);
@@ -371,7 +386,7 @@ export class Assistant implements OnInit {
         this.remember(r.data.conversation.conversationId);
         const newest = this.traceRuns()[0];
         if (newest != null) this.showTrace(newest);
-        this.tab.set(this.flow() ? 'flow' : this.chart() ? 'chart' : this.tab());
+        this.tab.set(openingTab(this.tab(), { flow: !!this.flow(), chart: !!this.chart(), calls: newest != null }));
       },
       error: err => { this.threadLoading.set(false); this.threadError.set(err?.error?.message || 'Could not open the conversation.'); },
     });
@@ -549,6 +564,7 @@ export class Assistant implements OnInit {
           this.pickedChart.set(null);
           if (this.flowMessageId() !== hadFlow && this.flow()) this.tab.set('flow');
           else if (this.chartMessageId() !== hadChart && this.chart()) this.tab.set('chart');
+          else if (!this.flow() && !this.chart()) this.tab.set(openingTab(this.tab(), { flow: false, chart: false, calls: true }));
         }
         this.showTrace(f.runId, true);
       },

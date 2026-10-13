@@ -117,9 +117,16 @@ import { RunFollow } from './run-follow';
       <div class="h-full grid place-items-center text-center px-6">
         <div class="max-w-sm flex flex-col items-center gap-2">
           <span class="grid place-items-center rounded-full size-10 bg-accent-soft text-accent" aria-hidden="true"><app-icon name="layers" /></span>
-          <p class="text-sm font-medium">No flow yet</p>
-          <p class="text-sm text-[color:var(--text-muted)]">Describe a pipeline in plain words and it is drawn here, step by step, checked against this
-            workspace's tasks. @if (canCreate()) { Nothing is saved until you press Create pipeline. } @else { Nothing is saved from here. }</p>
+          @if (question()) {
+            <!-- A conversation that asked questions and designed nothing: say so, gently, rather than "No flow yet". -->
+            <p class="text-sm font-medium" data-flow-empty="question">Nothing to draw for a question</p>
+            <p class="text-sm text-[color:var(--text-muted)]">This conversation asked about the workspace; it did not design a pipeline. Describe one in
+              plain words and it is drawn here, step by step. The answer's tool calls are in the Tool calls tab.</p>
+          } @else {
+            <p class="text-sm font-medium" data-flow-empty="none">No flow yet</p>
+            <p class="text-sm text-[color:var(--text-muted)]">Describe a pipeline in plain words and it is drawn here, step by step, checked against this
+              workspace's tasks. @if (canCreate()) { Nothing is saved until you press Create pipeline. } @else { Nothing is saved from here. }</p>
+          }
         </div>
       </div>
     }
@@ -132,6 +139,8 @@ export class FlowPanel {
 
   readonly flow = input<PipelineFlowArtifact | null>(null);
   readonly canCreate = input(false);
+  /** The open conversation has answers but no flow: a question, which the empty state says plainly. */
+  readonly question = input(false);
 
   /** The step shown below the canvas, once the person picks one (the canvas keeps the room until then). */
   readonly selected = linkedSignal<PipelineFlowArtifact | null, string | null>({
