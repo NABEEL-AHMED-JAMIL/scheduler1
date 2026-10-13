@@ -197,6 +197,29 @@ describe('Data Catalog asset panel', () => {
   });
 });
 
+describe('Data Catalog sensitive data (UX review B5, CT1)', () => {
+  it('says how many assets hold sensitive fields, with the way to them, and marks those rows', () => {
+    const { el } = page();
+    const callout = el.querySelector('[data-phi-callout]')!;
+    expect(callout.textContent).toContain('1 asset holds fields marked sensitive');
+    expect(callout.querySelector('a')?.getAttribute('href')).toBe('/data/catalog?flag=sensitive');
+    expect(el.querySelector('tr[data-asset="1346"] [data-sensitive-asset]')).not.toBeNull();
+    expect(el.querySelector('tr[data-asset="1010"] [data-sensitive-asset]')).toBeNull();
+  });
+
+  it('marks a sensitive column where it is listed, and flags an untagged one that reads like patient data', () => {
+    const { el } = panel({ columns: [
+      { position: 0, name: 'email', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: ['email'], tagsReviewed: false },
+      { position: 1, name: 'patient_id', dataType: 'VARCHAR', nullPercent: 0, distinctCount: 3, tags: [], tagsReviewed: false },
+      { position: 2, name: 'region', dataType: 'VARCHAR', nullPercent: 25, distinctCount: 2, tags: [], tagsReviewed: true }] });
+    expect(el.querySelector('tr[data-column="email"]')!.classList).toContain('is-sensitive');
+    expect(el.querySelector('tr[data-column="email"] [data-sensitive-column]')).not.toBeNull();
+    expect(el.querySelector('tr[data-column="patient_id"] [data-phi-column]')?.textContent).toContain('patient identifier');
+    expect(el.querySelector('tr[data-column="region"] [data-phi-column]')).toBeNull();
+    expect(el.querySelector('[data-phi-hint]')?.textContent).toContain('1 column looks like patient data');
+  });
+});
+
 describe('Data Catalog model', () => {
   it('says how fresh an asset is from the server clock', () => {
     const now = new Date('2026-10-01T05:00:00Z');
@@ -215,5 +238,20 @@ describe('Data Catalog model', () => {
 
   it('names a document type by where it comes from', () => {
     expect(whereText({ ...ASSETS[0], kind: 'document_type', rowCount: 12 })).toBe('Document Intelligence · 12 rows');
+  });
+});
+
+describe('phiHint (UX review B5, CT1)', () => {
+  it('reads patient identifiers and health details from a column name', async () => {
+    const { phiHint } = await import('./catalog.model');
+    expect(phiHint('patient_id')).toBe('patient identifier');
+    expect(phiHint('MRN')).toBe('patient identifier');
+    expect(phiHint('dateOfBirth')).toBe('date of birth');
+    expect(phiHint('primary_diagnosis')).toBe('health detail');
+    expect(phiHint('discharge_date')).toBe('care date');
+    expect(phiHint('zip_code')).toBe('address');
+    expect(phiHint('risk_level')).toBeNull();
+    expect(phiHint('total')).toBeNull();
+    expect(phiHint('')).toBeNull();
   });
 });

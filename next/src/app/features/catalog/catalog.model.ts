@@ -111,6 +111,31 @@ export function tagText(tag: string): string {
   return TAGS.find(t => t.id === tag)?.label ?? tag.replace(/_/g, ' ');
 }
 
+/**
+ * UX review B5 (CT1): a column whose NAME reads like a patient identifier or health detail -- the HIPAA identifiers
+ * (names, dates of birth, record and plan numbers, contact details, addresses) and clinical fields. A hint only, for a
+ * column nobody has tagged: the scanner reads values, and a person decides. Generic names, nothing workspace-specific.
+ */
+const PHI_NAMES: readonly [RegExp, string][] = [
+  [/(^|_)(mrn|medical_?record|patient_?(id|number|no))($|_)/, 'patient identifier'],
+  [/(^|_)(dob|date_?of_?birth|birth_?date|birthdate)($|_)/, 'date of birth'],
+  [/(^|_)(ssn|social_?security|national_?id|nhs_?(number|no))($|_)/, 'national id'],
+  [/(^|_)(member_?id|policy_?(id|number)|insurance_?(id|number)|beneficiary|health_?plan)($|_)/, 'health plan number'],
+  [/(^|_)(first_?name|last_?name|full_?name|surname|patient_?name|given_?name)($|_)/, 'person name'],
+  [/(^|_)(email|e_?mail)($|_)/, 'email'],
+  [/(^|_)(phone|mobile|telephone|fax)($|_)/, 'phone'],
+  [/(^|_)(address|street|zip|zip_?code|postcode|postal_?code)($|_)/, 'address'],
+  [/(^|_)(diagnos[ie]s|icd(_?10)?|condition|medication|prescription|allergy|procedure|lab_?result)($|_)/, 'health detail'],
+  [/(^|_)(admission|admit|discharge|death)_?(date|time|at)($|_)/, 'care date'],
+];
+
+export function phiHint(column: string | null | undefined): string | null {
+  const name = (column ?? '').trim().replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase().replace(/[\s.-]+/g, '_');
+  if (!name) return null;
+  for (const [pattern, label] of PHI_NAMES) if (pattern.test(name)) return label;
+  return null;
+}
+
 export function isSensitive(level: string | null | undefined): boolean {
   return level === 'Confidential' || level === 'Restricted';
 }

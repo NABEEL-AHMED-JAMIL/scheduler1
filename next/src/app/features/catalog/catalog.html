@@ -17,6 +17,23 @@
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="The catalog at a glance" />
   }
 
+  <!-- UX review B5 (CT1): sensitive data, said once at the top -- how much is marked, the way to it, and how to mark more. -->
+  @if (summary(); as s) {
+    <section class="step-notice step-notice-warn" role="note" data-phi-callout aria-label="Sensitive data">
+      <app-icon name="shield" class="icon-warn shrink-0 mt-0.5" />
+      <div class="text-sm flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        @if (s.sensitive) {
+          <span><b>{{ s.sensitive }} {{ s.sensitive === 1 ? 'asset holds' : 'assets hold' }} fields marked sensitive</b> (patient or personal data);
+            their values are masked for anyone without access.</span>
+          <a class="link-inline" routerLink="/data/catalog" [queryParams]="{ flag: 'sensitive' }">Show them</a>
+        } @else {
+          <span><b>No field is marked sensitive yet.</b> Open a dataset or file and choose Scan for sensitive data: patient identifiers,
+            names and contact details are then marked and masked for anyone without access.</span>
+        }
+      </div>
+    </section>
+  }
+
   <app-table-shell heading="Assets" columnsKey="data-catalog" [loading]="loading()" [error]="error()" [isEmpty]="!shown().length"
                    [shown]="shown().length" [total]="total()" emptyIcon="database" (retry)="load()"
                    [emptyMessage]="search() || flag() || kind() || withDeleted() || withSystem() ? 'No asset matches.' : 'Nothing catalogued yet: upload a file or register a dataset.'">
@@ -47,7 +64,10 @@
         @for (a of shown(); track a.assetId) {
           <tr class="cursor-pointer" [attr.data-asset]="a.assetId" (click)="open(a.assetId, a.name)" tabindex="0" (keydown.enter)="open(a.assetId, a.name)">
             <td class="min-w-0">
-              <div class="font-medium truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="a.name">{{ a.name }}</div>
+              <div class="font-medium truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md flex items-center gap-1.5" [title]="a.name">
+                @if ((a.tags ?? []).length) { <app-icon name="shield" size="0.9em" class="icon-warn shrink-0" data-sensitive-asset aria-label="Holds sensitive fields" /> }
+                <span class="truncate">{{ a.name }}</span>
+              </div>
               <!-- Below 1280px the type rides on this line and its column goes: seven columns did not fit 1024 (UI review U4). -->
               <div class="text-xs text-[color:var(--text-muted)] truncate max-w-[12rem] lg:max-w-[16rem] xl:max-w-md" [title]="where(a)"><span class="xl:hidden">{{ kindText(a.kind) }} · </span>{{ where(a) }}</div>
               @if (a.status === 'Deleted') { <span class="pill pill-crit xl:hidden">Deleted</span> }

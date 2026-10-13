@@ -77,3 +77,8 @@
 /* A tile held at its height while the board is narrowed (heldHeights in dashboard.ts): its body
    takes what is left under the head and above the foot, and a longer result scrolls inside it. */
 app-analytics-widget.is-held ::ng-deep .widget-body { min-height: 0; overflow: auto; overscroll-behavior: contain; }
+
+/* A board's favourite star (UX review B5): top right of its card, beside the link rather than inside it. */
+.dash-fav { position: absolute; top: 0.625rem; right: 0.625rem; color: var(--text-muted); }
+.dash-fav:hover { color: var(--text-primary); }
+.dash-fav.is-on { color: var(--warn-text); }

@@ -6,6 +6,7 @@ import { DataText } from '../../shared/ui/data-text';
 import { WrapToggle } from '../../shared/ui/wrap-toggle';
 import { readWrap, writeWrap } from './data-grid';
 import { readsAsYears } from './charts/chart-table';
+import { columnLabel } from '../../shared/ui/column-label';
 
 /**
  * How many lines of a value a result table shows with "Wrap text" on. Not all of it, as the Data
@@ -61,7 +62,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
           <colgroup>@for (width of widths(); track $index) { <col [style.width.rem]="width" /> }</colgroup>
           <thead>
             <tr aria-rowindex="1">
-              @for (column of columns(); track column) { <th class="vt-head" [class.num]="numberColumn()[$index]" [title]="column">{{ column }}</th> }
+              @for (column of columns(); track column) { <th class="vt-head" [class.num]="numberColumn()[$index]" [title]="column">{{ label(column) }}</th> }
             </tr>
           </thead>
           <tbody>
@@ -88,7 +89,7 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
         <thead>
           <tr>
             @for (column of columns(); track column) {
-              <th class="whitespace-nowrap" [class.num]="numberColumn()[$index]">{{ column }}</th>
+              <th class="whitespace-nowrap" [class.num]="numberColumn()[$index]" [title]="column">{{ label(column) }}</th>
             }
           </tr>
         </thead>
@@ -134,6 +135,8 @@ export const WIDGET_TABLE_WRAP_KEY = 'result:widget-table';
   `],
 })
 export class WidgetTable {
+  /** UX review B5: a raw column name is shown as a heading ("Risk level"), the raw name its tooltip. */
+  protected readonly label = columnLabel;
   readonly columns = input<string[]>([]);
   readonly rows = input<(string | null)[][]>([]);
   /**

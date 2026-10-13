@@ -1,7 +1,7 @@
 import { Component, DestroyRef, OnInit, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { Subscription } from 'rxjs';
 import { Dialog } from '@angular/cdk/dialog';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth/auth.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
@@ -31,7 +31,7 @@ type KindFilter = '' | 'dataset' | 'file' | 'document_type';
  */
 @Component({
   selector: 'app-catalog',
-  imports: [RefreshButton, PageHeader, StatStrip, TableShell, Icon, Segmented, Pagination],
+  imports: [RefreshButton, PageHeader, StatStrip, TableShell, Icon, Segmented, Pagination, RouterLink],
   templateUrl: './catalog.html',
 })
 export class Catalog implements OnInit {

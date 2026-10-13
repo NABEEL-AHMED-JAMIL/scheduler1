@@ -2248,6 +2248,9 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .dash-grid > app-analytics-widget > .widget > .widget-body { flex: 1 1 auto; }
 /* A single figure sits in the middle of a tile its row has stretched, not at the top of it. */
 .dash-grid > app-analytics-widget[data-span="3"] > .widget > .widget-body { display: flex; flex-direction: column; justify-content: center; }
+/* UX review B5 (B1, M18): a single figure keeps its own height, top-aligned, rather than stretching to the gauge or
+   chart beside it in the row (a "100" floated in the middle of a 360px card). */
+.dash-grid > app-analytics-widget[data-span="3"] { align-self: start; }
 /* A table opened with "Show all" scrolls inside its tile rather than making the board a page long. */
 .dash-rows-open { max-height: 28rem; overflow: auto; }
 /* The board's facts, "7 widgets · 3 files · owner · last run", dotted between the parts. */

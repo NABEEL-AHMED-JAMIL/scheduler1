@@ -419,6 +419,49 @@ export class Dashboards implements OnInit, OnDestroy {
     pruneFilters(this.boardFilter()).clauses
       .map(node => (node as any).clauses ? '(a group)' : describeClause(node as any)));
 
+  // ---- favourites and groups (UX review B5, SA1) ------------------------------------------------
+  /** Each viewer's starred boards, kept in this browser under their own key. */
+  private readonly favouritesKey = `etl.dashboards.favourites.${typeof this.auth.user === 'function' ? this.auth.user()?.appUserId ?? 'anon' : 'anon'}`;
+  readonly favourites = signal<ReadonlySet<number>>(readFavourites(this.favouritesKey));
+  /** The pipelines each board's files come from (dashboard id -> pipeline names), as the server says. */
+  readonly boardPipelines = computed<ReadonlyMap<number, string[]>>(() => new Map(this.dashboards()
+    .filter(d => d.analyticsDashboardId != null && d.pipelines?.length)
+    .map(d => [d.analyticsDashboardId!, d.pipelines!.map(p => p.name || `Schedule #${p.jobId}`)])));
+
+  /** "Made by": the open board's newest feeding pipeline and its run, linked to the run page (B5, B1). */
+  readonly madeBy = computed(() => {
+    const pipelines = this.board()?.pipelines ?? [];
+    const first = pipelines[0];
+    if (!first) return null;
+    return {
+      name: first.name || `Schedule #${first.jobId}`,
+      run: first.lastRunId,
+      link: first.lastRunId ? ['/pipelines/schedules', first.jobId, 'runs', first.lastRunId, 'logs'] : ['/pipelines/schedules', first.jobId, 'executions'],
+      more: pipelines.length - 1,
+      all: pipelines.map(p => (p.name || `Schedule #${p.jobId}`) + (p.lastRunId ? ` · run #${p.lastRunId}` : '')).join('\n'),
+    };
+  });
+
+  isFavourite(item: Dashboard): boolean { return item.analyticsDashboardId != null && this.favourites().has(item.analyticsDashboardId); }
+
+  toggleFavourite(item: Dashboard, event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const id = item.analyticsDashboardId;
+    if (id == null) return;
+    const next = new Set(this.favourites());
+    if (next.has(id)) next.delete(id); else next.add(id);
+    this.favourites.set(next);
+    try { localStorage.setItem(this.favouritesKey, JSON.stringify([...next])); } catch { /* not remembered */ }
+  }
+
+  /**
+   * The cards in groups: the viewer's favourites first, then by the pipeline whose output each board reads (a board
+   * reading two pipelines' files sits under the first), then the boards no pipeline feeds. Without the pipelines known
+   * it is one group. A search narrows every group.
+   */
+  readonly dashboardGroups = computed(() => groupDashboards(this.visibleDashboards(), this.favourites(), this.boardPipelines()));
+
   readonly visibleDashboards = computed(() => {
     const needle = this.listFilter().trim().toLowerCase();
     if (!needle) return this.dashboards();
@@ -931,9 +974,11 @@ export class Dashboards implements OnInit, OnDestroy {
       ? this.analyses().find(item => item.analyticsAnalysisId === widget.analyticsAnalysisId)
       : this.queries().find(item => item.analyticsQueryId === widget.analyticsQueryId);
     if (!saved) return widget.analyticsAnalysisId ? 'Saved analysis' : 'Saved query';
-    const name = 'analysisName' in saved ? saved.analysisName : saved.queryName;
     const file = fileName(saved.datasetPath);
-    return name === widget.widgetTitle ? file : `${name} · ${file}`;
+    const name = withoutBoardName('analysisName' in saved ? saved.analysisName : saved.queryName, this.board()?.dashboardName);
+    // UX review B5 (B1, L11): "Riverside — Patient 360 — Patients in the cohort · cohort.csv" under a tile titled
+    // "Patients in the cohort" on the board "Riverside — Patient 360" said the board's name and the title again.
+    return !name || name === widget.widgetTitle ? file : `${name} · ${file}`;
   }
 
   /**
@@ -1840,4 +1885,49 @@ export class Dashboards implements OnInit, OnDestroy {
   clock(at: number): string {
     return this.timeOf(new Date(at), 'timeSec');
   }
+}
+
+/**
+ * A saved work's name without the board's own name in front of it ("Riverside — Patient 360 — Risk level" on that
+ * board is "Risk level"): the board says it once, in its header.
+ */
+export function withoutBoardName(name: string | null | undefined, board: string | null | undefined): string {
+  const n = (name ?? '').trim();
+  const b = (board ?? '').trim();
+  if (!b || !n.startsWith(b)) return n;
+  const rest = n.slice(b.length).replace(/^\s*[—–:\-·|]\s*/, '').trim();
+  return rest || n;
+}
+
+/** A viewer's starred board ids; anything unreadable is none. */
+export function readFavourites(key: string): ReadonlySet<number> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(key) ?? '[]');
+    return new Set(Array.isArray(saved) ? saved.filter((id: unknown) => typeof id === 'number') : []);
+  } catch { return new Set(); }
+}
+
+export interface DashboardGroup { key: string; label: string; items: Dashboard[]; }
+
+/** Favourites first, then one group per feeding pipeline (by name), then the rest -- each in the list's own order. */
+export function groupDashboards(items: Dashboard[], favourites: ReadonlySet<number>, pipelines: ReadonlyMap<number, string[]>): DashboardGroup[] {
+  const groups: DashboardGroup[] = [];
+  const favs = items.filter(i => i.analyticsDashboardId != null && favourites.has(i.analyticsDashboardId));
+  if (favs.length) groups.push({ key: 'favourites', label: 'Favourites', items: favs });
+  const rest = items.filter(i => !favs.includes(i));
+  if (!pipelines.size) {
+    if (rest.length) groups.push({ key: 'all', label: favs.length ? 'All dashboards' : '', items: rest });
+    return groups;
+  }
+  const byPipeline = new Map<string, Dashboard[]>();
+  const none: Dashboard[] = [];
+  for (const item of rest) {
+    const first = pipelines.get(item.analyticsDashboardId ?? -1)?.[0];
+    if (first) byPipeline.set(first, [...(byPipeline.get(first) ?? []), item]); else none.push(item);
+  }
+  for (const name of [...byPipeline.keys()].sort((a, b) => a.localeCompare(b))) {
+    groups.push({ key: 'pipeline:' + name, label: name, items: byPipeline.get(name)! });
+  }
+  if (none.length) groups.push({ key: 'none', label: byPipeline.size ? 'Not fed by a pipeline' : 'All dashboards', items: none });
+  return groups;
 }

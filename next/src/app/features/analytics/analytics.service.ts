@@ -717,7 +717,15 @@ export interface Dashboard {
   createdByName?: string;
   /** Present on fetchDashboardById, in display order. Absent on the listing. */
   widgets?: DashboardWidget[];
+  /**
+   * UX review B5: the pipelines whose output this board reads, the newest run first, from the catalog's lineage
+   * (analytics-service DashboardSources). Read-only; absent from an older server.
+   */
+  pipelines?: DashboardPipeline[];
 }
+
+/** A pipeline (by its schedule) that feeds a board, and its last run that did. */
+export interface DashboardPipeline { jobId: number; name: string | null; lastRunId: number | null; lastRunAt: string | null; }
 
 /**
  * What a widget draws, and the whole of what this client will store in visualization_type.
