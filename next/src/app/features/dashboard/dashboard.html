@@ -28,7 +28,7 @@
          Schedules. Unread lives on the bell. Each tile is the list it counts. A tile whose read failed shows a dash
          rather than a zero that reads like a real count. -->
     <app-blur-loader [active]="loading()" label="Loading…">
-      <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 stat-strip stat-row is-md is-start" role="list" data-test="home-kpis">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 stat-strip stat-row is-md is-start" role="list" data-test="home-kpis">
         <app-stat-tile label="Schedules" [value]="errors().status ? '—' : totalJobs()" icon="calendar" tone="info"
                        link="/pipelines/schedules" hint="Every schedule in this workspace" />
         <app-stat-tile label="Active schedules" [value]="errors().status ? '—' : activeJobs()" icon="zap" tone="ok"
