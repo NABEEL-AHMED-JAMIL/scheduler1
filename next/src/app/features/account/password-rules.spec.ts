@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { PasswordRulesHint } from './password-rules';
+import { PasswordRulesHint, newPasswordPlaceholder } from './password-rules';
 import { PasswordRules } from './account-security.api';
 
 const RULES: PasswordRules = {
@@ -33,6 +33,31 @@ describe('PasswordRulesHint', () => {
     expect(c.allMet()).toBe(false);
     const ok = hint('Long enough 12').componentInstance;
     expect(ok.allMet()).toBe(true);
+  });
+
+  it('shows one chip with the rule count, then progress and the first rule still missing (owner 10-12)', () => {
+    const empty = hint('');
+    expect(empty.componentInstance.summary()).toBe('Password rules (6)');
+    const chip = (empty.nativeElement as HTMLElement).querySelector('[data-test="password-rules-chip"]');
+    expect(chip?.textContent).toContain('Password rules (6)');
+    expect((empty.nativeElement as HTMLElement).querySelector('[data-test="password-rules-missing"]')).toBeNull();
+    // The full list is not on the page until the chip is clicked.
+    expect((empty.nativeElement as HTMLElement).querySelector('[data-test="password-rules-list"]')).toBeNull();
+
+    const partial = hint('Short1');
+    expect(partial.componentInstance.summary()).toBe('3 of 4 rules met');
+    expect((partial.nativeElement as HTMLElement).querySelector('[data-test="password-rules-missing"]')?.textContent)
+      .toContain('Still needs: at least 12 characters');
+
+    const ok = hint('Long enough 12');
+    expect(ok.componentInstance.summary()).toBe('Meets the rules');
+    expect((ok.nativeElement as HTMLElement).querySelector('[data-test="password-rules-chip"]')?.classList).toContain('rules-chip-ok');
+  });
+
+  it('gives a new-password field the length as its placeholder', () => {
+    expect(newPasswordPlaceholder(RULES)).toBe('At least 12 characters');
+    expect(newPasswordPlaceholder(null)).toBe('At least 12 characters');
+    expect(newPasswordPlaceholder({ ...RULES, passwordMinLength: 16 })).toBe('At least 16 characters');
   });
 
   it('shows nothing until the rules are known', () => {

@@ -26,7 +26,7 @@ import { instantMs } from '../../core/instant';
 import { Field } from '../../shared/ui/field';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { AccountSecurityApi, PasswordRules } from '../account/account-security.api';
-import { PasswordRulesHint } from '../account/password-rules';
+import { PasswordRulesHint, newPasswordPlaceholder } from '../account/password-rules';
 import { PageHeader } from '../../shared/ui/page-header';
 
 /** One run of one of the caller's jobs, as /sourceJob.json/myActivity reports it. */
@@ -259,6 +259,7 @@ export class Profile implements OnInit {
   readonly passwordError = signal('');
   /** MIG-353: the workspace's password rules, beside the new password. */
   readonly rules = signal<PasswordRules | null>(null);
+  readonly newPasswordHint = computed(() => newPasswordPlaceholder(this.rules()));
 
   canChangePassword(): boolean {
     return !!this.currentPassword() && this.newPassword().length >= (this.rules()?.passwordMinLength ?? 8);

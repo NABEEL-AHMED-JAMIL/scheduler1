@@ -1,7 +1,7 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AccountSecurityApi, PasswordRules } from '../../account/account-security.api';
-import { PasswordRulesHint } from '../../account/password-rules';
+import { PasswordRulesHint, newPasswordPlaceholder } from '../../account/password-rules';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Field } from '../../../shared/ui/field';
@@ -25,7 +25,7 @@ import { FormDialog } from '../../../shared/ui/form-dialog';
                    [control]="form.get('password')" [submitted]="submitted()"
                    hint="They will need this to sign in. It is stored hashed and cannot be read back.">
           <input id="resetPassword" type="password" class="input" formControlName="password"
-                 autocomplete="new-password" cdkFocusInitial (input)="typed.set($any($event.target).value)" />
+                 autocomplete="new-password" cdkFocusInitial [placeholder]="hint()" (input)="typed.set($any($event.target).value)" />
         </app-field>
         <!-- MIG-353: the person's workspace's rules; the server says which one a refused password broke. -->
         <app-password-rules [rules]="rules()" [password]="typed()" />
@@ -39,6 +39,7 @@ export class ResetPasswordDialog implements OnInit {
   private readonly security = inject(AccountSecurityApi);
   readonly submitted = signal(false);
   readonly rules = signal<PasswordRules | null>(null);
+  readonly hint = computed(() => newPasswordPlaceholder(this.rules()));
   readonly typed = signal('');
 
   ngOnInit(): void {

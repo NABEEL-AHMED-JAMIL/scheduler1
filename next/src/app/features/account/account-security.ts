@@ -8,7 +8,7 @@ import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { AccountSecurityApi, METHOD_LABEL, PasswordRules, SessionRow, deviceOf } from './account-security.api';
-import { PasswordRulesHint } from './password-rules';
+import { PasswordRulesHint, newPasswordPlaceholder } from './password-rules';
 import { SignInHistory } from './sign-in-history';
 import { TwoFactorCard } from './two-factor-card';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -30,6 +30,7 @@ export class AccountSecurity implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly rules = signal<PasswordRules | null>(null);
+  readonly newPasswordHint = computed(() => newPasswordPlaceholder(this.rules()));
   readonly sessions = signal<SessionRow[]>([]);
   readonly sessionsLoading = signal(false);
   readonly sessionsError = signal('');

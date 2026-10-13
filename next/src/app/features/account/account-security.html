@@ -33,11 +33,13 @@
       <div class="grid sm:grid-cols-2 gap-4 mt-4">
         <app-field label="Current password" for="sec-current-password">
           <input id="sec-current-password" type="password" class="input" autocomplete="current-password"
+                 placeholder="Your current password"
                  [value]="currentPassword()" (input)="currentPassword.set($any($event.target).value)" />
         </app-field>
         <div>
           <app-field label="New password" for="sec-new-password">
             <input id="sec-new-password" type="password" class="input" autocomplete="new-password"
+                   [placeholder]="newPasswordHint()"
                    [value]="newPassword()" (input)="newPassword.set($any($event.target).value)" />
           </app-field>
           <app-password-rules [rules]="rules()" [password]="newPassword()" />

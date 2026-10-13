@@ -132,6 +132,7 @@
             <app-field label="Password" for="password" [control]="form.controls.password">
               <input id="password" class="input" type="password" formControlName="password"
                      autocomplete="current-password"
+                     placeholder="Your password"
                      [attr.aria-invalid]="form.controls.password.touched && form.controls.password.invalid" />
             </app-field>
 

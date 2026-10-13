@@ -2608,3 +2608,24 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 .chat-composer { display: flex; align-items: flex-end; gap: 0.5rem; min-width: 0; }
 .chat-composer > textarea { flex: 1 1 auto; min-width: 0; min-height: 3.75rem; max-height: 12rem; resize: vertical; }
 .chat-composer > .btn { flex: none; min-height: 1.75rem; }
+
+/* Owner 10-12: the password rules as one small info chip under the field; a click opens them all. */
+@layer components {
+  .rules-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    height: 1.5rem;
+    padding: 0 0.6rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    background: var(--surface-sunken);
+    color: var(--text-secondary);
+    font-size: 0.75rem;
+    font-weight: 500;
+    cursor: pointer;
+  }
+  .rules-chip:hover { border-color: var(--accent-mark); color: var(--text-primary); }
+  .rules-chip:focus-visible { outline: 2px solid var(--accent-mark); outline-offset: 2px; }
+  .rules-chip-ok { color: var(--ok-text); border-color: color-mix(in srgb, var(--ok-text) 45%, transparent); }
+}

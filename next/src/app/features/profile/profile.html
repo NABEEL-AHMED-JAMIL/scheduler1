@@ -202,12 +202,14 @@
           <div class="grid sm:grid-cols-2 gap-4 mt-4 max-w-xl">
             <app-field label="Current password" for="currentPassword">
               <input id="currentPassword" type="password" class="input" autocomplete="current-password"
+                     placeholder="Your current password"
                      [value]="currentPassword()"
                      (input)="currentPassword.set($any($event.target).value)" />
             </app-field>
             <div>
               <app-field label="New password" for="newPassword">
                 <input id="newPassword" type="password" class="input" autocomplete="new-password"
+                       [placeholder]="newPasswordHint()"
                        [value]="newPassword()"
                        (input)="newPassword.set($any($event.target).value)" />
               </app-field>
