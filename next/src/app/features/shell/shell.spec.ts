@@ -47,14 +47,14 @@ describe('shell navigation', () => {
     shell.nav().flatMap(item => item.children ?? []);
 
   it('tags every page an access profile can withhold, and nothing a profile cannot', () => {
-    const tagged = children().filter(child => child.pageKey).map(child => child.path).sort();
+    const tagged = children().filter(child => child.pageKey || child.pageKeys).map(child => child.path).sort();
     expect(tagged).toEqual([
       '/ai/assistant', '/ai/prompts', '/ai/tools', '/data/analytics', '/data/analytics/dashboards', '/data/ask', '/data/catalog',
       // Documents in and Document types (its tab) are one page, behind one key.
       '/documents/converter', '/documents/files', '/documents/inbox', '/documents/intelligence', '/documents/intelligence',
       '/documents/reports', '/documents/review',
       '/documents/transcript', '/forms/builder', '/forms/submissions', '/integration/api-collections',
-      '/integration/connectors', '/integration/sources', '/pipelines', '/pipelines/executions', '/pipelines/queue', '/pipelines/run-analytics',
+      '/integration/connectors', '/integration/sources', '/pipelines', '/pipelines/executions', '/pipelines/run-analytics',
       '/pipelines/schedules', '/workflows/designer', '/workflows/inbox',
     ]);
     expect(children().find(child => child.path === '/dashboard')?.pageKey).toBeUndefined();
@@ -77,7 +77,9 @@ describe('shell navigation', () => {
     const paths = restricted.nav().flatMap(item => item.children ?? []).map(child => child.path);
 
     expect(paths).toContain('/pipelines/schedules');
-    expect(paths).toContain('/pipelines/queue');
+    // UX review B3 (E1): Runs and Runs by date are one entry, shown to a holder of either page.
+    expect(paths).toContain('/pipelines/executions');
+    expect(paths).not.toContain('/pipelines/queue');
     expect(paths).not.toContain('/pipelines/run-analytics');
     expect(paths).not.toContain('/documents/converter');
     expect(restricted.nav().map(item => item.label)).not.toContain('Documents');
@@ -265,7 +267,7 @@ describe('shell navigation', () => {
       const { fixture, shell: s, el } = await rendered('TENANT_ADMIN');
       s.toggleMenu('__user');
       await fixture.whenStable();
-      expect(el.querySelector('[data-nav-menu="__user"]')!.textContent).toContain('Tenant administrator');
+      expect(el.querySelector('[data-nav-menu="__user"]')!.textContent).toContain('Workspace administrator');
       localStorage.removeItem('etl_auth_user');
     });
 

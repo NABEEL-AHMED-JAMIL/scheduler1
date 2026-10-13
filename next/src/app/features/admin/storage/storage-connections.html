@@ -1,21 +1,13 @@
 <div class="page">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-      <h1 class="page-title">Storage connections</h1>
-      <p class="page-subtitle">
-        S3, Azure, MinIO or FTP/FTPS. Passwords, secret keys and connection strings are encrypted
-        and never sent back to the browser.
-      </p>
-      </div>
-      <div class="flex items-center gap-2">
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
-        @if (!locked()) {
-          <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New connection</button>
-        }
-      </div>
-    </div>
+  <!-- UX review B7 (I1): the Storage tab of Connections -- one page, one title, its own address and gate. -->
+  <app-page-header title="Connections" crumb="Storage"
+                   subtitle="S3, Azure, MinIO or FTP/FTPS that pipelines read and write. Passwords, secret keys and connection strings are encrypted and never sent back to the browser.">
+    <app-refresh-button [loading]="loading()" (refresh)="load()" />
+    @if (!locked()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="create()"><app-icon name="plus" />New storage connection</button>
+    }
   </app-page-header>
+  <app-connections-tabs active="storage" />
   <app-managed-banner what="storage connections" />
 
   <!-- The row answers "how much of this can a job use, and what is broken": what is in service,

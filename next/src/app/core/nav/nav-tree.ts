@@ -14,6 +14,10 @@ export interface NavChild {
   platformOnly?: boolean;
   /** The access-profile page this entry is; absent for pages a profile cannot take away. */
   pageKey?: PageKey;
+  /** Shown to whoever holds ANY of these pages (an entry that merged two pages keeps both keys: Runs). */
+  pageKeys?: PageKey[];
+  /** Other addresses that are this entry's views: it is the active entry and the breadcrumb's step there too. */
+  alsoAt?: string[];
   /** A page that is not built yet: the entry opens its "coming soon" page. */
   soon?: boolean;
   /**
@@ -53,8 +57,7 @@ export interface NavItem {
  * profile that granted "Task inbox" grants "Review inbox" -- the same screen, under its new name -- and an entry a
  * person cannot open stays hidden. The breadcrumbs read the same tree (page-header.ts).
  *
- * Not merged yet (separate tasks): Runs and Runs by date are still Executions and Queue (E1), and Storage connections
- * is still its own page rather than a tab of Connections (I1).
+ * Storage connections is the Storage tab of Connections (UX review B7, I1).
  */
 export const NAV: NavItem[] = [
   { label: 'Home', path: '/dashboard', icon: 'chart' },
@@ -63,9 +66,7 @@ export const NAV: NavItem[] = [
     icon: 'download',
     children: [
       { label: 'Connections', path: '/integration/connectors', pageKey: 'connector-hub', icon: 'plug',
-        hint: 'Databases, SaaS apps and files, ready to connect' },
-      { label: 'Storage connections', path: '/integration/storage-connections', icon: 'cloud', adminOnly: true,
-        hint: 'S3, Azure, MinIO and FTP that pipelines read and write' },
+        hint: 'Connectors for databases, SaaS apps and files, and the storage pipelines read and write' },
       { label: 'API Collections', path: '/integration/api-collections', pageKey: 'api-collections', icon: 'code',
         hint: 'Which APIs exist, tested and versioned' },
       { label: 'Sources', path: '/integration/sources', pageKey: 'sources', icon: 'database',
@@ -104,10 +105,10 @@ export const NAV: NavItem[] = [
     icon: 'play',
     children: [
       // Every schedule's newest runs, and the runs waiting for a review (MIG-325).
-      { label: 'Runs', path: '/pipelines/executions', pageKey: 'jobs', icon: 'history',
-        hint: 'Recent runs, and what waits for review' },
-      { label: 'Runs by date', path: '/pipelines/queue', pageKey: 'queue', icon: 'clock',
-        hint: 'Every run in a date range, in flight or done' },
+      // UX review B3 (E1): Runs and Runs by date are one page -- Latest and By date are its two views, each keeping its
+      // address and page key, and the entry shows for whoever holds either.
+      { label: 'Runs', path: '/pipelines/executions', pageKeys: ['jobs', 'queue'], alsoAt: ['/pipelines/queue'], icon: 'history',
+        hint: 'Recent runs, runs by date, and what waits for review' },
       { label: 'Schedules & triggers', path: '/pipelines/schedules', pageKey: 'jobs', icon: 'calendar',
         hint: 'When each pipeline runs, and what starts it' },
       { label: 'Review inbox', path: '/workflows/inbox', pageKey: 'task-inbox', icon: 'inbox', badge: 'tasks',
@@ -237,11 +238,12 @@ export function placeOf(url: string): { group?: NavItem; entry?: NavChild | NavI
       best = { group: undefined, entry: group, length: group.path.length, exactQuery: false };
     }
     for (const child of group.children ?? []) {
-      if (!(path === child.path || path.startsWith(child.path + '/'))) continue;
+      const at = [child.path, ...(child.alsoAt ?? [])].find(p => path === p || path.startsWith(p + '/'));
+      if (!at) continue;
       const queryMatch = !child.query || Object.entries(child.query).every(([k, v]) => query.get(k) === v);
       if (!queryMatch) continue;
-      const better = child.path.length > best.length || (child.path.length === best.length && !!child.query && !best.exactQuery);
-      if (better) best = { group, entry: child, length: child.path.length, exactQuery: !!child.query };
+      const better = at.length > best.length || (at.length === best.length && !!child.query && !best.exactQuery);
+      if (better) best = { group, entry: child, length: at.length, exactQuery: !!child.query };
     }
   }
   return { group: best.group, entry: best.entry };

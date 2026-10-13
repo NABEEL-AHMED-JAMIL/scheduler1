@@ -136,7 +136,7 @@ describe('route table', () => {
     expect(byPath['administration/tenants']).toBe('PLATFORM_ADMIN');
     expect(byPath['administration/tenant-requests']).toBe('PLATFORM_ADMIN');
     expect(byPath['configuration/engine']).toBe('PLATFORM_ADMIN');
-    for (const p of ['administration/users', 'integration/storage-connections', 'configuration/kafka',
+    for (const p of ['administration/users', 'integration/connectors/storage', 'configuration/kafka',
                      'configuration/values', 'configuration/home-pages', 'configuration/task-groups',
                      'ai/connections', 'ai/prompts/new', 'ai/prompts/:promptId/edit']) {
       expect(byPath[p]).toBe('TENANT_ADMIN');

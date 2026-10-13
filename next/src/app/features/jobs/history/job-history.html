@@ -13,13 +13,15 @@
         Every recorded run of schedule <span class="mono">#{{ jobId() }}</span>.
       } @else {
         <!-- Reached without a schedule (Runs in the menu): the last day's runs of every schedule. -->
-        The newest runs of every schedule in the last day@if (recentCut()) { (the latest {{ runs().length }})}. Open a run's
-        schedule for its whole history, or choose an hour on Home.
+        The newest runs of every schedule in the last day@if (recentCut()) { (the latest {{ runs().length }})}. By date lists
+        every run in a range.
       }
     </p>
   </app-page-header>
 
+  <!-- UX review B3 (E1): Latest and By date, the two views of the one Runs page. -->
   @if (!jobId() && !isDrillDown()) {
+    <app-runs-views active="latest" />
     <app-review-waiting />
   }
 

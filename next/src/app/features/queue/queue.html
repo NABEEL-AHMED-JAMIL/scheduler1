@@ -1,33 +1,14 @@
 <div class="page">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Runs by date</h1>
-        <p class="page-subtitle">Every run in the chosen dates — waiting, running and finished.</p>
-      </div>
-      <div class="flex items-center gap-2">
-        @if (hasInsights()) {
-          <button type="button" class="btn btn-ghost btn-sm"
-                  [class.text-accent]="showInsights()" [attr.aria-expanded]="showInsights()"
-                  (click)="showInsights.set(!showInsights())">
-            <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
-          </button>
-        }
-        <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
-      </div>
+  <!-- UX review B3 (E1): the By date view of the one Runs page; owner 2026-10-12: one date-range control in the header. -->
+  <app-page-header title="Runs" crumb="By date">
+    <p subtitle class="page-subtitle" data-test="runs-range">Every run from {{ rangeLabel() }}: waiting, running and finished.</p>
+    <div class="flex items-center gap-2">
+      <app-date-range [value]="range()" [storageKey]="rangeStore" [maxSpanDays]="366" label="Date range for runs" (rangeChange)="applyRange($event)" />
+      <app-refresh-button [live]="live()" [loading]="loading()" (refresh)="load()" />
     </div>
   </app-page-header>
+  <app-runs-views active="date" />
   <app-managed-banner what="runs' status" still="You can still see every run and its logs." />
-
-  @if (counts().length) {
-    <div class="flex flex-wrap gap-2">
-      @for (item of counts(); track item.status) {
-        <app-status-filter-chip [status]="item.status" [count]="item.count"
-                                 [selected]="selectedStatuses().includes(item.status)"
-                                 (toggle)="toggleStatus(item.status)" />
-      }
-    </div>
-  }
 
   @if (hasMore()) {
     <!-- The window, said where the chips and the charts are: they count the rows read, not the range. -->
@@ -81,8 +62,8 @@
       </div>
 
       <div class="card chart-card">
-        <h3 class="chart-title">Busiest jobs</h3>
-        <p class="chart-sub">Which jobs are producing the queue traffic.</p>
+        <h3 class="chart-title">Busiest schedules</h3>
+        <p class="chart-sub">Which schedules run most in these dates.</p>
         <app-ranked-bar [data]="byJob()" [max]="4" />
       </div>
 
@@ -108,32 +89,32 @@
     </div>
   }
 
-  <app-table-shell heading="Queue" [loading]="loading()" [error]="error()"
+  <app-table-shell heading="Runs" [loading]="loading()" [error]="error()"
                    [isEmpty]="!data().length" [shown]="data().length" [total]="rows().length"
                    emptyMessage="Nothing in the queue for these filters."
-                   emptyIcon="clock" [showSubbar]="!!rangeError()"
+                   emptyIcon="clock"
                    (retry)="load()">
     <ng-container toolbar>
-      <!-- Console-format dates ("5 Oct 2026"), the browser's calendar behind each (UI review U3). -->
-      <app-date-field class="max-w-44" inputId="queue-from" label="From date" [value]="fromDate()" [max]="toDate()"
-                      (valueChange)="setFrom($event)" />
-      <app-date-field class="max-w-44" inputId="queue-to" label="To date" [value]="toDate()" [min]="fromDate()"
-                      (valueChange)="setTo($event)" />
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search job, run or message" aria-label="Search queue messages"
+        <input class="input" placeholder="Search schedule, run or message" aria-label="Search runs"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
+      <!-- Owner 2026-10-12: the outcome chips and Charts are filters of this list, after the search, one height. -->
+      @for (item of counts(); track item.status) {
+        <app-status-filter-chip [status]="item.status" [count]="item.count"
+                                 [selected]="selectedStatuses().includes(item.status)"
+                                 (toggle)="toggleStatus(item.status)" />
+      }
+      @if (hasInsights()) {
+        <button type="button" class="btn btn-ghost btn-sm" data-test="runs-charts"
+                [class.text-accent]="showInsights()" [attr.aria-pressed]="showInsights()"
+                (click)="showInsights.set(!showInsights())">
+          <app-icon name="chart" />{{ showInsights() ? 'Hide charts' : 'Charts' }}
+        </button>
+      }
       @if (hasFilters()) {
         <button type="button" class="btn btn-ghost btn-sm" (click)="clearFilters()"><app-icon name="close" />Clear</button>
-      }
-    </ng-container>
-
-    <!-- The range is not read while it makes no sense, so the reason sits right under the boxes. -->
-    <ng-container subbar>
-      @if (rangeError()) {
-        <p id="queue-range-error" class="field-note text-crit-500 mt-0" role="alert">{{ rangeError() }}</p>
-        <button type="button" class="btn btn-ghost btn-sm" (click)="resetRange()"><app-icon name="calendar" />Last 7 days</button>
       }
     </ng-container>
 

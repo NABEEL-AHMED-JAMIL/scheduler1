@@ -75,7 +75,7 @@ async function land(url: string): Promise<{ url: string; title: string | undefin
  */
 const OLD_ADDRESSES: [string, string][] = [
   ['/admin/access-profiles', '/administration/access-profiles'],
-  ['/admin/storage', '/integration/storage-connections'],
+  ['/admin/storage', '/integration/connectors/storage'],
   ['/admin/tenant-requests', '/administration/tenant-requests'],
   ['/admin/tenants', '/administration/tenants'],
   ['/admin/users', '/administration/users'],
@@ -113,7 +113,9 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/settings/lookup', '/configuration/values'],
   ['/settings/pipeline-forms', '/configuration/task-registry'],
   ['/settings/pipelines', '/configuration/task-registry'],
-  ['/settings/storage-connections', '/integration/storage-connections'],
+  ['/settings/storage-connections', '/integration/connectors/storage'],
+  // UX review B7: Storage connections is the Storage tab of Connections.
+  ['/integration/storage-connections', '/integration/connectors/storage'],
   ['/settings/task-types', '/configuration/kafka'],
   ['/tasks', '/pipelines'],
   ['/tasks/1854/edit', '/pipelines/1854/edit'],
@@ -135,7 +137,7 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/operations/tasks/1854/edit', '/pipelines/1854/edit'],
   ['/operations/reports', '/pipelines/run-analytics'],
   ['/configuration/pipelines', '/configuration/task-registry'],
-  ['/configuration/storage-connections', '/integration/storage-connections'],
+  ['/configuration/storage-connections', '/integration/connectors/storage'],
   ['/objects/files', '/documents/files'],
   ['/objects/analytics', '/data/analytics'],
   ['/objects/analytics/dashboards', '/data/analytics/dashboards'],
@@ -192,7 +194,7 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/pipelines/executions', 'Runs', 'jobs', undefined],
     ['/pipelines/queue', 'Runs by date', 'queue', undefined],
     ['/pipelines/run-analytics', 'Run analytics', 'reports', undefined],
-    ['/integration/storage-connections', 'Storage connections', undefined, 'TENANT_ADMIN'],
+    ['/integration/connectors/storage', 'Storage connections', undefined, 'TENANT_ADMIN'],
     // MIG-332: the customer API's clients and event routes, an administrator's.
     ['/integration/api-clients', 'API Clients', undefined, 'TENANT_ADMIN'],
     // MIG-336: the developer portal; its pages are lazy children (features/developer/developer.routes.ts).
@@ -317,7 +319,6 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   // UX review 2026-10-12 (A10): grouped by job, one name per thing; every entry keeps its page key and least role.
   const HOME = ['Home -> /dashboard'];
   const CONNECTIONS = 'Get data in › Connections -> /integration/connectors';
-  const STORAGE = 'Get data in › Storage connections -> /integration/storage-connections';
   const API_AND_SOURCES = [
     'Get data in › API Collections -> /integration/api-collections',
     'Get data in › Sources -> /integration/sources',
@@ -330,7 +331,6 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const DOCUMENT_TYPES = 'Build › Document types -> /documents/intelligence';
   const APPROVALS = 'Build › Approval workflows -> /workflows/designer';
   const RUNS = 'Run & review › Runs -> /pipelines/executions';
-  const RUNS_BY_DATE = 'Run & review › Runs by date -> /pipelines/queue';
   const SCHEDULES = 'Run & review › Schedules & triggers -> /pipelines/schedules';
   const REVIEW_INBOX = 'Run & review › Review inbox -> /workflows/inbox';
   const DOCUMENT_REVIEW = 'Run & review › Document review -> /documents/review';
@@ -367,14 +367,14 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
     ...HOME,
     CONNECTIONS, ...API_AND_SOURCES, DOCUMENTS_IN, FILE_DROP, ...FORMS,
     PIPELINES, ...AI_BUILD, DOCUMENT_TYPES, APPROVALS,
-    RUNS, RUNS_BY_DATE, SCHEDULES, REVIEW_INBOX, DOCUMENT_REVIEW, RUN_ANALYTICS,
+    RUNS, SCHEDULES, REVIEW_INBOX, DOCUMENT_REVIEW, RUN_ANALYTICS,
     DASHBOARDS, ...ASK_AND_CATALOG, STUDIO, CATALOG, GENERATED, BROWSE, ...TOOLS,
   ];
   const ADMIN_MENU = [
     ...HOME,
-    CONNECTIONS, STORAGE, ...API_AND_SOURCES, DOCUMENTS_IN, FILE_DROP, ...FORMS,
+    CONNECTIONS, ...API_AND_SOURCES, DOCUMENTS_IN, FILE_DROP, ...FORMS,
     PIPELINES, ...AI_BUILD, DOCUMENT_TYPES, APPROVALS,
-    RUNS, RUNS_BY_DATE, SCHEDULES, REVIEW_INBOX, DOCUMENT_REVIEW, RUN_ANALYTICS,
+    RUNS, SCHEDULES, REVIEW_INBOX, DOCUMENT_REVIEW, RUN_ANALYTICS,
     DASHBOARDS, ...ASK_AND_CATALOG, STUDIO, CATALOG, GENERATED, BROWSE, ...TOOLS,
     ...ADMIN_WORKSPACE, TOOL_REGISTRY, ...ADMIN_SETTINGS, DEVELOPER_PORTAL,
   ];
@@ -406,7 +406,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       ...HOME,
       ...API_AND_SOURCES, FILE_DROP,
       PIPELINES, ...AI_BUILD,
-      RUNS, RUNS_BY_DATE, SCHEDULES, RUN_ANALYTICS,
+      RUNS, SCHEDULES, RUN_ANALYTICS,
       DASHBOARDS, STUDIO, GENERATED, BROWSE, ...TOOLS,
       // The Tool Registry rides the Prompts key, as it did under AI: a member holding Prompts still reads it.
       TOOL_REGISTRY,
@@ -422,12 +422,17 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
 
   it('a tenant user with five pages (api-check TU)', () => {
     expect(menuFor('TENANT_USER', ['jobs', 'tasks', 'queue', 'reports', 'objects'])).toEqual([
-      ...HOME, FILE_DROP, PIPELINES, RUNS, RUNS_BY_DATE, SCHEDULES, RUN_ANALYTICS, BROWSE,
+      ...HOME, FILE_DROP, PIPELINES, RUNS, SCHEDULES, RUN_ANALYTICS, BROWSE,
     ]);
   });
 
+  // UX review B3 (E1): one Runs entry for Runs and Runs by date, shown to whoever holds either page.
+  it('shows the one Runs entry to a member holding only the Queue page', () => {
+    expect(menuFor('TENANT_USER', ['queue'])).toEqual([...HOME, RUNS]);
+  });
+
   it('a tenant user with two pages keeps only those, and drops every empty menu', () => {
-    expect(menuFor('TENANT_USER', ['jobs', 'queue'])).toEqual([...HOME, RUNS, RUNS_BY_DATE, SCHEDULES]);
+    expect(menuFor('TENANT_USER', ['jobs', 'queue'])).toEqual([...HOME, RUNS, SCHEDULES]);
   });
 
   it('a tenant user with no page', () => {

@@ -21,7 +21,7 @@ const SCREENS: { url: string; writes: string[] }[] = [
   { url: '/integration/sources', writes: ['New source'] },
   { url: '/ai/prompts', writes: ['New prompt'] },
   { url: '/ai/connections', writes: ['New connection'] },
-  { url: '/integration/storage-connections', writes: ['New connection'] },
+  { url: '/integration/connectors/storage', writes: ['New storage connection'] },
   // Owner 2026-09-29: the Kafka and Task Registry screens are build screens too.
   { url: '/configuration/kafka', writes: ['New connection'] },
   { url: '/configuration/task-registry', writes: ['New registry task'] },

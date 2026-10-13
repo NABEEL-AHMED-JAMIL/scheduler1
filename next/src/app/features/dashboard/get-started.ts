@@ -23,7 +23,7 @@ export interface StartState {
 }
 
 const STEPS: Omit<StartStep, 'done'>[] = [
-  { key: 'storage', title: 'Connect your storage', link: '/integration/storage-connections', linkLabel: 'Storage connections',
+  { key: 'storage', title: 'Connect your storage', link: '/integration/connectors/storage', linkLabel: 'Connections › Storage',
     why: 'Where pipelines read files from and keep what they write: an S3, Azure, MinIO or FTP connection of your own.' },
   { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/inbox', linkLabel: 'Inbox', optional: true,
     why: 'Files people upload land in your storage, each under a key a pipeline step can read. A schedule can also start when one arrives.' },

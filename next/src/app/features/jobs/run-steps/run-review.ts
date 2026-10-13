@@ -57,7 +57,7 @@ const STATUS: Record<string, { label: string; tone: string; icon: string }> = {
           </div>
           @if (r.decisions?.length) {
             <ul class="space-y-1.5 text-sm">
-              @for (d of r.decisions ?? []; track d.runReviewDecisionId) {
+              @for (d of r.decisions; track d.runReviewDecisionId) {
                 <li class="flex flex-wrap items-baseline gap-x-2">
                   <span class="font-medium">{{ partyOf(d.party) }}</span>
                   <span [class]="d.decision === 'APPROVED' ? 'text-[color:var(--ok-text)]' : 'text-[color:var(--crit-text)]'">

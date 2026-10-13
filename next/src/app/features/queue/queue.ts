@@ -8,6 +8,8 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { localIsoDay, localIsoDaysAgo } from '../../shared/ui/local-day';
+import { DateRange, DateRangePicker, presetRange, rangeKey, rangeText, restoreRange } from '../../shared/ui/date-range';
+import { RunsViews } from '../jobs/history/runs-views';
 import { instantOf } from '../../core/instant';
 import { formatDuration } from '../../shared/ui/time-format';
 import { AuthService } from '../../core/auth/auth.service';
@@ -25,7 +27,6 @@ import { daySeries } from '../../shared/charts/day-series';
 import { statusColor } from '../../shared/charts/status-color';
 import { SplitBar } from '../../shared/charts/split-bar';
 import { createPager } from '../../shared/ui/pager';
-import { DateField } from '../../shared/ui/date-field';
 import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
@@ -66,7 +67,7 @@ const FAILED = new Set(['Failed', 'Interrupt']);
 
 @Component({
   selector: 'app-queue',
-  imports: [RefreshButton, PageHeader, DateField, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner],
+  imports: [RefreshButton, PageHeader, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, StatusFilterChip, Donut, RankedBar, BarChart, SplitBar, Pagination, ManagedBanner, DateRangePicker, RunsViews],
   templateUrl: './queue.html',
 })
 export class Queue implements OnInit {
@@ -106,8 +107,12 @@ export class Queue implements OnInit {
   readonly selectedStatuses = signal<string[]>([]);
   // fetchLogs requires a date range, so the page opens on the last seven days rather than
   // erroring with "FromDate missing" before the user has touched anything.
-  readonly fromDate = signal(localIsoDaysAgo(6));
-  readonly toDate = signal(localIsoDaysAgo(0));
+  /** Owner 2026-10-12: one date-range control (app-date-range), the viewer's last choice remembered. */
+  readonly rangeStore = rangeKey('runs-by-date', typeof this.auth?.user === 'function' ? this.auth.user()?.appUserId : null);
+  readonly range = signal<DateRange>(restoreRange(this.rangeStore, '7d'));
+  readonly fromDate = signal(this.range().from);
+  readonly toDate = signal(this.range().to);
+  readonly rangeLabel = computed(() => rangeText(this.fromDate(), this.toDate()));
 
   /**
    * Why the date boxes cannot be read, as on the dashboard. From after To was sent as it was and
@@ -410,13 +415,20 @@ export class Queue implements OnInit {
     this.pager.reset();
   }
 
-  setFrom(value: string): void { this.fromDate.set(value); this.load(); }
-  setTo(value: string): void { this.toDate.set(value); this.load(); }
+  setFrom(value: string): void { this.fromDate.set(value); this.range.set({ from: value, to: this.toDate(), preset: 'custom' }); this.load(); }
+  setTo(value: string): void { this.toDate.set(value); this.range.set({ from: this.fromDate(), to: value, preset: 'custom' }); this.load(); }
+
+  /** The range control's choice, read at once. */
+  applyRange(range: DateRange): void {
+    this.range.set(range);
+    this.fromDate.set(range.from);
+    this.toDate.set(range.to);
+    this.pager.reset();
+    this.load();
+  }
 
   resetRange(): void {
-    this.fromDate.set(localIsoDaysAgo(6));
-    this.toDate.set(localIsoDaysAgo(0));
-    this.load();
+    this.applyRange({ ...presetRange('7d'), preset: '7d' });
   }
 
   clearFilters(): void {

@@ -101,8 +101,8 @@ export const routes: Routes = [
       // ---------------------------------------------------------------------------------------------
       {
         // Infrastructure a pipeline reads from and writes to. Role-gated, not page-keyed: every call
-        // behind it is TENANT_ADMIN.
-        path: 'integration/storage-connections',
+        // behind it is TENANT_ADMIN. UX review B7 (I1): the Storage tab of Connections; the old address redirects here.
+        path: 'integration/connectors/storage',
         title: 'Storage connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
@@ -785,7 +785,8 @@ export const routes: Routes = [
         ['operations/tasks/:taskDetailId/edit', 'pipelines/:taskDetailId/edit'],
         ['operations/reports', 'pipelines/run-analytics'],
         ['configuration/pipelines', 'configuration/task-registry'],
-        ['configuration/storage-connections', 'integration/storage-connections'],
+        ['configuration/storage-connections', 'integration/connectors/storage'],
+        ['integration/storage-connections', 'integration/connectors/storage'],
         ['objects/files', 'documents/files'],
         ['objects/analytics', 'data/analytics'],
         ['objects/analytics/dashboards', 'data/analytics/dashboards'],
@@ -816,8 +817,8 @@ export const routes: Routes = [
         ['objects', 'documents/files'],
         ['analytics', 'data/analytics'],
         ['analytics/dashboards', 'data/analytics/dashboards'],
-        ['admin/storage', 'integration/storage-connections'],
-        ['settings/storage-connections', 'integration/storage-connections'],
+        ['admin/storage', 'integration/connectors/storage'],
+        ['settings/storage-connections', 'integration/connectors/storage'],
         // Prompts replaced AI Agents on 2026-09-18; the Ollama Models page folded into a
         // connection's "Test connection", which lists them.
         ['ai/agents', 'ai/prompts'],

@@ -126,7 +126,8 @@ export class Shell {
           !child.crumbOnly
           && (!child.adminOnly || isAdmin) && (!child.platformOnly || isPlatform)
           && (!child.teamOnly || (!isPlatform && this.showTeamActivity()))
-          && (!child.pageKey || this.auth.canOpen(child.pageKey))));
+          && (!child.pageKey || this.auth.canOpen(child.pageKey))
+          && (!child.pageKeys || child.pageKeys.some(key => this.auth.canOpen(key)))));
         return { ...item, children, blocks: blocksOf(children ?? []) };
       })
       .filter(item => !item.children || item.children.length > 0);
