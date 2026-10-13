@@ -555,7 +555,9 @@ describe('Run page: a run waiting at an Approval step', () => {
     ] });
     fixture.detectChanges();
     const feeds = el.querySelector('[data-link="feeds"]')!;
-    expect(feeds.textContent!.replace(/\s+/g, ' ').trim()).toBe('Feeds: Cohort overview, Readmissions');
+    expect(feeds.textContent!.replace(/\s+/g, ' ').trim()).toBe('Feeds: Cohort overview,Readmissions');
+    // Each board and its comma are one item of the row, which the row's gap spaces apart.
+    expect([...feeds.querySelectorAll(':scope > span')].map(item => item.textContent!.trim())).toEqual(['Cohort overview,', 'Readmissions']);
     expect([...feeds.querySelectorAll('a')].map(a => a.getAttribute('href'))).toEqual([
       '/data/analytics/dashboards?board=1448', '/data/analytics/dashboards?board=1450']);
     expect(el.querySelector('[data-link="dashboards"]')).toBeNull();

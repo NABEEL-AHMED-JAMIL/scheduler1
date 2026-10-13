@@ -17,7 +17,7 @@
           <span class="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 text-[color:var(--text-secondary)]" data-link="feeds">
             <app-icon name="chart" size="0.95em" />Feeds:
             @for (b of feeds(); track b.id; let last = $last) {
-              <a class="link-inline" [routerLink]="'/data/analytics/dashboards'" [queryParams]="{ board: b.id }" [attr.data-board]="b.id">{{ b.name }}</a>@if (!last) {<span>, </span>}
+              <span><a class="link-inline" [routerLink]="'/data/analytics/dashboards'" [queryParams]="{ board: b.id }" [attr.data-board]="b.id">{{ b.name }}</a>@if (!last) {<span>,</span>}</span>
             }
           </span>
         }
