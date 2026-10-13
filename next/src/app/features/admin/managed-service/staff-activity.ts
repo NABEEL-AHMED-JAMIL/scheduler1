@@ -5,6 +5,8 @@ import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ActionsPage, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** Words that read as initials, not as words, when a resource or action name is split. */
 const INITIALS: Record<string, string> = { ai: 'AI', api: 'API', apis: 'APIs', sql: 'SQL', url: 'URL', id: 'ID', ids: 'IDs', kafka: 'Kafka',
@@ -54,7 +56,7 @@ export const ACTIONS_PAGE = 50;
  */
 @Component({
   selector: 'app-staff-activity',
-  imports: [TableShell, Icon, ServerTimePipe],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe],
   templateUrl: './staff-activity.html',
 })
 export class StaffActivity implements OnInit {

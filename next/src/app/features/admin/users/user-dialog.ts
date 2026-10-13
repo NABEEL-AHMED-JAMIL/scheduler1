@@ -13,6 +13,8 @@ import { ROLE_META, UserRole } from '../../../core/auth/auth.models';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { AccountSecurityApi, PasswordRules } from '../../account/account-security.api';
 import { PasswordRulesHint } from '../../account/password-rules';
+import { Section } from '../../../shared/ui/section';
+import { FormRow } from '../../../shared/ui/form-row';
 
 /**
  * The picker's options, taken from the table that already names every role rather than said a
@@ -31,7 +33,7 @@ const ROLES = Object.entries(ROLE_META).map(([value, meta]) => ({
 
 @Component({
   selector: 'app-user-dialog',
-  imports: [PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox],
+  imports: [Section, FormRow, PasswordRulesHint, ReactiveFormsModule, Field, FormDialog, PhoneInput, Combobox],
   templateUrl: './user-dialog.html',
 })
 export class UserDialog {

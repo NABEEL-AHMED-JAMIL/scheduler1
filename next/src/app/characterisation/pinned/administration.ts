@@ -29,7 +29,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pageAccess.json/pages"
     ],
     "headings": [
-      "Access profiles",
+      "Page access",
       "Choose a workspace"
     ],
     "buttons": [
@@ -53,7 +53,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pageAccess.json/listProfiles"
     ],
     "headings": [
-      "Access profiles",
+      "Page access",
       "UI-REVIEW Analysts — Zürich – 東京 ✓ finance analytics and AI prompt authors (long name)",
       "UI-REVIEW No pages"
     ],
@@ -75,7 +75,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /pageAccess.json/listPeople"
     ],
     "headings": [
-      "Access profiles"
+      "Page access"
     ],
     "buttons": [
       "New profile",
@@ -127,7 +127,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /tenant.json/listTenants"
     ],
     "headings": [
-      "Tenants",
+      "Workspaces",
       "Tenants (2 of 2)",
       "Claude Demo 75a611b4",
       "Default"

@@ -28,6 +28,8 @@ import { createPager } from '../../../shared/ui/pager';
 import { Pagination } from '../../../shared/ui/pagination';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { AccountSecurityApi, PersonStanding } from '../../account/account-security.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** What one user owns and how their runs have gone, from dashboard.json/userStatistics. */
 export interface UserStatistic {
@@ -79,7 +81,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
+  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {

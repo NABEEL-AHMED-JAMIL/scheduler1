@@ -10,6 +10,7 @@ import { Bar, BarChart } from '../../../shared/charts/bar-chart';
 import { daySeries } from '../../../shared/charts/day-series';
 import { statusColor } from '../../../shared/charts/status-color';
 import { BillingSlo, BurnRate, PipelineRunsSlo, ReliabilityApi, RunGroup, SloWindow } from './reliability.service';
+import { PageHeader } from '../../../shared/ui/page-header';
 
 export type RangeDays = '7' | '28' | '90';
 
@@ -172,7 +173,7 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
  */
 @Component({
   selector: 'app-reliability',
-  imports: [Icon, StatTile, Segmented, BarChart, DecimalPipe, NgTemplateOutlet, RouterLink, ServerTimePipe],
+  imports: [PageHeader, Icon, StatTile, Segmented, BarChart, DecimalPipe, NgTemplateOutlet, RouterLink, ServerTimePipe],
   templateUrl: './reliability.html',
   // Local to the page, on the console's tokens: the status cards' big word and figures, the callout, the section head
   // (text beside its two tiles, wrapping under them when narrow) and a table that scrolls inside its own box.
@@ -188,7 +189,7 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
     .rel-section-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 1rem; }
     .rel-section-text { flex: 1 1 24rem; min-width: 0; max-width: 56rem; }
     .rel-section-tiles { flex: 0 1 32rem; min-width: min(100%, 20rem); display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
+      grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0; }
     .rel-tone-ok { color: var(--ok-text); }
     .rel-tone-warn { color: var(--warn-text); }
     .rel-tone-crit { color: var(--crit-text); }

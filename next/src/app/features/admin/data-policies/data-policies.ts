@@ -15,6 +15,8 @@ import {
   LevelDraft, MODEL_RULES, ModelChoice, ModelRule, PolicyLevel, allowedText, defaultLevel, draftOf, draftProblem, isChanged,
   levelsOf, modelChoices, policyState, ruleBlocks, ruleOf, saveBody,
 } from './data-policy.model';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 type Switch = 'aiWriteTools' | 'minFieldsWarning';
 
@@ -29,7 +31,7 @@ const readable = (text: string | null | undefined) => (text ?? '').replace(/\s--
  */
 @Component({
   selector: 'app-data-policies',
-  imports: [Icon, LoadError, BlurLoader, Combobox, Field, RouterLink],
+  imports: [RefreshButton, PageHeader, Icon, LoadError, BlurLoader, Combobox, Field, RouterLink],
   templateUrl: './data-policies.html',
 })
 export class DataPolicies implements OnInit {

@@ -1,19 +1,19 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Managed service</h1>
-      <p class="page-subtitle">
-        Which of our staff may work in which customer's workspace. Every change they make there is recorded in
-        <a routerLink="/administration/staff-activity" class="link-inline">Staff activity</a>.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Managed service</h1>
+        <p class="page-subtitle">
+          Which of our staff may work in which customer's workspace. Every change they make there is recorded in
+          <a routerLink="/administration/staff-activity" class="link-inline">Staff activity</a>.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="openGrant()"><app-icon name="plus" />Grant</button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="openGrant()"><app-icon name="plus" />Grant</button>
-    </div>
-  </div>
+  </app-page-header>
 
   <app-table-shell heading="Grants" [loading]="loading()" [error]="error()"
                    [isEmpty]="!grants().length" [shown]="grants().length"

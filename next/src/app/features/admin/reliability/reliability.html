@@ -1,14 +1,16 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Reliability</h1>
-      <p class="page-subtitle">Pipeline execution and billing against their 99.99% targets, from stored rows.</p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reliability</h1>
+        <p class="page-subtitle">Pipeline execution and billing against their 99.99% targets, from stored rows.</p>
+      </div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="range()" (valueChange)="setRange($event)" />
+        <button type="button" class="btn btn-ghost btn-sm" (click)="load()"><app-icon name="refresh" />Refresh</button>
+      </div>
     </div>
-    <div class="flex items-center gap-2 flex-wrap">
-      <app-segmented ariaLabel="Range" [options]="rangeOptions" [value]="range()" (valueChange)="setRange($event)" />
-      <button type="button" class="btn btn-ghost btn-sm" (click)="load()"><app-icon name="refresh" />Refresh</button>
-    </div>
-  </div>
+  </app-page-header>
 
   <!-- Firing rules, collapsed: one plain line per objective, the rule lines behind Details. -->
   @if (alertGroups().length) {
@@ -169,7 +171,7 @@
       </div>
       @if (runs(); as r) {
         @if (!runsLoading() && !runsError()) {
-          <div class="rel-section-tiles">
+          <div class="rel-section-tiles stat-strip stat-row is-md is-start" role="list">
             <app-stat-tile label="Runs counted" [value]="(r.numerator | number) + ' / ' + (r.denominator | number)" icon="play" tone="info"
               foot="completed / ended" />
             <app-stat-tile label="Left out" [value]="(r.excluded | number) ?? ''" icon="skip" tone="muted" foot="skips, refusals, closed by a person" />
@@ -220,7 +222,7 @@
       </div>
       @if (billing(); as b) {
         @if (!billingLoading() && !billingError()) {
-          <div class="rel-section-tiles">
+          <div class="rel-section-tiles stat-strip stat-row is-md is-start" role="list">
             <app-stat-tile label="Events counted" [value]="(b.numerator | number) + ' / ' + (b.denominator | number)" icon="database" tone="info"
               foot="priced / accepted" />
             <app-stat-tile label="Not priced" [value]="(b.unpriced | number) + ' · ' + (b.unrolled | number)" icon="alert"

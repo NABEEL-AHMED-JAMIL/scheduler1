@@ -15,6 +15,8 @@ import { confirmWith } from '../../../shared/ui/confirm';
 import { AccessPerson, AccessProfile, AccessProfilesService } from './access-profiles.service';
 import { AccessProfileDialog, AccessProfileDialogData } from './access-profile-dialog';
 import { AccessPeopleGrid } from './access-people-grid';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 /** A profile's pages arranged the way the menu arranges them, for the card. */
 interface CardSection { section: string; opens: string[]; withholds: string[]; }
@@ -30,7 +32,7 @@ interface Tenant { tenantId: number; tenantName: string; }
  */
 @Component({
   selector: 'app-access-profiles',
-  imports: [Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, Combobox],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, CdkMenu, CdkMenuItem, CdkMenuTrigger, AccessPeopleGrid, Combobox],
   templateUrl: './access-profiles.html',
 })
 export class AccessProfiles implements OnInit {

@@ -24,6 +24,8 @@ import { ApiLimitsDialog, ApiLimitsDialogData } from './api-limits-dialog';
 import { BillingZoneDialog, BillingZoneDialogData } from './billing-zone-dialog';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagementMode } from '../../../core/auth/auth.models';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 export interface Tenant {
   /** Filled in by the server on the way out; null on rows with no recorded author. */
@@ -75,7 +77,7 @@ interface ResourceCount {
 
 @Component({
   selector: 'app-tenants',
-  imports: [MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton],
+  imports: [RefreshButton, PageHeader, MineFilter, CdkMenu, CdkMenuItem, CdkMenuTrigger, ViewToggle, StatTile, Icon, ServerTimePipe, StatusPill, TableShell, Pagination, CopyButton],
   templateUrl: './tenants.html',
 })
 export class Tenants implements OnInit {

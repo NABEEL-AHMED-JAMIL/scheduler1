@@ -1,16 +1,16 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Security</h1>
-      <p class="page-subtitle">
-        How people sign in to {{ platformMode() ? 'every workspace, unless it sets its own rules' : 'this workspace' }}: password
-        rules, lockout, idle sign-out, two-factor login, single sign-on, and every sign-in.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Sign-in security</h1>
+        <p class="page-subtitle">
+          How people sign in to {{ platformMode() ? 'every workspace, unless it sets its own rules' : 'this workspace' }}: password
+          rules, lockout, idle sign-out, two-factor login, single sign-on, and every sign-in.
+        </p>
+      </div>
+      <app-refresh-button [loading]="loading()" (refresh)="load()" />
     </div>
-    <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-      <app-icon name="refresh" [class.spin]="loading()" />Refresh
-    </button>
-  </div>
+  </app-page-header>
 
   @if (isPlatformAdmin()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">
@@ -49,11 +49,14 @@
         }
       </div>
 
-      <div class="grid gap-6 mt-4 lg:grid-cols-3">
-        @for (group of groups; track group) {
-          <div class="min-w-0">
-            <h3 class="text-[11px] uppercase tracking-wider text-[color:var(--text-muted)] mb-2">{{ group }}</h3>
-            <div class="space-y-3">
+      <!-- UX review 2026-10-12 (A3, A4, SEC1): each group under a section title (not the uppercase overline the field labels
+           use), and a balanced grid: Passwords' seven fields in two columns over two thirds, Lockout and Sessions stacked in
+           the third, instead of 7 / 2 / 2 with half the card empty. -->
+      <div class="grid gap-x-8 gap-y-6 mt-4 lg:grid-cols-3">
+        @for (group of groups; track group; let first = $first) {
+          <div class="min-w-0" [class.lg:col-span-2]="first" [class.lg:row-span-2]="first">
+            <h3 class="form-legend">{{ group }}</h3>
+            <div [class]="first ? 'grid gap-x-5 gap-y-3 sm:grid-cols-2' : 'space-y-3'">
               @for (f of groupFields(group); track f.key) {
                 <div class="field">
                   <label class="label" [attr.for]="'rule-' + f.key">{{ f.label }}</label>
@@ -81,14 +84,15 @@
           <app-icon name="alert" size="0.9em" class="mt-px shrink-0" /><span>{{ saveError() }}</span>
         </p>
       }
-      <div class="flex flex-wrap gap-2 mt-4">
-        <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving() || loading()" data-test="rules-save">
-          <app-icon name="save" [busy]="saving()" />Save rules
-        </button>
+      <!-- A5: saved from the bar at the card's foot, the primary on the right like every other form. -->
+      <app-actions-bar class="-mx-4 -mb-4 mt-4 rounded-b-card" [dialog]="true" label="Sign-in rules">
         @if (!platformMode()) {
           <button type="button" class="btn btn-default btn-sm" (click)="useDefaults()">Use the platform's defaults</button>
         }
-      </div>
+        <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving() || loading()" data-test="rules-save">
+          <app-icon name="save" [busy]="saving()" />Save rules
+        </button>
+      </app-actions-bar>
     </section>
 
     <!-- Single sign-on -->
@@ -110,6 +114,13 @@
               (ADFS, Okta, Entra ID). Their company's own two-factor login applies there.
             </p>
           </div>
+          <!-- SEC1: the section's on-switch sits at its head, not in the middle of a column of fields. -->
+          @if (sso()) {
+            <label class="flex items-center gap-2 text-sm font-medium shrink-0">
+              <input type="checkbox" class="checkbox" [checked]="ssoDraft().enabled" (change)="setSso('enabled', $any($event.target).checked)" />
+              On: people can sign in this way
+            </label>
+          }
         </div>
 
         @if (sso(); as s) {
@@ -250,10 +261,6 @@
                   </select>
                 </div>
               }
-              <label class="flex items-center gap-2 text-sm">
-                <input type="checkbox" class="checkbox" [checked]="ssoDraft().enabled" (change)="setSso('enabled', $any($event.target).checked)" />
-                On: people can sign in this way
-              </label>
               <div class="rounded-md border border-subtle p-3 space-y-2 text-sm">
                 @if (ssoDraft().protocol === 'OIDC') {
                   <div>
@@ -332,7 +339,8 @@
             </p>
           }
           @if (ssoTest()) { <p class="field-note mt-3 flex items-center gap-1.5" role="status"><app-icon name="checkCircle" class="icon-ok" />{{ ssoTest() }}</p> }
-          <div class="flex flex-wrap gap-2 mt-4">
+          <!-- A5: saved from the bar at the card's foot, the primary on the right. -->
+          <app-actions-bar class="-mx-4 -mb-4 mt-4 rounded-b-card" [dialog]="true" label="Single sign-on">
             <button type="button" class="btn btn-primary btn-sm" (click)="saveSso()" [disabled]="ssoSaving()" data-test="sso-save">
               <app-icon name="save" [busy]="ssoSaving()" />Save single sign-on
             </button>
@@ -350,7 +358,7 @@
             @if (s.configured) {
               <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" (click)="removeSso()"><app-icon name="trash" />Remove</button>
             }
-          </div>
+          </app-actions-bar>
         } @else {
           <p class="text-sm text-[color:var(--text-muted)] mt-4">Loading…</p>
         }

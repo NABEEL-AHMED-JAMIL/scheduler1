@@ -11,6 +11,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { GrantDialog, GrantDialogData, GrantWorkspace } from './grant-dialog';
 import { ManagedGrant, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 
 interface TenantRow { tenantId: number; tenantName: string; status?: string; managementMode?: ManagementMode | null }
 
@@ -21,7 +23,7 @@ interface TenantRow { tenantId: number; tenantName: string; status?: string; man
  */
 @Component({
   selector: 'app-managed-service',
-  imports: [TableShell, Icon, ServerTimePipe, RouterLink],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, RouterLink],
   templateUrl: './managed-service.html',
 })
 export class ManagedService implements OnInit {

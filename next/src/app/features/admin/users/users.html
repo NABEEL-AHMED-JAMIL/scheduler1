@@ -1,20 +1,20 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Users</h1>
-      <p class="page-subtitle">
-        Roles are enforced on the server — they decide what a person can reach, not just what they see.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Users</h1>
+        <p class="page-subtitle">
+          Roles are enforced on the server — they decide what a person can reach, not just what they see.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="create()">
+          <app-icon name="plus" />New user
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="create()">
-        <app-icon name="plus" />New user
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
   @if (focusedTenantId() !== null) {
     <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
@@ -23,12 +23,12 @@
         Showing users in <strong>{{ focusedTenantName() }}</strong> only.
       </span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="clearTenantFocus()">
-        <app-icon name="close" />Show all tenants
+        <app-icon name="close" />Show all workspaces
       </button>
     </div>
   }
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Users',            value: summary().total, icon: 'users', tone: 'info' },
       { label: 'Active',           value: summary().active, icon: 'checkCircle', tone: 'ok' },
@@ -67,7 +67,7 @@
       @if (canPickTenant() && tenantOptions().length > 1) {
         <div class="w-44">
           <app-combobox id="users-tenant" ariaLabel="Filter by tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event); pager.reset()"
-                        placeholder="All tenants" clearLabel="All tenants" [options]="tenantComboOptions()" />
+                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantComboOptions()" />
         </div>
       }
       <select class="input max-w-32" [value]="statusFilter()" aria-label="Filter by state"
@@ -78,7 +78,7 @@
       </select>
       <div class="search-field max-w-56">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, email or tenant" aria-label="Search users"
+        <input class="input" placeholder="Search name, email or workspace" aria-label="Search users"
                [value]="search()" (input)="search.set($any($event.target).value); pager.reset()" />
       </div>
       <app-mine-filter [(only)]="onlyMine" (onlyChange)="pager.reset()" />

@@ -1,20 +1,20 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Data policies</h1>
-      <p class="page-subtitle">
-        For each level of data — public, internal, sensitive — which models may see it, how long a run keeps it, and
-        whether the AI Assistant may change things with it.
-      </p>
-    </div>
-    @if (!waitingForWorkspace()) {
-      <div class="flex items-center gap-2">
-        <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-          <app-icon name="refresh" [class.spin]="loading()" />Refresh
-        </button>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Data policies</h1>
+        <p class="page-subtitle">
+          For each level of data — public, internal, sensitive — which models may see it, how long a run keeps it, and
+          whether the AI Assistant may change things with it.
+        </p>
       </div>
-    }
-  </div>
+      @if (!waitingForWorkspace()) {
+        <div class="flex items-center gap-2">
+          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        </div>
+      }
+    </div>
+  </app-page-header>
 
   @if (isPlatformAdmin()) {
     <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">

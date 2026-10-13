@@ -1,18 +1,18 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Workspace requests</h1>
-      <p class="page-subtitle">
-        Asks from outside for a workspace. Approving one creates the tenant, its first
-        administrator, and emails them how to sign in.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Workspace requests</h1>
+        <p class="page-subtitle">
+          Asks from outside for a workspace. Approving one creates the tenant, its first
+          administrator, and emails them how to sign in.
+        </p>
+      </div>
+      <app-refresh-button [loading]="loading()" (refresh)="load()" />
     </div>
-    <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading()">
-      <app-icon name="refresh" [class.spin]="loading()" />Refresh
-    </button>
-  </div>
+  </app-page-header>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Waiting',  value: summary().pending,  foot: 'need a decision', icon: 'inbox', tone: 'warn' },
       { label: 'Approved', value: summary().approved, foot: 'became tenants', icon: 'checkCircle', tone: 'ok' },

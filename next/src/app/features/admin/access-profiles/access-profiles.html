@@ -1,32 +1,32 @@
 <div class="page">
-  <div class="page-head">
-    <div>
-      <h1 class="page-title">Access profiles</h1>
-      <p class="page-subtitle">
-        A named bundle of pages for your tenant users. Everyone holds one; anyone without their own
-        gets the default. Admins always open everything.
-      </p>
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Page access</h1>
+        <p class="page-subtitle">
+          A named bundle of pages for your tenant users. Everyone holds one; anyone without their own
+          gets the default. Admins always open everything.
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        @if (canPickTenant()) {
+          <!-- [selected] on the options, not [value] on the select: the select's value is applied
+               before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
+               above a grid that had already loaded that tenant's people. -->
+          <div class="w-56" data-testid="tenant-picker">
+            <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
+                          placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
+          </div>
+        }
+        <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
+        <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile" [disabled]="needsWorkspace()">
+          <app-icon name="plus" />New profile
+        </button>
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      @if (canPickTenant()) {
-        <!-- [selected] on the options, not [value] on the select: the select's value is applied
-             before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
-             above a grid that had already loaded that tenant's people. -->
-        <div class="w-56" data-testid="tenant-picker">
-          <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
-                        placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
-        </div>
-      }
-      <button type="button" class="btn btn-default btn-sm" (click)="load()" [disabled]="loading() || needsWorkspace()">
-        <app-icon name="refresh" [class.spin]="loading()" />Refresh
-      </button>
-      <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile" [disabled]="needsWorkspace()">
-        <app-icon name="plus" />New profile
-      </button>
-    </div>
-  </div>
+  </app-page-header>
 
-  <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     <app-stat-tile label="Profiles" [value]="stats().profiles" icon="layers" tone="info"
                    [foot]="stats().profiles === 0 ? 'none yet — everyone sees every page' : 'in this workspace'" />
     <app-stat-tile label="People assigned" [value]="stats().assigned" icon="users" tone="info"

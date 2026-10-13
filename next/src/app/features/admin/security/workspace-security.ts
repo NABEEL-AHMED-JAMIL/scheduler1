@@ -14,6 +14,9 @@ import { SignInHistory } from '../../account/sign-in-history';
 import { AccessProfile, AccessProfilesService } from '../access-profiles/access-profiles.service';
 import { FlagChoice, RANGES, RulesDraft, draftOf, draftProblem, platformText, settingsOf } from './security-settings.model';
 import { SsoStarted, rememberFlow } from '../../login/sign-in.api';
+import { PageHeader } from '../../../shared/ui/page-header';
+import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { ActionsBar } from '../../../shared/ui/actions-bar';
 
 /** A workspace's single sign-on, as the server answers it (never the secret). */
 export interface SsoSettings {
@@ -127,7 +130,7 @@ const RULE_FIELDS: { key: keyof RulesDraft; label: string; hint: string; flag?: 
  */
 @Component({
   selector: 'app-workspace-security',
-  imports: [Icon, Combobox, CopyButton, ServerTimePipe, SignInHistory],
+  imports: [ActionsBar, RefreshButton, PageHeader, Icon, Combobox, CopyButton, ServerTimePipe, SignInHistory],
   templateUrl: './workspace-security.html',
 })
 export class WorkspaceSecurity implements OnInit {
