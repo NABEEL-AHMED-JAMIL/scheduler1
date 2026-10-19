@@ -25,8 +25,8 @@ const ROWS = [
   { tenantId: 2963, tenantName: 'New', tenantCode: 'new', status: 'Active', userCount: 0, sourceTaskCount: 0, sourceJobCount: 0 },
 ];
 const FIGURES = { month: '2026-10', storageDay: '2026-10-18', workspaces: [
-  { tenantId: 2960, costThisMonth: '167.81', storageGb: '2.5', plan: 'Standard 2026', planOwn: false },
-  { tenantId: 2962, costThisMonth: '12.00', storageGb: '0.25', plan: 'Open Data pilot', planOwn: true },
+  { tenantId: 2960, costThisMonth: '167.81', storageBytes: '2684354560', plan: 'Standard 2026', planOwn: false },
+  { tenantId: 2962, costThisMonth: '12.00', storageBytes: '268435456', plan: 'Open Data pilot', planOwn: true },
 ] };
 
 function setup(figures: object = { status: 'SUCCESS', data: FIGURES }) {

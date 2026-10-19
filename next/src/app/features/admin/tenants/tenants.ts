@@ -8,7 +8,7 @@ import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { ManagedServiceApi } from '../managed-service/managed-service.api';
 import { ManagedSession } from '../managed-service/managed-session';
 import { BillingApi, WorkspaceFigure } from '../../billing/billing.service';
-import { formatMoney } from '../../billing/billing-format';
+import { formatBytes, formatMoney } from '../../billing/billing-format';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { AuthService } from '../../../core/auth/auth.service';
 import { StatusPill } from '../../../shared/ui/status-pill';
@@ -73,7 +73,7 @@ export interface Tenant {
   openAlerts?: number | null;
   /** Owner #19, billing's (billing.json/workspaceFigures): cost this month so far, storage on the last billed day, its plan. */
   costThisMonth?: number | null;
-  storageGb?: number | null;
+  storageBytes?: number | null;
   plan?: string | null;
   planOwn?: boolean;
 }
@@ -136,7 +136,7 @@ export class Tenants implements OnInit {
     { key: 'userCount', label: 'Users', title: 'People in the workspace' },
     { key: 'sourceTaskCount', label: 'Pipelines', title: 'Pipelines, and the schedules that run them' },
     { key: 'runsThisMonth', label: 'Runs', title: 'Runs this month (Chicago), and how many failed' },
-    { key: 'storageGb', label: 'Storage', title: 'Stored on the last billed day' },
+    { key: 'storageBytes', label: 'Storage', title: 'Written less deleted, as metered' },
     { key: 'costThisMonth', label: 'Cost', title: 'This month so far, priced each day' },
     { key: 'openAlerts', label: 'Alerts', title: 'Alerts open now' },
   ];
@@ -265,16 +265,12 @@ export class Tenants implements OnInit {
     const figures = this.figures();
     return this.tenants().map(t => {
       const f = figures.get(t.tenantId);
-      return f ? { ...t, costThisMonth: Number(f.costThisMonth), storageGb: f.storageGb == null ? null : Number(f.storageGb), plan: f.plan,
+      return f ? { ...t, costThisMonth: Number(f.costThisMonth), storageBytes: f.storageBytes == null ? null : Number(f.storageBytes), plan: f.plan,
         planOwn: !!f.planOwn } : t;
     });
   });
   money(v: number | null | undefined): string { return v == null ? '—' : formatMoney(Number(v)); }
-  storage(gb: number | null | undefined): string {
-    if (gb == null) return '—';
-    const n = Number(gb);
-    return n >= 1 ? `${n.toLocaleString('en-US', { maximumFractionDigits: 1 })} GB` : `${Math.round(n * 1024).toLocaleString('en-US')} MB`;
-  }
+  storage(bytes: number | null | undefined): string { return bytes == null ? '—' : formatBytes(Number(bytes)); }
   /** Active, Suspended or Inactive, and Managed beside it: the state in words. */
   stateTone(t: Tenant): string {
     return t.status === 'Active' ? 'pill-ok' : t.status === 'Suspended' ? 'pill-warn' : 'pill-neutral';

@@ -132,7 +132,7 @@
                   <div class="text-[11px] leading-tight" [class]="tenant.failedRunsThisMonth ? 'text-crit-500' : 'text-[color:var(--text-muted)]'">{{ tenant.failedRunsThisMonth || 0 }} failed</div>
                 } @else { <span class="text-[color:var(--text-muted)]" title="Core could not count them just now">—</span> }
               </td>
-              <td class="text-right tabular whitespace-nowrap">{{ storage(tenant.storageGb) }}</td>
+              <td class="text-right tabular whitespace-nowrap">{{ storage(tenant.storageBytes) }}</td>
               <td class="text-right tabular whitespace-nowrap" data-test="workspace-cost">{{ money(tenant.costThisMonth) }}</td>
               <td class="text-right tabular" data-test="workspace-alerts">
                 @if (tenant.openAlerts) { <span class="pill pill-crit">{{ tenant.openAlerts }} open</span> }
@@ -246,7 +246,7 @@
                 <dt class="text-[color:var(--text-muted)]">Runs this month</dt>
                 <dd class="m-0 text-right tabular">{{ tenant.runsThisMonth ?? '—' }}@if (tenant.failedRunsThisMonth) { <span class="text-crit-500"> · {{ tenant.failedRunsThisMonth }} failed</span> }</dd>
                 <dt class="text-[color:var(--text-muted)]">Cost this month</dt><dd class="m-0 text-right tabular">{{ money(tenant.costThisMonth) }}</dd>
-                <dt class="text-[color:var(--text-muted)]">Storage</dt><dd class="m-0 text-right tabular">{{ storage(tenant.storageGb) }}</dd>
+                <dt class="text-[color:var(--text-muted)]">Storage</dt><dd class="m-0 text-right tabular">{{ storage(tenant.storageBytes) }}</dd>
                 <dt class="text-[color:var(--text-muted)]">Alerts open</dt><dd class="m-0 text-right tabular" [class.text-crit-500]="!!tenant.openAlerts">{{ tenant.openAlerts ?? '—' }}</dd>
                 <dt class="text-[color:var(--text-muted)]">Plan</dt><dd class="m-0 text-right truncate" [title]="tenant.plan || ''">{{ tenant.plan || '—' }}</dd>
               </dl>

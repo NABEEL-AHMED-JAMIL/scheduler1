@@ -187,7 +187,8 @@ export interface CostTrends {
 export interface WorkspaceFigure {
   tenantId: number;
   costThisMonth: number;
-  storageGb: number | null;
+  /** Bytes written less bytes deleted, as metered since the start. */
+  storageBytes: number | null;
   plan: string | null;
   planVersion?: number | null;
   planOwn?: boolean;
