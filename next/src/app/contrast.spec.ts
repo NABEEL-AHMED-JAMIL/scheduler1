@@ -169,6 +169,8 @@ const TEXT = ['--text-primary', '--text-secondary', '--text-muted', '--accent-te
 const PROVIDER_PILLS = ['prov-openai', 'prov-anthropic', 'prov-ollama', 'prov-azure', 'prov-compat'];
 const PILLS = ['neutral', 'brand', 'ok', 'warn', 'crit', 'info', ...PROVIDER_PILLS];
 const SOLID_PILLS = ['brand', 'ok', 'warn', 'crit', 'neutral'];
+/** Owner #11: the payment chips (features/billing/payment-chips.ts), one pair per state and per method. */
+const PAYMENT_PILLS = ['pay-pending', 'pay-verified', 'pay-applied', 'pay-rejected', 'pay-failed', 'pay-refunded', 'pay-card', 'pay-bank'];
 
 function measure(tokens: Tokens, fg: string, bg: string, ground = '--surface-raised'): number {
   const base = resolve(`var(${ground})`, tokens);
@@ -219,6 +221,38 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
           }
         }
         expect(off).toEqual([]);
+      });
+
+      /** Owner #11: every payment chip reads at 4.5:1 -- on a card, a hovered row and a selected one. */
+      it('every payment chip clears 4.5:1, on a card, a hovered row and a selected row', () => {
+        const off: string[] = [];
+        for (const ground of ['--surface-raised', '--surface-sunken', '--row-selected-bg']) {
+          for (const chip of PAYMENT_PILLS) {
+            const r = measure(tokens, `--pill-${chip}-fg`, `--pill-${chip}-bg`, ground);
+            if (r < 4.5) off.push(`pill-${chip} on ${ground}: ${r}`);
+          }
+        }
+        expect(off).toEqual([]);
+      });
+
+      /**
+       * Owner #11: no two payment chips look alike -- each differs from every other in its ground or its text by at least
+       * 0.06 in OKLab (0.02 is barely visible), so Pending, Verified, Rejected, Failed, Refunded, Card and Bank are told
+       * apart at a glance, not only by their words.
+       */
+      it('gives every payment state and method its own colour', () => {
+        const ground = resolve('var(--surface-raised)', tokens);
+        const lab = (token: string) => toOklab(over(resolve(`var(${token})`, tokens), ground));
+        const close: string[] = [];
+        for (let i = 0; i < PAYMENT_PILLS.length; i++) {
+          for (let j = i + 1; j < PAYMENT_PILLS.length; j++) {
+            const [a, b] = [PAYMENT_PILLS[i], PAYMENT_PILLS[j]];
+            const dist = (x: number[], y: number[]) => Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]);
+            const d = Math.max(dist(lab(`--pill-${a}-bg`), lab(`--pill-${b}-bg`)), dist(lab(`--pill-${a}-fg`), lab(`--pill-${b}-fg`)));
+            if (d < 0.06) close.push(`${a} ~ ${b}: ${d.toFixed(3)}`);
+          }
+        }
+        expect(close).toEqual([]);
       });
 
       /** Owner item #12: two providers never share a chip -- each one's text colour stands apart from every other's. */
@@ -366,6 +400,7 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
           .sort((a, b) => a.r - b.r)[0];
         const text = weakest(TEXT.flatMap(fg => SURFACES.map(bg => [fg, bg] as [string, string])));
         const pills = weakest(PILLS.map(t => [`--pill-${t}-fg`, `--pill-${t}-bg`] as [string, string]));
+        const payments = weakest(PAYMENT_PILLS.map(t => [`--pill-${t}-fg`, `--pill-${t}-bg`] as [string, string]));
         const charts = weakest(Array.from({ length: 8 }, (_, i) => [`--chart-${i}`, '--surface-raised'] as [string, string]));
         const series = weakest(['brand', 'ok', 'warn', 'crit'].flatMap(f => [`--series-${f}`, `--series-${f}-soft`])
           .map(t => [t, '--surface-raised'] as [string, string]));
@@ -376,7 +411,7 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
         if (env['CONTRAST_REPORT']) {
           const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as { appendFileSync(p: string, d: string): void };
           fs.appendFileSync(env['CONTRAST_REPORT'], `${name}: text ${text.r} (${text.pair}); pills ${pills.r} (${pills.pair}); ` +
-            `chart ${charts.r} (${charts.pair}); status fills ${series.r} (${series.pair}); focus/marks ${marks.r} (${marks.pair}); ` +
+            `payment chips ${payments.r} (${payments.pair}); chart ${charts.r} (${charts.pair}); status fills ${series.r} (${series.pair}); focus/marks ${marks.r} (${marks.pair}); ` +
             `control borders ${controls.r} (${controls.pair}); ` +
             `primary text on card ${measure(tokens, '--text-primary', '--surface-raised')}\n`);
         }

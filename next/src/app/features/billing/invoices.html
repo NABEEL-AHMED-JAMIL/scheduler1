@@ -73,21 +73,26 @@
         <ul class="lookup-rail-list" role="listbox" aria-label="Invoices">
           @for (r of visible(); track r.invoiceId) {
             <li role="presentation">
-              <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="shownNumber() === r.number" [class.is-selected]="shownNumber() === r.number" (click)="select(r)">
-                <span class="kafka-rail-dot" [class]="'kafka-rail-dot bill-dot-' + tone(r)" [title]="statusLabel[r.status]" aria-hidden="true"></span>
-                <span class="sr-only">{{ statusLabel[r.status] }}</span>
+              <!-- Owner #8: the state in words on its own chip (it was a coloured dot), the amount right-aligned and tabular,
+                   the period and what is pending under the number; a long number or workspace name truncates with its title. -->
+              <button type="button" class="lookup-rail-item bill-rail-item" role="option" [attr.aria-selected]="shownNumber() === r.number" [class.is-selected]="shownNumber() === r.number" (click)="select(r)">
                 <span class="min-w-0 flex-1">
-                  <span class="lookup-rail-key mono">{{ r.number }}</span>
-                  <span class="lookup-rail-sub">
-                    {{ period(r) }} · <span class="tabular">{{ money(r.total, r.currency) }}</span>
-                    @if (r.status === 'overdue') { · <em>{{ overdueDays(r) }} d overdue</em> }
-                    @else if ((r.pendingPayments ?? 0) > 0) { · <em>slip to verify</em> }
-                    @else if (r.status === 'draft') { · running }
-                    @else if (r.status === 'partially_paid') { · {{ money(r.balance, r.currency) }} open }
-                    @if (cardNote(r); as c) { · <em data-card-note>{{ c }}</em> }
-                    @if (isPlatformAdmin()) { · {{ r.tenantName }} }
+                  <span class="bill-rail-line">
+                    <span class="lookup-rail-key mono" [title]="r.number">{{ r.number }}</span>
+                    <span class="pill" [class]="'pill ' + statusTone[r.status]" data-rail-status>{{ statusLabel[r.status] }}</span>
                   </span>
-                  @if (docsLabel(r)) { <span class="lookup-rail-sub">{{ docsLabel(r) }}</span> }
+                  <span class="bill-rail-line lookup-rail-sub">
+                    <span class="truncate">{{ period(r) }}@if (isPlatformAdmin() && r.tenantName) { · <span [title]="r.tenantName">{{ r.tenantName }}</span> }</span>
+                    <span class="tabular bill-rail-amount" [class.text-crit-500]="r.total < 0">{{ money(r.total, r.currency) }}</span>
+                  </span>
+                  <span class="lookup-rail-sub">
+                    @if (r.status === 'overdue') { <em>{{ overdueDays(r) }} d overdue</em> · }
+                    @else if ((r.pendingPayments ?? 0) > 0) { <em>slip to verify</em> · }
+                    @else if (r.status === 'draft') { running · }
+                    @else if (r.status === 'partially_paid') { {{ money(r.balance, r.currency) }} open · }
+                    @if (cardNote(r); as c) { <em data-card-note>{{ c }}</em> · }
+                    {{ docsLabel(r) || 'no documents yet' }}
+                  </span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
               </button>

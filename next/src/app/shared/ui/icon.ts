@@ -94,6 +94,10 @@ const PATHS: Record<string, string> = {
   // A sheet with a header band and ruled lines: a form definition rather than a plain document.
   template:  'M4 3h16a1 1 0 0 1 1 1v16a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1ZM3 9h18M7 13h10M7 17h6',
   // An office block, for a tenant: the Tenants screen has been asking for this name all along.
+  // Owner #11 (2026-10-19): a payment's method and a refund, beside its status chip.
+  card:      'M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2ZM2 10h20M6 15h4',
+  bank:      'M3 21h18M4 10h16M12 3l9 5H3ZM6 10v8M10 10v8M14 10v8M18 10v8',
+  undo:      'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3',
   building:  'M3 21h18M5 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16M13 21V10h5a1 1 0 0 1 1 1v10M8 8h2M8 12h2M8 16h2',
 };
 

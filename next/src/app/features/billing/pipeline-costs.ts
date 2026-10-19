@@ -8,7 +8,7 @@ import { StatusPill } from '../../shared/ui/status-pill';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { instantOf } from '../../core/instant';
 import { BillingApi, PipelineCostRow, PipelineCosts as Costs, RunCost, RunCostRow, UsageQuery } from './billing.service';
-import { dayHeading, formatMoney, groupByDay, moneyDigits, zonedDay, zonedTime } from './billing-format';
+import { dayHeading, formatMoney, formatShare, groupByDay, moneyDigits, zonedDay, zonedTime } from './billing-format';
 
 const RUNS_PAGE = 25;
 
@@ -81,9 +81,9 @@ export function shareOf(cost: number, total: number): number {
                   <td class="text-right tabular">{{ p.runs }}</td>
                   <td class="text-right tabular font-medium" [title]="exact(p.cost)">{{ money(p.cost) }}</td>
                   <td>
-                    <div class="flex items-center gap-2" [title]="share(p) + '% of the month'">
-                      <div class="h-1.5 flex-1 rounded-full overflow-hidden bg-sunken"><div class="h-full rounded-full bg-[color:var(--chart-0)]" [style.width.%]="share(p)"></div></div>
-                      <span class="text-[11px] tabular text-[color:var(--text-muted)] w-8 text-right">{{ share(p) }}%</span>
+                    <div class="flex items-center gap-2" [title]="shareText(p) + ' of the month'">
+                      <div class="h-1.5 flex-1 rounded-full overflow-hidden bg-sunken"><div class="h-full rounded-full bg-[color:var(--chart-0)]" [style.width.%]="p.cost > 0 ? Math.max(share(p), 1) : 0"></div></div>
+                      <span class="text-[11px] tabular text-[color:var(--text-muted)] w-8 text-right">{{ shareText(p) }}</span>
                     </div>
                   </td>
                 </tr>
@@ -190,6 +190,9 @@ export class PipelineCosts {
 
   exact(value: number): string { return formatMoney(value, this.costs()?.currency ?? this.currency(), 5); }
   share(p: PipelineCostRow): number { return shareOf(p.cost, this.costs()?.total ?? 0); }
+  /** Owner #7: "<1%" for a real cost that rounds to nothing, as By service writes it. */
+  shareText(p: PipelineCostRow): string { return formatShare(this.share(p), Number(p.cost)); }
+  readonly Math = Math;
 
   load(): void {
     this.reading?.unsubscribe();

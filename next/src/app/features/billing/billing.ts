@@ -10,7 +10,7 @@ import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { TableShell } from '../../shared/ui/data-table';
 import { instantOf } from '../../core/instant';
 import { BillingApi, DayRow, DayTotal, MeterLine, PricedWith, RunRow, SubjectRow, UsageQuery } from './billing.service';
-import { HOURS_PER_DAY, dayHeading, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, groupByDay, moneyDigits, pluralUnit, shiftDay, zonedDay, zonedTime } from './billing-format';
+import { HOURS_PER_DAY, dayHeading, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, groupByDay, moneyDigits, pluralUnit, shiftDay, zonedDay, zonedTime, formatShare } from './billing-format';
 import { CostByDay } from './cost-by-day';
 import { CostDay, CostView, forecastAtMonthEnd, forecastPace, orderServices, serviceCssColor } from './cost-by-day-model';
 import { WorkspacePicker } from './workspace-picker';
@@ -203,6 +203,10 @@ export class Billing implements OnInit {
   readonly runsLoading = signal(false);
   readonly runsError = signal('');
   private runsPage = 0;
+  readonly Math = Math;
+  /** Owner #7: a service's share, "<1%" for a real amount that rounds to nothing. */
+  shareLabel(share: number, amount: number): string { return formatShare(share, amount); }
+
   /** The precision the run Cost column shares, as the lines' Amount does. */
   readonly runDigits = computed(() => moneyDigits(this.runs().map(r => r.amount)));
   readonly moreRuns = computed(() => this.runs().length < this.runsTotal());

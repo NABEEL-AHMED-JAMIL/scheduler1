@@ -1,3 +1,4 @@
+import { ReceiptStampSettings } from './receipt-stamp-settings';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 
 import { Dialog } from '@angular/cdk/dialog';
@@ -25,7 +26,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-rate-cards',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ReceiptStampSettings],
   templateUrl: './rate-cards.html',
 })
 export class RateCards implements OnInit {

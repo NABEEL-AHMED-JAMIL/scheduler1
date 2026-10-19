@@ -8,6 +8,8 @@
       <div class="flex items-center gap-2 flex-wrap">
         <app-workspace-select [allowAll]="true" [value]="workspaces.chosenId()" (valueChange)="pickWorkspace($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <!-- Owner #10: a receipt someone sends back, checked against what the platform issued. -->
+        <button type="button" class="btn btn-default btn-sm" (click)="verifyFile()" data-test="verify-receipt-file" title="Check a receipt PDF's signature and that it is one this platform issued"><app-icon name="shield" />Verify a receipt</button>
         <button type="button" class="btn btn-primary btn-sm" (click)="statement()" [disabled]="statementBusy()" [title]="'The ' + year() + ' invoices and payments as one PDF'"><app-icon name="file" [busy]="statementBusy()" />Statement {{ year() }}</button>
       </div>
     </div>
@@ -54,11 +56,20 @@
         <ul class="lookup-rail-list" role="listbox" aria-label="Documents">
           @for (d of visible(); track d.documentId) {
             <li role="presentation">
+              <!-- Owner #9: what it is, its period and its state on every row (the date was cut off the one line), a long
+                   statement number shortened to its range with the whole number in the tooltip. -->
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedId() === d.documentId" [class.is-selected]="selectedId() === d.documentId" (click)="pick(d.documentId)">
                 <span class="doc-ic">{{ glyph(d) }}</span>
                 <span class="min-w-0 flex-1">
-                  <span class="lookup-rail-key is-wrap">{{ d.number || d.fileName }}</span>
-                  <span class="lookup-rail-sub">{{ kindLabel[d.kind] }}@if (d.invoiceNumber && d.kind !== 'invoice') { · for {{ d.invoiceNumber }} } · {{ d.issuedAt | serverTime: 'day' }}@if (d.amount != null) { · <span class="tabular">{{ money(d.amount, d.currency) }}</span> }</span>
+                  <span class="bill-rail-line">
+                    <span class="lookup-rail-key" [class.mono]="title(d) === d.number" [title]="d.number || d.fileName">{{ title(d) }}</span>
+                    @if (state(d); as c) { <span [class]="c.cls" [title]="c.title || c.label" data-doc-state>{{ c.label }}</span> }
+                  </span>
+                  <span class="lookup-rail-sub">{{ kindLabel[d.kind] }}@if (d.periodLabel || d.invoiceNumber) { · {{ about(d) }} }</span>
+                  <span class="bill-rail-line lookup-rail-sub">
+                    <span class="truncate">{{ d.issuedAt | serverTime: 'day' }}@if (isPlatformAdmin() && d.tenantName) { · {{ d.tenantName }} }</span>
+                    @if (d.amount != null) { <span class="tabular bill-rail-amount">{{ money(d.amount, d.currency) }}</span> }
+                  </span>
                 </span>
                 <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
               </button>
@@ -74,18 +85,22 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="pill pill-neutral">{{ kindLabel[d.kind] }}</span>
+              @if (state(d); as c) { <span [class]="c.cls" [title]="c.title || c.label" data-doc-state-head><app-icon [name]="c.icon" size="0.85em" />{{ c.label }}</span> }
               @if (isPlatformAdmin() && d.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ d.tenantName }}</span> }
-              @if (d.amount != null) { <span class="pill pill-brand tabular">{{ money(d.amount, d.currency) }}</span> }
             </div>
-            <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
-              <h2 class="lookup-detail-key" [title]="d.fileName">{{ d.number || d.fileName }}</h2>
-              <span class="text-xs text-[color:var(--text-muted)] min-w-0">
-                {{ d.issuedAt | serverTime: 'dateTime' }}@if (d.createdByName) { · {{ d.createdByName }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }
-                @if (d.invoiceNumber) { · for <a class="link-inline mono" [routerLink]="['/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> }
-              </span>
+            <div class="flex items-baseline gap-x-3 gap-y-1 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [class.mono]="title(d) === d.number" [title]="d.number || d.fileName">{{ title(d) }}</h2>
+              @if (d.amount != null) { <span class="text-sm font-semibold tabular" data-doc-amount>{{ money(d.amount, d.currency) }}</span> }
             </div>
+            <p class="text-xs text-[color:var(--text-muted)] mt-0.5 min-w-0">
+              {{ d.issuedAt | serverTime: 'dateTime' }}@if (d.periodLabel) { · {{ d.periodLabel }} }@if (d.createdByName) { · {{ d.createdByName }} }@if (d.sizeBytes) { · {{ humanSize(d.sizeBytes) }} }
+              @if (d.invoiceNumber) { · for <a class="link-inline mono" [routerLink]="['/billing/invoices', d.invoiceNumber]">{{ d.invoiceNumber }}</a> }
+            </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">
+            @if (d.kind === 'receipt' && d.number) {
+              <button type="button" class="btn btn-default btn-sm" (click)="verify(d)" data-test="verify-receipt" [title]="d.signed ? 'Check its digital signature, hash and certificate' : 'Issued before receipts were signed'"><app-icon name="shield" />Verify signature</button>
+            }
             <button type="button" class="btn btn-primary btn-sm" (click)="download(d)"><app-icon name="download" />Download</button>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="docMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
             <ng-template #docMenu>

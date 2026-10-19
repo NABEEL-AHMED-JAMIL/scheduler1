@@ -68,6 +68,8 @@ export interface PaymentRow {
   /** MIG-359: a card payment's provider and ids -- never card data, which Billing never sees. */
   currency?: string | null; provider?: string | null; providerPaymentId?: string | null; providerChargeId?: string | null;
   providerSessionId?: string | null; refundedAmount?: number | null;
+  /** Owner #10 (MIG-393): who verified it and in what role, as the receipt names them (frozen at verification). */
+  approverName?: string | null; approverRole?: string | null;
 }
 /** billing.json/payments: the latest payments, a workspace's or (the platform's) every workspace's (MIG-359). */
 export interface PaymentListRow extends PaymentRow {
@@ -83,6 +85,30 @@ export interface DocumentRow {
   tenantId: number; tenantName?: string; createdByName?: string;
   /** The currency `amount` is in: its invoice's, or the workspace's for a statement. */
   currency?: string;
+  /** Owner #9/#10: what it is about -- its invoice's period and status, its payment's state -- and a receipt's signature. */
+  invoiceStatus?: InvoiceRow['status'] | null; periodLabel?: string | null;
+  paymentStatus?: PaymentRow['status'] | null; paymentMethod?: string | null; paymentProvider?: string | null;
+  paymentAmount?: number | null; refundedAmount?: number | null;
+  signed?: boolean; sha256?: string | null;
+}
+/** Owner #10 (MIG-393): one check of "Verify this receipt". */
+export interface ReceiptCheck { key: 'signed' | 'intact' | 'certified' | 'issued' | 'certificate'; label: string; ok: boolean; detail: string; }
+/** billing.json/receipt/verify: the verdict, each check, the receipt it matched and what its signature says. */
+export interface ReceiptVerdict {
+  verified: boolean; source: 'stored' | 'upload'; summary: string; checks: ReceiptCheck[]; trustNote: string;
+  receipt?: { documentId: number; number: string; tenantId: number; invoiceId?: number; paymentId?: number; amount?: number; issuedAt?: string; sha256?: string };
+  signature: { signed: boolean; signerName?: string | null; signerSubject?: string | null; certificateSha256?: string | null;
+    certificateNotAfter?: string | null; reason?: string | null; location?: string | null; signedAt?: string | null; sha256: string; problems: string[] };
+}
+/** billing.json/receipt/signing: whether receipts are signed, and with which certificate -- never the key. */
+export interface ReceiptSigning {
+  configured: boolean; subject?: string; signerName?: string; certificateSha256?: string; notAfter?: string; selfIssued?: boolean;
+  reason: string; trustNote?: string;
+}
+/** billing.json/stamp: the receipt stamp the platform's (and one workspace's) receipts use. */
+export interface StampInfo { fileName: string; contentType: string; sizeBytes: number; updatedBy?: number | null; dateUpdated?: string | null; }
+export interface ReceiptStamp {
+  platformName: string; platform: StampInfo | null; workspace?: StampInfo | null; uses: 'generated' | 'platform' | 'workspace'; signing: ReceiptSigning;
 }
 export interface InvoiceDetail extends InvoiceRow {
   lines: InvoiceLine[]; payments: PaymentRow[]; documents: DocumentRow[]; account: BillingAccount; referencesNumber?: string; createdByName?: string;
@@ -244,6 +270,21 @@ export class BillingApi {
   documents(tenantId?: string | null): Observable<ApiResponse<DocumentRow[]>> { return this.http.get<ApiResponse<DocumentRow[]>>(`${this.base}/documents`, { params: this.tenantParam(tenantId) }); }
   /** The invoice number as a QR code (PNG); the PDF carries the same one. */
   qrBlob(number: string, size = 160): Observable<Blob> { return this.http.get(`${this.base}/invoice/qr`, { params: { number, size: String(size) }, responseType: 'blob' }); }
+  // ---- owner #10 (MIG-393): signed receipts and the receipt stamp ----
+  verifyReceipt(number: string): Observable<ApiResponse<ReceiptVerdict>> { return this.http.get<ApiResponse<ReceiptVerdict>>(`${this.base}/receipt/verify`, { params: { number } }); }
+  verifyReceiptFile(file: File): Observable<ApiResponse<ReceiptVerdict>> {
+    const form = new FormData(); form.append('file', file, file.name);
+    return this.http.post<ApiResponse<ReceiptVerdict>>(`${this.base}/receipt/verify`, form);
+  }
+  receiptSigning(): Observable<ApiResponse<ReceiptSigning>> { return this.http.get<ApiResponse<ReceiptSigning>>(`${this.base}/receipt/signing`); }
+  receiptCertificate(): Observable<Blob> { return this.http.get(`${this.base}/receipt/certificate`, { responseType: 'blob' }); }
+  stamp(tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> { return this.http.get<ApiResponse<ReceiptStamp>>(`${this.base}/stamp`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) }); }
+  saveStamp(file: File, tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> {
+    const form = new FormData(); form.append('file', file, file.name);
+    return this.http.post<ApiResponse<ReceiptStamp>>(`${this.base}/stamp`, form, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) });
+  }
+  removeStamp(tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> { return this.http.post<ApiResponse<ReceiptStamp>>(`${this.base}/stamp/remove`, null, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) }); }
+  stampSpecimen(tenantId?: number | null): Observable<Blob> { return this.http.get(`${this.base}/stamp/specimen`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)), responseType: 'blob' }); }
   documentBlob(documentId: number): Observable<Blob> { return this.http.get(`${this.base}/document`, { params: { documentId: String(documentId) }, responseType: 'blob' }); }
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
@@ -343,10 +384,10 @@ export function modelOfMeter(meter: string): string | null {
  */
 export function cardPaymentChip(i: Pick<InvoiceRow, 'status' | 'paidVia' | 'paymentError' | 'payLinkOpen' | 'cardPayable'>):
   { label: string; tone: string; title: string } | null {
-  if (i.status === 'paid' && i.paidVia === 'card') return { label: 'Paid by card', tone: 'pill-ok', title: 'Paid online by card through Stripe' };
+  if (i.status === 'paid' && i.paidVia === 'card') return { label: 'Paid by card', tone: 'pill-pay pill-pay-card', title: 'Paid online by card through Stripe' };
   const open = i.status === 'issued' || i.status === 'partially_paid' || i.status === 'overdue';
   if (!open) return null;
-  if (i.paymentError) return { label: 'Card declined', tone: 'pill-crit', title: i.paymentError };
+  if (i.paymentError) return { label: 'Card declined', tone: 'pill-pay pill-pay-failed', title: i.paymentError };
   if (i.payLinkOpen) return { label: 'Pay link open', tone: 'pill-neutral', title: 'A Stripe checkout is open for this invoice' };
   return null;
 }
@@ -354,8 +395,13 @@ export function cardPaymentChip(i: Pick<InvoiceRow, 'status' | 'paidVia' | 'paym
 export const INVOICE_STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', issued: 'Issued', partially_paid: 'Partially paid', paid: 'Paid', overdue: 'Overdue', void: 'Void',
 };
+/**
+ * Owner #8 (2026-10-19): each invoice state its own chip -- a draft outlined (still changing), issued blue (open, nothing
+ * wrong), partly paid amber, paid green, overdue red, void grey -- where issued and partly paid were one amber, and a
+ * draft and a void one grey.
+ */
 export const INVOICE_STATUS_TONE: Record<string, string> = {
-  draft: 'pill-neutral', issued: 'pill-warn', partially_paid: 'pill-warn', paid: 'pill-ok', overdue: 'pill-crit', void: 'pill-neutral',
+  draft: 'pill-brand', issued: 'pill-info', partially_paid: 'pill-warn', paid: 'pill-ok', overdue: 'pill-crit', void: 'pill-neutral',
 };
 export const DOCUMENT_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', receipt: 'Receipt', statement: 'Statement', payment_slip: 'Payment slip',

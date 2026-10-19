@@ -9,7 +9,10 @@ import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { formatSize } from '../../shared/ui/format-size';
-import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
+import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { Dialog } from '@angular/cdk/dialog';
+import { PaymentChip, paymentStateChip } from './payment-chips';
+import { RECEIPT_VERIFY_TITLE_ID, ReceiptVerifyDialog, ReceiptVerifyData } from './receipt-verify';
 import { MoneyTotals, addMoney, formatMoney, formatTotals } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
@@ -33,6 +36,7 @@ export class BillingDocuments implements OnInit, OnDestroy {
   private readonly api = inject(BillingApi);
   private readonly toast = inject(ToastService);
   private readonly route = inject(ActivatedRoute);
+  private readonly dialog = inject(Dialog);
   readonly workspaces = inject(WorkspacePicker);
   readonly isPlatformAdmin = this.workspaces.isPlatformAdmin;
 
@@ -113,6 +117,18 @@ export class BillingDocuments implements OnInit, OnDestroy {
   clearFilters(): void { this.search.set(''); this.kind.set(''); }
   money(v: number, currency?: string): string { return formatMoney(v, currency || 'USD'); }
   totals(t: MoneyTotals): string { return formatTotals(t); }
+  /** A document's name in the list: its number -- a statement's shortened to its range ("Statement 1 Jan – 31 Dec 2026 #2") -- or its file. */
+  title(d: DocumentRow): string { return documentTitle(d); }
+  /** What it is about: its billing period, else the invoice it belongs to. */
+  about(d: DocumentRow): string { return d.periodLabel ? d.periodLabel.replace(/,\s*[A-Za-z_]+\/[A-Za-z_]+$|,\s*UTC$/, '') + (d.kind !== 'invoice' && d.invoiceNumber ? ' · ' + d.invoiceNumber : '') : (d.invoiceNumber ?? ''); }
+  /** Its state, as the chip every billing screen uses (owner #9, #11). */
+  state(d: DocumentRow): PaymentChip | null { return documentState(d); }
+  verify(d: DocumentRow): void {
+    this.dialog.open<void, ReceiptVerifyData>(ReceiptVerifyDialog, { data: { number: d.number }, hasBackdrop: true, ariaLabelledBy: RECEIPT_VERIFY_TITLE_ID });
+  }
+  verifyFile(): void {
+    this.dialog.open<void, ReceiptVerifyData>(ReceiptVerifyDialog, { data: {}, hasBackdrop: true, ariaLabelledBy: RECEIPT_VERIFY_TITLE_ID });
+  }
   glyph(d: DocumentRow): string { const t = d.contentType || ''; return t.includes('pdf') ? 'PDF' : t.startsWith('image/') ? 'IMG' : 'FILE'; }
   open(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.open(b), error: () => this.toast.error('Could not open the document.') }); }
   download(d: DocumentRow): void { this.api.documentBlob(d.documentId).subscribe({ next: b => BillingApi.save(b, d.fileName), error: () => this.toast.error('Could not download the document.') }); }
@@ -125,4 +141,33 @@ export class BillingDocuments implements OnInit, OnDestroy {
       error: err => { this.statementBusy.set(false); this.toast.error(err?.error?.message || 'The statement could not be prepared.'); },
     });
   }
+}
+
+/** "STM-2961-2026-01-01-2026-12-31-2" as "Statement 1 Jan – 31 Dec 2026 #2"; any other document by its number or file name. */
+export function documentTitle(d: Pick<DocumentRow, 'kind' | 'number' | 'fileName'>): string {
+  const m = /^STM-\d+-(\d{4})-(\d{2})-(\d{2})-(\d{4})-(\d{2})-(\d{2})-(\d+)$/.exec(d.number ?? '');
+  if (d.kind === 'statement' && m) {
+    const month = (n: string) => ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][Number(n) - 1];
+    const from = `${Number(m[3])} ${month(m[2])}${m[1] === m[4] ? '' : ' ' + m[1]}`;
+    return `Statement ${from} – ${Number(m[6])} ${month(m[5])} ${m[4]} #${m[7]}`;
+  }
+  return d.number || d.fileName;
+}
+
+/**
+ * A document's state as the chip every billing screen uses: an invoice's or credit note's status, a slip's payment
+ * state, a receipt signed or not (owner #9, #10, #11); a statement has none.
+ */
+export function documentState(d: DocumentRow): PaymentChip | null {
+  if (d.kind === 'receipt') {
+    return d.signed ? { kind: 'signed', label: 'Signed', cls: 'pill pill-pay pill-pay-verified', icon: 'shield', title: 'Digitally signed with the platform\'s certificate' }
+      : { kind: 'unsigned', label: 'Not signed', cls: 'pill pill-pay pill-neutral', icon: 'file', title: 'Issued before receipts were signed' };
+  }
+  if (d.kind === 'payment_slip' && d.paymentStatus) {
+    return paymentStateChip({ status: d.paymentStatus, method: d.paymentMethod, provider: d.paymentProvider, amount: d.paymentAmount, refundedAmount: d.refundedAmount });
+  }
+  if ((d.kind === 'invoice' || d.kind === 'credit_note') && d.invoiceStatus) {
+    return { kind: d.invoiceStatus, label: INVOICE_STATUS_LABEL[d.invoiceStatus] ?? d.invoiceStatus, cls: 'pill ' + (INVOICE_STATUS_TONE[d.invoiceStatus] ?? 'pill-neutral'), icon: 'file' };
+  }
+  return null;
 }

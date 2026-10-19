@@ -31,16 +31,22 @@
       <button type="button" class="btn btn-default btn-sm mt-3" (click)="load()"><app-icon name="refresh" />Try again</button>
     </div>
   } @else {
-    <p class="text-xs text-[color:var(--text-muted)]">
+    <!-- Owner #7: the facts of the month as chips -- the card that prices it, the currency, the day, yesterday and the
+         billing time zone -- rather than one dotted line that wrapped mid-fact at 1024. -->
+    <div class="bill-meta" data-test="usage-meta">
       @if (rateCard(); as card) {
-        Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> }
-        @if (card.fallback; as f) { <span data-fallback-card>· meters it does not name are priced from <b>{{ f.name }}</b> v{{ f.version }}</span> } · {{ currency() }}
-        @if (isPlatformAdmin()) { · <a routerLink="/billing/settings" class="link-inline">rate cards</a> }
-      } @else { Priced with the rate card in effect · {{ currency() }} }
-      · day {{ daysElapsed() }} of {{ daysInMonth() }}
-      @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
-      @if (timeZone(); as zone) { · <span data-billing-zone title="Days and months on this page and on the invoice are counted in this workspace's billing time zone">days in {{ zone }}</span> }
-    </p>
+        <span class="bill-meta-chip" data-test="usage-card" [title]="'Priced with ' + card.name + ' v' + card.version"><app-icon name="layers" size="0.9em" />Priced with <b>{{ card.name }}</b> v{{ card.version }}</span>
+        @if (card.tenantSpecific) { <span class="pill pill-brand">This workspace's card</span> }
+        @if (card.fallback; as f) { <span class="bill-meta-chip" data-fallback-card [title]="'Meters it does not name are priced from ' + f.name + ' v' + f.version"><app-icon name="layers" size="0.9em" />others priced from <b>{{ f.name }}</b> v{{ f.version }}</span> }
+      } @else {
+        <span class="bill-meta-chip"><app-icon name="layers" size="0.9em" />Priced with the rate card in effect</span>
+      }
+      <span class="bill-meta-chip"><b>{{ currency() }}</b></span>
+      <span class="bill-meta-chip tabular"><app-icon name="calendar" size="0.9em" />Day {{ daysElapsed() }} of {{ daysInMonth() }}</span>
+      @if (isCurrentMonth()) { <span class="bill-meta-chip tabular">Yesterday <b>{{ fmtMoney(yesterday()) }}</b></span> }
+      @if (timeZone(); as zone) { <span class="bill-meta-chip" data-billing-zone title="Days and months on this page and on the invoice are counted in this workspace's billing time zone"><app-icon name="globe" size="0.9em" />Days in <b>{{ zone }}</b></span> }
+      @if (isPlatformAdmin()) { <a routerLink="/billing/settings" class="bill-meta-chip"><app-icon name="settings" size="0.9em" />Rate cards</a> }
+    </div>
 
     @if (unpricedLines().length) {
       <!-- Rate card fallback: what is left unpriced is on no card at all -- billed at 0 until a card prices it. -->
@@ -87,9 +93,10 @@
             <tbody>
               @for (s of byService(); track s.service) {
                 <tr [attr.data-service]="s.service">
-                  <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}</td>
+                  <td><span class="inline-block size-2.5 rounded-sm mr-2 align-middle" [style.background]="s.color"></span>{{ s.service }}
+                    <div class="svc-share" aria-hidden="true"><span [style.width.%]="s.amount > 0 ? Math.max(s.share, 1) : 0" [style.background]="s.color"></span></div></td>
                   <td class="text-right tabular" [title]="fmtExact(s.amount)">{{ fmtAmount(s.amount) }}</td>
-                  <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ s.share }}%</td>
+                  <td class="text-right tabular text-[color:var(--text-muted)] w-14">{{ shareLabel(s.share, s.amount) }}</td>
                 </tr>
               }
             </tbody>

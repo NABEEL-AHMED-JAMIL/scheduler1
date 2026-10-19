@@ -45,6 +45,15 @@ export function formatTotals(totals: MoneyTotals): string {
   return codes.map(code => formatMoney(totals[code], code)).join(' · ');
 }
 
+/**
+ * A share of a total as a column writes it (owner #7): "77%", and "<1%" for a real amount that rounds to nothing --
+ * "0%" beside $0.16 read as if that line cost nothing.
+ */
+export function formatShare(sharePercent: number, amount: number): string {
+  if (amount > 0 && sharePercent < 1) return '<1%';
+  return `${Math.round(sharePercent)}%`;
+}
+
 /** Money as a headline figure: whole units. */
 export function formatMoneyRound(value: number, currency = 'USD'): string {
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, maximumFractionDigits: 0 }).format(value);

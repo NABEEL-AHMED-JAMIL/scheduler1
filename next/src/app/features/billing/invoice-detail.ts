@@ -17,6 +17,8 @@ import { DOC_VIEW_TITLE_ID, DocumentViewDialog } from './document-view-dialog';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { dayText } from '../../shared/ui/date-field';
 import { PaymentPanel, PaymentPanelData, PaymentPanelResult } from './payment-panel';
+import { paymentMethodChip, paymentStateChip } from './payment-chips';
+import { RECEIPT_VERIFY_TITLE_ID, ReceiptVerifyDialog, ReceiptVerifyData } from './receipt-verify';
 import { BillingApi, cardPaymentChip, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, paymentMethodLabel } from './billing.service';
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
@@ -127,7 +129,7 @@ export class InvoicePane implements OnDestroy {
         continue;
       }
       out.push({ at: p.dateCreated, text: `Payment of ${this.money(Number(p.amount))} ${p.method === 'credit_note' ? 'credited (' + p.reference + ')' : 'submitted' + (p.submittedBy ? ' by ' + p.submittedBy : '') + (p.reference ? ' · ' + p.reference : '')}`, tone: 'muted' });
-      if (p.verifiedAt && p.method !== 'credit_note') out.push({ at: p.verifiedAt, text: p.status === 'verified' ? `Verified${p.verifiedBy ? ' by ' + p.verifiedBy : ''} · receipt ${p.receiptNumber}` : `Rejected${p.verifiedBy ? ' by ' + p.verifiedBy : ''}${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
+      if (p.verifiedAt && p.method !== 'credit_note') out.push({ at: p.verifiedAt, text: p.status === 'verified' ? `Verified${(p.verifiedBy || p.approverName) ? ' by ' + (p.verifiedBy || p.approverName) : ''} · receipt ${p.receiptNumber}` : `Rejected${(p.verifiedBy || p.approverName) ? ' by ' + (p.verifiedBy || p.approverName) : ''}${p.note ? ' · ' + p.note : ''}`, tone: p.status === 'verified' ? 'ok' : 'crit' });
     }
     if (i.paidAt && i.status === 'paid') out.push({ at: i.paidAt, text: 'Paid in full', tone: 'ok' });
     if (i.voidedAt) out.push({ at: i.voidedAt, text: `Voided${i.note ? ' · ' + i.note : ''}`, tone: 'crit' });
@@ -226,6 +228,16 @@ export class InvoicePane implements OnDestroy {
 
   // ---- documents ----
   /** Read in place, in the same modal the Object Browser opens a file in. */
+  /** Owner #11: a payment's state and method, the same chips on every billing screen. */
+  stateChip(p: PaymentRow) { return paymentStateChip(p); }
+  methodChip(p: PaymentRow) { return paymentMethodChip(p.method, p.provider); }
+
+  /** Owner #10: "Verify this receipt" -- its stored copy's signature, hash and certificate, in place. */
+  verifyReceipt(number: string | null | undefined): void {
+    if (!number) return;
+    this.dialog.open<void, ReceiptVerifyData>(ReceiptVerifyDialog, { data: { number }, hasBackdrop: true, ariaLabelledBy: RECEIPT_VERIFY_TITLE_ID });
+  }
+
   openDocument(documentId: number): void {
     const doc = this.invoice()?.documents.find(d => d.documentId === documentId);
     if (!doc) return;
