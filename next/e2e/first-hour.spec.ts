@@ -180,15 +180,16 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     if (!registry.some((p: any) => p.pipelineId === REGISTRY_ID)) {
       await page.goto('/settings/task-registry');
       await page.getByRole('button', { name: 'New registry task' }).click();
-      await page.getByRole('heading', { name: 'New registry task' }).waitFor();
-      const dialog = page.getByRole('dialog').last();
+      // Owner #18: New registry task is a page of its own now, not a dialog.
+      await page.getByRole('heading', { name: 'New registry task', level: 1 }).waitFor();
+      const dialog = page.locator('app-registry-task-editor');
       await dialog.locator('#pipelineId').fill(REGISTRY_ID);
       await dialog.locator('#pipelineName').fill(REGISTRY_NAME);
       await pick(page, 'pipelineTopic', TOPIC, TOPIC);
       await dialog.getByRole('button', { name: /Add (a )?field/i }).first().click();
       await dialog.locator('#tagKey0').fill('input_file');
       await dialog.locator('#label0').fill('Input file');
-      await dialog.getByRole('button', { name: 'Create pipeline' }).click();
+      await dialog.getByRole('button', { name: 'Create registry task' }).first().click();
       await expect(page.getByText(`"${REGISTRY_NAME}" saved`)).toBeVisible();
     }
     lap('registry task');

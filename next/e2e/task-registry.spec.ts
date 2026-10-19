@@ -106,7 +106,7 @@ test.describe('Task Registry', () => {
     expect(line).toMatchObject({ enabled: true, overridden: false });
   });
 
-  test('a Legacy row opens the existing pipeline dialog (viewed only)', async ({ browser }) => {
+  test('a Legacy row opens its registry task page (owner #18; viewed only)', async ({ browser }) => {
     const page = await pageAs(browser, s);
     await page.goto('/settings/task-registry');
     // Found by its id: the list is paged.
@@ -117,14 +117,16 @@ test.describe('Task Registry', () => {
     await expect(panel.locator('.pipeline-fields li').first()).toBeVisible();
     await expect(panel.getByRole('switch')).toHaveCount(0);
     await panel.getByRole('button', { name: 'Edit registry task' }).click();
-    const dialog = page.locator('app-pipeline-dialog');
-    await expect(dialog.getByRole('heading', { name: 'Edit registry task' })).toBeVisible();
+    const dialog = page.locator('app-registry-task-editor');
+    await expect(page).toHaveURL(/\/settings\/task-registry\/\d+$/);
+    await expect(dialog.getByRole('heading', { name: SHARED.pipelineName, level: 1 })).toBeVisible();
     await expect(dialog.locator('#pipelineId')).toHaveValue(SHARED.pipelineId);
     await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page).toHaveURL(/\/settings\/task-registry$/);
     await expect(dialog).toHaveCount(0);
   });
 
-  test('a Legacy row\'s dialog saves as before: same pipeline, topic and fields in order', async ({ browser, request }) => {
+  test('a Legacy row\'s page saves as the dialog did: same pipeline, topic and fields in order', async ({ browser, request }) => {
     const key = await checkPipeline(request, s);
     const before = await fieldsOf(request, s, key);
     const page = await pageAs(browser, s);
@@ -132,10 +134,10 @@ test.describe('Task Registry', () => {
     await page.getByRole('textbox', { name: 'Search tasks' }).fill(CHECK_ID);
     await page.getByRole('button', { name: `Open ${CHECK_NAME}` }).click();
     await page.getByRole('dialog', { name: CHECK_NAME }).getByRole('button', { name: /^Edit (pipeline|registry task)$/ }).click();
-    const dialog = page.locator('app-pipeline-dialog');
+    const dialog = page.locator('app-registry-task-editor');
     await expect(dialog.locator('#pipelineId')).toHaveValue(CHECK_ID);
     const sent = page.waitForRequest(r => r.url().includes('/pipeline.json/save') && r.method() === 'POST');
-    await dialog.getByRole('button', { name: 'Save changes' }).click();
+    await dialog.getByRole('button', { name: 'Save changes' }).first().click();
     const body = JSON.parse((await sent).postData() ?? '{}');
     expect(body).toMatchObject({ pipelineKey: key, pipelineId: CHECK_ID, pipelineName: CHECK_NAME, sourceTaskTypeId: TOPIC, status: 'Active' });
     expect(body.fields.map((f: { tagKey: string; position: number }) => `${f.position}:${f.tagKey}`)).toEqual(before.map(f => `${f.position}:${f.tagKey}`));

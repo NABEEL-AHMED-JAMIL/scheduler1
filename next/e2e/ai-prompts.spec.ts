@@ -111,7 +111,8 @@ test.describe('AI prompts in pipelines', () => {
     expect(topic, 'the default profile has a topic').toBeTruthy();
     await page.goto('/configuration/pipelines');
     await page.getByRole('button', { name: 'New registry task' }).click();
-    await page.getByRole('heading', { name: 'New registry task' }).waitFor();
+    // Owner #18: New registry task is a page of its own now, not a dialog.
+    await page.getByRole('heading', { name: 'New registry task', level: 1 }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
     await page.locator('#pipelineName').fill(PIPELINE_NAME);
     await pick(page, 'pipelineTopic', topic.serviceName.slice(0, 12), topic.serviceName);
@@ -129,7 +130,7 @@ test.describe('AI prompts in pipelines', () => {
     await expect(page.locator('.side-panel-foot')).toContainText('Ready');
     await page.getByRole('button', { name: 'Apply' }).click();
     await expect(page.locator('.ai-step-line')).toContainText(PROMPT);
-    await page.getByRole('button', { name: 'Create pipeline' }).click();
+    await page.getByRole('button', { name: 'Create registry task' }).first().click();
     await expect(page.getByText(`"${PIPELINE_NAME}" saved`)).toBeVisible();
     const pipelines = await (await request.get(`${api}/pipeline.json/listForTopic?sourceTaskTypeId=${topic.sourceTaskTypeId}`, { headers })).json();
     pipelineKey = pipelines.data.find((p: any) => p.pipelineId === PIPELINE_ID)?.pipelineKey ?? null;

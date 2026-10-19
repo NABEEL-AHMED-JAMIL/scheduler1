@@ -84,14 +84,15 @@ test.describe('topics and pipelines', () => {
     // ── 2. Pipelines: define one on that topic (the topic box is searchable) ─────────────
     await page.goto('/configuration/pipelines');
     await page.getByRole('button', { name: 'New registry task' }).click();
-    await page.getByRole('heading', { name: 'New registry task' }).waitFor();
+    // Owner #18: New registry task is a page of its own now, not a dialog.
+    await page.getByRole('heading', { name: 'New registry task', level: 1 }).waitFor();
     await page.locator('#pipelineId').fill(PIPELINE_ID);
     await page.locator('#pipelineName').fill(PIPELINE_NAME);
     await pick(page, 'pipelineTopic', STAMP, TOPIC_NAME);
     await page.getByRole('button', { name: /Add (a )?field/i }).first().click();
     await page.locator('input[formcontrolname="tagKey"], input[id^="tagKey"]').first().fill('input_folder');
     await page.locator('input[formcontrolname="label"], input[id^="label"]').first().fill('Input folder');
-    await page.getByRole('button', { name: 'Create pipeline' }).click();
+    await page.getByRole('button', { name: 'Create registry task' }).first().click();
     await expect(page.getByText(`"${PIPELINE_NAME}" saved`)).toBeVisible();
     // The list is paged now; the topic's own list is the direct way to the row.
     const pipelines = await (await request.get(`${api}/pipeline.json/listForTopic?sourceTaskTypeId=${topicId}`, { headers })).json();
