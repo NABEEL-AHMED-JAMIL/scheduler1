@@ -131,16 +131,24 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Document Converter",
+      "1 Convert",
+      "Limits and queue",
       "Recent conversions (1 of 1)"
     ],
     "buttons": [
+      "30 days",
+      "7 days",
+      "90 days",
+      "All time",
       "Columns",
+      "Custom",
       "Delete this conversion",
       "From a bucket",
       "PDF from a dataset",
       "PDF from a run",
+      "Read the queue again",
       "Refresh",
-      "Supported formats",
+      "Supported formats2 families",
       "Upload a file",
       "View the converted file",
       "View the original file"
@@ -156,7 +164,9 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
-      "Choose a file"
+      "Choose a file",
+      "Search name, file or format",
+      "Search recent conversions"
     ],
     "links": [
       "/data/files?bucket=ui-review-s3&prefix=UI-REVIEW%20converted%2F1034%2Foutput%2F",

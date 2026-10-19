@@ -188,6 +188,7 @@ export class ReadDocumentDialog implements OnInit {
   async pickStored(): Promise<void> {
     const picked = await firstValueFrom(this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
       heading: 'A document to read', bucket: this.bucket(), extensions: OCR_EXTENSIONS,
+      selectedKey: this.picked()?.bucket === this.bucket() ? this.picked()?.key : undefined,
     })).closed);
     if (picked) { this.picked.set(picked); if (picked.bucket) this.bucket.set(picked.bucket); }
   }

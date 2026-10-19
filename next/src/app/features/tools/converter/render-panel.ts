@@ -224,7 +224,7 @@ export class RenderPanel implements OnInit {
     this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
       heading: 'Pick a table to render',
       bucket: t?.bucket,
-      prefix: t ? t.key.slice(0, t.key.lastIndexOf('/') + 1) : undefined,
+      selectedKey: t?.key,
       extensions: TABLE_EXTENSIONS,
     })).closed.subscribe(picked => { if (picked) { this.table.set(picked); this.clearOutput(); } });
   }

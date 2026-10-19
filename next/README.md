@@ -59,6 +59,12 @@ E2E_MINT=1 npx playwright test    # or: npx playwright test e2e/inbox.spec.ts
 - **Who it signs in as.** No password is ever in the repository. `E2E_PASSWORD` (with `E2E_USERNAME`) signs in through the API; without it, `E2E_TENANT_ADMIN_TOKEN` or `E2E_MINT=1` uses a minted test token (etl-platform's `scripts/mint-test-token.sh`, development stacks only) for the rebuilt workspace's administrator. With none of them the specs skip and say why.
 - **Fixtures.** Workspaces, people, pipelines, schedules and dashboards come from the platform rebuild's state file, `etl-platform/.state/demo/rebuild.json` (`e2e/support/fixtures.ts`; another file with `E2E_FIXTURES`). Specs name a role, never an id, and only read the rebuilt rows; what a spec makes for itself is named "E2E ..." . Without the file, the specs that need it skip, naming it.
 - **Where.** `E2E_BASE_URL` (default `http://localhost:4400`) and `E2E_API_URL` (default `http://localhost:9098/api/v1`). The sales demo's paths are opt-in with `E2E_DEMO=1`.
+- **A branch before its deploy.** `E2E_LOCAL_BUILD=http://127.0.0.1:4301` serves the pages from a worktree's `ng build`
+  (any static server on `dist/next/browser`) at the console's own address, so CORS and the session still apply; a spec
+  opts in with `test.use(LOCAL_BUILD_USE)` and `useLocalBuild(page)` (`e2e/support/local-build.ts`).
+- **Written test cases.** `docs/test-cases/` lists a screen's cases with their inputs, expected results and limits;
+  each automated test names the cases it runs (`TC-...`). `docs/test-cases/tools.md`: the Document Converter (with
+  the every-pair matrix) and Audio Transcript.
 
 The backend's own end-to-end suites drive the HTTP API through the real security chain.
 

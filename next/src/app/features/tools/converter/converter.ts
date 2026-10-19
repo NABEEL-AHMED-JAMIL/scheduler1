@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
+import { Component, LOCALE_ID, OnInit, computed, effect, inject, signal, untracked } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient, HttpEventType } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -20,6 +20,13 @@ import { Pagination } from '../../../shared/ui/pagination';
 import { createPager } from '../../../shared/ui/pager';
 import { RenderPanel } from './render-panel';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { Section } from '../../../shared/ui/section';
+import { sidePanelConfig } from '../../../shared/ui/side-panel';
+import { DateRange, DateRangePicker, rangeKey, restoreRange, saveRange } from '../../../shared/ui/date-range';
+import { localIsoDay } from '../../../shared/ui/local-day';
+import { instantOf } from '../../../core/instant';
+import { AuthService } from '../../../core/auth/auth.service';
+import { ConversionAction, ConversionPanel, ConversionPanelData } from './conversion-panel';
 
 interface FormatFamily {
   key: string;
@@ -74,6 +81,9 @@ export interface ConverterLimits {
   timeoutSeconds: number;
   slots: number;
   maxWaiting: number;
+  /** Now: conversions converting and waiting (ADR-027's gate); older servers leave them out. */
+  running?: number;
+  waiting?: number;
 }
 
 /** The size limit for one conversion: a CSV/TSV (or XLSX) to PDF is streamed, everything else goes to LibreOffice. */
@@ -91,10 +101,35 @@ export function limitsHint(limits: ConverterLimits | null): string {
     + `${limits.xlsxMaxFileSizeMb} MB. A table's PDF prints its first ${limits.pdfMaxRows.toLocaleString('en-US')} rows.`;
 }
 
+/** Whether a conversion was made inside the range ("yyyy-MM-dd" days, both included; empty ends are open). */
+export function createdIn(task: Pick<ConverterTask, 'dateCreated'>, range: Pick<DateRange, 'from' | 'to'>): boolean {
+  if (!range.from && !range.to) return true;
+  // A row with no readable date is not hidden by a date filter it cannot be judged against.
+  const at = instantOf(task.dateCreated ?? '');
+  if (!at) return true;
+  const day = localIsoDay(at);
+  return (!range.from || day >= range.from) && (!range.to || day <= range.to);
+}
+
 @Component({
   selector: 'app-converter',
-  imports: [PageHeader, Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel],
+  imports: [PageHeader, Icon, RouterLink, ServerTimePipe, Segmented, FileDropzone, Combobox, TableShell, Pagination, RenderPanel,
+    Section, DateRangePicker],
   templateUrl: './converter.html',
+  styles: `
+    /* Owner #26: the work on the left, the limits, queue and formats on the right; one column below a wide screen. */
+    .tool-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+    @media (min-width: 73rem) { .tool-grid { grid-template-columns: minmax(0, 1fr) 22rem; } }
+    @media (min-width: 120rem) { .tool-grid { grid-template-columns: minmax(0, 1fr) 26rem; } }
+    .facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.5rem 1rem; font-size: 0.875rem; }
+    .facts dt { color: var(--text-muted); }
+    .facts dd { margin: 0; }
+    .picked-file { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; border: 1px solid var(--border-subtle);
+                   border-radius: var(--radius-lg); background: var(--surface-sunken); }
+    .picked-empty { border-style: dashed; background: transparent; }
+    .conv-row { cursor: pointer; }
+    .conv-row:hover > td { background: var(--surface-sunken); }
+  `,
 })
 export class Converter implements OnInit {
   private readonly http = inject(HttpClient);
@@ -158,7 +193,21 @@ export class Converter implements OnInit {
   readonly tasksLoading = signal(false);
   readonly tasksError = signal('');
   readonly taskPager = createPager<ConverterTask>();
-  readonly pagedTasks = computed(() => this.taskPager.slice(this.tasks()));
+
+  /** Recent conversions narrowed by the shared date range (remembered per viewer) and a search of names. */
+  private readonly auth = inject(AuthService, { optional: true });
+  readonly rangeStore = rangeKey('converter-tasks', typeof this.auth?.user === 'function' ? this.auth.user()?.appUserId : null);
+  readonly range = signal<DateRange>(restoreRange(this.rangeStore, '30d'));
+  readonly taskQuery = signal('');
+  readonly shownTasks = computed(() => {
+    const q = this.taskQuery().trim().toLowerCase();
+    return this.tasks().filter(t => createdIn(t, this.range())
+      && (!q || [t.taskName, t.inputFileName, t.outputFileName, t.inputFormat, t.outputFormat, t.bucketName]
+        .some(v => (v ?? '').toLowerCase().includes(q))));
+  });
+  readonly pagedTasks = computed(() => this.taskPager.slice(this.shownTasks()));
+  /** The picked bucket file, with its size and date for the card (the picker's answer). */
+  readonly picked = signal<PickedObject | null>(null);
 
   readonly extension = computed(() => {
     const name = this.mode() === 'upload'
@@ -196,13 +245,61 @@ export class Converter implements OnInit {
     this.dialog.open<PickedObject | undefined>(ObjectPicker, objectPickerConfig({
       heading: 'Pick a document to convert',
       bucket: this.bucket() || undefined,
-      prefix: key ? key.slice(0, key.lastIndexOf('/') + 1) : undefined,
+      selectedKey: key || undefined,
       extensions: this.families().flatMap(f => f.inputFormats),
     })).closed.subscribe(picked => {
       if (!picked) return;
       this.bucket.set(picked.bucket);
       this.selectedKey.set(picked.key);
+      this.picked.set(picked);
     });
+  }
+
+  /** "77.0 KB · modified 19 Oct 2026, 18:07" for the picked file's card; empty when the picker said neither. */
+  readonly pickedMeta = computed(() => {
+    const picked = this.picked();
+    if (!picked) return '';
+    const parts: string[] = [];
+    if (picked.size != null) parts.push(formatSize(picked.size));
+    const at = picked.lastModified ? this.when.transform(picked.lastModified, 'dateTime') : null;
+    if (at) parts.push(`modified ${at}`);
+    return parts.join(' · ');
+  });
+  private readonly when = new ServerTimePipe(inject(LOCALE_ID));
+
+  /** The folder a picked key sits in, for the card. */
+  folderOf(key: string): string {
+    const cut = key.lastIndexOf('/');
+    return cut > 0 ? key.slice(0, cut + 1) : '/';
+  }
+
+  applyRange(range: DateRange): void {
+    this.range.set(range);
+    saveRange(this.rangeStore, range);
+    this.taskPager.reset();
+  }
+
+  setTaskQuery(value: string): void {
+    this.taskQuery.set(value);
+    this.taskPager.reset();
+  }
+
+  /** Reads the limits again: the queue's "now" numbers change while the page is open. */
+  loadLimits(): void {
+    this.http.get<ApiResponse<ConverterLimits>>(`${API_BASE}/documentConverter.json/limits`).subscribe({
+      next: r => { if (r?.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') this.limits.set(r.data); },
+      error: () => { /* the limits are a hint; the server still checks */ },
+    });
+  }
+
+  /** A conversion's details, sliding over the right; its actions are done here. */
+  openTask(task: ConverterTask): void {
+    const data: ConversionPanelData = { task, folder: this.outputFolderOf(task) };
+    this.dialog.open<ConversionAction | undefined>(ConversionPanel, sidePanelConfig(data, 'narrow', 'right'))
+      .closed.subscribe(action => {
+        if (action === 'input' || action === 'output') this.view(task, action);
+        else if (action === 'delete') this.removeTask(task);
+      });
   }
 
   /** Pulls the chosen object down so it can be posted as the multipart file. */
@@ -238,10 +335,7 @@ export class Converter implements OnInit {
       error: () => { /* upload mode still works with no bucket list */ },
     });
     this.loadFormats();
-    this.http.get<ApiResponse<ConverterLimits>>(`${API_BASE}/documentConverter.json/limits`).subscribe({
-      next: r => { if (r.status === API_SUCCESS && typeof r.data?.maxFileSizeMb === 'number') this.limits.set(r.data); },
-      error: () => { /* the limits are a hint; the server still checks */ },
-    });
+    this.loadLimits();
   }
 
   loadFormats(): void {
@@ -329,6 +423,7 @@ export class Converter implements OnInit {
               ? `Converted and saved to ${this.saveBucket()}.`
               : `Converted to ${this.outputFormat().toUpperCase()}.`);
             if (this.saveToBucket()) this.loadTasks();
+            this.loadLimits();
           } else {
             this.convertError.set(response?.message || 'The conversion failed.');
           }
@@ -338,6 +433,7 @@ export class Converter implements OnInit {
           this.progress.set(null);
           // 429: every office process is busy and the queue is full -- nothing went wrong with the file.
           this.busy.set(err?.status === 429);
+          if (err?.status === 429) this.loadLimits();
           this.convertError.set(err?.error?.message
             || (err?.status === 429 ? 'The converter is busy. Try again in a minute.'
               : err?.status === 413 ? 'The file is too big for the converter.' : 'The conversion failed.'));
@@ -374,6 +470,7 @@ export class Converter implements OnInit {
     this.result.set(null);
     this.outputFormat.set('');
     this.selectedKey.set('');
+    this.picked.set(null);
     this.taskName.set('');
   }
 

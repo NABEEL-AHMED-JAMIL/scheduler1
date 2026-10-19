@@ -2,51 +2,81 @@
   <app-page-header title="Audio Transcript"
                    subtitle="Speech-to-text for .mp3 and .m4a, transcribed the same way a scheduled run does it." />
 
-  <div class="card p-4 space-y-4">
-    <app-segmented [value]="mode()" (valueChange)="mode.set($event); transcript.set('')"
-                   [options]="modeOptions" ariaLabel="Choose a source" />
+  <!-- Owner #27 (2026-10-19): the work on the left, what the tool takes on the right (one column below 1280 px). -->
+  <div class="tool-grid">
+    <app-section [card]="true" [number]="1" title="Choose the recording" sub="Upload one from this computer, or use one already in a bucket.">
+      <div class="space-y-4">
+        <app-segmented [value]="mode()" (valueChange)="setMode($event)" [options]="modeOptions" ariaLabel="Choose a source" />
 
-    @if (mode() === 'upload') {
-      <app-file-dropzone [file]="file()" (fileChange)="onFile($event)"
-                         accept=".mp3,.m4a" prompt="Drop an audio file here" hint=".mp3 or .m4a" />
-    } @else {
-      <!-- The console's one file picker: buckets, folders, a filter, paging, and a read that
-           fails says so with Try again. -->
-      <div class="flex flex-wrap items-center gap-3">
-        <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()">
-          <app-icon name="folder" />{{ selectedKey() ? 'Choose another file…' : 'Choose an audio file…' }}
-        </button>
-        @if (selectedKey()) {
-          <span class="text-sm min-w-0 truncate" [title]="bucket() + '/' + selectedKey()">
-            <span class="mono text-xs">{{ bucket() }}/{{ selectedKey() }}</span>
-          </span>
+        @if (mode() === 'upload') {
+          <app-file-dropzone [file]="file()" (fileChange)="onFile($event)" accept=".mp3,.m4a"
+                             prompt="Drop an audio file here" [hint]="'.mp3 or .m4a, up to ' + limits().uploadMaxMb + ' MB'" />
         } @else {
-          <span class="text-sm text-[color:var(--text-muted)]">No file chosen yet.</span>
+          <!-- The console's one file picker: buckets, folders, search, type filter, paging, the selection kept. -->
+          @if (selectedKey()) {
+            <div class="picked-file" data-test="picked-file">
+              <app-icon name="volume" size="1.5rem" class="icon-info shrink-0" />
+              <div class="min-w-0 flex-1">
+                <div class="text-sm font-medium truncate" [title]="selectedKey()">{{ picked()?.name || selectedKey() }}</div>
+                <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="bucket() + '/' + selectedKey()">{{ bucket() }}/{{ folderOf(selectedKey()) }}</div>
+                @if (pickedMeta(); as meta) { <div class="text-xs text-[color:var(--text-secondary)] tabular">{{ meta }}</div> }
+              </div>
+              <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()"><app-icon name="folder" />Change…</button>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Clear the chosen file" title="Clear" (click)="clearPick()"><app-icon name="close" /></button>
+            </div>
+          } @else {
+            <div class="picked-file picked-empty">
+              <app-icon name="folder" size="1.5rem" class="icon-muted shrink-0" />
+              <div class="min-w-0 flex-1 text-sm text-[color:var(--text-muted)]">No file chosen yet. Search, filter by type and page through any bucket you can see.</div>
+              <button type="button" class="btn btn-default btn-sm" (click)="chooseFile()"><app-icon name="folder" />Choose an audio file…</button>
+            </div>
+          }
         }
+
+        @if (problem()) {
+          <p class="text-sm text-warn-500 flex items-center gap-2" role="alert" data-test="audio-problem"><app-icon name="alert" class="shrink-0" />{{ problem() }}</p>
+        }
+
+        <label class="flex items-center gap-2 text-sm">
+          <input type="checkbox" class="checkbox" [checked]="timestamps()"
+                 (change)="timestamps.set($any($event.target).checked)" />
+          Include timestamps before each segment
+        </label>
       </div>
-    }
 
-    <label class="flex items-center gap-2 text-sm">
-      <input type="checkbox" class="checkbox" [checked]="timestamps()"
-             (change)="timestamps.set($any($event.target).checked)" />
-      Include timestamps before each segment
-    </label>
+      <!-- UX review 2026-10-12 (A5, TR1): the primary at the bottom right, in the card's actions bar. -->
+      <app-actions-bar class="-mx-5 -mb-5 mt-5 rounded-b-card" [dialog]="true" label="Transcribe"
+                       [state]="extracting() ? 'Transcription runs on the server and can take a few minutes for a long recording.' : ''">
+        <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
+                (click)="extract()" data-test="transcribe">
+          <app-icon name="volume" [busy]="extracting()" />
+          {{ extracting() ? 'Transcribing…' : 'Extract transcript' }}
+        </button>
+      </app-actions-bar>
+    </app-section>
 
-    <!-- UX review 2026-10-12 (A5, TR1): the primary at the bottom right, in the card's actions bar. -->
-    <app-actions-bar class="-mx-4 -mb-4 rounded-b-card" [dialog]="true" label="Transcribe"
-                     [state]="extracting() ? 'Transcription runs on the server and can take a minute or two.' : ''">
-      <button type="button" class="btn btn-primary" [disabled]="!canExtract() || extracting()"
-              (click)="extract()">
-        <app-icon name="volume" [busy]="extracting()" />
-        {{ extracting() ? 'Extracting…' : 'Extract transcript' }}
-      </button>
-    </app-actions-bar>
+    <aside class="card p-4 space-y-4" aria-labelledby="tr-limits" data-test="transcript-limits">
+      <h2 id="tr-limits" class="section-title flex items-center gap-2"><app-icon name="info" class="icon-info" />What it takes</h2>
+      <dl class="facts">
+        <dt>Formats</dt><dd>{{ limits().formats.join(', ') }}</dd>
+        <dt>Upload</dt><dd>up to {{ limits().uploadMaxMb }} MB</dd>
+        <dt>From a bucket</dt><dd>up to {{ limits().bucketMaxMb }} MB</dd>
+        <dt>Time</dt><dd>up to {{ limits().timeoutMinutes }} minutes a recording</dd>
+      </dl>
+      <p class="text-sm text-[color:var(--text-secondary)]">
+        A few recordings are transcribed at once and a few more wait their turn. When that line is full you are told the
+        transcriber is busy; nothing is lost, try again in about {{ limits().retryAfterSeconds }} seconds.
+      </p>
+      <p class="text-xs text-[color:var(--text-muted)]">
+        Billed by the minute of audio, as AI transcript minutes. A file over the upload limit can go to a bucket first.
+      </p>
+    </aside>
   </div>
 
   @if (error()) {
-    <div class="card p-4 flex flex-wrap items-center gap-2" role="alert">
-      <app-icon name="alert" class="icon-crit shrink-0" />
-      <p class="text-sm text-crit-500 flex-1 min-w-0">{{ error() }}</p>
+    <div class="card p-4 flex flex-wrap items-center gap-2" role="alert" [attr.data-busy]="busy() || null" data-test="transcript-error">
+      @if (busy()) { <app-icon name="clock" class="icon-warn shrink-0" /> } @else { <app-icon name="alert" class="icon-crit shrink-0" /> }
+      <p class="text-sm flex-1 min-w-0" [class.text-crit-500]="!busy()" [class.text-warn-500]="busy()">{{ error() }}</p>
       <button type="button" class="btn btn-default btn-sm" (click)="extract()" [disabled]="extracting()">
         <app-icon name="refresh" />Try again
       </button>

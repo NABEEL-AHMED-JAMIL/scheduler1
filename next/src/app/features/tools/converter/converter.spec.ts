@@ -59,7 +59,7 @@ describe('Converter source from a bucket', () => {
     converter.bucket.set('docs');
     converter.selectedKey.set('legal/2026/contract.docx');
     converter.chooseFile();
-    expect(open.mock.calls[0][1].data).toMatchObject({ bucket: 'docs', prefix: 'legal/2026/' });
+    expect(open.mock.calls[0][1].data).toMatchObject({ bucket: 'docs', selectedKey: 'legal/2026/contract.docx' });
     expect(converter.selectedKey()).toBe('legal/2026/contract.docx');
   });
 });

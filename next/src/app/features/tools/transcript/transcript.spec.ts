@@ -24,7 +24,7 @@ function transcriptFor() {
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
-      { provide: HttpClient, useValue: {} },
+      { provide: HttpClient, useValue: { get: () => new Subject() } },
       { provide: StorageService, useValue: {} },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
     ],
@@ -124,7 +124,7 @@ describe('Transcript source from a bucket', () => {
     const open = vi.fn((_component: unknown, _config: any) => ({ closed: of(picked) }));
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
-      { provide: HttpClient, useValue: {} },
+      { provide: HttpClient, useValue: { get: () => new Subject() } },
       { provide: StorageService, useValue: {} },
       { provide: Dialog, useValue: { open } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } },
@@ -147,7 +147,7 @@ describe('Transcript source from a bucket', () => {
     expect(t.selectedKey()).toBe('calls/2026/one.mp3');
     expect(t.canExtract()).toBe(true);
     t.chooseFile();
-    expect(open.mock.calls[1][1].data).toMatchObject({ bucket: 'audio', prefix: 'calls/2026/' });
+    expect(open.mock.calls[1][1].data).toMatchObject({ bucket: 'audio', selectedKey: 'calls/2026/one.mp3' });
   });
 });
 
