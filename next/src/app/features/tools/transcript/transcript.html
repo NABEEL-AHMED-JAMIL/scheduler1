@@ -2,9 +2,15 @@
   <app-page-header title="Audio Transcript"
                    subtitle="Speech-to-text for .mp3 and .m4a, transcribed the same way a scheduled run does it." />
 
-  <!-- Owner #27 (2026-10-19): the work on the left, what the tool takes on the right (one column below 1280 px). -->
-  <div class="tool-grid">
-    <app-section [card]="true" [number]="1" title="Choose the recording" sub="Upload one from this computer, or use one already in a bucket.">
+  <!-- Owner #27 (2026-10-19): one full-width card, as the converter; what the tool takes is one compact line in it. -->
+    <app-section [card]="true" title="Choose the recording" sub="Upload one from this computer, or use one already in a bucket.">
+      <div class="limits-strip" data-test="transcript-limits" aria-label="What it takes">
+        <span><b>Formats</b> {{ limits().formats.join(', ') }}</span>
+        <span><b>Upload</b> up to {{ limits().uploadMaxMb }} MB</span>
+        <span><b>From a bucket</b> up to {{ limits().bucketMaxMb }} MB</span>
+        <span><b>Time</b> up to {{ limits().timeoutMinutes }} minutes a recording</span>
+        <span class="limits-note">Billed by the minute of audio. If the transcriber is busy you're told so; nothing is lost, try again in about {{ limits().retryAfterSeconds }} seconds. A file over the upload limit can go to a bucket first.</span>
+      </div>
       <div class="space-y-4">
         <app-segmented [value]="mode()" (valueChange)="setMode($event)" [options]="modeOptions" ariaLabel="Choose a source" />
 
@@ -55,23 +61,6 @@
       </app-actions-bar>
     </app-section>
 
-    <aside class="card p-4 space-y-4" aria-labelledby="tr-limits" data-test="transcript-limits">
-      <h2 id="tr-limits" class="section-title flex items-center gap-2"><app-icon name="info" class="icon-info" />What it takes</h2>
-      <dl class="facts">
-        <dt>Formats</dt><dd>{{ limits().formats.join(', ') }}</dd>
-        <dt>Upload</dt><dd>up to {{ limits().uploadMaxMb }} MB</dd>
-        <dt>From a bucket</dt><dd>up to {{ limits().bucketMaxMb }} MB</dd>
-        <dt>Time</dt><dd>up to {{ limits().timeoutMinutes }} minutes a recording</dd>
-      </dl>
-      <p class="text-sm text-[color:var(--text-secondary)]">
-        A few recordings are transcribed at once and a few more wait their turn. When that line is full you are told the
-        transcriber is busy; nothing is lost, try again in about {{ limits().retryAfterSeconds }} seconds.
-      </p>
-      <p class="text-xs text-[color:var(--text-muted)]">
-        Billed by the minute of audio, as AI transcript minutes. A file over the upload limit can go to a bucket first.
-      </p>
-    </aside>
-  </div>
 
   @if (error()) {
     <div class="card p-4 flex flex-wrap items-center gap-2" role="alert" [attr.data-busy]="busy() || null" data-test="transcript-error">

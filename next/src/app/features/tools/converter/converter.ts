@@ -117,13 +117,14 @@ export function createdIn(task: Pick<ConverterTask, 'dateCreated'>, range: Pick<
     Section, DateRangePicker],
   templateUrl: './converter.html',
   styles: `
-    /* Owner #26: the work on the left, the limits, queue and formats on the right; one column below a wide screen. */
-    .tool-grid { display: grid; gap: 1.25rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
-    @media (min-width: 73rem) { .tool-grid { grid-template-columns: minmax(0, 1fr) 22rem; } }
-    @media (min-width: 120rem) { .tool-grid { grid-template-columns: minmax(0, 1fr) 26rem; } }
-    .facts { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 0.5rem 1rem; font-size: 0.875rem; }
-    .facts dt { color: var(--text-muted); }
-    .facts dd { margin: 0; }
+    /* Owner #26: the limits as one wrapping line of facts at the top of the card, not a column beside it. */
+    .limits-strip { display: flex; flex-wrap: wrap; gap: 0.375rem 1.25rem; font-size: 0.8125rem; color: var(--text-secondary);
+                    padding: 0.625rem 0.875rem; margin-bottom: 1rem; border-radius: var(--radius-lg); background: var(--surface-inset);
+                    border: 1px solid var(--border-subtle); font-variant-numeric: tabular-nums; }
+    .limits-strip b { font-weight: 500; color: var(--text-muted); margin-right: 0.25rem; }
+    .limits-note { color: var(--text-muted); flex-basis: 100%; }
+    .formats-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); margin-bottom: 1rem; }
+    .format-family { display: grid; gap: 0.375rem; padding: 0.75rem 0.875rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
     .picked-file { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; border: 1px solid var(--border-subtle);
                    border-radius: var(--radius-lg); background: var(--surface-sunken); }
     .picked-empty { border-style: dashed; background: transparent; }

@@ -6,9 +6,56 @@
     <a class="btn btn-default btn-sm" routerLink="/data/reports" data-test="to-generated-reports"><app-icon name="file" />Generated reports</a>
   </app-page-header>
 
-  <!-- Owner #26 (2026-10-19): the work on the left; the limits, the queue and the formats on the right. -->
-  <div class="tool-grid">
-  <app-section [card]="true" [number]="1" title="Convert" sub="Pick the source, then what to make of it." data-test="converter-main">
+  <!-- Owner #26 (2026-10-19, after "you destroyed the screen"): one full-width card again. The limits are one compact
+       line inside it, the queue a chip in its head, the formats a fold-out; nothing in a tall side column. -->
+  <app-section [card]="true" title="Convert" data-test="converter-main">
+    <div section-actions>
+      @if (limits(); as l) {
+        @if (l.running != null) {
+          <span class="pill" [class.pill-neutral]="!l.running && !l.waiting" [class.pill-warn]="!!l.waiting" [class.pill-info]="!!l.running && !l.waiting"
+                data-test="converter-now" title="The converter's queue right now">
+            <app-icon name="clock" size="0.9em" />{{ l.running }} converting, {{ l.waiting ?? 0 }} waiting
+          </span>
+        }
+      }
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Read the limits and queue again" title="Read the limits and queue again" (click)="loadLimits()"><app-icon name="refresh" /></button>
+      <button type="button" class="btn btn-default btn-sm" data-test="converter-formats-toggle"
+              [attr.aria-expanded]="showFormats()" aria-controls="conv-formats" (click)="showFormats.set(!showFormats())">
+        <app-icon name="list" />Supported formats <span class="text-[color:var(--text-muted)]">{{ families().length }}</span>
+        <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'" size="0.9em" />
+      </button>
+    </div>
+
+    <div class="limits-strip" data-test="converter-limits" aria-label="Limits">
+      @if (limits(); as l) {
+        <span><b>File</b> up to {{ l.maxFileSizeMb }} MB</span>
+        <span><b>CSV or TSV to PDF</b> up to {{ l.tableMaxFileSizeMb }} MB, first {{ l.pdfMaxRows.toLocaleString('en-US') }} rows printed</span>
+        <span><b>XLSX to PDF</b> up to {{ l.xlsxMaxFileSizeMb }} MB</span>
+        <span><b>Output</b> up to {{ l.maxOutputMb }} MB, {{ l.pdfMaxPages.toLocaleString('en-US') }} pages</span>
+        <span><b>Time</b> {{ l.timeoutSeconds }} s a file</span>
+        <span><b>Queue</b> {{ l.slots }} at once, {{ l.maxWaiting }} more waiting</span>
+        <span class="limits-note">If it's busy you're told so; nothing is lost, try again in about 30 seconds.</span>
+      } @else {
+        <span class="limits-note">The limits could not be read; the converter still checks every file.</span>
+      }
+    </div>
+
+    @if (showFormats()) {
+      <div id="conv-formats" class="formats-grid" data-test="converter-formats">
+        @for (family of families(); track family.key) {
+          <div class="format-family">
+            <div class="text-sm font-medium">{{ family.label }}</div>
+            <div class="flex flex-wrap items-center gap-1 text-xs"><span class="text-[color:var(--text-muted)] w-9">From</span>
+              @for (f of family.inputFormats; track f) { <span class="pill pill-neutral">{{ f }}</span> }
+            </div>
+            <div class="flex flex-wrap items-center gap-1 text-xs"><span class="text-[color:var(--text-muted)] w-9">To</span>
+              @for (f of family.outputFormats; track f) { <span class="pill pill-brand">{{ f }}</span> }
+            </div>
+          </div>
+        }
+      </div>
+    }
+
   <div class="space-y-4">
     <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
 
@@ -159,58 +206,6 @@
   </div>
   </app-section>
 
-  <aside class="space-y-5">
-    <div class="card p-4 space-y-4" aria-labelledby="conv-limits" data-test="converter-limits">
-      <div class="flex items-center gap-2">
-        <h2 id="conv-limits" class="section-title flex items-center gap-2 mr-auto"><app-icon name="info" class="icon-info" />Limits and queue</h2>
-        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Read the queue again" title="Read the queue again" (click)="loadLimits()"><app-icon name="refresh" /></button>
-      </div>
-      @if (limits(); as l) {
-        <dl class="facts">
-          <dt>A file</dt><dd>up to {{ l.maxFileSizeMb }} MB</dd>
-          <dt>CSV or TSV to PDF</dt><dd>up to {{ l.tableMaxFileSizeMb }} MB; the first {{ l.pdfMaxRows.toLocaleString('en-US') }} rows printed</dd>
-          <dt>XLSX to PDF</dt><dd>up to {{ l.xlsxMaxFileSizeMb }} MB</dd>
-          <dt>Output</dt><dd>up to {{ l.maxOutputMb }} MB, {{ l.pdfMaxPages.toLocaleString('en-US') }} PDF pages</dd>
-          <dt>Time</dt><dd>up to {{ l.timeoutSeconds }} seconds a file</dd>
-          <dt>Queue</dt><dd>{{ l.slots }} at once, {{ l.maxWaiting }} more waiting</dd>
-          @if (l.running != null) {
-            <dt>Now</dt><dd data-test="converter-now">{{ l.running }} converting, {{ l.waiting ?? 0 }} waiting</dd>
-          }
-        </dl>
-        <p class="text-sm text-[color:var(--text-secondary)]">
-          When every slot is busy and the line is full, you are told the converter is busy; nothing is lost, try again in
-          about 30 seconds. A table becomes a PDF without LibreOffice, so a big CSV never waits for it.
-        </p>
-      } @else {
-        <p class="text-sm text-[color:var(--text-muted)]">The limits could not be read; the converter still checks every file.</p>
-      }
-    </div>
-
-    <div class="card overflow-hidden" data-test="converter-formats">
-      <button type="button" class="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold"
-              [attr.aria-expanded]="showFormats()" (click)="showFormats.set(!showFormats())">
-        <span class="mr-auto">Supported formats</span>
-        <span class="text-xs font-normal text-[color:var(--text-muted)]">{{ families().length }} families</span>
-        <app-icon [name]="showFormats() ? 'chevronDown' : 'chevronRight'" class="text-[color:var(--text-muted)]" />
-      </button>
-      @if (showFormats()) {
-        <ul class="border-t border-subtle divide-y divide-[color:var(--border-subtle)]">
-          @for (family of families(); track family.key) {
-            <li class="px-4 py-3 space-y-1.5">
-              <div class="text-sm font-medium">{{ family.label }}</div>
-              <div class="flex flex-wrap items-center gap-1 text-xs"><span class="text-[color:var(--text-muted)] w-9">From</span>
-                @for (f of family.inputFormats; track f) { <span class="pill pill-neutral">{{ f }}</span> }
-              </div>
-              <div class="flex flex-wrap items-center gap-1 text-xs"><span class="text-[color:var(--text-muted)] w-9">To</span>
-                @for (f of family.outputFormats; track f) { <span class="pill pill-brand">{{ f }}</span> }
-              </div>
-            </li>
-          }
-        </ul>
-      }
-    </div>
-  </aside>
-  </div>
 
   <app-table-shell heading="Recent conversions" [shown]="pagedTasks().length" [total]="shownTasks().length"
                    [loading]="tasksLoading()" [error]="tasksError()" (retry)="loadTasks()"
