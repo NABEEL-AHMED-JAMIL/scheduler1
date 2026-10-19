@@ -1,14 +1,13 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
+import { Dialog } from '@angular/cdk/dialog';
 import { of, throwError } from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AuthService } from '../../../core/auth/auth.service';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { PageCatalogueEntry } from '../../../core/auth/page-keys';
-import { AccessProfile, AccessProfileDraft, AccessProfilesService } from './access-profiles.service';
-import { AccessProfileDialog } from './access-profile-dialog';
+import { AccessProfile, AccessProfilesService } from './access-profiles.service';
 import { AccessProfiles } from './access-profiles';
 
 const PAGES: PageCatalogueEntry[] = [
@@ -24,84 +23,6 @@ const PAGES: PageCatalogueEntry[] = [
 function profile(id: number, name: string, keys: string[], isDefault = false, userCount = 0): AccessProfile {
   return { pageAccessProfileId: id, profileName: name, defaultProfile: isDefault, pageKeys: keys as any, userCount, userNames: [] };
 }
-
-function dialogFor(data: { profile?: AccessProfile; first: boolean }, save = vi.fn(() => of({ status: 'SUCCESS', message: 'ok', data: {} }))) {
-  TestBed.resetTestingModule();
-  TestBed.configureTestingModule({
-    providers: [
-      { provide: DIALOG_DATA, useValue: { ...data, pages: PAGES } },
-      { provide: DialogRef, useValue: { close: vi.fn() } },
-      { provide: AccessProfilesService, useValue: { save } },
-      { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
-    ],
-  });
-  return { dialog: TestBed.runInInjectionContext(() => new AccessProfileDialog()), save };
-}
-
-/**
- * The profile editor: the pages are a set of checkboxes grouped as the menu groups them, and
- * what is sent is the catalogue's order, not the order somebody clicked in.
- */
-describe('AccessProfileDialog', () => {
-  it('groups the catalogue by menu section, in catalogue order', () => {
-    const { dialog } = dialogFor({ first: true });
-    expect(dialog.sections().map(s => s.section)).toEqual(['Pipelines', 'Object Browser', 'Tools']);
-    expect(dialog.sections()[0].pages.map(p => p.key)).toEqual(['jobs', 'tasks', 'queue', 'reports']);
-  });
-
-  it('starts from the profile being edited', () => {
-    const { dialog } = dialogFor({ profile: profile(1, 'Operator', ['jobs', 'queue']), first: false });
-    expect(dialog.isEdit()).toBe(true);
-    expect([...dialog.selected()]).toEqual(['jobs', 'queue']);
-    expect(dialog.form.get('profileName')!.value).toBe('Operator');
-  });
-
-  it('toggles a page and a whole section', () => {
-    const { dialog } = dialogFor({ first: true });
-    dialog.toggle('reports');
-    expect(dialog.selected().has('reports')).toBe(true);
-    dialog.toggle('reports');
-    expect(dialog.selected().has('reports')).toBe(false);
-
-    const pipelines = dialog.sections()[0];
-    dialog.toggleSection(pipelines);
-    expect(dialog.allOn(pipelines)).toBe(true);
-    dialog.toggleSection(pipelines);
-    expect(dialog.allOn(pipelines)).toBe(false);
-  });
-
-  it('refuses to save without a name and never calls the server', () => {
-    const { dialog, save } = dialogFor({ first: true });
-    dialog.save();
-    expect(save).not.toHaveBeenCalled();
-    expect(dialog.submitted()).toBe(true);
-  });
-
-  it('sends the pages in catalogue order whatever order they were ticked, with the first profile as default', () => {
-    const { dialog, save } = dialogFor({ first: true });
-    dialog.form.patchValue({ profileName: '  Analyst ', description: ' Reads reports ' });
-    dialog.toggle('reports');
-    dialog.toggle('jobs');
-    dialog.toggle('analytics');
-    dialog.save();
-
-    expect(save).toHaveBeenCalledTimes(1);
-    const draft = (save.mock.calls[0] as any)[0] as AccessProfileDraft;
-    expect(draft.profileName).toBe('Analyst');
-    expect(draft.description).toBe('Reads reports');
-    expect(draft.pageKeys).toEqual(['jobs', 'reports', 'analytics']);
-    expect(draft.defaultProfile).toBe(true);
-    expect(draft.pageAccessProfileId).toBeUndefined();
-  });
-
-  it('carries the id on an edit and keeps the default flag it came with', () => {
-    const { dialog, save } = dialogFor({ profile: profile(7, 'Operator', ['jobs'], false), first: false });
-    dialog.save();
-    const draft = (save.mock.calls[0] as any)[0] as AccessProfileDraft;
-    expect(draft.pageAccessProfileId).toBe(7);
-    expect(draft.defaultProfile).toBe(false);
-  });
-});
 
 function screenWith(profiles: AccessProfile[], api: Record<string, unknown> = {}, platformAdmin = false) {
   TestBed.resetTestingModule();
@@ -119,6 +40,7 @@ function screenWith(profiles: AccessProfile[], api: Record<string, unknown> = {}
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin } },
       { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+      { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
       { provide: HttpClient, useValue: { get: () => of({ status: 'SUCCESS', message: '', data: [{ tenantId: 5, tenantName: 'Acme' }] }) } },
     ],
   });
@@ -172,13 +94,14 @@ describe('AccessProfiles screen', () => {
     expect(list).not.toHaveBeenCalled();
   });
 
-  it('tells the first dialog it is the first profile, so it becomes the default', () => {
-    const { screen } = screenWith([]);
-    const dialog = TestBed.inject(Dialog) as any;
+  it('opens New access profile as a page of its own, and a profile\'s pages on its page (owner 2026-10-19 #3)', () => {
+    const { screen } = screenWith([profile(3, 'Viewer', ['jobs'])]);
+    const router = TestBed.inject(Router) as any;
     screen.add();
-    expect(dialog.open).toHaveBeenCalledTimes(1);
-    expect(dialog.open.mock.calls[0][1].data.first).toBe(true);
-    expect(dialog.open.mock.calls[0][1].data.pages).toEqual(PAGES);
+    expect(router.navigate).toHaveBeenCalledWith(['/administration/access-profiles/new'], { queryParams: {} });
+    screen.edit(screen.profiles()[0]);
+    expect(router.navigate).toHaveBeenCalledWith(['/administration/access-profiles', 3], { queryParams: {} });
+    expect((TestBed.inject(Dialog) as any).open).not.toHaveBeenCalled();
   });
 
   it('shows the server\'s refusal when a held profile is deleted', async () => {
@@ -191,7 +114,7 @@ describe('AccessProfiles screen', () => {
   });
 
   /** A platform administrator has no workspace of its own: nothing lists until one is picked, and the pick travels to the dialog. */
-  it('makes a platform administrator choose a workspace first, and hands it to the dialog', () => {
+  it('makes a platform administrator choose a workspace first, and takes it to the editor', () => {
     const list = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [profile(1, 'Operator', ['jobs'], true)] }));
     const { screen } = screenWith([], { list }, true);
     expect(screen.canPickTenant()).toBe(true);
@@ -202,9 +125,8 @@ describe('AccessProfiles screen', () => {
     expect(list).toHaveBeenCalledWith(5);
     expect(screen.profiles().map(p => p.profileName)).toEqual(['Operator']);
 
-    const dialog = TestBed.inject(Dialog) as any;
     screen.add();
-    expect(dialog.open.mock.calls[0][1].data.tenantId).toBe(5);
+    expect((TestBed.inject(Router) as any).navigate).toHaveBeenCalledWith(['/administration/access-profiles/new'], { queryParams: { tenantId: 5 } });
   });
 
   it('never shows a tenant administrator the picker, and lists its own workspace at once', () => {
@@ -294,32 +216,13 @@ describe('AccessProfiles -- audit fixes', () => {
         { provide: ToastService, useValue: toast },
         { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
         { provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: { get: () => null } } } },
+      { provide: Router, useValue: { navigate: vi.fn(() => Promise.resolve(true)) } },
         { provide: HttpClient, useValue: { get: () => throwError(() => ({ error: {} })) } },
       ],
     });
     TestBed.runInInjectionContext(() => new AccessProfiles()).ngOnInit();
     expect(toast.error).toHaveBeenCalledWith('The workspaces could not be loaded.');
     expect(toast.error).toHaveBeenCalledWith('The page catalogue could not be loaded.');
-  });
-});
-
-describe('AccessProfileDialog -- the default box', () => {
-  it('is disabled on the control itself for the first profile, and still saved as default', () => {
-    const { dialog, save } = dialogFor({ first: true });
-    expect(dialog.form.get('defaultProfile')!.disabled).toBe(true);
-    dialog.form.get('profileName')!.setValue('Ops');
-    dialog.save();
-    expect(((save.mock.calls[0] as any)[0] as AccessProfileDraft).defaultProfile).toBe(true);
-  });
-
-  it('is disabled for the profile that is already the default', () => {
-    const { dialog } = dialogFor({ profile: profile(1, 'Operator', ['jobs'], true), first: false });
-    expect(dialog.form.get('defaultProfile')!.disabled).toBe(true);
-  });
-
-  it('stays free on any other profile', () => {
-    const { dialog } = dialogFor({ profile: profile(2, 'Analyst', ['jobs']), first: false });
-    expect(dialog.form.get('defaultProfile')!.enabled).toBe(true);
   });
 });
 

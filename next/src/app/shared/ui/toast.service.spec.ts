@@ -30,3 +30,26 @@ describe('ToastService', () => {
     expect(toasts.toasts().map(t => t.tone + ':' + t.message)).toEqual(['crit:A', 'crit:B', 'ok:A']);
   });
 });
+
+describe('ToastService: one notice system (owner 2026-10-19 #29)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  it('keeps a toast with its own duration, and tells its owner when it goes', () => {
+    vi.useFakeTimers();
+    const toasts = new ToastService();
+    const closed = vi.fn();
+    toasts.success('Password reset.', { duration: 120_000, onClose: closed, action: { label: 'Copy password', run: () => true } });
+    vi.advanceTimersByTime(119_000);
+    expect(toasts.toasts()).toHaveLength(1);
+    vi.advanceTimersByTime(1_000);
+    expect(toasts.toasts()).toHaveLength(0);
+    expect(closed).toHaveBeenCalledOnce();
+  });
+
+  it('never merges two toasts that carry an action: each is about its own moment', () => {
+    const toasts = new ToastService();
+    toasts.success('Password reset.', { action: { label: 'Copy', run: () => true } });
+    toasts.success('Password reset.', { action: { label: 'Copy', run: () => true } });
+    expect(toasts.toasts()).toHaveLength(2);
+  });
+});

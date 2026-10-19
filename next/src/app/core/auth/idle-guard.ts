@@ -1,4 +1,5 @@
-import { Component, DestroyRef, NgZone, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, NgZone, TemplateRef, computed, effect, inject, signal, viewChild } from '@angular/core';
+import { ToastService } from '../../shared/ui/toast.service';
 import { AuthService, IDLE_REASON, LAST_ACTIVITY_KEY, isIdleRefusal } from './auth.service';
 import { API_SUCCESS } from '../api/api.config';
 import { Icon } from '../../shared/ui/icon';
@@ -43,31 +44,34 @@ function writeNumber(key: string, value: number): void {
 @Component({
   selector: 'app-idle-guard',
   imports: [Icon],
+  // Owner 2026-10-19 #29: drawn in the toast stack at the top right (ToastService.pin), not at the bottom of the screen
+  // -- every notice in one place. An alertdialog of its own there, with its countdown and two buttons.
   template: `
-    @if (warning()) {
-      <div class="fixed inset-x-0 bottom-4 z-[70] flex justify-center px-4 pointer-events-none">
-        <div role="alertdialog" aria-labelledby="idle-title" aria-describedby="idle-body" data-test="idle-warning"
-             class="card shadow-2xl pointer-events-auto w-full max-w-md p-4 flex items-start gap-3">
-          <app-icon name="clock" class="icon-warn mt-0.5 shrink-0" size="1.2em" />
-          <div class="min-w-0 flex-1">
-            <h2 id="idle-title" class="text-sm font-semibold">Still there?</h2>
-            <p id="idle-body" class="text-sm text-[color:var(--text-secondary)] mt-0.5">
-              You'll be signed out in <span class="tabular font-medium text-[color:var(--text-primary)]">{{ countdown() }}</span>:
-              your workspace signs people out after {{ idleMinutes() }} minutes without activity.
-            </p>
-            <div class="flex gap-2 mt-3">
-              <button type="button" class="btn btn-primary btn-sm" (click)="stay()">Stay signed in</button>
-              <button type="button" class="btn btn-default btn-sm" (click)="signOut()">Sign out now</button>
-            </div>
+    <ng-template #warningNotice>
+      <div role="alertdialog" aria-labelledby="idle-title" aria-describedby="idle-body" data-test="idle-warning"
+           class="card shadow-2xl w-full p-4 flex items-start gap-3 border-l-4 tone-edge tone-warn">
+        <app-icon name="clock" class="icon-warn mt-0.5 shrink-0" size="1.2em" />
+        <div class="min-w-0 flex-1">
+          <h2 id="idle-title" class="text-sm font-semibold">Still there?</h2>
+          <p id="idle-body" class="text-sm text-[color:var(--text-secondary)] mt-0.5">
+            You'll be signed out in <span class="tabular font-medium text-[color:var(--text-primary)]">{{ countdown() }}</span>:
+            your workspace signs people out after {{ idleMinutes() }} minutes without activity.
+          </p>
+          <div class="flex gap-2 mt-3">
+            <button type="button" class="btn btn-primary btn-sm" (click)="stay()">Stay signed in</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="signOut()">Sign out now</button>
           </div>
         </div>
       </div>
-    }
+    </ng-template>
   `,
 })
 export class IdleGuard {
   private readonly auth = inject(AuthService);
   private readonly zone = inject(NgZone);
+  private readonly toasts = inject(ToastService);
+  /** The warning, pinned in the toast stack (toast-stack) while it shows. */
+  private readonly notice = viewChild.required<TemplateRef<unknown>>('warningNotice');
 
   readonly idleMinutes = computed(() => this.auth.user()?.idleMinutes || DEFAULT_IDLE_MINUTES);
   private readonly remaining = signal(Number.POSITIVE_INFINITY);
@@ -82,6 +86,11 @@ export class IdleGuard {
   private signedOut = false;
 
   constructor() {
+    effect(() => {
+      const notice = this.notice();
+      if (this.warning()) this.toasts.pin(notice); else this.toasts.unpin(notice);
+    });
+    inject(DestroyRef).onDestroy(() => this.toasts.unpin(this.notice()));
     // A session that has just begun counts as activity, not as a console idle since its last tab closed.
     this.markActive(true);
     const onActivity = (event: Event) => this.markActive(event.type !== 'pointermove');

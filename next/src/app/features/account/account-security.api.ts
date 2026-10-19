@@ -87,6 +87,20 @@ export interface PersonStanding {
   passwordChangedAt: string | null;
   mfaEnabled?: boolean;
   mfaEnrolledAt?: string | null;
+  /** Owner 2026-10-19 #30: successful sign-ins in the last 30 days, and how they last signed in. */
+  signIns30d?: number;
+  lastSignInMethod?: string | null;
+}
+
+/** A person's live session, as an administrator sees it (tenant.json/security/sessions). */
+export interface PersonSession {
+  sessionId: string;
+  method: string;
+  ip: string | null;
+  userAgent: string | null;
+  signedInAt: string;
+  lastActiveAt: string;
+  idleExpiresAt: string;
 }
 
 /** MIG-353 part 4: a person's two-factor login. */
@@ -203,6 +217,19 @@ export class AccountSecurityApi {
 
   newRecoveryCodes(password: string): Observable<ApiResponse<{ recoveryCodes: string[] }>> {
     return this.http.post<ApiResponse<{ recoveryCodes: string[] }>>(`${API_BASE}/appUser.json/security/mfa/recoveryCodes`, { password });
+  }
+
+  /** Owner 2026-10-19 #31: a person's live sessions, for their Edit user page. */
+  sessionsOf(appUserId: number): Observable<ApiResponse<PersonSession[]>> {
+    return this.http.get<ApiResponse<PersonSession[]>>(`${API_BASE}/tenant.json/security/sessions`, { params: { appUserId } });
+  }
+
+  endSessionOf(appUserId: number, sessionId: string): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${API_BASE}/tenant.json/security/sessions/end`, { appUserId, sessionId });
+  }
+
+  endAllSessionsOf(appUserId: number): Observable<ApiResponse<{ ended: number }>> {
+    return this.http.post<ApiResponse<{ ended: number }>>(`${API_BASE}/tenant.json/security/sessions/endAll`, { appUserId });
   }
 
   resetMfa(appUserId: number): Observable<ApiResponse<{ appUserId: number; wasOn: boolean }>> {

@@ -63,7 +63,7 @@
           <label for="access-preview-person" class="text-sm font-medium">Check a person</label>
           <select id="access-preview-person" class="input input-sm w-auto max-w-72" [disabled]="peopleLoading()" (change)="previewId.set(+$any($event.target).value || null)">
             <option value="">{{ peopleLoading() ? 'Reading the people…' : 'Choose a member' }}</option>
-            @for (p of people(); track p.appUserId) { <option [value]="p.appUserId" [selected]="previewId() === p.appUserId">{{ p.fullName || p.username }}</option> }
+            @for (p of people(); track p.appUserId) { <option [value]="p.appUserId" [selected]="previewId() === p.appUserId" [title]="p.fullName || p.username">{{ p.fullName || p.username }}</option> }
           </select>
         }
       </div>
@@ -159,12 +159,13 @@
             <div class="flex items-start justify-between gap-3 p-4 pb-3">
               <div class="min-w-0">
                 <div class="flex items-center gap-2 flex-wrap">
-                  <h2 class="text-base font-semibold truncate">{{ card.profile.profileName }}</h2>
+                  <h2 class="text-base font-semibold break-words min-w-0">{{ card.profile.profileName }}</h2>
                   @if (card.profile.defaultProfile) {
                     <span class="pill pill-brand" title="Anyone without a profile of their own gets this one">Default</span>
                   }
                 </div>
-                <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 min-h-5">{{ card.profile.description || 'No description.' }}</p>
+                <!-- Owner 2026-10-19 #2: a long description wraps in full -- never cut, never pushing the card wider. -->
+                <p class="text-sm text-[color:var(--text-secondary)] mt-0.5 min-h-5 break-words whitespace-pre-line" data-test="profile-description">{{ card.profile.description || 'No description.' }}</p>
               </div>
               <button type="button" class="btn btn-ghost btn-icon shrink-0" [cdkMenuTriggerFor]="cardMenu"
                       [attr.aria-label]="'Actions for ' + card.profile.profileName">
@@ -194,7 +195,7 @@
               </div>
               @for (section of card.sections; track section.section) {
                 <div class="grid grid-cols-[6.5rem_1fr] gap-x-3 items-baseline text-sm">
-                  <span class="text-xs text-[color:var(--text-muted)] truncate">{{ section.section }}</span>
+                  <span class="text-xs text-[color:var(--text-muted)] break-words" [title]="section.section">{{ section.section }}</span>
                   <div class="flex flex-wrap gap-1">
                     @for (label of section.opens; track label) {
                       <span class="pill pill-neutral"><app-icon name="check" size="0.75em" class="icon-ok" />{{ label }}</span>
@@ -213,7 +214,7 @@
                  with no profile of their own -- said separately, because "by default" is the
                  part that changes when a new default is picked. -->
             <div class="flex items-center justify-between gap-2 px-4 py-2.5 border-t border-[color:var(--border-subtle)] text-xs text-[color:var(--text-muted)]">
-              <span class="truncate" [title]="card.coverage.names.join(', ')">
+              <span class="min-w-0 break-words" [title]="card.coverage.names.join(', ')">
                 @if (card.coverage.total === 0) {
                   No one on it yet
                 } @else {

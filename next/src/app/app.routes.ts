@@ -738,10 +738,36 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
+        // Owner 2026-10-19 #31: Edit user is a page -- profile, role and access, sign-in security, activity, notifications,
+        // and the danger zone -- not a dialog. The role rules stay the server's (scopedFind); the page reads them too.
+        path: 'administration/users/:appUserId',
+        title: 'Edit user',
+        loadComponent: () => import('./features/admin/users/user-edit').then(m => m.UserEdit),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'administration/access-profiles',
         title: 'Page access',
         loadComponent: () =>
           import('./features/admin/access-profiles/access-profiles').then(m => m.AccessProfiles),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        // Owner 2026-10-19 #3: a profile is made and changed on a page of its own, for a catalogue of fifty-odd pages.
+        path: 'administration/access-profiles/new',
+        title: 'New access profile',
+        loadComponent: () =>
+          import('./features/admin/access-profiles/access-profile-editor').then(m => m.AccessProfileEditor),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
+        path: 'administration/access-profiles/:pageAccessProfileId',
+        title: 'Access profile',
+        loadComponent: () =>
+          import('./features/admin/access-profiles/access-profile-editor').then(m => m.AccessProfileEditor),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },

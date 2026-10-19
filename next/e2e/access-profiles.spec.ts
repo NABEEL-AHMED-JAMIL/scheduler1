@@ -85,13 +85,18 @@ test.describe('access profiles', () => {
     const adminPage = await pageAs(browser, adminSession);
     await adminPage.goto('/administration/access-profiles');
     await expect(adminPage.getByRole('heading', { level: 1, name: 'Page access' })).toBeVisible();
-    // The dialog takes the page catalogue the screen fetched; opened before it lands, it lists "0 of 0" pages.
     await expect(adminPage.locator('app-stat-tile', { hasText: 'can be granted or withheld' })).toContainText(/Pages\s*[1-9]/);
+    // Owner 2026-10-19 #3: New access profile is a page, the catalogue grouped by the menu.
     await adminPage.getByTestId('new-profile').click();
+    await expect(adminPage).toHaveURL(/\/administration\/access-profiles\/new/);
+    await expect(adminPage.getByTestId('page-counter')).toContainText(/0 of [1-9]/);
     await adminPage.getByLabel('Profile name').fill(PROFILE);
     await adminPage.getByLabel('Description').fill('Made by the end-to-end test.');
-    await adminPage.locator('input[data-page="reports"]').check();
-    await adminPage.getByRole('button', { name: 'Create' }).click();
+    await adminPage.locator('input[data-view="reports"]').check();
+    await expect(adminPage.getByTestId('page-counter')).toContainText(/1 of /);
+    await expect(adminPage.getByTestId('profile-preview')).toContainText('Runs');
+    await adminPage.getByTestId('save-profile').click();
+    await expect(adminPage).toHaveURL(/\/administration\/access-profiles(\?|$)/);
     const card = adminPage.locator(`[data-profile="${PROFILE}"]`);
     await expect(card).toBeVisible();
     await expect(card.getByText('Run analytics', { exact: true })).toBeVisible();   // the reports page's name since MIG-246
@@ -102,7 +107,7 @@ test.describe('access profiles', () => {
     expect(created).toBeTruthy();
     createdProfileId = created.pageAccessProfileId;
 
-    // --- the admin, in the browser: put the person on it from the user dialog
+    // --- the admin, in the browser: put the person on it from their Edit user page (owner 2026-10-19 #31)
     await adminPage.goto('/administration/users');
     // The row whose username is exactly the member's: "viewer@…" is also the tail of "reviewer@…".
     const row = adminPage.locator('tr').filter({ has: adminPage.locator(`span[title="${member.username}"]`) });
@@ -110,10 +115,12 @@ test.describe('access profiles', () => {
     await expect(row).toBeVisible();
     await row.getByRole('button', { name: 'Actions' }).click();
     await adminPage.getByRole('menuitem', { name: /Edit/ }).click();
-    const picker = adminPage.locator('#pageAccessProfileId');
+    await expect(adminPage).toHaveURL(/\/administration\/users\/\d+$/);
+    const picker = adminPage.locator('#ue-profile');
     await expect(picker).toBeVisible();
     await picker.selectOption({ label: PROFILE });
-    await adminPage.getByRole('button', { name: 'Save changes' }).click();
+    await expect(adminPage.getByTestId('user-preview')).toContainText('After you save');
+    await adminPage.getByTestId('save-user').click();
     await expect(adminPage.getByText(/updated/i).first()).toBeVisible();
     await adminPage.context().close();
 

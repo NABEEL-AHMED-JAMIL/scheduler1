@@ -736,8 +736,35 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/administration/users/:appUserId",
+      "title": "Edit user",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/administration/access-profiles",
       "title": "Page access",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/access-profiles/new",
+      "title": "New access profile",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/administration/access-profiles/:pageAccessProfileId",
+      "title": "Access profile",
       "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"

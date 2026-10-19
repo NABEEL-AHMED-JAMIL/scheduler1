@@ -1,0 +1,350 @@
+<div class="page">
+  <app-page-header [title]="person() ? name() : 'Edit user'" [crumb]="person() ? name() : 'Edit user'"
+                   [subtitle]="person() ? person()!.username : ''">
+    <ng-container pills>
+      @if (person(); as p) {
+        <app-status [label]="p.status" [quiet]="true" />
+        @if (isSelf()) { <span class="pill pill-neutral">You</span> }
+      }
+    </ng-container>
+    <a routerLink="/administration/users" class="btn btn-default btn-sm"><app-icon name="arrowLeft" />All users</a>
+    @if (person() && !readOnly()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving() || !changed()" data-test="save-user">
+        <app-icon name="check" />{{ saving() ? 'Saving…' : 'Save changes' }}
+      </button>
+    }
+  </app-page-header>
+
+  @if (loading() && !person()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm text-crit-500">{{ error() }}</p>
+      <a routerLink="/administration/users" class="btn btn-default btn-sm mt-3">Back to Users</a>
+    </div>
+  } @else if (person(); as p) {
+    @if (readOnly()) {
+      <div class="card flex items-center gap-2 px-4 py-2.5 text-sm" role="note" data-test="read-only">
+        <app-icon name="lock" class="icon-muted shrink-0" />{{ managedByPlatformOnly }} You can read this page; nothing on it can be changed.
+      </div>
+    }
+
+    <div class="ue-layout">
+      <nav class="ue-nav" aria-label="Parts of this page">
+        <div class="ue-nav-list">
+          @for (s of sections; track s.id) {
+            @if (s.id !== 'danger' || !readOnly()) {
+              <button type="button" class="ue-nav-btn" (click)="jump(s.id)" [attr.aria-controls]="'ue-' + s.id">
+                <app-icon [name]="s.icon" size="0.95em" class="opacity-70" />{{ s.label }}
+              </button>
+            }
+          }
+        </div>
+      </nav>
+
+      <div class="ue-main">
+        <form [formGroup]="form" class="ue-main" (ngSubmit)="save()">
+          <!-- 1. Profile -->
+          <app-section id="ue-profile" title="Profile" [number]="1" [card]="true" sub="Who they are, and how to reach them.">
+            <div class="flex flex-wrap items-start gap-5">
+              <div class="flex flex-col items-center gap-2" data-test="user-picture">
+                <app-avatar [appUserId]="p.appUserId" [version]="p.avatarVersion || null" [name]="name()" [size]="6" />
+                @if (!readOnly()) {
+                  <div class="flex flex-col items-stretch gap-1 w-full">
+                    <label class="btn btn-default btn-sm justify-center" [class.opacity-55]="busy() === 'picture'">
+                      <app-icon name="upload" />{{ p.avatarVersion ? 'Replace' : 'Upload' }}
+                      <input type="file" class="sr-only" accept="image/png,image/jpeg,image/webp" [disabled]="busy() === 'picture'"
+                             (change)="pick($any($event.target).files?.[0]); $any($event.target).value = ''" data-test="picture-input"
+                             [attr.aria-label]="'Upload a profile picture for ' + name()" />
+                    </label>
+                    @if (p.avatarVersion) {
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="removePicture()" [disabled]="busy() === 'picture'">
+                        <app-icon name="trash" class="icon-crit" />Remove
+                      </button>
+                    }
+                  </div>
+                  <p class="text-[11px] text-[color:var(--text-muted)] max-w-[9rem] text-center">PNG, JPEG or WebP, up to 5 MB. Kept privately.</p>
+                }
+              </div>
+              <div class="flex-1 min-w-[16rem]">
+                <app-form-row>
+                  <app-field label="Full name" for="ue-fullName" class="fr-6" [required]="true" [control]="form.get('fullName')" [submitted]="submitted()">
+                    <input id="ue-fullName" class="input" formControlName="fullName" />
+                  </app-field>
+                  <app-field label="Email" for="ue-username" class="fr-6" [required]="true" hint="Used to sign in."
+                             [control]="form.get('username')" [submitted]="submitted()">
+                    <input id="ue-username" type="email" class="input" formControlName="username" autocomplete="off" />
+                  </app-field>
+                  <app-field label="Position" for="ue-position" class="fr-6" hint="Their job title. What they may do is set by Role."
+                             [control]="form.get('position')" [submitted]="submitted()">
+                    <input id="ue-position" class="input" formControlName="position" />
+                  </app-field>
+                  @if (role() !== 'PLATFORM_ADMIN') {
+                    <app-field label="Manager" for="ue-managerId" class="fr-6"
+                               hint="Whom their approvals go to when a step says &quot;their manager&quot;, and whom overdue tasks escalate to.">
+                      <app-combobox id="ue-managerId" formControlName="managerId" [numeric]="true" placeholder="Search people…"
+                                    clearLabel="No manager" [options]="managerOptions()" />
+                    </app-field>
+                  }
+                  <app-field label="Phone" for="ue-phone" class="fr-12" hint="Pick the country, then the number as it is written there.">
+                    <app-phone-input [(value)]="phone" inputId="ue-phone" [submitted]="submitted()" />
+                  </app-field>
+                </app-form-row>
+              </div>
+            </div>
+          </app-section>
+
+          <!-- 2. Role and access -->
+          <app-section id="ue-access" title="Role and access" [number]="2" [card]="true"
+                       sub="What they may do, which pages they open, and the menu that makes.">
+            <div class="ue-two">
+              <div class="form-stack">
+                <app-field label="Role" for="ue-userRole" [required]="true" [hint]="roleHint()" [control]="form.get('userRole')" [submitted]="submitted()">
+                  <select id="ue-userRole" class="input" formControlName="userRole">
+                    @for (option of roles(); track option.value) { <option [value]="option.value">{{ option.label }}</option> }
+                  </select>
+                </app-field>
+                @if (isSelf()) { <p class="field-note">Nobody changes their own role.</p> }
+                <dl class="ue-facts">
+                  <dt>Workspace</dt>
+                  <dd>{{ p.tenantName || (p.userRole === 'PLATFORM_ADMIN' ? 'Every workspace' : '—') }}
+                    <span class="block text-xs text-[color:var(--text-muted)]">Fixed once the account exists.</span></dd>
+                </dl>
+                @if (isMember()) {
+                  @if (profiles().length) {
+                    <app-field label="Page access profile" for="ue-profile" hint="Which pages they open. Profiles are made on Page access.">
+                      <select id="ue-profile" class="input" formControlName="pageAccessProfileId" data-test="profile-picker">
+                        <option [ngValue]="null">Workspace default{{ defaultProfile() ? ' (' + defaultProfile()!.profileName + ')' : '' }}</option>
+                        @for (profile of profiles(); track profile.pageAccessProfileId) {
+                          <option [ngValue]="profile.pageAccessProfileId">{{ profile.profileName }}</option>
+                        }
+                      </select>
+                    </app-field>
+                  } @else {
+                    <p class="text-sm rounded-md px-3 py-2 bg-sunken">The workspace has no access profiles yet, so members open every page.</p>
+                  }
+                  @if (access(); as a) {
+                    @if ((a.allowedExceptions?.length ?? 0) + (a.withheldExceptions?.length ?? 0) > 0) {
+                      <p class="text-xs text-[color:var(--text-secondary)]">
+                        <span class="access-exception-dot"></span>
+                        {{ (a.allowedExceptions?.length ?? 0) + (a.withheldExceptions?.length ?? 0) }} page(s) opened or withheld for them alone.
+                        <a class="link-inline" [routerLink]="['/administration/access-profiles']" [queryParams]="{ view: 'people', q: p.username, tenantId: auth.isPlatformAdmin() ? p.tenantId : null }">Change in People × pages</a>
+                      </p>
+                    }
+                  }
+                } @else {
+                  <p class="text-sm rounded-md px-3 py-2 bg-sunken">An administrator opens every page of the workspace; Page access does not apply.</p>
+                }
+              </div>
+              <div class="rounded-lg border border-[color:var(--border-subtle)] p-4" data-test="user-preview" aria-labelledby="ue-preview-title">
+                <h3 id="ue-preview-title" class="section-title">What they can see</h3>
+                <p class="section-sub">
+                  {{ pagesOpen() }} of {{ catalogue().length }} pages, {{ previewPlaces() }} places on the menu.
+                  @if (previewUnsaved()) { <span class="pill pill-warn ml-1">After you save</span> }
+                </p>
+                <div class="grid gap-3 mt-3 sm:grid-cols-2">
+                  @for (group of preview(); track group.label) {
+                    <div class="min-w-0">
+                      <p class="text-[11px] font-semibold uppercase tracking-wide text-[color:var(--text-muted)]">{{ group.label }}</p>
+                      <ul class="mt-1 flex flex-col gap-1">
+                        @for (entry of group.entries; track entry.label) {
+                          <li class="text-sm min-w-0">
+                            <span class="inline-flex items-center gap-1.5"><app-icon [name]="entry.icon" size="0.9em" class="opacity-70" />{{ entry.label }}</span>
+                            @if (entry.tabs.length) { <span class="block pl-5 text-xs text-[color:var(--text-secondary)] break-words">{{ entry.tabs.join(' · ') }}</span> }
+                          </li>
+                        }
+                      </ul>
+                    </div>
+                  }
+                </div>
+              </div>
+            </div>
+          </app-section>
+
+          @if (!readOnly()) {
+            <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5" data-test="form-actions">
+              <span class="text-sm text-[color:var(--text-secondary)]">{{ changed() ? 'You have changes to the profile, role or access.' : 'No unsaved changes.' }}</span>
+              <button type="button" class="btn btn-default btn-sm ml-auto" (click)="discard()" [disabled]="!changed() || saving()">Discard</button>
+              <button type="submit" class="btn btn-primary btn-sm" [disabled]="!changed() || saving()">Save changes</button>
+            </div>
+          }
+        </form>
+
+        <!-- 3. Sign-in security -->
+        <app-section id="ue-security" title="Sign-in security" [number]="3" [card]="true" sub="How they sign in, and what is open now.">
+          <div class="ue-two">
+            <dl class="ue-facts" data-test="security-facts">
+              <dt>Two-factor login</dt>
+              <dd>
+                @if (standing()?.mfaEnabled) {
+                  <span class="pill pill-ok">On</span> <span class="text-xs text-[color:var(--text-muted)]">since {{ standing()!.mfaEnrolledAt | serverTime: 'date' }}</span>
+                } @else { <span class="pill pill-warn">Off</span> <span class="text-xs text-[color:var(--text-muted)]">a password alone</span> }
+              </dd>
+              <dt>Last sign-in</dt>
+              <dd>
+                {{ p.lastLoginAt ? (p.lastLoginAt | serverTime: 'dateTime') : 'Never' }}
+                @if (standing()?.lastSignInMethod; as m) { <span class="text-xs text-[color:var(--text-muted)]">· {{ methodLabel[m] || m }}</span> }
+                @if (standing()?.signIns30d != null) { <span class="block text-xs text-[color:var(--text-muted)]">{{ standing()!.signIns30d }} sign-ins in 30 days</span> }
+              </dd>
+              <dt>Password</dt>
+              <dd>
+                {{ standing()?.passwordChangedAt ? 'Changed ' + (standing()!.passwordChangedAt | serverTime: 'date') : 'Never changed' }}
+                @if (p.mustChangePassword) { <span class="pill pill-info ml-1">Chooses a new one at next sign-in</span> }
+              </dd>
+              <dt>Lock</dt>
+              <dd>
+                @if (standing()?.lockedUntil) {
+                  <span class="pill pill-crit" data-test="user-locked">Locked until {{ standing()!.lockedUntil | serverTime: 'time' }}</span>
+                } @else { Not locked }
+                @if (standing()?.failedSignIns) { <span class="block text-xs text-[color:var(--text-muted)]">{{ standing()!.failedSignIns }} failed sign-ins in a row</span> }
+              </dd>
+            </dl>
+            @if (!readOnly()) {
+              <div class="flex flex-col items-start gap-2">
+                <button type="button" class="btn btn-default btn-sm" (click)="resetPassword()"><app-icon name="key" />Reset password</button>
+                @if (standing()?.lockedUntil) {
+                  <button type="button" class="btn btn-default btn-sm" (click)="unlock()" [disabled]="busy() === 'unlock'"><app-icon name="lock" />Unlock</button>
+                }
+                @if (standing()?.mfaEnabled) {
+                  <button type="button" class="btn btn-default btn-sm btn-intent-warn" (click)="resetMfa()" [disabled]="busy() === 'mfa'">
+                    <app-icon name="shield" />Reset two-factor login
+                  </button>
+                }
+              </div>
+            }
+          </div>
+
+          <div class="mt-5">
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <h3 class="text-sm font-semibold">Sessions open now</h3>
+              @if (sessions()?.length && !readOnly()) {
+                <button type="button" class="btn btn-ghost btn-sm ml-auto btn-intent-warn" (click)="endAllSessions()" [disabled]="busy() === 'sessions'"
+                        data-test="end-all-sessions"><app-icon name="logout" />Sign out everywhere</button>
+              }
+            </div>
+            @if (readOnly()) {
+              <p class="text-sm text-[color:var(--text-muted)]">Only a platform administrator sees another administrator's sessions.</p>
+            } @else if (sessionsError()) {
+              <p class="text-sm text-crit-500" role="alert">{{ sessionsError() }}</p>
+            } @else if (sessions() === null) {
+              <p class="text-sm text-[color:var(--text-muted)]">Reading their sessions…</p>
+            } @else if (!sessions()!.length) {
+              <p class="text-sm text-[color:var(--text-muted)]" data-test="no-sessions">No session is open: they are signed out everywhere.</p>
+            } @else {
+              <div class="overflow-x-auto">
+                <table class="table-modern text-sm" data-test="sessions">
+                  <thead><tr><th>Device</th><th>How</th><th>Signed in</th><th>Last active</th><th class="th-actions">End</th></tr></thead>
+                  <tbody>
+                    @for (s of sessions(); track s.sessionId) {
+                      <tr>
+                        <td><span [title]="s.userAgent || ''">{{ browserOf(s.userAgent) }}</span>
+                          @if (s.ip) { <span class="block text-xs text-[color:var(--text-muted)] mono">{{ s.ip }}</span> }</td>
+                        <td>{{ methodLabel[s.method] || s.method }}</td>
+                        <td class="whitespace-nowrap">{{ s.signedInAt | serverTime: 'dateTime' }}</td>
+                        <td class="whitespace-nowrap">{{ s.lastActiveAt | serverTime: 'dateTime' }}</td>
+                        <td class="text-right">
+                          <button type="button" class="btn btn-ghost btn-sm" (click)="endSession(s)" [disabled]="busy() === 'session:' + s.sessionId"
+                                  [attr.aria-label]="'End the session from ' + browserOf(s.userAgent)">End</button>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </div>
+        </app-section>
+
+        <!-- 4. Activity -->
+        <app-section id="ue-activity" title="Activity" [number]="4" [card]="true" sub="Their recent sign-ins and the account's history.">
+          <div class="ue-two">
+            <div class="min-w-0">
+              <h3 class="text-sm font-semibold mb-2">Recent sign-ins and account changes</h3>
+              @if (!history().length) {
+                <p class="text-sm text-[color:var(--text-muted)]">Nothing recorded yet.</p>
+              } @else {
+                <ul class="flex flex-col divide-y divide-[color:var(--border-subtle)]" data-test="user-history">
+                  @for (e of history(); track e.id) {
+                    <li class="py-1.5 flex flex-wrap items-baseline gap-x-2 text-sm">
+                      <span class="pill" [class]="e.outcome === 'SUCCESS' ? 'pill pill-ok' : e.outcome === 'FAILURE' || e.outcome === 'LOCKED' ? 'pill pill-crit' : 'pill pill-neutral'">
+                        {{ outcomeLabel[e.outcome] || e.outcome }}</span>
+                      <span class="text-[color:var(--text-secondary)]">{{ methodLabel[e.method] || e.method }}</span>
+                      @if (e.reasonText) { <span class="text-xs text-[color:var(--text-muted)] break-words">{{ e.reasonText }}</span> }
+                      <span class="ml-auto text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ e.at | serverTime: 'dateTime' }}</span>
+                    </li>
+                  }
+                </ul>
+                @if (historyTotal() > history().length) {
+                  <p class="text-xs text-[color:var(--text-muted)] mt-2">{{ historyTotal() - history().length }} more in
+                    <a class="link-inline" routerLink="/administration/security">Sign-in security › history</a>.</p>
+                }
+              }
+            </div>
+            <dl class="ue-facts" data-test="user-audit">
+              <dt>Added</dt>
+              <dd>{{ p.dateCreated ? (p.dateCreated | serverTime: 'date') : '—' }}@if (p.createdByName) { by {{ p.createdByName }} }</dd>
+              <dt>Last edited by</dt><dd>{{ p.updatedByName || '—' }}</dd>
+              <dt>Last sign-in</dt><dd>{{ p.lastLoginAt ? (p.lastLoginAt | serverTime: 'dateTime') : 'Never' }}</dd>
+              <dt>Role</dt><dd>{{ roleLabel(p.userRole) }}</dd>
+            </dl>
+          </div>
+        </app-section>
+
+        <!-- 5. Notifications -->
+        <app-section id="ue-notifications" title="Notifications" [number]="5" [card]="true" sub="Where what the console tells them arrives.">
+          <dl class="ue-facts" data-test="user-notifications">
+            <dt>In the console</dt><dd>The bell at the top right: runs, approvals, documents and alerts that are theirs.</dd>
+            <dt>By email</dt><dd class="mono">{{ p.username }} <span class="block font-sans text-xs text-[color:var(--text-muted)]">Their welcome and one-time passwords, and account notices.</span></dd>
+            <dt>Their manager</dt><dd>{{ managerName() || 'None set' }}</dd>
+            <dt>They manage</dt>
+            <dd>
+              @if (reports().length) {
+                {{ reports().length }} {{ reports().length === 1 ? 'person' : 'people' }}, whose overdue approvals escalate here:
+                <span class="text-[color:var(--text-secondary)]">{{ reportNames() }}</span>
+              } @else { Nobody }
+            </dd>
+          </dl>
+        </app-section>
+
+        <!-- 6. Danger zone -->
+        @if (!readOnly()) {
+          <app-section id="ue-danger" title="Danger zone" [number]="6" [card]="true" class="ue-danger" sub="Blocking or removing the account.">
+            <div class="flex flex-col gap-4">
+              <div class="flex flex-wrap items-start gap-3">
+                <div class="flex-1 min-w-[16rem]">
+                  <p class="font-medium text-sm">{{ p.status === 'Active' ? 'Deactivate the account' : 'Activate the account' }}</p>
+                  <p class="text-sm text-[color:var(--text-secondary)]">
+                    @if (p.status === 'Active') {
+                      They are signed out everywhere and cannot sign in until activated again. Their work, schedules and history are kept.
+                    } @else { They can sign in again with their password. }
+                  </p>
+                </div>
+                <button type="button" [class]="p.status === 'Active' ? 'btn btn-default btn-sm btn-intent-warn' : 'btn btn-default btn-sm btn-intent-ok'"
+                        (click)="toggleStatus()" [disabled]="isSelf() || busy() === 'status'"
+                        [title]="isSelf() ? 'You cannot deactivate your own account' : ''" data-test="toggle-status">
+                  <app-icon [name]="p.status === 'Active' ? 'pause' : 'play'" />{{ p.status === 'Active' ? 'Deactivate' : 'Activate' }}
+                </button>
+              </div>
+              <div class="flex flex-wrap items-start gap-3 pt-4 border-t border-subtle">
+                <div class="flex-1 min-w-[16rem]">
+                  <p class="font-medium text-sm text-crit-500">Delete the account</p>
+                  <p class="text-sm text-[color:var(--text-secondary)]">
+                    For good: they can never sign in again, their profile picture is deleted from storage and their page exceptions go.
+                    What they made and the account history stay.
+                  </p>
+                </div>
+                <button type="button" class="btn btn-sm btn-danger" (click)="deleteUser()" [disabled]="isSelf() || busy() === 'status'"
+                        [title]="isSelf() ? 'You cannot delete your own account' : ''" data-test="delete-user">
+                  <app-icon name="trash" />Delete user
+                </button>
+              </div>
+            </div>
+          </app-section>
+        }
+      </div>
+    </div>
+  }
+</div>

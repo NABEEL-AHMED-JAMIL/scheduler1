@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Combobox } from '../../../shared/ui/combobox';
 import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { forkJoin } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -13,7 +13,6 @@ import { StatTile } from '../../../shared/ui/stat-tile';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { AccessPerson, AccessProfile, AccessProfilesService } from './access-profiles.service';
-import { AccessProfileDialog, AccessProfileDialogData } from './access-profile-dialog';
 import { AccessPeopleGrid } from './access-people-grid';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
@@ -42,6 +41,7 @@ export class AccessProfiles implements OnInit {
   private readonly http = inject(HttpClient);
   readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
 
   /**
    * A platform administrator has no workspace of its own, so it picks one; the screen is empty until it
@@ -229,20 +229,20 @@ export class AccessProfiles implements OnInit {
     return sections;
   }
 
-  private dialogData(profile?: AccessProfile): AccessProfileDialogData {
-    return { profile, pages: this.pages(), first: this.profiles().length === 0, tenantId: this.tenantId() };
-  }
-
+  /**
+   * Owner 2026-10-19 #3: a profile is made and changed on a page of its own (AccessProfileEditor), where fifty-odd pages
+   * are grouped by the menu, searchable and previewed -- not in a dialog. A platform administrator's workspace travels.
+   */
   add(): void {
-    this.dialog.open<boolean>(AccessProfileDialog, { data: this.dialogData() }).closed.subscribe(saved => {
-      if (saved) this.load();
-    });
+    void this.router.navigate(['/administration/access-profiles/new'], { queryParams: this.workspaceQuery() });
   }
 
   edit(profile: AccessProfile): void {
-    this.dialog.open<boolean>(AccessProfileDialog, { data: this.dialogData(profile) }).closed.subscribe(saved => {
-      if (saved) this.load();
-    });
+    void this.router.navigate(['/administration/access-profiles', profile.pageAccessProfileId], { queryParams: this.workspaceQuery() });
+  }
+
+  private workspaceQuery(): Record<string, number> {
+    return this.canPickTenant() && this.tenantId() ? { tenantId: this.tenantId()! } : {};
   }
 
   setDefault(profile: AccessProfile): void {

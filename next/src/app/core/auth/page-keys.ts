@@ -37,7 +37,18 @@ export interface PageCatalogueEntry {
   label: string;
   section: string;
   route: string;
+  /** The page this one is the editing half of (a read/edit split), when the catalogue says so; else EDIT_OF does. */
+  editOf?: PageKey;
 }
+
+/**
+ * Read/edit splits: a page key that holds the writes of another page (UX review 2026-10-12: Saved Analyses reads the
+ * boards, Edit dashboards saves, pins and deletes them). The access-profile editor shows the pair as one row with a View
+ * and an Edit box, and Edit always brings View with it. Identity's PageKey has the same split.
+ */
+export const EDIT_OF: Partial<Record<PageKey, PageKey>> = {
+  'dashboards-edit': 'analytics-dashboards',
+};
 
 /**
  * The label a key is shown under when the catalogue has not been fetched (the 403 page).

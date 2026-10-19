@@ -58,19 +58,24 @@ describe('Users -- reset password is checked inside its dialog', () => {
     expect(opened[0].config.data).toEqual({ appUserId: 2, name: 'b@acme.test', tenantId: 10, own: false });
   });
 
-  it('keeps the reset that happened for its notice, and drops it when the next reset opens', () => {
+  it('says the reset that happened in a toast with "Copy password", and takes it away when the next reset opens', () => {
     const opened: any[] = [];
     const screen = usersScreen(opened);
+    const toasts = TestBed.inject(ToastService) as any;
+    toasts.success = vi.fn(() => 41);
+    toasts.dismiss = vi.fn();
     const done = { name: 'b@acme.test', own: false, password: 'kept-for-copy-only' };
     (TestBed.inject(Dialog) as any).open = (component: unknown, config: any) => {
       opened.push({ component, config });
       return { closed: of(done) };
     };
     screen.resetPassword(ROWS[1]);
-    expect(screen.resetDone()).toEqual(done);
+    expect(toasts.success).toHaveBeenCalledWith(expect.stringContaining('next sign-in'),
+      expect.objectContaining({ title: 'Password reset for b@acme.test.', duration: 120_000 }));
+    expect(JSON.stringify(toasts.success.mock.calls[0][0])).not.toContain('kept-for-copy-only');
     (TestBed.inject(Dialog) as any).open = () => ({ closed: of(undefined) });
     screen.resetPassword(ROWS[2]);
-    expect(screen.resetDone()).toBeNull();
+    expect(toasts.dismiss).toHaveBeenCalledWith(41);
   });
 });
 

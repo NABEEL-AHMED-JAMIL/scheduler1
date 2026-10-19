@@ -28,16 +28,9 @@
     </div>
   }
 
-  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
-    @for (tile of [
-      { label: 'Users',            value: summary().total, icon: 'users', tone: 'info' },
-      { label: 'Active',           value: summary().active, icon: 'checkCircle', tone: 'ok' },
-      { label: 'Admins',           value: summary().admins, icon: 'shield', tone: 'info' },
-      { label: 'Never signed in',  value: summary().neverSignedIn, icon: 'clock', tone: 'warn' }
-    ]; track tile.label) {
-      <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon" [tone]="$any(tile.tone)" />
-    }
-  </div>
+  <!-- Owner 2026-10-19 #30: who is here, who can get in, how they get in and who uses it; each card filters the list. -->
+  <app-stat-strip label="People by standing" [items]="cards()" [cols]="2" [smCols]="4" [lgCols]="6" align="start" size="md"
+                  (itemClick)="pickCard($event)" data-test="user-cards" />
 
   <app-table-shell heading="Users" [loading]="loading()" [error]="error()"
                    [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="users().length"
@@ -552,4 +545,3 @@
   </app-table-shell>
 </div>
 
-<app-reset-password-notice [result]="resetDone()" (dismissed)="resetDone.set(null)" />
