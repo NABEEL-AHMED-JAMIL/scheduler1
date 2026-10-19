@@ -709,17 +709,17 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/platform/billing-analytics",
+      "path": "/billing/analytics",
       "title": "Billing analytics",
-      "minRole": "PLATFORM_ADMIN",
+      "minRole": "TENANT_ADMIN",
       "guards": [
         "roleGuard"
       ],
       "lazy": true
     },
     {
-      "path": "/platform/rate-cards",
-      "title": "Rate cards",
+      "path": "/billing/settings",
+      "title": "Billing settings",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -835,17 +835,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/platform/work-in-workspace",
-      "title": "Work in a workspace",
-      "minRole": "PLATFORM_ADMIN",
-      "guards": [
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/platform/reliability",
-      "title": "Reliability",
+      "path": "/platform/service-health",
+      "title": "Service health",
       "minRole": "PLATFORM_ADMIN",
       "guards": [
         "roleGuard"
@@ -1155,14 +1146,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
-      "path": "/billing/analytics",
-      "redirectTo": "platform/billing-analytics",
-      "guards": [],
-      "lazy": false
-    },
-    {
       "path": "/billing/rates",
-      "redirectTo": "platform/rate-cards",
+      "redirectTo": "billing/settings",
       "guards": [],
       "lazy": false
     },
@@ -1192,13 +1177,37 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/work-in-workspace",
-      "redirectTo": "platform/work-in-workspace",
+      "redirectTo": "platform/workspaces",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/administration/reliability",
-      "redirectTo": "platform/reliability",
+      "redirectTo": "platform/service-health",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/work-in-workspace",
+      "redirectTo": "platform/workspaces",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/reliability",
+      "redirectTo": "platform/service-health",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/billing-analytics",
+      "redirectTo": "billing/analytics",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/platform/rate-cards",
+      "redirectTo": "billing/settings",
       "guards": [],
       "lazy": false
     },
@@ -1558,13 +1567,13 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/administration/billing/analytics",
-      "redirectTo": "platform/billing-analytics",
+      "redirectTo": "billing/analytics",
       "guards": [],
       "lazy": false
     },
     {
       "path": "/administration/billing/rates",
-      "redirectTo": "platform/rate-cards",
+      "redirectTo": "billing/settings",
       "guards": [],
       "lazy": false
     },
@@ -1606,8 +1615,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Cost & usage"
   },
   "old address /administration/billing/analytics": {
-    "lands": "/platform/billing-analytics",
-    "heading": "Billing analytics"
+    "lands": "/billing/analytics",
+    "heading": "Analytics"
   },
   "old address /administration/billing/documents": {
     "lands": "/billing/documents",
@@ -1622,16 +1631,16 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Invoices"
   },
   "old address /administration/billing/rates": {
-    "lands": "/platform/rate-cards",
-    "heading": "Rate cards"
+    "lands": "/billing/settings",
+    "heading": "Billing settings"
   },
   "old address /administration/managed-service": {
     "lands": "/platform/managed-service",
     "heading": "Managed service"
   },
   "old address /administration/reliability": {
-    "lands": "/platform/reliability",
-    "heading": "Reliability"
+    "lands": "/platform/service-health",
+    "heading": "Service health"
   },
   "old address /administration/staff-activity": {
     "lands": "/platform/staff-activity",
@@ -1646,8 +1655,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Workspaces"
   },
   "old address /administration/work-in-workspace": {
-    "lands": "/platform/work-in-workspace",
-    "heading": "Work in a workspace"
+    "lands": "/platform/workspaces",
+    "heading": "Workspaces"
   },
   "old address /ai/agents": {
     "lands": "/pipelines/prompts",
@@ -1701,13 +1710,9 @@ export const PINNED: Record<string, unknown> = {
     "lands": "/pipelines/prompts/new",
     "heading": "New prompt"
   },
-  "old address /billing/analytics": {
-    "lands": "/platform/billing-analytics",
-    "heading": "Billing analytics"
-  },
   "old address /billing/rates": {
-    "lands": "/platform/rate-cards",
-    "heading": "Rate cards"
+    "lands": "/billing/settings",
+    "heading": "Billing settings"
   },
   "old address /configuration/engine": {
     "lands": "/platform/engine",
@@ -1936,6 +1941,22 @@ export const PINNED: Record<string, unknown> = {
   "old address /pipelines/run-analytics": {
     "lands": "/runs/analytics",
     "heading": "Run analytics"
+  },
+  "old address /platform/billing-analytics": {
+    "lands": "/billing/analytics",
+    "heading": "Analytics"
+  },
+  "old address /platform/rate-cards": {
+    "lands": "/billing/settings",
+    "heading": "Billing settings"
+  },
+  "old address /platform/reliability": {
+    "lands": "/platform/service-health",
+    "heading": "Service health"
+  },
+  "old address /platform/work-in-workspace": {
+    "lands": "/platform/workspaces",
+    "heading": "Workspaces"
   },
   "old address /queue": {
     "lands": "/runs/by-date",

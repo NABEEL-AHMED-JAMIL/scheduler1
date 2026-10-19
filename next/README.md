@@ -119,14 +119,23 @@ group, hub and tab; the paths below are today's (old addresses redirect).
   name) and Audio Transcript.
 - **Administration & billing.** Users, Page access, Sign-in security, Data policies, Activity; Billing (Cost & usage by
   day, pipeline and run, in the workspace's billing time zone; Invoices with Pay now on Stripe's hosted page and the
-  payments side panel; Billing documents); Settings (Model connections, Tool Registry, Task Registry, Kafka & Topics,
+  payments side panel; Billing documents; Analytics -- cost by month, service and pipeline, a workspace administrator's own and
+  the platform's every workspace with its revenue; Settings -- the rate cards, platform only); Settings (Model connections, Tool Registry, Task Registry, Kafka & Topics,
   Configuration values, Home pages, Task groups); Developers (API Clients with scopes, webhooks, event routes and API
   limits, and the Developer portal at `/developers/portal`, bundled by `scripts/sync-developer-docs.mjs` from
   etl-platform's `docs/api/`). The embedded run view at `/embed/runs/:token` sits outside the shell for a customer's
   portal to frame.
-- **Platform.** Workspaces (`/platform/workspaces`: a table with every action in the row's ⋮, among them API limits and
-  Billing time zone), Requests, Managed service, Work in a workspace, Staff activity, Reliability (a status card per
-  objective with its error budget), Billing analytics, Rate cards, Engine settings.
+- **Platform.** Workspaces (`/platform/workspaces`: tiles and a table of each workspace's users, pipelines, runs this
+  month, storage, cost this month, alerts open and plan, with every action in the row's ⋮ -- "Work in this workspace" first,
+  API limits, Billing time zone), Requests, Managed service, Staff activity, Service health (status, version, restarts,
+  error rate, planned deploys, alerts, then the objectives), Engine settings (the allow-listed limits: ranges, defaults,
+  reset, history, a workspace's own values). Owner #20-#24 (2026-10-19) removed Work in a workspace, Reliability, Billing
+  analytics and Rate cards as Platform pages; their addresses redirect (`removed-pages.spec.ts` holds that nothing else
+  names them).
+- **The workspace selector.** One component for a platform administrator, `app-workspace-select`
+  (`shared/ui/workspace-select.ts` over `core/workspaces/workspace-directory.ts`): first in the page header's actions on every
+  screen that picks a workspace, "All workspaces" only where the page can show them all, the recent ones first, the choice
+  kept for the session, and "Work in this workspace" beside it. A workspace's own people never see it.
 - **Shared page pieces.** `app-page-header` (breadcrumb, title, pills, actions in a fixed order with the primary
   rightmost), `app-section`, the field grid, `app-actions-bar`, `app-table-shell` (heading, then the filters, Columns at
   the right; numbers right-aligned), `app-stat-strip`, `app-empty-state` and `app-side-panel` (a row's detail on the

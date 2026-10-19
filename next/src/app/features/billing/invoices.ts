@@ -16,6 +16,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { BillingAccountDialog } from './billing-account-dialog';
 import { InvoicePane } from './invoice-detail';
 import { WorkspacePicker } from './workspace-picker';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 
@@ -27,7 +28,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-invoices',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, InvoicePane, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   styles: [ONE_PANE_BELOW_1024],
   templateUrl: './invoices.html',
 })

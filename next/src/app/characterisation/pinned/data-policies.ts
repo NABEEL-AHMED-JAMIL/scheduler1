@@ -14,8 +14,7 @@ export const PINNED: Record<string, unknown> = {
     "columns": [],
     "fields": [
       "Pick a workspace",
-      "Workspace",
-      "Workspace whose data policy to read"
+      "Workspace"
     ],
     "links": [
       "/administration",
@@ -252,7 +251,7 @@ export const PINNED: Record<string, unknown> = {
       "Public",
       "How a call's level is decided",
       "Bulk review",
-      "Retention Off",
+      "Retention",
       "Legal holds"
     ],
     "buttons": [

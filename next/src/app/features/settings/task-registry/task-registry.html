@@ -10,6 +10,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2 ml-auto">
+        <app-workspace-select [allowAll]="true" [value]="tenantFilter() ? +tenantFilter() : null" (valueChange)="setFilter(tenantFilter, $event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading() || tasksLoading()" (refresh)="load()" />
         @if (!locked()) {
         <button type="button" class="btn btn-primary btn-sm" (click)="create()">
@@ -76,12 +77,6 @@
         <option value="" [selected]="!stateFilter()">All states</option>
         @for (s of states; track s) { <option [value]="s" [selected]="stateFilter() === s">{{ s }}</option> }
       </select>
-      @if (isPlatformAdmin()) {
-        <div class="w-48">
-          <app-combobox id="pipelines-tenant" ariaLabel="Filter by workspace" [selected]="tenantFilter()" (selectedChange)="setFilter(tenantFilter, $event)"
-                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantOptions()" />
-        </div>
-      }
       <div class="w-56">
         <!-- Remote: the box asks for the first fifty topics matching what is typed. A topic narrows to its pipelines. -->
         <app-combobox id="pipelines-topic" [selected]="topicFilter()" (selectedChange)="setFilter(topicFilter, $event)"

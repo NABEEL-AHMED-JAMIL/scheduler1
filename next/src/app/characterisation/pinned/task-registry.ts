@@ -239,7 +239,6 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "All topics",
       "All workspaces",
-      "Filter by workspace",
       "Kind",
       "Search name, code, service or topic",
       "Search tasks",
@@ -259,7 +258,8 @@ export const PINNED: Record<string, unknown> = {
       "Switch Transform on in this workspace",
       "Switch Upload to bucket on in this workspace",
       "Switch Validate on in this workspace",
-      "Switch Write Database on in this workspace"
+      "Switch Write Database on in this workspace",
+      "Workspace"
     ],
     "links": [
       "/settings",

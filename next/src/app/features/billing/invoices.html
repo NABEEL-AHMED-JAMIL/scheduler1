@@ -9,6 +9,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
+        <app-workspace-select [allowAll]="true" [value]="workspaces.chosenId()" (valueChange)="pickWorkspace($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         @if (isPlatformAdmin()) {
           <label class="flex items-center gap-1.5 text-xs text-[color:var(--text-muted)]">Month
@@ -50,12 +51,6 @@
           <app-icon name="search" size="0.95em" />
           <input class="input" placeholder="Find a number, workspace, month" aria-label="Find an invoice" [value]="search()" (input)="search.set($any($event.target).value)" />
         </div>
-        @if (isPlatformAdmin()) {
-          <select class="input w-full" [value]="workspaces.tenantId() ?? ''" aria-label="Workspace" (change)="pickWorkspace($any($event.target).value)">
-            <option value="">Every workspace</option>
-            @for (o of workspaces.options(); track o.value) { <option [value]="o.value">{{ o.label }}</option> }
-          </select>
-        }
         <select class="input w-full" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
           <option value="">All states</option>
           @for (s of statuses; track s) { @if (counts()[s]) { <option [value]="s">{{ statusLabel[s] }} ({{ counts()[s] }})</option> } }

@@ -235,12 +235,12 @@ describe('Workflow designer -- a link to a workflow that is not here', () => {
 
 /** Review 2026-10-07: a platform administrator's own sign-in has no workspace; workflows are a workspace's. */
 describe('Workflow designer -- a sign-in with no workspace', () => {
-  it('reads nothing and points to Work in a workspace instead of an error', () => {
+  it('reads nothing and points to Platform › Workspaces instead of an error', () => {
     const { api, el, screen } = screenWith({ tenantId: null });
     expect(api.list).not.toHaveBeenCalled();
     expect(api.fetch).not.toHaveBeenCalled();
     expect(el.querySelector('[data-test="needs-workspace"]')!.textContent).toContain('Workflows belong to a workspace');
-    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/platform/work-in-workspace');
+    expect(el.querySelector('[data-test="needs-workspace"] a')!.getAttribute('href')).toBe('/platform/workspaces');
     expect(el.querySelector('[data-test="workflow-list"]')).toBeNull();
     expect(screen.canEdit()).toBe(false);
     expect(el.querySelector('[data-test="new-workflow"]')).toBeNull();

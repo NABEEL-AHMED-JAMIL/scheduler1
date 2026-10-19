@@ -2,8 +2,8 @@
   <app-page-header>
     <div class="page-head">
       <div>
-        <h1 class="page-title">Rate cards</h1>
-        <p class="page-subtitle">The calculation behind every bill, kept as versions. A new version prices bills from its effective date on; a bill already drafted keeps the version it names.</p>
+        <h1 class="page-title">Billing settings</h1>
+        <p class="page-subtitle">The rate cards: the calculation behind every bill, kept as versions. A new version prices bills from its effective date on; a bill already drafted or issued keeps the version it names.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
@@ -145,4 +145,20 @@
       }
     </section>
   </div>
+
+  <!-- Owner #23 (2026-10-19): the redesign's pricing rules. The data model is in (billing V12.0, meter.rate_card_rule, on each
+       card version); the rating engine, the editor and the preview are the plan's next steps (etl-platform
+       docs/plans/rate-card-rules.md). Said plainly here so nobody looks for a rule that prices nothing yet. -->
+  <section class="card p-4 mt-4" data-test="pricing-rules" aria-labelledby="pricing-rules-title">
+    <div class="flex flex-wrap items-center gap-2">
+      <h2 class="section-title m-0" id="pricing-rules-title">Pricing rules</h2>
+      <span class="pill pill-neutral">Coming next</span>
+    </div>
+    <p class="text-sm text-[color:var(--text-secondary)] mt-2 mb-0 max-w-4xl">
+      A rule will give one meter its own price for one pipeline, for the pipelines with a tag, or for a data class (public,
+      internal, sensitive) — the most specific rule wins, then the card's own price. Rules belong to a card version, so they are
+      versioned with it and an issued invoice keeps the version it was priced with. Before a version is saved, a preview will show
+      what last month would have cost with it. Every price today still comes from the card's own items.
+    </p>
+  </section>
 </div>

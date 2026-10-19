@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
@@ -5,7 +7,6 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
-import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { CopyButton } from '../../../shared/ui/copy-button';
 import { copyText } from '../../../shared/ui/clipboard.util';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
@@ -130,7 +131,7 @@ const RULE_FIELDS: { key: keyof RulesDraft; label: string; hint: string; flag?: 
  */
 @Component({
   selector: 'app-workspace-security',
-  imports: [ActionsBar, RefreshButton, PageHeader, Icon, Combobox, CopyButton, ServerTimePipe, SignInHistory],
+  imports: [WorkspaceSelect, ActionsBar, RefreshButton, PageHeader, Icon, CopyButton, ServerTimePipe, SignInHistory],
   templateUrl: './workspace-security.html',
 })
 export class WorkspaceSecurity implements OnInit {
@@ -141,8 +142,7 @@ export class WorkspaceSecurity implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
-  readonly tenantId = signal<number | null>(null);
-  readonly tenants = signal<ComboboxOption[]>([]);
+  readonly tenantId = signal<number | null>(inject(WorkspaceDirectory).remembered());
   /** A platform administrator with no workspace picked edits the platform's defaults. */
   readonly platformMode = computed(() => this.isPlatformAdmin() && this.tenantId() === null);
 
@@ -171,18 +171,11 @@ export class WorkspaceSecurity implements OnInit {
   readonly samlBusy = signal(false);
 
   ngOnInit(): void {
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set((r.data ?? []).map(t => ({ value: String(t.tenantId), label: t.tenantName }))); },
-        error: () => {},
-      });
-    }
     this.load();
   }
 
-  pickWorkspace(value: string): void {
-    const id = Number(value);
-    this.tenantId.set(value && Number.isFinite(id) ? id : null);
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
     this.load();
   }
 

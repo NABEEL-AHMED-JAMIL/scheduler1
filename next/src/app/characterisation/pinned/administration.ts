@@ -25,8 +25,8 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants",
-      "GET /pageAccess.json/pages"
+      "GET /pageAccess.json/pages",
+      "GET /tenant.json/listTenants"
     ],
     "headings": [
       "Page access",
@@ -38,7 +38,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "Choose a workspace…",
+      "Pick a workspace",
       "Workspace"
     ],
     "links": [
@@ -162,7 +162,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
-      "GET /managedService.json/myWorkspaces"
+      "GET /managedService.json/myWorkspaces",
+      "GET /billing.json/workspaceFigures"
     ],
     "headings": [
       "Workspaces",
@@ -171,38 +172,34 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Claude Demo 75a611b4",
       "Actions for Default",
-      "Buckets",
+      "Alerts",
       "Cards",
       "Columns",
       "Copy claude-demo-75a611b4",
       "Copy default",
-      "Created",
-      "Kafka",
+      "Cost",
       "New workspace",
       "Only mine",
       "Pipelines",
       "Refresh",
-      "Schedules",
+      "Runs",
+      "Storage",
       "Table",
-      "Topics",
       "Users",
       "Workspace"
     ],
     "columns": [
       [
         "Workspace",
-        "Admin",
-        "Users",
-        "Schedules",
-        "Pipelines",
-        "Topics",
-        "Buckets",
-        "Kafka",
-        "Created",
-        "Created by",
-        "Updated by",
-        "Mode",
         "State",
+        "Plan",
+        "Users",
+        "Pipelines",
+        "Runs",
+        "Storage",
+        "Cost",
+        "Alerts",
+        "Admin",
         "Actions"
       ]
     ],
@@ -213,14 +210,11 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/platform",
-      "/platform/billing-analytics",
       "/platform/engine",
       "/platform/managed-service",
-      "/platform/rate-cards",
-      "/platform/reliability",
       "/platform/requests",
+      "/platform/service-health",
       "/platform/staff-activity",
-      "/platform/work-in-workspace",
       "/platform/workspaces"
     ]
   },

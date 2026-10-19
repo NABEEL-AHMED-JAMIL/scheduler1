@@ -464,7 +464,7 @@ export class Docs implements AfterViewInit {
       ],
       fields: [
         { name: 'What is metered', required: false, note: 'Storage kept (measured nightly), bytes written, read and deleted, storage operations, pipeline runs and their minutes, model tokens, images described, documents converted, analytics queries, API calls and seats.' },
-        { name: 'Rate cards', required: false, note: 'Kept as versions by a platform administrator. A change is a new version with an effective date; a bill already drafted keeps the version it names.' },
+        { name: 'Rate cards', required: false, note: 'Kept as versions by a platform administrator on Billing › Settings. A change is a new version with an effective date; a bill already drafted or issued keeps the version it names.' },
       ],
     },
     {

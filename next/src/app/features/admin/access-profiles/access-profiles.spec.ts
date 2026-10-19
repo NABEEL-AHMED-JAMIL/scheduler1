@@ -118,7 +118,6 @@ describe('AccessProfiles screen', () => {
     const list = vi.fn(() => of({ status: 'SUCCESS', message: '', data: [profile(1, 'Operator', ['jobs'], true)] }));
     const { screen } = screenWith([], { list }, true);
     expect(screen.canPickTenant()).toBe(true);
-    expect(screen.tenants().map(t => t.tenantName)).toEqual(['Acme']);
     expect(list).not.toHaveBeenCalled();
 
     screen.pickTenant('5');
@@ -206,7 +205,8 @@ describe('AccessProfiles -- audit fixes', () => {
     expect((open.mock.calls[0] as any)[1].data.confirmLabel).toBe('Delete profile');
   });
 
-  it('says so when a platform administrator\'s workspace list or page catalogue cannot be read', () => {
+  // Owner #5: the workspace list is the shared selector's now; the page catalogue is still this page's.
+  it('says so when a platform administrator\'s page catalogue cannot be read', () => {
     TestBed.resetTestingModule();
     const toast = { success: vi.fn(), error: vi.fn() };
     TestBed.configureTestingModule({
@@ -221,7 +221,6 @@ describe('AccessProfiles -- audit fixes', () => {
       ],
     });
     TestBed.runInInjectionContext(() => new AccessProfiles()).ngOnInit();
-    expect(toast.error).toHaveBeenCalledWith('The workspaces could not be loaded.');
     expect(toast.error).toHaveBeenCalledWith('The page catalogue could not be loaded.');
   });
 });

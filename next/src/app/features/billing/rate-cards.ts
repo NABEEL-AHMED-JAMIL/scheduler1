@@ -10,12 +10,14 @@ import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { BillingApi, RateCard, RateItem } from './billing.service';
 import { formatQuantity, formatUnitPrice, localIsoDate } from './billing-format';
 import { RateCardEditor, RateCardEditorData } from './rate-card-editor';
-import { WorkspacePicker } from './workspace-picker';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /**
+ * Billing › Settings (owner #23, 2026-10-19; before, Platform › Rate cards), platform administrators only.
+ *
  * Rate cards: the calculation behind every bill, kept as versions. The default card prices
  * every workspace that has none of its own; a workspace's card wins for it from the day it
  * takes effect. A bill is priced with the version in effect when its period started and
@@ -30,7 +32,7 @@ export class RateCards implements OnInit {
   private readonly api = inject(BillingApi);
   private readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
-  readonly workspaces = inject(WorkspacePicker);
+  readonly directory = inject(WorkspaceDirectory);
 
   readonly loading = signal(false);
   readonly error = signal('');
@@ -60,7 +62,7 @@ export class RateCards implements OnInit {
   readonly upcoming = computed(() => this.cards().filter(c => c.effective_from > this.todayIso).length);
 
   ngOnInit(): void {
-    this.workspaces.ready(() => this.load());
+    this.directory.load().subscribe(() => this.load());
   }
 
   load(keep = this.selectedVersion()): void {
@@ -113,7 +115,7 @@ export class RateCards implements OnInit {
   /** A new version, drafted from the selected card (or the default in effect) for the picked scope. */
   newVersion(base: RateCard | null = this.selected() ?? this.today().defaultCard, tenantId: number | null = base?.tenant_id ?? null): void {
     if (!base) { this.toast.error('No rate card to start from.'); return; }
-    const data: RateCardEditorData = { base, workspaces: this.workspaces.options(), tenantId };
+    const data: RateCardEditorData = { base, workspaces: this.directory.workspaces().map(w => ({ value: String(w.tenantId), label: this.directory.nameOf(w.tenantId) })), tenantId };
     this.dialog.open<RateCard | null>(RateCardEditor, sidePanelConfig(data, 'wide')).closed.subscribe(saved => { if (saved) this.load(saved.version); });
   }
 

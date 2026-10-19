@@ -102,7 +102,8 @@ describe('Home pages and task groups -- the list', () => {
 
   it('lets a platform administrator narrow to one workspace', () => {
     const { component, http } = screen('TASK_GROUP', true);
-    http.expectOne(r => r.url.endsWith('/tenant.json/listTenants')).flush({ status: API_SUCCESS, data: [] });
+    // The page's own list (names its rows) and the shared workspace selector's (owner #5).
+    for (const r of http.match(r => r.url.endsWith('/tenant.json/listTenants'))) r.flush({ status: API_SUCCESS, data: [] });
     http.expectOne(r => r.url === ENDPOINT).flush({ status: API_SUCCESS, data: [] });
     component.setTenant('2901');
     const req = http.expectOne(r => r.url === ENDPOINT);

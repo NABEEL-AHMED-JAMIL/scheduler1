@@ -250,8 +250,8 @@ export const PINNED: Record<string, unknown> = {
     ],
     "columns": [],
     "fields": [
-      "Choose a workspace…",
       "Kind",
+      "Pick a workspace",
       "Search tools",
       "State",
       "Workspace"

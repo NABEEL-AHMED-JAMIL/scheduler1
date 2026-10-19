@@ -233,15 +233,19 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await page.close();
   });
 
-  test('Work in a workspace: a managed session with its banner, and Exit back to the platform session', async ({ browser }, info) => {
+  // Owner #20 (2026-10-19): "Work in this workspace" is Platform › Workspaces' row action; Exit comes back there.
+  test('Work in this workspace: a managed session with its banner, and Exit back to the platform session', async ({ browser }, info) => {
     const page = await pageAs(browser, PLATFORM);
     const seen = await fakeApi(page, {
       'GET /managedService.json/myWorkspaces': { status: 'SUCCESS', message: '', data: [{ grantId: 11, tenantId: FAKE.tenant, tenantName: 'Claude Demo',
         managementMode: 'MANAGED', appUserId: 5001, grantedAt: '2026-09-28 10:00:00' }] },
       'POST /managedService.json/openSession': { status: 'SUCCESS', message: 'Managed-service session opened.', data: STAFF_SESSION },
+      'GET /tenant.json/listTenants': { status: 'SUCCESS', message: '', data: [{ tenantId: FAKE.tenant, tenantName: 'Claude Demo', tenantCode: 'claude-demo',
+        status: 'Active', managementMode: 'MANAGED', userCount: 1, sourceTaskCount: 0, sourceJobCount: 0 }] },
     });
-    await page.goto('/platform/work-in-workspace');
-    await page.getByRole('button', { name: 'Work in Claude Demo' }).click();
+    await page.goto('/platform/workspaces');
+    await page.getByRole('button', { name: 'Actions for Claude Demo' }).click();
+    await page.getByRole('menuitem', { name: 'Work in this workspace' }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     const bar = page.locator('[data-managed-session]');
     await expect(bar).toContainText('Managed session: Claude Demo — every change is audited');
@@ -252,7 +256,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await expect(page.getByText('Managed by our team')).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'New pipeline' })).toBeVisible();
     await bar.getByRole('button', { name: 'Exit' }).click();
-    await expect(page).toHaveURL(/\/platform\/work-in-workspace$/);
+    await expect(page).toHaveURL(/\/platform\/workspaces$/);
     await expect(bar).toHaveCount(0);
     const logout = seen.find(s => s.path === '/auth.json/logout');
     expect(logout?.auth).toBe(`Bearer ${STAFF_SESSION['accessToken']}`);

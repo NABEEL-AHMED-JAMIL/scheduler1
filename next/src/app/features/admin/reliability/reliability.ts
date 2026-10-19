@@ -180,6 +180,7 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
   // (text beside its two tiles, wrapping under them when narrow) and a table that scrolls inside its own box.
   styles: [`
     .rel-alert { border-left: 3px solid var(--series-crit); }
+    .rel-detail + .rel-detail { border-top: 1px solid var(--border-subtle); padding-top: 1rem; }
     .rel-health { display: flex; align-items: center; gap: 0.5rem; font-size: 1.5rem; line-height: 2rem; font-weight: 600; }
     .rel-figures { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
     .rel-figure { margin-top: 0.25rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -339,6 +340,9 @@ export class Reliability implements OnInit {
 
   /** Brings a section into view: "What to do" points at the breakdown that answers it. */
   scrollTo(id: string): void {
+    // Owner #21: the details are folded; open them first so the section is there to scroll to.
+    const details = document.getElementById('objective-details') as HTMLDetailsElement | null;
+    if (details && !details.open) details.open = true;
     document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
   sloLabel(slo: string): string { return slo === 'good' ? 'Good' : slo === 'bad' ? 'Bad' : 'Left out'; }

@@ -80,8 +80,8 @@ function readStorage(key: string): string | null {
   }
 }
 
-/** Where Exit returns a staff member: the picker they opened the managed session from. */
-export const WORK_IN_WORKSPACE_PATH = '/platform/work-in-workspace';
+/** Where Exit returns a staff member: Platform › Workspaces, where "Work in this workspace" opened it (owner #20). */
+export const WORK_IN_WORKSPACE_PATH = '/platform/workspaces';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {

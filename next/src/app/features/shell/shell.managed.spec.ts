@@ -62,7 +62,9 @@ describe('MIG-254: the shell and the managed service', () => {
     const tabs = hubTabsOf(v);
     expect(tabs).toContain('Managed service -> /platform/managed-service');
     expect(tabs).toContain('Staff activity -> /platform/staff-activity');
-    expect(tabs).toContain('Work in a workspace -> /platform/work-in-workspace');
+    // Owner #20: Work in a workspace is no page of its own; its action is on Workspaces.
+    expect(tabs.some(t => t.includes('work-in-workspace'))).toBe(false);
+    expect(tabs).toContain('Service health -> /platform/service-health');
     // Our team's activity is a workspace administrator's view; the platform administrator has Staff activity.
     restoreClock();
     const admin = await visit('/administration/users', 'PLATFORM_ADMIN', null);

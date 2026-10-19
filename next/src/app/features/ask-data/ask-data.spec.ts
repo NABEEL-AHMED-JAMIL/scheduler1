@@ -69,11 +69,11 @@ describe('Ask your data -- the pure pieces', () => {
 });
 
 describe('Ask your data -- as drawn', () => {
-  it('asks nothing of a sign-in with no workspace, and points to Work in a workspace (review 2026-10-07, L6)', () => {
+  it('asks nothing of a sign-in with no workspace, and points to Platform › Workspaces (review 2026-10-07, L6; owner #20)', () => {
     const { q, api } = render({ tenantId: null });
     expect(api.suggestions).not.toHaveBeenCalled();
     expect(q('[data-test=needs-workspace]')!.textContent).toContain('Ask your data is a workspace\'s, and this sign-in has none.');
-    expect(q('[data-test=needs-workspace] a')!.getAttribute('href')).toBe('/platform/work-in-workspace');
+    expect(q('[data-test=needs-workspace] a')!.getAttribute('href')).toBe('/platform/workspaces');
     expect(q('[data-test=question]')).toBeNull();
   });
 

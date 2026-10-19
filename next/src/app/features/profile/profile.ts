@@ -1,3 +1,4 @@
+import { Section } from '../../shared/ui/section';
 import { CROP_SESSION } from '../../shared/ui/avatar-crop-session';
 import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
@@ -78,7 +79,7 @@ interface UserProfile {
 
 @Component({
   selector: 'app-profile',
-  imports: [PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint, ThemeChooser],
+  imports: [Section, PageHeader, PhoneInput, Icon, Avatar, CopyButton, ServerTimePipe, RouterLink, StatusPill, Donut, BillingBrief, Field, StatTile, PasswordRulesHint, ThemeChooser],
   templateUrl: './profile.html',
 })
 export class Profile implements OnInit {

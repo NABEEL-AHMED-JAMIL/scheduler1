@@ -8,25 +8,17 @@
           whether the AI Assistant may change things with it.
         </p>
       </div>
-      @if (!waitingForWorkspace()) {
-        <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2">
+        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event === null ? '' : '' + $event)" />
+        @if (!waitingForWorkspace()) {
           <app-refresh-button [loading]="loading()" (refresh)="load()" />
-        </div>
-      }
+        }
+      </div>
     </div>
   </app-page-header>
 
-  @if (isPlatformAdmin()) {
-    <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">
-      <label for="policy-workspace" class="text-sm font-medium">Workspace</label>
-      <app-combobox id="policy-workspace" ariaLabel="Workspace whose data policy to read" class="w-72 max-w-full"
-                    placeholder="Pick a workspace" [allowClear]="false" [options]="tenants()" [selected]="tenantId()"
-                    (selectedChange)="pickWorkspace($event)" />
-    </div>
-  }
-
   @if (waitingForWorkspace()) {
-    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick the workspace whose data policy to read.</div>
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick the workspace whose data policy to read, above.</div>
   } @else if (error()) {
     <div class="card p-0"><app-load-error [message]="error()" (retry)="load()" /></div>
   } @else {
@@ -195,18 +187,8 @@
             </tbody>
           </table>
         </div>
-        @if (rule()) {
-          <section class="card p-4 flex flex-col gap-1" aria-labelledby="policy-rule">
-            <h2 id="policy-rule" class="font-semibold text-sm">How a call's level is decided</h2>
-            <p class="text-sm text-[color:var(--text-secondary)]">{{ rule() }}</p>
-            <p class="text-xs text-[color:var(--text-muted)]">
-              A prompt declares its level on its editor; a pipeline may declare one in its settings; an API collection or a data
-              contract has one of its own.
-              @if (canEdit()) { Mark a hosted connection as covered by a BAA on <a class="link-inline" routerLink="/settings/model-connections">Model connections</a>. }
-            </p>
-          </section>
-        }
-        <app-review-policy-card />
+        <!-- Owner #4: the levels' save bar sits under the levels it saves (it stuck to the page bottom below the review policy, which
+             saves itself, and left a gap above Retention). -->
         @if (canEdit() && levels().length) {
           <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2 sticky bottom-3 z-10">
             @if (saveError()) {
@@ -222,6 +204,18 @@
             </button>
           </div>
         }
+        @if (rule()) {
+          <section class="card p-4 flex flex-col gap-1" aria-labelledby="policy-rule">
+            <h2 id="policy-rule" class="font-semibold text-sm">How a call's level is decided</h2>
+            <p class="text-sm text-[color:var(--text-secondary)]">{{ rule() }}</p>
+            <p class="text-xs text-[color:var(--text-muted)]">
+              A prompt declares its level on its editor; a pipeline may declare one in its settings; an API collection or a data
+              contract has one of its own.
+              @if (canEdit()) { Mark a hosted connection as covered by a BAA on <a class="link-inline" routerLink="/settings/model-connections">Model connections</a>. }
+            </p>
+          </section>
+        }
+        <app-review-policy-card />
         <app-retention-card [tenantId]="tenantId()" />
       </div>
     </app-blur-loader>

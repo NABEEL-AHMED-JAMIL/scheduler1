@@ -6,10 +6,7 @@
         <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        @if (isPlatformAdmin()) {
-          <label for="usageWorkspace" class="sr-only">Workspace</label>
-          <app-combobox id="usageWorkspace" class="w-56" [selected]="workspaces.effective()" (selectedChange)="pickTenant($event)" placeholder="Workspace" [allowClear]="false" [options]="workspaces.options()" />
-        }
+        <app-workspace-select [value]="workspaces.effectiveId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
         <div class="btn-join" role="group" aria-label="Month">
           <button type="button" class="btn btn-default btn-icon btn-sm" (click)="shiftMonth(-1)" aria-label="Previous month"><app-icon name="chevronLeft" /></button>
           <span class="btn btn-default btn-sm btn-label min-w-32" aria-live="polite">{{ monthLabel() }}</span>
@@ -38,7 +35,7 @@
       @if (rateCard(); as card) {
         Priced with <b>{{ card.name }}</b> v{{ card.version }}@if (card.tenantSpecific) { <span class="pill pill-brand ml-1">This workspace's card</span> }
         @if (card.fallback; as f) { <span data-fallback-card>· meters it does not name are priced from <b>{{ f.name }}</b> v{{ f.version }}</span> } · {{ currency() }}
-        @if (isPlatformAdmin()) { · <a routerLink="/platform/rate-cards" class="link-inline">rate cards</a> }
+        @if (isPlatformAdmin()) { · <a routerLink="/billing/settings" class="link-inline">rate cards</a> }
       } @else { Priced with the rate card in effect · {{ currency() }} }
       · day {{ daysElapsed() }} of {{ daysInMonth() }}
       @if (isCurrentMonth()) { · yesterday {{ fmtMoney(yesterday()) }} }
@@ -53,7 +50,7 @@
           <b>Usage with no price anywhere:</b>
           @for (l of unpricedLines(); track l.meter) { <span class="mono">{{ l.label }} ({{ l.meter }})</span>{{ $last ? '' : ', ' }} }
           — on {{ unpricedWhere() }}, so it is billed at 0.
-          @if (isPlatformAdmin()) { <a routerLink="/platform/rate-cards" class="link-inline">Price it on a rate card</a> and the month is priced again. }
+          @if (isPlatformAdmin()) { <a routerLink="/billing/settings" class="link-inline">Price it on a rate card</a> and the month is priced again. }
         </div>
       </div>
     }

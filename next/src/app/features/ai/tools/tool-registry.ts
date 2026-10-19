@@ -1,10 +1,11 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
 import { roleLabel } from '../../../core/auth/auth.models';
-import { Combobox } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { TableShell } from '../../../shared/ui/data-table';
 import { StatTile } from '../../../shared/ui/stat-tile';
@@ -36,7 +37,7 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-tool-registry',
-  imports: [RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, Combobox, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, TableShell, StatTile, ServerTimePipe, RouterLink, ManagedBanner],
   templateUrl: './tool-registry.html',
   styles: `
     .tool-group th { background: var(--surface-sunken); text-align: left; padding: 0.4rem 1rem; text-transform: none; letter-spacing: 0;
@@ -67,10 +68,8 @@ export class ToolRegistry implements OnInit {
   readonly canSwitch = computed(() => this.auth.canManageAgents());
 
   readonly canPickTenant = computed(() => this.auth.isPlatformAdmin());
-  readonly tenants = signal<{ tenantId: number; tenantName: string }[]>([]);
-  readonly tenantId = signal<number | null>(null);
+  readonly tenantId = signal<number | null>(inject(WorkspaceDirectory).remembered());
   readonly needsWorkspace = computed(() => this.canPickTenant() && !this.tenantId());
-  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName })));
 
   readonly filtered = computed(() => {
     const q = this.search().trim().toLowerCase();
@@ -103,10 +102,7 @@ export class ToolRegistry implements OnInit {
   ngOnInit(): void {
     if (this.canPickTenant()) {
       this.loading.set(false);
-      this.api.workspaces().subscribe({
-        next: r => this.tenants.set(r.status === API_SUCCESS ? r.data ?? [] : []),
-        error: () => this.tenants.set([]),
-      });
+      if (this.tenantId()) this.load();
       return;
     }
     this.load();

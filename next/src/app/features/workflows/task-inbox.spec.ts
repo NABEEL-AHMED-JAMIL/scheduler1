@@ -175,7 +175,7 @@ describe('P2 #31 and #36: the inbox at the edges', () => {
 
 /** Review 2026-10-07: a platform administrator's own sign-in has no workspace; the inbox said "could not be read". */
 describe('Task inbox -- a sign-in with no workspace', () => {
-  it('reads nothing and points to Work in a workspace', () => {
+  it('reads nothing and points to Platform › Workspaces', () => {
     const { api, el, screen } = screenWith(DETAIL, null);
     expect(api.mine).not.toHaveBeenCalled();
     expect(screen.error()).toBe('');

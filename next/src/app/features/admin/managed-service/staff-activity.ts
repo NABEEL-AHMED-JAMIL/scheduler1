@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Avatar } from '../../../shared/ui/avatar';
 import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
@@ -57,7 +59,7 @@ export const ACTIONS_PAGE = 50;
  */
 @Component({
   selector: 'app-staff-activity',
-  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, Avatar],
   templateUrl: './staff-activity.html',
 })
 export class StaffActivity implements OnInit {
@@ -81,7 +83,7 @@ export class StaffActivity implements OnInit {
   readonly staff = computed(() => this.showWorkspace()
     ? this.platformStaff()
     : [...this.seen().values()].sort((a, b) => personName(a).localeCompare(personName(b))));
-  readonly tenantFilter = signal<number | null>(null);
+  readonly tenantFilter = signal<number | null>(inject(WorkspaceDirectory).remembered());
   readonly staffFilter = signal<number | null>(null);
   readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter());
   readonly name = personName;

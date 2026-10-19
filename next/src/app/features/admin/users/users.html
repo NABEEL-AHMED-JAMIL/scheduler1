@@ -8,6 +8,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [allowAll]="true" [value]="tenantFilter() ? +tenantFilter() : null" (valueChange)="tenantFilter.set($event === null ? '' : '' + $event); pager.reset()" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         <button type="button" class="btn btn-primary btn-sm" (click)="create()">
           <app-icon name="plus" />New user
@@ -56,12 +57,6 @@
             <option [value]="name">{{ name }}</option>
           }
         </select>
-      }
-      @if (canPickTenant() && tenantOptions().length > 1) {
-        <div class="w-44">
-          <app-combobox id="users-tenant" ariaLabel="Filter by tenant" [selected]="tenantFilter()" (selectedChange)="tenantFilter.set($event); pager.reset()"
-                        placeholder="All workspaces" clearLabel="All workspaces" [options]="tenantComboOptions()" />
-        </div>
       }
       <select class="input max-w-32" [value]="statusFilter()" aria-label="Filter by state"
               (change)="statusFilter.set($any($event.target).value); pager.reset()">

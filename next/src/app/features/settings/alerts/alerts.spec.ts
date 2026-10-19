@@ -8,8 +8,8 @@ import { of } from 'rxjs';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AlertRules } from './alert-rules';
-import { Alert, AlertRule, PlannedDeploy, ServiceHealth, minutes, recommendedRules, ruleSentence } from './alerts.api';
-import { PLANNED_DEPLOYS, deployLength, healthOption, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
+import { Alert, AlertRule, PlannedDeploy, minutes, recommendedRules, ruleSentence } from './alerts.api';
+import { deployLength, errorRate, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
 import { notificationTarget, openableTarget } from '../../notifications/notification-links';
 
 /** MIG-355: alerts and their rules -- the list, the open alerts with Resolve, the recommended rules, and the words. */
@@ -68,6 +68,47 @@ describe('Alerts', () => {
     expect(resolve.request.body).toEqual({ id: 5 });
   });
 
+  it('owner #6: says "Rules 6 of 50" in words -- the rules in use against the workspace\'s limit -- and groups the rules by kind', () => {
+    const s = screen();
+    const kinds = [{ kind: 'RUN_FAILED', label: 'Runs failed', threshold: 1, windowMinutes: 60, whatToDo: 'x', runbook: 'y' },
+      { kind: 'RUN_SLOW', label: 'A run is slower than usual', threshold: 1, windowMinutes: 60, whatToDo: 'x', runbook: 'y' }];
+    const rules = [rule({ id: 1, kind: 'RUN_SLOW', factor: 2 }), rule({ id: 2 }), rule({ id: 3, enabled: false }),
+      rule({ id: 4, mutedUntil: new Date(Date.now() + 3_600_000).toISOString(), lastFiredAt: '2026-10-19T13:00:00Z', openAlerts: 2 })];
+    s.http.expectOne(r => r.url === RULES).flush({ status: API_SUCCESS, message: '', data: { scope: 'workspace', rules, maxRules: 50, kinds } });
+    s.http.expectOne(r => r.url === ALERTS).flush({ status: API_SUCCESS, message: '', data: [] });
+    s.fixture.detectChanges();
+    const count = s.el.querySelector('[data-test="rules-count"]')!;
+    expect(count.textContent!.replace(/\s+/g, ' ').trim()).toBe('4 rules · up to 50 per workspace · 1 off · 1 muted');
+    expect(count.getAttribute('title')).toContain('out of the most a workspace may have (50)');
+    expect([...s.el.querySelectorAll('[data-kind]')].map(g => g.getAttribute('data-kind'))).toEqual(['RUN_FAILED', 'RUN_SLOW']);
+    const muted = s.el.querySelector('[data-rule="4"]')!;
+    expect(muted.querySelector('[data-test="rule-muted"]')).not.toBeNull();
+    expect(muted.querySelector('[data-test="rule-last-fired"]')!.textContent).toContain('2 open');
+    expect(s.el.querySelector('[data-rule="2"] [data-test="rule-last-fired"]')!.textContent!.trim()).toBe('never');
+  });
+
+  it('owner #6: mutes a rule for a while, and ends a mute', () => {
+    const s = screen();
+    answer(s, [rule()], []);
+    const page = s.fixture.componentInstance;
+    page.mute(rule(), 60);
+    expect(s.http.expectOne(`${API_BASE}/reliability.json/alerts/rules/mute`).request.body).toEqual({ id: 1001, minutes: 60 });
+    page.mute(rule(), 0);
+    expect(s.http.expectOne(`${API_BASE}/reliability.json/alerts/rules/mute`).request.body).toEqual({ id: 1001, minutes: 0 });
+  });
+
+  it('refuses a new rule at the limit, saying why', () => {
+    const s = screen();
+    s.http.expectOne(r => r.url === RULES).flush({ status: API_SUCCESS, message: '', data: { scope: 'workspace',
+      rules: Array.from({ length: 50 }, (_, i) => rule({ id: i + 1 })), maxRules: 50,
+      kinds: [{ kind: 'RUN_FAILED', label: 'Runs failed', threshold: 1, windowMinutes: 60, whatToDo: 'x', runbook: 'y' }] } });
+    s.http.expectOne(r => r.url === ALERTS).flush({ status: API_SUCCESS, message: '', data: [] });
+    s.fixture.detectChanges();
+    const add = s.el.querySelector<HTMLButtonElement>('[data-test="alerts-new-rule"]')!;
+    expect(add.disabled).toBe(true);
+    expect(add.title).toContain('the most it may have');
+  });
+
   it('offers the recommended rules to a workspace with none, and saves each', () => {
     const s = screen();
     answer(s, [], []);
@@ -88,44 +129,31 @@ describe('Alerts', () => {
 
   it('keeps an alert link\'s query for the pages that read it, and still drops the old app\'s', () => {
     expect(notificationTarget('/runs/failed?pipeline=10')).toBe('/runs/failed?pipeline=10');
-    expect(notificationTarget('/platform/reliability?service=media')).toBe('/platform/reliability?service=media');
+    expect(notificationTarget('/platform/service-health?service=media')).toBe('/platform/service-health?service=media');
+    // An alert stored before owner #21 still opens the page, now Service health.
+    expect(notificationTarget('/platform/reliability?service=media')).toBe('/platform/service-health?service=media');
+    expect(notificationTarget('/platform/reliability')).toBe('/platform/service-health');
     expect(notificationTarget('/jobList?jobId=4')).toBe('/pipelines/schedules');
     expect(notificationTarget('/runs/failed?x=<script>')).toBe('/runs/failed');
     expect(openableTarget('/runs/failed?pipeline=10', key => key !== 'queue')).toBeNull();
     expect(openableTarget('/runs/failed?pipeline=10', () => true)).toBe('/runs/failed?pipeline=10');
   });
 
-  it('draws a service\'s status in words and its day as one line a service', () => {
+  it('says a service\'s status, restarts and error rate in words, with no history chart (owner #21)', () => {
     expect(statusWord('UNREACHABLE')).toEqual({ word: 'Not answering', tone: 'crit' });
     expect(statusWord(undefined).tone).toBe('muted');
-    const option = healthOption([
-      { service: 'media', status: 'UP', series: { at: ['2026-10-13T13:00:00Z'], heapUsedMb: [900], requestsPerMin: [4], errorsPerMin: [0],
-        meanMs: [12], cpuPct: [3], up: [true] } },
-      { service: 'gateway', status: 'UP' },
-    ], 'heapUsedMb', ['#111'], '#222', '#333', '2026-10-13T14:00:00Z') as { series: { name: string; data: unknown[]; showSymbol: boolean }[];
-      xAxis: { min: number; max: number } };
-    expect(option.series.map(s => s.name)).toEqual(['media']);
-    expect(option.series[0].showSymbol).toBe(true);
-    expect(option.xAxis.max - option.xAxis.min).toBe(86_400_000);
-    expect(option.series[0].data).toEqual([['2026-10-13T13:00:00Z', 900]]);
+    expect(errorRate({ service: 'media', status: 'UP', requestsPerMin: 200, errorsPerMin: 3, errorPct: 1.5 })).toEqual({ text: '1.5% · 3/min', bad: true });
+    expect(errorRate({ service: 'media', status: 'UP', requestsPerMin: 200, errorsPerMin: 0, errorPct: 0 })).toEqual({ text: 'none', bad: false });
+    expect(errorRate({ service: 'gateway', status: 'UP' })).toEqual({ text: '—', bad: false });
   });
 
-  it('marks each planned deploy on the day, and counts its restart apart', () => {
+  it('counts a planned deploy\'s restart apart, and says how long each deploy took', () => {
     const deploys: PlannedDeploy[] = [
       { service: 'transcriber', start: '2026-10-13T13:30:00Z', end: '2026-10-13T13:31:10Z', expires: '2026-10-13T13:45:00Z',
         closes: '2026-10-13T13:31:10Z', state: 'ended', outcome: 'ok' },
       { service: 'process', start: '2026-10-13T12:00:00Z', end: null, expires: '2026-10-13T12:15:00Z', closes: '2026-10-13T12:15:00Z',
         state: 'expired', outcome: null },
     ];
-    const media: ServiceHealth = { service: 'media', status: 'UP', series: { at: ['2026-10-13T13:00:00Z'], heapUsedMb: [900], requestsPerMin: [4],
-      errorsPerMin: [0], meanMs: [12], cpuPct: [3], up: [true] } };
-    const option = healthOption([media], 'heapUsedMb', ['#111'], '#222', '#333', '2026-10-13T14:00:00Z', deploys) as {
-      series: { name: string; markLine?: { data: { xAxis: string }[] }; markArea?: { data: { xAxis: string }[][] } }[] };
-    expect(option.series.map(s => s.name)).toEqual(['media', PLANNED_DEPLOYS]);
-    expect(option.series[1].markLine!.data.map(d => d.xAxis)).toEqual(['2026-10-13T13:30:00Z', '2026-10-13T12:00:00Z']);
-    expect(option.series[1].markArea!.data[1].map(d => d.xAxis)).toEqual(['2026-10-13T12:00:00Z', '2026-10-13T12:15:00Z']);
-    const none = healthOption([media], 'heapUsedMb', ['#111'], '#222', '#333', '2026-10-13T14:00:00Z') as { series: unknown[] };
-    expect(none.series.length).toBe(1);
     expect(deployLength(deploys[0])).toBe('70 s');
     expect(deployLength(deploys[1])).toBe('15 min');
     expect(deployLength({ ...deploys[0], state: 'open', end: null })).toBe('running');

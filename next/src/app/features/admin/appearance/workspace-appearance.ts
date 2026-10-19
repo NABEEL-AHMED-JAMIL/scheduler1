@@ -7,7 +7,9 @@ import { themeLabel } from '../../../core/theme-options';
 import { ThemePreference } from '../../../core/theme-preference';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { Icon } from '../../../shared/ui/icon';
-import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
+import { Section } from '../../../shared/ui/section';
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { ThemeChooser } from '../../../shared/ui/theme-chooser';
 
@@ -24,58 +26,35 @@ export interface AppearanceSettings {
  */
 @Component({
   selector: 'app-workspace-appearance',
-  imports: [Icon, Combobox, PageHeader, ThemeChooser],
+  imports: [Icon, PageHeader, ThemeChooser, Section, WorkspaceSelect],
   template: `
     <div class="page">
-      <app-page-header>
-        <div class="page-head">
-          <div>
-            <h1 class="page-title">Appearance</h1>
-            <p class="page-subtitle">
-              The theme your workspace's people see until they choose their own. Each person can still pick another in
-              the top bar or on their profile.
-            </p>
-          </div>
-        </div>
+      <app-page-header title="Appearance"
+                       subtitle="The theme your workspace's people see until they choose their own. Each person can still pick another in the top bar or on their profile.">
+        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
       </app-page-header>
-
-      @if (isPlatformAdmin()) {
-        <div class="card px-4 py-2.5 flex flex-wrap items-center gap-3">
-          <label for="appearance-workspace" class="text-sm font-medium">Workspace</label>
-          <app-combobox id="appearance-workspace" ariaLabel="Workspace whose default theme to set" class="w-72 max-w-full"
-                        placeholder="Pick a workspace" [options]="tenants()"
-                        [selected]="tenantId() === null ? '' : '' + tenantId()" (selectedChange)="pickWorkspace($event)" />
-        </div>
-      }
 
       @if (error()) {
         <div class="card p-4 text-sm text-crit-500" role="alert">{{ error() }}</div>
       } @else if (isPlatformAdmin() && tenantId() === null) {
-        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick a workspace to set its default theme.</div>
+        <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" data-test="pick-workspace">Pick a workspace above to set its default theme.</div>
       } @else {
-        <section class="card p-4" aria-labelledby="appearance-heading" data-test="workspace-theme-card">
-          <div class="flex flex-wrap items-start gap-2">
-            <div class="min-w-0 flex-1">
-              <h2 id="appearance-heading" class="text-sm font-semibold">Default theme</h2>
-              <p class="field-note text-[color:var(--text-muted)] mt-0.5">
-                Now: {{ savedLabel() }}. People who have chosen a theme keep theirs; everyone else opens in this one from
-                their next sign-in.
-              </p>
-            </div>
-          </div>
-          <div class="mt-4">
-            <app-theme-chooser label="Workspace default theme" systemLabel="System (no default)"
-                               [value]="draft()" [disabled]="loading() || saving()" (picked)="draft.set($event)" />
-          </div>
-          <div class="mt-4 flex items-center gap-2">
+        <!-- Owner #4 (2026-10-19): one section -- title and the state in a sentence, the themes on the shared chooser's grid, and
+             the actions in the section's footer, the primary rightmost. -->
+        <app-section [card]="true" title="Default theme" data-test="workspace-theme-card"
+                     [sub]="'Now: ' + savedLabel() + '. People who have chosen a theme keep theirs; everyone else opens in this one from their next sign-in.'">
+          <app-theme-chooser label="Workspace default theme" systemLabel="System (no default)"
+                             [value]="draft()" [disabled]="loading() || saving()" (picked)="draft.set($event)" />
+          <div class="form-actions" data-test="appearance-actions">
+            @if (changed()) {
+              <span class="text-xs text-[color:var(--text-muted)] mr-auto">Not saved yet: {{ draftLabel() }}.</span>
+              <button type="button" class="btn btn-ghost btn-sm" [disabled]="saving()" (click)="draft.set(savedChoice())">Undo</button>
+            }
             <button type="button" class="btn btn-primary btn-sm" [disabled]="!changed() || saving()" (click)="save()">
               <app-icon name="save" [busy]="saving()" />{{ saving() ? 'Saving…' : 'Save default' }}
             </button>
-            @if (changed()) {
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="saving()" (click)="draft.set(savedChoice())">Undo</button>
-            }
           </div>
-        </section>
+        </app-section>
       }
     </div>
   `,
@@ -88,8 +67,7 @@ export class WorkspaceAppearance implements OnInit {
   private readonly toast = inject(ToastService);
 
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
-  readonly tenantId = signal<number | null>(null);
-  readonly tenants = signal<ComboboxOption[]>([]);
+  readonly tenantId = signal<number | null>(inject(WorkspaceDirectory).remembered());
   readonly saved = signal<string | null>(null);
   readonly draft = signal<ThemeChoice>('system');
   readonly loading = signal(false);
@@ -99,21 +77,17 @@ export class WorkspaceAppearance implements OnInit {
   readonly savedChoice = computed<ThemeChoice>(() => { const s = this.saved(); return isThemeChoice(s) ? s : 'system'; });
   readonly savedLabel = computed(() => (this.saved() ? themeLabel(this.saved()) : 'no default (each device’s light or dark)'));
   readonly changed = computed(() => this.draft() !== this.savedChoice());
+  readonly draftLabel = computed(() => (this.draft() === 'system' ? 'no default' : themeLabel(this.draft())));
 
   ngOnInit(): void {
-    if (this.isPlatformAdmin()) {
-      this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-        next: r => { if (r.status === API_SUCCESS) this.tenants.set((r.data ?? []).map(t => ({ value: String(t.tenantId), label: t.tenantName }))); },
-        error: () => {},
-      });
-      return;
-    }
+    // A platform administrator reads the workspace picked (this session's choice); a workspace administrator their own.
+    if (this.isPlatformAdmin() && this.tenantId() === null) return;
     this.load();
   }
 
-  pickWorkspace(value: string): void {
-    const id = Number(value);
-    this.tenantId.set(value && Number.isFinite(id) ? id : null);
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
+    this.error.set('');
     if (this.tenantId() !== null) this.load();
   }
 

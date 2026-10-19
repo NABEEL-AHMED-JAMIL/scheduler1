@@ -9,15 +9,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        @if (canPickTenant()) {
-          <!-- [selected] on the options, not [value] on the select: the select's value is applied
-               before the options exist, so a deep-linked tenantId showed "Choose a workspace…"
-               above a grid that had already loaded that tenant's people. -->
-          <div class="w-56" data-testid="tenant-picker">
-            <app-combobox id="ap-tenant" ariaLabel="Workspace" [selected]="tenantId() ?? ''" (selectedChange)="pickTenant($event)"
-                          placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
-          </div>
-        }
+        <app-workspace-select data-testid="tenant-picker" [value]="tenantId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
         <button type="button" class="btn btn-primary btn-sm" (click)="add()" data-testid="new-profile" [disabled]="needsWorkspace()">
           <app-icon name="plus" />New profile

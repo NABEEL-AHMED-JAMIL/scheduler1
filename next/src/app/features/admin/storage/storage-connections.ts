@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -58,7 +60,7 @@ interface StorageConnection {
 
 @Component({
   selector: 'app-storage-connections',
-  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, StatTile, Icon, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, CopyButton, Pagination, ManagedBanner],
   templateUrl: './storage-connections.html',
 })
 export class StorageConnections implements OnInit {
@@ -71,7 +73,7 @@ export class StorageConnections implements OnInit {
   readonly error = signal('');
   readonly search = signal('');
   readonly providerFilter = signal('');
-  readonly workspaceFilter = signal('');
+  readonly workspaceFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
 
   /**
    * Whose connection each row is. A platform administrator's list merges every workspace's, and

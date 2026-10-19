@@ -11,20 +11,16 @@
           }
         </p>
       </div>
-      <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      <div class="flex items-center gap-2">
+        @if (showWorkspace()) { <app-workspace-select [allowAll]="true" [value]="tenantFilter()" (valueChange)="setTenant($event === null ? '' : '' + $event)" /> }
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      </div>
     </div>
   </app-page-header>
 
   <app-table-shell heading="Changes" [loading]="loading()" [error]="error()" [isEmpty]="!rows().length"
                    [shown]="rows().length" [emptyMessage]="emptyMessage()" emptyIcon="history" (retry)="load()">
     <ng-container toolbar>
-      @if (showWorkspace()) {
-        <select class="input max-w-48 min-w-0" aria-label="Filter by workspace" [value]="tenantFilter() ?? ''"
-                (change)="setTenant($any($event.target).value)">
-          <option value="">Every workspace</option>
-          @for (t of tenants(); track t.tenantId) { <option [value]="t.tenantId">{{ t.tenantName }}</option> }
-        </select>
-      }
       <select class="input max-w-48 min-w-0" aria-label="Filter by staff member" [value]="staffFilter() ?? ''"
               (change)="setStaff($any($event.target).value)">
         <option value="">Every staff member</option>

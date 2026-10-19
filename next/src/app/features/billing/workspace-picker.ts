@@ -1,48 +1,48 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
+import { Injectable, computed, inject } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
-import { workspaceLabels } from './billing-format';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 
 interface TenantOption { tenantId: number; tenantName: string; }
 
 /**
- * Which workspace the billing screens are looking at. A workspace admin has no choice and the
- * value stays empty, which the server reads as "your own". A platform administrator's choice is shared
- * across the screens so it follows the person -- and until they choose, it is EMPTY, which
- * Invoices and Documents read as every workspace (their select says so) and Cost & usage, which
- * needs one, reads as the first (`effective`). The picker used to fill in the first workspace
- * for everyone, so a platform administrator opened Invoices scoped to the newest workspace under a
- * select that said "Every workspace", and a deep link to another workspace's invoice was
- * replaced by that workspace's first.
+ * Which workspace the billing screens are looking at -- since owner #5 (2026-10-19) the platform-wide choice of the one
+ * workspace selector (shared/ui/workspace-select.ts, WorkspaceDirectory), so the workspace picked on Users or Cost &amp;
+ * usage is the one Invoices opens with. A workspace admin has no choice and the value stays empty, which the server reads
+ * as "your own". A platform administrator's choice is EMPTY until they make one, which Invoices and Documents read as every
+ * workspace ("All workspaces") and Cost &amp; usage, which needs one, reads as the first (`effective`). A deep link to
+ * another workspace's invoice is never replaced by the choice.
  */
 @Injectable({ providedIn: 'root' })
 export class WorkspacePicker {
-  private readonly http = inject(HttpClient);
   private readonly auth = inject(AuthService);
+  private readonly directory = inject(WorkspaceDirectory);
 
-  readonly tenants = signal<TenantOption[]>([]);
-  readonly tenantId = signal<string | null>(null);
+  readonly tenants = computed<TenantOption[]>(() => this.directory.workspaces().map(w => ({ tenantId: w.tenantId, tenantName: w.tenantName })));
+  /** The choice as the billing calls send it (a string id), or null; `set` is a pick, kept for the session. */
+  readonly tenantId = Object.assign(computed(() => {
+    const chosen = this.directory.chosen();
+    return chosen === null ? null : String(chosen);
+  }), {
+    set: (id: string | null) => {
+      const n = Number(id);
+      this.directory.choose(id && Number.isFinite(n) && n > 0 ? n : null);
+    },
+  });
   /** How each workspace is named in the pickers: two that share a name carry their ids, or they read as one. */
-  readonly labels = computed(() => workspaceLabels(this.tenants()));
+  readonly labels = this.directory.names;
   readonly options = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: this.labels().get(t.tenantId) ?? t.tenantName })));
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;
   readonly name = computed(() => this.options().find(o => o.value === this.tenantId())?.label ?? '');
   /** The choice, or the first workspace when none was made: for the screens that must look at one. */
   readonly effective = computed(() => this.tenantId() ?? (this.tenants().length ? String(this.tenants()[0].tenantId) : null));
-  private loaded = false;
+  /** The choice as a number (the shared selector's value), or null for none / every workspace. */
+  readonly chosenId = computed(() => this.directory.chosen());
+  /** The effective one as a number, for the shared selector on a page that needs one. */
+  readonly effectiveId = computed(() => { const e = this.effective(); return e === null ? null : Number(e); });
 
   /** Runs `then` once a workspace is known: at once for a tenant administrator, after the list for a platform administrator. */
   ready(then: () => void): void {
     if (!this.isPlatformAdmin()) { then(); return; }
-    if (this.loaded) { then(); return; }
-    this.http.get<ApiResponse<TenantOption[]>>(`${API_BASE}/tenant.json/listTenants`).subscribe({
-      next: r => {
-        this.loaded = true;
-        if (r.status === API_SUCCESS) this.tenants.set(r.data ?? []);
-        then();
-      },
-      error: () => then(),
-    });
+    this.directory.load().subscribe({ next: () => then(), error: () => then() });
   }
 }

@@ -7,6 +7,9 @@ import { Component, computed, input, isDevMode } from '@angular/core';
  */
 const PATHS: Record<string, string> = {
   refresh:   'M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6',
+  // Owner #21/#22 (2026-10-19): Service health's pulse and Billing › Analytics' trend.
+  activity:  'M22 12h-4l-3 9L9 3l-3 9H2',
+  trendingUp: 'M22 7l-8.5 8.5-5-5L2 17M16 7h6v6',
   plus:      'M12 5v14M5 12h14',
   minus:     'M5 12h14',
   edit:      'M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z',

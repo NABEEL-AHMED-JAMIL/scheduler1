@@ -68,8 +68,9 @@ test.describe('rate cards', () => {
     undo = { s: session, base: nextBase, day, name };
 
     const page = await pageAs(browser, session);
-    await page.goto('/platform/rate-cards');
-    await expect(page.getByRole('heading', { name: 'Rate cards' })).toBeVisible();
+    // Owner #23 (2026-10-19): the rate cards are Billing › Settings, the platform's alone.
+    await page.goto('/billing/settings');
+    await expect(page.getByRole('heading', { name: 'Billing settings' })).toBeVisible();
     await expect(page.getByText('Default card today')).toBeVisible();
 
     // The editor: a name, one price, one allowance, saved as a new default version from the 1st of next month.
@@ -124,8 +125,8 @@ test.describe('rate cards', () => {
     const list = await (await request.get(`${api}/billing.json/rateCards`, { headers: auth })).json();
     expect(list.status).toBe('ERROR');
     const page = await pageAs(browser, session);
-    await page.goto('/platform/rate-cards');
-    await expect(page.getByRole('heading', { name: 'Rate cards' })).toHaveCount(0);
+    await page.goto('/billing/settings');
+    await expect(page.getByRole('heading', { name: 'Billing settings' })).toHaveCount(0);
     await page.goto('/billing/usage');
     await expect(page.getByText(/Priced with/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'rate cards' })).toHaveCount(0);

@@ -12,6 +12,7 @@ import { formatSize } from '../../shared/ui/format-size';
 import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow } from './billing.service';
 import { MoneyTotals, addMoney, formatMoney, formatTotals } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
@@ -23,7 +24,7 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
  */
 @Component({
   selector: 'app-billing-documents',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, Icon, StatTile, RouterLink, ServerTimePipe, PdfViewer, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './documents.html',
 })
 export class BillingDocuments implements OnInit, OnDestroy {

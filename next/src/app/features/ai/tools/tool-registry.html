@@ -9,12 +9,7 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        @if (canPickTenant()) {
-          <div class="w-56" data-testid="tool-tenant-picker">
-            <app-combobox id="tools-tenant" ariaLabel="Workspace" [selected]="tenantId() ? '' + tenantId() : ''" (selectedChange)="pickTenant($event)"
-                          placeholder="Choose a workspace…" clearLabel="Choose a workspace…" [options]="tenantOptions()" />
-          </div>
-        }
+        <app-workspace-select data-testid="tool-tenant-picker" [value]="tenantId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading()" [disableWhileLoading]="false" (refresh)="load()" />
         <a class="btn btn-primary btn-sm" routerLink="/ai/assistant"><app-icon name="chat" />Open the assistant</a>
       </div>

@@ -4,8 +4,8 @@ import { pin, restoreClock, visit } from './harness';
 import { PINNED } from './pinned/managed-service';
 
 /**
- * MIG-254 characterisation baseline: the managed-service pages (Administration › Managed service, Staff activity,
- * Work in a workspace for a platform administrator; Our team's activity for a workspace administrator), and a
+ * MIG-254 characterisation baseline: the managed-service pages (Administration › Managed service and Staff activity for a
+ * platform administrator -- Work in a workspace became Workspaces' row action, owner #20; Our team's activity for a workspace administrator), and a
  * MANAGED workspace's build screen under its banner. The answers are made up here, in the shapes identity-service
  * gives (MIG-244): the platform's only administrator is the owner's account, which is not used to capture them.
  */
@@ -45,7 +45,6 @@ describe('MIG-254: the managed-service pages', () => {
   const platform: [string, string][] = [
     ['managed service, as a platform administrator', '/platform/managed-service'],
     ['staff activity, as a platform administrator', '/platform/staff-activity'],
-    ['work in a workspace, as a platform administrator', '/platform/work-in-workspace'],
   ];
   for (const [name, url] of platform) {
     it(name, async () => {

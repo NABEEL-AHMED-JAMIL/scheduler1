@@ -246,8 +246,13 @@ export const NAV: NavItem[] = [
         hint: 'What the workspace used, what it costs, and its bills',
         tabs: [
           { label: 'Cost & usage', path: '/billing/usage', icon: 'chart', adminOnly: true },
+          // Owner #22 (2026-10-19): a workspace administrator's own trends; a platform administrator's every workspace's, with a
+          // workspace filter and the cross-customer revenue (platform only, inside the page).
+          { label: 'Analytics', path: '/billing/analytics', icon: 'trendingUp', adminOnly: true },
           { label: 'Invoices', path: '/billing/invoices', icon: 'file', adminOnly: true },
           { label: 'Billing documents', path: '/billing/documents', icon: 'folder', adminOnly: true },
+          // Owner #23: the rate cards and their pricing rules -- the platform's alone.
+          { label: 'Settings', path: '/billing/settings', icon: 'settings', platformOnly: true },
         ],
       },
       {
@@ -287,11 +292,11 @@ export const NAV: NavItem[] = [
       // listRequests, approve and reject all carry hasRole('PLATFORM_ADMIN').
       { label: 'Requests', path: '/platform/requests', icon: 'inbox', platformOnly: true },
       { label: 'Managed service', path: '/platform/managed-service', icon: 'briefcase', platformOnly: true },
-      { label: 'Work in a workspace', path: '/platform/work-in-workspace', icon: 'external', platformOnly: true },
+      // Owner #20 (2026-10-19): no Work in a workspace page -- "Work in this workspace" is on Workspaces' row menu and beside the
+      // workspace selector. Staff activity stays.
       { label: 'Staff activity', path: '/platform/staff-activity', icon: 'history', platformOnly: true },
-      { label: 'Reliability', path: '/platform/reliability', icon: 'chart', platformOnly: true },
-      { label: 'Billing analytics', path: '/platform/billing-analytics', icon: 'chart', platformOnly: true },
-      { label: 'Rate cards', path: '/platform/rate-cards', icon: 'layers', platformOnly: true },
+      // Owner #21: Reliability slimmed into Service health. #22 and #23: Billing analytics and Rate cards moved into Billing.
+      { label: 'Service health', path: '/platform/service-health', icon: 'activity', platformOnly: true },
       { label: 'Engine settings', path: '/platform/engine', icon: 'settings', platformOnly: true },
     ],
   },

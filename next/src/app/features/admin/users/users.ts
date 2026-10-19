@@ -1,6 +1,7 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { toneClass } from '../../../shared/ui/tone';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Combobox } from '../../../shared/ui/combobox';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
 
@@ -84,7 +85,7 @@ export interface AppUser {
 
 @Component({
   selector: 'app-users',
-  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, Combobox, StatStrip],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Icon, CopyButton, Avatar, Pagination, StatStrip],
   templateUrl: './users.html',
 })
 export class Users implements OnInit {
@@ -113,7 +114,7 @@ export class Users implements OnInit {
   readonly search = signal('');
   readonly roleFilter = signal('');
   readonly statusFilter = signal('');
-  readonly tenantFilter = signal('');
+  readonly tenantFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
   /** '' = any, 'default' = on the workspace default, else a profile name. */
   readonly profileFilter = signal('');
   /** Which contact line was just copied, as '<userId>:<field>'. One signal rather than one
@@ -157,7 +158,6 @@ export class Users implements OnInit {
        || this.focusedTenantId() !== null || this.onlyMine() || this.cardFilter()));
 
   /** Tenants that actually have users, so the filter never offers an empty result. */
-  readonly tenantComboOptions = computed(() => this.tenantOptions().map(t => ({ value: String(t.id), label: t.name })));
   readonly tenantOptions = computed(() => {
     const seen = new Map<number, string>();
     for (const user of this.users()) {

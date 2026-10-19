@@ -1,93 +1,180 @@
 <div class="page">
-  <app-page-header>
-    <div class="page-head">
-      <div>
-        <h1 class="page-title">Engine settings</h1>
-        <p class="page-subtitle">
-          The scheduler's own settings, shared by every workspace. The fetch limit is how many queued
-          runs one scheduler pass claims; the two watermarks record where each cron last got to.
-        </p>
-      </div>
-      <div class="flex items-center gap-2 ml-auto">
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
-      </div>
-    </div>
+  <app-page-header title="Engine settings"
+                   subtitle="The engine's limits, shared by every workspace unless one has its own: change one inside its range, or put its default back. Secrets and infrastructure settings stay in the environment and are not here.">
+    <app-refresh-button [loading]="loading()" (refresh)="load()" />
   </app-page-header>
 
-  <app-table-shell heading="Engine settings" [loading]="loading()" [error]="error()"
-                   [isEmpty]="!settings().length" emptyMessage="No engine settings came back."
-                   emptyIcon="settings" [scrollRows]="false"
-                   (retry)="load()">
-    <table class="table-modern">
-      <thead>
-        <tr>
-          <th>Setting</th>
-          <th>Value</th>
-          <th>Last changed</th>
-          <th class="w-40 th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (s of settings(); track s.key) {
-          <tr [attr.data-key]="s.key">
-            <td class="max-w-80">
-              <div class="mono font-medium">{{ s.key }}</div>
-              @if (s.description) {
-                <div class="text-xs text-[color:var(--text-secondary)]">{{ s.description }}</div>
-              }
-            </td>
-            <td>
-              @if (editing() === s.key) {
-                <div class="field" [class.field-invalid]="!!draftError()">
-                  <input id="engineValue" class="input mono max-w-40" inputmode="numeric" autocomplete="off"
-                         [attr.aria-label]="s.key" [value]="draft()"
-                         (input)="onDraft($any($event.target).value)" />
-                  @if (draftError()) {
-                    <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
-                      <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
-                      <span>{{ draftError() }}</span>
-                    </p>
-                  } @else {
-                    <p class="field-note text-[color:var(--text-muted)]">A whole number from 1 to 1,000,000.</p>
+  <div class="grid grid-cols-2 md:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
+    <app-stat-tile label="Settings" [value]="'' + settings().length" icon="settings" tone="info" foot="on the allow-list" />
+    <app-stat-tile label="Changed" [value]="'' + changedCount()" icon="edit" [tone]="changedCount() ? 'warn' : 'muted'" foot="from their default" />
+    <app-stat-tile label="Workspace values" [value]="'' + overrideCount()" icon="building" [tone]="overrideCount() ? 'info' : 'muted'" foot="a workspace's own" />
+    <app-stat-tile label="Read by the engine" [value]="cacheSeconds() + ' s'" icon="clock" tone="muted" foot="at most this after a change" />
+  </div>
+
+  @if (error()) {
+    <div class="card p-4 text-sm text-crit-500" role="alert">{{ error() }}
+      <button type="button" class="btn btn-default btn-sm ml-2" (click)="load()"><app-icon name="refresh" />Try again</button></div>
+  } @else {
+    <section class="card overflow-hidden" aria-labelledby="dials-title" data-test="engine-dials">
+      <div class="px-4 pt-4"><h2 class="section-title m-0" id="dials-title">Limits</h2>
+        <p class="section-sub">Each is checked on the server as well. A change applies on every Core instance within {{ cacheSeconds() }} seconds, and when it says.</p></div>
+      <div class="overflow-x-auto mt-3">
+        <table class="table-modern">
+          <thead>
+            <tr>
+              <th>Setting</th>
+              <th class="text-right">Value</th>
+              <th class="text-right">Default</th>
+              <th class="text-right">Range</th>
+              <th>Takes effect</th>
+              <th>Workspaces</th>
+              <th class="w-28 th-actions">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (loading() && !settings().length) {
+              <tr><td colspan="7" class="text-center text-[color:var(--text-muted)] py-6">Reading the engine settings…</td></tr>
+            }
+            @for (s of settings(); track s.key) {
+              <tr [attr.data-key]="s.key" [class.is-selected]="open() === s.key">
+                <td class="max-w-96">
+                  <div class="font-medium">{{ s.label }}</div>
+                  <div class="text-xs text-[color:var(--text-secondary)]">{{ s.description }}</div>
+                  <div class="mono text-[11px] text-[color:var(--text-muted)] mt-0.5">{{ s.key }}</div>
+                </td>
+                <td class="text-right tabular whitespace-nowrap">
+                  <span class="font-medium">{{ s.value | number }}</span> <span class="text-xs text-[color:var(--text-muted)]">{{ s.unit }}</span>
+                  @if (!s.atDefault) {
+                    <div class="text-[11px] text-[color:var(--text-muted)]">@if (s.updatedAt) { {{ s.updatedAt | serverTime:'recent' }} }@if (s.updatedByName) { by {{ s.updatedByName }} }</div>
                   }
-                </div>
-              } @else {
-                <!-- A watermark is an instant: read in the console's 24-hour format, the stored text on its tooltip (UI review U6). -->
-                @if (isInstant(s.value)) {
-                  <span class="tabular" [title]="s.value">{{ s.value | serverTime: 'dateTimeSec' }}</span>
-                } @else {
-                  <span class="mono">{{ s.value }}</span>
-                }
-                @if (!canEdit(s)) {
-                  <div class="text-xs text-[color:var(--text-muted)]">Written only by its cron</div>
-                }
-              }
-            </td>
-            <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">
-              @if (s.updatedAt) {
-                {{ s.updatedAt | serverTime:'dateTime' }}@if (s.updatedByName) { by {{ s.updatedByName }}}
-              } @else { — }
-            </td>
-            <td>
-              @if (canEdit(s)) {
-                <div class="flex items-center justify-end gap-1">
-                  @if (editing() === s.key) {
-                    <button type="button" class="btn btn-default btn-sm" (click)="cancel()" [disabled]="saving()">Cancel</button>
-                    <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving()">
-                      @if (saving()) { <app-icon name="refresh" class="spin" /> }Save
+                </td>
+                <td class="text-right tabular whitespace-nowrap" [title]="s.defaultFrom === 'built-in' ? 'The built-in default' : 'From the environment: ' + s.defaultFrom">
+                  {{ s.defaultValue | number }}
+                  @if (s.atDefault) { <div><span class="pill pill-neutral">At default</span></div> }
+                </td>
+                <td class="text-right tabular whitespace-nowrap text-xs text-[color:var(--text-secondary)]">{{ s.min | number }}–{{ s.max | number }}</td>
+                <td class="text-xs text-[color:var(--text-secondary)] max-w-56">{{ s.takesEffect }}</td>
+                <td class="text-xs">
+                  @if (!s.perWorkspace) { <span class="text-[color:var(--text-muted)]" title="Shared by every workspace: one workspace's value would take from the others'">Platform only</span> }
+                  @else if (s.overrides.length) { <span class="pill pill-info">{{ s.overrides.length }} with their own</span> }
+                  @else { <span class="text-[color:var(--text-muted)]">None of their own</span> }
+                </td>
+                <td>
+                  <div class="flex items-center justify-end gap-1">
+                    <button type="button" class="btn btn-default btn-sm" (click)="toggle(s)" [attr.aria-expanded]="open() === s.key"
+                            [attr.aria-label]="(open() === s.key ? 'Close ' : 'Change ') + s.label">
+                      <app-icon [name]="open() === s.key ? 'chevronUp' : 'edit'" />{{ open() === s.key ? 'Close' : 'Change' }}
                     </button>
-                  } @else {
-                    <button type="button" class="btn btn-default btn-sm" (click)="startEdit(s)"
-                            [attr.aria-label]="'Edit ' + s.key">
-                      <app-icon name="edit" />Edit
-                    </button>
-                  }
-                </div>
+                  </div>
+                </td>
+              </tr>
+              @if (open() === s.key) {
+                <tr class="engine-editor" data-test="engine-editor">
+                  <td colspan="7" class="bg-[color:var(--surface-sunken)]">
+                    <div class="grid gap-6 lg:grid-cols-2 py-2">
+                      <div>
+                        <h3 class="text-sm font-semibold m-0">The platform's value</h3>
+                        <p class="field-note text-[color:var(--text-muted)] mt-0.5">Every workspace without its own uses it. {{ s.takesEffect }}</p>
+                        <div class="flex flex-wrap items-start gap-2 mt-2">
+                          <div class="field" [class.field-invalid]="!!draftError()">
+                            <label class="sr-only" [attr.for]="'dial-' + s.key">{{ s.label }}</label>
+                            <input [id]="'dial-' + s.key" class="input mono w-40" inputmode="numeric" autocomplete="off"
+                                   [value]="draft()" (input)="draft.set($any($event.target).value)" [attr.aria-describedby]="'dial-note-' + s.key" />
+                            <p class="field-note" [id]="'dial-note-' + s.key" [class.text-crit-500]="!!draftError()" [class.text-[color:var(--text-muted)]]="!draftError()" role="status">
+                              {{ draftError() || ('A whole number from ' + (s.min | number) + ' to ' + (s.max | number) + ' ' + s.unit + '.') }}
+                            </p>
+                          </div>
+                          <button type="button" class="btn btn-default btn-sm" (click)="reset(s)" [disabled]="saving() || s.atDefault"
+                                  [title]="s.atDefault ? 'Already at its default' : 'Back to ' + s.defaultValue">Reset to default</button>
+                          <button type="button" class="btn btn-primary btn-sm" (click)="save(s)" [disabled]="saving() || !!draftError() || draft() === '' + s.value">
+                            <app-icon name="save" [busy]="saving()" />Save
+                          </button>
+                        </div>
+                      </div>
+                      @if (s.perWorkspace) {
+                        <div data-test="engine-overrides">
+                          <h3 class="text-sm font-semibold m-0">A workspace's own value</h3>
+                          <p class="field-note text-[color:var(--text-muted)] mt-0.5">Only for this workspace's runs; Reset puts it back on the platform's value.</p>
+                          @if (s.overrides.length) {
+                            <ul class="list-none m-0 mt-2 p-0 flex flex-col gap-1 text-sm">
+                              @for (o of s.overrides; track o.tenantId) {
+                                <li class="flex items-center justify-between gap-2" [attr.data-override]="o.tenantId">
+                                  <span class="truncate">{{ workspaceName(o.tenantId) }}</span>
+                                  <span class="flex items-center gap-2 whitespace-nowrap"><span class="tabular font-medium">{{ o.value | number }} {{ s.unit }}</span>
+                                    <button type="button" class="btn btn-ghost btn-sm" (click)="reset(s, o.tenantId)" [disabled]="saving()"
+                                            [attr.aria-label]="'Reset ' + workspaceName(o.tenantId)">Reset</button></span>
+                                </li>
+                              }
+                            </ul>
+                          }
+                          <div class="flex flex-wrap items-start gap-2 mt-2">
+                            <app-combobox class="w-56" [id]="'dial-ws-' + s.key" ariaLabel="Workspace" placeholder="Pick a workspace" [allowClear]="false"
+                                          [options]="workspaceOptions()" [selected]="ownWorkspace()" (selectedChange)="ownWorkspace.set($event)" />
+                            <div class="field" [class.field-invalid]="!!ownDraft() && !!ownError()">
+                              <label class="sr-only" [attr.for]="'dial-own-' + s.key">Its value</label>
+                              <input [id]="'dial-own-' + s.key" class="input mono w-32" inputmode="numeric" autocomplete="off" [placeholder]="'' + s.value"
+                                     [value]="ownDraft()" (input)="ownDraft.set($any($event.target).value)" />
+                              @if (ownDraft() && ownError()) { <p class="field-note text-crit-500" role="alert">{{ ownError() }}</p> }
+                            </div>
+                            <button type="button" class="btn btn-default btn-sm" (click)="saveOwn(s)" [disabled]="saving() || !ownWorkspace() || !!ownError()">Set its own value</button>
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  </td>
+                </tr>
               }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </app-table-shell>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="grid gap-4 xl:grid-cols-2">
+      <section class="card p-4" aria-labelledby="history-title" data-test="engine-history">
+        <h2 class="section-title m-0" id="history-title">Changes</h2>
+        <p class="section-sub">Every change and reset, newest first: who, when, from what to what.</p>
+        <div class="overflow-x-auto mt-2">
+          <table class="table-modern">
+            <thead><tr><th>When</th><th>Setting</th><th>For</th><th class="text-right">From</th><th class="text-right">To</th><th>By</th></tr></thead>
+            <tbody>
+              @for (h of history(); track h.id) {
+                <tr [attr.data-change]="h.id">
+                  <td class="whitespace-nowrap text-xs">{{ h.changedAt ? (h.changedAt | serverTime:'dateTime') : '—' }}</td>
+                  <td>{{ h.label }}@if (h.action === 'RESET') { <span class="pill pill-neutral ml-1">Reset</span> }</td>
+                  <td class="text-xs">{{ workspaceName(h.tenantId) }}</td>
+                  <td class="text-right tabular text-xs">{{ h.oldValue ?? 'default' }}</td>
+                  <td class="text-right tabular text-xs">{{ h.newValue ?? '—' }}</td>
+                  <td class="text-xs text-[color:var(--text-secondary)]">{{ h.changedByName || '—' }}</td>
+                </tr>
+              } @empty {
+                <tr><td colspan="6" class="text-center text-[color:var(--text-muted)] py-4">No change yet: every setting is at its default.</td></tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card p-4" aria-labelledby="watermarks-title" data-test="engine-watermarks">
+        <h2 class="section-title m-0" id="watermarks-title">Watermarks</h2>
+        <p class="section-sub">Where each cron last got to, written only by the cron: shown so a stalled one can be seen, never edited.</p>
+        <div class="overflow-x-auto mt-2">
+          <table class="table-modern">
+            <thead><tr><th>Watermark</th><th>Value</th></tr></thead>
+            <tbody>
+              @for (w of watermarks(); track w.key) {
+                <tr [attr.data-key]="w.key">
+                  <td><div class="mono text-xs font-medium">{{ w.key }}</div>@if (w.description) { <div class="text-xs text-[color:var(--text-secondary)]">{{ w.description }}</div> }</td>
+                  <td class="whitespace-nowrap">
+                    @if (isInstant(w.value)) { <span class="tabular" [title]="w.value">{{ w.value | serverTime: 'dateTimeSec' }}</span> }
+                    @else { <span class="mono">{{ w.value }}</span> }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  }
 </div>

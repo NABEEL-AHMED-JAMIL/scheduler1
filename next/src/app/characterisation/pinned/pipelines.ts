@@ -175,11 +175,11 @@ export const PINNED: Record<string, unknown> = {
     "fields": [
       "All topics",
       "All workspaces",
-      "Filter by workspace",
       "Kind",
       "Search name, code, service or topic",
       "Search tasks",
-      "State"
+      "State",
+      "Workspace"
     ],
     "links": [
       "/settings",

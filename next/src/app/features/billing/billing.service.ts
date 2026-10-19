@@ -167,6 +167,32 @@ export interface BillingAnalytics {
   usageByTenant?: { tenantId: number; amount: number; quantityByMeter: Record<string, number>; unpricedMeters?: string[] }[] | null;
 }
 
+/**
+ * Owner #22 (2026-10-19): billing.json/costTrends -- what was used, priced day by day (before the month's allowances and
+ * tiers), by month, by service and by pipeline; across every workspace (the platform's, with no tenantId) by workspace
+ * instead of by pipeline.
+ */
+export interface CostTrends {
+  tenantId: number | null;
+  from: string;
+  to: string;
+  total: number;
+  months: { month: string; amount: number; byService: Record<string, number> }[];
+  byService: { service: string; amount: number }[];
+  byPipeline?: PipelineCostRow[] | null;
+  byWorkspace?: { tenantId: number; amount: number }[];
+}
+
+/** Owner #19: Platform › Workspaces' cost figures (billing.json/workspaceFigures, platform administrators). */
+export interface WorkspaceFigure {
+  tenantId: number;
+  costThisMonth: number;
+  storageGb: number | null;
+  plan: string | null;
+  planVersion?: number | null;
+  planOwn?: boolean;
+}
+
 /** The billing.json calls: invoices, payments, documents, the account, the platform's view. */
 @Injectable({ providedIn: 'root' })
 export class BillingApi {
@@ -268,6 +294,12 @@ export class BillingApi {
     return this.http.get<ApiResponse<RateCard>>(`${this.base}/rateCard`, { params: { ...this.tenantParam(tenantId), ...(day ? { day } : {}) } });
   }
   saveRateCard(card: RateCardDraft): Observable<ApiResponse<RateCard>> { return this.http.put<ApiResponse<RateCard>>(`${this.base}/rateCard`, card); }
+  costTrends(from: string, to: string, tenantId?: number | null): Observable<ApiResponse<CostTrends>> {
+    return this.http.get<ApiResponse<CostTrends>>(`${this.base}/costTrends`, { params: { from, to, ...(tenantId ? { tenantId: String(tenantId) } : {}) } });
+  }
+  workspaceFigures(): Observable<ApiResponse<{ month: string; storageDay: string; workspaces: WorkspaceFigure[] }>> {
+    return this.http.get<ApiResponse<{ month: string; storageDay: string; workspaces: WorkspaceFigure[] }>>(`${this.base}/workspaceFigures`);
+  }
   analytics(from: string, to: string): Observable<ApiResponse<BillingAnalytics>> { return this.http.get<ApiResponse<BillingAnalytics>>(`${this.base}/analytics`, { params: { from, to } }); }
 
   /** Opens a fetched document in a new tab (a PDF renders there; an image too). */

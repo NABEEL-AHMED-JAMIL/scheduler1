@@ -234,22 +234,20 @@
           </div>
         </div>
 
-        <!-- Owner 2026-10-13: the app themes, as the top bar's menu offers them, with larger previews. -->
-        <div class="card p-4" data-test="appearance">
-          <div class="flex items-baseline gap-2">
-            <h3 class="text-sm font-semibold">Appearance</h3>
+        <!-- Owner 2026-10-13: the app themes, as the top bar's menu offers them, with larger previews. Owner #4 (2026-10-19): the
+             shared section -- title, sub, the saved state on the title's line -- as Administration › Appearance. -->
+        <app-section [card]="true" title="Appearance" data-test="appearance"
+                     sub="The console's colours. Your choice is kept on your account, so it follows you to any device you sign in on.">
+          <span section-actions>
             @if (themeSaved() === 'saved') {
-              <span class="text-xs text-[color:var(--ok-text)] ml-auto" role="status">Saved to your account</span>
+              <span class="text-xs text-[color:var(--ok-text)]" role="status">Saved to your account</span>
             } @else if (themeSaved() === 'local') {
-              <span class="text-xs text-[color:var(--warn-text)] ml-auto" role="status">Kept on this device only</span>
+              <span class="text-xs text-[color:var(--warn-text)]" role="status">Kept on this device only</span>
             }
-          </div>
-          <p class="field-note text-[color:var(--text-muted)] mt-1 mb-4">
-            The console's colours. Your choice is kept on your account, so it follows you to any device you sign in on.
-          </p>
+          </span>
           <app-theme-chooser label="Theme" [value]="themes.choice()" (picked)="chooseTheme($event)" />
           @if (workspaceThemeLabel(); as ws) {
-            <p class="text-xs text-[color:var(--text-muted)] mt-3" data-test="workspace-theme">
+            <p class="field-note text-[color:var(--text-muted)] mt-3 mb-0" data-test="workspace-theme">
               Your workspace's default is {{ ws }}.
               @if (ownTheme()) {
                 <button type="button" class="link-inline" (click)="chooseTheme(null)">Use the workspace default</button>
@@ -258,7 +256,7 @@
               }
             </p>
           }
-        </div>
+        </app-section>
 
         <div class="card p-4">
           <div class="flex items-baseline gap-2 mb-4">

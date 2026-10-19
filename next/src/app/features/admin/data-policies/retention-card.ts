@@ -5,6 +5,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { StatTile } from '../../../shared/ui/stat-tile';
+import { Section } from '../../../shared/ui/section';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { askReason } from '../../../shared/ui/reason';
@@ -31,49 +32,42 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
  */
 @Component({
   selector: 'app-retention-card',
-  imports: [Icon, ServerTimePipe, StatTile],
+  imports: [Icon, ServerTimePipe, StatTile, Section],
   styles: `
     .retention-table { table-layout: fixed; min-width: 52rem; }
     .retention-table .retention-class-col { width: 34%; }
     .retention-table th, .retention-table td { text-align: left; vertical-align: top; }
     .retention-table tbody th { text-transform: none; letter-spacing: normal; font-weight: 400; padding: 0.625rem 1rem;
-      border-bottom: 1px solid var(--border-subtle); }
+      border-bottom: 1px solid var(--border-subtle); white-space: normal; }
+    .retention-table tbody td { vertical-align: top; }
+    .retention-table tbody tr:last-child th { border-bottom: 0; }
+    .retention-holds-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding-top: 0.75rem;
+      border-top: 1px solid var(--border-subtle); }
   `,
   template: `
     @if (visible()) {
-      <section class="card p-4 flex flex-col gap-3" id="retention" aria-labelledby="retention-title" data-retention>
-        <div class="flex flex-wrap items-start gap-2">
-          <app-icon name="history" class="shrink-0 mt-0.5" />
-          <div class="min-w-0 flex-1">
-            <h2 id="retention-title" class="font-semibold text-sm flex items-center gap-2">
-              Retention
-              @if (view(); as v) {
-                <span class="pill" [class.pill-ok]="v.enabled" [class.pill-neutral]="!v.enabled" data-retention-state>{{ v.enabled ? 'On' : 'Off' }}</span>
-              }
-            </h2>
-            <p class="text-sm text-[color:var(--text-secondary)]">
-              How long each kind of data is kept. Once a day, after 02:00 (Chicago time), a pass removes what is older than its days, in
-              small batches, and records what it removed. Retention helps you meet your record-keeping policy; set the days that policy
-              requires.
-            </p>
-          </div>
-          @if (view()) {
-            <div class="flex flex-wrap items-center gap-2 ml-auto">
-              <button type="button" class="btn btn-ghost btn-sm" (click)="openHistory()" data-retention-history><app-icon name="list" />History</button>
-              @if (isPlatformAdmin()) {
-                <button type="button" class="btn btn-ghost btn-sm" (click)="openPlatform()" data-retention-platform><app-icon name="settings" />Platform minimums</button>
-              }
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="previewing()" (click)="runPreview()" data-retention-preview>
-                <app-icon name="eye" [busy]="previewing()" />Preview
-              </button>
-              <button type="button" class="btn btn-ghost btn-sm" [disabled]="!view()!.enabled || view()!.running || starting()" (click)="runNow()"
-                      [attr.title]="view()!.enabled ? null : 'Turn retention on first'" data-retention-run>
-                <app-icon name="play" [busy]="starting()" />Run now
-              </button>
-              <button type="button" class="btn btn-primary btn-sm" (click)="openEdit()" data-retention-edit><app-icon name="edit" />Edit retention</button>
-            </div>
+      <!-- Owner #4 (2026-10-19): the shared section head -- title and state, one line saying what it is, the actions on the
+           title's line with the primary rightmost -- and the table's row headers padded and ruled as its cells. -->
+      <app-section [card]="true" id="retention" title="Retention" data-retention
+                   sub="How long each kind of data is kept. Once a day, after 02:00 (Chicago time), a pass removes what is older than its days, in small batches, and records what it removed. Set the days your record-keeping policy requires.">
+        <div section-actions class="flex flex-wrap items-center justify-end gap-2">
+          @if (view(); as v) {
+            <span class="pill" [class.pill-ok]="v.enabled" [class.pill-neutral]="!v.enabled" data-retention-state>{{ v.enabled ? 'On' : 'Off' }}</span>
+            <button type="button" class="btn btn-ghost btn-sm" (click)="openHistory()" data-retention-history><app-icon name="list" />History</button>
+            @if (isPlatformAdmin()) {
+              <button type="button" class="btn btn-ghost btn-sm" (click)="openPlatform()" data-retention-platform><app-icon name="settings" />Platform minimums</button>
+            }
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="previewing()" (click)="runPreview()" data-retention-preview>
+              <app-icon name="eye" [busy]="previewing()" />Preview
+            </button>
+            <button type="button" class="btn btn-ghost btn-sm" [disabled]="!v.enabled || v.running || starting()" (click)="runNow()"
+                    [attr.title]="v.enabled ? null : 'Turn retention on first'" data-retention-run>
+              <app-icon name="play" [busy]="starting()" />Run now
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="openEdit()" data-retention-edit><app-icon name="edit" />Edit retention</button>
           }
         </div>
+        <div class="flex flex-col gap-3">
 
         @if (error()) {
           <p class="text-sm text-crit-500 flex items-start gap-1.5" role="alert" data-retention-error>
@@ -161,11 +155,13 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
             </p>
           }
 
-          <div class="flex flex-col gap-2 pt-1" data-retention-holds>
-            <div class="flex flex-wrap items-center gap-2">
-              <h3 class="font-semibold text-sm m-0">Legal holds</h3>
-              <span class="text-xs text-[color:var(--text-muted)]">While a hold is on, nothing in its scope is removed. Placing and releasing one is recorded.</span>
-              <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="openHold()" data-retention-place-hold><app-icon name="lock" />Place a hold</button>
+          <div class="flex flex-col gap-2" data-retention-holds>
+            <div class="retention-holds-head">
+              <div class="min-w-0 flex-1">
+                <h3 class="font-semibold text-sm m-0">Legal holds</h3>
+                <p class="text-xs text-[color:var(--text-muted)] m-0 mt-0.5">While a hold is on, nothing in its scope is removed. Placing and releasing one is recorded.</p>
+              </div>
+              <button type="button" class="btn btn-default btn-sm" (click)="openHold()" data-retention-place-hold><app-icon name="lock" />Place a hold</button>
             </div>
             @if (activeHolds().length) {
               <ul class="flex flex-col gap-1.5">
@@ -183,14 +179,15 @@ import { RetentionPlatformPanel } from './retention-platform-panel';
               <p class="text-sm text-[color:var(--text-muted)]" data-retention-no-holds>No legal hold is active.</p>
             }
           </div>
-          <p class="text-xs text-[color:var(--text-muted)]">
+          <p class="text-xs text-[color:var(--text-muted)] m-0">
             Issued invoices and billing records are never removed by retention. Files a pipeline delivered to your own buckets are yours and
             stay; their record in the run is marked expired.
           </p>
         } @else {
           <p class="text-sm text-[color:var(--text-muted)] flex items-center gap-2"><span class="spinner"></span>Reading the retention policy…</p>
         }
-      </section>
+        </div>
+      </app-section>
     }
   `,
 })

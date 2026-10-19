@@ -58,6 +58,7 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "All workspaces",
       "Filter by provider",
       "Search connections",
       "Search name, alias or host",

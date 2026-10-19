@@ -6,7 +6,7 @@ import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
-import { Combobox } from '../../shared/ui/combobox';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { TableShell } from '../../shared/ui/data-table';
 import { instantOf } from '../../core/instant';
 import { BillingApi, DayRow, DayTotal, MeterLine, PricedWith, RunRow, SubjectRow, UsageQuery } from './billing.service';
@@ -38,7 +38,7 @@ function isTiny(amount: number): boolean {
  */
 @Component({
   selector: 'app-billing',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, Combobox, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, WorkspaceSelect, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts],
   templateUrl: './billing.html',
   styleUrl: './day-table.css',
 })

@@ -41,7 +41,6 @@ function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => 
       return of({ status: 'SUCCESS', message: enabled === null
         ? `${name} is back to its default in this workspace: on.` : `${name} is ${enabled ? 'on' : 'off'} in this workspace.` });
     })),
-    workspaces: vi.fn(() => of({ status: 'SUCCESS', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }, { tenantId: 2900, tenantName: 'Default' }] })),
     // Owner item #15: the platform's control, and the audit of the switches.
     setPlatformState: vi.fn((name: string, state: string, _tenant: number, reason?: string | null) => {
       const t = server.find(x => x.name === name)!;
@@ -186,7 +185,6 @@ describe('Tool Registry', () => {
   // an empty registry. It now picks the workspace first, the way Access profiles does.
   it('a platform administrator picks a workspace before any tool is read', () => {
     const { el, api } = render({ platform: true });
-    expect(api.workspaces).toHaveBeenCalled();
     expect(api.tools).not.toHaveBeenCalled();
     expect(el.querySelector('[data-testid="tool-tenant-picker"]')).not.toBeNull();
     expect(el.textContent).toContain('Choose a workspace to see its tools.');

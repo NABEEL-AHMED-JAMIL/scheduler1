@@ -109,11 +109,6 @@ export class AssistantApi {
     return this.http.get<ApiResponse<ToolRun[]>>(`${BASE()}/tools/runs`, { params: withTenant({ limit }, tenantId) });
   }
 
-  /** The workspaces a platform administrator may pick from (Identity's tenant.json/listTenants). */
-  workspaces(): Observable<ApiResponse<{ tenantId: number; tenantName: string }[]>> {
-    return this.http.get<ApiResponse<{ tenantId: number; tenantName: string }[]>>(`${API_BASE}/tenant.json/listTenants`);
-  }
-
   dataset(datasetRef: string, offset = 0, limit = 50): Observable<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>> {
     return this.http.get<ApiResponse<{ rows: Record<string, unknown>[]; offset: number; rowsKept: number }>>(
       `${BASE()}/tools/dataset`, { params: { datasetRef, offset, limit } });

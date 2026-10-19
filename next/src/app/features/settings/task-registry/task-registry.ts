@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { Component, OnInit, WritableSignal, computed, effect, inject, signal, untracked } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { firstValueFrom } from 'rxjs';
@@ -46,7 +48,7 @@ const EMPTY_SUMMARY: PipelineSummary = { total: 0, active: 0, fields: 0, topics:
  */
 @Component({
   selector: 'app-task-registry',
-  imports: [RefreshButton, PageHeader, MineFilter, StatTile, TableShell, TaskStatePill, TaskSwitch, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, StatTile, TableShell, TaskStatePill, TaskSwitch, Icon, CdkMenu, CdkMenuItem, CdkMenuTrigger, RouterLink, Combobox, Pagination, ManagedBanner],
   templateUrl: './task-registry.html',
 })
 export class TaskRegistry implements OnInit {
@@ -80,10 +82,9 @@ export class TaskRegistry implements OnInit {
   readonly search = signal('');
   /** The topic, workspace and "Only mine" filters are the pipelines' own: they ask the server again. */
   readonly topicFilter = signal('');
-  readonly tenantFilter = signal('');
+  readonly tenantFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
   readonly onlyMine = signal(false);
   readonly tenants = signal<{ tenantId: number; tenantName: string; tenantCode?: string }[]>([]);
-  readonly tenantOptions = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: t.tenantName, hint: t.tenantCode ?? '' })));
   readonly topicSearch = createTopicSearch(this.http);
   readonly topicFilterOptions = computed(() => {
     const rows = this.topicSearch.options();

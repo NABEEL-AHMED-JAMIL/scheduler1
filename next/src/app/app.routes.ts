@@ -714,15 +714,19 @@ export const routes: Routes = [
         canActivate: [pageGuard, roleGuard],
       },
       {
-        path: 'platform/billing-analytics',
+        // Owner #22 (2026-10-19): Billing › Analytics -- a workspace administrator's own trends (by month, service and
+        // pipeline); a platform administrator's every workspace's, with a workspace filter and the cross-customer revenue.
+        // Role-gated like Cost & usage: every call behind it is TENANT_ADMIN at the floor and scoped by the server.
+        path: 'billing/analytics',
         title: 'Billing analytics',
         loadComponent: () => import('./features/billing/billing-analytics').then(m => m.BillingAnalyticsPage),
-        data: { minRole: 'PLATFORM_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
       },
       {
-        path: 'platform/rate-cards',
-        title: 'Rate cards',
+        // Owner #23: Billing › Settings -- the rate cards and their pricing rules, the platform's alone.
+        path: 'billing/settings',
+        title: 'Billing settings',
         loadComponent: () => import('./features/billing/rate-cards').then(m => m.RateCards),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
@@ -835,18 +839,11 @@ export const routes: Routes = [
         canActivate: [roleGuard],
       },
       {
-        path: 'platform/work-in-workspace',
-        title: 'Work in a workspace',
-        loadComponent: () =>
-          import('./features/admin/managed-service/work-in-workspace').then(m => m.WorkInWorkspace),
-        data: { minRole: 'PLATFORM_ADMIN' },
-        canActivate: [roleGuard],
-      },
-      {
-        // MIG-196: the 99.99% objectives for pipeline execution and billing, their error budgets and burn rates.
-        // Platform-wide: every call behind it is PLATFORM_ADMIN (process /reliability.json, billing /billing.json/reliability).
-        path: 'platform/reliability',
-        title: 'Reliability',
+        // Owner #21 (2026-10-19): Service health -- each service's status, version, restarts and error rate, the planned
+        // deploys and the platform's alerts; then the 99.99% objectives (MIG-196). Platform-wide: every call behind it is
+        // PLATFORM_ADMIN (process /reliability.json, billing /billing.json/reliability).
+        path: 'platform/service-health',
+        title: 'Service health',
         loadComponent: () => import('./features/admin/reliability/reliability').then(m => m.Reliability),
         data: { minRole: 'PLATFORM_ADMIN' },
         canActivate: [roleGuard],
@@ -937,14 +934,21 @@ export const routes: Routes = [
         ['configuration/home-pages', 'settings/home-pages'],
         ['configuration/task-groups', 'settings/task-groups'],
         ['configuration/engine', 'platform/engine'],
-        ['billing/analytics', 'platform/billing-analytics'],
-        ['billing/rates', 'platform/rate-cards'],
+        ['billing/rates', 'billing/settings'],
         ['administration/tenants', 'platform/workspaces'],
         ['administration/tenant-requests', 'platform/requests'],
         ['administration/managed-service', 'platform/managed-service'],
         ['administration/staff-activity', 'platform/staff-activity'],
-        ['administration/work-in-workspace', 'platform/work-in-workspace'],
-        ['administration/reliability', 'platform/reliability'],
+        ['administration/work-in-workspace', 'platform/workspaces'],
+        ['administration/reliability', 'platform/service-health'],
+      ]),
+      // Owner decisions #20-#23 (2026-10-19): the Platform pages that went -- Work in a workspace (its action is on
+      // Workspaces), Reliability (now Service health), Billing analytics and Rate cards (now Billing's tabs).
+      ...moved([
+        ['platform/work-in-workspace', 'platform/workspaces'],
+        ['platform/reliability', 'platform/service-health'],
+        ['platform/billing-analytics', 'billing/analytics'],
+        ['platform/rate-cards', 'billing/settings'],
       ]),
       // The addresses of MIG-246's renames and regrouping (2026-09-28).
       ...moved([
@@ -1018,8 +1022,8 @@ export const routes: Routes = [
         ['administration/billing/invoices', 'billing/invoices'],
         ['administration/billing/invoices/:number', 'billing/invoices/:number'],
         ['administration/billing/documents', 'billing/documents'],
-        ['administration/billing/analytics', 'platform/billing-analytics'],
-        ['administration/billing/rates', 'platform/rate-cards'],
+        ['administration/billing/analytics', 'billing/analytics'],
+        ['administration/billing/rates', 'billing/settings'],
       ]),
       // Last: an address that matches no page shows "Page not found" inside the layout.
       {

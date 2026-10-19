@@ -38,6 +38,11 @@ export interface AlertRule {
   quietHours: { start: string; end: string; zone: string | null } | null;
   whatToDo?: string;
   runbook?: string;
+  /** Owner #6: when the rule tells its recipients again; null when it is not muted. */
+  mutedUntil?: string | null;
+  /** When it last fired (its newest alert's first sighting), and how many of its alerts are open now. */
+  lastFiredAt?: string | null;
+  openAlerts?: number;
 }
 
 export interface AlertRulesAnswer {
@@ -69,38 +74,29 @@ export interface Alert {
   runbook: string | null;
 }
 
-export interface ServiceSeries {
-  at: string[];
-  heapUsedMb: (number | null)[];
-  requestsPerMin: (number | null)[];
-  errorsPerMin: (number | null)[];
-  meanMs: (number | null)[];
-  cpuPct: (number | null)[];
-  up: boolean[];
-}
-
+/**
+ * One service on Platform › Service health (owner #21, 2026-10-19): its status, the version it runs (written by
+ * scripts/deploy.sh), when it started, its restarts in 24 hours (planned or not) and its error rate. Heap, CPU and request
+ * history are CloudWatch's on AWS and are not served.
+ */
 export interface ServiceHealth {
   service: string;
   status: string;
   source?: string;
   sampledAt?: string;
-  responseMs?: number | null;
-  heapUsedMb?: number | null;
-  heapMaxMb?: number | null;
-  heapAfterGcPct?: number | null;
-  cpuPct?: number | null;
-  threads?: number | null;
   startedAt?: string | null;
+  /** The deployed commit (or image) and its branch, and when it was deployed; null until the service's next deploy. */
+  version?: string | null;
+  branch?: string | null;
+  deployedAt?: string | null;
   requestsPerMin?: number | null;
   errorsPerMin?: number | null;
   errorPct?: number | null;
-  meanMs?: number | null;
   restarts24h?: number;
   minutesNotUp24h?: number;
   /** Of those, inside a planned deploy window (scripts/deploy.sh announced it): what the rules did not alert on. */
   plannedRestarts24h?: number;
   plannedMinutesNotUp24h?: number;
-  series?: ServiceSeries;
 }
 
 /**
@@ -121,7 +117,6 @@ export interface Probe { probe: string; readAt: string | null; ok: boolean; read
 
 export interface PlatformHealth {
   asOf: string;
-  bucketMinutes: number;
   services: ServiceHealth[];
   probes: Probe[];
   incidents: Alert[];
@@ -154,8 +149,13 @@ export class AlertsApi {
     return this.http.post<ApiResponse>(`${this.base}/alerts/incidents/resolve`, { id });
   }
 
-  health(bucketMinutes = 15): Observable<ApiResponse<PlatformHealth>> {
-    return this.http.get<ApiResponse<PlatformHealth>>(`${this.base}/health`, { params: { bucketMinutes } });
+  health(): Observable<ApiResponse<PlatformHealth>> {
+    return this.http.get<ApiResponse<PlatformHealth>>(`${this.base}/health`);
+  }
+
+  /** Owner #6: tells nobody for so many minutes (0 ends the mute). */
+  mute(id: number, minutes: number): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.base}/alerts/rules/mute`, { id, minutes });
   }
 }
 
