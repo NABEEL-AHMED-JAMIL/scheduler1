@@ -4,9 +4,8 @@
       <div>
         <h1 class="page-title">Task Registry</h1>
         <p class="page-subtitle">
-          Every task a pipeline's steps can run — what it reads and writes, its settings, how it retries and who may
-          add it — and every existing pipeline as a Legacy task, still edited in its own dialog: its topic, payload
-          fields and AI steps.
+          Every task a pipeline's steps can run — what it does, who may add it, how many pipelines use it and how often
+          they ran this month — and every existing pipeline as a Legacy task, edited on its own page.
         </p>
       </div>
       <div class="flex items-center gap-2 ml-auto">
@@ -22,23 +21,20 @@
   </app-page-header>
   <app-managed-banner what="pipelines and tasks" />
 
-  @if (isPlatformAdmin()) {
-    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm">
+  @if (isPlatformAdmin() && !canControl()) {
+    <!-- Owner #16: the platform's control over each task is per workspace. -->
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="note" data-test="pick-workspace">
       <app-icon name="info" class="text-[color:var(--text-muted)]" />
-      <span>
-        A pipeline belongs to one workspace. One you create here is filed under the default
-        workspace — only its users can use it. Sign in as a specific workspace to create one
-        for them instead.
-      </span>
+      <span>Choose a workspace above to enable, disable or block a task for it. With all workspaces the counts are every workspace's.</span>
     </div>
   }
 
   <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
-      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' switched on', icon: 'layers', tone: 'info' },
-      { label: 'Unavailable', value: taskTiles().unavailable, foot: taskTiles().unavailable ? 'the platform cannot run yet' : 'every task can run', icon: 'alert', tone: taskTiles().unavailable ? 'warn' : 'muted' },
-      { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active', icon: 'send', tone: 'info' },
-      { label: 'No topic', value: summary().untopped, foot: summary().untopped ? 'assign one to use them' : 'every pipeline has one', icon: 'alert', tone: summary().untopped ? 'warn' : 'muted' }
+      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on' + (taskTiles().unavailable ? ' · ' + taskTiles().unavailable + ' the platform cannot run yet' : ''), icon: 'layers', tone: 'info' },
+      { label: 'In use', value: taskTiles().inUse, foot: 'step tasks a pipeline runs', icon: 'activity', tone: 'ok' },
+      { label: 'Blocked', value: taskTiles().blocked, foot: taskTiles().blocked ? 'by a platform administrator' : 'none', icon: 'lock', tone: taskTiles().blocked ? 'crit' : 'muted' },
+      { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active' + (summary().untopped ? ' · ' + summary().untopped + ' with no topic' : ''), icon: 'send', tone: summary().untopped ? 'warn' : 'info' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
                      [tone]="$any(tile.tone)" [foot]="tile.foot" />
@@ -50,6 +46,13 @@
       <app-icon name="alert" class="icon-warn" />
       <span class="flex-1 min-w-0 [overflow-wrap:anywhere]">The step tasks could not be read: {{ tasksError() }} The pipelines are listed as usual.</span>
       <button type="button" class="btn btn-ghost btn-sm" (click)="loadTasks()">Try again</button>
+    </div>
+  }
+  @if (usageError()) {
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="alert">
+      <app-icon name="alert" class="icon-warn" />
+      <span class="flex-1 min-w-0">The pipeline and run counts could not be read: {{ usageError() }}</span>
+      <button type="button" class="btn btn-ghost btn-sm" (click)="loadUsage()">Try again</button>
     </div>
   }
   @if (truncated()) {
@@ -102,9 +105,11 @@
         <tr>
           <th>Task</th>
           <th>Kind</th>
-          <th>Service</th>
-          <th>Input → output</th>
-          <th>{{ canSwitch() ? 'In this workspace' : 'State' }}</th>
+          <th class="hidden xl:table-cell">Service</th>
+          <th class="hidden 2xl:table-cell">Input → output</th>
+          <th class="text-right" title="Pipelines whose latest version runs it (a Legacy row: that name its pipeline id)">Pipelines</th>
+          <th class="text-right" title="Runs of those pipelines since the first of this month">{{ runsHeading() }}</th>
+          <th>{{ canSwitch() ? 'In this workspace' : canControl() ? 'For this workspace' : 'State' }}</th>
           <th class="w-12 th-actions">Actions</th>
         </tr>
       </thead>
@@ -123,7 +128,7 @@
               }
             </td>
             <td><span class="pill" [class.pill-neutral]="!row.legacy" [class.pill-solid-neutral]="row.legacy" [attr.data-kind]="row.kind">{{ row.kind }}</span></td>
-            <td class="text-xs">
+            <td class="text-xs hidden xl:table-cell">
               <span class="mono">{{ row.service || '—' }}</span>
               @if (row.pipeline; as p) {
                 <div class="mt-0.5">
@@ -136,15 +141,51 @@
                 </div>
               }
             </td>
-            <td class="text-xs whitespace-nowrap">{{ row.input }} <span class="text-[color:var(--text-muted)]">→</span> {{ row.output }}</td>
+            <td class="text-xs whitespace-nowrap hidden 2xl:table-cell">{{ row.input }} <span class="text-[color:var(--text-muted)]">→</span> {{ row.output }}</td>
+            @let used = countOf(row);
+            <!-- Owner #17: Core's counts, the caller's workspace's; a count opens the list behind it. Zero is zero. -->
+            <td class="text-right tabular" [attr.data-pipelines]="row.id">
+              @if (!countsKnown()) { <span class="text-[color:var(--text-muted)]" title="The count is not known right now">—</span> }
+              @else if (used.pipelines) {
+                <button type="button" class="link-inline font-medium" (click)="openUsage(row, 'pipelines')"
+                        [attr.aria-label]="used.pipelines + ' pipelines use ' + row.name + ': show them'">{{ used.pipelines }}</button>
+              } @else { <span class="text-[color:var(--text-muted)]">0</span> }
+            </td>
+            <td class="text-right tabular" [attr.data-runs]="row.id">
+              @if (!countsKnown()) { <span class="text-[color:var(--text-muted)]" title="The count is not known right now">—</span> }
+              @else if (used.runs) {
+                <button type="button" class="link-inline font-medium" (click)="openUsage(row, 'runs')"
+                        [attr.aria-label]="used.runs + ' runs this month of pipelines using ' + row.name + ': show them'">{{ used.runs }}</button>
+              } @else { <span class="text-[color:var(--text-muted)]">0</span> }
+            </td>
             <td class="text-xs max-w-72">
-              @if (canSwitch() && !row.legacy) {
+              @if (canControl() && !row.legacy && row.task.overridable !== false) {
+                <!-- Owner #16: the platform's control over this task for the chosen workspace. -->
+                <div class="flex items-center gap-2 flex-wrap" [attr.data-control]="row.code">
+                  <select #ctl class="input input-sm max-w-32" data-test="platform-control" [attr.aria-label]="'Platform control of ' + row.code"
+                          [value]="platformValue(row.task)" [disabled]="controlling() === row.code || row.task.available === false" (change)="setPlatform(row.task, ctl)">
+                    <option value="default" [selected]="platformValue(row.task) === 'default'">Default</option>
+                    <option value="enabled" [selected]="platformValue(row.task) === 'enabled'">Enabled</option>
+                    <option value="disabled" [selected]="platformValue(row.task) === 'disabled'">Disabled</option>
+                    <option value="blocked" [selected]="platformValue(row.task) === 'blocked'">Blocked</option>
+                  </select>
+                  <app-task-state [state]="row.state" [overridden]="false" />
+                </div>
+                @if (setBy(row.task); as by) {
+                  <p class="text-[11px] mt-0.5 text-[color:var(--text-muted)]" data-test="task-set-by">Set by {{ by.who }}@if (by.at) { · {{ by.at | serverTime: 'recent' }} }</p>
+                }
+                @if (row.reason) { <p class="mt-1 text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">{{ row.reason }}</p> }
+              } @else if (canSwitch() && !row.legacy) {
                 <!-- B2 (P7, P8): the switch is the state's control -- one thing that says On or Off, not a pill and a box. -->
                 <div class="flex items-center gap-2" [attr.data-switch]="row.code">
                   <app-task-switch [task]="row.task" [busy]="!!switching()" (switched)="switchTask(row.task, $event)" />
                   <span class="font-medium">{{ row.state }}</span>
-                  @if (row.overridden) { <span class="pill pill-neutral" title="This workspace switched it; Default puts it back">Switched here</span> }
+                  @if (row.state === 'Blocked') { <span class="pill pill-crit" data-test="task-state">Blocked</span> }
+                  @else if (row.overridden) { <span class="pill pill-neutral" title="Switched for this workspace; Default puts it back">Switched here</span> }
                 </div>
+                @if (setBy(row.task); as by) {
+                  <p class="text-[11px] mt-0.5 text-[color:var(--text-muted)]" data-test="task-set-by">Set by {{ by.who }}@if (by.at) { · {{ by.at | serverTime: 'recent' }} }</p>
+                }
                 @if (row.reason) { <p class="mt-1 text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">{{ row.reason }}</p> }
               } @else {
                 <app-task-state [state]="row.state" [reason]="row.reason" [overridden]="row.overridden" />
@@ -182,4 +223,20 @@
     <app-pagination pager [total]="filtered().length" [page]="pager.page()" [size]="pager.size()"
                     (goTo)="goToPage($event)" (setSize)="setPageSize($event)" />
   </app-table-shell>
+
+  @if (changes().length) {
+    <!-- Owner #16: who switched, blocked or reset a task here, newest first (task_registry_audit). -->
+    <section class="card p-4" aria-labelledby="task-changes-heading" data-test="task-changes">
+      <h2 id="task-changes-heading" class="section-title mb-2">Recent changes</h2>
+      <ul class="side-panel-list">
+        @for (c of changes(); track $index) {
+          <li class="text-sm flex flex-wrap items-baseline gap-x-2">
+            <span class="font-medium">{{ changeWords(c) }}</span>
+            <span class="text-xs text-[color:var(--text-muted)]">by {{ changeBy(c) }}@if (c.at) { · {{ c.at | serverTime: 'recent' }} }</span>
+            @if (c.reason) { <span class="text-xs text-[color:var(--text-secondary)] [overflow-wrap:anywhere]">"{{ c.reason }}"</span> }
+          </li>
+        }
+      </ul>
+    </section>
+  }
 </div>

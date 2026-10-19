@@ -5,6 +5,7 @@ import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
 import { DocumentsApi } from '../../documents/documents.service';
+import { TaskChange, TaskControlState, TaskUsage, UsageOf, UsagePipeline, UsageRuns, usageParams } from './task-usage.model';
 import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
@@ -34,9 +35,46 @@ export class StepsApi {
     return this.http.post<ApiResponse<ValidateResult>>(`${API_BASE}/pipeline.json/steps/save`, { pipelineKey, format, text });
   }
 
-  /** The Task Registry as this workspace sees it (MIG-231): every task, and one legacy line per pipeline. */
-  tasks(): Observable<ApiResponse<StepTaskEntry[]>> {
-    return this.http.get<ApiResponse<StepTaskEntry[]>>(`${API_BASE}/pipeline.json/steps/tasks`);
+  /**
+   * The Task Registry as this workspace sees it (MIG-231): every task, and one legacy line per pipeline. Owner #16: a
+   * platform administrator names the workspace (the shared selector); anyone else's tenantId is ignored by Core.
+   */
+  tasks(tenantId?: number | null): Observable<ApiResponse<StepTaskEntry[]>> {
+    const params: Record<string, number> = {};
+    if (tenantId) params['tenantId'] = tenantId;
+    return this.http.get<ApiResponse<StepTaskEntry[]>>(`${API_BASE}/pipeline.json/steps/tasks`, { params });
+  }
+
+  /** Owner #16: a platform administrator sets a task to default, enabled, disabled or blocked for one workspace. */
+  setPlatformState(code: string, state: TaskControlState, tenantId: number, reason: string | null): Observable<ApiResponse<StepTaskEntry>> {
+    return this.http.post<ApiResponse<StepTaskEntry>>(`${API_BASE}/pipeline.json/steps/tasks/platformState`, { code, state, reason },
+      { params: { tenantId } });
+  }
+
+  /** Owner #16: who switched, blocked or reset a task (or every task, code null) in the workspace, newest first. */
+  taskHistory(code: string | null, tenantId?: number | null): Observable<ApiResponse<TaskChange[]>> {
+    const params: Record<string, string | number> = {};
+    if (code) params['code'] = code;
+    if (tenantId) params['tenantId'] = tenantId;
+    return this.http.get<ApiResponse<TaskChange[]>>(`${API_BASE}/pipeline.json/steps/tasks/history`, { params });
+  }
+
+  /** Owner #17: per task and per Legacy row, the pipelines using it and their runs this month (server-counted). */
+  taskUsage(tenantId?: number | null): Observable<ApiResponse<TaskUsage>> {
+    const params: Record<string, number> = {};
+    if (tenantId) params['tenantId'] = tenantId;
+    return this.http.get<ApiResponse<TaskUsage>>(`${API_BASE}/pipeline.json/steps/tasks/usage`, { params });
+  }
+
+  /** Owner #17: the pipelines behind a count -- a task's (code) or a Legacy row's (pipelineKey). */
+  taskPipelines(of: UsageOf, tenantId?: number | null): Observable<ApiResponse<UsagePipeline[]>> {
+    return this.http.get<ApiResponse<UsagePipeline[]>>(`${API_BASE}/pipeline.json/steps/tasks/pipelines`, { params: usageParams(of, tenantId) });
+  }
+
+  /** Owner #17: those pipelines' runs this month, newest first. */
+  taskRuns(of: UsageOf, tenantId?: number | null, limit = 100): Observable<ApiResponse<UsageRuns>> {
+    return this.http.get<ApiResponse<UsageRuns>>(`${API_BASE}/pipeline.json/steps/tasks/runs`,
+      { params: { ...usageParams(of, tenantId), limit } });
   }
 
   /** A workspace administrator switches a task on or off here, or back to its default (null). Legacy is refused. */

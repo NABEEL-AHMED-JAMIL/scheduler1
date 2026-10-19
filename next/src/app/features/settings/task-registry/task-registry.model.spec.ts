@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { StepTaskEntry } from '../../tasks/steps/steps.model';
-import { Pipeline } from '../pipelines/pipeline-dialog';
+import { Pipeline } from '../pipelines/pipeline.model';
 import {
   EMPTY_FILTER, filterRows, kindCounts, permissionLabel, readableSchema, registryRows, retryText, schemaShape,
   stateOf, timeoutText,

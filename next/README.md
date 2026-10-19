@@ -132,6 +132,14 @@ group, hub and tab; the paths below are today's (old addresses redirect).
   reset, history, a workspace's own values). Owner #20-#24 (2026-10-19) removed Work in a workspace, Reliability, Billing
   analytics and Rate cards as Platform pages; their addresses redirect (`removed-pages.spec.ts` holds that nothing else
   names them).
+- **Task Registry** (`/settings/task-registry`, owner #16-#18, 2026-10-19). Every step task and every registry pipeline (a
+  Legacy task), each row with the pipelines that use it and their runs this month -- Core's counts, the caller's workspace's;
+  a count opens the list in a drawer (`task-usage-panel.ts`), zero is 0 and an unknown count a dash. A workspace
+  administrator switches a task on or off; a platform administrator picks the workspace and sets each task to Default,
+  Enabled, Disabled or Blocked for it (a block asks why and is shown to the workspace, whose switch is then locked); Recent
+  changes is the audit. New / Edit registry task is a page (`/settings/task-registry/new`, `/<key>`, Duplicate
+  `new?copyOf=<key>`; `registry-task-editor.ts`) with the payload preview, Used by and help on the right, and
+  `shared/ui/unsaved-changes.guard.ts` asking before unsaved changes are left.
 - **The workspace selector.** One component for a platform administrator, `app-workspace-select`
   (`shared/ui/workspace-select.ts` over `core/workspaces/workspace-directory.ts`): first in the page header's actions on every
   screen that picks a workspace, "All workspaces" only where the page can show them all, the recent ones first, the choice

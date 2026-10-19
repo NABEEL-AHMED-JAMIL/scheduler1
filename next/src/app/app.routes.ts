@@ -1,4 +1,5 @@
 import { Routes, Route } from '@angular/router';
+import { unsavedChangesGuard } from './shared/ui/unsaved-changes.guard';
 import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 import { toFirstTab } from './core/nav/nav-access';
@@ -634,6 +635,24 @@ export const routes: Routes = [
           import('./features/settings/task-registry/task-registry').then(m => m.TaskRegistry),
         data: { minRole: 'TENANT_ADMIN' },
         canActivate: [roleGuard],
+      },
+      {
+        // Owner 2026-10-19 #18: New / Edit registry task is a wide page of its own, not a dialog. Duplicate is new?copyOf=<key>.
+        // Leaving it with unsaved changes asks first. Role-gated like the registry: pipeline.json/get and save are TENANT_ADMIN.
+        path: 'settings/task-registry/new',
+        title: 'New registry task',
+        loadComponent: () => import('./features/settings/task-registry/registry-task-editor').then(m => m.RegistryTaskEditor),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+        canDeactivate: [unsavedChangesGuard],
+      },
+      {
+        path: 'settings/task-registry/:pipelineKey',
+        title: 'Edit registry task',
+        loadComponent: () => import('./features/settings/task-registry/registry-task-editor').then(m => m.RegistryTaskEditor),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+        canDeactivate: [unsavedChangesGuard],
       },
       {
         path: 'settings/kafka',

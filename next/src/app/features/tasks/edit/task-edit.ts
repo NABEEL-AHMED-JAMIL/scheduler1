@@ -14,7 +14,7 @@ import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
 import { focusFirstInvalid } from '../../../shared/ui/focus-first-invalid';
-import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline-dialog';
+import { FieldChoice, Pipeline, PipelineField, parseFieldChoices } from '../../settings/pipelines/pipeline.model';
 import { TaskReference, TaskReferenceKind, notBlank } from '../../settings/configuration/configuration.models';
 import { isPlatformDefault, profileLabel } from '../../settings/kafka/platform-default';
 import { StepBuilder, BuilderTab } from '../steps/step-builder';

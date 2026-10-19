@@ -1,7 +1,7 @@
 import {
   FieldKind, JsonSchema, LEGACY_TASK, StepTaskEntry, TASK_KINDS, TaskState, fieldsOf, isMapSchema, mapValueKind, stateOf,
 } from '../../tasks/steps/steps.model';
-import { Pipeline } from '../pipelines/pipeline-dialog';
+import { Pipeline } from '../pipelines/pipeline.model';
 
 export { stateOf };
 export type { TaskState };

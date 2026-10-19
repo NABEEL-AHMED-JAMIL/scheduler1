@@ -1,0 +1,262 @@
+<div class="page">
+  <app-page-header [title]="heading()" [crumb]="heading()"
+                   subtitle="A registry task is a Legacy pipeline: its id, the topic it publishes on, and the payload fields a pipeline on it fills in.">
+    <ng-container pills>
+      @if (isEdit() && original(); as p) { <app-status [label]="p.status || 'Active'" [quiet]="true" /> }
+    </ng-container>
+    <button type="button" class="btn btn-default btn-sm" (click)="cancel()"><app-icon name="arrowLeft" />Task Registry</button>
+    @if (ready()) {
+      <button type="button" class="btn btn-primary btn-sm" (click)="save()" [disabled]="saving()" data-test="save-task">
+        <app-icon name="check" />{{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create registry task' }}
+      </button>
+    }
+  </app-page-header>
+
+  @if (loading()) {
+    <div class="card p-12 text-center text-sm text-[color:var(--text-muted)]">
+      <div class="spinner mx-auto mb-3" role="status" aria-label="Loading"></div>Loading…
+    </div>
+  } @else if (error()) {
+    <div class="card p-10 text-center" role="alert">
+      <app-icon name="alert" size="1.5rem" class="icon-crit block mx-auto mb-2" />
+      <p class="text-sm text-crit-500">{{ error() }}</p>
+      <a routerLink="/settings/task-registry" class="btn btn-default btn-sm mt-3">Back to Task Registry</a>
+    </div>
+  } @else if (ready()) {
+    @if (isPlatformAdmin() && !isEdit()) {
+      <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="note">
+        <app-icon name="info" class="text-[color:var(--text-muted)]" />
+        <span>A registry task belongs to one workspace. One you create here is filed under the default workspace — only its users
+          can use it. Sign in as a specific workspace to create one for them instead.</span>
+      </div>
+    }
+
+    <div class="rte-layout">
+      <form [formGroup]="form" class="rte-main" (ngSubmit)="save()">
+        <!-- 1. What it is -->
+        <app-section title="Registry task" [number]="1" [card]="true"
+                     sub="What a pipeline picks as its registry task, and the Kafka topic its messages go out on.">
+          <app-form-row>
+            <app-field label="Pipeline ID" for="pipelineId" class="fr-4" [required]="true"
+                       [control]="form.get('pipelineId')" [submitted]="submitted()"
+                       hint="The id runs know it by, and what a pipeline's Registry task box shows. One form per pipeline.">
+              <input id="pipelineId" class="input mono" formControlName="pipelineId" placeholder="ORDERS_IMPORT" />
+            </app-field>
+            <app-field label="Name" for="pipelineName" class="fr-5" [required]="true"
+                       [control]="form.get('pipelineName')" [submitted]="submitted()">
+              <input id="pipelineName" class="input" formControlName="pipelineName" placeholder="Orders import" />
+            </app-field>
+            <app-field label="Status" for="pipelineStatus" class="fr-3" [control]="form.get('status')" [submitted]="submitted()"
+                       hint="Inactive keeps it and its pipelines, off the task screen's picker.">
+              <select id="pipelineStatus" class="input" formControlName="status">
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </app-field>
+          </app-form-row>
+          <app-form-row>
+            <app-field label="Topic" for="pipelineTopic" class="fr-6" [required]="true"
+                       [control]="form.get('sourceTaskTypeId')" [submitted]="submitted()" [hint]="topicHint()">
+              <app-combobox id="pipelineTopic" formControlName="sourceTaskTypeId" [numeric]="true"
+                            placeholder="Search topics…" [allowClear]="false"
+                            [remote]="true" (search)="topicSearch.search($event)" [searching]="topicSearch.searching()"
+                            [options]="topicSearch.options()" [selectedLabel]="topicLabel()" />
+              @if (noTopicsYet()) {
+                <a routerLink="/settings/kafka" class="link-inline text-xs mt-1 inline-block">Open Kafka &amp; Topics</a>
+              }
+            </app-field>
+            <app-field label="Description" for="formDescription" class="fr-6"
+                       [control]="form.get('description')" [submitted]="submitted()">
+              <textarea id="formDescription" class="input" rows="2" formControlName="description"
+                        placeholder="What a pipeline on this registry task collects"></textarea>
+            </app-field>
+          </app-form-row>
+        </app-section>
+
+        <!-- 2. The payload's fields -->
+        <app-section title="Payload fields" [number]="2" [card]="true"
+                     sub="Each field fills one XML tag of the payload; the order here is the order a pipeline shows them in.">
+          <span section-actions class="pill pill-neutral tabular" data-test="field-count">{{ fieldCount() }} field{{ fieldCount() === 1 ? '' : 's' }}</span>
+          <button section-actions type="button" class="btn btn-default btn-sm" (click)="addField()" data-test="add-field">
+            <app-icon name="plus" />Add field
+          </button>
+
+          @if (!fields.length) {
+            <p class="field-note text-crit-500 flex items-start gap-1.5 mb-3" role="alert">
+              <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+              <span>A form needs at least one field.</span>
+            </p>
+          }
+
+          <div class="rte-fields" formArrayName="fields">
+            @for (row of fields.controls; track row; let i = $index) {
+              <div class="card p-4 flex flex-col gap-2.5" [formGroupName]="i" data-test="field-card">
+                <div class="flex items-center gap-2">
+                  <span class="stat-glyph shrink-0"><app-icon [name]="row.get('fieldType')?.value === 'ai' ? 'sparkle' : 'template'" /></span>
+                  <span class="text-xs text-[color:var(--text-muted)] mono">#{{ i + 1 }}</span>
+                  <span class="text-sm font-medium truncate">{{ row.get('label')?.value || row.get('tagKey')?.value || 'New field' }}</span>
+                  <span class="ml-auto flex items-center gap-1">
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Move up" [disabled]="i === 0" (click)="move(i, -1)">
+                      <app-icon name="arrowUp" />
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Move down" [disabled]="i === fields.length - 1" (click)="move(i, 1)">
+                      <app-icon name="arrowDown" />
+                    </button>
+                    <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Remove field" (click)="removeField(i)">
+                      <app-icon name="trash" class="icon-crit" />
+                    </button>
+                  </span>
+                </div>
+
+                <app-form-row>
+                  <app-field label="XML tag" [for]="'tagKey' + i" class="fr-6" [required]="true" [control]="row.get('tagKey')" [submitted]="submitted()">
+                    <input [id]="'tagKey' + i" class="input mono" formControlName="tagKey" placeholder="region" />
+                  </app-field>
+                  <app-field label="Label" [for]="'label' + i" class="fr-6" [required]="true" [control]="row.get('label')" [submitted]="submitted()">
+                    <input [id]="'label' + i" class="input" formControlName="label" placeholder="Region" />
+                  </app-field>
+                </app-form-row>
+                <app-form-row>
+                  <app-field label="Type" [for]="'fieldType' + i" class="fr-6" [control]="row.get('fieldType')" [submitted]="submitted()">
+                    <select [id]="'fieldType' + i" class="input" formControlName="fieldType">
+                      @for (type of fieldTypes; track type) {
+                        <option [value]="type">{{ type === 'ai' ? 'AI prompt (runs before dispatch)' : type }}</option>
+                      }
+                    </select>
+                  </app-field>
+                  <app-field label="Nested under" [for]="'tagParent' + i" class="fr-6" [control]="row.get('tagParent')" [submitted]="submitted()"
+                             hint="Another field's tag, or the document root.">
+                    <select [id]="'tagParent' + i" class="input" formControlName="tagParent">
+                      <option value="">(root)</option>
+                      @for (key of parentChoices(i); track key) { <option [value]="key">{{ key }}</option> }
+                    </select>
+                  </app-field>
+                </app-form-row>
+                <app-form-row>
+                  @if (row.get('fieldType')?.value === 'select') {
+                    <!-- A dropdown's default has to BE one of its choices: picked from them, never typed. -->
+                    <app-field label="Default value" [for]="'defaultValue' + i" class="fr-6" [control]="row.get('defaultValue')" [submitted]="submitted()"
+                               hint="The choice a new task starts on.">
+                      <select [id]="'defaultValue' + i" class="input" formControlName="defaultValue">
+                        <option value="">(none)</option>
+                        @for (choice of defaultValueOptions(i); track $index) { <option [value]="choice.value">{{ choice.label }}</option> }
+                      </select>
+                    </app-field>
+                  } @else {
+                    <app-field label="Default value" [for]="'defaultValue' + i" class="fr-6" [control]="row.get('defaultValue')" [submitted]="submitted()">
+                      <input [id]="'defaultValue' + i" class="input mono" formControlName="defaultValue" />
+                    </app-field>
+                  }
+                  <app-field label="Help text" [for]="'helpText' + i" class="fr-6" [control]="row.get('helpText')" [submitted]="submitted()">
+                    <input [id]="'helpText' + i" class="input" formControlName="helpText" placeholder="Shown under the field" />
+                  </app-field>
+                </app-form-row>
+
+                @if (row.get('fieldType')?.value === 'ai') {
+                  <div class="ai-step-line">
+                    <app-icon name="sparkle" class="icon-brand shrink-0" />
+                    <div class="min-w-0 flex-1 text-sm">
+                      @if (row.get('promptId')?.value) {
+                        <span class="font-medium">{{ row.get('promptName')?.value || 'Prompt ' + row.get('promptId')?.value }}</span>
+                        <span class="text-[color:var(--text-muted)]"> · {{ mappedCount(i) }} variable(s) mapped · {{ row.get('runIn')?.value === 'worker' ? 'in the worker' : 'before dispatch' }} · on failure: {{ row.get('onError')?.value === 'continue' ? 'continue empty' : 'fail the run' }}</span>
+                      } @else {
+                        <span class="text-warn-500">No prompt chosen yet.</span>
+                      }
+                      <div class="text-xs text-[color:var(--text-muted)]">The answer is written to &lt;{{ row.get('tagKey')?.value || '…' }}&gt; {{ row.get('runIn')?.value === 'worker' ? 'by the worker as the task runs' : 'before the task is dispatched' }}; a task shows this as a read-only step.</div>
+                    </div>
+                    <button type="button" class="btn btn-default btn-sm shrink-0" (click)="configureAiStep(i)">
+                      <app-icon name="edit" />{{ row.get('promptId')?.value ? 'Change' : 'Configure' }}
+                    </button>
+                  </div>
+                }
+
+                @if (row.get('fieldType')?.value === 'select') {
+                  <div class="flex flex-col gap-1.5">
+                    <div class="flex items-center justify-between gap-2">
+                      <span class="label">Choices</span>
+                      <button type="button" class="btn btn-default btn-sm" (click)="addChoice(i)"><app-icon name="plus" />Add choice</button>
+                    </div>
+                    <p class="field-note text-[color:var(--text-muted)]">
+                      The value is what the task stores and the worker receives. The label is what the operator picks from — leave it empty to show the value itself.
+                    </p>
+                    @if (!choicesArray(i).length) {
+                      <p class="field-note text-crit-500 flex items-start gap-1.5" role="alert">
+                        <app-icon name="alert" size="0.9em" class="mt-px shrink-0" />
+                        <span>A dropdown with no choices offers the operator nothing but “None”.</span>
+                      </p>
+                    }
+                    <div class="flex flex-col gap-1.5" formArrayName="choices">
+                      @for (choice of choicesArray(i).controls; track choice; let c = $index) {
+                        <div class="flex items-center gap-1.5" [formGroupName]="c">
+                          <input class="input mono flex-1" formControlName="value" placeholder="lines" [attr.aria-label]="'Choice ' + (c + 1) + ' value'" />
+                          <span class="text-[color:var(--text-muted)] text-xs shrink-0" aria-hidden="true">shows as</span>
+                          <input class="input flex-1" formControlName="label" placeholder="JSON Lines (one object per line)" [attr.aria-label]="'Choice ' + (c + 1) + ' label'" />
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Remove choice" (click)="removeChoice(i, c)">
+                            <app-icon name="trash" class="icon-crit" />
+                          </button>
+                        </div>
+                      }
+                    </div>
+                  </div>
+                }
+
+                <label class="flex items-center gap-2 text-sm">
+                  <input type="checkbox" class="checkbox" formControlName="required" />Required
+                </label>
+              </div>
+            }
+          </div>
+        </app-section>
+
+        <app-actions-bar [state]="changeState()" label="Save the registry task">
+          <button type="button" class="btn btn-ghost btn-sm" (click)="cancel()">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" [disabled]="saving()">
+            <app-icon name="check" />{{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create registry task' }}
+          </button>
+        </app-actions-bar>
+      </form>
+
+      <!-- On the right: the payload as it will be sent, who uses it, and what the parts mean. -->
+      <aside class="rte-aside" aria-label="Preview and help">
+        <app-section title="Payload preview" [card]="true" [level]="3" sub="The shape a task on this pipeline sends, with the defaults on the left.">
+          @if (preview()) {
+            <pre class="rte-preview mono text-xs leading-relaxed rounded p-2.5 overflow-auto whitespace-pre-wrap break-words bg-code border border-subtle"
+                 data-test="payload-preview">{{ preview() }}</pre>
+          } @else {
+            <p class="text-sm text-[color:var(--text-muted)]">Add a field with an XML tag to see the payload.</p>
+          }
+        </app-section>
+
+        @if (isEdit()) {
+          <app-section title="Used by" [card]="true" [level]="3" sub="The pipelines that name this registry task.">
+            @if (users() === null) {
+              <p class="text-sm text-[color:var(--text-muted)]">Not known right now.</p>
+            } @else if (!users()!.length) {
+              <p class="text-sm text-[color:var(--text-muted)]" data-test="used-by-none">No pipeline uses it yet: changing it affects nobody.</p>
+            } @else {
+              <p class="text-sm mb-2" data-test="used-by">{{ users()!.length }} pipeline{{ users()!.length === 1 ? '' : 's' }}: a save changes what each of them sends from its next run.</p>
+              <ul class="side-panel-list">
+                @for (u of users()!.slice(0, 8); track u.taskDetailId) {
+                  <li>
+                    <a class="link-inline truncate" [routerLink]="['/pipelines', u.taskDetailId, 'edit']">{{ u.taskName }}</a>
+                    <span class="text-xs text-[color:var(--text-muted)] shrink-0">{{ u.runsThisMonth }} run{{ u.runsThisMonth === 1 ? '' : 's' }} this month</span>
+                  </li>
+                }
+              </ul>
+              @if (users()!.length > 8) { <p class="text-xs text-[color:var(--text-muted)] mt-1">and {{ users()!.length - 8 }} more — see the Pipelines count on the Task Registry.</p> }
+            }
+          </app-section>
+        }
+
+        <app-section title="About these settings" [card]="true" [level]="3">
+          <dl class="text-sm grid gap-2">
+            <div><dt class="font-medium">Pipeline ID</dt><dd class="text-[color:var(--text-secondary)]">The worker routes on it; keep it stable once pipelines use it.</dd></div>
+            <div><dt class="font-medium">Topic</dt><dd class="text-[color:var(--text-secondary)]">Where a run's message goes; its Kafka connection is the topic's.</dd></div>
+            <div><dt class="font-medium">Fields</dt><dd class="text-[color:var(--text-secondary)]">Each is one tag of the XML payload a pipeline fills in. A dropdown stores its value and shows its label; an AI prompt field is filled before dispatch (or by the worker) from the fields above it.</dd></div>
+            <div><dt class="font-medium">Steps instead</dt><dd class="text-[color:var(--text-secondary)]">A new pipeline is usually built from step tasks (Pipelines › New pipeline); a registry task is for a worker that takes a payload.</dd></div>
+          </dl>
+        </app-section>
+      </aside>
+    </div>
+  }
+</div>

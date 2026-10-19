@@ -1,11 +1,17 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
+import { Dialog } from '@angular/cdk/dialog';
 import { HttpClient } from '@angular/common/http';
+import { ActivatedRoute, Router } from '@angular/router';
 import { of } from 'rxjs';
-import { Pipeline, PipelineDialog } from './pipeline-dialog';
+import { Pipeline } from '../pipelines/pipeline.model';
+import { RegistryTaskEditor } from './registry-task-editor';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../../core/api/api.config';
+import { AuthService } from '../../../core/auth/auth.service';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
+import { unsavedChangesGuard } from '../../../shared/ui/unsaved-changes.guard';
+import { DUPLICATE_DATA, EDIT_DATA, SAVE_REQUEST } from './legacy-save.golden';
 
 /**
  * The authoring side of a select. Two things are being held in place here.
@@ -21,29 +27,42 @@ import { API_SUCCESS } from '../../../core/api/api.config';
  * them all saved without complaint before this and produced a blank <select> on somebody else's
  * screen, hours later, with nothing pointing back at the form that caused it.
  */
-function dialogFor(form?: Pipeline, topics: unknown[] = []) {
-  const post = vi.fn(() => of({ status: API_SUCCESS, message: 'saved' }));
-  const get = vi.fn(() => of({ status: API_SUCCESS, data: topics }));
+function dialogFor(form?: Pipeline, topics: unknown[] = [], opts: { copyOf?: number; confirm?: boolean } = {}) {
+  const post = vi.fn((_url: string, _body?: unknown) => of({ status: API_SUCCESS, message: 'saved' }));
+  const get = vi.fn((url: string, _options?: unknown) => {
+    if (url.endsWith('/pipeline.json/get')) return of({ status: API_SUCCESS, data: structuredClone(form) });
+    if (url.endsWith('/pipeline.json/steps/tasks/pipelines')) return of({ status: API_SUCCESS, data: [] });
+    return of({ status: API_SUCCESS, data: topics });
+  });
   const toast = { success: vi.fn(), error: vi.fn(), info: () => {} };
-  const close = vi.fn();
+  const navigate = vi.fn();
+  const opened: any[] = [];
+  const key = opts.copyOf ? null : form?.pipelineKey ?? null;
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
-      { provide: DIALOG_DATA, useValue: form ? { form } : {} },
-      { provide: DialogRef, useValue: { close } },
       { provide: HttpClient, useValue: { post, get } },
       { provide: ToastService, useValue: toast },
+      { provide: Router, useValue: { navigate } },
+      { provide: Dialog, useValue: { open: (component: unknown, config: any) => { opened.push({ component, config }); return { closed: of(opts.confirm) }; } } },
+      { provide: AuthService, useValue: { isPlatformAdmin: () => false, isTenantAdmin: () => true, user: () => null, builderLocked: () => false } },
+      { provide: WorkspaceDirectory, useValue: { names: () => new Map() } },
+      { provide: ActivatedRoute, useValue: { snapshot: {
+        paramMap: { get: (k: string) => (k === 'pipelineKey' && key ? String(key) : null) },
+        queryParamMap: { get: (k: string) => (k === 'copyOf' && opts.copyOf ? String(opts.copyOf) : null) },
+      } } },
     ],
   });
-  const dialog = TestBed.runInInjectionContext(() => new PipelineDialog());
-  return { dialog, post, get, toast, close };
+  const dialog = TestBed.runInInjectionContext(() => new RegistryTaskEditor());
+  dialog.ngOnInit();
+  return { dialog, post, get, toast, navigate, opened };
 }
 
 /**
  * MIG-324: in a new workspace the topic box was empty and only said "No matches" -- a dead end for an administrator
  * who did not yet know topics are added under Kafka & Topics. A new pipeline asks once whether the workspace has any.
  */
-describe('PipelineDialog -- a workspace with no topic yet', () => {
+describe('Registry task page -- a workspace with no topic yet', () => {
   it('says where a topic is added when the workspace has none', () => {
     const { dialog, get } = dialogFor();
     expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/setting\.json\/topics$/), { params: { q: '', limit: 1 } });
@@ -57,9 +76,10 @@ describe('PipelineDialog -- a workspace with no topic yet', () => {
     expect(dialog.topicHint()).not.toContain('Kafka & Topics');
   });
 
-  it('does not ask when an existing pipeline is edited: it has its topic', () => {
+  it('does not ask when an existing pipeline is edited: it reads the row, which has its topic', () => {
     const { dialog, get } = dialogFor(selectForm(null));
-    expect(get).not.toHaveBeenCalled();
+    expect(get.mock.calls.map(c => c[0])).not.toContainEqual(expect.stringMatching(/\/setting\.json\/topics$/));
+    expect(get).toHaveBeenCalledWith(expect.stringMatching(/\/pipeline\.json\/get$/), { params: { pipelineKey: 7 } });
     expect(dialog.noTopicsYet()).toBe(false);
   });
 });
@@ -76,11 +96,11 @@ function selectForm(fieldOptions: string | null, defaultValue: string | null = n
 }
 
 /** The field list the dialog would POST, without going through save()'s validation. */
-function payloadFields(dialog: PipelineDialog): any[] {
+function payloadFields(dialog: RegistryTaskEditor): any[] {
   return (dialog as any).rows();
 }
 
-describe('PipelineDialog -- choices are edited as value and label', () => {
+describe('Registry task page -- choices are edited as value and label', () => {
   it('splits an existing value/label choice into its two boxes', () => {
     const { dialog } = dialogFor(selectForm('records=JSON array\nlines=JSON Lines', 'records'));
     expect(dialog.choicesArray(0).getRawValue()).toEqual([
@@ -126,7 +146,7 @@ describe('PipelineDialog -- choices are edited as value and label', () => {
   });
 });
 
-describe('PipelineDialog -- the Default value dropdown', () => {
+describe('Registry task page -- the Default value dropdown', () => {
   it('offers the parsed choices, showing labels and storing values', () => {
     const { dialog } = dialogFor(selectForm('records=JSON array\nlines=JSON Lines'));
     expect(dialog.defaultValueOptions(0)).toEqual([
@@ -154,7 +174,7 @@ describe('PipelineDialog -- the Default value dropdown', () => {
   });
 });
 
-describe('PipelineDialog -- choices survive a save made while the type is not select', () => {
+describe('Registry task page -- choices survive a save made while the type is not select', () => {
   it('keeps the choices when the field is saved as text', () => {
     /*
      * The payload used to null fieldOptions for anything but a select, and saveForm replaces
@@ -176,8 +196,8 @@ describe('PipelineDialog -- choices survive a save made while the type is not se
   });
 });
 
-describe('PipelineDialog -- what save() refuses', () => {
-  function readyToSave(dialog: PipelineDialog): void {
+describe('Registry task page -- what save() refuses', () => {
+  function readyToSave(dialog: RegistryTaskEditor): void {
     dialog.form.patchValue({ pipelineId: 'F768930', pipelineName: 'CSV to JSON demo' });
   }
 
@@ -224,5 +244,52 @@ describe('PipelineDialog -- what save() refuses', () => {
     dialog.save();
     expect(post).not.toHaveBeenCalled();
     expect(toast.error.mock.calls[0][0]).toContain('"=" in its value');
+  });
+});
+
+/** Owner #18: New / Edit registry task is a page with its own address -- it reads its row, saves the same request, and asks before leaving unsaved changes. */
+describe('Registry task page -- its own page', () => {
+  it('reads the row by its key, and a save untouched POSTs the request the dialog did, byte for byte', () => {
+    const { dialog, post, toast, navigate } = dialogFor(EDIT_DATA.form as unknown as Pipeline);
+    expect(dialog.isEdit()).toBe(true);
+    expect(dialog.heading()).toBe(EDIT_DATA.form.pipelineName);
+    expect(dialog.hasUnsavedChanges()).toBe(false);
+    dialog.save();
+    expect(toast.error).not.toHaveBeenCalled();
+    expect(post.mock.calls[0][0]).toBe(SAVE_REQUEST.url);
+    expect(JSON.stringify(post.mock.calls[0][1])).toBe(JSON.stringify(SAVE_REQUEST.body));
+    expect(navigate).toHaveBeenCalledWith(['/settings/task-registry']);
+  });
+
+  it(`opens a duplicate as the list's Duplicate did: no key, no id, "(copy)", no field ids`, () => {
+    const { dialog } = dialogFor(EDIT_DATA.form as unknown as Pipeline, [], { copyOf: EDIT_DATA.form.pipelineKey });
+    expect(dialog.isEdit()).toBe(false);
+    expect(dialog.heading()).toBe('Duplicate registry task');
+    const v = dialog.form.getRawValue();
+    expect(v.pipelineKey).toBeNull();
+    expect(v.pipelineId).toBe(DUPLICATE_DATA.form.pipelineId);
+    expect(v.pipelineName).toBe(DUPLICATE_DATA.form.pipelineName);
+    expect(payloadFields(dialog).every(f => f.pipelineFieldId === undefined)).toBe(true);
+  });
+
+  it('knows when what is on screen is not saved, and the guard asks before leaving', async () => {
+    const { dialog, opened } = dialogFor(selectForm('records\nlines', 'records'), [], { confirm: false });
+    expect(dialog.changeState()).toBe('No changes');
+    expect(TestBed.runInInjectionContext(() => unsavedChangesGuard(dialog, null as any, null as any, null as any))).toBe(true);
+    dialog.form.patchValue({ pipelineName: 'Renamed' });
+    expect(dialog.hasUnsavedChanges()).toBe(true);
+    expect(dialog.changeState()).toBe('Unsaved changes');
+    const stay = await TestBed.runInInjectionContext(() => unsavedChangesGuard(dialog, null as any, null as any, null as any));
+    expect(stay).toBe(false);
+    expect(opened[0].config.data.confirmLabel).toBe('Leave without saving');
+    dialog.form.patchValue({ pipelineName: 'CSV to JSON demo' });
+    expect(dialog.hasUnsavedChanges()).toBe(false);
+  });
+
+  it('a new one starts empty, with nothing to lose', () => {
+    const { dialog } = dialogFor(undefined);
+    expect(dialog.ready()).toBe(true);
+    expect(dialog.heading()).toBe('New registry task');
+    expect(dialog.hasUnsavedChanges()).toBe(false);
   });
 });

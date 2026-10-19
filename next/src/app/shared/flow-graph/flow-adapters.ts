@@ -89,6 +89,8 @@ const TASK_ICONS: Record<string, string> = {
   sort: 'sort', limit: 'filter', validate: 'check', enrich: 'plug', ai_prompt: 'sparkle', measure_image: 'image', approval: 'user',
   save_file: 'download', upload_bucket: 'upload', render_pdf: 'file', send_notification: 'mail', send_webhook: 'send',
   write_database: 'database', legacy: 'history',
+  // Owner #16 (2026-10-19): the common tasks added to the registry.
+  dedupe: 'layers', split_column: 'code', pivot: 'table', unpivot: 'list', fill_missing: 'check',
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && !!x);

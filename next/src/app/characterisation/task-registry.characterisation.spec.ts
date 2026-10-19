@@ -1,4 +1,6 @@
 import { describe, it, afterEach } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
 import { useMemoryStorage } from '../shared/testing/memory-storage';
 import { TU_PAGES, Visit, click, closeOverlays, detailsOf, overlay, pin, restoreClock, visit } from './harness';
 import { PINNED } from './pinned/task-registry';
@@ -128,10 +130,12 @@ describe('MIG-250: Configuration › Task Registry', () => {
     pin(FILE, 'a Legacy row in the side panel', { requests, ...overlay(), ...panelOf() }, PINNED);
   });
 
-  it('Edit pipeline from a Legacy row\'s panel opens the pipeline dialog', async () => {
+  it('Edit registry task from a Legacy row\'s panel opens its page', async () => {
     const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'Open Reference: CSV check and summarise');
     const requests = await click(v, 'Edit registry task');
-    pin(FILE, 'Edit pipeline from a Legacy row\'s panel opens the pipeline dialog', { requests, ...overlay() }, PINNED);
+    // The page is lazy-loaded: under a busy test run the navigation can land a few settles later.
+    for (let i = 0; i < 20 && TestBed.inject(Router).url === '/settings/task-registry'; i++) requests.push(...await v.settle());
+    pin(FILE, 'Edit registry task from a Legacy row\'s panel opens its page', { requests, url: TestBed.inject(Router).url }, PINNED);
   });
 });

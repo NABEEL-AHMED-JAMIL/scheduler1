@@ -622,6 +622,24 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/settings/task-registry/new",
+      "title": "New registry task",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/settings/task-registry/:pipelineKey",
+      "title": "Edit registry task",
+      "minRole": "TENANT_ADMIN",
+      "guards": [
+        "roleGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/settings/kafka",
       "title": "Kafka & Topics",
       "minRole": "TENANT_ADMIN",

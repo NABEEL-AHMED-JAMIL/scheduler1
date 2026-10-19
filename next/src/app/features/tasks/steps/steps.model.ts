@@ -174,6 +174,19 @@ export interface StepTaskEntry {
   /** Whether the platform can run it at all (a backing service may not be there yet). */
   available?: boolean;
   disabledReason?: string | null;
+  /** Owner #16: what the task is in this workspace -- unavailable, blocked, off or on -- and who set that. */
+  effectiveState?: 'unavailable' | 'blocked' | 'off' | 'on' | null;
+  setBy?: 'default' | 'workspace' | 'platform' | null;
+  switchedBy?: number | null;
+  switchedByName?: string | null;
+  switchedByRole?: string | null;
+  switchedAt?: string | null;
+  /** Owner #16: a platform administrator's block for this workspace: off whatever the switch says. */
+  blocked?: boolean;
+  blockedBy?: number | null;
+  blockedByName?: string | null;
+  blockedAt?: string | null;
+  blockReason?: string | null;
   pipelineKey?: number | null;
   pipelineId?: string | null;
   config?: Record<string, unknown> | null;
@@ -420,10 +433,12 @@ export function taskEntry(tasks: StepTaskEntry[], code: string | null | undefine
 export const taskLabel = (task: StepTaskEntry | undefined, code?: string) => task?.name || task?.code || code || '';
 
 /** A task's state in a workspace: Unavailable (the platform cannot run it), Off (switched off, or off by default), On. */
-export type TaskState = 'On' | 'Off' | 'Unavailable';
+export type TaskState = 'On' | 'Off' | 'Blocked' | 'Unavailable';
 
 export function stateOf(t: StepTaskEntry): { state: TaskState; reason: string } {
   if (t.available === false) return { state: 'Unavailable', reason: t.disabledReason || 'The platform cannot run it yet.' };
+  // Owner #16: a platform administrator's block, with the reason they gave.
+  if (t.blocked) return { state: 'Blocked', reason: t.disabledReason || 'Blocked for this workspace by a platform administrator.' };
   if (t.enabled === false) {
     return { state: 'Off', reason: t.disabledReason || (t.overridden ? 'Switched off in this workspace.' : 'Off by default.') };
   }
@@ -644,7 +659,35 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
       return union(input(), right >= 0 && right < index ? outputColumns(definition, right, tasks) : null);
     }
     case 'filter': case 'save_file': case 'send_notification': case 'validate':
+    case 'dedupe': case 'fill_missing': case 'sort': case 'limit':
       return input();
+    // Owner #16 (2026-10-19): the common tasks added to the registry.
+    case 'unpivot': {
+      const columns = input();
+      if (!columns) return null;
+      const turned = strings(config['columns']);
+      const nameAs = typeof config['nameAs'] === 'string' && config['nameAs'] ? config['nameAs'] as string : 'name';
+      const valueAs = typeof config['valueAs'] === 'string' && config['valueAs'] ? config['valueAs'] as string : 'value';
+      return [...columns.filter(c => !turned.includes(c)), nameAs, valueAs];
+    }
+    case 'split_column': {
+      const columns = input();
+      if (!columns) return null;
+      const column = typeof config['column'] === 'string' ? config['column'] as string : '';
+      const into = strings(config['into']);
+      if (config['mode'] === 'rows') return columns.map(c => (c === column && into.length ? into[0] : c));
+      const out: string[] = [];
+      for (const c of columns) {
+        if ((c !== column || config['keepOriginal'] === true) && !into.includes(c)) out.push(c);
+        if (c === column) out.push(...into);
+      }
+      return out;
+    }
+    case 'pivot': {
+      // The new columns are the data's unless the step names them.
+      const named = strings(config['columns']);
+      return named.length ? [...strings(config['groupBy']), ...named] : null;
+    }
     default:
       return null;
   }

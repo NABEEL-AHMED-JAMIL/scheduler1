@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   FieldChoice, PipelineField,
   parseFieldChoices, serializeFieldChoices, validateSelectChoices,
-} from './pipeline-dialog';
+} from './pipeline.model';
 
 /**
  * A select's choices are one free-text column, `task_form_field.field_options`, and until

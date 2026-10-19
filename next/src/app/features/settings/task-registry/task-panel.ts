@@ -22,14 +22,14 @@ export interface TaskPanelData {
   onSwitched?: (line: StepTaskEntry) => void;
 }
 
-/** What the panel closes with: 'edit' asks the page to open a Legacy row's pipeline in its dialog. */
+/** What the panel closes with: 'edit' asks the page to open a Legacy row's pipeline on its own page. */
 export type TaskPanelResult = 'edit' | undefined;
 
 /**
  * One task of the Task Registry (MIG-250), in the wide side panel: what it does, its settings (the config schema, as
  * a list to read), what it takes and gives, how it runs -- retry, timeout, who may use it, its AI tool name, the
  * service behind it -- and, for a workspace administrator, its switch. A Legacy row is an existing pipeline: its
- * payload fields and topic, and Edit pipeline, which the page opens in the pipeline dialog exactly as before.
+ * payload fields and topic, and Edit registry task, which opens its own page (owner #18).
  */
 @Component({
   selector: 'app-task-panel',
@@ -78,7 +78,7 @@ export type TaskPanelResult = 'edit' | undefined;
             } @else {
               <p class="text-sm text-[color:var(--text-muted)]">{{ p.fieldCount ?? 0 }} field(s), {{ p.requiredCount ?? 0 }} required.</p>
             }
-            <p class="field-note text-[color:var(--text-muted)]">Always on: an existing pipeline stays runnable. Its topic, fields and AI steps are edited in its dialog.</p>
+            <p class="field-note text-[color:var(--text-muted)]">Always on: an existing pipeline stays runnable. Its topic, fields and AI steps are edited on its own page (Edit registry task).</p>
           </section>
         } @else if (data.isAdmin) {
           <section class="flex flex-col gap-2" aria-labelledby="task-panel-switch">
@@ -86,7 +86,8 @@ export type TaskPanelResult = 'edit' | undefined;
             <div class="flex items-center gap-3">
               <p class="text-sm text-[color:var(--text-secondary)] flex-1 min-w-0">
                 {{ task().enabled ? 'On: Add step offers it in every pipeline here.' : 'Off: Add step does not offer it here.' }}
-                @if (task().overridable === false) { It cannot be switched. }
+                @if (task().blocked) { Blocked by a platform administrator{{ task().blockedByName ? ' (' + task().blockedByName + ')' : '' }}: only they can unblock it. }
+                @else if (task().overridable === false) { It cannot be switched. }
                 @else if (task().available === false && !task().enabled) { It cannot be switched on until the platform can run it. }
                 @else { {{ task().enabledByDefault === false ? 'Off by default.' : 'On by default.' }} }
               </p>
