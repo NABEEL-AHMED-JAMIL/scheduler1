@@ -48,7 +48,7 @@ import {
     .rte-main { display: grid; gap: 1.25rem; min-width: 0; }
     .rte-aside { display: grid; gap: 1.25rem; min-width: 0; }
     .rte-fields { display: grid; gap: 0.75rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
-    @media (min-width: 100rem) { .rte-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+    @media (min-width: 100rem) { .rte-fields { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } .rte-wide { grid-column: 1 / -1; } }
     .rte-preview { max-height: 28rem; }
   `,
 })

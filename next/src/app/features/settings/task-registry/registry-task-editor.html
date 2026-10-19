@@ -67,7 +67,7 @@
             </app-field>
             <app-field label="Description" for="formDescription" class="fr-6"
                        [control]="form.get('description')" [submitted]="submitted()">
-              <textarea id="formDescription" class="input" rows="2" formControlName="description"
+              <textarea id="formDescription" class="input" rows="3" formControlName="description"
                         placeholder="What a pipeline on this registry task collects"></textarea>
             </app-field>
           </app-form-row>
@@ -90,7 +90,7 @@
 
           <div class="rte-fields" formArrayName="fields">
             @for (row of fields.controls; track row; let i = $index) {
-              <div class="card p-4 flex flex-col gap-2.5" [formGroupName]="i" data-test="field-card">
+              <div class="card p-4 flex flex-col gap-2.5" [class.rte-wide]="i === fields.length - 1 && fields.length % 2 === 1" [formGroupName]="i" data-test="field-card">
                 <div class="flex items-center gap-2">
                   <span class="stat-glyph shrink-0"><app-icon [name]="row.get('fieldType')?.value === 'ai' ? 'sparkle' : 'template'" /></span>
                   <span class="text-xs text-[color:var(--text-muted)] mono">#{{ i + 1 }}</span>

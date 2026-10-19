@@ -31,7 +31,7 @@
 
   <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
-      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on' + (taskTiles().unavailable ? ' · ' + taskTiles().unavailable + ' the platform cannot run yet' : ''), icon: 'layers', tone: 'info' },
+      { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on' + (taskTiles().unavailable ? ' · ' + taskTiles().unavailable + ' unavailable' : ''), icon: 'layers', tone: 'info' },
       { label: 'In use', value: taskTiles().inUse, foot: 'step tasks a pipeline runs', icon: 'activity', tone: 'ok' },
       { label: 'Blocked', value: taskTiles().blocked, foot: taskTiles().blocked ? 'by a platform administrator' : 'none', icon: 'lock', tone: taskTiles().blocked ? 'crit' : 'muted' },
       { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active' + (summary().untopped ? ' · ' + summary().untopped + ' with no topic' : ''), icon: 'send', tone: summary().untopped ? 'warn' : 'info' }

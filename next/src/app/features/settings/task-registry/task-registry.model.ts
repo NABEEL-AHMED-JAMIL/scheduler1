@@ -15,7 +15,7 @@ export type { TaskState };
 /** The kind chips, in the order the table lists them. */
 export const REGISTRY_KINDS = [...TASK_KINDS, 'Legacy'] as const;
 
-export const TASK_STATES: TaskState[] = ['On', 'Off', 'Unavailable'];
+export const TASK_STATES: TaskState[] = ['On', 'Off', 'Blocked', 'Unavailable'];
 
 export interface RegistryRow {
   /** The task's code, or legacy:<pipelineKey> for a pipeline. */
