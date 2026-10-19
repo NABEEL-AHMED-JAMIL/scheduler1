@@ -26,6 +26,24 @@ describe('toast placement', () => {
     expect(source).toContain('pointer-events-auto');
   });
 
+  it('is the only place that positions a notice: no other template floats a live region of its own', async () => {
+    const fs = (await import(/* @vite-ignore */ ['node', 'fs'].join(':'))) as {
+      readFileSync(p: string, e: 'utf8'): string; readdirSync(p: string, o: { recursive: true }): string[] };
+    const root = (globalThis as unknown as { process: { cwd(): string } }).process.cwd() + '/src/app/';
+    const offenders: string[] = [];
+    for (const file of fs.readdirSync(root, { recursive: true })) {
+      if (!/\.(ts|html)$/.test(file) || file.endsWith('.spec.ts') || file.endsWith('toast-host.ts')) continue;
+      const text = fs.readFileSync(root + file, 'utf8');
+      // An element that is fixed to the viewport AND announces itself (a toast or notice) belongs in the toast stack.
+      for (const tag of text.match(/<[a-z][^>]*>/gs) ?? []) {
+        const fixed = /class="[^"]*\bfixed\b/.test(tag);
+        const announces = /role="(status|alert|alertdialog)"|aria-live=/.test(tag);
+        if (fixed && announces) offenders.push(`${file}: ${tag.slice(0, 80)}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
+
   it('is the only floating notice: the reset-password notice is gone and the idle warning sits where toasts do', async () => {
     const users = await read('features/admin/users/users.html');
     expect(users).not.toContain('app-reset-password-notice');
