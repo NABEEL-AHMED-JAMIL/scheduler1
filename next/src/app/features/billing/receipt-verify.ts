@@ -27,6 +27,7 @@ export function shortHash(hex: string | null | undefined): string {
 @Component({
   selector: 'app-receipt-verdict',
   imports: [Icon, ServerTimePipe],
+  host: { class: 'flex flex-col gap-3' },
   template: `
     @if (verdict(); as v) {
       <div class="receipt-verdict" [class.is-ok]="v.verified" [class.is-bad]="!v.verified" role="status" data-test="receipt-verdict">

@@ -2505,7 +2505,7 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .receipt-checks > li { display: flex; gap: 0.5rem; color: var(--crit-text); }
 .receipt-checks > li.is-ok { color: var(--ok-text); }
 .receipt-checks > li .font-medium { color: var(--text-primary); }
-.receipt-check-word { font-size: 11px; font-weight: 600; }
+.receipt-check-word { margin-left: 0.4rem; font-size: 11px; font-weight: 600; }
 .receipt-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.25rem 1rem; font-size: 12px; margin: 0; }
 .receipt-facts dt { color: var(--text-muted); }
 .receipt-facts dd { margin: 0; color: var(--text-primary); overflow-wrap: anywhere; }
