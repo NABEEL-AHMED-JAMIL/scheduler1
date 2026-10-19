@@ -58,7 +58,7 @@
               <tr>
                 <th scope="col" class="align-bottom">Setting</th>
                 @for (c of columns(); track c.d.sensitivity) {
-                  <th scope="col" class="align-top normal-case" [attr.data-level]="c.d.sensitivity" data-row="head">
+                  <th scope="col" class="align-top normal-case whitespace-normal" [attr.data-level]="c.d.sensitivity" data-row="head">
                     <div class="flex items-start justify-between gap-2">
                       <div class="min-w-0">
                         <h2 class="text-sm font-semibold text-[color:var(--text-primary)] flex items-center gap-1.5" [id]="'level-' + c.d.sensitivity">
