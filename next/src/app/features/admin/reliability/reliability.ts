@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { DecimalPipe, NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
@@ -206,6 +206,8 @@ const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 })
 export class Reliability implements OnInit {
   private readonly api = inject(ReliabilityApi);
+  /** The services, deploys and alerts above the objectives: the page's one Refresh reloads them too. */
+  readonly health = viewChild(PlatformHealthView);
 
   readonly rangeOptions: SegmentOption<RangeDays>[] = [
     { id: '7', label: 'Last 7 days' }, { id: '28', label: 'Last 28 days' }, { id: '90', label: 'Last 90 days' },
@@ -283,6 +285,11 @@ export class Reliability implements OnInit {
   setRange(days: RangeDays): void {
     this.range.set(days);
     this.load();
+  }
+
+  refreshAll(): void {
+    this.load();
+    this.health()?.load();
   }
 
   load(): void {

@@ -1,7 +1,6 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { API_SUCCESS } from '../../../core/api/api.config';
-import { Icon } from '../../../shared/ui/icon';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
@@ -49,7 +48,7 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
  */
 @Component({
   selector: 'app-platform-health',
-  imports: [Icon, StatTile, ServerTimePipe, DecimalPipe, AlertRules],
+  imports: [StatTile, ServerTimePipe, DecimalPipe, AlertRules],
   styles: `
     .dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; vertical-align: middle; }
     .dot-ok { background: var(--series-ok); }
@@ -74,7 +73,6 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
       <div class="flex flex-wrap items-center gap-2">
         <h2 class="text-lg font-semibold m-0" id="health-title">Services</h2>
         <span class="text-sm text-[color:var(--text-secondary)]">{{ summary() }}</span>
-        <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="load()" [disabled]="loading()"><app-icon name="refresh" [busy]="loading()" />Refresh</button>
       </div>
       @if (error()) { <p class="text-sm text-crit-500 m-0" role="alert">{{ error() }}</p> }
 
@@ -123,7 +121,7 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
           <p class="chart-sub m-0">The last 24 hours, newest first. A restart inside one raises no alert.</p>
           @if (deploys().length) {
             <ul class="list-none m-0 mt-2 p-0 text-sm flex flex-col gap-1">
-              @for (d of deploys(); track d.service + d.start) {
+              @for (d of shownDeploys(); track d.service + d.start) {
                 <li class="flex justify-between gap-2" [attr.data-service]="d.service" [attr.data-state]="d.state">
                   <span class="font-medium truncate">{{ d.service }}</span>
                   <span class="text-[color:var(--text-secondary)] whitespace-nowrap">{{ d.start | serverTime:'recent' }}, {{ length(d) }}
@@ -133,6 +131,11 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
                 </li>
               }
             </ul>
+            @if (deploys().length > DEPLOYS_SHOWN) {
+              <button type="button" class="btn btn-ghost btn-xs mt-1" data-test="deploys-more" (click)="allDeploys.set(!allDeploys())" [attr.aria-expanded]="allDeploys()">
+                {{ allDeploys() ? 'Show fewer' : 'and ' + (deploys().length - DEPLOYS_SHOWN) + ' more' }}
+              </button>
+            }
           } @else { <p class="text-sm text-[color:var(--text-muted)] m-0 mt-2">No deploy in the last 24 hours.</p> }
         </section>
         <section class="card p-4" aria-labelledby="kafka-title">
@@ -171,6 +174,10 @@ export class PlatformHealthView implements OnInit, OnDestroy {
 
   readonly services = computed(() => this.health()?.services ?? []);
   readonly deploys = computed(() => this.health()?.deploys ?? []);
+  /** A busy day's deploys would push Kafka and billing off the screen: the newest eight, then "and N more". */
+  readonly DEPLOYS_SHOWN = 8;
+  readonly allDeploys = signal(false);
+  readonly shownDeploys = computed(() => this.allDeploys() ? this.deploys() : this.deploys().slice(0, this.DEPLOYS_SHOWN));
   readonly upCount = computed(() => this.services().filter(s => s.status === 'UP').length);
   readonly unplannedTotal = computed(() => this.services().reduce((n, s) => n + unplannedRestarts(s), 0));
   readonly erroring = computed(() => this.services().filter(s => errorRate(s).bad));

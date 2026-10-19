@@ -6,7 +6,7 @@ import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 /**
  * MIG-355: alert rules and alerts (Core, /reliability.json/alerts). A workspace administrator works on the workspace's
  * (failed runs, missed schedules, slow runs, reviews left waiting); a platform administrator on the platform's (a service
- * unhealthy or restarted, memory, Kafka lag, disk, billing reconciliation). Platform › Reliability's health view reads
+ * unhealthy or restarted, memory, Kafka lag, disk, billing reconciliation). Platform › Service health reads
  * /reliability.json/health.
  */
 export type AlertScope = 'workspace' | 'platform';

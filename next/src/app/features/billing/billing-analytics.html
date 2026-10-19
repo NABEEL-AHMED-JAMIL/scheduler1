@@ -56,12 +56,12 @@
             <h2 class="font-semibold text-sm mb-2">By pipeline</h2>
             <div class="overflow-x-auto">
               <table class="table-modern">
-                <thead><tr><th>Pipeline</th><th class="text-right">Runs</th><th class="text-right">Cost</th><th>Last run</th></tr></thead>
+                <thead><tr><th>Pipeline</th><th class="text-right">Runs</th><th class="text-right">Cost</th><th class="hidden 2xl:table-cell">Last run</th></tr></thead>
                 <tbody>
                   @for (p of pipelineRows(); track p.taskDetailId ?? $index) {
-                    <tr><td class="max-w-72 truncate" [title]="p.pipeline || ''">{{ p.pipeline || 'Not tied to a pipeline' }}</td>
+                    <tr><td class="max-w-56 truncate" [title]="p.pipeline || ''">{{ p.pipeline || 'Not tied to a pipeline' }}</td>
                       <td class="text-right tabular">{{ p.runs | number }}</td><td class="text-right tabular">{{ money2(p.cost) }}</td>
-                      <td class="text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ p.lastRunAt ? (p.lastRunAt | serverTime: 'recent') : '—' }}</td></tr>
+                      <td class="hidden 2xl:table-cell text-xs text-[color:var(--text-secondary)] whitespace-nowrap">{{ p.lastRunAt ? (p.lastRunAt | serverTime: 'recent') : '—' }}</td></tr>
                   }
                   @if (!pipelineRows().length) { <tr><td colspan="4" class="text-center text-[color:var(--text-muted)] py-4">{{ t.byPipeline === null ? 'Pipeline costs could not be read just now.' : 'No pipeline run was billed in this range.' }}</td></tr> }
                 </tbody>

@@ -9,7 +9,7 @@ import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AlertRules } from './alert-rules';
 import { Alert, AlertRule, PlannedDeploy, minutes, recommendedRules, ruleSentence } from './alerts.api';
-import { deployLength, errorRate, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
+import { PlatformHealthView, deployLength, errorRate, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
 import { notificationTarget, openableTarget } from '../../notifications/notification-links';
 
 /** MIG-355: alerts and their rules -- the list, the open alerts with Resolve, the recommended rules, and the words. */
@@ -159,5 +159,32 @@ describe('Alerts', () => {
     expect(deployLength({ ...deploys[0], state: 'open', end: null })).toBe('running');
     expect(unplannedRestarts({ service: 'transcriber', status: 'UP', restarts24h: 3, plannedRestarts24h: 2 })).toBe(1);
     expect(unplannedRestarts({ service: 'transcriber', status: 'UP', restarts24h: 1, plannedRestarts24h: 2 })).toBe(0);
+  });
+  it('shows the newest eight planned deploys, then "and N more" (owner #21)', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [PlatformHealthView],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: Dialog, useValue: { open: () => ({ closed: of(false) }) } },
+        { provide: ToastService, useValue: { success: () => {}, error: () => {}, info: () => {} } }],
+    });
+    const fixture = TestBed.createComponent(PlatformHealthView);
+    fixture.detectChanges();
+    const http = TestBed.inject(HttpTestingController);
+    const deploys: PlannedDeploy[] = Array.from({ length: 11 }, (_, i) => ({ service: `svc-${i}`, start: `2026-10-19T1${i % 10}:00:00Z`,
+      end: `2026-10-19T1${i % 10}:01:00Z`, expires: null, closes: null, state: 'ended', outcome: 'ok' }) as unknown as PlannedDeploy);
+    http.expectOne(r => r.url === `${API_BASE}/reliability.json/health`).flush({ status: API_SUCCESS, message: '',
+      data: { services: [], probes: [], deploys } });
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    const listed = () => el.querySelectorAll('[data-test="planned-deploys"] li').length;
+    expect(listed()).toBe(8);
+    const more = el.querySelector<HTMLButtonElement>('[data-test="deploys-more"]')!;
+    expect(more.textContent!.trim()).toBe('and 3 more');
+    more.click();
+    fixture.detectChanges();
+    expect(listed()).toBe(11);
+    expect(more.textContent!.trim()).toBe('Show fewer');
+    clearInterval((fixture.componentInstance as unknown as { timer: ReturnType<typeof setInterval> }).timer);
   });
 });

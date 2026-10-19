@@ -6,7 +6,7 @@
         <p class="page-subtitle">Each service's status, version, restarts and error rate, the planned deploys and the platform's alerts; then pipeline execution and billing against their 99.99% targets. Heap, CPU and request history are CloudWatch's.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
-        <button type="button" class="btn btn-ghost btn-sm" (click)="load()"><app-icon name="refresh" />Refresh</button>
+        <button type="button" class="btn btn-ghost btn-sm" data-test="refresh-all" (click)="refreshAll()" [disabled]="health()?.loading()"><app-icon name="refresh" [busy]="!!health()?.loading()" />Refresh</button>
       </div>
     </div>
   </app-page-header>

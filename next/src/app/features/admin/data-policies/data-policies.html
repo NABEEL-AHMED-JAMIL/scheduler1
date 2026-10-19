@@ -190,7 +190,7 @@
         <!-- Owner #4: the levels' save bar sits under the levels it saves (it stuck to the page bottom below the review policy, which
              saves itself, and left a gap above Retention). -->
         @if (canEdit() && levels().length) {
-          <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2 sticky bottom-3 z-10">
+          <div class="card px-4 py-2.5 flex flex-wrap items-center justify-end gap-2">
             @if (saveError()) {
               <p class="text-sm text-crit-500 mr-auto flex items-start gap-1.5" role="alert" data-save-error><app-icon name="alert" size="0.9em" class="mt-0.5 shrink-0" /><span>{{ saveError() }}</span></p>
             } @else {

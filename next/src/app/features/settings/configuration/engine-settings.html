@@ -43,7 +43,7 @@
                   <div class="mono text-[11px] text-[color:var(--text-muted)] mt-0.5">{{ s.key }}</div>
                 </td>
                 <td class="text-right tabular whitespace-nowrap">
-                  <span class="font-medium">{{ s.value | number }}</span> <span class="text-xs text-[color:var(--text-muted)]">{{ s.unit }}</span>
+                  <span class="font-medium">{{ s.value | number }}</span>&nbsp;<span class="text-xs text-[color:var(--text-muted)]">{{ s.unit }}</span>
                   @if (!s.atDefault) {
                     <div class="text-[11px] text-[color:var(--text-muted)]">@if (s.updatedAt) { {{ s.updatedAt | serverTime:'recent' }} }@if (s.updatedByName) { by {{ s.updatedByName }} }</div>
                   }
