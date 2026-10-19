@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { Component, LOCALE_ID, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 
@@ -36,8 +38,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { clonePayload } from './job-clone';
 import { clockTime, monthDayLabel, weekdayLabel } from './schedule-labels';
 import { dayLabel } from '../../shared/ui/time-format';
-import { Combobox } from '../../shared/ui/combobox';
-import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
+import { matchesWorkspace, workspaceName } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
@@ -117,7 +118,7 @@ const BULK_CONCURRENCY = 4;
 
 @Component({
   selector: 'app-jobs',
-  imports: [RefreshButton, PageHeader, Combobox, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, AssistantDock, Icon, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger, TableShell, StatusPill, Pagination, BarChart, StatStrip, ManagedBanner],
   templateUrl: './jobs.html',
 })
 export class Jobs implements OnInit {
@@ -244,8 +245,7 @@ export class Jobs implements OnInit {
    */
   readonly seesWorkspaces = computed(() => this.auth.isPlatformAdmin());
   /** The picked workspace's id as text; empty is "All workspaces". */
-  readonly workspaceFilter = signal('');
-  readonly workspaceOptions = computed(() => this.seesWorkspaces() ? workspaceOptions(this.jobs()) : []);
+  readonly workspaceFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
   workspaceName(job: SourceJob): string { return workspaceName(job); }
 
   readonly filtered = computed(() => {

@@ -1,3 +1,5 @@
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
@@ -21,7 +23,7 @@ import { Pagination } from '../../shared/ui/pagination';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { sensitivityText } from '../../shared/ui/sensitivity';
 import { parseTopicPartition } from '../../shared/ui/topic';
-import { matchesWorkspace, workspaceName, workspaceOptions } from '../../shared/ui/workspace-name';
+import { matchesWorkspace, workspaceName } from '../../shared/ui/workspace-name';
 import { ManagedBanner } from '../../shared/ui/managed-banner';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
@@ -74,7 +76,7 @@ interface SourceTask {
 
 @Component({
   selector: 'app-tasks',
-  imports: [RefreshButton, PageHeader, MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
+  imports: [WorkspaceSelect, RefreshButton, PageHeader, MineFilter, ViewToggle, Icon, RouterLink, TableShell, StatusPill, CdkMenu, CdkMenuItem, CdkMenuTrigger, Pagination, ServerTimePipe, Combobox, ManagedBanner],
   templateUrl: './tasks.html',
 })
 export class Tasks implements OnInit {
@@ -137,8 +139,7 @@ export class Tasks implements OnInit {
    */
   readonly seesWorkspaces = computed(() => this.auth.isPlatformAdmin());
   /** The picked workspace's id as text; empty is "All workspaces". */
-  readonly workspaceFilter = signal('');
-  readonly workspaceOptions = computed(() => this.seesWorkspaces() ? workspaceOptions(this.tasks()) : []);
+  readonly workspaceFilter = signal(String(inject(WorkspaceDirectory).remembered() ?? ''));
   workspaceName(task: SourceTask): string { return workspaceName(task); }
 
   /** Whether Clear is offered: anything that narrows the list, Only mine included. */
