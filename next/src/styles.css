@@ -2106,7 +2106,7 @@ html[data-theme="contrast"]:not(.dark) {
 .access-grid { table-layout: fixed; width: max-content; min-width: 100%; }
 .access-grid .access-grid-person { width: 18rem; min-width: 18rem; max-width: 18rem; text-align: left; position: sticky; left: 0; z-index: 2;
   background: var(--surface-raised); white-space: normal; overflow-wrap: anywhere; vertical-align: top; }
-.access-grid .access-grid-profile { width: 11rem; min-width: 11rem; position: sticky; left: 18rem; z-index: 2; background: var(--surface-raised);
+.access-grid .access-grid-profile { width: 12.5rem; min-width: 12.5rem; position: sticky; left: 18rem; z-index: 2; background: var(--surface-raised);
   box-shadow: inset -1px 0 0 var(--border-subtle); vertical-align: top; }
 .access-grid tbody td.access-grid-person, .access-grid tbody td.access-grid-profile { padding-top: 0.5rem; padding-bottom: 0.5rem; }
 .access-grid .access-grid-group td.access-grid-person, .access-grid .access-grid-group td.access-grid-profile { background: var(--access-group-bg); }

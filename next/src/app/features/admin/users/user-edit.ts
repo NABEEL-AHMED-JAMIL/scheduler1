@@ -61,8 +61,9 @@ export const USER_EDIT_SECTIONS = [
       .ue-nav { position: sticky; top: 4.5rem; }
     }
     .ue-nav-list { display: flex; flex-wrap: wrap; gap: 0.25rem; }
-    @media (min-width: 80rem) { .ue-nav-list { flex-direction: column; } }
-    .ue-nav-btn { display: flex; align-items: center; gap: 0.5rem; width: 100%; text-align: left; padding: 0.4rem 0.6rem;
+    @media (min-width: 80rem) { .ue-nav-list { flex-direction: column; } .ue-nav-btn { width: 100%; } }
+    /* Below 80rem the parts are a row of chips over the page; beside it from 80rem, a column. */
+    .ue-nav-btn { display: flex; align-items: center; gap: 0.5rem; width: auto; text-align: left; padding: 0.4rem 0.6rem;
       border-radius: var(--radius-md); font-size: 0.875rem; color: var(--text-secondary); }
     .ue-nav-btn:hover { background: var(--surface-sunken); color: var(--text-primary); }
     .ue-nav-btn:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
