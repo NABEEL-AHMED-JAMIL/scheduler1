@@ -15,7 +15,7 @@ import { MineFilter, isMine } from '../../../shared/ui/mine-filter';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { BlurLoader } from '../../../shared/ui/blur-loader';
 import { ConnectionDialog } from './connection-dialog';
-import { AI_PROVIDERS, ModelConnection, providerOf } from '../ai-providers';
+import { AI_PROVIDERS, ModelConnection, providerOf, providerPill, statusPill } from '../ai-providers';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { Bar, BarChart } from '../../../shared/charts/bar-chart';
@@ -120,7 +120,7 @@ export class Connections implements OnInit {
     });
     effect(() => {
       const id = this.selectedId();
-      untracked(() => this.loadActivity(id));
+      untracked(() => { this.loadActivity(id); this.loadHistory(id); });
     });
   }
 
@@ -223,6 +223,51 @@ export class Connections implements OnInit {
     });
   }
 
+  /** Owner item #12: the provider's own chip colour, and the status chip. */
+  providerChip(c: ModelConnection): string { return providerPill(c.provider); }
+  statusChip(c: ModelConnection) { return statusPill(c.status); }
+
+  /** Owner item #13: who last made the selected connection active or inactive, and when. */
+  readonly history = signal<StatusChange[]>([]);
+  readonly switching = signal<number | null>(null);
+
+  loadHistory(id: number | null): void {
+    this.history.set([]);
+    if (id === null) return;
+    this.http.get<ApiResponse<StatusChange[]>>(`${API_BASE}/aiConnection.json/history`, { params: { connectionId: id } }).subscribe({
+      next: r => { if (this.selectedId() === id && r.status === API_SUCCESS) this.history.set(r.data ?? []); },
+      error: () => undefined,
+    });
+  }
+
+  /**
+   * Owner item #13: Active / Inactive. Making a connection inactive stops everything that runs on it -- the assistant, Ask
+   * your data, Document Intelligence, pipeline AI steps, prompts -- until it is made active again; the server refuses each
+   * by name. Asked first, with the default's consequence said when it is the default.
+   */
+  async setActive(c: ModelConnection, active: boolean): Promise<void> {
+    if (!active) {
+      const ok = await confirmWith(this.dialog, {
+        title: `Make ${c.name} inactive?`,
+        body: 'Nothing will run on it until it is made active again: the AI Assistant, Ask your data and its charts, Document '
+          + 'Intelligence, pipeline AI steps, image description and prompts are refused, naming this connection.'
+          + (c.isDefault ? ' It is the workspace default, so everything that runs on the default is refused too, until you reactivate it '
+            + 'or make another connection the default.' : ''),
+        confirmLabel: 'Make inactive', danger: true,
+      });
+      if (!ok) return;
+    }
+    this.switching.set(c.connectionId);
+    this.http.put<ApiResponse>(`${API_BASE}/aiConnection.json/setActive`, null, { params: { connectionId: c.connectionId, active } }).subscribe({
+      next: r => {
+        this.switching.set(null);
+        if (r.status === API_SUCCESS) { this.toast.success(r.message); this.load(); this.loadHistory(c.connectionId); }
+        else this.toast.error(r.message);
+      },
+      error: err => { this.switching.set(null); this.toast.error(err?.error?.message || 'The connection could not be changed.'); },
+    });
+  }
+
   setDefault(c: ModelConnection): void {
     this.http.put<ApiResponse>(`${API_BASE}/aiConnection.json/setDefault`, null, { params: { connectionId: c.connectionId } }).subscribe({
       next: r => { if (r.status === API_SUCCESS) { this.toast.success(r.message); this.load(); } else this.toast.error(r.message); },
@@ -253,4 +298,15 @@ export interface ConnectionActivity {
     status: string; latencyMs?: number | null; tokensIn?: number | null; tokensOut?: number | null; error?: string | null; jobQueueId?: number | null;
   }[];
   prompts: { promptId: number; name: string; status: string }[];
+}
+
+/** aiConnection.json/history: a connection's status changes, newest first. */
+export interface StatusChange {
+  action: string;
+  from: string | null;
+  to: string | null;
+  by: number | null;
+  byName: string | null;
+  byRole: string | null;
+  at: string | null;
 }

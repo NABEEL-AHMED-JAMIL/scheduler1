@@ -209,6 +209,31 @@ export interface ToolDef {
   /** MIG-317: the part of the platform the call reaches, and what it hands back, as ai-service says. */
   service?: string | null;
   output?: string | null;
+  /** Owner item #15: the tool's state here -- unavailable, blocked (by the platform), off or on -- and who set it. */
+  effectiveState?: 'unavailable' | 'blocked' | 'off' | 'on';
+  setBy?: 'platform' | 'workspace' | 'default';
+  blocked?: boolean;
+  blockedBy?: number | null;
+  blockedByName?: string | null;
+  blockedAt?: string | null;
+  blockReason?: string | null;
+  switchedBy?: number | null;
+  switchedByName?: string | null;
+  switchedByRole?: string | null;
+  switchedAt?: string | null;
+}
+
+/** tools/history: one change to a tool's switch or block, newest first. */
+export interface ToolChange {
+  toolName: string;
+  action: 'enable' | 'disable' | 'block' | 'default' | string;
+  from: string | null;
+  to: string | null;
+  reason: string | null;
+  by: number | null;
+  byName: string | null;
+  byRole: string | null;
+  at: string | null;
 }
 
 // ------------------------------------------------------------------------------------------ content
@@ -347,9 +372,23 @@ export function outcomeLook(outcome: string | null | undefined): { label: string
  * the workspace's switch, then the person (role or access profile). Blocked is what the assistant
  * would be refused with; Off is an administrator's choice.
  */
+/** "by Dana (platform administrator)": who set a switch or a block, as the list says. */
+export function setByWords(name: string | null | undefined, id: number | null | undefined, role: string | null | undefined): string {
+  const who = name || (id ? `user ${id}` : 'someone');
+  return role === 'PLATFORM_ADMIN' ? `${who} (platform administrator)` : role === 'TENANT_ADMIN' ? `${who} (workspace administrator)` : who;
+}
+
 export function toolState(t: ToolDef): { label: string; tone: Tone; reason: string } {
   if (!t.available) return { label: 'Blocked', tone: 'crit', reason: t.unavailableReason || 'Not available on this platform yet.' };
-  if (!t.enabledInWorkspace) return { label: 'Off', tone: 'neutral', reason: 'Switched off in this workspace.' };
+  // Owner item #15: blocked for this workspace by a platform administrator -- the workspace cannot switch it on.
+  if (t.blocked) {
+    return { label: 'Blocked', tone: 'crit', reason: `Blocked for this workspace by ${setByWords(t.blockedByName, t.blockedBy, 'PLATFORM_ADMIN')}`
+      + `${t.blockReason ? ': ' + t.blockReason : ''}. Only a platform administrator can unblock it.` };
+  }
+  if (!t.enabledInWorkspace) {
+    return { label: 'Off', tone: 'neutral', reason: t.switchedBy ? `Switched off by ${setByWords(t.switchedByName, t.switchedBy, t.switchedByRole)}.`
+      : 'Switched off in this workspace.' };
+  }
   if (!t.youMayUse) {
     const role = t.requiredRole && t.requiredRole !== 'TENANT_USER' ? `Needs the ${roleLabel(t.requiredRole)} role.` : 'Your access profile does not include its page.';
     return { label: 'Blocked', tone: 'crit', reason: role };

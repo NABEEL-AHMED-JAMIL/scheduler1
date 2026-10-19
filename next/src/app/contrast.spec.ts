@@ -165,7 +165,9 @@ function ratio(fg: Rgba, bg: Rgba): number {
 const SURFACES = ['--surface-page', '--surface-raised', '--surface-sunken', '--surface-inset'];
 const TEXT = ['--text-primary', '--text-secondary', '--text-muted', '--accent-text',
   '--ok-text', '--warn-text', '--crit-text', '--info-text'];
-const PILLS = ['neutral', 'brand', 'ok', 'warn', 'crit', 'info'];
+/** Owner item #12: a model connection's provider chips are pills too, one categorical slot each. */
+const PROVIDER_PILLS = ['prov-openai', 'prov-anthropic', 'prov-ollama', 'prov-azure', 'prov-compat'];
+const PILLS = ['neutral', 'brand', 'ok', 'warn', 'crit', 'info', ...PROVIDER_PILLS];
 const SOLID_PILLS = ['brand', 'ok', 'warn', 'crit', 'neutral'];
 
 function measure(tokens: Tokens, fg: string, bg: string, ground = '--surface-raised'): number {
@@ -217,6 +219,21 @@ describe('WCAG AA contrast, from the tokens in styles.css', () => {
           }
         }
         expect(off).toEqual([]);
+      });
+
+      /** Owner item #12: two providers never share a chip -- each one's text colour stands apart from every other's. */
+      it('gives every provider chip its own colour', () => {
+        const close: string[] = [];
+        for (let i = 0; i < PROVIDER_PILLS.length; i++) {
+          for (let j = i + 1; j < PROVIDER_PILLS.length; j++) {
+            const a = toOklab(resolve(`var(--pill-${PROVIDER_PILLS[i]}-fg)`, tokens));
+            const b = toOklab(resolve(`var(--pill-${PROVIDER_PILLS[j]}-fg)`, tokens));
+            // Euclidean distance in OKLab: about 0.02 is barely visible; 0.08 is two clearly different colours.
+            const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+            if (d < 0.08) close.push(`${PROVIDER_PILLS[i]} ~ ${PROVIDER_PILLS[j]}: ${d.toFixed(3)}`);
+          }
+        }
+        expect(close).toEqual([]);
       });
 
       /** A solid pill must stand apart from its soft partner, or two statuses read as one. */

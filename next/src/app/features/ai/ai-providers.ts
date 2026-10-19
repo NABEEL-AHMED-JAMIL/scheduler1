@@ -18,6 +18,30 @@ export const AI_PROVIDERS: AiProvider[] = [
   { key: 'OpenAI-compatible', label: 'OpenAI-compatible (Groq, vLLM, LM Studio…)', needsKey: true, builtInEndpoint: false, endpointHint: 'https://…/v1/chat/completions', modelHint: 'as the server names it' },
 ];
 
+/**
+ * Owner item #12: each provider's chip has its own colour -- a categorical chart slot (styles.css --pill-prov-*), never a
+ * status colour, so a provider never reads as "ok" or "failing". contrast.spec.ts measures every one in every theme.
+ */
+export const PROVIDER_TONES: Record<string, string> = {
+  OpenAI: 'openai',
+  Anthropic: 'anthropic',
+  Ollama: 'ollama',
+  AzureOpenAI: 'azure',
+  'OpenAI-compatible': 'compat',
+};
+
+/** The pill class for a provider's chip; an unknown provider is the OpenAI-compatible one's. */
+export function providerPill(key: string | null | undefined): string {
+  return `pill pill-prov-${PROVIDER_TONES[key ?? ''] ?? 'compat'}`;
+}
+
+/** Owner item #13: a connection's status chip -- Active (ok) or Inactive (warn: nothing runs on it). */
+export function statusPill(status: string | null | undefined): { cls: string; label: string; icon: string } {
+  return status === 'Inactive'
+    ? { cls: 'pill pill-warn', label: 'Inactive', icon: 'pause' }
+    : { cls: 'pill pill-ok', label: 'Active', icon: 'check' };
+}
+
 export function providerOf(key: string | null | undefined): AiProvider {
   return AI_PROVIDERS.find(p => p.key === key) ?? AI_PROVIDERS[AI_PROVIDERS.length - 1];
 }

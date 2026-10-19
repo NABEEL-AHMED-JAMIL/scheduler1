@@ -8,6 +8,7 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { AssistantApi } from '../assistant/assistant.api';
 import { ToolDef } from '../assistant/assistant.model';
 import { ToolRegistry } from './tool-registry';
+import { Dialog } from '@angular/cdk/dialog';
 
 const tool = (t: Partial<ToolDef>): ToolDef => ({ name: 'get_jobs', title: 'Pipeline jobs', description: 'List jobs.', kind: 'read',
   requiresConfirmation: false, requiredRole: 'TENANT_USER', page: 'jobs', coreTask: null, returnsDatasetReference: false,
@@ -41,6 +42,17 @@ function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => 
         ? `${name} is back to its default in this workspace: on.` : `${name} is ${enabled ? 'on' : 'off'} in this workspace.` });
     })),
     workspaces: vi.fn(() => of({ status: 'SUCCESS', data: [{ tenantId: 2924, tenantName: 'Claude Demo' }, { tenantId: 2900, tenantName: 'Default' }] })),
+    // Owner item #15: the platform's control, and the audit of the switches.
+    setPlatformState: vi.fn((name: string, state: string, _tenant: number, reason?: string | null) => {
+      const t = server.find(x => x.name === name)!;
+      if (state === 'blocked') Object.assign(t, { blocked: true, blockReason: reason ?? null, blockedBy: 4639, blockedByName: 'QA Platform', youMayUse: false,
+        enabledInWorkspace: false, effectiveState: 'blocked' });
+      else Object.assign(t, { blocked: false, enabledInWorkspace: state !== 'disabled', switchedInWorkspace: state !== 'default',
+        switchedByRole: state === 'default' ? null : 'PLATFORM_ADMIN', youMayUse: state !== 'disabled' });
+      return of({ status: 'SUCCESS', message: `${name} is ${state}.` });
+    }),
+    toolHistory: vi.fn(() => of({ status: 'SUCCESS', data: [{ toolName: 'get_reports', action: 'disable', from: 'default', to: 'off', reason: null,
+      by: 4640, byName: 'Riverside admin', byRole: 'TENANT_ADMIN', at: '2026-10-19T09:00:00-05:00' }] })),
   };
   const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() };
   const admin = opts.admin ?? true;
@@ -52,6 +64,8 @@ function render(opts: { admin?: boolean; platform?: boolean; setEnabled?: () => 
       provideRouter([]),
       { provide: AssistantApi, useValue: api },
       { provide: ToastService, useValue: toast },
+      // A platform administrator's block asks why: the dialog answers as a person typing a reason would.
+      { provide: Dialog, useValue: { open: () => ({ closed: of('Under review') }) } },
       { provide: AuthService, useValue: { canManageAgents: () => admin, builderLocked: () => false, isTenantAdmin: () => admin, isPlatformAdmin: () => !!opts.platform } },
     ],
   });
@@ -178,15 +192,31 @@ describe('Tool Registry', () => {
     expect(el.textContent).toContain('Choose a workspace to see its tools.');
   });
 
-  it('reads and switches the picked workspace\'s tools', () => {
-    const { screen, api, fixture, row } = render({ platform: true });
+  it('reads the picked workspace\'s tools and sets the platform\'s control over each (owner item #15)', async () => {
+    const { screen, api, fixture, row, cells } = render({ platform: true });
     screen.pickTenant('2924');
     fixture.detectChanges();
     expect(api.tools).toHaveBeenCalledWith(2924);
-    const box = row('get_jobs').querySelector<HTMLInputElement>('input[role="switch"]')!;
-    box.checked = false;
-    box.dispatchEvent(new Event('change'));
-    expect(api.setEnabled).toHaveBeenCalledWith('get_jobs', false, 2924);
+    expect(row('get_jobs').querySelector('input[role="switch"]')).toBeNull();
+    const control = row('get_jobs').querySelector<HTMLSelectElement>('select[data-test="platform-control"]')!;
+    expect(control.value).toBe('default');
+    control.value = 'disabled';
+    control.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    expect(api.setPlatformState).toHaveBeenCalledWith('get_jobs', 'disabled', 2924, null);
+
+    control.value = 'blocked';
+    control.dispatchEvent(new Event('change'));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.setPlatformState).toHaveBeenCalledWith('get_jobs', 'blocked', 2924, 'Under review');
+    expect(cells('get_jobs')[5]).toContain('Blocked');
+    expect(cells('get_jobs')[5]).toContain('Blocked for this workspace by QA Platform (platform administrator): Under review.');
+  });
+
+  it('a tool the platform blocked is locked for the workspace\'s administrator, with who blocked it and why', () => {
+    const { row, cells, el } = render();
+    TOOLS_BLOCKED(row, cells, el);
   });
 
   // UX final TL1: the name in words leads, the machine name under it; Reads and Writes are grouped; a blocked tool's
@@ -222,3 +252,28 @@ describe('Tool Registry', () => {
     expect(reason.querySelector('app-icon')).not.toBeNull();
   });
 });
+
+/** The workspace administrator's view of a tool the platform blocked (owner item #15). */
+function TOOLS_BLOCKED(row: (n: string) => HTMLElement, cells: (n: string) => string[], el: HTMLElement): void {
+  TestBed.resetTestingModule();
+  const blocked = tool({ name: 'delete_file', title: 'Delete a file', kind: 'write', requiresConfirmation: true, blocked: true, blockReason: 'Not for this customer',
+    blockedBy: 4639, blockedByName: 'QA Platform', blockedAt: '2026-10-19T09:00:00-05:00', enabledInWorkspace: false, youMayUse: false, effectiveState: 'blocked',
+    setBy: 'platform' });
+  const api = { tools: vi.fn(() => of({ status: 'SUCCESS', data: [blocked] })), runs: vi.fn(), trace: vi.fn(), setEnabled: vi.fn(), workspaces: vi.fn(),
+    setPlatformState: vi.fn(), toolHistory: vi.fn(() => of({ status: 'SUCCESS', data: [] })) };
+  TestBed.configureTestingModule({
+    imports: [ToolRegistry],
+    providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: AssistantApi, useValue: api },
+      { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+      { provide: AuthService, useValue: { canManageAgents: () => true, builderLocked: () => false, isTenantAdmin: () => true, isPlatformAdmin: () => false } }],
+  });
+  const fixture = TestBed.createComponent(ToolRegistry);
+  fixture.detectChanges();
+  const r = (fixture.nativeElement as HTMLElement).querySelector('tr[data-row="delete_file"]') as HTMLElement;
+  const box = r.querySelector<HTMLInputElement>('input[role="switch"]')!;
+  expect(box.disabled).toBe(true);
+  expect(r.textContent).toContain('Blocked for this workspace by QA Platform (platform administrator): Not for this customer.');
+  expect(r.querySelector('[data-test="tool-set-by"]')!.textContent).toContain('QA Platform (platform administrator)');
+  expect(r.querySelector('button[aria-label^="Put"]')).toBeNull();
+  void row; void cells; void el;
+}

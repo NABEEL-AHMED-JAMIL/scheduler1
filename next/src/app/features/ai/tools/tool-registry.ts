@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -11,7 +12,8 @@ import { ToastService } from '../../../shared/ui/toast.service';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { capTitle } from '../../../shared/ui/long-text';
 import { AssistantApi } from '../assistant/assistant.api';
-import { ToolDef, allowedTools, ioOf, serviceOf, toolState } from '../assistant/assistant.model';
+import { ToolChange, ToolDef, allowedTools, ioOf, serviceOf, setByWords, toolState } from '../assistant/assistant.model';
+import { askReason } from '../../../shared/ui/reason';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
@@ -26,6 +28,11 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  *
  * Tools are switched per workspace, and a platform administrator has none of its own: it picks the workspace first
  * (as on Access profiles), and every call names it. Without that, tools/list refused it and the page looked empty.
+ *
+ * Owner item #15: a platform administrator controls each tool for the chosen workspace -- Default, Enabled, Disabled or
+ * Blocked (tools/platformState). Enabled and disabled are the workspace's switch, set by the platform; Blocked is the
+ * platform's alone: the workspace's administrator sees it locked with who blocked it and why, and cannot switch it on.
+ * Every row says its effective state and who set it; Recent changes lists the audit (tools/history).
  */
 @Component({
   selector: 'app-tool-registry',
@@ -44,6 +51,10 @@ export class ToolRegistry implements OnInit {
   private readonly api = inject(AssistantApi);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
+  private readonly dialog = inject(Dialog);
+
+  /** Owner item #15: the switches' and blocks' audit, newest first (administrators). */
+  readonly changes = signal<ToolChange[]>([]);
 
   readonly tools = signal<ToolDef[]>([]);
   readonly loading = signal(true);
@@ -85,6 +96,7 @@ export class ToolRegistry implements OnInit {
       allowed: allowedTools(list).length,
       askFirst: list.filter(t => t.requiresConfirmation).length,
       blocked: list.filter(t => toolState(t).label === 'Blocked').length,
+      platformBlocked: list.filter(t => t.blocked).length,
     };
   });
 
@@ -116,10 +128,69 @@ export class ToolRegistry implements OnInit {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
         this.tools.set(r.data ?? []);
+        this.loadChanges();
       },
       error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not load the tools.'); },
     });
   }
+
+  /** The audit of the workspace's switches and blocks: administrators only (tools/history answers 403 to anyone else). */
+  loadChanges(): void {
+    if (!this.canSwitch()) return;
+    this.api.toolHistory(null, this.tenantId() ?? undefined).subscribe({
+      next: r => this.changes.set(r.status === API_SUCCESS ? (r.data ?? []).slice(0, 12) : []),
+      error: () => this.changes.set([]),
+    });
+  }
+
+  /** Owner item #15: the platform's control over the tool in the chosen workspace, as the select shows it. */
+  platformValue(t: ToolDef): string {
+    if (t.blocked) return 'blocked';
+    if (t.switchedInWorkspace && t.switchedByRole === 'PLATFORM_ADMIN') return t.enabledInWorkspace ? 'enabled' : 'disabled';
+    return 'default';
+  }
+
+  /** A platform administrator sets Default, Enabled, Disabled or Blocked; a block asks why (optional, shown to the workspace). */
+  async setPlatform(t: ToolDef, select: HTMLSelectElement): Promise<void> {
+    const state = select.value as 'enabled' | 'disabled' | 'blocked' | 'default';
+    const tenant = this.tenantId();
+    if (!tenant) return;
+    let reason: string | null = null;
+    if (state === 'blocked') {
+      reason = await askReason(this.dialog, {
+        title: `Block ${t.title} for this workspace?`,
+        subtitle: 'The workspace cannot use it, and its administrator cannot switch it on, until a platform administrator unblocks it.',
+        label: 'Why (shown to the workspace)', placeholder: 'e.g. Under review for this customer', confirmLabel: 'Block tool', danger: true,
+      });
+      if (reason === null) { select.value = this.platformValue(t); return; }
+    }
+    this.busy.set(t.name);
+    this.api.setPlatformState(t.name, state, tenant, reason).subscribe({
+      next: r => {
+        this.busy.set(null);
+        if (r.status !== API_SUCCESS) { select.value = this.platformValue(t); this.toast.error(r.message); return; }
+        this.toast.success(r.message);
+        this.refresh();
+        this.loadChanges();
+      },
+      error: err => { this.busy.set(null); select.value = this.platformValue(t); this.toast.error(err?.error?.message || 'The tool could not be changed.'); },
+    });
+  }
+
+  /** Who set the tool's state here, and when -- the block's, else the switch's; '' for the default. */
+  setBy(t: ToolDef): { who: string; at: string | null } | null {
+    if (t.blocked) return { who: setByWords(t.blockedByName, t.blockedBy, 'PLATFORM_ADMIN'), at: t.blockedAt ?? null };
+    if (t.switchedInWorkspace) return { who: setByWords(t.switchedByName, t.switchedBy, t.switchedByRole), at: t.switchedAt ?? null };
+    return null;
+  }
+
+  changeWords(c: ToolChange): string {
+    const what = c.action === 'block' ? 'blocked' : c.action === 'enable' ? 'switched on' : c.action === 'disable' ? 'switched off'
+      : c.action === 'default' ? 'put back to its default' : c.action;
+    return `${c.toolName} ${what}`;
+  }
+
+  changeBy(c: ToolChange): string { return setByWords(c.byName, c.by, c.byRole); }
 
   /**
    * The list again, quietly, after a switch moved: whether the person may use a tool (youMayUse) is the server's to say,
@@ -127,7 +198,7 @@ export class ToolRegistry implements OnInit {
    */
   private refresh(): void {
     this.api.tools(this.tenantId() ?? undefined).subscribe({
-      next: r => { if (r.status === API_SUCCESS) this.tools.set(r.data ?? []); },
+      next: r => { if (r.status === API_SUCCESS) this.tools.set(r.data ?? []); this.loadChanges(); },
       error: () => undefined,
     });
   }

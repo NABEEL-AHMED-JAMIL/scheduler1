@@ -79,7 +79,8 @@
                 <span class="min-w-0 flex-1">
                   <span class="lookup-rail-key">{{ c.name }}</span>
                   <span class="lookup-rail-sub">
-                    {{ providerLabel(c) }} · <span class="mono">{{ c.defaultModel }}</span>@if (c.isDefault) { · default }
+                    <span [class]="providerChip(c)" data-test="provider-chip">{{ providerLabel(c) }}</span> · <span class="mono">{{ c.defaultModel }}</span>@if (c.isDefault) { · default }
+                    @if (c.status === 'Inactive') { · <span [class]="statusChip(c).cls" data-test="rail-status">Inactive</span> }
                     @if (canSeeWorkspace() && c.tenantName) { · {{ c.tenantName }} }
                   </span>
                 </span>
@@ -100,11 +101,12 @@
         <header class="lookup-detail-head">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="pill pill-neutral">{{ providerLabel(c) }}</span>
+              <span [class]="providerChip(c)" data-test="provider-chip">{{ providerLabel(c) }}</span>
               @if (c.isDefault) { <span class="pill pill-brand" title="Prompts that name no connection run on this one"><app-icon name="check" size="0.85em" />Default</span> }
               @if (c.baaSigned) { <span class="pill pill-ok" title="Covered by a signed Business Associate Agreement: a data policy level set to BAA-signed hosted, or local, may use it"><app-icon name="shield" size="0.85em" />BAA signed</span> }
               @if (canSeeWorkspace() && c.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ c.tenantName }}</span> }
-              <app-status [label]="c.status || 'Active'" [quiet]="true" />
+              @let st = statusChip(c);
+              <span [class]="st.cls" data-test="status-chip"><app-icon [name]="st.icon" size="0.85em" />{{ st.label }}</span>
             </div>
             <div class="flex items-baseline gap-3 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [title]="c.name">{{ c.name }}</h2>
@@ -114,6 +116,16 @@
             </div>
           </div>
           <div class="flex items-center gap-2 shrink-0">
+            @if (!locked()) {
+              <!-- Owner item #13: Active / Inactive, said on the button itself. -->
+              @if (c.status === 'Inactive') {
+                <button type="button" class="btn btn-default btn-sm btn-intent-ok" data-test="activate" [disabled]="switching() === c.connectionId"
+                        (click)="setActive(c, true)"><app-icon name="play" [busy]="switching() === c.connectionId" />Make active</button>
+              } @else {
+                <button type="button" class="btn btn-default btn-sm btn-intent-warn" data-test="deactivate" [disabled]="switching() === c.connectionId"
+                        (click)="setActive(c, false)"><app-icon name="pause" [busy]="switching() === c.connectionId" />Make inactive</button>
+              }
+            }
             <button type="button" class="btn btn-primary btn-sm" (click)="test(c)" [disabled]="testing() === c.connectionId">
               <app-icon name="plug" [busy]="testing() === c.connectionId" />{{ testing() === c.connectionId ? 'Testing…' : 'Test connection' }}
             </button>
@@ -132,6 +144,20 @@
           </div>
         </header>
 
+        @if (c.status === 'Inactive') {
+          <div class="mx-5 mt-3 step-notice step-notice-warn text-sm flex items-start gap-2" role="status" data-test="inactive-banner">
+            <app-icon name="pause" size="1em" class="shrink-0 mt-0.5" />
+            <span>Inactive: nothing runs on this connection. The AI Assistant, Ask your data, Document Intelligence, pipeline AI steps,
+              image description and prompts are refused until it is made active again.@if (c.isDefault) { It is the workspace default, so
+              everything that runs on the default is refused too. }</span>
+          </div>
+        }
+        @if (history()[0]; as h) {
+          <p class="px-5 mt-2 text-xs text-[color:var(--text-muted)]" data-test="status-history">
+            Made {{ h.to === 'Inactive' ? 'inactive' : 'active' }} by {{ h.byName || ('user ' + h.by) }}@if (h.byRole === 'PLATFORM_ADMIN') { (platform administrator) }
+            @if (h.at) { · {{ h.at | serverTime: 'recent' }} }
+          </p>
+        }
         <div class="kafka-strip">
           <div class="kafka-strip-row">
             <span class="kafka-strip-k">Last test</span>

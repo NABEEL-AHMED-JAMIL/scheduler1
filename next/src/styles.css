@@ -259,7 +259,7 @@
     --info-text:        var(--color-info-600);
     --info-text-strong: var(--color-info-700);
     --info-mark:        var(--color-info-600);
-    --info-soft:        color-mix(in oklab, var(--color-info-500) 12%, var(--surface-raised));
+    --info-soft:        color-mix(in oklab, var(--color-info-500) 8%, var(--surface-raised));
 
     /* Text on a filled semantic colour -- a solid pill, the danger button, the bell's count. */
     --on-solid: #ffffff;
@@ -302,6 +302,19 @@
     --pill-crit-fg:        var(--color-crit-500);
     --pill-info-bg:        var(--color-info-100);
     --pill-info-fg:        var(--color-info-700);
+    /* Owner item #12: a model connection's provider chip, one categorical chart slot each -- never a status colour, so a
+       provider never reads as ok or failing. The text is the slot drawn 12% toward the body text (darker on light, lighter on dark), the ground an 8% tint of the slot on the raised surface;
+       both follow --chart-* and --surface-raised into every theme, and contrast.spec.ts measures each pair there. */
+    --pill-prov-openai-fg:    color-mix(in oklab, var(--chart-6) 88%, var(--text-primary));
+    --pill-prov-openai-bg:    color-mix(in oklab, var(--chart-6) 8%, var(--surface-raised));
+    --pill-prov-anthropic-fg: color-mix(in oklab, var(--chart-4) 88%, var(--text-primary));
+    --pill-prov-anthropic-bg: color-mix(in oklab, var(--chart-4) 8%, var(--surface-raised));
+    --pill-prov-ollama-fg:    color-mix(in oklab, var(--chart-1) 88%, var(--text-primary));
+    --pill-prov-ollama-bg:    color-mix(in oklab, var(--chart-1) 8%, var(--surface-raised));
+    --pill-prov-azure-fg:     color-mix(in oklab, var(--chart-7) 88%, var(--text-primary));
+    --pill-prov-azure-bg:     color-mix(in oklab, var(--chart-7) 8%, var(--surface-raised));
+    --pill-prov-compat-fg:    color-mix(in oklab, var(--chart-3) 88%, var(--text-primary));
+    --pill-prov-compat-bg:    color-mix(in oklab, var(--chart-3) 8%, var(--surface-raised));
     /* Filled chips separate the second status in a family from the first: Running from Start,
        Failed from Interrupt, Missed from Skip. White on each clears 4.5:1. */
     --pill-solid-brand-bg:   var(--btn-primary-bg);
@@ -363,7 +376,7 @@
        into a near-black surface computes to #141c2c, which is 1.04:1 against the header and so
        is not a chip at all, just a slightly different black. A monochrome system marks a
        selected row on a dark ground by lifting it toward the light, not by darkening it. */
-    --accent-soft:     color-mix(in oklab, var(--color-ink-50) 12%, var(--surface-raised));
+    --accent-soft:     color-mix(in oklab, var(--color-ink-50) 8%, var(--surface-raised));
     --row-selected-bg: color-mix(in oklab, var(--accent-soft) 70%, var(--surface-raised));
     /*
      * Inverted, and it has to be. The accent is monochrome now, so a primary button in light is
@@ -1097,6 +1110,11 @@
   .pill-warn    { background: var(--pill-warn-bg); color: var(--pill-warn-fg); }
   .pill-crit    { background: var(--pill-crit-bg); color: var(--pill-crit-fg); }
   .pill-info    { background: var(--pill-info-bg); color: var(--pill-info-fg); }
+  .pill-prov-openai    { background: var(--pill-prov-openai-bg);    color: var(--pill-prov-openai-fg); }
+  .pill-prov-anthropic { background: var(--pill-prov-anthropic-bg); color: var(--pill-prov-anthropic-fg); }
+  .pill-prov-ollama    { background: var(--pill-prov-ollama-bg);    color: var(--pill-prov-ollama-fg); }
+  .pill-prov-azure     { background: var(--pill-prov-azure-bg);     color: var(--pill-prov-azure-fg); }
+  .pill-prov-compat    { background: var(--pill-prov-compat-bg);    color: var(--pill-prov-compat-fg); }
   .pill-solid-brand   { background: var(--pill-solid-brand-bg);   color: var(--pill-solid-brand-fg); }
   .pill-solid-crit    { background: var(--pill-solid-crit-bg);    color: var(--pill-solid-crit-fg); }
   .pill-solid-warn    { background: var(--pill-solid-warn-bg);    color: var(--pill-solid-warn-fg); }

@@ -156,7 +156,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
       "GET /tenant.json/listTenants",
-      "GET /aiConnection.json/activity?connectionId=1047"
+      "GET /aiConnection.json/activity?connectionId=1047",
+      "GET /aiConnection.json/history?connectionId=1047"
     ],
     "headings": [
       "Model connections",
@@ -170,8 +171,9 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Local Ollama",
       "Back to list",
-      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
-      "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
+      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncationOllama (local) · gemma3:1b",
+      "Last test passedLocal OllamaOllama (local) · gemma3:1b · default",
+      "Make inactive",
       "New connection",
       "Only mine",
       "Refresh",
@@ -222,7 +224,8 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
       "GET /aiConnection.json/list",
-      "GET /aiConnection.json/activity?connectionId=1047"
+      "GET /aiConnection.json/activity?connectionId=1047",
+      "GET /aiConnection.json/history?connectionId=1047"
     ],
     "headings": [
       "Model connections",
@@ -236,8 +239,9 @@ export const PINNED: Record<string, unknown> = {
     "buttons": [
       "Actions for Local Ollama",
       "Back to list",
-      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncation Ollama (local) · gemma3:1b",
-      "Last test passedLocal Ollama Ollama (local) · gemma3:1b · default",
+      "Last test failedUI-REVIEW Zürich – 東京 ✓ unreachable Ollama with a deliberately long connection name for truncationOllama (local) · gemma3:1b",
+      "Last test passedLocal OllamaOllama (local) · gemma3:1b · default",
+      "Make inactive",
       "New connection",
       "Only mine",
       "Refresh",
