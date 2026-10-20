@@ -225,15 +225,15 @@
           <span class="pill pill-neutral">{{ r.versions.length }} version{{ r.versions.length === 1 ? '' : 's' }}</span>
         </div>
         <div class="overflow-x-auto"><table class="table-modern">
-          <thead><tr><th>Version</th><th>Generated · by</th><th>Template</th><th>Data</th><th>Signed</th><th class="text-right">Files</th></tr></thead>
+          <thead><tr><th>Version</th><th>Generated · by</th><th>Template · data</th><th>Signed</th><th class="text-right">Files</th></tr></thead>
           <tbody>
             @for (v of r.versions; track v.versionId) {
               <tr>
                 <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }</td>
-                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | serverTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-48 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
-                <td class="text-sm">v{{ v.templateVersion }}</td>
-                <td class="text-xs mono max-w-36 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</td>
-                <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verify(v)" [title]="'Signed ' + (v.approval!.approvedAt | serverTime: 'dateTime')">{{ v.approval!.approverName }}</button> }
+                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | serverTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-40 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
+                <td class="text-xs"><span class="whitespace-nowrap">Template v{{ v.templateVersion }}</span>
+                  <div class="mono text-[color:var(--text-muted)] max-w-36 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</div></td>
+                <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verify(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | serverTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }
                   @else if (v.approval) { <span class="pill pill-neutral" [title]="v.approval.notSignedReason || ''">Approved</span> }
                   @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-ghost btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
                   @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>
@@ -248,7 +248,7 @@
                   }
                 </td>
               </tr>
-            } @empty { <tr><td colspan="6" class="text-sm text-[color:var(--text-muted)]">No version yet.</td></tr> }
+            } @empty { <tr><td colspan="5" class="text-sm text-[color:var(--text-muted)]">No version yet.</td></tr> }
           </tbody>
         </table></div>
         @for (j of failedJobs(); track j.jobId) {
