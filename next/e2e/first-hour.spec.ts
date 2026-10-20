@@ -58,9 +58,15 @@ async function getJson(request: APIRequestContext, s: Session, path: string): Pr
   return (await request.get(`${api}${path}`, { headers: authOf(s) })).json().catch(() => ({}));
 }
 
-/** Opens a row's actions menu on a list screen and picks an item. */
+/**
+ * Opens a row's actions menu on a list screen and picks an item. The row is looked up as a person would in a full
+ * workspace, with the list's own search when it has one: a list pages its rows (50 a page), and the rebuilt workspace's
+ * schedules ran past one page (final-regression 10-20: the new schedule was on page 2 and the walk waited for ever).
+ */
 async function rowAction(page: Page, rowText: string, item: string): Promise<void> {
-  await page.locator('tbody tr', { hasText: rowText }).first().getByRole('button', { name: /^Actions for/ }).click();
+  const search = page.locator('main input[placeholder^="Search"]').first();
+  if (await search.count()) await search.fill(rowText);
+  await page.locator('tbody tr', { hasText: rowText }).first().getByRole('button', { name: /^Actions for/ }).click({ timeout: 30_000 });
   await page.getByRole('menuitem', { name: item }).click();
 }
 

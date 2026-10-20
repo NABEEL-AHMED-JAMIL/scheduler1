@@ -139,6 +139,26 @@ async function expectLastUsed(page: Page, request: APIRequestContext, s: Session
   else await expect(cell).toHaveText('Never');
 }
 
+/** A tool as tools/list answers it: just what the page decides its state from. */
+type ListedTool = { name: string; available: boolean; blocked?: boolean; enabledInWorkspace: boolean; youMayUse: boolean };
+
+/** Every tool tools/list answers for this person, here (the registry's and the Context tab's one source). */
+async function listedTools(request: APIRequestContext, s: Session): Promise<ListedTool[]> {
+  const data = (await getJson(request, s, '/aiPrompt.json/tools/list')).data;
+  return Array.isArray(data) ? data : data?.tools ?? [];
+}
+
+/**
+ * The state the page must print for a tool, from tools/list's own fields: Blocked when it is not available, blocked for
+ * the workspace by a platform administrator (10-19, owner item #15) or out of this person's reach; Off when the
+ * workspace switched it off; else Enabled. Which tools are blocked is the platform's data, not this spec's: every tool
+ * is available since transform_data, enrich_data and join_data shipped.
+ */
+function expectedState(t: ListedTool): 'Blocked' | 'Off' | 'Enabled' {
+  if (!t.available || t.blocked || !t.youMayUse) return 'Blocked';
+  return t.enabledInWorkspace ? 'Enabled' : 'Off';
+}
+
 const composer = (page: Page) => page.getByRole('textbox', { name: 'Message the assistant' });
 
 async function ask(page: Page, text: string): Promise<void> {
@@ -279,7 +299,17 @@ test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
     await expect(page.locator('[data-call="run_pipeline"]')).toHaveAttribute('data-outcome', 'confirmed');
     await page.getByRole('tab', { name: 'Context' }).click();
     await expect(page.locator('[data-context]')).toContainText('Tools allowed');
-    await expect(page.locator('[data-blocked]')).toContainText('transform_data');
+    // Allowed and Blocked are tools/list's answer for this person now, whatever it is.
+    const tools = await listedTools(request, s);
+    const blocked = tools.filter(t => expectedState(t) !== 'Enabled').map(t => t.name);
+    for (const t of tools.filter(t => expectedState(t) === 'Enabled')) {
+      await expect(page.locator('[data-allowed]').getByText(t.name, { exact: true })).toBeVisible();
+    }
+    if (blocked.length) {
+      for (const name of blocked) await expect(page.locator('[data-blocked]')).toContainText(name);
+    } else {
+      await expect(page.locator('[data-blocked]')).toHaveCount(0);
+    }
     await shot(page, info, 'assistant-live-1440');
     expect(writes).toEqual([]);
     await page.context().close();
@@ -291,9 +321,16 @@ test.describe('AI Assistant and Tool Registry: live smoke (read only)', () => {
     await page.goto('/settings/tools');
     await expect(page.getByRole('heading', { name: 'Tool Registry', exact: true })).toBeVisible();
     await expect(page.locator('tr[data-row="run_pipeline"]')).toContainText('Asks first');
-    for (const name of ['transform_data', 'enrich_data', 'join_data']) {
-      await expect(page.locator(`tr[data-row="${name}"]`)).toHaveAttribute('data-state', 'Blocked');
-      await expect(page.locator(`tr[data-row="${name}"] input[role="switch"]`)).toBeDisabled();
+    // Every tool has its row, in the state tools/list gives it; a blocked one's switch cannot move.
+    const tools = await listedTools(request, s);
+    expect(tools.length).toBeGreaterThan(0);
+    await expect(page.locator('tr[data-row]')).toHaveCount(tools.length);
+    for (const t of tools) {
+      const row = page.locator(`tr[data-row="${t.name}"]`);
+      await expect(row).toHaveAttribute('data-state', expectedState(t));
+      // The switch is locked exactly when the tool cannot be switched here: not available, or blocked by the platform.
+      if (!t.available || t.blocked) await expect(row.locator('input[role="switch"]')).toBeDisabled();
+      else await expect(row.locator('input[role="switch"]')).toBeEnabled();
     }
     // "Last used" is tools/list's own lastUsedAt: Never until the assistant has called get_jobs in this workspace.
     await expectLastUsed(page, request, s, 'get_jobs');
@@ -319,6 +356,36 @@ test.describe('Tool Registry: last used and Reset (live, restores what it change
       data: { toolName: 'validate_data', enabled: null } }).catch(() => undefined);
   });
 
+  test('a tool a platform administrator blocks here is locked, with who and why; Default unblocks it', async ({ browser, request }, info) => {
+    test.skip(!canSignIn('platform'), NEEDS.platform);
+    const platform = await sessionFor(request, 'platform');
+    const control = (state: string, reason: string | null) => request.post(`${api}/aiPrompt.json/tools/platformState`, {
+      headers: { Authorization: `Bearer ${platform.token}` }, params: { tenantId: String(s.tenantId) }, data: { toolName: 'join_data', state, reason } });
+    const reason = 'E2E: blocked for a minute by the Tool Registry spec';
+    try {
+      const blocked = await control('blocked', reason);
+      expect((await blocked.json()).status, 'the platform administrator blocks join_data here').toBe('SUCCESS');
+      const page = await pageAs(browser, s);
+      await page.goto('/settings/tools');
+      const row = page.locator('tr[data-row="join_data"]');
+      await expect(row).toHaveAttribute('data-state', 'Blocked');
+      await expect(row.locator('input[role="switch"]')).toBeDisabled();
+      await expect(row.locator('[data-test="tool-reason"]')).toContainText(reason);
+      await expect(row.locator('[data-test="tool-reason"]')).toContainText('Only a platform administrator can unblock it.');
+      await expect(row.locator('[data-test="tool-set-by"]')).toContainText(/^\s*Set by .+/);
+      await expect(row.getByRole('button', { name: 'Put join_data back to its default' })).toHaveCount(0);
+      await shot(page, info, 'tools-platform-blocked-1440');
+      const back = await control('default', null);
+      expect((await back.json()).status).toBe('SUCCESS');
+      await page.reload();
+      await expect(row).toHaveAttribute('data-state', 'Enabled');
+      await expect(row.locator('input[role="switch"]')).toBeEnabled();
+      await page.context().close();
+    } finally {
+      await control('default', null).catch(() => undefined);
+    }
+  });
+
   test('no run or trace is read, and Reset puts a switch back to its default', async ({ browser, request }, info) => {
     const off = await request.post(`${api}/aiPrompt.json/tools/setEnabled`, { headers: { Authorization: `Bearer ${s.token}` },
       data: { toolName: 'validate_data', enabled: false } });
@@ -329,12 +396,15 @@ test.describe('Tool Registry: last used and Reset (live, restores what it change
     await page.goto('/settings/tools');
     const row = page.locator('tr[data-row="validate_data"]');
     await expect(row).toHaveAttribute('data-state', 'Off');
-    await expect(row).toContainText('switched here');
+    // Owner item #15: who switched it and when, and why it is off, in words.
+    await expect(row.locator('[data-test="tool-set-by"]')).toContainText(/^\s*Set by .+/);
+    await expect(row.locator('[data-test="tool-reason"]')).toContainText('Switched off by');
     await expectLastUsed(page, request, s, 'get_jobs');
     await expect(page.locator('tr[data-row="get_sources"] td').nth(1)).toHaveText('Sources');
     await row.getByRole('button', { name: 'Put validate_data back to its default' }).click();
     await expect(row).toHaveAttribute('data-state', 'Enabled');
-    await expect(row).not.toContainText('switched here');
+    await expect(row.locator('[data-test="tool-set-by"]')).toHaveCount(0);
+    await expect(row.locator('[data-test="tool-reason"]')).toHaveCount(0);
     await shot(page, info, 'tools-reset-1440');
     expect(read).toEqual([]);
     await page.context().close();

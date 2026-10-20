@@ -39,7 +39,7 @@ async function keptRun(request: APIRequestContext): Promise<{ run: number; datas
     const outputs = await outputsOf(request, s, pinned);
     return { run: pinned, dataset: outputs.find(o => o.name === KEPT)?.runDatasetId ?? 0 };
   }
-  return keptRunOf(request, s, pipeline('readmission').jobId, KEPT);
+  return keptRunOf(request, s, pipeline('readmission').jobId, KEPT, ['readmission']);
 }
 
 async function pageAs(browser: Browser, s: Session, width = 1440): Promise<Page> {
@@ -202,15 +202,18 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     const bucket = await bucketReadable(page.request);
     await page.goto('/data/reports');
     const rows = page.locator('table tbody tr');
+    if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
+    else await expect(page.getByRole('alert')).toContainText(`${BUCKET}/reports/ could not be read`);
+    await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
+    // The kept run's schedule need not be among the ten most recently run (final-regression 10-20: it was the eleventh):
+    // found by its name, as a person looks for it -- Find reads the schedules it names beyond the recent ones.
+    await page.getByRole('textbox', { name: 'Find a report' }).fill(SCHEDULE);
     const run = rows.filter({ has: page.getByRole('link', { name: `Run #${RUN}` }) });
     await expect(run.first()).toBeVisible();
     expect(await run.count()).toBeGreaterThanOrEqual(2);
     await expect(run.filter({ hasText: `Kept by run #${RUN}` }).first()).toContainText('Ready');
     await expect(run.filter({ hasText: `Kept by run #${RUN}` }).first()).toContainText(TASK);
     await expect(run.filter({ hasText: `${UPLOAD.bucket}/${UPLOAD.key}` })).toContainText('In storage');
-    if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
-    else await expect(page.getByRole('alert')).toContainText(`${BUCKET}/reports/ could not be read`);
-    await expect(page.locator('[data-reports-reach]')).toContainText('recent runs');
     await shot(page, info, 'documents-reports');
 
     // A row's actions are in its ⋮ menu (UX final RP1).

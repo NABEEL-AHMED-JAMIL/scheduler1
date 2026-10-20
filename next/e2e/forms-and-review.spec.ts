@@ -83,11 +83,15 @@ test.describe('Forms (lite), the result review, and the Friday menu (live)', () 
     test.skip(!run, 'No rebuilt schedule has a completed run pending review (the rebuild left the partner-lab sign-off open).');
     const page = await pageAs(browser, s);
     await page.goto(`/pipelines/schedules/${REVIEW_JOB}/runs/${run}/logs`);
-    const review = page.locator('[data-review]');
+    // Since the run page's UX review (2026-10-12) the review is its Next steps card, beside the run's facts.
+    const review = page.locator('[data-test="next-steps"]');
     await expect(review).toBeVisible();
-    await expect(review.getByRole('heading', { name: 'Result review' })).toBeVisible();
-    await expect(review.getByText('Waiting for review')).toBeVisible();
-    await expect(review.getByText('Needs: Our team')).toBeVisible();
+    await expect(review.getByRole('heading', { name: 'Next steps' })).toBeVisible();
+    await expect(review.locator('[data-test="review-status"]')).toHaveText('Waiting for review');
+    // Who must review: our team (the internal review), as a group or the workspace's people, and the administrator
+    // reading it may decide here.
+    await expect(review.locator('[data-test="waiting-on"]')).toContainText(/Waiting on .*(group|administrators|users)/);
+    await expect(review.locator('[data-test="waiting-on"]')).toContainText('you can decide here');
     await expect(review.getByRole('button', { name: 'Approve' })).toBeEnabled();
     await expect(review.getByRole('button', { name: 'Reject' })).toBeEnabled();
   });

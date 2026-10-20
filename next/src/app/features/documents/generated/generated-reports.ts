@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { RouterLink } from '@angular/router';
 import { EMPTY, Observable, catchError, expand, forkJoin, map, of, reduce, switchMap } from 'rxjs';
@@ -26,6 +26,9 @@ export const SUBFOLDER_CAP = 10;
 /** Files read per folder, following the listing's pages of 100 (scale review P2 #33: it stopped at the first 100). */
 export const FOLDER_FILE_CAP = 1000;
 const DATASET_FORMATS = ['csv', 'json', 'jsonl'] as const;
+/** Find reads the schedules beyond the recent ones that it names after this pause, and from this many characters. */
+export const FIND_DELAY_MS = 400;
+export const FIND_MIN_CHARS = 3;
 /** A run's kept file that is a report (render_pdf, MIG-255), not rows. */
 const isPdf = (r: GeneratedReport) => r.type.toLowerCase() === 'pdf';
 
@@ -36,6 +39,8 @@ const isPdf = (r: GeneratedReport) => r.type.toLowerCase() === 'pdf';
  * built from what exists: the files in one bucket folder (renders are saved to `reports/` unless
  * named otherwise), one level of its subfolders, and the outputs of recent runs, read through a
  * capped fan-out. It says how far it looked, so a file it did not reach is not taken for missing.
+ * Find also reaches past that fan-out: a query reads the outputs of the other schedules whose name or
+ * pipeline it names (2026-10-20: the eleventh most recently run schedule's outputs could not be found).
  *
  * @author Nabeel Ahmed
  */
@@ -49,6 +54,7 @@ export class GeneratedReports implements OnInit {
   private readonly service = inject(GeneratedService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly destroyRef = inject(DestroyRef);
 
   readonly buckets = signal<BucketSummary[]>([]);
   readonly bucket = signal('');
@@ -64,8 +70,13 @@ export class GeneratedReports implements OnInit {
   /** A folder held more than FOLDER_FILE_CAP files, so the list stops short there. */
   readonly folderCut = signal(false);
   readonly query = signal('');
+  /** What Find reached beyond the recent runs: the outputs of the other schedules the query names, and the query. */
+  readonly found = signal<(RecentOutputs & { query: string }) | null>(null);
+  private findTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The newest Find asked; an older answer that comes back late is dropped. */
+  private findSeq = 0;
 
-  readonly reports = computed(() => mergeReports(this.objects(), this.runs()?.reports ?? []));
+  readonly reports = computed(() => mergeReports(this.objects(), [...this.runs()?.reports ?? [], ...this.found()?.reports ?? []]));
   readonly filtered = computed(() => {
     const q = this.query().trim().toLowerCase();
     if (!q) return this.reports();
@@ -91,10 +102,18 @@ export class GeneratedReports implements OnInit {
       parts.push(`the outputs of ${runs.runsRead} recent runs (the newest ${FAN_OUT.runsPerJob} of each of the ${runs.jobsRead} `
         + `most recently run schedules${runs.failed ? `; ${runs.failed} could not be read` : ''})`);
     }
+    const found = this.found();
+    if (found) {
+      parts.push(found.jobsRead
+        ? `the outputs of ${found.runsRead} runs of the ${found.jobsRead} other schedules whose name or pipeline has "${found.query}"`
+          + (found.failed ? ` (${found.failed} could not be read)` : '')
+        : `no other schedule whose name or pipeline has "${found.query}"`);
+    }
     return parts.length ? `Showing ${parts.join(', and ')}. Nothing lists every generated file yet.` : '';
   });
 
   ngOnInit(): void {
+    this.destroyRef.onDestroy(() => { if (this.findTimer) clearTimeout(this.findTimer); });
     this.storage.buckets().subscribe({
       next: r => {
         const list = r.status === API_SUCCESS ? (r.data ?? []) : [];
@@ -118,6 +137,33 @@ export class GeneratedReports implements OnInit {
       },
     });
     this.loadObjects();
+    if (this.found()) this.findBeyond(this.found()!.query);
+  }
+
+  /**
+   * Find: the list narrows at once to what is in hand; after a pause, the schedules beyond the recent ones whose name or
+   * pipeline has the query are read too, so a report of a schedule that has not run lately is found by its name.
+   */
+  search(value: string): void {
+    this.query.set(value);
+    this.pager.goTo(1, this.filtered().length);
+    if (this.findTimer) clearTimeout(this.findTimer);
+    this.findTimer = null;
+    const q = value.trim();
+    if (q.length < FIND_MIN_CHARS) {
+      this.findSeq++;
+      this.found.set(null);
+      return;
+    }
+    this.findTimer = setTimeout(() => { this.findTimer = null; this.findBeyond(q); }, FIND_DELAY_MS);
+  }
+
+  findBeyond(q: string): void {
+    const seq = ++this.findSeq;
+    this.service.matchingOutputs(q).subscribe({
+      next: r => { if (seq === this.findSeq) this.found.set({ ...r, query: q }); },
+      error: () => { if (seq === this.findSeq) this.found.set({ reports: [], runsRead: 0, jobsRead: 0, failed: 0, query: q }); },
+    });
   }
 
   pickBucket(bucket: string): void {

@@ -73,7 +73,7 @@ test.describe('Executions', () => {
     if (!FILES.run) {
       const rebuilt = readmission.run?.jobQueueId;
       const kept = rebuilt && (await outputsOf(request, s, rebuilt)).some(o => o.kind === 'file' && o.name === KEPT_FILE && !o.expired);
-      FILES.run = kept ? rebuilt! : (await keptRun(request, s, FILES.job, KEPT_FILE)).run;
+      FILES.run = kept ? rebuilt! : (await keptRun(request, s, FILES.job, KEPT_FILE, ['readmission'])).run;
     }
     if (!ENGINE.run) ENGINE.run = FILES.run;
     const engine = await getJson(request, s, `/sourceJob.json/stepExecutions?jobQueueId=${ENGINE.run}`);

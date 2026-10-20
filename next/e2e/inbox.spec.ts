@@ -98,12 +98,16 @@ test.describe('Inbox (live storage-service)', () => {
   test('shows the service\'s refusal for an executable, word for word', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
     await page.goto('/documents/file-drop');
+    const answered = page.waitForResponse(r => r.url().includes('/storage.json/inbox/upload') && r.request().method() === 'POST');
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
       name: 'E2E-evil.exe', mimeType: 'application/octet-stream', buffer: Buffer.from('MZ not really a program'),
     });
+    // The service's own words (platform-commons' InboxFileCheck since MIG-406), and the page shows exactly those.
+    const refusal = (await (await answered).json()).message;
+    expect(refusal).toBe('\'E2E-evil.exe\': .exe files are not accepted.');
     const row = page.getByRole('list', { name: 'Uploads' }).locator('li').filter({ hasText: 'E2E-evil.exe' });
     await expect(row).toHaveAttribute('data-state', 'refused');
-    await expect(row.getByRole('alert')).toHaveText('\'E2E-evil.exe\': .exe files are not accepted in the inbox.');
+    await expect(row.getByRole('alert')).toHaveText(refusal);
     await expect(page.getByRole('table').getByText('E2E-evil.exe')).toHaveCount(0);
     await shot(page, info, 'inbox-refused');
   });

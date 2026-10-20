@@ -10,8 +10,8 @@ import { reportsFromRun } from '../documents/generated/generated.model';
 
 /**
  * MIG-253: Storage's file panel -- what is knowable about a file: the object's own metadata, the run
- * that uploaded it when a recent run did (there is no object → run lookup, so recent runs' outputs are
- * searched), and its data policy and expiry (MIG-243 is not live: "No policy").
+ * that uploaded it (Core's object → run lookup since 2026-10-20; the recent runs' outputs searched only
+ * when Core cannot be asked), and its data policy and expiry (MIG-243 is not live: "No policy").
  */
 const KEY = 'registry-live-check/customers-clean.json';
 const META = { name: 'customers-clean.json', key: KEY, folder: false, size: 169, lastModified: '2026-09-29T12:07:05Z',
@@ -22,7 +22,13 @@ const RECENT = { runsRead: 12, jobsRead: 4, failed: 0, reports: reportsFromRun(
   [{ runOutputId: 1001, kind: 'bucket', name: 'customers-clean.json', recordedAt: '2026-09-29T07:07:05.863214',
      bucket: 'ui-review-s3', key: KEY, stepKey: 'publish' }]) };
 
-function details(data: FileDetailsData, opts: { meta?: 'fail'; recent?: typeof RECENT } = {}) {
+/** What Core's sourceJob.json/objectWriter answered, as GeneratedService hands it on. */
+const WRITER = { id: 'writer-8380', name: 'statistics.csv', type: 'CSV', origin: 'run-bucket' as const, created: '2026-10-19T05:47:06.939323',
+  status: 'In storage' as const, owner: 'Riverside Health admin', bucket: 'riverside-health-s3', key: 'datasets/readmission/results/statistics.csv',
+  jobQueueId: 8380, jobId: 2905, jobName: 'Hospital readmission risk (daily)', pipeline: 'Hospital readmission risk' };
+
+function details(data: FileDetailsData, opts: { meta?: 'fail'; recent?: typeof RECENT; writer?: typeof WRITER | null | 'fail' } = {}) {
+  const writer = opts.writer === undefined ? 'fail' : opts.writer;
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
     providers: [
@@ -31,13 +37,16 @@ function details(data: FileDetailsData, opts: { meta?: 'fail'; recent?: typeof R
       { provide: DialogRef, useValue: { close: vi.fn() } },
       { provide: StorageService, useValue: { objectMetadata: vi.fn(() => opts.meta === 'fail'
         ? throwError(() => ({ error: { message: 'No such object.' } })) : of({ status: 'SUCCESS', message: '', data: META })) } },
-      { provide: GeneratedService, useValue: { recentOutputs: vi.fn(() => of(opts.recent ?? RECENT)) } },
+      { provide: GeneratedService, useValue: {
+        objectWriter: vi.fn(() => writer === 'fail' ? throwError(() => new Error('404')) : of(writer)),
+        recentOutputs: vi.fn(() => of(opts.recent ?? RECENT)) } },
     ],
   });
   const fixture = TestBed.createComponent(FileDetails);
   fixture.detectChanges();
   const text = () => (fixture.nativeElement as HTMLElement).textContent!.replace(/\s+/g, ' ');
-  return { fixture, d: fixture.componentInstance, text };
+  const generated = TestBed.inject(GeneratedService) as unknown as { recentOutputs: ReturnType<typeof vi.fn>; objectWriter: ReturnType<typeof vi.fn> };
+  return { fixture, d: fixture.componentInstance, text, generated };
 }
 
 describe('Storage file details', () => {
@@ -49,7 +58,27 @@ describe('Storage file details', () => {
     expect(text()).toContain('Not recorded');
   });
 
-  it('names the run and pipeline that uploaded it, when a recent run did', () => {
+  // 2026-10-20: the eleventh most recently run schedule's upload was "not written by any recent run".
+  it('names the run that wrote it from Core\'s lookup, however long ago, without searching recent runs', () => {
+    const { fixture, d, text, generated } = details({ bucket: 'riverside-health-s3', key: WRITER.key, name: 'statistics.csv' },
+      { writer: WRITER });
+    expect(generated.objectWriter).toHaveBeenCalledWith('riverside-health-s3', WRITER.key);
+    expect(generated.recentOutputs).not.toHaveBeenCalled();
+    expect(d.run()?.jobQueueId).toBe(8380);
+    expect(text()).toContain('Run #8380');
+    expect(text()).toContain('Hospital readmission risk (daily)');
+    expect((fixture.nativeElement as HTMLElement).querySelector('a[href*="/schedules/2905/runs/8380"]')).not.toBeNull();
+  });
+
+  it('says no run the reader can read wrote it when Core finds none, and does not claim it looked only at recent runs', () => {
+    const { d, text, generated } = details({ bucket: 'ui-review-s3', key: 'by-hand.csv', name: 'by-hand.csv' }, { writer: null });
+    expect(d.run()).toBeNull();
+    expect(generated.recentOutputs).not.toHaveBeenCalled();
+    expect(text()).toContain('No run you can read wrote this file.');
+    expect(text()).not.toContain('most recent runs');
+  });
+
+  it('names the run and pipeline that uploaded it, when a recent run did (Core could not be asked)', () => {
     const { fixture, d, text } = details({ bucket: 'ui-review-s3', key: KEY, name: 'customers-clean.json' });
     expect(d.run()?.jobQueueId).toBe(7405);
     expect(text()).toContain('Run #7405');
@@ -58,7 +87,7 @@ describe('Storage file details', () => {
     expect(link).not.toBeNull();
   });
 
-  it('says how far it looked when no recent run wrote the file', () => {
+  it('says how far it looked when no recent run wrote the file (Core could not be asked)', () => {
     const { d, text } = details({ bucket: 'ui-review-s3', key: 'elsewhere.csv', name: 'elsewhere.csv' });
     expect(d.run()).toBeNull();
     expect(text()).toContain('Not written by any of the 12 most recent runs');

@@ -29,6 +29,18 @@ const KEY = process.env['E2E_OCR_KEY'] ?? 'e2e/ocr/ocr-live-check.png';
 const VENDOR = `E2E vendor ${Date.now().toString(36)}`;
 
 interface Field { fieldId: number; fieldKey: string; tableKey?: string | null; label?: string; value: string | null; page?: number | null; box?: unknown; }
+interface Defined { key: string; label?: string; type?: string; required?: boolean; options?: string[] }
+interface ReviewDetail { fields: Field[]; definition?: string | { fields?: Defined[] } }
+
+/** The document type's required top-level fields the extraction left empty, each with a value of its type to type in. */
+function missingRequired(detail: ReviewDetail): { key: string; label: string; value: string }[] {
+  const definition = typeof detail.definition === 'string' ? JSON.parse(detail.definition) : detail.definition ?? {};
+  const read = new Map(detail.fields.filter(f => !f.tableKey).map(f => [f.fieldKey, f.value]));
+  return ((definition.fields ?? []) as Defined[])
+    .filter(d => d.required && !(read.get(d.key) ?? '').toString().trim())
+    .map(d => ({ key: d.key, label: d.label ?? d.key, value: d.type === 'date' ? '2026-09-28'
+      : d.type === 'money' || d.type === 'number' ? '1.00' : d.type === 'choice' ? (d.options?.[0] ?? 'E2E') : `E2E-${Date.now().toString(36)}` }));
+}
 
 async function pageAs(browser: Browser, s: Session, width = 1440, height = 900): Promise<Page> {
   // Seeded before the app loads (support/session.ts pageWith): a dead stored session can no longer sign it out.
@@ -93,7 +105,7 @@ test.describe('Document Intelligence', () => {
   test('review: a field\'s box is highlighted, a value corrected, the document approved into its dataset', async ({ browser, request }, info) => {
     test.setTimeout(300_000);
     const extractionId = await seed(request, s);
-    const detail = await call<{ fields: Field[] }>(request, s, 'GET', `/documentReview.json/fetchById?extractionId=${extractionId}`);
+    const detail = await call<ReviewDetail>(request, s, 'GET', `/documentReview.json/fetchById?extractionId=${extractionId}`);
     const boxed = detail.fields.find(f => !f.tableKey && f.page && f.box);
     expect(boxed, 'a value read from the page, with its box').toBeTruthy();
 
@@ -116,9 +128,14 @@ test.describe('Document Intelligence', () => {
     await page.keyboard.press('ArrowDown');
     await expect(page.locator('.doc-field-active')).toHaveCount(1);
 
-    // ---- corrections: the vendor and the total the model did not find
+    // ---- corrections: the vendor and the total, and every other required field the model left empty. A small local
+    // model does not miss the same fields twice (final-regression 10-20: it also missed the invoice number once, and the
+    // screen rightly kept the document from approval), so what else is missing is read from the extraction, not assumed.
     await page.getByRole('textbox', { name: 'Vendor', exact: true }).fill(VENDOR);
     await page.getByRole('textbox', { name: 'Total', exact: true }).fill('9820.00');
+    for (const f of missingRequired(detail).filter(f => f.key !== 'vendor_name' && f.key !== 'total')) {
+      await page.getByRole('textbox', { name: f.label, exact: true }).fill(f.value);
+    }
     const saved = page.waitForResponse(r => r.url().includes('/documentReview.json/correct') && r.request().method() === 'POST');
     await page.getByRole('button', { name: 'Save corrections' }).click();
     expect((await saved).status()).toBe(200);
