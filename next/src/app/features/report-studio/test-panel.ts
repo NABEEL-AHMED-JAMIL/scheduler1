@@ -43,7 +43,7 @@ export interface TestPanelData {
             <span class="label">Report data starts at</span>
             <input class="input mono max-w-80" [ngModel]="rootPath()" (ngModelChange)="rootPath.set($event)" aria-label="Root path"
                    placeholder="$" />
-            <span class="field-note text-[color:var(--text-muted)]">A JSON path such as $.data.quality; the template's paths start there.</span>
+            <span class="block field-note text-[color:var(--text-muted)]">A JSON path such as $.data.quality; the template's paths start there.</span>
           </label>
           <div class="flex flex-wrap items-center gap-2">
             <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !source()" (click)="check()">

@@ -12,6 +12,7 @@ import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { JobRow, ReportRow, chipWord, isRunning, stageWord } from './report-studio.model';
 import { GeneratePanel, GeneratePanelData } from './generate-panel';
@@ -25,7 +26,7 @@ type View = 'reports' | 'jobs';
  */
 @Component({
   selector: 'app-report-library',
-  imports: [PageHeader, RefreshButton, Icon, TableShell, StatusPill, Segmented, ServerTimePipe, RouterLink],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, ServerTimePipe, RouterLink],
   templateUrl: './library.html',
 })
 export class ReportLibrary implements OnInit {
@@ -34,6 +35,8 @@ export class ReportLibrary implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceDirectory);
+  /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
+  readonly tenantId = signal<number | null>(this.workspaces.remembered());
   private readonly destroy = inject(DestroyRef);
 
   readonly view = signal<View>('reports');
@@ -79,7 +82,7 @@ export class ReportLibrary implements OnInit {
   load(quiet = false): void {
     if (!quiet) this.loading.set(true);
     this.error.set('');
-    const scope = this.auth.isPlatformAdmin() ? this.workspaces.remembered() : null;
+    const scope = this.auth.isPlatformAdmin() ? this.tenantId() : null;
     this.api.reports('', scope).subscribe({
       next: r => { this.reports.set(r); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The reports could not be read.').message); this.loading.set(false); },

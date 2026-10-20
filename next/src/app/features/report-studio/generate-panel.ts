@@ -55,7 +55,7 @@ export interface GeneratePanelData {
               <span class="label">Report name</span>
               <input class="input" [ngModel]="name()" (ngModelChange)="name.set($event)" aria-label="Report name"
                      placeholder="Monthly quality report · September 2026" />
-              <span class="field-note text-[color:var(--text-muted)]">Left empty, the template's name (and the run's number).</span>
+              <span class="block field-note text-[color:var(--text-muted)]">Left empty, the template's name (and the run's number).</span>
             </label>
           }
           <fieldset class="field">

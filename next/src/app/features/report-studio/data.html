@@ -5,13 +5,14 @@
         <h1 class="page-title">Reports</h1>
         <p class="page-subtitle">The data a report can read: pipeline outputs, files in your buckets, and uploads. Each is read as you.</p>
       </div>
-      <div class="flex items-center gap-2"><app-refresh-button [loading]="loading()" (refresh)="load()" /></div>
+      <div class="flex items-center gap-2"><app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="load()" /></div>
     </div>
   </app-page-header>
 
   <div class="rs-banner rs-banner-info mb-4" role="note">
     <app-icon name="shield" class="shrink-0" />
-    <div class="text-sm">Only {{ workspaceName() }}'s data. You see a source's schema and at most 100 of its records, and use it in reports.
+    <div class="text-sm min-w-0 flex-1">Only {{ workspaceName() }}'s data. You see a source's schema and at most 100 of its records, and use it in reports.
       Connection settings and passwords are never asked for or shown; a run or file you cannot open elsewhere is refused here too.</div>
   </div>
 
@@ -99,7 +100,7 @@
             <label class="field">
               <span class="label">Report data starts at</span>
               <input class="input mono" [ngModel]="rootPath()" (change)="reroot($any($event.target).value)" aria-label="Root path" />
-              <span class="field-note text-[color:var(--text-muted)]">A template's paths are read from here. Pick a list or object below.</span>
+              <span class="block field-note text-[color:var(--text-muted)]">A template's paths are read from here. Pick a list or object below.</span>
             </label>
             <ul class="rs-tree">
               @for (t of flatTree(); track t.node.path) {

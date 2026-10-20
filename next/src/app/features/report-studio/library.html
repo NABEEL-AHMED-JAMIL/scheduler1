@@ -6,6 +6,7 @@
         <p class="page-subtitle">Every report and its versions. Generating again makes a new version; nothing is overwritten.</p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         @if (canPipelineFiles()) { <a class="btn btn-default btn-sm" routerLink="/reports/from-pipelines"><app-icon name="folder" />From pipelines</a> }
         @if (canGenerate()) { <button type="button" class="btn btn-primary btn-sm" (click)="generate()"><app-icon name="play" />New report</button> }

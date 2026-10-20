@@ -13,6 +13,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { StarterRow, TemplateDetail, TemplateRow, chipWord, originWord } from './report-studio.model';
 import { ImportTemplatePanel, NewTemplateData, NewTemplatePanel } from './template-panels';
@@ -26,7 +27,7 @@ import { downloadJson } from './report-files';
  */
 @Component({
   selector: 'app-report-templates',
-  imports: [PageHeader, RefreshButton, Icon, TableShell, StatusPill, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger],
   templateUrl: './templates.html',
 })
 export class ReportTemplates implements OnInit {
@@ -37,6 +38,8 @@ export class ReportTemplates implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceDirectory);
+  /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
+  readonly tenantId = signal<number | null>(this.workspaces.remembered());
 
   readonly templates = signal<TemplateRow[]>([]);
   readonly starters = signal<StarterRow[]>([]);
@@ -66,7 +69,7 @@ export class ReportTemplates implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.list(this.archived(), this.isPlatformAdmin() ? this.workspaces.remembered() : null).subscribe({
+    this.api.list(this.archived(), this.isPlatformAdmin() ? this.tenantId() : null).subscribe({
       next: lib => { this.templates.set(lib.templates); this.starters.set(lib.starters); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The templates could not be read.').message); this.loading.set(false); },
     });

@@ -35,10 +35,10 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
             <textarea class="input mono text-xs" rows="10" spellcheck="false" [ngModel]="text()" (ngModelChange)="text.set($event)"
                       [attr.aria-invalid]="!!pasteError() || null"
                       placeholder='{"period": "September 2026", "summary": {"total": 1240}, "rows": [ ... ]}'></textarea>
-            <span class="field-note text-[color:var(--text-muted)]">
+            <span class="block field-note text-[color:var(--text-muted)]">
               Read straight away and never stored, unless you save it as a test sample. At most 5 MB.
             </span>
-            @if (text() && pasteError()) { <span class="field-note text-[color:var(--crit-text)]" role="alert">{{ pasteError() }}</span> }
+            @if (text() && pasteError()) { <span class="block field-note text-[color:var(--crit-text)]" role="alert">{{ pasteError() }}</span> }
           </label>
           <label class="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" [ngModel]="csv()" (ngModelChange)="csv.set($event)" /> It is CSV (a header row, then rows)

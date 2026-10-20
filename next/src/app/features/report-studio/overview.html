@@ -6,6 +6,7 @@
         <p class="page-subtitle">Design report templates once, fill them from pipeline runs and files, and keep every version.</p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         @if (canTemplates()) {
           <button type="button" class="btn btn-default btn-sm" (click)="newTemplate()"><app-icon name="plus" />New template</button>

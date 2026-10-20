@@ -6,6 +6,7 @@
         <p class="page-subtitle">Templates are data: a page layout, its blocks and the data paths they show. Published versions never change.</p>
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         @if (canEdit()) {
           <button type="button" class="btn btn-default btn-sm" (click)="importJson()"><app-icon name="upload" />Import JSON</button>

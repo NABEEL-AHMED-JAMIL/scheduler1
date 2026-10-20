@@ -13,7 +13,7 @@
               @if (r.currentVersion) { <span class="pill pill-neutral">Version {{ r.currentVersion }}</span> }
             </span>
           </div>
-          <p class="page-subtitle mono text-xs">{{ r.label }} · from <a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a></p>
+          <p class="page-subtitle"><span class="mono text-xs">{{ r.label }}</span> · from <a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a></p>
         </div>
         <div class="flex items-center gap-2">
           <app-refresh-button [loading]="loading()" (refresh)="load()" />

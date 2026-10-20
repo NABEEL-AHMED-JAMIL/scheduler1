@@ -11,6 +11,7 @@ import { LoadError } from '../../shared/ui/load-error';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { StudioOverview, chipWord, isRunning, stageWord } from './report-studio.model';
 import { GeneratePanel, GeneratePanelData } from './generate-panel';
@@ -22,7 +23,7 @@ import { GeneratePanel, GeneratePanelData } from './generate-panel';
  */
 @Component({
   selector: 'app-report-overview',
-  imports: [PageHeader, RefreshButton, Icon, StatStrip, StatusPill, ServerTimePipe, LoadError, RouterLink],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, ServerTimePipe, LoadError, RouterLink],
   templateUrl: './overview.html',
 })
 export class ReportOverview implements OnInit {
@@ -31,6 +32,8 @@ export class ReportOverview implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly router = inject(Router);
   private readonly workspaces = inject(WorkspaceDirectory);
+  /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
+  readonly tenantId = signal<number | null>(this.workspaces.remembered());
 
   readonly data = signal<StudioOverview | null>(null);
   readonly loading = signal(true);
@@ -49,9 +52,9 @@ export class ReportOverview implements OnInit {
     if (!f) return [];
     const rate = f.jobsFinishedThisMonth ? `${((f.jobsSucceededThisMonth / f.jobsFinishedThisMonth) * 100).toFixed(1)}%` : '—';
     return [
-      { label: 'Report versions this month', value: f.versionsThisMonth, icon: 'file', tone: 'info', foot: `${f.reports} reports in all` },
+      { label: 'Report versions this month', value: f.versionsThisMonth, icon: 'file', tone: 'info', foot: `${f.reports} report${f.reports === 1 ? '' : 's'} in all` },
       { label: 'Published templates', value: f.publishedTemplates, icon: 'template', tone: 'info',
-        foot: f.templatesWithDrafts ? `${f.templatesWithDrafts} with draft changes` : `${f.templates} templates in all` },
+        foot: f.templatesWithDrafts ? `${f.templatesWithDrafts} with draft changes` : `${f.templates} template${f.templates === 1 ? '' : 's'} in all` },
       { label: 'Generated OK', value: rate, icon: 'checkCircle', tone: 'ok',
         foot: `${f.jobsSucceededThisMonth} of ${f.jobsFinishedThisMonth} jobs this month` },
       { label: 'Needs attention', value: f.failedLast7Days, icon: 'alert', tone: f.failedLast7Days ? 'crit' : 'muted',
@@ -66,7 +69,7 @@ export class ReportOverview implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.overview(this.auth.isPlatformAdmin() ? this.workspaces.remembered() : null).subscribe({
+    this.api.overview(this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
       next: d => { this.data.set(d); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The overview could not be read.').message); this.loading.set(false); },
     });

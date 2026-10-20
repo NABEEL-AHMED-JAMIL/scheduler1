@@ -10,6 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { BucketSummary, StorageService } from '../objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ReportStudioApi, studioError } from './report-studio.api';
@@ -24,7 +25,7 @@ import { ReportSourcePicker } from './source-picker';
  */
 @Component({
   selector: 'app-report-data',
-  imports: [PageHeader, RefreshButton, Icon, FileDropzone, ServerTimePipe, FormsModule, ReportSourcePicker],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, FileDropzone, ServerTimePipe, FormsModule, ReportSourcePicker],
   templateUrl: './data.html',
 })
 export class ReportData implements OnInit {
@@ -34,6 +35,8 @@ export class ReportData implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly workspaces = inject(WorkspaceDirectory);
+  /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
+  readonly tenantId = signal<number | null>(this.workspaces.remembered());
 
   readonly sources = signal<DataSourceRow[]>([]);
   readonly buckets = signal<BucketSummary[]>([]);
@@ -79,7 +82,7 @@ export class ReportData implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.sources(this.isPlatformAdmin() ? this.workspaces.remembered() : null).subscribe({
+    this.api.sources(this.isPlatformAdmin() ? this.tenantId() : null).subscribe({
       next: s => { this.sources.set(s); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The sources could not be read.').message); this.loading.set(false); },
     });
