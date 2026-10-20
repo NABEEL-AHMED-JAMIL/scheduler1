@@ -14,13 +14,13 @@
     </div>
   </app-page-header>
 
-  <div class="mb-3"><app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" /></div>
-
   @if (view() === 'reports') {
     <app-table-shell heading="Reports" columnsKey="report-library" [loading]="loading()" [error]="error()" [isEmpty]="!shownReports().length"
                      [shown]="shownReports().length" [total]="reports().length" emptyIcon="file" (retry)="load()"
                      [emptyMessage]="search() || status() ? 'No report matches the filters.' : 'No reports yet: publish a template, then generate one.'">
       <ng-container toolbar>
+        <!-- Owner 2026-10-20: Reports / Generation jobs in the table's own top bar, as Table / Cards is on the other lists. -->
+        <app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" />
         <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
           <option value="">All</option><option value="GENERATED">Ready</option><option value="FAILED">Failed</option>
         </select>
@@ -64,6 +64,8 @@
                      [shown]="shownJobs().length" [total]="jobs().length" emptyIcon="history" (retry)="load()"
                      [emptyMessage]="search() || status() ? 'No job matches the filters.' : 'No jobs yet.'">
       <ng-container toolbar>
+        <!-- Owner 2026-10-20: Reports / Generation jobs in the table's own top bar, as Table / Cards is on the other lists. -->
+        <app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" />
         <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
           <option value="">All</option><option value="RUNNING">Running</option><option value="SUCCEEDED">Completed</option>
           <option value="FAILED">Failed</option><option value="CANCELLED">Cancelled</option>
