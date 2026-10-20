@@ -69,6 +69,16 @@ export interface ApiClientWithSecret extends ApiClientRow { clientSecret: string
 
 export interface ScopeRow { scope: string; description: string }
 
+/** Owner #25: one change to an API client (Identity's api_client_change): never a secret. */
+export interface ClientChangeRow {
+  id: number;
+  action: 'CREATED' | 'UPDATED' | 'SECRET_ROTATED' | 'REVOKED';
+  /** Field to {from, to}; empty for a rotation or a revoke. */
+  changes: Record<string, { from: unknown; to: unknown }>;
+  changedBy: number | null;
+  changedAt: string | null;
+}
+
 export interface ApiClientInput {
   clientId?: string;
   name?: string;
@@ -194,6 +204,13 @@ export class ApiClientsApi {
 
   scopes(): Observable<ApiResponse<ScopeRow[]>> {
     return this.http.get<ApiResponse<ScopeRow[]>>(`${this.clients}/scopes`);
+  }
+
+  /** Owner #25: every change to the client, newest first. */
+  history(clientId: string, sandbox = false): Observable<ApiResponse<ClientChangeRow[]>> {
+    const params: Record<string, string> = { clientId };
+    if (sandbox) params['sandbox'] = 'true';
+    return this.http.get<ApiResponse<ClientChangeRow[]>>(`${this.clients}/history`, { params });
   }
 
   list(): Observable<ApiResponse<ApiClientRow[]>> {

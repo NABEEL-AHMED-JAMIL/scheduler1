@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { DeveloperClients } from './clients';
+import { DeveloperConnected } from './connected-apis';
 import { DeveloperChangelog } from './changelog';
 import { DeveloperLayout } from './developer-layout';
 import { guideTitle } from './developer-docs';
@@ -19,6 +21,9 @@ export const DEVELOPER_ROUTES: Routes = [
       { path: 'reference', title: 'API reference', component: DeveloperReference },
       { path: 'guides/:slug', title: route => guideTitle(route.paramMap.get('slug')), component: DeveloperGuide },
       { path: 'changelog', title: 'API changelog', component: DeveloperChangelog },
+      // Owner #28: what each of the workspace's API clients may call, and the APIs its pipelines call out to.
+      { path: 'clients', title: 'Your API clients', component: DeveloperClients },
+      { path: 'connected', title: 'APIs this workspace calls', component: DeveloperConnected },
     ],
   },
 ];

@@ -106,6 +106,7 @@
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openClient(c)"><app-icon name="edit" />Change</button>
                     <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotate(c)"><app-icon name="refresh" />New secret</button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openHistory(c)"><app-icon name="history" />History</button>
                     <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="revoke(c)">
                       <app-icon name="power" class="icon-crit" />Revoke
                     </button>

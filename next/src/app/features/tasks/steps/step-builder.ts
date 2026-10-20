@@ -16,7 +16,7 @@ import {
   Definition, DefinitionView, LIMITS, ON_ERRORS, Problem, SOURCE_TYPES, Settings, Step, StepProblem, StepTaskEntry, ValidateResult,
   addStep, canonical, definitionJson, inputColumns, isLegacyDefinition, refusalOf, moveStep, onErrorLabel, problemsByStep, removeStep, replaceStep,
   sameDefinition, sampleRowsOf, sourceLabel, taskEntry, taskLabel, taskOptions, toYaml, updateSettings, updateSource, usesBucket, usesPrompt,
-  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
+  withSample, BucketChoice, PromptChoice, usesWebhook, WebhookChoice, usesApiRequest, ApiRequestChoice, DocumentTypeChoice, usesDocumentType, updateParameters,
 } from './steps.model';
 import { ParameterEditor } from './parameter-editor';
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
@@ -319,6 +319,8 @@ export class StepBuilder implements OnInit {
 
   /** MIG-346: the workspace's webhooks, read the first time a step that names one is opened. */
   private readonly webhookChoices = signal<WebhookChoice[] | null>(null);
+  /** Owner #25: the workspace's saved API requests, read the first time a step that names one is opened. */
+  private readonly apiRequestChoices = signal<ApiRequestChoice[] | null>(null);
 
   /** MIG-364: the workspace's document types, read the first time a step that names one is opened. */
   private readonly documentTypeChoices = signal<DocumentTypeChoice[] | null>(null);
@@ -352,6 +354,14 @@ export class StepBuilder implements OnInit {
       });
       return;
     }
+    if (this.apiRequestChoices() === null && usesApiRequest(schema)) {
+      // Likewise: without the list a saved request still shows by its id.
+      this.api.apiRequests().subscribe({
+        next: requests => { this.apiRequestChoices.set(requests); this.open(index); },
+        error: () => { this.apiRequestChoices.set([]); this.open(index); },
+      });
+      return;
+    }
     if (this.documentTypeChoices() === null && usesDocumentType(schema)) {
       // Likewise: without the list a saved type still shows by its id.
       this.api.documentTypes().subscribe({
@@ -375,6 +385,7 @@ export class StepBuilder implements OnInit {
       buckets: this.bucketChoices() ?? [],
       webhooks: this.webhookChoices() ?? [],
       documentTypes: this.documentTypeChoices() ?? [],
+      apiRequests: this.apiRequestChoices() ?? [],
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.

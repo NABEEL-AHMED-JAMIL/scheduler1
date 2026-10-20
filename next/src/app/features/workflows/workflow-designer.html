@@ -327,6 +327,60 @@
                       </div>
                     }
 
+                    @if (s.type === 'call_api') {
+                      <!-- Owner #25: one of the workspace's saved API requests (POST, PUT), its answer kept on the request for a
+                           Condition to branch on. -->
+                      <div>
+                        <label class="label" for="st-req">API request</label>
+                        <app-combobox id="st-req" [numeric]="true" placeholder="Search saved requests…" [allowClear]="false" [disabled]="!canEdit()"
+                                      [options]="requestOptions()" [ngModel]="s.requestId == null ? null : s.requestId"
+                                      (ngModelChange)="set('requestId', numberOrNull($event)); set('environmentId', null)" data-test="wf-api-request" />
+                        <p class="field-note text-[color:var(--text-muted)]">Saved in Connections › API collections; its secrets stay there.</p>
+                      </div>
+                      @if (requestOf(s)?.environments?.length) {
+                        <div>
+                          <label class="label" for="st-env">Environment</label>
+                          <select id="st-env" class="input" [ngModel]="s.environmentId ?? ''" (ngModelChange)="set('environmentId', numberOrNull($event))">
+                            <option value="">The collection's default</option>
+                            @for (e of requestOf(s)!.environments; track e.id) { <option [value]="e.id">{{ e.label }}</option> }
+                          </select>
+                        </div>
+                      }
+                      <div>
+                        <span class="label">Variables</span>
+                        <div class="space-y-2" data-test="wf-api-variables">
+                          @for (v of variableRows(s); track $index; let i = $index) {
+                            <div class="flex items-center gap-2">
+                              <input class="input font-mono text-xs w-36" [value]="v.name" [attr.aria-label]="'Variable ' + (i + 1) + ' name'"
+                                     (change)="setVariable(s, i, 'name', $any($event.target).value)" />
+                              <input class="input font-mono text-xs flex-1 min-w-0" [value]="v.value" [placeholder]="variablePlaceholder"
+                                     [attr.aria-label]="'Value of ' + v.name" (change)="setVariable(s, i, 'value', $any($event.target).value)" />
+                              <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + v.name" (click)="removeVariable(s, i)">
+                                <app-icon name="trash" class="icon-crit" />
+                              </button>
+                            </div>
+                          }
+                          <button type="button" class="btn btn-ghost btn-sm" (click)="addVariable(s)"><app-icon name="plus" />Add a variable</button>
+                        </div>
+                        <p class="field-note text-[color:var(--text-muted)]">From the request's fields by name (patient.id), and subject_id, instance and call_key.</p>
+                      </div>
+                      <div>
+                        <label class="label" for="st-save">Keep the answer as</label>
+                        <input id="st-save" class="input font-mono" maxlength="64" [ngModel]="s.saveAs" (ngModelChange)="set('saveAs', $event)" />
+                        <p class="field-note text-[color:var(--text-muted)]">
+                          A Condition after this step reads {{ s.saveAs || 'api' }}.status, .ok, .error or .body.<i>field</i>.
+                          <button type="button" class="link-inline" (click)="branchOnAnswer(s)" data-test="wf-api-branch">Add a condition on it</button>
+                        </p>
+                      </div>
+                      <div>
+                        <label class="label" for="st-api-err">If the call is not ok</label>
+                        <select id="st-api-err" class="input" [ngModel]="s.onError || 'fail'" (ngModelChange)="set('onError', $event)">
+                          <option value="continue">Carry on (branch on the answer)</option>
+                          <option value="fail">Stop the request</option>
+                        </select>
+                      </div>
+                    }
+
                     @if (s.type === 'save_dataset') {
                       <div>
                         <label class="label" for="st-ds">Dataset</label>

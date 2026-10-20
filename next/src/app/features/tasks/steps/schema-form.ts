@@ -2,7 +2,7 @@ import { Component, computed, input, linkedSignal, output, signal } from '@angul
 import { Field } from '../../../shared/ui/field';
 import { Icon } from '../../../shared/ui/icon';
 import {
-  BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
+  ApiRequestChoice, BucketChoice, DocumentTypeChoice, FieldKind, FieldSpec, JsonSchema, PromptChoice, StepProblem, WebhookChoice, coerce, fieldsOf, isMapSchema, mapValueKind, parseJson, withValue,
 } from './steps.model';
 
 interface MapRow { key: string; value: unknown; }
@@ -139,6 +139,40 @@ interface MapRow { key: string; value: unknown; }
               </select>
             </app-field>
           }
+          @case ('api-request') {
+            <!-- Owner #25: one of the workspace's saved API requests, grouped by collection, with its method. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
+                       [hint]="f.description || apiRequestHint">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()" data-test="api-request-select"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">{{ f.required ? 'Choose an API request…' : 'None' }}</option>
+                @for (group of apiRequestGroups(); track group.collection) {
+                  <optgroup [label]="group.collection">
+                    @for (r of group.requests; track r.id) {
+                      <option [value]="'' + r.id" [selected]="textOf(f) === '' + r.id" [disabled]="!r.enabled && textOf(f) !== '' + r.id">
+                        {{ r.method }} · {{ r.label.slice(group.collection.length + 3) }}{{ r.enabled ? '' : ' (disabled)' }}</option>
+                    }
+                  </optgroup>
+                }
+                @if (textOf(f) && !apiRequestListed(f)) {
+                  <option [value]="textOf(f)" selected>Request {{ textOf(f) }} (not one of this workspace's saved requests)</option>
+                }
+              </select>
+            </app-field>
+          }
+          @case ('api-environment') {
+            <!-- Owner #25: an environment of the chosen request's collection; none is the collection's default. -->
+            <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)" [hint]="f.description || ''">
+              <select [id]="idOf(f)" class="input" [value]="textOf(f)" [disabled]="disabled()"
+                      (change)="set(f.name, $any($event.target).value === '' ? undefined : +$any($event.target).value)">
+                <option value="">The collection's default</option>
+                @for (e of environmentChoices(); track e.id) { <option [value]="'' + e.id" [selected]="textOf(f) === '' + e.id">{{ e.label }}</option> }
+                @if (textOf(f) && !environmentListed(f)) {
+                  <option [value]="textOf(f)" selected>Environment {{ textOf(f) }}</option>
+                }
+              </select>
+            </app-field>
+          }
           @case ('document-type') {
             <!-- MIG-364: one of the workspace's document types, stored as its id; empty is the documents that started the run. -->
             <app-field [label]="f.label" [for]="idOf(f)" [required]="f.required" [error]="errorOf(f)"
@@ -210,7 +244,7 @@ interface MapRow { key: string; value: unknown; }
               <p class="label">{{ f.label }}@if (f.required) { <span class="text-crit-500 ml-0.5" aria-hidden="true">*</span> }</p>
               @if (f.description) { <p class="field-note text-[color:var(--text-muted)] -mt-1 mb-2">{{ f.description }}</p> }
               <app-schema-form [schema]="f.schema" [value]="objectOf(f)" [problems]="problemsUnder(f.name)" [idPrefix]="idOf(f)"
-                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
+                               [label]="f.label" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [apiRequests]="apiRequests()" [disabled]="disabled()" (valueChange)="set(f.name, $event)" />
             </fieldset>
           }
           @case ('objects') {
@@ -234,7 +268,7 @@ interface MapRow { key: string; value: unknown; }
                     }
                   </div>
                   <app-schema-form [schema]="f.schema.items!" [value]="row" [problems]="problemsUnder(f.name + '[' + i + ']')"
-                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()"
+                                   [idPrefix]="idOf(f) + '-' + i" [label]="f.label + ' row ' + (i + 1)" [columns]="columns()" [steps]="steps()" [prompts]="prompts()" [buckets]="buckets()" [webhooks]="webhooks()" [documentTypes]="documentTypes()" [apiRequests]="apiRequests()"
                                    [disabled]="disabled()" (valueChange)="setRow(f, i, $event)" />
                 </div>
               } @empty {
@@ -298,6 +332,21 @@ export class SchemaForm {
   readonly buckets = input<BucketChoice[]>([]);
   /** MIG-364: the workspace's document types, what a document-type setting offers. */
   readonly documentTypes = input<DocumentTypeChoice[]>([]);
+  /** Owner #25: the workspace's saved API requests, what an api-request setting offers. */
+  readonly apiRequests = input<ApiRequestChoice[]>([]);
+  readonly apiRequestHint = 'One of this workspace’s saved API requests (Connections › API collections).';
+  /** The requests by collection, in the order they came. */
+  readonly apiRequestGroups = computed(() => {
+    const groups: { collection: string; requests: ApiRequestChoice[] }[] = [];
+    for (const r of this.apiRequests()) {
+      const group = groups.find(g => g.collection === r.collection);
+      if (group) group.requests.push(r); else groups.push({ collection: r.collection, requests: [r] });
+    }
+    return groups;
+  });
+  /** The environments of the request this form's requestId names: what an api-environment setting offers. */
+  readonly environmentChoices = computed(() =>
+    this.apiRequests().find(r => '' + r.id === '' + (this.current()['requestId'] ?? ''))?.environments ?? []);
   /** MIG-364: what a document-type setting says when its schema says nothing. */
   readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document Intelligence).';
   readonly disabled = input(false);
@@ -342,6 +391,14 @@ export class SchemaForm {
     if (on) held.add(option); else held.delete(option);
     const next = f.options.filter(o => held.has(o));
     this.set(f.name, next.length ? next : undefined);
+  }
+
+  apiRequestListed(f: FieldSpec): boolean {
+    return this.apiRequests().some(r => '' + r.id === this.textOf(f));
+  }
+
+  environmentListed(f: FieldSpec): boolean {
+    return this.environmentChoices().some(e => '' + e.id === this.textOf(f));
   }
 
   webhookListed(f: FieldSpec): boolean {

@@ -20,6 +20,8 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
 import { WebhookDialog, WebhookDialogData, WebhookDialogResult } from './webhook-dialog';
 import { WebhookSecretDialog, WebhookSecretDialogData } from './webhook-secret-dialog';
 import { SandboxPanel } from './sandbox-panel';
+import { ClientHistoryData, ClientHistoryPanel } from './client-history-panel';
+import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 
@@ -275,6 +277,13 @@ export class ApiClients implements OnInit {
       this.loadWebhooks();
       if ('made' in result) this.showWebhookSecret(result.made, false);
     });
+  }
+
+  /** Owner #25: every change to the client since it was made, sliding over the right. */
+  openHistory(client: ApiClientRow): void {
+    const me = this.auth.user()?.appUserId;
+    const data: ClientHistoryData = { client, sandbox: false, names: me ? { [me]: 'you' } : {} };
+    this.dialog.open(ClientHistoryPanel, sidePanelConfig(data, 'narrow', 'right'));
   }
 
   openDeliveries(webhook: WebhookRow): void {

@@ -2,7 +2,7 @@
  * A workflow's steps as the designer edits them (MIG-276): the same JSON workflow-service's WorkflowSteps reads and
  * checks, so what is published is what the engine walks. Only the fields a step's type uses are sent.
  */
-export type StepType = 'approval' | 'task' | 'condition' | 'notify' | 'run_pipeline' | 'save_dataset' | 'wait';
+export type StepType = 'approval' | 'task' | 'condition' | 'notify' | 'run_pipeline' | 'call_api' | 'save_dataset' | 'wait';
 export type WhoKind = 'user' | 'role' | 'group' | 'manager' | 'requester' | 'subject';
 
 /**
@@ -41,6 +41,11 @@ export interface DraftStep {
   // run_pipeline
   jobId?: number | null;
   onError?: 'fail' | 'continue';
+  // call_api (owner #25): a saved API request, its environment, variables from the request's fields, where the answer goes
+  requestId?: number | null;
+  environmentId?: number | null;
+  variables?: Record<string, string>;
+  saveAs?: string;
   // save_dataset
   dataset?: string;
   // wait
@@ -59,6 +64,7 @@ export const STEP_TYPES: { type: StepType; label: string; icon: string; hint: st
   { type: 'condition', label: 'Condition', icon: 'filter', hint: 'Goes one of two ways on the request\'s fields', tone: 'warn' },
   { type: 'notify', label: 'Notify', icon: 'bell', hint: 'Tells someone, and goes on', tone: 'brand' },
   { type: 'run_pipeline', label: 'Run pipeline', icon: 'play', hint: 'Starts a schedule\'s run', tone: 'info' },
+  { type: 'call_api', label: 'Call API', icon: 'send', hint: 'Sends a saved API request and keeps its answer to branch on', tone: 'info' },
   { type: 'save_dataset', label: 'Save to dataset', icon: 'database', hint: 'Keeps the request as a row', tone: 'neutral' },
   { type: 'wait', label: 'Wait', icon: 'clock', hint: 'Pauses for some hours', tone: 'neutral' },
 ];
@@ -88,6 +94,7 @@ export function newStep(type: StepType, taken: string[]): DraftStep {
     case 'condition': return { key, type, name: label, condition: { field: 'amount', op: 'gt', value: 1000 }, whenTrue: 'end', whenFalse: 'end' };
     case 'notify': return { key, type, name: label, to: { kind: 'requester' }, message: 'Your request has moved on.' };
     case 'run_pipeline': return { key, type, name: label, jobId: null, onError: 'fail' };
+    case 'call_api': return { key, type, name: label, requestId: null, variables: {}, saveAs: key.replace(/-/g, '_'), onError: 'continue' };
     case 'save_dataset': return { key, type, name: label, dataset: 'requests' };
     case 'wait': return { key, type, name: label, hours: 24 };
   }
@@ -123,6 +130,13 @@ export function toJson(steps: DraftStep[]): { steps: Record<string, unknown>[] }
           break;
         case 'run_pipeline':
           out['jobId'] = s.jobId;
+          if (s.onError === 'continue') out['onError'] = 'continue';
+          break;
+        case 'call_api':
+          out['requestId'] = s.requestId;
+          if (s.environmentId) out['environmentId'] = s.environmentId;
+          if (s.variables && Object.keys(s.variables).length) out['variables'] = s.variables;
+          if (s.saveAs) out['saveAs'] = s.saveAs;
           if (s.onError === 'continue') out['onError'] = 'continue';
           break;
         case 'save_dataset':

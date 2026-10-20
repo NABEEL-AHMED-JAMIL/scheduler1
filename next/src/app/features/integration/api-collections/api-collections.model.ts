@@ -80,6 +80,9 @@ export interface CollectionDetail {
   imports: ImportRow[];
 }
 
+/** /request/sample (AI tools batch, 2026-10-19): the newest answered call, masked and cut at the runner's sample size. */
+export interface RequestSample { requestId: number; callId: number; at: string; statusCode: number | null; truncated: boolean; body: string }
+
 /** /request/get: the whole definition, as the editor opens it. */
 export interface RequestDetail {
   requestId: number;

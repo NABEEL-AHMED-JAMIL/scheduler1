@@ -51,6 +51,14 @@ import { PageHeader } from '../../shared/ui/page-header';
                 <span class="font-medium">API reference</span>
                 <span class="block text-sm text-[color:var(--text-secondary)] mt-1">Every call, its scopes, parameters, answers and errors, with a curl call to copy.</span>
               </a>
+              <a class="card p-4 block hover:border-[color:var(--border-strong)]" [routerLink]="portal + '/clients'" data-start-clients>
+                <span class="font-medium">Your API clients</span>
+                <span class="block text-sm text-[color:var(--text-secondary)] mt-1">What each of this workspace's clients may call, with a quick start.</span>
+              </a>
+              <a class="card p-4 block hover:border-[color:var(--border-strong)]" [routerLink]="portal + '/connected'">
+                <span class="font-medium">APIs this workspace calls</span>
+                <span class="block text-sm text-[color:var(--text-secondary)] mt-1">The saved requests pipelines send, and what each last answered.</span>
+              </a>
               <a class="card p-4 block hover:border-[color:var(--border-strong)]" [routerLink]="portal + '/changelog'">
                 <span class="font-medium">Changelog</span>
                 <span class="block text-sm text-[color:var(--text-secondary)] mt-1">What changed in the API, newest first.</span>

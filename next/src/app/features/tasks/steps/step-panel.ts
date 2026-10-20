@@ -7,7 +7,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
 import {
-  LIMITS, ON_ERRORS, BucketChoice, DocumentTypeChoice, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
+  LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
   validKey,
 } from './steps.model';
 
@@ -28,6 +28,8 @@ export interface StepPanelData {
   webhooks?: WebhookChoice[];
   /** MIG-364: the workspace's document types, for a task whose settings name one. */
   documentTypes?: DocumentTypeChoice[];
+  /** Owner #25: the workspace's saved API requests, for a task whose settings name one. */
+  apiRequests?: ApiRequestChoice[];
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
   /** The settings' on-error, for what "Default" means here. */

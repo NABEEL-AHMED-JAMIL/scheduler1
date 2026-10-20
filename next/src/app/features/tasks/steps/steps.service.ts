@@ -1,12 +1,12 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, map } from 'rxjs';
+import { Observable, forkJoin, map, of, switchMap } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import { LIST_LIMIT } from '../../../core/api/list-limit';
 import { jobActionRequest } from '../../jobs/job-actions';
 import { DocumentsApi } from '../../documents/documents.service';
 import { TaskChange, TaskControlState, TaskUsage, UsageOf, UsagePipeline, UsageRuns, usageParams } from './task-usage.model';
-import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice } from './steps.model';
+import { DefinitionView, LinkedJob, BucketChoice, DocumentTypeChoice, PromptChoice, RunRow, StepLog, StepTaskEntry, Timeline, ValidateResult, STEP_WEBHOOK_EVENT, WebhookChoice, ApiRequestChoice } from './steps.model';
 
 export type DefinitionFormat = 'json' | 'yaml';
 
@@ -128,6 +128,32 @@ export class StepsApi {
         const why = !w.active ? ' (paused)' : !takes ? ` (does not take ${STEP_WEBHOOK_EVENT})` : '';
         return { id: Number(w.id), label: `#${w.id} ${w.url}${why}`, ready };
       })));
+  }
+
+  /**
+   * Owner #25: the workspace's saved API requests, each with its collection's environments -- what an api-request setting
+   * offers. The first 50 collections (the list's own order), each read once; a collection that cannot be read is left out.
+   */
+  apiRequests(): Observable<ApiRequestChoice[]> {
+    type Row = { collectionId: number; name: string };
+    type Detail = { collection: Row; requests: { requestId: number; name: string; method: string; enabled: boolean }[];
+      environments: { environmentId: number; name: string; isDefault?: boolean }[] };
+    return this.http.get<{ data?: Row[] }>(`${API_BASE}/apiCollection.json/list`, { params: { page: 1, limit: 50 } }).pipe(
+      switchMap(list => {
+        const rows = (Array.isArray(list?.data) ? list.data : []).filter(c => c.collectionId != null);
+        if (!rows.length) return of([] as ApiRequestChoice[]);
+        return forkJoin(rows.map(c => this.http.get<ApiResponse<Detail>>(`${API_BASE}/apiCollection.json/get`,
+          { params: { collectionId: c.collectionId } }).pipe(map(r => r.data ?? null)))).pipe(
+          map(details => details.flatMap(d => !d ? [] : (d.requests ?? []).map(r => ({
+            id: Number(r.requestId),
+            label: `${d.collection.name} › ${r.name}`,
+            method: (r.method || 'GET').toUpperCase(),
+            collectionId: Number(d.collection.collectionId),
+            collection: d.collection.name,
+            enabled: r.enabled !== false,
+            environments: (d.environments ?? []).map(e => ({ id: Number(e.environmentId), label: e.name + (e.isDefault ? ' (default)' : '') })),
+          })))));
+      }));
   }
 
   /** MIG-364: the workspace's document types (Document Intelligence's own list), by name, for a step that names one. */

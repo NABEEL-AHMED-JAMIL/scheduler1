@@ -3,7 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
 import {
-  CollectionDetail, CollectionRow, ImportResult, RequestDetail, RunResult, Saved, UsageRow, VersionDetail, VersionRow,
+  CollectionDetail, CollectionRow, ImportResult, RequestDetail, RequestSample, RunResult, Saved, UsageRow, VersionDetail, VersionRow,
 } from './api-collections.model';
 
 /** The list's paging, as the service answers it beside the rows. */
@@ -56,6 +56,11 @@ export class ApiCollectionsApi {
   /** Refused while in use: ERROR, with the users in data. */
   deleteCollection(collectionId: number): Observable<ApiResponse<Saved | UsageRow[]>> {
     return this.http.delete<ApiResponse<Saved | UsageRow[]>>(`${BASE}/delete`, { params: { collectionId } });
+  }
+
+  /** Owner #28: the request's newest answered call as the runner kept it (masked, cut), or null when none was kept. */
+  sample(requestId: number): Observable<ApiResponse<RequestSample | null>> {
+    return this.http.get<ApiResponse<RequestSample | null>>(`${BASE}/request/sample`, { params: { requestId } });
   }
 
   getRequest(requestId: number): Observable<ApiResponse<RequestDetail>> {

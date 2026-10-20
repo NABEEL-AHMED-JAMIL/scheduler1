@@ -263,3 +263,17 @@ describe('Workflow designer -- pipeline workflows link back (W2)', () => {
     expect(el.querySelector('[data-test="pipeline-link"]')!.textContent).toContain('Approval step');
   });
 });
+
+describe('Call API in a workflow (owner #25)', () => {
+  it('starts as a step that carries on to branch on its answer, and is sent with only its own fields', async () => {
+    const { newStep, toJson } = await import('./designer.model');
+    const step = newStep('call_api', []);
+    expect(step).toMatchObject({ key: 'call-api', type: 'call_api', requestId: null, saveAs: 'call_api', onError: 'continue' });
+    step.requestId = 12;
+    step.variables = { patient: '{{patient.id}}' };
+    expect(toJson([step]).steps[0]).toEqual({ key: 'call-api', type: 'call_api', name: 'Call API', requestId: 12,
+      variables: { patient: '{{patient.id}}' }, saveAs: 'call_api', onError: 'continue' });
+    expect(toJson([{ ...step, variables: {}, onError: 'fail', environmentId: 4 }]).steps[0]).toEqual({ key: 'call-api', type: 'call_api',
+      name: 'Call API', requestId: 12, environmentId: 4, saveAs: 'call_api' });
+  });
+});

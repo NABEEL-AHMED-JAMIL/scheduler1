@@ -1,3 +1,5 @@
+import { DeveloperClients } from './clients';
+import { DeveloperConnected } from './connected-apis';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { provideZonelessChangeDetection } from '@angular/core';
@@ -56,6 +58,8 @@ describe('MIG-336: the developer portal\'s routes and menu', () => {
       ['reference', 'API reference', DeveloperReference],
       ['guides/:slug', 'resolved', DeveloperGuide],
       ['changelog', 'API changelog', DeveloperChangelog],
+      ['clients', 'Your API clients', DeveloperClients],
+      ['connected', 'APIs this workspace calls', DeveloperConnected],
     ]);
     expect(guideTitle('no-such-guide')).toBe('Guide');
   });

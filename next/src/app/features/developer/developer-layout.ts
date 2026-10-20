@@ -72,6 +72,8 @@ export class DeveloperLayout {
       { label: 'Overview', route: PORTAL, exact: true },
       ...(DOCS.guides.length ? [{ label: 'Guides' }] : []),
       ...DOCS.guides.map(g => ({ label: g.title, route: `${PORTAL}/guides/${g.slug}`, sub: true })),
+      { label: 'Your API clients', route: `${PORTAL}/clients` },
+      { label: 'APIs this workspace calls', route: `${PORTAL}/connected` },
       { label: 'API reference', route: reference, exact: true },
       ...tags.map(t => ({ label: t.name, route: reference, fragment: `tag-${t.name}`, sub: true, mono: true })),
       { label: 'Schemas', route: reference, fragment: 'schemas', sub: true },
