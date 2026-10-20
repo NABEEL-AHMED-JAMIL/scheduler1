@@ -240,6 +240,7 @@
             @for (v of r.versions; track v.versionId) {
               <tr>
                 <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }
+                  @if (v.config?.['markAsCopy'] === true) { <span class="pill pill-neutral ml-1" title="Generated marked as COPY: every page of its files says COPY">COPY</span> }
                   @if (v.void) { <span class="pill pill-crit ml-1" [title]="'VOID: ' + v.void.reason + (v.void.by ? ' · ' + v.void.by : '')">VOID</span> }
                   @else if (canGenerate()) { <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
                 <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | rsTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
