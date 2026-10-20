@@ -5,6 +5,8 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { chartable, openVisualise } from '../../analytics/charts/visualise-open';
 import { RunOutput, formatsFor } from './run-steps.model';
 import { outputLabel } from './run-page.model';
+import { RunOutputView, RunOutputViewData, viewKind } from './run-output-view';
+import { PreviewDialog, PreviewData } from '../../objects/preview/preview-dialog';
 import { RunTimelineStore } from './run-timeline.store';
 
 /**
@@ -47,6 +49,13 @@ import { RunTimelineStore } from './run-timeline.store';
                 </div>
               </div>
               <div class="flex flex-wrap justify-end gap-1" role="group" [attr.aria-label]="'Download ' + o.name">
+                @if (canView(o)) {
+                  <button type="button" class="btn btn-default btn-xs" data-test="view"
+                          [disabled]="o.kind === 'file' ? !!o.expired || !o.runDatasetId : !o.bucket || !o.key"
+                          [attr.aria-label]="'View ' + o.name" [title]="o.expired ? 'This file has expired' : 'Look at this file here'" (click)="view(o)">
+                    <app-icon name="eye" />View
+                  </button>
+                }
                 @if (canVisualise(o)) {
                   <button type="button" class="btn btn-default btn-xs" data-test="visualise" [disabled]="o.kind === 'file' ? !!o.expired || !o.runDatasetId : !o.bucket || !o.key"
                           [attr.aria-label]="'Visualise ' + o.name" title="Suggested charts of this file" (click)="visualise(o)">
@@ -85,6 +94,20 @@ export class RunOutputs {
   readonly files = this.store.outputList;
 
   label(o: RunOutput): string { return outputLabel(o); }
+
+  /** Owner 2026-10-20: every output can be looked at in place -- an upload with the object browser's preview (any kind), a
+   *  kept file when it is a PDF or a table (RunOutputView); anything else only downloads. */
+  canView(o: RunOutput): boolean { return o.kind === 'bucket' || viewKind(o.name, o.format) !== null; }
+
+  view(o: RunOutput): void {
+    if (o.kind === 'bucket') {
+      if (!o.bucket || !o.key) return;
+      this.dialog.open<boolean, PreviewData>(PreviewDialog, { data: { bucket: o.bucket, key: o.key, name: o.name }, hasBackdrop: true });
+    } else if (o.runDatasetId && !o.expired) {
+      this.dialog.open<unknown, RunOutputViewData>(RunOutputView,
+        { data: { name: o.name, runDatasetId: o.runDatasetId, format: o.format ?? null, rowCount: o.rowCount ?? null }, hasBackdrop: true });
+    }
+  }
 
   /** MIG-357: a table the run put out can be charted -- a kept file read as rows, an upload through Analytics. */
   canVisualise(o: RunOutput): boolean { return chartable(o.name, o.format); }

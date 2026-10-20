@@ -153,7 +153,7 @@ describe('Run page: the Outputs tab', () => {
 
   it('downloads an upload from storage, by its alias and key', () => {
     const { el, http } = mount();
-    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] button:not([data-test="visualise"])')!.click();
+    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] button:not([data-test="visualise"]):not([data-test="view"])')!.click();
     const req = http.expectOne(r => r.url.endsWith('/storage.json/downloadObject'));
     expect(req.request.params.get('bucket')).toBe('ui-review-s3');
     expect(req.request.params.get('key')).toBe('registry-live-check/customers-clean.json');
@@ -181,3 +181,18 @@ describe('Run page: the Outputs tab', () => {
     expect(el.textContent).toContain('The run\'s files could not be read.');
   });
 });
+
+describe('Run page: View (owner 2026-10-20)', () => {
+  it('offers View on a kept JSON file and on a bucket upload', () => {
+    const { el } = mount();
+    expect(el.querySelectorAll('[data-test="view"]').length).toBe(2);
+  });
+
+  it('offers no View on a kept file it cannot show, and disables it on an expired one', () => {
+    const { el } = mount([{ ...KEPT, name: 'blob.bin', format: 'bin' }, { ...KEPT, runOutputId: 1002, expired: true }]);
+    const buttons = el.querySelectorAll<HTMLButtonElement>('[data-test="view"]');
+    expect(buttons.length).toBe(1);
+    expect(buttons[0].disabled).toBe(true);
+  });
+});
+
