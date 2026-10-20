@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { TestBed } from '@angular/core/testing';
 import { Block } from './designer-model';
 import { PropChange, PropertiesPanel, fieldsFor, filterRows, filterValues, opValue } from './properties';
-import { neededFields } from '../wizard/new-report';
+import { neededFields, passedStages } from '../wizard/new-report';
 
 /**
  * QA 2026-10-20 (media 3e1cb7d, e79e89c): the template's soft tints, chips, a label and value's size and list field, row
@@ -185,6 +185,14 @@ describe('Create report\'s fields', () => {
       { id: 'c', type: 'labelValue', binding: 'primary.period' },
     ] } };
     expect(neededFields(def).map(f => `${f.path}:${f.type}`)).toEqual(['accuracy:array', 'results:array', 'period:string']);
+  });
+});
+
+describe('Create report\'s checks', () => {
+  it('lists the passed checks by name, in order', () => {
+    expect(passedStages([{ stage: 'BINDINGS' }, { stage: 'ASSETS' }])).toEqual(['Template structure', 'Components', 'Data contract',
+      'Layout and page breaks', 'Renders as PDF and HTML']);
+    expect(passedStages([]).length).toBe(7);
   });
 });
 

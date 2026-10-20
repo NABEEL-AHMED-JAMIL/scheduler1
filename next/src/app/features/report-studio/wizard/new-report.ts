@@ -42,6 +42,16 @@ export interface MatchRow {
 
 /** The checks a preview runs, in the order the server runs them (spec section 22). */
 const STAGES = ['SCHEMA', 'COMPONENTS', 'DATA_CONTRACT', 'BINDINGS', 'ASSETS', 'LAYOUT', 'RENDER'];
+/** Each check's words, as the checks panel lists the passed ones (drawing 5). */
+export const STAGE_WORDS: Record<string, string> = {
+  SCHEMA: 'Template structure', COMPONENTS: 'Components', DATA_CONTRACT: 'Data contract', BINDINGS: 'Data fields',
+  ASSETS: 'Images, signatures and stamps', LAYOUT: 'Layout and page breaks', RENDER: 'Renders as PDF and HTML',
+};
+
+/** The checks a list of problems passes: every stage with no problem, in order, in words. */
+export function passedStages(problems: { stage?: string }[]): string[] {
+  return STAGES.filter(s => !problems.some(p => p.stage === s)).map(s => STAGE_WORDS[s]);
+}
 
 /** The words for a contract type. */
 export function typeWords(type: string, rows: number | null = null): string {
@@ -221,7 +231,8 @@ export class NewReport implements OnInit {
   readonly missing = computed(() => this.rows().filter(r => r.state === 'missing'));
   readonly errors = computed(() => this.problems().filter(p => p.severity === 'ERROR'));
   readonly warnings = computed(() => this.problems().filter(p => p.severity === 'WARNING'));
-  readonly passed = computed(() => STAGES.filter(s => !this.problems().some(p => p.stage === s)).length);
+  readonly passedChecks = computed(() => passedStages(this.problems()));
+  readonly passed = computed(() => this.passedChecks().length);
   readonly nextVersion = computed(() => (this.report()?.currentVersion ?? 0) + 1);
   readonly blocked = computed(() => this.errors().length > 0 || this.missing().length > 0);
 

@@ -231,6 +231,11 @@
               <span class="pill" [class]="warnings().length ? 'pill-warn' : 'pill-neutral'">{{ warnings().length }} warning{{ warnings().length === 1 ? '' : 's' }}</span>
               <span class="pill pill-ok">{{ passed() }} passed</span>
             </div>
+            @if (checkedAt() && passedChecks().length) {
+              <ul class="rsw-passed" aria-label="Passed checks">
+                @for (c of passedChecks(); track c) { <li><app-icon name="checkCircle" class="icon-ok" />{{ c }}</li> }
+              </ul>
+            }
             @if (problems().length) { <app-report-problems [problems]="problems()" [summary]="false" fixText="Fix the data mapping →" (fix)="step.set(2)" /> }
             @if (!errors().length && missing().length) {
               <button type="button" class="link-inline text-sm self-start" (click)="step.set(2)">Fix the data mapping →</button>
