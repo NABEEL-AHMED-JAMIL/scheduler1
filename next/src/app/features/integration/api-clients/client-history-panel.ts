@@ -6,7 +6,8 @@ import { LoadError } from '../../../shared/ui/load-error';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { ApiClientRow, ApiClientsApi, ClientChangeRow } from './api-clients.api';
 
-export interface ClientHistoryData { client: ApiClientRow; sandbox: boolean; names: Record<number, string> }
+/** tenantId: the workspace a platform administrator picked; none for a workspace administrator (their own). */
+export interface ClientHistoryData { client: ApiClientRow; sandbox: boolean; names: Record<number, string>; tenantId?: number | null }
 
 const ACTIONS: Record<string, string> = { CREATED: 'Made', UPDATED: 'Changed', SECRET_ROTATED: 'New secret', REVOKED: 'Revoked' };
 const FIELDS: Record<string, string> = {
@@ -67,7 +68,7 @@ export class ClientHistoryPanel {
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.history(this.data.client.clientId, this.data.sandbox).subscribe({
+    this.api.history(this.data.client.clientId, this.data.sandbox, this.data.tenantId).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status === API_SUCCESS) this.rows.set(r.data ?? []);

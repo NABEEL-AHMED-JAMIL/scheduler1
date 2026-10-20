@@ -17,6 +17,8 @@ export interface ClientDialogData {
    * the frame allow-list of its run views.
    */
   canSetLimits?: boolean;
+  /** The workspace a platform administrator picked; none for a workspace administrator (their own). */
+  tenantId?: number | null;
   /** MIG-336: a test key of the workspace's sandbox (cl_test_...), made and changed there. */
   sandbox?: boolean;
 }
@@ -175,7 +177,7 @@ export class ClientDialog {
       if (!sameFrames(this.frames(), client?.frameAncestors)) input.frameAncestors = this.frames();
     }
     if (client) {
-      this.api.update({ clientId: client.clientId, ...input }).subscribe({
+      this.api.update({ clientId: client.clientId, ...input }, this.data.tenantId).subscribe({
         next: r => {
           this.saving.set(false);
           if (r.status === API_SUCCESS) {
@@ -189,7 +191,7 @@ export class ClientDialog {
       });
       return;
     }
-    this.api.create(input).subscribe({
+    this.api.create(input, this.data.tenantId).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status === API_SUCCESS && r.data) this.ref.close({ made: r.data });

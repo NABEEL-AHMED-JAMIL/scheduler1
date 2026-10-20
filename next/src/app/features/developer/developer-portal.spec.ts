@@ -11,6 +11,7 @@ import { pageGuard } from '../../core/auth/auth.guard';
 import { AuthService } from '../../core/auth/auth.service';
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { ToastService } from '../../shared/ui/toast.service';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { DEVELOPER_ROUTES } from './developer.routes';
 import { DOCS, Guide, guideTitle } from './developer-docs';
 import { DeveloperLayout } from './developer-layout';
@@ -21,21 +22,31 @@ import { DeveloperChangelog } from './changelog';
 
 const SANDBOX = { tenantId: 2950, name: 'Northwind (sandbox)', code: 'NWSBX', status: 'Active', createdAt: '2026-10-06T09:00:00' };
 
-function configure(admin: boolean, sandbox: () => unknown = () => of({ status: 'SUCCESS', message: '', data: SANDBOX })) {
-  const api = { sandbox: vi.fn(sandbox) };
+/** A platform administrator's directory: no workspace of his own, the one this session picked last (null: none). */
+function platformDirectory(remembered: number | null) {
+  return { picks: () => true, remembered: () => remembered, names: () => new Map(), recent: () => [], workspaces: () => [], load: () => of([]),
+    choose: vi.fn(), nameOf: (id: number) => `Workspace ${id}` };
+}
+
+function configure(admin: boolean, sandbox: () => unknown = () => of({ status: 'SUCCESS', message: '', data: SANDBOX }),
+  platform?: { remembered: number | null }) {
+  const api = { sandbox: vi.fn(sandbox), list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
+    scopes: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     provideZonelessChangeDetection(),
     provideRouter([{ path: 'developers/portal', children: DEVELOPER_ROUTES }], withComponentInputBinding()),
     { provide: ApiClientsApi, useValue: api },
-    { provide: AuthService, useValue: { hasAtLeast: (role: string) => admin && role !== 'PLATFORM_ADMIN' } },
+    { provide: AuthService, useValue: { hasAtLeast: (role: string) => admin && (role !== 'PLATFORM_ADMIN' || !!platform),
+      isTenantAdmin: () => admin, isPlatformAdmin: () => !!platform, isManagedSession: () => false } },
     { provide: ToastService, useValue: { success: () => undefined, error: () => undefined } },
+    ...(platform ? [{ provide: WorkspaceDirectory, useValue: platformDirectory(platform.remembered) }] : []),
   ] });
   return api;
 }
 
-function overview(admin: boolean, sandbox?: () => unknown) {
-  const api = configure(admin, sandbox);
+function overview(admin: boolean, sandbox?: () => unknown, platform?: { remembered: number | null }) {
+  const api = configure(admin, sandbox, platform);
   const fixture = TestBed.createComponent(DeveloperOverview);
   fixture.detectChanges();
   return { api, el: fixture.nativeElement as HTMLElement };
@@ -117,6 +128,20 @@ describe('MIG-336: the overview', () => {
     expect(el.querySelector('[data-downloads]')).not.toBeNull();
   });
 
+  it('a platform administrator sees the sandbox of the workspace picked last this session', () => {
+    const { el, api } = overview(true, undefined, { remembered: 2960 });
+    expect(api.sandbox).toHaveBeenCalledWith(2960);
+    expect(el.querySelector('[data-sandbox-card]')!.textContent).toContain('Your sandbox: Northwind (sandbox)');
+  });
+
+  it('a platform administrator with no workspace picked is told where to pick one, not shown an error', () => {
+    const { el, api } = overview(true, undefined, { remembered: null });
+    expect(api.sandbox).not.toHaveBeenCalled();
+    const card = el.querySelector('[data-sandbox-card]')!;
+    expect(card.querySelector('[data-sandbox-pick]')!.textContent).toContain('Pick a workspace in API Clients to see its sandbox.');
+    expect(card.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('sends a tenant user to their administrator, and asks Identity nothing', () => {
     const { el, api } = overview(false);
     expect(api.sandbox).not.toHaveBeenCalled();
@@ -194,5 +219,32 @@ describe('MIG-336: a guide page', () => {
   it('links back from the last guide, and says so for a slug there is no guide for', () => {
     expect(guide('second').querySelector('[data-guide-previous]')!.getAttribute('href')).toBe('/developers/portal/guides/first');
     expect(guide('nope').querySelector('[data-guide-missing]')!.textContent).toContain('There is no guide called "nope".');
+  });
+});
+
+describe('Owner #28: Your API clients for each role', () => {
+  function clients(admin: boolean, platform?: { remembered: number | null }) {
+    const api = configure(admin, undefined, platform);
+    const fixture = TestBed.createComponent(DeveloperClients);
+    fixture.detectChanges();
+    return { api, fixture, page: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('a workspace administrator reads their own workspace\'s clients, with no selector', () => {
+    const { api, el } = clients(true);
+    expect(api.list).toHaveBeenCalledWith(null);
+    expect(el.querySelector('[data-test="workspace-select"]')).toBeNull();
+    expect(el.querySelector('[data-test="pick-workspace"]')).toBeNull();
+  });
+
+  it('a platform administrator picks the workspace first, then reads that one\'s clients', () => {
+    const { api, fixture, page, el } = clients(true, { remembered: null });
+    expect(api.list).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="pick-workspace"]')!.textContent).toContain('Pick a workspace to see its API clients');
+    expect(el.querySelector('app-load-error')).toBeNull();
+    page.pickWorkspace(2960);
+    fixture.detectChanges();
+    expect(api.list).toHaveBeenCalledWith(2960);
+    expect(el.querySelector('[data-test="pick-workspace"]')).toBeNull();
   });
 });

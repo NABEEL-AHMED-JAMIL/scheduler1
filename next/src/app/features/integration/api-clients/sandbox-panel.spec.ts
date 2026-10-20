@@ -85,11 +85,11 @@ describe('MIG-336: API Clients › Sandbox', () => {
     const { panel, api, opened, toasts } = setup();
     await panel.rotate(KEYS[0] as any);
     await settle();
-    expect(api.rotateSecret).toHaveBeenCalledWith(KEYS[0].clientId, true);
+    expect(api.rotateSecret).toHaveBeenCalledWith(KEYS[0].clientId, true, null);
     expect(opened.find(o => o.component === SecretDialog)!.data.rotated).toBe(true);
     await panel.revoke(KEYS[0] as any);
     await settle();
-    expect(api.revoke).toHaveBeenCalledWith(KEYS[0].clientId, true);
+    expect(api.revoke).toHaveBeenCalledWith(KEYS[0].clientId, true, null);
     expect(toasts).toContain('Test key revoked.');
   });
 

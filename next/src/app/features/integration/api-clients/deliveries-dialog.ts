@@ -9,6 +9,8 @@ import { ApiClientsApi, AttemptRow, DeliveryRow, WebhookRow } from './api-client
 
 export interface DeliveriesDialogData {
   webhook: WebhookRow;
+  /** The workspace a platform administrator picked; none for a workspace administrator (their own). */
+  tenantId?: number | null;
 }
 
 const PAGE = 50;
@@ -148,7 +150,7 @@ export class DeliveriesDialog implements OnInit {
   private fetch(before: string | null): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.deliveries(this.data.webhook.id, before, PAGE).subscribe({
+    this.api.deliveries(this.data.webhook.id, before, PAGE, this.data.tenantId).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) {
@@ -179,7 +181,7 @@ export class DeliveriesDialog implements OnInit {
     }
     this.open.set(d.id);
     this.attempts.set([]);
-    this.api.attempts(this.data.webhook.id, d.id).subscribe({
+    this.api.attempts(this.data.webhook.id, d.id, this.data.tenantId).subscribe({
       next: r => this.attempts.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.attempts.set([]),
     });
@@ -187,7 +189,7 @@ export class DeliveriesDialog implements OnInit {
 
   resend(d: DeliveryRow): void {
     this.busy.set(d.id);
-    this.api.redeliver(this.data.webhook.id, d.id).subscribe({
+    this.api.redeliver(this.data.webhook.id, d.id, this.data.tenantId).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status === API_SUCCESS && r.data) {

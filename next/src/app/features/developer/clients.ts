@@ -10,6 +10,8 @@ import { DOCS } from './developer-docs';
 import { DevCode } from './code-block';
 import { operationsOf } from './openapi';
 import { methodClass } from './reference-model';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { contractScopes, coverageOf, quickStart } from './client-model';
 import { PORTAL } from './guide-markdown';
 
@@ -19,20 +21,27 @@ import { PORTAL } from './guide-markdown';
  * lacks, and a quick start (a token with its client id, then its first call). The scopes are Identity's live list
  * (apiClient.json/scopes); a scope the contract asks for that Identity does not offer, or one Identity offers that no
  * call asks for, is said here as a disagreement (and fails the console's developer-docs check and the portal e2e).
- * Workspace administrators (who manage the clients); anyone else with the portal's page sees how to ask for one.
+ * Workspace administrators (who manage the clients); anyone else with the portal's page sees how to ask for one. A
+ * platform administrator picks the workspace in the header (the shared selector, opening on this session's last pick).
  */
 @Component({
   selector: 'app-developer-clients',
-  imports: [PageHeader, RouterLink, Icon, LoadError, DevCode],
+  imports: [PageHeader, RouterLink, Icon, LoadError, DevCode, WorkspaceSelect],
   template: `
     <div class="page" data-developer-clients>
       <app-page-header title="Your API clients"
-                       subtitle="What each of this workspace's API clients may call, and how it starts." />
+                       subtitle="What each of this workspace's API clients may call, and how it starts.">
+        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
+      </app-page-header>
 
       @if (!admin()) {
         <section class="card p-4 text-sm text-[color:var(--text-secondary)]">
           API clients are made by a workspace administrator under Developers › API Clients. Ask one for a client with the
           scopes your system needs; the reference names the scope each call asks for.
+        </section>
+      } @else if (needsWorkspace()) {
+        <section class="card p-8 text-center text-sm text-[color:var(--text-muted)]" data-test="pick-workspace">
+          Pick a workspace to see its API clients and what each may call.
         </section>
       } @else if (error()) {
         <app-load-error [message]="error()" (retry)="load()" />
@@ -121,9 +130,13 @@ import { PORTAL } from './guide-markdown';
 export class DeveloperClients {
   private readonly api = inject(ApiClientsApi);
   private readonly auth = inject(AuthService);
+  private readonly directory = inject(WorkspaceDirectory);
 
   readonly portal = PORTAL;
   readonly operations = operationsOf(DOCS.spec);
+  /** The workspace a platform administrator picked; null for anyone else (their own). */
+  readonly tenantId = signal<number | null>(this.directory.remembered());
+  readonly needsWorkspace = computed(() => this.directory.picks() && this.tenantId() === null);
   readonly admin = computed(() => this.auth.isTenantAdmin());
   readonly clients = signal<ApiClientRow[]>([]);
   readonly scopes = signal<ScopeRow[] | null>(null);
@@ -148,21 +161,35 @@ export class DeveloperClients {
   });
 
   constructor() {
-    if (this.admin()) this.load();
+    if (this.admin() && !this.needsWorkspace()) this.load();
+  }
+
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
+    this.clients.set([]);
+    this.chosen.set(null);
+    this.error.set('');
+    if (id !== null) this.load();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.list().subscribe({
+    const asked = this.tenantId();
+    this.api.list(asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message || 'Could not read the API clients.'); return; }
         const active = (r.data ?? []).filter(c => c.status === 'Active');
         this.clients.set(active);
         if (!this.chosen() && active.length) this.chosen.set(active[0]);
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the API clients.'); },
+      error: err => {
+        if (asked !== this.tenantId()) return;
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Could not read the API clients.');
+      },
     });
     this.api.scopes().subscribe({
       next: r => { if (r.status === API_SUCCESS) this.scopes.set(r.data ?? []); },

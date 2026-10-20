@@ -191,9 +191,24 @@ export interface AttemptRow {
   error: string | null;
 }
 
+/** A platform administrator's workspace as a query parameter; nothing for anyone else (they work in their own). */
+function scoped(params: Record<string, string>, tenantId?: number | null): Record<string, string> {
+  if (tenantId) params['tenantId'] = String(tenantId);
+  return params;
+}
+
+/** A platform administrator's workspace in a request body; the body as it is for anyone else. */
+function scopedBody<T extends object>(body: T, tenantId?: number | null): T & { tenantId?: number } {
+  return tenantId ? { ...body, tenantId } : body;
+}
+
 /**
  * MIG-332: the customer API's API clients (identity-service, apiClient.json) and event routes (Core, eventRoute.json),
  * a workspace administrator's; MIG-333: its webhooks and their deliveries (integration-service, webhook.json).
+ *
+ * Every workspace call takes an optional tenantId: the workspace a platform administrator picked (he has none of his own).
+ * It is left out for a workspace administrator, whose calls are always their own workspace's (each service ignores
+ * anyone else's tenantId). The scopes and the webhook event catalogue are the platform's, the same for every workspace.
  */
 @Injectable({ providedIn: 'root' })
 export class ApiClientsApi {
@@ -207,47 +222,48 @@ export class ApiClientsApi {
   }
 
   /** Owner #25: every change to the client, newest first. */
-  history(clientId: string, sandbox = false): Observable<ApiResponse<ClientChangeRow[]>> {
+  history(clientId: string, sandbox = false, tenantId?: number | null): Observable<ApiResponse<ClientChangeRow[]>> {
     const params: Record<string, string> = { clientId };
     if (sandbox) params['sandbox'] = 'true';
-    return this.http.get<ApiResponse<ClientChangeRow[]>>(`${this.clients}/history`, { params });
+    return this.http.get<ApiResponse<ClientChangeRow[]>>(`${this.clients}/history`, { params: scoped(params, tenantId) });
   }
 
-  list(): Observable<ApiResponse<ApiClientRow[]>> {
-    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`);
+  list(tenantId?: number | null): Observable<ApiResponse<ApiClientRow[]>> {
+    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`, { params: scoped({}, tenantId) });
   }
 
-  create(input: ApiClientInput): Observable<ApiResponse<ApiClientWithSecret>> {
-    return this.http.post<ApiResponse<ApiClientWithSecret>>(`${this.clients}/create`, input);
+  create(input: ApiClientInput, tenantId?: number | null): Observable<ApiResponse<ApiClientWithSecret>> {
+    return this.http.post<ApiResponse<ApiClientWithSecret>>(`${this.clients}/create`, scopedBody(input, tenantId));
   }
 
-  update(input: ApiClientInput): Observable<ApiResponse<ApiClientRow>> {
-    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/update`, input);
+  update(input: ApiClientInput, tenantId?: number | null): Observable<ApiResponse<ApiClientRow>> {
+    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/update`, scopedBody(input, tenantId));
   }
 
   /** `sandbox`: a test key of the workspace's sandbox (MIG-336). */
-  rotateSecret(clientId: string, sandbox = false): Observable<ApiResponse<ApiClientWithSecret>> {
-    return this.http.post<ApiResponse<ApiClientWithSecret>>(`${this.clients}/rotateSecret`, sandbox ? { clientId, sandbox } : { clientId });
+  rotateSecret(clientId: string, sandbox = false, tenantId?: number | null): Observable<ApiResponse<ApiClientWithSecret>> {
+    return this.http.post<ApiResponse<ApiClientWithSecret>>(`${this.clients}/rotateSecret`,
+      scopedBody(sandbox ? { clientId, sandbox } : { clientId }, tenantId));
   }
 
-  revoke(clientId: string, sandbox = false): Observable<ApiResponse<ApiClientRow>> {
-    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revoke`, sandbox ? { clientId, sandbox } : { clientId });
+  revoke(clientId: string, sandbox = false, tenantId?: number | null): Observable<ApiResponse<ApiClientRow>> {
+    return this.http.post<ApiResponse<ApiClientRow>>(`${this.clients}/revoke`,
+      scopedBody(sandbox ? { clientId, sandbox } : { clientId }, tenantId));
   }
 
   /** MIG-336: the workspace's sandbox, or null when our team has not made one. */
-  sandbox(): Observable<ApiResponse<SandboxInfo | null>> {
-    return this.http.get<ApiResponse<SandboxInfo | null>>(`${this.clients}/sandbox`);
+  sandbox(tenantId?: number | null): Observable<ApiResponse<SandboxInfo | null>> {
+    return this.http.get<ApiResponse<SandboxInfo | null>>(`${this.clients}/sandbox`, { params: scoped({}, tenantId) });
   }
 
   /** MIG-336: the sandbox's test keys (client ids start cl_test_). */
-  sandboxList(): Observable<ApiResponse<ApiClientRow[]>> {
-    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`, { params: { sandbox: 'true' } });
+  sandboxList(tenantId?: number | null): Observable<ApiResponse<ApiClientRow[]>> {
+    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`, { params: scoped({ sandbox: 'true' }, tenantId) });
   }
 
   /** MIG-337: the workspace's API limits; a platform administrator names the workspace. */
   limits(tenantId?: number | null): Observable<ApiResponse<ApiLimitsRow>> {
-    const params: Record<string, string> = tenantId ? { tenantId: String(tenantId) } : {};
-    return this.http.get<ApiResponse<ApiLimitsRow>>(`${this.clients}/limits`, { params });
+    return this.http.get<ApiResponse<ApiLimitsRow>>(`${this.clients}/limits`, { params: scoped({}, tenantId) });
   }
 
   /** MIG-337: a workspace's bounds -- the platform administrator's. 0 or null: the default; monthlyCalls 0: no quota. */
@@ -257,62 +273,66 @@ export class ApiClientsApi {
 
   /** MIG-337: a workspace's clients, for a platform administrator naming it (an invoice's "by client" lines). */
   listOf(tenantId?: number | null): Observable<ApiResponse<ApiClientRow[]>> {
-    const params: Record<string, string> = tenantId ? { tenantId: String(tenantId) } : {};
-    return this.http.get<ApiResponse<ApiClientRow[]>>(`${this.clients}/list`, { params });
+    return this.list(tenantId);
   }
 
-  routesList(): Observable<ApiResponse<EventRouteRow[]>> {
-    return this.http.get<ApiResponse<EventRouteRow[]>>(`${this.routes}/list`);
+  routesList(tenantId?: number | null): Observable<ApiResponse<EventRouteRow[]>> {
+    return this.http.get<ApiResponse<EventRouteRow[]>>(`${this.routes}/list`, { params: scoped({}, tenantId) });
   }
 
-  routeTargets(): Observable<ApiResponse<{ pipelines: RouteTarget[] }>> {
-    return this.http.get<ApiResponse<{ pipelines: RouteTarget[] }>>(`${this.routes}/targets`);
+  routeTargets(tenantId?: number | null): Observable<ApiResponse<{ pipelines: RouteTarget[] }>> {
+    return this.http.get<ApiResponse<{ pipelines: RouteTarget[] }>>(`${this.routes}/targets`, { params: scoped({}, tenantId) });
   }
 
-  saveRoute(input: EventRouteInput): Observable<ApiResponse<EventRouteRow>> {
-    return this.http.post<ApiResponse<EventRouteRow>>(`${this.routes}/save`, input);
+  saveRoute(input: EventRouteInput, tenantId?: number | null): Observable<ApiResponse<EventRouteRow>> {
+    return this.http.post<ApiResponse<EventRouteRow>>(`${this.routes}/save`, scopedBody(input, tenantId));
   }
 
-  deleteRoute(routeId: number): Observable<ApiResponse> {
-    return this.http.post<ApiResponse>(`${this.routes}/delete`, { routeId });
+  deleteRoute(routeId: number, tenantId?: number | null): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.routes}/delete`, scopedBody({ routeId }, tenantId));
   }
 
   eventTypes(): Observable<ApiResponse<EventTypeRow[]>> {
     return this.http.get<ApiResponse<EventTypeRow[]>>(`${this.webhooks}/eventTypes`);
   }
 
-  webhookList(): Observable<ApiResponse<WebhookRow[]>> {
-    return this.http.get<ApiResponse<WebhookRow[]>>(`${this.webhooks}/list`);
+  /** Without a tenantId a platform administrator would be answered every workspace's webhooks: the page always names one. */
+  webhookList(tenantId?: number | null): Observable<ApiResponse<WebhookRow[]>> {
+    return this.http.get<ApiResponse<WebhookRow[]>>(`${this.webhooks}/list`, { params: scoped({}, tenantId) });
   }
 
-  createWebhook(input: WebhookInput): Observable<ApiResponse<WebhookWithSecret>> {
-    return this.http.post<ApiResponse<WebhookWithSecret>>(`${this.webhooks}/create`, input);
+  createWebhook(input: WebhookInput, tenantId?: number | null): Observable<ApiResponse<WebhookWithSecret>> {
+    return this.http.post<ApiResponse<WebhookWithSecret>>(`${this.webhooks}/create`, scopedBody(input, tenantId));
   }
 
-  updateWebhook(input: WebhookInput): Observable<ApiResponse<WebhookRow>> {
-    return this.http.post<ApiResponse<WebhookRow>>(`${this.webhooks}/update`, input);
+  /**
+   * The calls below name one webhook by its id. integration-service lets a platform administrator reach any webhook by id
+   * and reads no tenantId on them today; it is sent anyway so each call says which workspace the page is showing.
+   */
+  updateWebhook(input: WebhookInput, tenantId?: number | null): Observable<ApiResponse<WebhookRow>> {
+    return this.http.post<ApiResponse<WebhookRow>>(`${this.webhooks}/update`, scopedBody(input, tenantId));
   }
 
-  deleteWebhook(webhookId: string): Observable<ApiResponse> {
-    return this.http.post<ApiResponse>(`${this.webhooks}/delete`, { webhookId });
+  deleteWebhook(webhookId: string, tenantId?: number | null): Observable<ApiResponse> {
+    return this.http.post<ApiResponse>(`${this.webhooks}/delete`, scopedBody({ webhookId }, tenantId));
   }
 
-  rotateWebhookSecret(webhookId: string): Observable<ApiResponse<WebhookWithSecret>> {
-    return this.http.post<ApiResponse<WebhookWithSecret>>(`${this.webhooks}/rotateSecret`, { webhookId });
+  rotateWebhookSecret(webhookId: string, tenantId?: number | null): Observable<ApiResponse<WebhookWithSecret>> {
+    return this.http.post<ApiResponse<WebhookWithSecret>>(`${this.webhooks}/rotateSecret`, scopedBody({ webhookId }, tenantId));
   }
 
   /** Newest first; `before` is the last id of the page shown. */
-  deliveries(webhookId: string, before?: string | null, limit = 50): Observable<ApiResponse<DeliveryRow[]>> {
+  deliveries(webhookId: string, before?: string | null, limit = 50, tenantId?: number | null): Observable<ApiResponse<DeliveryRow[]>> {
     const params: Record<string, string> = { webhookId, limit: String(limit) };
     if (before) params['before'] = before;
-    return this.http.get<ApiResponse<DeliveryRow[]>>(`${this.webhooks}/deliveries`, { params });
+    return this.http.get<ApiResponse<DeliveryRow[]>>(`${this.webhooks}/deliveries`, { params: scoped(params, tenantId) });
   }
 
-  attempts(webhookId: string, deliveryId: string): Observable<ApiResponse<AttemptRow[]>> {
-    return this.http.get<ApiResponse<AttemptRow[]>>(`${this.webhooks}/attempts`, { params: { webhookId, deliveryId } });
+  attempts(webhookId: string, deliveryId: string, tenantId?: number | null): Observable<ApiResponse<AttemptRow[]>> {
+    return this.http.get<ApiResponse<AttemptRow[]>>(`${this.webhooks}/attempts`, { params: scoped({ webhookId, deliveryId }, tenantId) });
   }
 
-  redeliver(webhookId: string, deliveryId: string): Observable<ApiResponse<DeliveryRow>> {
-    return this.http.post<ApiResponse<DeliveryRow>>(`${this.webhooks}/redeliver`, { webhookId, deliveryId });
+  redeliver(webhookId: string, deliveryId: string, tenantId?: number | null): Observable<ApiResponse<DeliveryRow>> {
+    return this.http.post<ApiResponse<DeliveryRow>>(`${this.webhooks}/redeliver`, scopedBody({ webhookId, deliveryId }, tenantId));
   }
 }

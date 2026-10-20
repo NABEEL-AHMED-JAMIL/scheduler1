@@ -9,245 +9,264 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <app-refresh-button [loading]="loading()" (refresh)="load(); loadRoutes(); loadWebhooks()" />
-        <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
-          <app-icon name="plus" />New API client
-        </button>
+        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
+        @if (!needsWorkspace()) {
+          <app-refresh-button [loading]="loading()" (refresh)="loadAll()" />
+          <button type="button" class="btn btn-primary btn-sm" (click)="openNew()" [disabled]="!scopes().length">
+            <app-icon name="plus" />New API client
+          </button>
+        }
       </div>
     </div>
   </app-page-header>
 
-  @if (limits()?.bounds && limits(); as l) {
-    <div class="card p-4 mb-3 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm" data-api-limits>
-      <div>
-        <div class="text-xs text-[color:var(--text-muted)]">Each client</div>
-        <div>at most {{ l.bounds.clientRateMax.toLocaleString() }} calls a minute · burst {{ l.bounds.clientBurstMax.toLocaleString() }}</div>
-      </div>
-      <div>
-        <div class="text-xs text-[color:var(--text-muted)]">All clients together</div>
-        <div>{{ l.bounds.workspaceRate.toLocaleString() }} calls a minute · burst {{ l.bounds.workspaceBurst.toLocaleString() }}</div>
-      </div>
-      <div>
-        <div class="text-xs text-[color:var(--text-muted)]">This month{{ l.month ? ' (' + l.month + ', UTC)' : '' }}</div>
-        <div [class]="l.quotaWarning ? 'text-[color:var(--color-warn-600)]' : ''" data-api-quota>
-          {{ quotaLine(l) }}
-          @if (l.quotaWarning) { <span class="pill pill-warn ml-1">{{ (l.quotaUsedPercent ?? 0) >= 100 ? 'Quota used up' : 'Nearly used up' }}</span> }
-        </div>
-      </div>
-      <p class="text-xs text-[color:var(--text-muted)] basis-full">
-        Past a limit the API answers 429 with Retry-After. API calls are billed per 1,000 (Billing › Cost &amp; usage). Our team sets these
-        limits; ask your account team to change them.
-      </p>
+  @if (needsWorkspace()) {
+    <!-- A platform administrator has no workspace of his own: nothing is read until he picks one. -->
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" data-test="pick-workspace">
+      Pick a workspace to see its API clients, sandbox, event routes and webhooks.
     </div>
-  }
+  } @else {
+    @if (limits()?.bounds && limits(); as l) {
+      <div class="card p-4 mb-3 flex flex-wrap items-center gap-x-8 gap-y-2 text-sm" data-api-limits>
+        <div>
+          <div class="text-xs text-[color:var(--text-muted)]">Each client</div>
+          <div>at most {{ l.bounds.clientRateMax.toLocaleString() }} calls a minute · burst {{ l.bounds.clientBurstMax.toLocaleString() }}</div>
+        </div>
+        <div>
+          <div class="text-xs text-[color:var(--text-muted)]">All clients together</div>
+          <div>{{ l.bounds.workspaceRate.toLocaleString() }} calls a minute · burst {{ l.bounds.workspaceBurst.toLocaleString() }}</div>
+        </div>
+        <div>
+          <div class="text-xs text-[color:var(--text-muted)]">This month{{ l.month ? ' (' + l.month + ', ' + (l.monthTimeZone || 'UTC') + ')' : '' }}</div>
+          <div [class]="l.quotaWarning ? 'text-[color:var(--color-warn-600)]' : ''" data-api-quota>
+            {{ quotaLine(l) }}
+            @if (l.quotaWarning) { <span class="pill pill-warn ml-1">{{ (l.quotaUsedPercent ?? 0) >= 100 ? 'Quota used up' : 'Nearly used up' }}</span> }
+          </div>
+        </div>
+        @if (directory.picks()) {
+          <button type="button" class="btn btn-default btn-sm ml-auto" (click)="changeLimits()" data-change-limits>
+            <app-icon name="edit" />Change limits
+          </button>
+        }
+        <p class="text-xs text-[color:var(--text-muted)] basis-full">
+          Past a limit the API answers 429 with Retry-After. API calls are billed per 1,000 (Billing › Cost &amp; usage).
+          @if (directory.picks()) {
+            These are this workspace's bounds: change them with Change limits.
+          } @else {
+            Our team sets these limits; ask your account team to change them.
+          }
+        </p>
+      </div>
+    }
 
-  <app-table-shell heading="API clients" [loading]="loading()" [error]="error()"
-                   [isEmpty]="!shown().length" [shown]="shown().length"
-                   [emptyMessage]="clients().length ? 'Every client here is revoked.' : 'No API clients yet. Make one for each system that calls the API.'"
-                   emptyIcon="key" (retry)="load()">
-    <ng-container toolbar>
-      @if (revokedCount()) {
-        <label class="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
-          <input type="checkbox" class="checkbox" [checked]="showRevoked()" (change)="showRevoked.set($any($event.target).checked)" />
-          Show revoked ({{ revokedCount() }})
-        </label>
+    <app-table-shell heading="API clients" [loading]="loading()" [error]="error()"
+                     [isEmpty]="!shown().length" [shown]="shown().length"
+                     [emptyMessage]="clients().length ? 'Every client here is revoked.' : 'No API clients yet. Make one for each system that calls the API.'"
+                     emptyIcon="key" (retry)="load()">
+      <ng-container toolbar>
+        @if (revokedCount()) {
+          <label class="inline-flex items-center gap-1.5 text-sm whitespace-nowrap">
+            <input type="checkbox" class="checkbox" [checked]="showRevoked()" (change)="showRevoked.set($any($event.target).checked)" />
+            Show revoked ({{ revokedCount() }})
+          </label>
+        }
+      </ng-container>
+      <table class="table-modern" data-api-clients>
+        <thead>
+          <tr>
+            <th>Client</th>
+            <th>Scopes</th>
+            <th>Allowed from</th>
+            <th>Limit</th>
+            <th class="text-right">Calls this month</th>
+            <th>Last used</th>
+            <th>Expires</th>
+            <th class="text-right">State</th>
+            <th class="w-12 th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of shown(); track c.clientId) {
+            <tr [class.opacity-70]="c.status !== 'Active'">
+              <td class="max-w-64">
+                <div class="font-medium truncate">{{ c.name }}</div>
+                <div class="mono text-xs text-[color:var(--text-muted)] truncate">{{ c.clientId }}</div>
+              </td>
+              <td class="max-w-80">
+                <div class="flex flex-wrap gap-1">
+                  @for (s of c.scopes; track s) { <span class="pill pill-neutral mono">{{ s }}</span> }
+                </div>
+              </td>
+              <td class="text-[color:var(--text-secondary)]" data-client-allowed>
+                {{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}
+                @if (c.frameAncestors?.length) {
+                  <div class="text-xs text-[color:var(--text-muted)] mt-0.5" data-client-embeds>Run views embed on {{ c.frameAncestors!.join(', ') }}</div>
+                }
+              </td>
+              <td class="text-[color:var(--text-secondary)] whitespace-nowrap" data-client-limit>
+                {{ limitOf(c) }}
+                @if (c.ratePerMinute == null && c.burst == null) { <div class="text-xs text-[color:var(--text-muted)]">the workspace's most</div> }
+                @if (c.limit?.capped) { <div class="text-xs text-[color:var(--color-warn-600)]">capped by the workspace's limit</div> }
+              </td>
+              <td class="text-right tabular-nums" data-client-calls>{{ c.callsThisMonth == null ? '—' : c.callsThisMonth.toLocaleString() }}</td>
+              <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                {{ c.lastUsedAt ? (c.lastUsedAt | serverTime: 'dateTime') : 'Never' }}
+              </td>
+              <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.expiresAt ? (c.expiresAt | serverTime: 'date') : '—' }}</td>
+              <td class="text-right"><span [class]="statusPill(c)">{{ c.status }}</span></td>
+              <td class="text-right">
+                @if (c.status !== 'Revoked') {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="clientMenu"
+                          [attr.aria-label]="'Actions for ' + c.name" [disabled]="busy() === c.clientId">
+                    <app-icon name="dots" size="1em" [busy]="busy() === c.clientId" />
+                  </button>
+                  <ng-template #clientMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openClient(c)"><app-icon name="edit" />Change</button>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotate(c)"><app-icon name="refresh" />New secret</button>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openHistory(c)"><app-icon name="history" />History</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="revoke(c)">
+                        <app-icon name="power" class="icon-crit" />Revoke
+                      </button>
+                    </div>
+                  </ng-template>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+
+    <!-- MIG-336: the workspace's sandbox and its test keys; #sandbox is linked from the Developer portal. -->
+    <app-sandbox-panel [scopes]="scopes()" [tenantId]="tenantId()" />
+
+    <div class="flex items-center justify-between gap-2 mt-6 mb-2">
+      <div>
+        <h2 class="text-base font-semibold">Event routes</h2>
+        <p class="text-sm text-[color:var(--text-muted)]">Which pipeline or workflow each of your event types starts when your systems send it.</p>
+      </div>
+      @if (auth.canBuild()) {
+        <button type="button" class="btn btn-default btn-sm" (click)="openRoute(null)"><app-icon name="plus" />New event route</button>
       }
-    </ng-container>
-    <table class="table-modern" data-api-clients>
-      <thead>
-        <tr>
-          <th>Client</th>
-          <th>Scopes</th>
-          <th>Allowed from</th>
-          <th>Limit</th>
-          <th class="text-right">Calls this month</th>
-          <th>Last used</th>
-          <th>Expires</th>
-          <th class="text-right">State</th>
-          <th class="w-12 th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (c of shown(); track c.clientId) {
-          <tr [class.opacity-70]="c.status !== 'Active'">
-            <td class="max-w-64">
-              <div class="font-medium truncate">{{ c.name }}</div>
-              <div class="mono text-xs text-[color:var(--text-muted)] truncate">{{ c.clientId }}</div>
-            </td>
-            <td class="max-w-80">
-              <div class="flex flex-wrap gap-1">
-                @for (s of c.scopes; track s) { <span class="pill pill-neutral mono">{{ s }}</span> }
-              </div>
-            </td>
-            <td class="text-[color:var(--text-secondary)]" data-client-allowed>
-              {{ c.ipAllowlist.length ? c.ipAllowlist.join(', ') : 'Any address' }}
-              @if (c.frameAncestors?.length) {
-                <div class="text-xs text-[color:var(--text-muted)] mt-0.5" data-client-embeds>Run views embed on {{ c.frameAncestors!.join(', ') }}</div>
-              }
-            </td>
-            <td class="text-[color:var(--text-secondary)] whitespace-nowrap" data-client-limit>
-              {{ limitOf(c) }}
-              @if (c.ratePerMinute == null && c.burst == null) { <div class="text-xs text-[color:var(--text-muted)]">the workspace's most</div> }
-              @if (c.limit?.capped) { <div class="text-xs text-[color:var(--color-warn-600)]">capped by the workspace's limit</div> }
-            </td>
-            <td class="text-right tabular-nums" data-client-calls>{{ c.callsThisMonth == null ? '—' : c.callsThisMonth.toLocaleString() }}</td>
-            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-              {{ c.lastUsedAt ? (c.lastUsedAt | serverTime: 'dateTime') : 'Never' }}
-            </td>
-            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.expiresAt ? (c.expiresAt | serverTime: 'date') : '—' }}</td>
-            <td class="text-right"><span [class]="statusPill(c)">{{ c.status }}</span></td>
-            <td class="text-right">
-              @if (c.status !== 'Revoked') {
-                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="clientMenu"
-                        [attr.aria-label]="'Actions for ' + c.name" [disabled]="busy() === c.clientId">
-                  <app-icon name="dots" size="1em" [busy]="busy() === c.clientId" />
+    </div>
+    <app-managed-banner what="event routes" />
+    <app-table-shell heading="Event routes" [loading]="routesLoading()" [error]="routesError()"
+                     [isEmpty]="!routes().length" [shown]="routes().length"
+                     emptyMessage="No event routes yet. An event of a type no route takes is refused."
+                     emptyIcon="zap" (retry)="loadRoutes()">
+      <table class="table-modern" data-event-routes>
+        <thead>
+          <tr>
+            <th>Event type</th>
+            <th>Starts</th>
+            <th>Contract</th>
+            <th class="text-right">State</th>
+            <th class="w-12 th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of routes(); track r.routeId) {
+            <tr [class.opacity-70]="!r.active">
+              <td class="mono">{{ r.eventType }}</td>
+              <td>{{ targetOf(r) }}</td>
+              <td class="text-[color:var(--text-secondary)]">{{ r.contractName || (r.contractId ? 'Contract ' + r.contractId : '—') }}</td>
+              <td class="text-right"><span [class]="r.active ? 'pill pill-ok' : 'pill pill-neutral'">{{ r.active ? 'Active' : 'Inactive' }}</span></td>
+              <td class="text-right whitespace-nowrap">
+                @if (auth.canBuild()) {
+                  <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Change the route for ' + r.eventType" (click)="openRoute(r)">
+                    <app-icon name="edit" />Change
+                  </button>
+                  <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="routeBusy() === r.routeId"
+                          [attr.aria-label]="'Remove the route for ' + r.eventType" (click)="removeRoute(r)">
+                    <app-icon name="trash" />Remove
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+
+    <div class="flex items-center justify-between gap-2 mt-6 mb-2">
+      <div>
+        <h2 class="text-base font-semibold">Webhooks</h2>
+        <p class="text-sm text-[color:var(--text-muted)]">
+          Where the platform tells your systems what happened (a run started, finished or failed, a review, a file ready), as a
+          signed POST to a URL of yours.
+        </p>
+      </div>
+      @if (auth.canBuild()) {
+        <button type="button" class="btn btn-default btn-sm whitespace-nowrap shrink-0" (click)="openWebhook(null)" [disabled]="!eventTypes().length">
+          <app-icon name="plus" />New webhook
+        </button>
+      }
+    </div>
+    <app-managed-banner what="webhooks" still="You can still see what was sent and send a delivery again." />
+    <app-table-shell heading="Webhooks" [loading]="webhooksLoading()" [error]="webhooksError()"
+                     [isEmpty]="!webhooks().length" [shown]="webhooks().length"
+                     emptyMessage="No webhooks yet. Add one to be told when runs finish, fail or wait for your review."
+                     emptyIcon="send" (retry)="loadWebhooks()">
+      <table class="table-modern" data-webhooks>
+        <thead>
+          <tr>
+            <th>URL</th>
+            <th>Events</th>
+            <th>Last delivered</th>
+            <th class="text-right">State</th>
+            <th class="w-12 th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (w of webhooks(); track w.id) {
+            <tr [class.opacity-70]="!w.active">
+              <td class="max-w-96">
+                <div class="mono truncate" [title]="w.url">{{ w.url }}</div>
+                <div class="text-xs text-[color:var(--text-muted)] truncate">
+                  {{ w.createdBy ? 'Added by ' + w.createdBy : '' }}
+                  @if (w.pausedReason) { <span [title]="w.pausedReason"> · {{ w.pausedReason }}</span> }
+                </div>
+              </td>
+              <td class="max-w-96">
+                <div class="flex flex-wrap gap-1">
+                  @for (t of w.eventTypes; track t) { <span class="pill pill-neutral mono">{{ t }}</span> }
+                </div>
+              </td>
+              <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
+                {{ w.lastSuccessAt ? (w.lastSuccessAt | serverTime: 'dateTime') : 'Never' }}
+                @if (w.failingSince) {
+                  <div class="text-xs text-[color:var(--color-warn-600)]">failing since {{ w.failingSince | serverTime: 'dateTime' }}</div>
+                }
+              </td>
+              <td class="text-right"><span [class]="webhookPill(w)">{{ webhookState(w) }}</span></td>
+              <td class="text-right">
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="webhookMenu"
+                        [attr.aria-label]="'Actions for the webhook to ' + w.url" [disabled]="webhookBusy() === w.id">
+                  <app-icon name="dots" size="1em" [busy]="webhookBusy() === w.id" />
                 </button>
-                <ng-template #clientMenu>
+                <ng-template #webhookMenu>
                   <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openClient(c)"><app-icon name="edit" />Change</button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotate(c)"><app-icon name="refresh" />New secret</button>
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openHistory(c)"><app-icon name="history" />History</button>
-                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="revoke(c)">
-                      <app-icon name="power" class="icon-crit" />Revoke
-                    </button>
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openDeliveries(w)"><app-icon name="list" />Deliveries</button>
+                    @if (auth.canBuild()) {
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openWebhook(w)"><app-icon name="edit" />Change</button>
+                      @if (w.active) {
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setWebhookActive(w, false)"><app-icon name="pause" />Pause</button>
+                      } @else {
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setWebhookActive(w, true)"><app-icon name="play" />Resume</button>
+                      }
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotateWebhook(w)"><app-icon name="refresh" />New secret</button>
+                      <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWebhook(w)">
+                        <app-icon name="trash" class="icon-crit" />Remove
+                      </button>
+                    }
                   </div>
                 </ng-template>
-              }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </app-table-shell>
-
-  <!-- MIG-336: the workspace's sandbox and its test keys; #sandbox is linked from the Developer portal. -->
-  <app-sandbox-panel [scopes]="scopes()" />
-
-  <div class="flex items-center justify-between gap-2 mt-6 mb-2">
-    <div>
-      <h2 class="text-base font-semibold">Event routes</h2>
-      <p class="text-sm text-[color:var(--text-muted)]">Which pipeline or workflow each of your event types starts when your systems send it.</p>
-    </div>
-    @if (auth.canBuild()) {
-      <button type="button" class="btn btn-default btn-sm" (click)="openRoute(null)"><app-icon name="plus" />New event route</button>
-    }
-  </div>
-  <app-managed-banner what="event routes" />
-  <app-table-shell heading="Event routes" [loading]="routesLoading()" [error]="routesError()"
-                   [isEmpty]="!routes().length" [shown]="routes().length"
-                   emptyMessage="No event routes yet. An event of a type no route takes is refused."
-                   emptyIcon="zap" (retry)="loadRoutes()">
-    <table class="table-modern" data-event-routes>
-      <thead>
-        <tr>
-          <th>Event type</th>
-          <th>Starts</th>
-          <th>Contract</th>
-          <th class="text-right">State</th>
-          <th class="w-12 th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (r of routes(); track r.routeId) {
-          <tr [class.opacity-70]="!r.active">
-            <td class="mono">{{ r.eventType }}</td>
-            <td>{{ targetOf(r) }}</td>
-            <td class="text-[color:var(--text-secondary)]">{{ r.contractName || (r.contractId ? 'Contract ' + r.contractId : '—') }}</td>
-            <td class="text-right"><span [class]="r.active ? 'pill pill-ok' : 'pill pill-neutral'">{{ r.active ? 'Active' : 'Inactive' }}</span></td>
-            <td class="text-right whitespace-nowrap">
-              @if (auth.canBuild()) {
-                <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Change the route for ' + r.eventType" (click)="openRoute(r)">
-                  <app-icon name="edit" />Change
-                </button>
-                <button type="button" class="btn btn-ghost btn-sm btn-intent-crit" [disabled]="routeBusy() === r.routeId"
-                        [attr.aria-label]="'Remove the route for ' + r.eventType" (click)="removeRoute(r)">
-                  <app-icon name="trash" />Remove
-                </button>
-              }
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </app-table-shell>
-
-  <div class="flex items-center justify-between gap-2 mt-6 mb-2">
-    <div>
-      <h2 class="text-base font-semibold">Webhooks</h2>
-      <p class="text-sm text-[color:var(--text-muted)]">
-        Where the platform tells your systems what happened (a run started, finished or failed, a review, a file ready), as a
-        signed POST to a URL of yours.
-      </p>
-    </div>
-    @if (auth.canBuild()) {
-      <button type="button" class="btn btn-default btn-sm whitespace-nowrap shrink-0" (click)="openWebhook(null)" [disabled]="!eventTypes().length">
-        <app-icon name="plus" />New webhook
-      </button>
-    }
-  </div>
-  <app-managed-banner what="webhooks" still="You can still see what was sent and send a delivery again." />
-  <app-table-shell heading="Webhooks" [loading]="webhooksLoading()" [error]="webhooksError()"
-                   [isEmpty]="!webhooks().length" [shown]="webhooks().length"
-                   emptyMessage="No webhooks yet. Add one to be told when runs finish, fail or wait for your review."
-                   emptyIcon="send" (retry)="loadWebhooks()">
-    <table class="table-modern" data-webhooks>
-      <thead>
-        <tr>
-          <th>URL</th>
-          <th>Events</th>
-          <th>Last delivered</th>
-          <th class="text-right">State</th>
-          <th class="w-12 th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (w of webhooks(); track w.id) {
-          <tr [class.opacity-70]="!w.active">
-            <td class="max-w-96">
-              <div class="mono truncate" [title]="w.url">{{ w.url }}</div>
-              <div class="text-xs text-[color:var(--text-muted)] truncate">
-                {{ w.createdBy ? 'Added by ' + w.createdBy : '' }}
-                @if (w.pausedReason) { <span [title]="w.pausedReason"> · {{ w.pausedReason }}</span> }
-              </div>
-            </td>
-            <td class="max-w-96">
-              <div class="flex flex-wrap gap-1">
-                @for (t of w.eventTypes; track t) { <span class="pill pill-neutral mono">{{ t }}</span> }
-              </div>
-            </td>
-            <td class="whitespace-nowrap text-[color:var(--text-secondary)]">
-              {{ w.lastSuccessAt ? (w.lastSuccessAt | serverTime: 'dateTime') : 'Never' }}
-              @if (w.failingSince) {
-                <div class="text-xs text-[color:var(--color-warn-600)]">failing since {{ w.failingSince | serverTime: 'dateTime' }}</div>
-              }
-            </td>
-            <td class="text-right"><span [class]="webhookPill(w)">{{ webhookState(w) }}</span></td>
-            <td class="text-right">
-              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="webhookMenu"
-                      [attr.aria-label]="'Actions for the webhook to ' + w.url" [disabled]="webhookBusy() === w.id">
-                <app-icon name="dots" size="1em" [busy]="webhookBusy() === w.id" />
-              </button>
-              <ng-template #webhookMenu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openDeliveries(w)"><app-icon name="list" />Deliveries</button>
-                  @if (auth.canBuild()) {
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openWebhook(w)"><app-icon name="edit" />Change</button>
-                    @if (w.active) {
-                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setWebhookActive(w, false)"><app-icon name="pause" />Pause</button>
-                    } @else {
-                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="setWebhookActive(w, true)"><app-icon name="play" />Resume</button>
-                    }
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="rotateWebhook(w)"><app-icon name="refresh" />New secret</button>
-                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="removeWebhook(w)">
-                      <app-icon name="trash" class="icon-crit" />Remove
-                    </button>
-                  }
-                </div>
-              </ng-template>
-            </td>
-          </tr>
-        }
-      </tbody>
-    </table>
-  </app-table-shell>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
 </div>

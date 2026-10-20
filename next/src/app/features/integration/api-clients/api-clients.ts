@@ -24,6 +24,9 @@ import { ClientHistoryData, ClientHistoryPanel } from './client-history-panel';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
+import { ApiLimitsDialog, ApiLimitsDialogData } from '../../admin/tenants/api-limits-dialog';
 
 /**
  * MIG-332: Integration › API Clients (workspace administrators). The workspace's API clients for the customer API --
@@ -36,10 +39,16 @@ import { RefreshButton } from '../../../shared/ui/refresh-button';
  * MIG-337: each client's limit and calls this month, and the workspace's limits and monthly quota above the list; a client's
  * own limit is set in Change (our team's in a MANAGED workspace), the workspace's bounds in Administration › Tenants.
  * MIG-336: below the clients, the workspace's sandbox and its test keys (SandboxPanel).
+ *
+ * A platform administrator has no workspace of his own: he picks one in the header (the shared workspace selector, opening
+ * on the one picked last this session), and until he does the page asks for one instead of reading anything. Every read
+ * and write then names that workspace (tenantId), and he may change its API limits here. A workspace administrator sees
+ * no selector and works in their own workspace, as before.
  */
 @Component({
   selector: 'app-api-clients',
-  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger, SandboxPanel],
+  imports: [RefreshButton, PageHeader, TableShell, Icon, ServerTimePipe, ManagedBanner, CdkMenu, CdkMenuItem, CdkMenuTrigger, SandboxPanel,
+    WorkspaceSelect],
   templateUrl: './api-clients.html',
 })
 export class ApiClients implements OnInit {
@@ -47,6 +56,12 @@ export class ApiClients implements OnInit {
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   readonly auth = inject(AuthService);
+  readonly directory = inject(WorkspaceDirectory);
+
+  /** The workspace a platform administrator picked (this session's last choice to start with); null for anyone else. */
+  readonly tenantId = signal<number | null>(this.directory.remembered());
+  /** A platform administrator who has not picked a workspace yet: the page asks for one and reads nothing. */
+  readonly needsWorkspace = computed(() => this.directory.picks() && this.tenantId() === null);
 
   readonly clients = signal<ApiClientRow[]>([]);
   readonly scopes = signal<ScopeRow[]>([]);
@@ -74,29 +89,49 @@ export class ApiClients implements OnInit {
   readonly limits = signal<ApiLimitsRow | null>(null);
 
   ngOnInit(): void {
-    this.load();
-    this.loadRoutes();
-    this.loadWebhooks();
+    if (!this.needsWorkspace()) this.loadAll();
     this.api.scopes().subscribe({
       next: r => this.scopes.set(r.status === API_SUCCESS ? r.data ?? [] : []),
       error: () => this.scopes.set([]),
     });
   }
 
+  /** Every section of the page, for the workspace shown. */
+  loadAll(): void {
+    this.load();
+    this.loadRoutes();
+    this.loadWebhooks();
+  }
+
+  /** A platform administrator's pick: nothing of the last workspace stays on screen while the new one is read. */
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
+    this.clients.set([]);
+    this.limits.set(null);
+    this.routes.set([]);
+    this.pipelines.set([]);
+    this.webhooks.set([]);
+    this.showRevoked.set(false);
+    if (id !== null) this.loadAll();
+  }
+
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.limits().subscribe({
-      next: r => this.limits.set(r.status === API_SUCCESS ? r.data ?? null : null),
-      error: () => this.limits.set(null),
+    const asked = this.tenantId();
+    this.api.limits(asked).subscribe({
+      next: r => { if (asked === this.tenantId()) this.limits.set(r.status === API_SUCCESS ? r.data ?? null : null); },
+      error: () => { if (asked === this.tenantId()) this.limits.set(null); },
     });
-    this.api.list().subscribe({
+    this.api.list(asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         this.loading.set(false);
         if (r.status === API_SUCCESS) this.clients.set(r.data ?? []);
         else this.error.set(r.message || 'The API clients could not be read.');
       },
       error: err => {
+        if (asked !== this.tenantId()) return;
         this.loading.set(false);
         this.error.set(err?.error?.message || 'The API clients could not be read.');
       },
@@ -106,20 +141,33 @@ export class ApiClients implements OnInit {
   loadRoutes(): void {
     this.routesLoading.set(true);
     this.routesError.set('');
-    this.api.routesList().subscribe({
+    const asked = this.tenantId();
+    this.api.routesList(asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         this.routesLoading.set(false);
         if (r.status === API_SUCCESS) this.routes.set(r.data ?? []);
         else this.routesError.set(r.message || 'The event routes could not be read.');
       },
       error: err => {
+        if (asked !== this.tenantId()) return;
         this.routesLoading.set(false);
         this.routesError.set(err?.error?.message || 'The event routes could not be read.');
       },
     });
-    this.api.routeTargets().subscribe({
-      next: r => this.pipelines.set(r.status === API_SUCCESS ? r.data?.pipelines ?? [] : []),
-      error: () => this.pipelines.set([]),
+    this.api.routeTargets(asked).subscribe({
+      next: r => { if (asked === this.tenantId()) this.pipelines.set(r.status === API_SUCCESS ? r.data?.pipelines ?? [] : []); },
+      error: () => { if (asked === this.tenantId()) this.pipelines.set([]); },
+    });
+  }
+
+  /** MIG-337: a platform administrator changes the picked workspace's bounds here, as in Administration › Tenants. */
+  changeLimits(): void {
+    const tenantId = this.tenantId();
+    if (tenantId === null) return;
+    const data: ApiLimitsDialogData = { tenantId, tenantName: this.directory.nameOf(tenantId) };
+    this.dialog.open<boolean>(ApiLimitsDialog, { data, hasBackdrop: true }).closed.subscribe(saved => {
+      if (saved) this.load();
     });
   }
 
@@ -146,7 +194,8 @@ export class ApiClients implements OnInit {
   }
 
   openClient(client: ApiClientRow | null): void {
-    const data: ClientDialogData = { scopes: this.scopes(), client, bounds: this.limits()?.bounds ?? null, canSetLimits: this.auth.canBuild() };
+    const data: ClientDialogData = { scopes: this.scopes(), client, bounds: this.limits()?.bounds ?? null, canSetLimits: this.auth.canBuild(),
+      tenantId: this.tenantId() };
     this.dialog.open<ClientDialogResult>(ClientDialog, { data, hasBackdrop: true }).closed.subscribe(result => {
       if (!result) return;
       this.load();
@@ -169,7 +218,7 @@ export class ApiClients implements OnInit {
     });
     if (!ok) return;
     this.busy.set(client.clientId);
-    this.api.rotateSecret(client.clientId).subscribe({
+    this.api.rotateSecret(client.clientId, false, this.tenantId()).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status === API_SUCCESS && r.data) {
@@ -192,7 +241,7 @@ export class ApiClients implements OnInit {
     });
     if (!ok) return;
     this.busy.set(client.clientId);
-    this.api.revoke(client.clientId).subscribe({
+    this.api.revoke(client.clientId, false, this.tenantId()).subscribe({
       next: r => {
         this.busy.set(null);
         if (r.status === API_SUCCESS) {
@@ -207,7 +256,7 @@ export class ApiClients implements OnInit {
   }
 
   openRoute(route: EventRouteRow | null): void {
-    const data: RouteDialogData = { pipelines: this.pipelines(), route };
+    const data: RouteDialogData = { pipelines: this.pipelines(), route, tenantId: this.tenantId() };
     this.dialog.open<boolean>(RouteDialog, { data, hasBackdrop: true }).closed.subscribe(saved => {
       if (saved) this.loadRoutes();
     });
@@ -226,7 +275,7 @@ export class ApiClients implements OnInit {
     });
     if (!ok) return;
     this.routeBusy.set(route.routeId);
-    this.api.deleteRoute(route.routeId).subscribe({
+    this.api.deleteRoute(route.routeId, this.tenantId()).subscribe({
       next: r => {
         this.routeBusy.set(null);
         if (r.status === API_SUCCESS) {
@@ -245,13 +294,16 @@ export class ApiClients implements OnInit {
   loadWebhooks(): void {
     this.webhooksLoading.set(true);
     this.webhooksError.set('');
-    this.api.webhookList().subscribe({
+    const asked = this.tenantId();
+    this.api.webhookList(asked).subscribe({
       next: r => {
+        if (asked !== this.tenantId()) return;
         this.webhooksLoading.set(false);
         if (r.status === API_SUCCESS) this.webhooks.set(r.data ?? []);
         else this.webhooksError.set(r.message || 'The webhooks could not be read.');
       },
       error: err => {
+        if (asked !== this.tenantId()) return;
         this.webhooksLoading.set(false);
         this.webhooksError.set(err?.error?.message || 'The webhooks could not be read.');
       },
@@ -271,7 +323,7 @@ export class ApiClients implements OnInit {
   }
 
   openWebhook(webhook: WebhookRow | null): void {
-    const data: WebhookDialogData = { eventTypes: this.eventTypes(), webhook };
+    const data: WebhookDialogData = { eventTypes: this.eventTypes(), webhook, tenantId: this.tenantId() };
     this.dialog.open<WebhookDialogResult>(WebhookDialog, { data, hasBackdrop: true }).closed.subscribe(result => {
       if (!result) return;
       this.loadWebhooks();
@@ -282,12 +334,12 @@ export class ApiClients implements OnInit {
   /** Owner #25: every change to the client since it was made, sliding over the right. */
   openHistory(client: ApiClientRow): void {
     const me = this.auth.user()?.appUserId;
-    const data: ClientHistoryData = { client, sandbox: false, names: me ? { [me]: 'you' } : {} };
+    const data: ClientHistoryData = { client, sandbox: false, names: me ? { [me]: 'you' } : {}, tenantId: this.tenantId() };
     this.dialog.open(ClientHistoryPanel, sidePanelConfig(data, 'narrow', 'right'));
   }
 
   openDeliveries(webhook: WebhookRow): void {
-    const data: DeliveriesDialogData = { webhook };
+    const data: DeliveriesDialogData = { webhook, tenantId: this.tenantId() };
     this.dialog.open<boolean>(DeliveriesDialog, { data, hasBackdrop: true }).closed.subscribe(sent => {
       if (sent) this.loadWebhooks();
     });
@@ -309,7 +361,7 @@ export class ApiClients implements OnInit {
       if (!ok) return;
     }
     this.webhookBusy.set(webhook.id);
-    this.api.updateWebhook({ webhookId: webhook.id, active }).subscribe({
+    this.api.updateWebhook({ webhookId: webhook.id, active }, this.tenantId()).subscribe({
       next: r => {
         this.webhookBusy.set(null);
         if (r.status === API_SUCCESS) {
@@ -332,7 +384,7 @@ export class ApiClients implements OnInit {
     });
     if (!ok) return;
     this.webhookBusy.set(webhook.id);
-    this.api.rotateWebhookSecret(webhook.id).subscribe({
+    this.api.rotateWebhookSecret(webhook.id, this.tenantId()).subscribe({
       next: r => {
         this.webhookBusy.set(null);
         if (r.status === API_SUCCESS && r.data) {
@@ -355,7 +407,7 @@ export class ApiClients implements OnInit {
     });
     if (!ok) return;
     this.webhookBusy.set(webhook.id);
-    this.api.deleteWebhook(webhook.id).subscribe({
+    this.api.deleteWebhook(webhook.id, this.tenantId()).subscribe({
       next: r => {
         this.webhookBusy.set(null);
         if (r.status === API_SUCCESS) {

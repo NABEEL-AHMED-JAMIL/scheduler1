@@ -22,7 +22,7 @@ describe('ClientHistoryPanel', () => {
     const fixture = TestBed.createComponent(ClientHistoryPanel);
     fixture.detectChanges();
     const text = (fixture.nativeElement as HTMLElement).textContent!.replace(/\s+/g, ' ');
-    expect(history).toHaveBeenCalledWith('cl_x', false);
+    expect(history).toHaveBeenCalledWith('cl_x', false, undefined);
     expect(text).toContain('Revoked');
     expect(text).toContain('· you');
     expect(text).toContain('person #8');

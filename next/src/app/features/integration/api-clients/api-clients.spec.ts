@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { TestBed } from '@angular/core/testing';
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { computed, provideZonelessChangeDetection, signal } from '@angular/core';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
 import { provideRouter } from '@angular/router';
@@ -14,6 +14,8 @@ import { WebhookSecretDialog } from './webhook-secret-dialog';
 import { DeliveriesDialog } from './deliveries-dialog';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ToastService } from '../../../shared/ui/toast.service';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
+import { ApiLimitsDialog } from '../../admin/tenants/api-limits-dialog';
 
 const CLIENTS = [
   { clientId: 'cl_portal000000000000000000', name: 'Order portal', scopes: ['pipelines:read', 'runs:write'], ipAllowlist: ['203.0.113.0/24'],
@@ -45,7 +47,19 @@ const LIMITS = { tenantId: 2946, bounds: { clientRateMax: 600, clientBurstMax: 1
 Object.assign(CLIENTS[0], { ratePerMinute: 6, burst: 2, limit: { ratePerMinute: 6, burst: 2, capped: false }, callsThisMonth: 812 });
 Object.assign(CLIENTS[1], { ratePerMinute: null, burst: null, limit: { ratePerMinute: 600, burst: 100, capped: false }, callsThisMonth: 0 });
 
-function setup(options: { confirm?: boolean; locked?: boolean } = {}) {
+/** A platform administrator's workspace directory: Riverside, and the workspace this session picked last (if any). */
+function directoryOf(remembered: number | null) {
+  const workspaces = signal([{ tenantId: 2960, tenantName: 'Riverside Health', tenantCode: 'RIVERSIDE', status: 'Active' }]);
+  return {
+    picks: signal(true), workspaces, recent: signal<number[]>([]), loaded: signal(true), error: signal(''),
+    names: computed(() => new Map(workspaces().map(w => [w.tenantId, w.tenantName]))),
+    load: () => of(workspaces()), remembered: () => remembered, choose: vi.fn(),
+    nameOf: (id: number | null) => (id === 2960 ? 'Riverside Health' : `Workspace ${id}`),
+  };
+}
+
+/** `platform`: as a platform administrator, with the workspace this session picked last (null: none yet). */
+function setup(options: { confirm?: boolean; locked?: boolean; platform?: { remembered: number | null } } = {}) {
   const api = {
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: CLIENTS })),
     limits: vi.fn(() => of({ status: 'SUCCESS', message: '', data: LIMITS })),
@@ -71,7 +85,9 @@ function setup(options: { confirm?: boolean; locked?: boolean } = {}) {
     provideZonelessChangeDetection(),
     provideRouter([]),
     { provide: ApiClientsApi, useValue: api },
-    { provide: AuthService, useValue: { canBuild: signal(!options.locked), builderLocked: signal(!!options.locked) } },
+    { provide: AuthService, useValue: { canBuild: signal(!options.locked), builderLocked: signal(!!options.locked),
+      isPlatformAdmin: () => !!options.platform, isManagedSession: () => false, user: () => ({ appUserId: 4639 }) } },
+    ...(options.platform ? [{ provide: WorkspaceDirectory, useValue: directoryOf(options.platform.remembered) }] : []),
     { provide: Dialog, useValue: { open: (component: unknown, config: { data: any }) => {
       opened.push({ component, data: config.data });
       if (component === ClientDialog) return { closed: of({ made: MADE }) };
@@ -129,11 +145,11 @@ describe('MIG-332: Integration › API Clients', () => {
     const { page, api, opened, toasts } = setup();
     await page.rotate(CLIENTS[0] as any);
     await settle();
-    expect(api.rotateSecret).toHaveBeenCalledWith(CLIENTS[0].clientId);
+    expect(api.rotateSecret).toHaveBeenCalledWith(CLIENTS[0].clientId, false, null);
     expect(opened.find(o => o.component === SecretDialog)!.data.rotated).toBe(true);
     await page.revoke(CLIENTS[0] as any);
     await settle();
-    expect(api.revoke).toHaveBeenCalledWith(CLIENTS[0].clientId);
+    expect(api.revoke).toHaveBeenCalledWith(CLIENTS[0].clientId, false, null);
     expect(toasts).toContain('API client revoked. Its tokens no longer work.');
   });
 
@@ -221,11 +237,12 @@ describe('MIG-337: a client\'s own limit in the client dialog', () => {
     const { d, api } = dialog({ client: CLIENTS[0], canSetLimits: true });
     expect(d.rate()).toBe('6');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }), undefined);
     d.rate.set('');
     d.burst.set('50');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: CLIENTS[0].clientId, ratePerMinute: 0, burst: 50 }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ clientId: CLIENTS[0].clientId, ratePerMinute: 0, burst: 50 }),
+      undefined);
     d.rate.set('601');
     expect(d.ready()).toBe(false);
     d.rate.set('6.5');
@@ -238,12 +255,12 @@ describe('MIG-337: a client\'s own limit in the client dialog', () => {
     d.name.set('Portal test');
     d.toggle('pipelines:read');
     d.save();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Portal test', sandbox: true }));
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Portal test', sandbox: true }), undefined);
     ({ d, api } = dialog({ canSetLimits: true }));
     d.name.set('Portal');
     d.toggle('pipelines:read');
     d.save();
-    expect(api.create).toHaveBeenCalledWith(expect.not.objectContaining({ sandbox: expect.anything() }));
+    expect(api.create).toHaveBeenCalledWith(expect.not.objectContaining({ sandbox: expect.anything() }), undefined);
   });
 
   it('a new client may start with a limit; a customer of a MANAGED workspace sends none and sees the fields locked', () => {
@@ -252,32 +269,33 @@ describe('MIG-337: a client\'s own limit in the client dialog', () => {
     d.toggle('pipelines:read');
     d.rate.set('6');
     d.save();
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Tiny portal', ratePerMinute: 6 }));
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Tiny portal', ratePerMinute: 6 }), undefined);
     ({ d, api, fixture } = dialog({ client: CLIENTS[0], canSetLimits: false }));
     expect((fixture.nativeElement.querySelector('#clientRate') as HTMLInputElement).disabled).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Our team sets this workspace\'s API limits.');
     d.rate.set('30');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ ratePerMinute: expect.anything() }), undefined);
   });
 
   it('MIG-335: the sites that may embed its run views go only when changed, and are locked where our team sets them', () => {
     let { d, api, fixture } = dialog({ client: { ...CLIENTS[0], frameAncestors: ['https://portal.example.com'] }, canSetLimits: true });
     expect(d.frames()).toBe('https://portal.example.com');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ frameAncestors: expect.anything() }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ frameAncestors: expect.anything() }), undefined);
     d.frames.set('https://portal.example.com\nhttps://*.example.org');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ frameAncestors: 'https://portal.example.com\nhttps://*.example.org' }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ frameAncestors: 'https://portal.example.com\nhttps://*.example.org' }),
+      undefined);
     d.frames.set('');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ frameAncestors: '' }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.objectContaining({ frameAncestors: '' }), undefined);
     ({ d, api, fixture } = dialog({ client: CLIENTS[0], canSetLimits: false }));
     expect((fixture.nativeElement.querySelector('#clientFrames') as HTMLTextAreaElement).disabled).toBe(true);
     expect(fixture.nativeElement.textContent).toContain('Our team sets which sites may embed');
     d.frames.set('https://elsewhere.example.com');
     d.save();
-    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ frameAncestors: expect.anything() }));
+    expect(api.update).toHaveBeenLastCalledWith(expect.not.objectContaining({ frameAncestors: expect.anything() }), undefined);
   });
 });
 
@@ -319,17 +337,17 @@ describe('MIG-333: webhooks on Integration › API Clients', () => {
     const { page, api, opened, toasts } = setup();
     await page.setWebhookActive(WEBHOOKS[0] as any, false);
     await settle();
-    expect(api.updateWebhook).toHaveBeenCalledWith({ webhookId: '1000', active: false });
+    expect(api.updateWebhook).toHaveBeenCalledWith({ webhookId: '1000', active: false }, null);
     expect(toasts).toContain('Webhook paused.');
     await page.setWebhookActive(WEBHOOKS[1] as any, true);
-    expect(api.updateWebhook).toHaveBeenCalledWith({ webhookId: '1001', active: true });
+    expect(api.updateWebhook).toHaveBeenCalledWith({ webhookId: '1001', active: true }, null);
     await page.rotateWebhook(WEBHOOKS[0] as any);
     await settle();
-    expect(api.rotateWebhookSecret).toHaveBeenCalledWith('1000');
+    expect(api.rotateWebhookSecret).toHaveBeenCalledWith('1000', null);
     expect(opened.find(o => o.component === WebhookSecretDialog)!.data.rotated).toBe(true);
     await page.removeWebhook(WEBHOOKS[1] as any);
     await settle();
-    expect(api.deleteWebhook).toHaveBeenCalledWith('1001');
+    expect(api.deleteWebhook).toHaveBeenCalledWith('1001', null);
   });
 
   it('nothing is paused or removed when the confirmation is declined', async () => {
@@ -381,7 +399,8 @@ describe('MIG-333: the webhook dialog', () => {
     d.toggle('run.completed', true);
     expect(d.ready()).toBe(true);
     d.save();
-    expect(api.createWebhook).toHaveBeenCalledWith({ url: 'https://portal.example.com/hooks', eventTypes: ['run.completed', 'run.failed'] });
+    expect(api.createWebhook).toHaveBeenCalledWith({ url: 'https://portal.example.com/hooks', eventTypes: ['run.completed', 'run.failed'] },
+      undefined);
     expect(ref.close).toHaveBeenCalledWith({ made: MADE_HOOK });
   });
 
@@ -393,7 +412,8 @@ describe('MIG-333: the webhook dialog', () => {
     d.url.set('https://10.0.0.5/hooks');
     d.save();
     fixture.detectChanges();
-    expect(api.updateWebhook).toHaveBeenCalledWith({ webhookId: '1000', url: 'https://10.0.0.5/hooks', eventTypes: ['run.completed', 'run.failed'] });
+    expect(api.updateWebhook).toHaveBeenCalledWith(
+      { webhookId: '1000', url: 'https://10.0.0.5/hooks', eventTypes: ['run.completed', 'run.failed'] }, undefined);
     expect(ref.close).not.toHaveBeenCalled();
     expect((fixture.nativeElement as HTMLElement).textContent).toContain('a webhook must be a public address');
   });
@@ -435,20 +455,20 @@ describe('MIG-333: the deliveries dialog', () => {
     const { fixture, d, api } = deliveries();
     const el = fixture.nativeElement as HTMLElement;
     const text = el.querySelector('[data-deliveries]')!.textContent ?? '';
-    expect(api.deliveries).toHaveBeenCalledWith('1000', null, 50);
+    expect(api.deliveries).toHaveBeenCalledWith('1000', null, 50, undefined);
     expect(text).toContain('Retrying');
     expect(text).toContain('Delivered');
     expect(text).toContain('The receiver answered 500.');
     d.toggle(DELIVERIES[0] as any);
     fixture.detectChanges();
-    expect(api.attempts).toHaveBeenCalledWith('1000', '7');
+    expect(api.attempts).toHaveBeenCalledWith('1000', '7', undefined);
     expect(el.querySelector('[data-attempts]')!.textContent).toContain('failed');
   });
 
   it('Send again sends the event as a new delivery and the page refreshes when it closes', () => {
     const { d, api, ref } = deliveries();
     d.resend(DELIVERIES[1] as any);
-    expect(api.redeliver).toHaveBeenCalledWith('1000', '6');
+    expect(api.redeliver).toHaveBeenCalledWith('1000', '6', undefined);
     expect(d.rows()[0].id).toBe('8');
     expect(d.sent()).toBe(true);
     d.ref.close(d.sent());
@@ -481,5 +501,109 @@ describe('MIG-332: the secret dialog', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: vi.fn(() => Promise.resolve()) }, configurable: true });
     await fixture.componentInstance.copy('cs_y', 'secret');
     expect(fixture.componentInstance.copied()).toBe('secret');
+  });
+});
+
+describe('Developers › API Clients for a platform administrator', () => {
+  const READS = ['list', 'limits', 'routesList', 'routeTargets', 'webhookList', 'sandbox'] as const;
+
+  it('asks for a workspace first, calmly, and reads nothing of any workspace', () => {
+    const { fixture, api } = setup({ platform: { remembered: null } });
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="pick-workspace"]')!.textContent).toContain(
+      'Pick a workspace to see its API clients, sandbox, event routes and webhooks.');
+    expect(el.querySelector('[data-test="workspace-select"]')).not.toBeNull();
+    for (const read of READS) expect(api[read]).not.toHaveBeenCalled();
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+    expect(el.querySelector('[data-api-clients], #sandbox, [data-event-routes], [data-webhooks]')).toBeNull();
+    expect(el.textContent).not.toContain('New API client');
+  });
+
+  it('once a workspace is picked, reads every section of that workspace and only that one', async () => {
+    const { fixture, page, api } = setup({ platform: { remembered: null } });
+    page.pickWorkspace(2960);
+    fixture.detectChanges();
+    await settle();
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    for (const read of READS) expect(api[read]).toHaveBeenCalledWith(2960);
+    expect(api.sandboxList).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="pick-workspace"]')).toBeNull();
+    expect(el.querySelector('[data-api-clients]')!.textContent).toContain('Order portal');
+    expect(el.querySelector('[data-event-routes]')!.textContent).toContain('order.received');
+    expect(el.querySelector('[data-webhooks]')!.textContent).toContain('https://portal.example.com/hooks');
+    expect(el.querySelector('#sandbox')).not.toBeNull();
+  });
+
+  it('opens on the workspace this session picked last', () => {
+    const { fixture, api } = setup({ platform: { remembered: 2960 } });
+    expect(api.list).toHaveBeenCalledWith(2960);
+    expect(api.routesList).toHaveBeenCalledWith(2960);
+    expect((fixture.nativeElement as HTMLElement).querySelector('[data-test="pick-workspace"]')).toBeNull();
+  });
+
+  it('names the workspace on every write and in every dialog', async () => {
+    const { page, api, opened } = setup({ platform: { remembered: 2960 } });
+    await page.rotate(CLIENTS[0] as any);
+    await page.revoke(CLIENTS[0] as any);
+    await page.removeRoute(ROUTES[0] as any);
+    await page.setWebhookActive(WEBHOOKS[1] as any, true);
+    await page.rotateWebhook(WEBHOOKS[0] as any);
+    await page.removeWebhook(WEBHOOKS[1] as any);
+    await settle();
+    expect(api.rotateSecret).toHaveBeenCalledWith(CLIENTS[0].clientId, false, 2960);
+    expect(api.revoke).toHaveBeenCalledWith(CLIENTS[0].clientId, false, 2960);
+    expect(api.deleteRoute).toHaveBeenCalledWith(1000, 2960);
+    expect(api.updateWebhook).toHaveBeenCalledWith({ webhookId: '1001', active: true }, 2960);
+    expect(api.rotateWebhookSecret).toHaveBeenCalledWith('1000', 2960);
+    expect(api.deleteWebhook).toHaveBeenCalledWith('1001', 2960);
+    page.openNew();
+    page.openRoute(null);
+    page.openWebhook(null);
+    page.openDeliveries(WEBHOOKS[0] as any);
+    page.openHistory(CLIENTS[0] as any);
+    for (const kind of [ClientDialog, RouteDialog, WebhookDialog, DeliveriesDialog]) {
+      expect(opened.find(o => o.component === kind)!.data.tenantId).toBe(2960);
+    }
+    expect(opened.at(-1)!.data.tenantId).toBe(2960);
+  });
+
+  it('may change the picked workspace\'s API limits here, and the card says so', () => {
+    const { fixture, page, api, opened } = setup({ platform: { remembered: 2960 } });
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-api-limits]')!.textContent).toContain('change them with Change limits');
+    expect(el.querySelector('[data-api-limits]')!.textContent).not.toContain('ask your account team');
+    (el.querySelector('[data-change-limits]') as HTMLButtonElement).click();
+    const limits = opened.find(o => o.component === ApiLimitsDialog)!;
+    expect(limits.data).toEqual({ tenantId: 2960, tenantName: 'Riverside Health' });
+    expect(api.limits).toHaveBeenCalledTimes(2);
+    expect(page.tenantId()).toBe(2960);
+  });
+
+  it('a pick clears what the last workspace showed, and an answer for it that comes late is dropped', () => {
+    const { page, api } = setup({ platform: { remembered: 2960 } });
+    const late = { status: 'SUCCESS', message: '', data: [{ ...CLIENTS[0], name: 'Late answer' }] };
+    let answer: (v: unknown) => void = () => undefined;
+    api.list.mockImplementationOnce((() => ({ subscribe: (o: { next: (v: unknown) => void }) => { answer = o.next; } })) as never);
+    page.loadAll();
+    page.pickWorkspace(null);
+    expect(page.clients()).toEqual([]);
+    expect(page.needsWorkspace()).toBe(true);
+    answer(late);
+    expect(page.clients()).toEqual([]);
+  });
+});
+
+describe('Developers › API Clients for a workspace administrator', () => {
+  it('has no workspace selector, asks for no workspace, and names none in its calls', () => {
+    const { fixture, api } = setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="workspace-select"]')).toBeNull();
+    expect(el.querySelector('[data-test="pick-workspace"]')).toBeNull();
+    expect(el.querySelector('[data-change-limits]')).toBeNull();
+    expect(el.querySelector('[data-api-limits]')!.textContent).toContain('ask your account team');
+    for (const read of ['list', 'limits', 'routesList', 'routeTargets', 'webhookList', 'sandbox'] as const) {
+      expect(api[read]).toHaveBeenCalledWith(null);
+    }
   });
 });
