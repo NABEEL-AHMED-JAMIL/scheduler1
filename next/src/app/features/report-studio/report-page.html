@@ -67,9 +67,19 @@
               </div>
               @if (current(); as v) {
                 <div class="rsr-current">
-                  <div class="rsr-thumb">
-                    @if (thumb(); as src) { <img [src]="src" [alt]="'First page of ' + r.name + ' version ' + v.version" /> }
-                    @else { <span class="rst-paper-sm" aria-hidden="true"><i></i><i></i><b></b><i></i><i></i></span> }
+                  <!-- Owner 2026-10-20: the small view turns through the pages with Back and Next. -->
+                  <div class="rsr-thumb-wrap">
+                    <div class="rsr-thumb" [class.is-loading]="thumbLoading()">
+                      @if (thumb(); as src) { <img [src]="src" [alt]="'Page ' + thumbPage() + ' of ' + r.name + ' version ' + v.version" /> }
+                      @else { <span class="rst-paper-sm" aria-hidden="true"><i></i><i></i><b></b><i></i><i></i></span> }
+                    </div>
+                    @if ((v.pages ?? 0) > 1) {
+                      <div class="rsr-thumb-nav" data-test="thumb-nav">
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Previous page" [disabled]="thumbPage() <= 1 || thumbLoading()" (click)="turn(-1)"><app-icon name="chevronLeft" /></button>
+                        <span class="text-xs tabular" aria-live="polite">Page {{ thumbPage() }} of {{ v.pages }}</span>
+                        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Next page" [disabled]="thumbPage() >= (v.pages ?? 1) || thumbLoading()" (click)="turn(1)"><app-icon name="chevronRight" /></button>
+                      </div>
+                    }
                   </div>
                   <div class="flex flex-col gap-3 min-w-0">
                     <div><b class="text-base">{{ r.name }}</b><br>
@@ -119,6 +129,7 @@
                       <div class="mono text-xs text-[color:var(--text-muted)] truncate" [title]="o.fileName">{{ o.fileName }}</div>
                       <div class="text-xs text-[color:var(--text-muted)]">{{ size(o.format === 'PDF' && v.approval?.signed ? v.approval!.signedBytes : o.bytes) }}@if (o.pages) { · {{ o.pages }} page{{ o.pages === 1 ? '' : 's' }} }@if (o.format === 'HTML') { · self-contained }@if (o.format === 'PDF' && v.approval?.signed) { · signed }</div>
                     </div>
+                    <button type="button" class="btn btn-ghost btn-sm" (click)="view(v, o)" [attr.aria-label]="'View the ' + o.format"><app-icon name="eye" />View</button>
                     <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"
                             [attr.aria-label]="'Download the ' + o.format"><app-icon name="download" /></button>
                   </div>
@@ -228,7 +239,12 @@
                   @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>
                 <td class="whitespace-nowrap">
                   @for (o of outputsOf(v); track o.format) {
-                    <button type="button" class="btn btn-ghost btn-sm" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"><app-icon name="download" />{{ o.format }}</button>
+                    <span class="rsr-file-actions" [attr.data-format]="o.format">
+                      <span class="text-xs font-medium">{{ o.format }}</span>
+                      <button type="button" class="btn btn-ghost btn-sm" (click)="view(v, o)" [attr.aria-label]="'View the ' + o.format + ' of version ' + v.version"><app-icon name="eye" />View</button>
+                      <button type="button" class="btn btn-ghost btn-icon btn-sm" [disabled]="downloading() === v.versionId + o.format" (click)="download(v, o)"
+                              [attr.aria-label]="'Download the ' + o.format + ' of version ' + v.version" title="Download"><app-icon name="download" /></button>
+                    </span>
                   }
                 </td>
               </tr>

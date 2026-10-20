@@ -20,6 +20,7 @@ import {
   JobRow, OutputRow, ReportDetail, ReportVersionRow, VersionRow, chipWord, idempotencyKey, isRunning, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
+import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
 import { VerifyData, VerifyPanel } from './verify-panel';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 
@@ -52,6 +53,9 @@ export class ReportPage implements OnInit {
   readonly tab = signal<Tab>('details');
   readonly downloading = signal('');
   readonly thumb = signal<string | null>(null);
+  /** The page the small view shows (owner 2026-10-20: Back and Next). */
+  readonly thumbPage = signal(1);
+  readonly thumbLoading = signal(false);
   /** The template's versions a report can be made from (published, and the ones superseded since). */
   readonly templateVersions = signal<VersionRow[]>([]);
   readonly againVersion = signal<number | null>(null);
@@ -117,16 +121,38 @@ export class ReportPage implements OnInit {
     });
   }
 
-  private loadThumb(r: ReportDetail): void {
+  private loadThumb(r: ReportDetail, page = 1): void {
     if (!r.currentVersion || !this.current()?.outputs.some(o => o.format === 'PDF')) return;
-    this.api.reportThumbnail(r.reportId, r.currentVersion, this.auth.isPlatformAdmin() ? r.tenantId : null).subscribe({
+    this.thumbLoading.set(true);
+    this.api.reportThumbnail(r.reportId, r.currentVersion, this.auth.isPlatformAdmin() ? r.tenantId : null, page).subscribe({
       next: res => {
+        this.thumbLoading.set(false);
         if (!res.body || !(res.headers.get('Content-Type') ?? '').includes('png')) return;
         const old = this.thumb();
         if (old) URL.revokeObjectURL(old);
         this.thumb.set(URL.createObjectURL(res.body));
+        this.thumbPage.set(page);
       },
-      error: () => { /* the card shows without its picture */ },
+      error: () => { this.thumbLoading.set(false); /* the card keeps the page it had */ },
+    });
+  }
+
+  /** Back (-1) or Next (+1) in the small view, within the version's pages. */
+  turn(step: number): void {
+    const r = this.r();
+    const pages = this.current()?.pages ?? 1;
+    const next = this.thumbPage() + step;
+    if (!r || next < 1 || next > pages || this.thumbLoading()) return;
+    this.loadThumb(r, next);
+  }
+
+  /** Owner 2026-10-20: a version's PDF or HTML read in place, through the same signed and audited download. */
+  view(v: ReportVersionRow, o: OutputRow): void {
+    const r = this.r();
+    if (!r) return;
+    this.dialog.open<void>(ReportFileDialog, {
+      data: { reportId: r.reportId, version: v.version, format: o.format, fileName: o.fileName, title: r.name },
+      hasBackdrop: true, ariaLabelledBy: REPORT_FILE_TITLE_ID,
     });
   }
 

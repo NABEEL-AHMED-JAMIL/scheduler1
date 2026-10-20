@@ -145,10 +145,10 @@ export class ReportStudioApi {
       responseType: 'blob', observe: 'response' });
   }
 
-  /** A report version's first page as a 320 px PNG (MIG-404). */
-  reportThumbnail(reportId: string, version?: number | null, tenantId?: number | null): Observable<HttpResponse<Blob>> {
+  /** A page (default the first) of a report version's PDF as a 320 px PNG (MIG-404; any page since 2026-10-20). */
+  reportThumbnail(reportId: string, version?: number | null, tenantId?: number | null, page = 1): Observable<HttpResponse<Blob>> {
     return this.http.get(`${this.library}/thumbnail`, {
-      params: { reportId, ...(version ? { version: String(version) } : {}), ...ReportStudioApi.scope(tenantId) },
+      params: { reportId, ...(version ? { version: String(version) } : {}), ...(page > 1 ? { page: String(page) } : {}), ...ReportStudioApi.scope(tenantId) },
       responseType: 'blob', observe: 'response' });
   }
 

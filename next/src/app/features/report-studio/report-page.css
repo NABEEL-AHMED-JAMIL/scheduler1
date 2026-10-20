@@ -27,3 +27,11 @@
 .rsr-li-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: var(--radius-full);
   background: var(--surface-sunken); border: 1px solid var(--border-subtle); color: var(--text-secondary); }
 .rsr-li-title { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); }
+
+/* Owner 2026-10-20: the small view's Back and Next, under the page. */
+.rsr-thumb-wrap { display: flex; flex-direction: column; gap: 0.25rem; }
+.rsr-thumb.is-loading img { opacity: 0.55; }
+.rsr-thumb-nav { display: flex; align-items: center; justify-content: center; gap: 0.5rem; }
+/* The versions table's Files: each format with View and Download, on one line. */
+.rsr-file-actions { display: inline-flex; align-items: center; gap: 0.125rem; margin-right: 0.75rem; }
+.rsr-file-actions:last-child { margin-right: 0; }
