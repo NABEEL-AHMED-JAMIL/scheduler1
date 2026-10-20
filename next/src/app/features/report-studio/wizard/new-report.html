@@ -87,7 +87,7 @@
         <div class="rsw-two mt-4">
           <div class="flex flex-col gap-4 min-w-0">
             <section class="card">
-              <div class="rs-head"><h2 class="section-title">Data source</h2>@if (source()) { <span class="pill pill-neutral">{{ inspect()?.connector === 'RUN_OUTPUT' ? 'Pipeline output' : inspect()?.connector === 'BUCKET_OBJECT' ? 'Bucket file' : inspect()?.connector === 'UPLOAD' ? 'Upload' : inspect() ? 'Pasted data' : 'Reading…' }}</span> }</div>
+              <div class="rs-head"><h2 class="section-title">Data source</h2>@if (source()) { <span class="pill pill-neutral">{{ inspect()?.connector === 'BUNDLE' ? 'Several files' : inspect()?.connector === 'RUN_OUTPUT' ? 'Pipeline output' : inspect()?.connector === 'BUCKET_OBJECT' ? 'Bucket file' : inspect()?.connector === 'UPLOAD' ? 'Upload' : inspect() ? 'Pasted data' : 'Reading…' }}</span> }</div>
               <div class="p-4 flex flex-col gap-3">
                 <app-report-source-picker [samples]="tpl.samples" [(source)]="source" [(mode)]="sourceMode" />
                 <label class="field">
@@ -97,7 +97,9 @@
                 @if (inspecting()) { <span class="spinner" role="status" aria-label="Reading the data"></span> }
                 @if (inspectError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ inspectError() }}</p> }
                 @if (inspect(); as i) {
-                  <dl class="rs-kv"><dt>Read</dt><dd>{{ i.label }}</dd><dt>Records</dt><dd>{{ i.records }} at {{ i.rootPath }}</dd><dt>Format</dt><dd>{{ i.format }}</dd></dl>
+                  <dl class="rs-kv"><dt>Read</dt><dd>@if (i.connector === 'BUNDLE' ? bundleParts(i) : null; as ps) {
+                    <ul class="rs-parts">@for (p of ps; track p.name) { <li><span class="mono">$.{{ p.name }}</span>@if (p.label) { <span class="text-[color:var(--text-muted)]"> · {{ p.label }}</span> }</li> }</ul>
+                  } @else { {{ i.label }} }</dd><dt>Records</dt><dd>{{ i.records }} at {{ i.rootPath }}</dd><dt>Format</dt><dd>{{ i.format }}</dd></dl>
                 }
               </div>
             </section>

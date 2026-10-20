@@ -17,7 +17,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
-  JobRow, OutputRow, ReportDetail, ReportVersionRow, VersionRow, chipWord, idempotencyKey, isRunning, size, stageWord,
+  JobRow, OutputRow, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, idempotencyKey, isRunning, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
 import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
@@ -304,7 +304,14 @@ export class ReportPage implements OnInit {
 
   /** The data's label for a version: the pipeline run, the file or the pasted data. */
   dataOf(v: ReportVersionRow): string {
+    const parts = this.partsOf(v);
+    if (parts) return `${parts.length} files: ${parts.map(p => p.name).join(', ')}`;
     return v.snapshot?.pipelineRunId ? `#${v.snapshot.pipelineRunId}` : v.snapshot?.label ?? '—';
+  }
+
+  /** A version made from several files: its parts by name (and what each was), else null. */
+  partsOf(v: ReportVersionRow | null | undefined): { name: string; label: string }[] | null {
+    return bundleParts(v?.snapshot);
   }
 
   versionBy(v: ReportVersionRow): string {

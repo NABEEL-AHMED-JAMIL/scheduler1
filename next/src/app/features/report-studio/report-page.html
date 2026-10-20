@@ -195,8 +195,16 @@
               <li><span class="rsr-li-icon"><app-icon name="layers" /></span><div class="min-w-0"><span class="label">Template</span>
                 <a class="link-inline rsr-li-title" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }} · v{{ v.templateVersion }}</a>
                 <span class="text-xs text-[color:var(--text-muted)] block">Published · can't change</span></div></li>
-              <li><span class="rsr-li-icon"><app-icon [name]="v.snapshot?.pipelineRunId ? 'list' : 'database'" /></span><div class="min-w-0"><span class="label">{{ v.snapshot?.pipelineRunId ? 'Pipeline run' : 'Data' }}</span>
+              <li><span class="rsr-li-icon"><app-icon [name]="v.snapshot?.pipelineRunId ? 'list' : 'database'" /></span><div class="min-w-0">
+                @if (partsOf(v); as ps) {
+                  <span class="label">Data · {{ ps.length }} files{{ v.snapshot?.pipelineRunId ? ' · run #' + v.snapshot!.pipelineRunId : '' }}</span>
+                  <ul class="rs-parts text-sm" aria-label="Files">
+                    @for (p of ps; track p.name) { <li><b class="mono">{{ p.name }}</b>@if (p.label) { <span class="text-[color:var(--text-muted)]"> · {{ p.label }}</span> }</li> }
+                  </ul>
+                } @else {
+                <span class="label">{{ v.snapshot?.pipelineRunId ? 'Pipeline run' : 'Data' }}</span>
                 <b class="rsr-li-title truncate" [title]="v.snapshot?.label || ''">{{ v.snapshot?.label || '—' }}</b>
+                }
                 <span class="text-xs text-[color:var(--text-muted)] block">Frozen {{ v.snapshot?.takenAt | rsTime: 'recent' }} · {{ v.snapshot?.records ?? '?' }} record(s) · {{ size(v.snapshot?.bytes) }}</span></div></li>
               <li><span class="rsr-li-icon"><app-icon name="play" /></span><div class="min-w-0"><span class="label">Generation job</span>
                 <b class="rsr-li-title">{{ v.jobLabel }}@if (v.jobMs) { · completed in {{ (v.jobMs / 1000).toFixed(1) }} s }</b>
