@@ -407,6 +407,24 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/reports/templates/:templateId/design",
+      "title": "Template designer",
+      "pageKey": "report-templates",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/new",
+      "title": "Create report",
+      "pageKey": "report-generate",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/reports/templates/:templateId",
       "title": "Report template",
       "guards": [

@@ -1,0 +1,292 @@
+<div class="page">
+  <app-page-header [crumb]="report() ? 'Generate again' : 'New report'">
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">{{ step() === 2 ? 'Connect the right data' : step() === 3 ? 'Check before you generate' : step() === 4 ? 'Generating the report' : report() ? 'Generate ' + report()!.name + ' again' : 'Create a report' }}</h1>
+        <p class="page-subtitle">
+          @if (t(); as t) { {{ name() || t.name }} · template v{{ version() }}@if (inspect(); as i) { · {{ i.label }} } }
+          @else { Pick a published template, then the data to fill it with. }
+        </p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="leave()" />
+        <a class="btn btn-default btn-sm" [routerLink]="report() ? ['/reports/library', report()!.reportId] : ['/reports/overview']">{{ step() === 4 ? 'Close' : 'Cancel' }}</a>
+      </div>
+    </div>
+  </app-page-header>
+
+  <ol class="connect-steps rsw-steps" aria-label="Steps">
+    @for (n of stepNames; track n; let i = $index) {
+      <li class="connect-step" [class.is-current]="step() === i + 1" [class.is-done]="step() > i + 1"
+          [class.is-bad]="i === 1 && step() > 2 && missing().length" [attr.aria-current]="step() === i + 1 ? 'step' : null">
+        <span class="connect-dot">@if (step() > i + 1) { @if (i === 1 && missing().length) { ! } @else { ✓ } } @else { {{ i + 1 }} }</span>{{ n }}
+      </li>
+      @if (i < stepNames.length - 1) { <li class="rsw-line" aria-hidden="true"></li> }
+    }
+  </ol>
+
+  @if (!canGenerate()) {
+    <div class="rs-banner rs-banner-info mb-4" role="note"><app-icon name="info" class="shrink-0" />
+      <span class="text-sm min-w-0 flex-1">Reports are made by a workspace's members. You can read the steps here; to make one, work in the workspace.</span></div>
+  }
+  @if (error()) { <div class="rs-banner rs-banner-crit mb-4" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm">{{ error() }}</span></div> }
+
+  @switch (step()) {
+    @case (1) {
+      <section class="card">
+        <div class="rs-head">
+          <div><h2 class="section-title">Which template?</h2><p class="text-xs text-[color:var(--text-muted)]">Only published versions make reports; they never change.</p></div>
+          <input class="input max-w-72" type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Search templates" aria-label="Search templates" />
+        </div>
+        <div class="p-4">
+          @if (loadingTemplates()) { <div class="flex justify-center py-12"><span class="spinner" role="status" aria-label="Loading"></span></div> }
+          @else if (!shown().length) {
+            <p class="text-sm text-[color:var(--text-muted)] py-6">No published template yet. Publish one in Templates, or start from a starter there.</p>
+          } @else {
+            <div class="rsw-cards">
+              @for (tpl of shown(); track tpl.templateId) {
+                <button type="button" class="rsw-card" [class.is-active]="t()?.templateId === tpl.templateId" (click)="pick(tpl.templateId)">
+                  <span class="rsw-thumb">@if (thumbs()[tpl.templateId]; as src) { <img [src]="src" alt="" /> } @else { <app-icon name="file" size="1.5rem" /> }</span>
+                  <span class="min-w-0 flex flex-col gap-1 text-left">
+                    <span class="font-medium truncate">{{ tpl.name }}</span>
+                    <span class="flex flex-wrap gap-1"><span class="pill pill-ok">Published v{{ tpl.currentPublishedVersion }}</span>@if (tpl.category) { <span class="pill pill-neutral">{{ tpl.category }}</span> }</span>
+                    <span class="text-xs text-[color:var(--text-muted)] line-clamp-2">{{ tpl.description || 'No description.' }}</span>
+                  </span>
+                </button>
+              }
+            </div>
+          }
+        </div>
+      </section>
+    }
+
+    @case (2) {
+      @if (t(); as tpl) {
+        <section class="card rsw-template">
+          <span class="rsw-icon"><app-icon name="file" /></span>
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5"><b>{{ tpl.name }}</b><span class="pill pill-ok">Published v{{ version() }}</span><app-icon name="lock" class="text-[color:var(--text-muted)]" /></div>
+            <span class="text-xs text-[color:var(--text-muted)]">{{ pageCount() }} page{{ pageCount() === 1 ? '' : 's' }} · {{ needed().length }} data field{{ needed().length === 1 ? '' : 's' }} · a published version can't be edited</span>
+          </div>
+          @if (!report()) {
+            <label class="field rsw-name"><span class="label">Report name</span>
+              <input class="input" [ngModel]="name()" (ngModelChange)="name.set($event)" aria-label="Report name" maxlength="200" /></label>
+            <button type="button" class="link-inline text-sm" (click)="step.set(1)">Change template</button>
+          } @else {
+            <span class="text-sm"><span class="text-xs text-[color:var(--text-muted)]">Report</span><br>{{ report()!.name }} · {{ report()!.label }}</span>
+          }
+        </section>
+
+        @if (failedJob(); as j) {
+          <div class="rs-banner rs-banner-crit mt-4" role="status">
+            <app-icon name="alert" class="icon-crit shrink-0" />
+            <div class="text-sm min-w-0 flex-1"><b>{{ j.label }} could not make a version</b>: {{ j.error }} Pick the data again (@if (j.pipelineRunId) {a newer run than #{{ j.pipelineRunId }}, }or a corrected file) and match the missing field.</div>
+          </div>
+        }
+
+        <div class="rsw-two mt-4">
+          <div class="flex flex-col gap-4 min-w-0">
+            <section class="card">
+              <div class="rs-head"><h2 class="section-title">Data source</h2>@if (source()) { <span class="pill pill-neutral">{{ inspect()?.connector === 'RUN_OUTPUT' ? 'Pipeline output' : inspect()?.connector === 'BUCKET_OBJECT' ? 'Bucket file' : inspect()?.connector === 'UPLOAD' ? 'Upload' : inspect() ? 'Pasted data' : 'Reading…' }}</span> }</div>
+              <div class="p-4 flex flex-col gap-3">
+                <app-report-source-picker [samples]="tpl.samples" [(source)]="source" [(mode)]="sourceMode" />
+                <label class="field">
+                  <span class="label">Report data starts at</span>
+                  <input class="input mono max-w-80" [ngModel]="rootPath()" (change)="rootPath.set($any($event.target).value.trim() || '$')" aria-label="Root path" />
+                </label>
+                @if (inspecting()) { <span class="spinner" role="status" aria-label="Reading the data"></span> }
+                @if (inspectError()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ inspectError() }}</p> }
+                @if (inspect(); as i) {
+                  <dl class="rs-kv"><dt>Read</dt><dd>{{ i.label }}</dd><dt>Records</dt><dd>{{ i.records }} at {{ i.rootPath }}</dd><dt>Format</dt><dd>{{ i.format }}</dd></dl>
+                }
+              </div>
+            </section>
+
+            @if (inspect(); as i) {
+              <section class="card">
+                <div class="rs-head">
+                  <h2 class="section-title">What the source holds</h2>
+                  <div class="tabs" role="tablist">
+                    <button type="button" role="tab" class="tab" [class.tab-active]="view() === 'sample'" [attr.aria-selected]="view() === 'sample'" (click)="view.set('sample')">Sample</button>
+                    <button type="button" role="tab" class="tab" [class.tab-active]="view() === 'schema'" [attr.aria-selected]="view() === 'schema'" (click)="view.set('schema')">Schema</button>
+                    <button type="button" role="tab" class="tab" [class.tab-active]="view() === 'json'" [attr.aria-selected]="view() === 'json'" (click)="view.set('json')">JSON</button>
+                  </div>
+                </div>
+                @switch (view()) {
+                  @case ('sample') {
+                    @if (sampleScalars().length) {
+                      <dl class="rs-kv p-4">
+                        @for (s of sampleScalars(); track s.path) { <dt class="mono text-xs">{{ s.path }}</dt><dd class="text-sm">{{ s.value }}</dd> }
+                      </dl>
+                    }
+                    @if (sampleTable(); as tbl) {
+                      <div class="overflow-x-auto"><table class="table-modern">
+                        <thead><tr><th class="mono">{{ tbl.path }}[]</th>@for (c of tbl.cols.slice(1); track c) { <th>{{ c }}</th> }</tr></thead>
+                        <tbody>@for (r of tbl.rows; track $index) { <tr>@for (v of r; track $index) { <td class="text-sm">{{ v }}</td> }</tr> }</tbody>
+                      </table></div>
+                    }
+                  }
+                  @case ('schema') {
+                    <table class="table-modern">
+                      <thead><tr><th>Field</th><th>Type</th><th>Can be empty</th></tr></thead>
+                      <tbody>@for (f of i.schema; track f.path) { <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.nullable ? 'Yes' : 'No' }}</td></tr> }</tbody>
+                    </table>
+                  }
+                  @case ('json') { <pre class="rs-code m-4">{{ sampleText() }}</pre> }
+                }
+              </section>
+            }
+          </div>
+
+          <div class="flex flex-col gap-4 min-w-0">
+            <section class="card">
+              <div class="rs-head">
+                <div><h2 class="section-title">Match template fields</h2><p class="text-xs text-[color:var(--text-muted)]">Every required field needs a source field. Nothing is guessed.</p></div>
+                @if (inspect()) { <span class="pill" [class]="missing().length ? 'pill-warn' : 'pill-ok'">{{ matched() }} of {{ needed().length }} matched</span> }
+              </div>
+              <table class="table-modern rsw-match">
+                <thead><tr><th>Template field</th><th>Source field and sample</th><th>Status</th></tr></thead>
+                <tbody>
+                  @for (r of rows(); track r.field.path) {
+                    <tr [class.rsw-missing]="r.state === 'missing'">
+                      <td>
+                        <b class="mono text-xs">{{ r.field.path }}</b>@if (r.field.required) { <span class="text-[color:var(--crit-text)]" aria-label="required"> *</span> }
+                        <div class="text-xs text-[color:var(--text-muted)]">{{ r.field.label ? r.field.label + ' · ' : '' }}{{ typeWords(r.field.type) }} · {{ r.field.required ? 'required' : 'optional' }}</div>
+                      </td>
+                      <td>
+                        <select class="input mono text-xs" [attr.aria-invalid]="r.state === 'missing' || null" [disabled]="!inspect()"
+                                [attr.aria-label]="'Source field for ' + r.field.path" (change)="setSource(r.field.path, $any($event.target).value)">
+                          <option value="" [selected]="!r.source">Choose a source field</option>
+                          @for (o of r.options; track o.path) { <option [value]="o.path" [selected]="o.path === r.source">{{ o.path }} · {{ o.type }}</option> }
+                        </select>
+                        <div class="text-xs mt-0.5" [class]="r.state === 'missing' ? 'text-[color:var(--crit-text)]' : 'text-[color:var(--text-muted)]'">
+                          @if (!inspect()) { Pick the data first } @else if (r.state === 'matched') { {{ r.sample }} } @else if (r.state === 'missing') { No source value in this data } @else { Not in this data; printed as empty }
+                        </div>
+                        @if (r.feeds.length) { <div class="text-xs text-[color:var(--text-muted)] mt-0.5"><app-icon name="link" /> Feeds {{ feedsText(r) }}</div> }
+                      </td>
+                      <td class="whitespace-nowrap">
+                        @switch (r.state) {
+                          @case ('matched') { <span class="text-sm text-[color:var(--ok-text)]"><app-icon name="checkCircle" /> Matched</span> }
+                          @case ('missing') { <span class="text-sm text-[color:var(--crit-text)]"><app-icon name="alert" /> Missing</span> }
+                          @default { <span class="text-sm text-[color:var(--text-muted)]">Optional</span> }
+                        }
+                      </td>
+                    </tr>
+                  } @empty {
+                    <tr><td colspan="3" class="text-sm text-[color:var(--text-muted)]">This template reads no data.</td></tr>
+                  }
+                </tbody>
+              </table>
+            </section>
+            @for (m of missing().slice(0, 1); track m.field.path) {
+              <div class="rs-banner rs-banner-crit" role="alert">
+                <app-icon name="alert" class="icon-crit shrink-0" />
+                <div class="text-sm min-w-0 flex-1"><b>Required field missing: {{ m.field.path }}</b><br>
+                  The data has nothing for it. Add it to the pipeline's output and run the pipeline again, then pick the new run here, or choose the
+                  field the data names differently. A missing value is never filled in for you.@if (missing().length > 1) { ({{ missing().length - 1 }} more missing.) }</div>
+              </div>
+            }
+          </div>
+        </div>
+
+        <div class="rsw-foot">
+          <button type="button" class="btn btn-default btn-sm" (click)="step.set(1)"><app-icon name="arrowLeft" />Back to templates</button>
+          <div class="flex items-center gap-3">
+            @if (missing().length) { <span class="text-sm text-[color:var(--crit-text)]">{{ missing().length }} required field{{ missing().length === 1 ? '' : 's' }} missing · can't generate yet</span> }
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="!source() || !inspect()" (click)="go(3)">
+              <app-icon name="arrowRight" />{{ missing().length ? 'Preview with problems' : 'Preview and check' }}
+            </button>
+          </div>
+        </div>
+      }
+    }
+
+    @case (3) {
+      <div class="rsw-preview">
+        <section class="card min-w-0">
+          <div class="rs-head">
+            <div class="flex items-center gap-2"><h2 class="section-title">Preview</h2><span class="pill pill-neutral">Not generated</span></div>
+            @if (checking()) { <span class="spinner" role="status" aria-label="Checking"></span> }
+          </div>
+          @if (pdfUrl(); as src) {
+            <app-rs-pdf-pages [src]="src" [firstTitle]="firstHeading()" />
+            <p class="text-xs text-[color:var(--text-muted)] px-4 py-2"><app-icon name="info" /> {{ inspect()?.label }} · "—" marks a missing value · a preview prints at most 200 rows a table</p>
+          } @else if (checkError()) {
+            <p class="p-4 text-sm text-[color:var(--crit-text)]" role="alert">{{ checkError() }}</p>
+          } @else {
+            <div class="flex justify-center py-24"><span class="spinner" role="status" aria-label="Drawing the preview"></span></div>
+          }
+        </section>
+
+        <aside class="card rsw-side">
+          <section class="rsw-sec">
+            <div class="flex items-center justify-between gap-2">
+              <div><h2 class="section-title">Checks</h2><span class="text-xs text-[color:var(--text-muted)]">{{ problems().length + passed() }} checks@if (checkedAt(); as at) { · {{ at | serverTime: 'time' }} }</span></div>
+              <button type="button" class="btn btn-default btn-sm" [disabled]="checking()" (click)="check()"><app-icon name="refresh" />Check again</button>
+            </div>
+            <div class="flex flex-wrap gap-1">
+              <span class="pill" [class]="errors().length ? 'pill-crit' : 'pill-neutral'">{{ errors().length }} blocking</span>
+              <span class="pill" [class]="warnings().length ? 'pill-warn' : 'pill-neutral'">{{ warnings().length }} warning{{ warnings().length === 1 ? '' : 's' }}</span>
+              <span class="pill pill-ok">{{ passed() }} passed</span>
+            </div>
+            @if (problems().length) { <app-report-problems [problems]="problems()" [summary]="false" /> }
+            @if (errors().length || missing().length) {
+              <button type="button" class="link-inline text-sm self-start" (click)="step.set(2)">Fix the data mapping →</button>
+            } @else {
+              <p class="text-xs text-[color:var(--ok-text)]"><app-icon name="checkCircle" /> Data contract, bindings, assets and layout pass.</p>
+            }
+          </section>
+          <section class="rsw-sec">
+            <h3 class="rsd-eyebrow-plain">Branding</h3>
+            <label class="field"><span class="label">Brand profile</span>
+              <select class="input" disabled aria-label="Brand profile"><option>The template's own look</option></select></label>
+            <p class="text-xs text-[color:var(--text-muted)]">Brand profiles arrive with Assets &amp; branding.</p>
+          </section>
+          <section class="rsw-sec">
+            <h3 class="rsd-eyebrow-plain">Outputs</h3>
+            <label class="rsw-out"><input type="checkbox" class="checkbox" [ngModel]="pdf()" (ngModelChange)="pdf.set($event)" /><span><b>PDF</b><br><span class="text-xs text-[color:var(--text-muted)]">Print-ready · {{ pageCount() }} page{{ pageCount() === 1 ? '' : 's' }}</span></span></label>
+            <label class="rsw-out"><input type="checkbox" class="checkbox" [ngModel]="html()" (ngModelChange)="html.set($event)" /><span><b>HTML</b><br><span class="text-xs text-[color:var(--text-muted)]">Opens in any browser · self-contained</span></span></label>
+            <label class="field"><span class="label">Why (optional)</span>
+              <input class="input" [ngModel]="reason()" (ngModelChange)="reason.set($event)" aria-label="Reason" placeholder="Target mapped" /></label>
+            <p class="text-xs text-[color:var(--text-muted)]">
+              This creates version {{ nextVersion() }}@if (nextVersion() > 1) {; version {{ nextVersion() - 1 }} is kept}. The template version and the data are recorded with it.
+            </p>
+          </section>
+          <section class="rsw-sec">
+            <div class="flex flex-wrap gap-2">
+              <button type="button" class="btn btn-default btn-sm" (click)="step.set(2)"><app-icon name="arrowLeft" />Back to mapping</button>
+              <button type="button" class="btn btn-primary btn-sm" [disabled]="blocked() || generating() || (!pdf() && !html()) || !canGenerate()" (click)="generate()">
+                <app-icon [name]="blocked() ? 'lock' : 'play'" />Generate v{{ nextVersion() }}
+              </button>
+            </div>
+            @if (blocked()) { <p class="text-xs text-[color:var(--crit-text)]">Fix the blocking problem to generate. Warnings don't block.</p> }
+            @if (generateError()) { <p class="text-xs text-[color:var(--crit-text)]" role="alert">{{ generateError() }}</p> }
+          </section>
+        </aside>
+      </div>
+    }
+
+    @case (4) {
+      @if (job(); as j) {
+        <section class="card p-4 flex flex-col gap-4 max-w-3xl" aria-live="polite">
+          <div class="flex flex-wrap items-center gap-2"><span class="font-semibold mono">{{ j.label }}</span><span class="text-sm text-[color:var(--text-muted)]">{{ j.reportLabel }} · {{ j.reportName }}</span>
+            <app-status [label]="chipWord(j.status)" /></div>
+          <div class="rsw-progress" role="progressbar" [attr.aria-valuenow]="j.progressPct" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="stageWord(j.status)">
+            <i [style.width.%]="j.progressPct"></i></div>
+          <p class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</p>
+          @if (j.status === 'FAILED') {
+            <p class="text-sm text-[color:var(--crit-text)]" role="alert">{{ j.error }} No report version was made.</p>
+            <app-report-problems [problems]="j.diagnostics || []" />
+          }
+          @if (j.status === 'SUCCEEDED') {
+            <p class="text-sm text-[color:var(--ok-text)]"><app-icon name="checkCircle" /> Version {{ j.resultVersion }} is ready@if (j.pages) { · {{ j.pages }} page{{ j.pages === 1 ? '' : 's' }} }. Earlier versions are kept.</p>
+          }
+          <div class="flex gap-2">
+            @if (!isRunning(j.status)) { <button type="button" class="btn btn-primary btn-sm" (click)="openReport()"><app-icon name="arrowRight" />Open the report</button> }
+            @if (j.status === 'FAILED') { <button type="button" class="btn btn-default btn-sm" (click)="step.set(2)">Back to mapping</button> }
+          </div>
+        </section>
+      }
+    }
+  }
+</div>

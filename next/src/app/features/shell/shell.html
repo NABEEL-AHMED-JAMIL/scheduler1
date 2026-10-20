@@ -191,7 +191,8 @@
       <ng-container #sideNav />
     </aside>
 
-    <main id="main" tabindex="-1" class="outline-none flex-1 min-w-0 mx-auto max-w-[2560px] w-full px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12">
+    <main id="main" tabindex="-1" class="outline-none flex-1 min-w-0 mx-auto w-full"
+          [class]="canvasPage() ? 'app-main-canvas' : 'max-w-[2560px] px-4 sm:px-6 lg:px-8 2xl:px-10 pt-8 pb-12'">
       <router-outlet />
     </main>
   </div>

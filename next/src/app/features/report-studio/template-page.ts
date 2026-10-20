@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, input, signal } from '@angular/cor
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
@@ -17,21 +17,20 @@ import { ProblemList } from './problem-list';
 import { Problem, SampleRow, TemplateDetail, TemplateDefinition, VersionRow, originWord, size } from './report-studio.model';
 import { NewTemplateData, NewTemplatePanel, PublishData, PublishPanel } from './template-panels';
 import { TestPanel, TestPanelData } from './test-panel';
-import { GeneratePanel, GeneratePanelData } from './generate-panel';
 import { downloadJson } from './report-files';
 
 interface ContractField { path: string; type: string; required?: boolean; label?: string; }
 
 /**
- * One template (MIG-403): its draft and versions, its test samples and its data contract. The draft is edited here as
- * its JSON (the visual designer is phase 2), checked by the server's schema on every save, and tested with any data
+ * One template (MIG-403): its draft and versions, its test samples and its data contract. The draft is edited in the
+ * visual designer (MIG-404, /design) or here as its JSON, checked by the server's schema on every save, and tested with any data
  * before anything is published. Publishing (report-publish) freezes the draft as the next version; "New draft" starts
  * one from any version; "Make a copy" is a new template with its own history.
  */
 @Component({
   selector: 'app-report-template-page',
   imports: [PageHeader, RefreshButton, Icon, ServerTimePipe, LoadError, ProblemList, FormsModule, CdkMenu, CdkMenuItem,
-    CdkMenuTrigger],
+    CdkMenuTrigger, RouterLink],
   templateUrl: './template-page.html',
 })
 export class ReportTemplatePage implements OnInit {
@@ -192,14 +191,6 @@ export class ReportTemplatePage implements OnInit {
       next: doc => downloadJson(doc, `${t.name}${version === 'draft' ? '.draft' : '.v' + version}.template.json`),
       error: e => this.toast.error(studioError(e).message),
     });
-  }
-
-  generate(): void {
-    const t = this.t();
-    if (!t) return;
-    this.dialog.open<string | undefined, GeneratePanelData>(GeneratePanel, sidePanelConfig<GeneratePanelData>({
-      templateId: t.templateId, samples: t.samples,
-    }, 'wide', 'right'));
   }
 
   removeSample(s: SampleRow): void {

@@ -99,6 +99,15 @@ const PATHS: Record<string, string> = {
   bank:      'M3 21h18M4 10h16M12 3l9 5H3ZM6 10v8M10 10v8M14 10v8M18 10v8',
   undo:      'M9 14 4 9l5-5M4 9h11a5 5 0 0 1 0 10h-3',
   building:  'M3 21h18M5 21V5a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v16M13 21V10h5a1 1 0 0 1 1 1v10M8 8h2M8 12h2M8 16h2',
+  // MIG-404: the report designer's toolbar and its palette of components.
+  redo:      'm15 14 5-5-5-5M20 9H9a5 5 0 0 0 0 10h3',
+  heading:   'M6 4v16M18 4v16M6 12h12',
+  text:      'M4 6h16M4 10h16M4 14h10M4 18h13',
+  tag:       'M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8ZM7 7h.01',
+  columns:   'M3 4h18v16H3ZM12 4v16',
+  pageBreak: 'M3 12h4M10 12h4M17 12h4M5 3v5h14V3M5 21v-5h14v5',
+  hash:      'M4 9h16M4 15h16M10 3 8 21M16 3l-2 18',
+  spacer:    'M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4',
 };
 
 @Component({

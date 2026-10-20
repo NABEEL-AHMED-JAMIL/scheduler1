@@ -1,0 +1,38 @@
+/* Create report (MIG-404, Figma frames 4 and 5): the stepper, the template card, the two columns of Data and mapping,
+   and the preview beside its checks -- on the console's tokens; a wide screen gives the matching table the room. */
+:host { display: block; }
+.rsw-steps { list-style: none; padding: 0; margin: 1rem 0 1.25rem; flex-wrap: nowrap; overflow-x: auto; }
+.rsw-line { flex: 1 1 2rem; max-width: 6rem; min-width: 1rem; height: 0; border-top: 1px solid var(--border-strong); }
+.connect-step.is-bad { color: var(--crit-text); }
+.connect-step.is-bad .connect-dot { border-color: var(--crit-text); }
+.rsw-cards { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr)); }
+.rsw-card { display: grid; grid-template-columns: 5.5rem minmax(0, 1fr); gap: 0.75rem; align-items: start; padding: 0.75rem; text-align: left;
+  background: var(--surface-raised); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
+.rsw-card:hover { border-color: var(--focus-ring); }
+.rsw-card.is-active { border-color: var(--accent-mark-strong); box-shadow: 0 0 0 1px var(--accent-mark-strong); }
+.rsw-thumb { display: flex; align-items: center; justify-content: center; width: 5.5rem; aspect-ratio: 210 / 297; overflow: hidden;
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); color: var(--text-muted); }
+.rsw-thumb img { width: 100%; height: 100%; object-fit: cover; object-position: top; }
+.rsw-template { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; gap: 0.75rem 1rem; align-items: center; padding: 0.875rem 1rem; }
+@media (max-width: 1100px) { .rsw-template { grid-template-columns: auto minmax(0, 1fr); } }
+.rsw-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.125rem; height: 2.125rem; border-radius: var(--radius-lg);
+  background: var(--surface-sunken); color: var(--text-secondary); }
+.rsw-name { min-width: 18rem; }
+.rsw-two { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .rsw-two { grid-template-columns: 24rem minmax(0, 1fr); } }
+@media (min-width: 1700px) { .rsw-two { grid-template-columns: 28rem minmax(0, 1fr); } }
+.rsw-match td { vertical-align: top; }
+.rsw-match select { max-width: 22rem; }
+.rsw-missing td { background: var(--crit-soft); }
+.rsw-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 1.25rem; padding-top: 1rem;
+  border-top: 1px solid var(--border-subtle); }
+.rsw-preview { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .rsw-preview { grid-template-columns: minmax(0, 1fr) 22rem; } }
+@media (min-width: 1700px) { .rsw-preview { grid-template-columns: minmax(0, 1fr) 26rem; } }
+.rsw-side { display: flex; flex-direction: column; }
+.rsw-sec { display: flex; flex-direction: column; gap: 0.625rem; padding: 1rem; }
+.rsw-sec + .rsw-sec { border-top: 1px solid var(--border-subtle); }
+.rsd-eyebrow-plain { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-muted); }
+.rsw-out { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; }
+.rsw-progress { height: 0.5rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+.rsw-progress > i { display: block; height: 100%; background: var(--accent-mark-strong); transition: width 300ms ease; }

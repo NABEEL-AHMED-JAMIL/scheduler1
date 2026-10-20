@@ -1,0 +1,29 @@
+/* One report (MIG-404, Figma frame 6): the current version beside its "Generate again" and lineage, its files, its
+   versions. A wide screen gives the version its picture and figures side by side. */
+:host { display: block; }
+.rsr-split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .rsr-split { grid-template-columns: minmax(0, 1fr) 22rem; } }
+@media (min-width: 1700px) { .rsr-split { grid-template-columns: minmax(0, 1fr) 26rem; } }
+.rs-count { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.125rem; }
+.rsr-current { display: grid; gap: 1.25rem; padding: 1rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 900px) { .rsr-current { grid-template-columns: 13rem minmax(0, 1fr); } }
+.rsr-thumb { display: flex; justify-content: center; align-items: flex-start; padding: 0.75rem; min-height: 15rem; max-height: 17rem; overflow: hidden;
+  background: var(--surface-sunken); border-radius: var(--radius-lg); }
+.rsr-thumb img { width: 11rem; box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); }
+.rst-paper-sm { display: flex; flex-direction: column; gap: 0.4rem; width: 9rem; height: 12.5rem; padding: 0.875rem; background: var(--surface-raised); }
+.rst-paper-sm > i { height: 0.375rem; border-radius: var(--radius-sm); background: var(--border-subtle); }
+.rst-paper-sm > b { height: 3rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent-mark) 22%, var(--surface-sunken)); }
+.rsr-figures { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; }
+.rsr-figures > div { display: flex; flex-direction: column; gap: 0.125rem; }
+.rsr-figures b { font-size: 1.25rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.rsr-files { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.rsr-file { display: flex; align-items: center; gap: 0.75rem; padding: 0.875rem 1rem; }
+.rsr-file-icon { display: inline-flex; align-items: center; justify-content: center; width: 2.25rem; height: 2.25rem; flex: none;
+  border-radius: var(--radius-lg); background: var(--surface-sunken); color: var(--text-secondary); }
+.rsr-lineage { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.875rem; position: relative; }
+.rsr-lineage > li { display: flex; gap: 0.625rem; min-width: 0; position: relative; }
+.rsr-lineage > li:not(:last-child)::after { content: ""; position: absolute; left: 0.875rem; top: 1.875rem; bottom: -0.875rem; border-left: 1px solid var(--border-strong); }
+.rsr-lineage .label { margin-bottom: 0; display: block; }
+.rsr-li-icon { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; flex: none; border-radius: var(--radius-full);
+  background: var(--surface-sunken); border: 1px solid var(--border-subtle); color: var(--text-secondary); }
+.rsr-li-title { display: block; font-size: 0.875rem; font-weight: 500; color: var(--text-primary); }

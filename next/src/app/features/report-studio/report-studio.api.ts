@@ -2,9 +2,10 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpHeaders, HttpResponse } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
+import { PaletteEntry } from './designer/designer-model';
 import {
   DataSourceRow, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
-  TemplateDetail, TemplateLibrary, VersionRow,
+  TemplateContract, TemplateDetail, TemplateLibrary, VersionRow,
 } from './report-studio.model';
 
 /** What a refusal says (spec section 22): a stable code, a sentence, and the problems that blocked it. */
@@ -51,6 +52,12 @@ export class ReportStudioApi {
 
   schema(): Observable<Record<string, unknown>> {
     return ReportStudioApi.data$(this.http.get<ApiResponse<Record<string, unknown>>>(`${this.studio}/schema`));
+  }
+
+  /** The component palette (the registry's types, groups, words and starting settings). */
+  components(): Observable<PaletteEntry[]> {
+    return this.http.get<ApiResponse<{ components?: PaletteEntry[] } | PaletteEntry[]>>(`${this.studio}/components`)
+      .pipe(map(r => (Array.isArray(r.data) ? r.data : r.data?.components ?? [])));
   }
 
   // ---------------------------------------------------------------- templates
@@ -113,6 +120,31 @@ export class ReportStudioApi {
     return this.http.delete<ApiResponse>(`${this.templates}/sample/delete`, { params: { sampleId } });
   }
 
+  /** "Ask for approval" (MIG-404): recorded on the draft's revision; publishing stays report-publish's. */
+  requestApproval(templateId: string, revision: number, note: string): Observable<TemplateDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<TemplateDetail>>(`${this.templates}/requestApproval`, { revision, note },
+      { params: { templateId } }));
+  }
+
+  /** Each live template's data contract (MIG-404). */
+  contracts(tenantId?: number | null): Observable<TemplateContract[]> {
+    return this.http.get<ApiResponse<{ templates: TemplateContract[] }>>(`${this.templates}/contracts`, { params: ReportStudioApi.scope(tenantId) })
+      .pipe(map(r => r.data?.templates ?? []));
+  }
+
+  /** A template version's first page as a 320 px PNG (MIG-404): the newest published one, else the draft, or the one named. */
+  templateThumbnail(templateId: string, version?: string | null, tenantId?: number | null): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.templates}/thumbnail`, { params: { templateId, ...(version ? { version } : {}), ...ReportStudioApi.scope(tenantId) },
+      responseType: 'blob', observe: 'response' });
+  }
+
+  /** A report version's first page as a 320 px PNG (MIG-404). */
+  reportThumbnail(reportId: string, version?: number | null, tenantId?: number | null): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.library}/thumbnail`, {
+      params: { reportId, ...(version ? { version: String(version) } : {}), ...ReportStudioApi.scope(tenantId) },
+      responseType: 'blob', observe: 'response' });
+  }
+
   publish(templateId: string, revision: number, changeSummary: string): Observable<TemplateDetail> {
     return ReportStudioApi.data$(this.http.post<ApiResponse<TemplateDetail>>(`${this.publishing}/publish`, { revision, changeSummary },
       { params: { templateId } }));
@@ -122,6 +154,11 @@ export class ReportStudioApi {
 
   previewHtml(body: Record<string, unknown>): Observable<PreviewResult> {
     return ReportStudioApi.data$(this.http.post<ApiResponse<PreviewResult>>(`${this.previews}/html`, body));
+  }
+
+  /** The designer's canvas (MIG-404): the definition being edited as HTML whose elements name their components. */
+  canvas(body: Record<string, unknown>): Observable<PreviewResult> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<PreviewResult>>(`${this.previews}/canvas`, body));
   }
 
   previewPdf(body: Record<string, unknown>): Observable<HttpResponse<Blob>> {

@@ -1,0 +1,321 @@
+@if (error()) {
+  <div class="p-8"><app-load-error [message]="error()" (retry)="load()" /></div>
+} @else if (t(); as t) {
+  <div class="rsd" #editor>
+    <header class="rsd-head">
+      <div class="min-w-0">
+        <nav class="rsd-crumb" aria-label="Breadcrumb">
+          <a routerLink="/reports/overview">Reports</a><span aria-hidden="true">›</span>
+          <a routerLink="/reports/templates">Templates</a><span aria-hidden="true">›</span>
+          <a [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
+        </nav>
+        <div class="flex flex-wrap items-center gap-2 mt-0.5">
+          <h1 class="rsd-title">{{ t.name }}</h1>
+          @if (t.draft) { <span class="pill pill-brand">Draft v{{ t.draft.version }}</span> }
+          @else if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+          @if (approval(); as a) {
+            <span class="pill" [class]="a.current ? 'pill-warn' : 'pill-neutral'" [title]="a.note || ''">
+              Approval asked{{ a.requestedByName ? ' by ' + a.requestedByName : '' }}{{ a.current ? '' : ' · draft changed since' }}
+            </span>
+          }
+          <span class="text-xs text-[color:var(--text-muted)]" aria-live="polite">
+            @if (t.draft?.basedOnVersion) { From published v{{ t.draft!.basedOnVersion }} · }
+            <span [class.rsd-bad]="saveState() === 'conflict' || saveState() === 'error'">{{ savedWord() }}</span>
+          </span>
+        </div>
+      </div>
+      <div class="rsd-actions">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="toLibrary()" />
+        @if (!isPlatformAdmin()) { <button type="button" class="btn btn-default btn-sm" (click)="preview()"><app-icon name="eye" />Preview</button> }
+        <button type="button" class="btn btn-default btn-sm" (click)="validate()"><app-icon name="checkCircle" />Validate</button>
+        @if (editable()) {
+          <button type="button" class="btn btn-sm" [class]="canPublish() ? 'btn-default' : 'btn-primary'" (click)="askApproval()">
+            <app-icon name="send" />Ask for approval
+          </button>
+          @if (canPublish()) {
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="!structureValid()" (click)="publish()">
+              <app-icon name="check" />Publish v{{ t.draft!.version }}
+            </button>
+          } @else {
+            <button type="button" class="btn btn-default btn-sm" disabled title="Publishing needs the Publish report templates page">
+              <app-icon name="lock" />Publish v{{ t.draft!.version }}
+            </button>
+          }
+        } @else if (canEditTemplates() && !t.draft && t.currentPublishedVersion && t.status !== 'ARCHIVED') {
+          <button type="button" class="btn btn-primary btn-sm" (click)="startDraft()"><app-icon name="edit" />Start a draft from v{{ t.currentPublishedVersion }}</button>
+        }
+      </div>
+    </header>
+
+    @if (saveState() === 'conflict') {
+      <div class="rs-banner rs-banner-crit rsd-banner" role="alert">
+        <app-icon name="alert" class="icon-crit shrink-0" />
+        <div class="min-w-0 flex-1"><b>Someone saved this draft since you opened it.</b> {{ saveError() }}</div>
+        <button type="button" class="btn btn-default btn-sm" (click)="reload()"><app-icon name="refresh" />Reload</button>
+        <button type="button" class="btn btn-primary btn-sm" (click)="saveAsCopy()"><app-icon name="copy" />Save as a copy</button>
+      </div>
+    } @else if (saveState() === 'error') {
+      <div class="rs-banner rs-banner-crit rsd-banner" role="alert">
+        <app-icon name="alert" class="icon-crit shrink-0" />
+        <div class="min-w-0 flex-1">{{ saveError() }}</div>
+        <button type="button" class="btn btn-default btn-sm" (click)="saveNow()"><app-icon name="save" />Try again</button>
+      </div>
+    }
+
+    <div class="rsd-toolbar" role="toolbar" aria-label="Designer">
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)" [disabled]="!undoStack().length || !editable()" (click)="undo()"><app-icon name="undo" /></button>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)" [disabled]="!redoStack().length || !editable()" (click)="redo()"><app-icon name="redo" /></button>
+      <span class="rsd-sep" aria-hidden="true"></span>
+      <span class="rsd-tool">Select</span>
+      <button type="button" class="btn btn-ghost btn-sm" [class.rsd-on]="!selected()" [attr.aria-pressed]="!selected()" (click)="select(null)">Page settings</button>
+      <span class="rsd-chip rsd-chip-muted" title="Brand profiles arrive with Assets & branding">Brand: none yet</span>
+      <span class="flex-1"></span>
+      <button type="button" class="rsd-chip" (click)="openTestData()" [disabled]="isPlatformAdmin()"
+              [title]="isPlatformAdmin() ? 'Test data is a workspace member\'s: the template is drawn with its paths showing' : ''"
+              [attr.aria-label]="'Test data: ' + (testSource() ? testLabel() || 'chosen' : 'none')">
+        <app-icon name="database" />
+        @if (testSource()) { {{ testLabel() || 'Test data' }}@if (records()) { · {{ records() }} record{{ records() === 1 ? '' : 's' }} } }
+        @else { No test data · add some }
+      </button>
+      <span class="text-xs text-[color:var(--text-secondary)] px-1">{{ pageLabel() }}</span>
+      <div class="rsd-zoom" role="group" aria-label="Zoom">
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Zoom out" (click)="zoomBy(-1)"><app-icon name="minus" /></button>
+        <select class="input rsd-zoom-select" [ngModel]="zoom()" (ngModelChange)="zoom.set($event)" aria-label="Zoom level">
+          @for (z of zooms; track z) { <option [ngValue]="z">{{ z * 100 }}%</option> }
+          @if (!zooms.includes(zoom())) { <option [ngValue]="zoom()">{{ (zoom() * 100).toFixed(0) }}%</option> }
+        </select>
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Zoom in" (click)="zoomBy(1)"><app-icon name="plus" /></button>
+        <button type="button" class="btn btn-ghost btn-sm" (click)="fit()">Fit</button>
+      </div>
+      <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Full screen" title="Full screen" (click)="fullScreen()"><app-icon name="maximize" /></button>
+    </div>
+
+    <div class="rsd-body">
+      <aside class="rsd-left" aria-label="Components, layers and data">
+        <div class="tabs rsd-tabs" role="tablist">
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'components'" [attr.aria-selected]="tab() === 'components'" (click)="tab.set('components')">Components</button>
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'layers'" [attr.aria-selected]="tab() === 'layers'" (click)="tab.set('layers')">Layers</button>
+          <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'data'" [attr.aria-selected]="tab() === 'data'" (click)="tab.set('data')">Data</button>
+        </div>
+        <div class="rsd-left-body">
+          @switch (tab()) {
+            @case ('components') {
+              <label class="rsd-search">
+                <app-icon name="search" class="text-[color:var(--text-muted)]" />
+                <input class="input" type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Find a component" aria-label="Find a component" />
+              </label>
+              @for (g of paletteGroups(); track g.group) {
+                <h3 class="rsd-eyebrow">{{ g.group }}</h3>
+                <div class="rsd-palette" cdkDropList cdkDropListSortingDisabled [cdkDropListConnectedTo]="dropTargets()" [cdkDropListDisabled]="!editable()">
+                  @for (e of g.entries; track e.label) {
+                    <button type="button" class="rsd-comp" cdkDrag [cdkDragData]="{ add: e }" [cdkDragDisabled]="!editable()" [title]="e.description"
+                            [disabled]="!editable()" (cdkDragStarted)="dragStarted({ add: e })" (cdkDragMoved)="dragMoved($event)" (cdkDragEnded)="dragEnded()"
+                            (click)="add(e)">
+                      <app-icon [name]="typeIcon(e.type)" size="1.1rem" />
+                      <span>{{ e.label }}</span>
+                    </button>
+                  }
+                </div>
+              } @empty {
+                <p class="text-xs text-[color:var(--text-muted)]">No component matches.</p>
+              }
+              <h3 class="rsd-eyebrow">Page parts</h3>
+              <ul class="rsd-parts">
+                @for (p of pageParts(); track p.key) {
+                  <li>
+                    <button type="button" class="rsd-part" (click)="addPart(p.key)" [disabled]="!editable() && !p.id">
+                      <app-icon [name]="p.icon" /><span class="flex-1 text-left">{{ p.label }}</span>
+                      @if (p.id) { <span class="text-xs text-[color:var(--text-muted)]">on every page</span> } @else { <app-icon name="plus" /> }
+                    </button>
+                  </li>
+                }
+              </ul>
+              <div class="flex items-center justify-between mt-3">
+                <h3 class="rsd-eyebrow m-0">Pages · {{ pages().length }}</h3>
+                @if (editable()) { <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Add a page" (click)="addPage()"><app-icon name="plus" /></button> }
+              </div>
+              <ol class="rsd-pages">
+                @for (p of pages(); track p.index) {
+                  <li>
+                    <button type="button" class="rsd-page-link" (click)="select(p.blockIds[0] ?? p.breakId)">
+                      <span class="rsd-page-no">{{ p.index + 1 }}</span><span class="truncate">{{ p.title }}</span>
+                    </button>
+                  </li>
+                }
+              </ol>
+              <p class="text-xs text-[color:var(--text-muted)] mt-2">Drag components onto a page, or click one to add it after the selected block. The panel on the right sets what data each one shows.</p>
+            }
+            @case ('layers') {
+              <ul class="rsd-layers" cdkDropList id="rsd-layers" [cdkDropListConnectedTo]="dropTargets()" [cdkDropListDisabled]="!editable()"
+                  (cdkDropListDropped)="dropOnLayers($event)" aria-label="Layers">
+                @for (r of layers(); track r.id) {
+                  <li cdkDrag [cdkDragData]="{ move: r.id }" [cdkDragDisabled]="!editable()" (cdkDragStarted)="dragStarted({ move: r.id })"
+                      (cdkDragMoved)="dragMoved($event)" (cdkDragEnded)="dragEnded()">
+                    <button type="button" [class]="'rsd-layer rsd-depth-' + (r.depth > 5 ? 5 : r.depth)" [class.is-active]="selected() === r.id"
+                            [class.is-hidden]="r.hidden" (click)="select(r.id)">
+                      <app-icon [name]="typeIcon(r.type)" class="text-[color:var(--text-muted)]" />
+                      <span class="truncate flex-1 text-left">{{ r.label }}</span>
+                      <span class="text-xs text-[color:var(--text-muted)]">{{ typeWord(r.type) }}</span>
+                    </button>
+                  </li>
+                } @empty {
+                  <li class="text-xs text-[color:var(--text-muted)] p-2">The page is empty: add a component.</li>
+                }
+              </ul>
+              <p class="text-xs text-[color:var(--text-muted)] mt-2">Drag to reorder. Arrow keys select the block above or below; Alt+arrow moves it.</p>
+            }
+            @case ('data') {
+              <div class="flex flex-col gap-2">
+                <button type="button" class="btn btn-default btn-sm self-start" (click)="openTestData()"><app-icon name="database" />{{ testSource() ? 'Change the test data' : 'Add test data' }}</button>
+                @if (testSource()) {
+                  <p class="text-xs text-[color:var(--text-muted)]">{{ testLabel() }} · {{ records() }} record{{ records() === 1 ? '' : 's' }} · from {{ testRoot() }}</p>
+                } @else {
+                  <p class="text-xs text-[color:var(--text-muted)]">Paste JSON, pick a pipeline run's output, an upload or a saved test sample: the page fills with it at once.</p>
+                }
+                @if (dataFields().length) {
+                  <h3 class="rsd-eyebrow">Fields · click to use</h3>
+                  <ul class="rsd-fields">
+                    @for (f of dataFields(); track f.path) {
+                      <li>
+                        <button type="button" class="rsd-field" (click)="useField(f.path.replace('[]', ''), f.type)" [title]="'Use ' + f.path">
+                          <span class="mono text-xs truncate flex-1 text-left">{{ f.path }}</span>
+                          <span class="text-xs text-[color:var(--text-muted)]">{{ f.type }}</span>
+                        </button>
+                      </li>
+                    }
+                  </ul>
+                }
+              </div>
+            }
+          }
+        </div>
+      </aside>
+
+      <section class="rsd-canvas" cdkDropListGroup aria-label="Page canvas">
+        @if (drawError()) {
+          <div class="rs-banner rs-banner-crit rsd-canvas-note" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm">{{ drawError() }}</span></div>
+        }
+        @if (canvas(); as doc) {
+          @for (p of pages(); track p.index; let i = $index) {
+            <div class="rsd-page-head" [style.width.px]="pageWidthPx() * zoom()">
+              <span>PAGE {{ i + 1 }} · {{ p.title | uppercase }}</span>
+              @if (i === 0) {
+                <span class="rsd-ruler" aria-label="Ruler in millimetres">
+                  @for (m of ruler(); track m.mm) { <i [style.left.%]="(m.mm / page().width) * 100">{{ m.label }}</i> }
+                </span>
+              }
+            </div>
+            <div #pageSlot class="rsd-slot" [id]="'rsd-page-' + p.index" cdkDropList cdkDropListSortingDisabled [cdkDropListDisabled]="!editable()"
+                 (cdkDropListDropped)="dropOnPage($event)" [style.width.px]="pageWidthPx() * zoom()" [style.height.px]="slotHeight(i)">
+              <div class="rsd-clip">
+                <div class="rsd-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + zoom() + ')'">
+                  <app-rs-page-frame [html]="doc.pages[i] ?? ''" [css]="doc.css" [page]="i + 1" [pages]="pages().length" [heightMm]="page().height"
+                                     [selected]="selected()" [dropInto]="dropInto()?.page === i ? dropInto()!.id : null"
+                                     (picked)="pick($event)" (measured)="measured(i, $event)" />
+                </div>
+              </div>
+              @if (overlay(); as o) {
+                @if (o.page === i) {
+                  <div class="rsd-selection" [style.top.px]="o.top" [style.left.px]="o.left" [style.width.px]="o.width" [style.height.px]="o.height">
+                    @if (editable()) {
+                      <button type="button" class="rsd-grip" cdkDrag [cdkDragData]="{ move: selected()! }" aria-label="Drag to move the block"
+                              title="Drag to move" (cdkDragStarted)="dragStarted({ move: selected()! })" (cdkDragMoved)="dragMoved($event)" (cdkDragEnded)="dragEnded()">
+                        <app-icon name="grip" />
+                        <span *cdkDragPreview class="rsd-drag-preview">{{ selectedLabel() }}</span>
+                      </button>
+                    }
+                    @if (selectedBinding()) { <span class="rsd-binding mono">{{ selectedBinding() }}</span> }
+                  </div>
+                }
+              }
+              @if (indicator(); as line) {
+                @if (line.page === i) { <div class="rsd-insert" [style.top.px]="line.top" [style.left.px]="line.left" [style.width.px]="line.width"></div> }
+              }
+            </div>
+            @if (pages()[i + 1]?.breakId; as breakId) {
+              <button type="button" class="rsd-break" [class.is-active]="selected() === breakId" [style.width.px]="pageWidthPx() * zoom()" (click)="select(breakId)">
+                <span>PAGE BREAK</span>
+              </button>
+            }
+          }
+        } @else {
+          <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Drawing the page"></span></div>
+        }
+        @if (drawing()) { <span class="rsd-drawing spinner" role="status" aria-label="Drawing"></span> }
+      </section>
+
+      <aside class="rsd-right" aria-label="Properties">
+        @if (selectedBlock()) {
+          <app-rs-properties [block]="selectedBlock()" [label]="selectedLabel()" [definitions]="definitions()" [readonly]="!editable()"
+                             [fields]="dataFields()" [sample]="sample()" [tree]="inspect()?.tree" [names]="names()"
+                             (changed)="setProperty($event)" (duplicate)="duplicateSelected()" (remove)="removeSelected()" />
+        } @else if (def(); as d) {
+          <div class="rsd-props-head"><app-icon name="file" size="1.05rem" class="text-[color:var(--text-muted)]" /><div class="min-w-0 flex-1"><h2 class="text-sm font-semibold">Page settings</h2><p class="text-xs text-[color:var(--text-muted)]">Size, margins and type for every page.</p></div></div>
+          <section class="rsd-props-group" aria-label="Page">
+            <h3 class="rsd-eyebrow">Page</h3>
+            <div class="rsd-two">
+              <label class="field"><span class="label">Size</span>
+                <select class="input" [ngModel]="pageSetting('size') || 'A4'" (ngModelChange)="setPage('size', $event)" [disabled]="!editable()" aria-label="Page size">
+                  @for (s of pageSizes; track s) { <option [value]="s">{{ s }}</option> }
+                </select></label>
+              <label class="field"><span class="label">Orientation</span>
+                <select class="input" [ngModel]="pageSetting('orientation') || 'portrait'" (ngModelChange)="setPage('orientation', $event)" [disabled]="!editable()" aria-label="Orientation">
+                  <option value="portrait">Portrait</option><option value="landscape">Landscape</option>
+                </select></label>
+            </div>
+            <div class="rsd-four">
+              @for (m of marginSides; track m) {
+                <label class="field"><span class="label">{{ m }}</span>
+                  <input class="input" [ngModel]="margin(m)" (change)="setMargin(m, $any($event.target).value)" [disabled]="!editable()" [attr.aria-label]="'Margin ' + m" placeholder="16" /></label>
+              }
+            </div>
+            <p class="text-xs text-[color:var(--text-muted)]">Margins in mm.</p>
+          </section>
+          <section class="rsd-props-group" aria-label="Type">
+            <h3 class="rsd-eyebrow">Type and colour</h3>
+            <div class="rsd-two">
+              <label class="field"><span class="label">Font</span>
+                <select class="input" [ngModel]="themeSetting('fontFamily') || 'Noto Sans'" (ngModelChange)="setTheme('fontFamily', $event)" [disabled]="!editable()" aria-label="Font">
+                  @for (f of fonts; track f) { <option [value]="f">{{ f }}</option> }
+                </select></label>
+              <label class="field"><span class="label">Text size</span>
+                <select class="input" [ngModel]="themeSetting('fontSize') || '10pt'" (ngModelChange)="setTheme('fontSize', $event)" [disabled]="!editable()" aria-label="Text size">
+                  @for (s of fontSizes; track s) { <option [value]="s">{{ s }}</option> }
+                </select></label>
+            </div>
+            <label class="field"><span class="label">Main colour</span>
+              <input class="input rsd-colour" type="color" [ngModel]="themeSetting('primaryColor') || primaryDefault()" (change)="setTheme('primaryColor', $any($event.target).value.toUpperCase())" [disabled]="!editable()" aria-label="Main colour" /></label>
+          </section>
+          <section class="rsd-props-group" aria-label="Data">
+            <h3 class="rsd-eyebrow">Data</h3>
+            <p class="text-xs text-[color:var(--text-muted)]">Blocks read <span class="mono">{{ names()[0] }}</span>, which starts at <span class="mono">{{ testRoot() }}</span> in the data.</p>
+          </section>
+        }
+        <!-- The AI suggestion card (Figma frame 3) belongs here: it comes with Report Studio phase 6 and proposes; it never changes the draft by itself. -->
+      </aside>
+    </div>
+
+    <footer class="rsd-status">
+      <button type="button" class="rsd-status-check" [class.is-bad]="!structureValid()" (click)="showProblems.set(!showProblems())" [attr.aria-expanded]="showProblems()">
+        <app-icon [name]="structureValid() ? 'checkCircle' : 'alert'" />
+        {{ structureValid() ? 'Template structure valid' : 'Template has errors' }}
+        @if (structureValid() && (errors().length || warnings().length)) {
+          <span class="rsd-status-data">· {{ errors().length + warnings().length }} problem{{ errors().length + warnings().length === 1 ? '' : 's' }} with {{ testSource() ? 'this data' : 'the bindings' }}</span>
+        }
+        · {{ statusLine() }}
+      </button>
+      <span class="text-[color:var(--text-muted)]">
+        {{ editable() ? 'You can edit' : 'Read only' }} · {{ canPublish() ? 'You can publish' : 'Publishing needs an approver' }}@if (t.currentPublishedVersion) { · v{{ t.currentPublishedVersion }} can't be changed }
+      </span>
+      @if (showProblems()) {
+        <div class="rsd-problems card" role="dialog" aria-label="Problems">
+          <div class="flex items-center justify-between mb-2"><h2 class="text-sm font-semibold">Checks</h2>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Close" (click)="showProblems.set(false)"><app-icon name="close" /></button></div>
+          @if (problems().length) { <app-report-problems [problems]="problems()" /> } @else { <p class="text-sm text-[color:var(--ok-text)]">No problems found.</p> }
+        </div>
+      }
+    </footer>
+  </div>
+} @else {
+  <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+}

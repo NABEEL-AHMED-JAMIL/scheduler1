@@ -1,35 +1,40 @@
-import { Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
-import { RouterLink } from '@angular/router';
+import { NgTemplateOutlet } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { Subscription, interval, switchMap } from 'rxjs';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LoadError } from '../../shared/ui/load-error';
 import { confirmWith } from '../../shared/ui/confirm';
-import { sidePanelConfig } from '../../shared/ui/side-panel';
+import { copyText } from '../../shared/ui/clipboard.util';
 import { AuthService } from '../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
-import { OutputRow, ReportDetail, ReportVersionRow, chipWord, isRunning, size, stageWord } from './report-studio.model';
-import { GeneratePanel, GeneratePanelData } from './generate-panel';
+import {
+  JobRow, OutputRow, ReportDetail, ReportVersionRow, VersionRow, chipWord, idempotencyKey, isRunning, size, stageWord,
+} from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
 
-type Tab = 'details' | 'versions' | 'activity';
+type Tab = 'details' | 'versions' | 'activity' | 'access';
 
 /**
- * One report (MIG-403, Figma frame 6; page report-library): its current version with its files and where it came from
- * -- the template version, the data snapshot, the job -- every version (never overwritten), its jobs (a failed one made
- * no version) and its activity. Downloads go through a signed link, the reader's own, valid five minutes; each one is
- * recorded. "Generate again" makes the next version from a newer run, a corrected file or pasted data.
+ * One report (MIG-403, MIG-404; the owner-approved screen 6, Figma frame 6; page report-library): the current version --
+ * its first page, its key figures, its PDF and HTML -- every version (never overwritten) with what each was made from,
+ * its activity, and beside them "Generate again": a pinned template version and the data (the same frozen data, or other
+ * data through Create report) make the next version. Where a version came from is its lineage: the template version, the
+ * data, the job, the report. Downloads go through a signed link, the reader's own, valid five minutes; each is recorded.
  */
 @Component({
   selector: 'app-report-page',
-  imports: [PageHeader, RefreshButton, Icon, StatusPill, Segmented, ServerTimePipe, LoadError, ProblemList, RouterLink],
+  imports: [PageHeader, RefreshButton, Icon, StatusPill, ServerTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet],
   templateUrl: './report-page.html',
+  styleUrl: './report-page.css',
 })
 export class ReportPage implements OnInit {
   readonly reportId = input.required<string>();
@@ -37,34 +42,56 @@ export class ReportPage implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router);
 
   readonly r = signal<ReportDetail | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly tab = signal<Tab>('details');
   readonly downloading = signal('');
+  readonly thumb = signal<string | null>(null);
+  /** The template's versions a report can be made from (published, and the ones superseded since). */
+  readonly templateVersions = signal<VersionRow[]>([]);
+  readonly againVersion = signal<number | null>(null);
+  readonly againData = signal<'same' | 'other'>('same');
+  readonly againJob = signal<JobRow | null>(null);
+  readonly againError = signal('');
+  readonly againBusy = signal(false);
+  private againKey = idempotencyKey();
+  private poll?: Subscription;
   readonly chipWord = chipWord;
   readonly stageWord = stageWord;
   readonly isRunning = isRunning;
   readonly size = size;
 
-  readonly tabs = computed<SegmentOption<Tab>[]>(() => [
-    { id: 'details', label: 'Details' },
-    { id: 'versions', label: `Versions (${this.r()?.versions.length ?? 0})` },
-    { id: 'activity', label: `Activity (${this.r()?.activity.length ?? 0})` },
-  ]);
   readonly current = computed<ReportVersionRow | undefined>(() => {
     const r = this.r();
     return r?.versions.find(v => v.version === r.currentVersion);
   });
+  readonly newestJob = computed(() => this.r()?.jobs[0] ?? null);
   readonly lastFailed = computed(() => {
-    const r = this.r();
-    const failed = r?.jobs.find(j => j.status === 'FAILED');
-    const newest = r?.jobs[0];
-    return failed && newest && failed.jobId === newest.jobId ? failed : null;
+    const newest = this.newestJob();
+    return newest?.status === 'FAILED' ? newest : null;
   });
+  readonly justMade = computed(() => {
+    const j = this.newestJob();
+    const v = this.current();
+    return j?.status === 'SUCCEEDED' && v && j.resultVersion === v.version && v.version > 1 ? j : null;
+  });
+  readonly failedJobs = computed(() => this.r()?.jobs.filter(j => j.status === 'FAILED') ?? []);
   readonly running = computed(() => this.r()?.jobs.find(j => isRunning(j.status)) ?? null);
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin() && this.r()?.status !== 'ARCHIVED');
+  readonly workspace = computed(() => this.auth.user()?.tenantName || '');
+  readonly nextVersion = computed(() => (this.r()?.currentVersion ?? 0) + 1);
+  readonly records = computed(() => this.current()?.snapshot?.records ?? null);
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => {
+      this.poll?.unsubscribe();
+      const t = this.thumb();
+      if (t) URL.revokeObjectURL(t);
+    });
+  }
 
   ngOnInit(): void {
     this.load();
@@ -74,9 +101,42 @@ export class ReportPage implements OnInit {
     this.loading.set(true);
     this.error.set('');
     this.api.report(this.reportId()).subscribe({
-      next: r => { this.r.set(r); this.loading.set(false); },
+      next: r => {
+        this.r.set(r);
+        this.loading.set(false);
+        this.loadThumb(r);
+        if (this.canGenerate()) this.loadVersions(r.templateId);
+      },
       error: e => { this.error.set(studioError(e, 'The report could not be read.').message); this.loading.set(false); },
     });
+  }
+
+  private loadThumb(r: ReportDetail): void {
+    if (!r.currentVersion || !this.current()?.outputs.some(o => o.format === 'PDF')) return;
+    this.api.reportThumbnail(r.reportId, r.currentVersion, this.auth.isPlatformAdmin() ? r.tenantId : null).subscribe({
+      next: res => {
+        if (!res.body || !(res.headers.get('Content-Type') ?? '').includes('png')) return;
+        const old = this.thumb();
+        if (old) URL.revokeObjectURL(old);
+        this.thumb.set(URL.createObjectURL(res.body));
+      },
+      error: () => { /* the card shows without its picture */ },
+    });
+  }
+
+  private loadVersions(templateId: string): void {
+    this.api.template(templateId).subscribe({
+      next: t => {
+        const made = t.versions.filter(v => v.state !== 'DRAFT');
+        this.templateVersions.set(made);
+        this.againVersion.set(t.currentPublishedVersion ?? made[0]?.version ?? null);
+      },
+      error: () => this.templateVersions.set([]),
+    });
+  }
+
+  tabTo(tab: Tab): void {
+    this.tab.set(tab);
   }
 
   download(v: ReportVersionRow, o: OutputRow): void {
@@ -92,12 +152,70 @@ export class ReportPage implements OnInit {
     });
   }
 
+  /** The current version's PDF (else its HTML), downloaded. */
+  downloadCurrent(): void {
+    const v = this.current();
+    const o = v?.outputs.find(x => x.format === 'PDF') ?? v?.outputs[0];
+    if (v && o) this.download(v, o);
+  }
+
+  /** The current version opened in a new tab: its PDF, through a signed link, as a blob the browser shows. */
+  open(): void {
+    const r = this.r();
+    const v = this.current();
+    const o = v?.outputs.find(x => x.format === 'PDF');
+    if (!r || !v || !o) return;
+    this.api.download(r.reportId, v.version, 'PDF').subscribe({
+      next: res => {
+        if (!res.body) return;
+        const url = URL.createObjectURL(new Blob([res.body], { type: 'application/pdf' }));
+        window.open(url, '_blank', 'noopener');
+        setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      },
+      error: e => this.toast.error(studioError(e, 'The report could not be opened.').message),
+    });
+  }
+
+  share(): void {
+    void copyText(window.location.href).then(ok => this.toast[ok ? 'success' : 'error'](ok
+      ? 'Link copied. Only people in this workspace who may open reports can follow it.' : 'The link could not be copied.'));
+  }
+
+  /** "Generate again": the same frozen data with the chosen template version, as a new version; other data goes through Create report. */
   again(): void {
     const r = this.r();
+    const v = this.current();
     if (!r) return;
-    this.dialog.open<string | undefined, GeneratePanelData>(GeneratePanel, sidePanelConfig<GeneratePanelData>({
-      reportId: r.reportId, reportName: r.name,
-    }, 'wide', 'right')).closed.subscribe(() => this.load());
+    if (this.againData() === 'other' || !v) {
+      void this.router.navigate(['/reports/new'], { queryParams: { reportId: r.reportId } });
+      return;
+    }
+    this.againBusy.set(true);
+    this.againError.set('');
+    this.api.generate({
+      reportId: r.reportId, version: String(this.againVersion() ?? v.templateVersion), source: { connector: 'SNAPSHOT', snapshotId: v.snapshotId },
+      rootPath: (v.config?.['rootPath'] as string | undefined) ?? '$', ...(v.config?.['mapping'] ? { mapping: v.config['mapping'] } : {}),
+      reason: `Again from v${v.version}'s data, template v${this.againVersion() ?? v.templateVersion}`,
+    }, this.againKey).subscribe({
+      next: job => {
+        this.againBusy.set(false);
+        this.againJob.set(job);
+        this.againKey = idempotencyKey();
+        this.follow(job.jobId);
+      },
+      error: e => { this.againBusy.set(false); this.againError.set(studioError(e, 'The report could not be queued.').message); },
+    });
+  }
+
+  private follow(jobId: string): void {
+    this.poll?.unsubscribe();
+    this.poll = interval(1500).pipe(switchMap(() => this.api.job(jobId))).subscribe({
+      next: job => {
+        this.againJob.set(job);
+        if (!isRunning(job.status)) { this.poll?.unsubscribe(); this.load(); }
+      },
+      error: () => this.poll?.unsubscribe(),
+    });
   }
 
   archive(): void {
@@ -108,6 +226,29 @@ export class ReportPage implements OnInit {
       if (!ok) return;
       this.api.archiveReport(r.reportId).subscribe({ next: () => this.load(), error: e => this.toast.error(studioError(e).message) });
     });
+  }
+
+  /** A version's files, the PDF first (as the people who read it open it). */
+  outputsOf(v: ReportVersionRow): OutputRow[] {
+    return [...v.outputs].sort((a, b) => (a.format === 'PDF' ? -1 : 0) - (b.format === 'PDF' ? -1 : 0));
+  }
+
+  hasPdf(v: ReportVersionRow): boolean {
+    return v.outputs.some(o => o.format === 'PDF');
+  }
+
+  formatsOf(v: ReportVersionRow): string {
+    return v.outputs.map(o => o.format).join(' and ');
+  }
+
+  /** The data's label for a version: the pipeline run, the file or the pasted data. */
+  dataOf(v: ReportVersionRow): string {
+    return v.snapshot?.pipelineRunId ? `#${v.snapshot.pipelineRunId}` : v.snapshot?.label ?? '—';
+  }
+
+  versionBy(v: ReportVersionRow): string {
+    const name = v.config?.['requestedByName'];
+    return typeof name === 'string' && name ? name : v.createdBy ? 'A workspace member' : '—';
   }
 
   activityWord(action: string): string {

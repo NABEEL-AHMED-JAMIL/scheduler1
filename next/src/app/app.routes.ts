@@ -413,6 +413,23 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-404: the visual designer -- the whole width, the sidebar folded to its icons (`canvas`); report-templates.
+        path: 'reports/templates/:templateId/design',
+        title: 'Template designer',
+        loadComponent: () => import('./features/report-studio/designer/designer').then(m => m.ReportDesigner),
+        data: { pageKey: 'report-templates', canvas: true },
+        canActivate: [pageGuard],
+        canDeactivate: [unsavedChangesGuard],
+      },
+      {
+        // MIG-404: Create report -- Template, Data and mapping, Preview and check, Generate (Figma 4 and 5); report-generate.
+        path: 'reports/new',
+        title: 'Create report',
+        loadComponent: () => import('./features/report-studio/wizard/new-report').then(m => m.NewReport),
+        data: { pageKey: 'report-generate' },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'reports/templates/:templateId',
         title: 'Report template',
         loadComponent: () => import('./features/report-studio/template-page').then(m => m.ReportTemplatePage),

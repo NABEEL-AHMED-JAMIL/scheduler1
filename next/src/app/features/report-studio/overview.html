@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">Reports</h1>
-        <p class="page-subtitle">Design report templates once, fill them from pipeline runs and files, and keep every version.</p>
+        <p class="page-subtitle">Design report templates once, fill them from pipeline runs, and keep every version.</p>
       </div>
       <div class="flex items-center gap-2">
         <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
@@ -12,7 +12,7 @@
           <button type="button" class="btn btn-default btn-sm" (click)="newTemplate()"><app-icon name="plus" />New template</button>
         }
         @if (canGenerate()) {
-          <button type="button" class="btn btn-primary btn-sm" (click)="generate()"><app-icon name="play" />New report</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="newReport()"><app-icon name="plus" />New report</button>
         }
       </div>
     </div>
@@ -23,14 +23,19 @@
   } @else if (data(); as d) {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Reports at a glance" />
 
-    @for (j of d.failedJobs.slice(0, 1); track j.jobId) {
+    @if (blocked(); as j) {
       <div class="rs-banner rs-banner-crit mt-4" role="status">
         <app-icon name="alert" class="icon-crit shrink-0" />
         <div class="min-w-0 flex-1">
-          <div class="font-semibold">{{ j.reportName }} · generation failed</div>
-          <div class="text-sm">{{ j.label }}: {{ j.error }} <span class="mono text-xs">({{ j.errorCode }})</span> No version was made; the report keeps its last one.</div>
+          <div class="font-semibold">{{ j.reportName }} · generation {{ isMapping(j) ? 'blocked' : 'failed' }}</div>
+          <div class="text-sm">{{ j.label }} could not make @if (j.resultVersion) { a version } @else { a new version }: {{ j.error }}
+            <span class="mono text-xs">({{ j.errorCode }})</span> The report's last version is unchanged.</div>
         </div>
-        <a class="btn btn-default btn-sm shrink-0" [routerLink]="['/reports/library', j.reportId]"><app-icon name="arrowRight" />Open the report</a>
+        @if (isMapping(j) && canGenerate()) {
+          <button type="button" class="btn btn-default btn-sm shrink-0" (click)="fixMapping(j)"><app-icon name="arrowRight" />Fix field mapping</button>
+        } @else if (canLibrary()) {
+          <a class="btn btn-default btn-sm shrink-0" [routerLink]="['/reports/library', j.reportId]"><app-icon name="arrowRight" />Open the report</a>
+        }
       </div>
     }
 
@@ -39,13 +44,13 @@
         <section class="card">
           <div class="rs-head">
             <div><h2 class="section-title">Recent reports</h2><p class="text-xs text-[color:var(--text-muted)]">Each report keeps its own versions.</p></div>
-            @if (canLibrary()) { <a class="btn btn-ghost btn-sm" routerLink="/reports/library">View all reports</a> }
+            @if (canLibrary()) { <a class="btn btn-default btn-sm" routerLink="/reports/library">View all reports</a> }
           </div>
           @if (!d.recentReports.length) {
-            <p class="p-4 text-sm text-[color:var(--text-muted)]">No reports yet. Publish a template, then generate one from a pipeline run or pasted data.</p>
+            <p class="p-4 text-sm text-[color:var(--text-muted)]">No reports yet. Publish a template, then create a report from a pipeline run or pasted data.</p>
           } @else {
             <table class="table-modern">
-              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Updated</th></tr></thead>
+              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Updated</th><th class="w-12"><span class="sr-only">Open</span></th></tr></thead>
               <tbody>
                 @for (r of d.recentReports; track r.reportId) {
                   <tr>
@@ -54,8 +59,9 @@
                       <div class="text-xs text-[color:var(--text-muted)]">{{ r.label }} · from {{ r.templateName }}</div>
                     </td>
                     <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
-                    <td><app-status [label]="chipWord(r.status)" /></td>
-                    <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'dateTime' }}</td>
+                    <td><app-status [label]="r.lastJob && isRunning(r.lastJob.status) ? 'Running' : chipWord(r.status)" /></td>
+                    <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'recent' }}</td>
+                    <td><a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/reports/library', r.reportId]" [attr.aria-label]="'Open ' + r.name"><app-icon name="chevronRight" /></a></td>
                   </tr>
                 }
               </tbody>
@@ -72,17 +78,28 @@
             <p class="p-4 text-sm text-[color:var(--text-muted)]">No jobs yet.</p>
           } @else {
             <table class="table-modern">
-              <thead><tr><th>Job · report</th><th>Progress</th><th>Started</th></tr></thead>
+              <thead><tr><th>Job · report</th><th>Started by</th><th>Progress</th><th>Started</th><th></th></tr></thead>
               <tbody>
                 @for (j of d.recentJobs; track j.jobId) {
                   <tr>
                     <td class="max-w-80"><span class="font-medium mono">{{ j.label }}</span> · {{ j.reportName }}
                       <div class="text-xs text-[color:var(--text-muted)]">{{ j.templateName }}@if (j.templateVersion) { · v{{ j.templateVersion }} }</div></td>
+                    <td class="text-sm">{{ startedBy(j) }}@if (j.source && j.source !== 'CONSOLE') { <span class="mono text-xs"> GENERATE_REPORT</span> }</td>
                     <td>
-                      @if (isRunning(j.status)) { <span class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span> }
-                      @else { <app-status [label]="chipWord(j.status)" /> @if (j.errorCode) { <span class="text-xs mono ml-1">{{ j.errorCode }}</span> } }
+                      @if (isRunning(j.status)) {
+                        <div class="flex items-center gap-2"><span class="rs-progress-sm" role="progressbar" [attr.aria-valuenow]="j.progressPct" aria-valuemin="0" aria-valuemax="100"
+                             [attr.aria-label]="stageWord(j.status)"><i [style.width.%]="j.progressPct"></i></span><span class="text-xs text-[color:var(--text-muted)]">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span></div>
+                      } @else {
+                        <app-status [label]="chipWord(j.status)" />
+                        @if (j.errorCode) { <span class="text-xs mono ml-1">{{ j.errorCode }}</span> }
+                      }
                     </td>
-                    <td class="text-xs whitespace-nowrap">{{ j.createdAt | serverTime: 'dateTime' }}</td>
+                    <td class="text-xs whitespace-nowrap">{{ j.createdAt | serverTime: 'recent' }}</td>
+                    <td class="whitespace-nowrap">
+                      @if (j.status === 'FAILED' && isMapping(j) && canGenerate()) { <button type="button" class="link-inline text-sm" (click)="fixMapping(j)">Fix mapping</button> }
+                      @else if (j.status === 'SUCCEEDED' && canLibrary()) { <a class="link-inline text-sm" [routerLink]="['/reports/library', j.reportId]">View report</a> }
+                      @else if (canLibrary()) { <a class="link-inline text-sm" [routerLink]="['/reports/library', j.reportId]">View job</a> }
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -91,27 +108,58 @@
         </section>
       </div>
 
-      <aside class="flex flex-col gap-4 min-w-0">
-        <section class="card p-4 flex flex-col gap-2">
+      <aside class="card rs-side min-w-0">
+        <section class="rs-side-sec">
           <h2 class="section-title">Start here</h2>
-          @if (canGenerate()) { <button type="button" class="menu-item" (click)="generate()"><app-icon name="play" />Create a report</button> }
-          @if (canTemplates()) { <a class="menu-item" routerLink="/reports/templates"><app-icon name="layers" />Build or copy a template</a> }
-          @if (canData()) { <a class="menu-item" routerLink="/reports/data"><app-icon name="database" />Browse data</a> }
+          @if (canGenerate()) {
+            <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="file" />Create a report</span><button type="button" class="link-inline text-sm" (click)="newReport()">Start</button></div>
+          }
+          @if (canTemplates()) {
+            <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="layers" />Build a template</span><a class="link-inline text-sm" routerLink="/reports/templates">Open designer</a></div>
+          }
+          @if (canData()) {
+            <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="database" />Browse data</span><a class="link-inline text-sm" routerLink="/reports/data">Open Data</a></div>
+          }
         </section>
-        <section class="card p-4 flex flex-col gap-3">
+        <section class="rs-side-sec">
+          <h2 class="section-title">Connected pipelines</h2>
+          @for (p of pipelines(); track p.jobId) {
+            <div class="flex flex-col gap-1">
+              <div class="rs-side-row"><b class="truncate">{{ p.pipeline || p.name }}</b><app-status [label]="runWord(p.lastRun)" /></div>
+              <dl class="rs-kv">
+                <dt>Last run</dt><dd class="mono text-xs">@if (p.lastRun) { #{{ p.lastRun.jobQueueId }} · {{ p.lastRun.startTime | serverTime: 'recent' }} } @else { — }</dd>
+                <dt>Feeds</dt><dd>{{ p.templates }} template{{ p.templates === 1 ? '' : 's' }} · used run #{{ p.usedRun }}</dd>
+              </dl>
+            </div>
+          } @empty {
+            <p class="text-sm text-[color:var(--text-muted)]">
+              @if ((d.pipelineRuns ?? []).length) { Reports were made from {{ d.pipelineRuns!.length }} pipeline run{{ d.pipelineRuns!.length === 1 ? '' : 's' }} lately; their schedules are not ones you can open. }
+              @else { No report has been made from a pipeline run yet. Pick a run's output when you create one. }
+            </p>
+          }
+          @if (canData()) { <a class="link-inline text-sm" routerLink="/reports/data">Inspect source and schema →</a> }
+        </section>
+        <section class="rs-side-sec">
           <h2 class="section-title">Template activity</h2>
           @if (!d.templateActivity.length) { <p class="text-sm text-[color:var(--text-muted)]">No templates yet: start from a starter or import one.</p> }
           @for (t of d.templateActivity; track t.templateId) {
             <div class="flex flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-1.5">
-                <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
-                @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
                 @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
+                @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+                <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
               </div>
-              <span class="text-xs text-[color:var(--text-muted)]">Updated {{ t.updatedAt | serverTime: 'dateTime' }}</span>
+              <span class="text-xs text-[color:var(--text-muted)]">
+                @if (t.hasDraft && t.currentPublishedVersion) { Draft changes; published v{{ t.currentPublishedVersion }} is unchanged · }
+                Updated {{ t.updatedAt | serverTime: 'recent' }}
+              </span>
+              @if (t.hasDraft && canTemplates()) { <a class="link-inline text-xs" [routerLink]="['/reports/templates', t.templateId, 'design']">Continue editing the draft →</a> }
             </div>
           }
-          <p class="text-xs text-[color:var(--text-muted)]">Published versions never change: edits go into a new draft.</p>
+          <p class="text-xs text-[color:var(--text-muted)]">
+            @if (canTemplates()) { You can design@if (canGenerate()) { and generate}. }
+            {{ canPublish() ? 'You can publish templates.' : 'Publishing a template needs an approver.' }}
+          </p>
         </section>
       </aside>
     </div>

@@ -10,6 +10,7 @@ import { Problem } from './report-studio.model';
   selector: 'app-report-problems',
   imports: [Icon],
   template: `
+    @if (summary()) {
     <div class="flex flex-wrap items-center gap-1.5 text-xs">
       <span class="pill" [class.pill-crit]="errors().length" [class.pill-neutral]="!errors().length">
         {{ errors().length }} blocking
@@ -19,6 +20,7 @@ import { Problem } from './report-studio.model';
       </span>
       @if (!problems().length) { <span class="text-[color:var(--ok-text)] inline-flex items-center gap-1"><app-icon name="checkCircle" />Every check passed</span> }
     </div>
+    }
     @if (problems().length) {
       <ul class="rs-problems">
         @for (p of ordered(); track $index) {
@@ -44,6 +46,8 @@ import { Problem } from './report-studio.model';
 })
 export class ProblemList {
   readonly problems = input<Problem[]>([]);
+  /** The counts above the list; off where the page shows its own (Create report's checks). */
+  readonly summary = input(true);
   readonly errors = computed(() => this.problems().filter(p => p.severity === 'ERROR'));
   readonly warnings = computed(() => this.problems().filter(p => p.severity !== 'ERROR'));
   readonly ordered = computed(() => [...this.errors(), ...this.warnings()]);

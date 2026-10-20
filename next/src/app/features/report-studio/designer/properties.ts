@@ -1,0 +1,581 @@
+import { Component, computed, input, output } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+import { Icon } from '../../../shared/ui/icon';
+import { SchemaField, TreeNode } from '../report-studio.model';
+import {
+  Block, collections, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
+} from './designer-model';
+
+/** One setting of a component, as the form draws it. */
+export interface PropField {
+  key: string;
+  label: string;
+  kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
+    | 'format' | 'style' | 'size' | 'itemField' | 'json';
+  group: 'content' | 'data' | 'format' | 'style' | 'layout';
+  options?: string[];
+  min?: number;
+  max?: number;
+  hint?: string;
+}
+
+/** A change to one setting: the new value, or undefined to remove it. */
+export interface PropChange { key: string; value: unknown; }
+
+type JsonSchema = { type?: string | string[]; enum?: unknown[]; $ref?: string; maxLength?: number; minimum?: number; maximum?: number;
+  properties?: Record<string, JsonSchema>; items?: JsonSchema };
+
+/** The words for each setting; a setting not named here is shown by its own name. */
+const LABELS: Record<string, string> = {
+  name: 'Name', content: 'Text', level: 'Level', label: 'Label', title: 'Title', binding: 'Data', dataset: 'Collection', columns: 'Columns',
+  emptyText: 'When empty', emptyState: 'When empty', repeatHeader: 'Repeat the header on every page', striped: 'Striped rows',
+  maxRows: 'At most rows', allowPageBreak: 'May split across pages', markdown: 'Simple Markdown (bold, italic, bullets)', ordered: 'Numbered',
+  layout: 'Layout', role: 'Part of the page', gap: 'Gap', width: 'Width', height: 'Height', assetRef: 'Image', alt: 'Alt text', align: 'Align',
+  fit: 'Fit', missing: 'When the image is missing', thickness: 'Thickness', color: 'Colour', items: 'Items', itemField: 'Field of each item',
+  format: 'Format', style: 'Style', size: 'Size', keepTogether: "Keep together · don't split across pages", pageBreakBefore: 'Start a new page before it',
+  pageBreakAfter: 'Start a new page after it', hidden: 'Hidden (not in the report)', sort: 'Sort', size_spacer: 'Space',
+};
+
+const GROUPS: Record<string, PropField['group']> = {
+  binding: 'data', dataset: 'data', columns: 'data', itemField: 'data', emptyText: 'data', emptyState: 'data', maxRows: 'data', sort: 'data',
+  repeatHeader: 'data', striped: 'data', allowPageBreak: 'layout', format: 'format', style: 'style', size: 'layout', keepTogether: 'layout',
+  pageBreakBefore: 'layout', pageBreakAfter: 'layout', hidden: 'layout', width: 'layout', height: 'layout', gap: 'layout',
+};
+
+const FORMAT_TYPES = ['text', 'number', 'integer', 'currency', 'percent', 'date', 'datetime', 'boolean', 'uppercase', 'lowercase', 'capitalize', 'mask'];
+const STYLE_ENUMS: Record<string, string[]> = {
+  align: ['left', 'center', 'right', 'justify'], fontSize: ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'],
+  color: ['primary', 'text', 'muted', 'accent', 'success', 'warning', 'danger'], background: ['primary', 'muted', 'accent', 'background', 'success', 'warning', 'danger'],
+  padding: ['none', 'xs', 'sm', 'md', 'lg', 'xl'], marginTop: ['none', 'xs', 'sm', 'md', 'lg', 'xl'], marginBottom: ['none', 'xs', 'sm', 'md', 'lg', 'xl'],
+};
+const SIZE_PATTERN = /^(\d{1,3}(\.\d)?mm|\d{1,3}%)$/;
+const HEIGHT_PATTERN = /^\d{1,3}(\.\d)?mm$/;
+
+/** The settings a component type has, read from the template schema's definition for it (`<type>Component`). */
+export function fieldsFor(type: string, definitions: Record<string, JsonSchema>): PropField[] {
+  const def = definitions[`${type}Component`];
+  const props = def?.properties ?? {};
+  const out: PropField[] = [];
+  for (const [key, s] of Object.entries(props)) {
+    if (key === 'id' || key === 'type' || key === 'children') continue;
+    const group = GROUPS[key] ?? 'content';
+    const label = (type === 'spacer' && key === 'size' ? LABELS['size_spacer'] : LABELS[key]) ?? key;
+    let field: PropField;
+    if (s.$ref === '#/definitions/format') field = { key, label, kind: 'format', group: 'format' };
+    else if (s.$ref === '#/definitions/style') field = { key, label, kind: 'style', group: 'style' };
+    else if (s.$ref === '#/definitions/size') field = { key, label, kind: 'size', group: 'layout' };
+    else if (key === 'binding') field = { key, label, kind: type === 'list' ? 'listBinding' : 'binding', group: 'data' };
+    else if (key === 'dataset') field = { key, label, kind: 'collection', group: 'data' };
+    else if (key === 'columns') field = { key, label, kind: 'columns', group: 'data' };
+    else if (key === 'items') field = { key, label, kind: 'items', group: 'content', hint: 'One per line, used when no data is bound.' };
+    else if (key === 'itemField') field = { key, label, kind: 'itemField', group: 'data' };
+    else if (Array.isArray(s.enum)) field = { key, label, kind: 'enum', group, options: s.enum.map(String) };
+    else if (s.type === 'boolean') field = { key, label, kind: 'boolean', group };
+    else if (s.type === 'integer' || s.type === 'number') {
+      field = s.minimum !== undefined && s.maximum !== undefined && s.maximum - s.minimum <= 6
+        ? { key, label, kind: 'enum', group, options: Array.from({ length: s.maximum - s.minimum + 1 }, (_, i) => String(s.minimum! + i)) }
+        : { key, label, kind: 'number', group, min: s.minimum, max: s.maximum };
+    } else if (s.type === 'string') field = { key, label, kind: (s.maxLength ?? 0) > 300 ? 'textarea' : 'text', group };
+    else field = { key, label, kind: 'json', group: 'layout', hint: 'Edited as JSON.' };
+    out.push(field);
+  }
+  return out;
+}
+
+/**
+ * The designer's right panel (MIG-404, Figma frame 3): the selected component's settings, drawn from the template schema
+ * -- so a setting the schema gains appears here without a console change -- in groups: Content, Data (the collection and
+ * field pickers read the test data's own paths, and say whether the data matches and how many sample rows it has),
+ * Format, Style and Layout (width, height, keep together). Each change goes back to the designer, which keeps it on the
+ * undo stack and saves the draft.
+ */
+@Component({
+  selector: 'app-rs-properties',
+  imports: [Icon, NgTemplateOutlet],
+  template: `
+    @if (block(); as b) {
+      <div class="rsd-props-head">
+        <app-icon [name]="icon()" size="1.05rem" class="text-[color:var(--text-muted)]" />
+        <div class="min-w-0 flex-1">
+          <h2 class="text-sm font-semibold truncate">{{ title() }}</h2>
+          <p class="text-xs text-[color:var(--text-muted)] mono truncate">{{ b.id }}</p>
+        </div>
+        @if (!readonly()) {
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Duplicate (Ctrl+D)" title="Duplicate (Ctrl+D)" (click)="duplicate.emit()"><app-icon name="copy" /></button>
+          <button type="button" class="btn btn-ghost btn-icon btn-sm" aria-label="Delete (Delete)" title="Delete (Delete)" (click)="remove.emit()"><app-icon name="trash" class="icon-crit" /></button>
+        }
+      </div>
+      @for (g of groups(); track g.id) {
+        <section class="rsd-props-group" [attr.aria-label]="g.label">
+          <h3 class="rsd-eyebrow">{{ g.label }}</h3>
+          @for (f of g.fields; track f.key) {
+            @switch (f.kind) {
+              @case ('boolean') {
+                <label class="rsd-check">
+                  <input type="checkbox" class="checkbox" [checked]="value(f.key) === true" [disabled]="readonly()"
+                         (change)="set(f.key, $any($event.target).checked ? true : undefined)" />
+                  <span>{{ f.label }}</span>
+                </label>
+              }
+              @case ('enum') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <select class="input" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="setEnum(f, $any($event.target).value)">
+                    <option value="" [selected]="!text(f.key)">Default</option>
+                    @for (o of f.options; track o) { <option [value]="o" [selected]="o === text(f.key)">{{ o }}</option> }
+                  </select>
+                </label>
+              }
+              @case ('number') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <input class="input" type="number" [attr.min]="f.min ?? null" [attr.max]="f.max ?? null" [value]="text(f.key)" [disabled]="readonly()"
+                         [attr.aria-label]="f.label" (change)="setNumber(f.key, $any($event.target).value)" />
+                </label>
+              }
+              @case ('textarea') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <textarea class="input text-sm" rows="4" [value]="text(f.key)" [disabled]="readonly()" [attr.aria-label]="f.label"
+                            (input)="set(f.key, $any($event.target).value || undefined)"></textarea>
+                  @if (b.type === 'text' || b.type === 'heading') {
+                    <span class="block field-note text-[color:var(--text-muted)]">Fill in data with {{ '{{' }}{{ primary() }}.field{{ '}}' }}; nothing else is code.</span>
+                  }
+                </label>
+              }
+              @case ('items') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <textarea class="input text-sm" rows="3" [value]="itemsText()" [disabled]="readonly()" [attr.aria-label]="f.label"
+                            (input)="setItems($any($event.target).value)"></textarea>
+                  <span class="block field-note text-[color:var(--text-muted)]">{{ f.hint }}</span>
+                </label>
+              }
+              @case ('binding') {
+                <div class="field">
+                  <span class="label">Data field</span>
+                  <input class="input mono text-xs" [value]="text('binding')" [disabled]="readonly()" list="rsd-scalars" aria-label="Data field"
+                         placeholder="{{ primary() }}.summary.total" (change)="setBinding($any($event.target).value)" />
+                  <datalist id="rsd-scalars">
+                    @for (s of scalarFields(); track s.path) { <option [value]="primary() + '.' + s.path">{{ s.type }}</option> }
+                  </datalist>
+                  <ng-container *ngTemplateOutlet="match; context: { $implicit: bindingMatch() }" />
+                </div>
+              }
+              @case ('listBinding') {
+                <label class="field">
+                  <span class="label">Collection</span>
+                  <select class="input mono text-xs" [disabled]="readonly()" aria-label="Collection" (change)="setCollection('binding', $any($event.target).value)">
+                    <option value="" [selected]="!collectionOf('binding')">{{ hasData() ? 'Choose a list in the data' : 'No test data yet' }}</option>
+                    @for (c of lists(); track c.path) { <option [value]="c.path" [selected]="c.path === collectionOf('binding')">{{ c.path }}</option> }
+                    @if (collectionOf('binding') && !hasList(collectionOf('binding'))) { <option [value]="collectionOf('binding')" selected>{{ collectionOf('binding') }}</option> }
+                  </select>
+                </label>
+                <ng-container *ngTemplateOutlet="match; context: { $implicit: listMatch('binding') }" />
+              }
+              @case ('collection') {
+                <label class="field">
+                  <span class="label">Collection</span>
+                  <select class="input mono text-xs" [disabled]="readonly()" aria-label="Collection" (change)="setCollection('dataset', $any($event.target).value)">
+                    <option value="" [selected]="!collectionOf('dataset')">{{ hasData() ? 'Choose a list in the data' : 'No test data yet' }}</option>
+                    @for (c of lists(); track c.path) { <option [value]="c.path" [selected]="c.path === collectionOf('dataset')">{{ c.path }}</option> }
+                    @if (collectionOf('dataset') && !hasList(collectionOf('dataset'))) { <option [value]="collectionOf('dataset')" selected>{{ collectionOf('dataset') }}</option> }
+                  </select>
+                </label>
+                <ng-container *ngTemplateOutlet="match; context: { $implicit: listMatch('dataset') }" />
+              }
+              @case ('itemField') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set('itemField', $any($event.target).value || undefined)">
+                    <option value="" [selected]="!text('itemField')">The item itself</option>
+                    @for (c of itemsOf('binding'); track c.path) { <option [value]="c.path" [selected]="c.path === text('itemField')">{{ c.path }} · {{ c.type }}</option> }
+                  </select>
+                </label>
+              }
+              @case ('columns') {
+                <div class="flex flex-col gap-2">
+                  <span class="label">Columns</span>
+                  @for (c of columns(); track $index; let i = $index) {
+                    <div class="rsd-column">
+                      <div class="rsd-column-top">
+                        <input class="input text-sm" [value]="c.label ?? ''" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' label'"
+                               placeholder="Label" (change)="setColumn(i, 'label', $any($event.target).value || undefined)" />
+                        @if (!readonly()) {
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove column ' + (i + 1)" (click)="removeColumn(i)">
+                            <app-icon name="close" />
+                          </button>
+                        }
+                      </div>
+                      <div class="rsd-two">
+                        <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' field'"
+                                (change)="setColumn(i, 'field', $any($event.target).value)">
+                          @if (!hasItemField('dataset', c.field)) { <option [value]="c.field" selected>{{ c.field }}</option> }
+                          @for (x of itemsOf('dataset'); track x.path) { <option [value]="x.path" [selected]="x.path === c.field">{{ x.path }}</option> }
+                        </select>
+                        <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' format'"
+                                (change)="setColumnFormat(i, $any($event.target).value)">
+                          <option value="" [selected]="!c.format?.type">As written</option>
+                          @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === c.format?.type">{{ t }}</option> }
+                        </select>
+                      </div>
+                    </div>
+                  }
+                  @if (!readonly()) {
+                    <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addColumn()"><app-icon name="plus" />Column</button>
+                  }
+                </div>
+              }
+              @case ('format') {
+                <div class="rsd-two">
+                  <label class="field">
+                    <span class="label">Format</span>
+                    <select class="input" [disabled]="readonly()" aria-label="Format" (change)="setFormat('type', $any($event.target).value)">
+                      <option value="" [selected]="!formatType()">As written</option>
+                      @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === formatType()">{{ t }}</option> }
+                    </select>
+                  </label>
+                  @if (formatType() === 'currency') {
+                    <label class="field">
+                      <span class="label">Currency</span>
+                      <input class="input mono" maxlength="3" [value]="formatValue('currency')" [disabled]="readonly()" aria-label="Currency"
+                             placeholder="USD" (change)="setFormat('currency', $any($event.target).value.toUpperCase())" />
+                    </label>
+                  }
+                  @if (['number', 'currency', 'percent'].includes(formatType())) {
+                    <label class="field">
+                      <span class="label">Decimals</span>
+                      <input class="input" type="number" min="0" max="10" [value]="formatValue('maximumFractionDigits')" [disabled]="readonly()"
+                             aria-label="Decimals" (change)="setFormatNumber('maximumFractionDigits', $any($event.target).value)" />
+                    </label>
+                  }
+                  @if (formatType() === 'percent') {
+                    <label class="field">
+                      <span class="label">The data holds</span>
+                      <select class="input" [disabled]="readonly()" aria-label="Percent scale" (change)="setFormat('scale', $any($event.target).value)">
+                        <option value="" [selected]="!formatValue('scale')">A ratio (0.112)</option><option value="percent" [selected]="formatValue('scale') === 'percent'">A percent (11.2)</option>
+                      </select>
+                    </label>
+                  }
+                  @if (formatType() === 'date' || formatType() === 'datetime') {
+                    <label class="field">
+                      <span class="label">Style</span>
+                      <select class="input" [disabled]="readonly()" aria-label="Date style" (change)="setFormat('dateStyle', $any($event.target).value)">
+                        @for (d of dateStyles; track d.id) { <option [value]="d.id" [selected]="d.id === formatValue('dateStyle')">{{ d.label }}</option> }
+                      </select>
+                    </label>
+                  }
+                </div>
+              }
+              @case ('style') {
+                <div class="rsd-two">
+                  @for (s of styleKeys; track s) {
+                    <label class="field">
+                      <span class="label">{{ styleLabel(s) }}</span>
+                      <select class="input" [disabled]="readonly()" [attr.aria-label]="styleLabel(s)" (change)="setStyle(s, $any($event.target).value)">
+                        <option value="" [selected]="!styleValue(s)">Default</option>
+                        @for (o of styleEnums[s]; track o) { <option [value]="o" [selected]="o === styleValue(s)">{{ o }}</option> }
+                      </select>
+                    </label>
+                  }
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1">
+                  @for (s of styleFlags; track s) {
+                    <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="styleFlag(s)" [disabled]="readonly()"
+                           (change)="setStyle(s, $any($event.target).checked ? true : '')" /><span>{{ styleLabel(s) }}</span></label>
+                  }
+                </div>
+              }
+              @case ('size') {
+                <div class="rsd-two">
+                  <label class="field">
+                    <span class="label">Width</span>
+                    <input class="input" [value]="sizeValue('width')" [disabled]="readonly()" aria-label="Width" placeholder="Full width"
+                           [attr.aria-invalid]="sizeBad('width') || null" (change)="setSize('width', $any($event.target).value)" />
+                  </label>
+                  <label class="field">
+                    <span class="label">Height</span>
+                    <input class="input" [value]="sizeValue('height')" [disabled]="readonly()" aria-label="Height" placeholder="As tall as it needs"
+                           [attr.aria-invalid]="sizeBad('height') || null" (change)="setSize('height', $any($event.target).value)" />
+                  </label>
+                </div>
+                <p class="text-xs text-[color:var(--text-muted)]">Width in mm or a share of the line (170 mm, 50%); height in mm, the least it takes.</p>
+              }
+              @case ('json') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <textarea class="input mono text-xs" rows="3" [value]="json(f.key)" [disabled]="readonly()" [attr.aria-label]="f.label"
+                            (change)="setJson(f.key, $any($event.target).value)"></textarea>
+                </label>
+              }
+              @default {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <input class="input" [value]="text(f.key)" [disabled]="readonly()" [attr.aria-label]="f.label"
+                         (input)="set(f.key, $any($event.target).value || undefined)" />
+                </label>
+              }
+            }
+          }
+        </section>
+      }
+      <ng-template #match let-m>
+        @if (m) {
+          <p class="text-xs" [class]="m.ok ? 'text-[color:var(--ok-text)]' : m.missing ? 'text-[color:var(--crit-text)]' : 'text-[color:var(--text-muted)]'" role="status">
+            <app-icon [name]="m.ok ? 'checkCircle' : m.missing ? 'alert' : 'info'" />{{ m.text }}
+          </p>
+        }
+      </ng-template>
+    } @else {
+      <div class="p-4 flex flex-col gap-2 text-sm text-[color:var(--text-muted)]">
+        <h2 class="text-sm font-semibold text-[color:var(--text-primary)]">Nothing selected</h2>
+        <p>Click a block on the page, or pick one in Layers, to change what it shows and where its data comes from.</p>
+      </div>
+    }
+  `,
+  styles: `
+    :host { display: block; }
+    .rsd-column { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem; border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md); }
+    .rsd-column-top { display: flex; align-items: center; gap: 0.25rem; }
+  `,
+})
+export class PropertiesPanel {
+  readonly block = input<Block | null>(null);
+  /** The template schema's definitions (GET reportStudio.json/schema). */
+  readonly definitions = input<Record<string, JsonSchema>>({});
+  readonly label = input('');
+  readonly readonly = input(false);
+  /** The test data's schema, its first record and its shape (an inspect of the designer's test data). */
+  readonly fields = input<SchemaField[]>([]);
+  readonly sample = input<unknown>(undefined);
+  readonly tree = input<TreeNode | undefined>(undefined);
+  /** The primary dataset's names (its id, and its alias when it starts at the root); the first is written in new bindings. */
+  readonly names = input<string[]>(['primary']);
+  readonly changed = output<PropChange>();
+  readonly duplicate = output<void>();
+  readonly remove = output<void>();
+
+  readonly formatTypes = FORMAT_TYPES;
+  readonly dateStyles = [{ id: '', label: '19 Oct 2026' }, { id: 'long', label: '19 October 2026' }, { id: 'short', label: 'Short' },
+    { id: 'iso', label: '2026-10-19' }];
+  readonly styleEnums = STYLE_ENUMS;
+  readonly styleKeys = ['align', 'fontSize', 'color', 'background', 'padding', 'marginTop', 'marginBottom'];
+  readonly styleFlags = ['bold', 'italic', 'uppercase', 'border'];
+
+  readonly primary = computed(() => this.names()[0] ?? 'primary');
+  readonly hasData = computed(() => this.fields().length > 0);
+  readonly lists = computed(() => collections(this.fields()));
+  readonly scalarFields = computed(() => scalars(this.fields()));
+  readonly icon = computed(() => typeIcon(this.block()?.type ?? ''));
+  readonly title = computed(() => this.label() || typeWord(this.block()?.type ?? ''));
+
+  readonly groups = computed(() => {
+    const b = this.block();
+    if (!b) return [];
+    const all = fieldsFor(b.type, this.definitions());
+    const order: { id: PropField['group']; label: string }[] = [
+      { id: 'content', label: 'Content' }, { id: 'data', label: 'Data' }, { id: 'format', label: 'Format' },
+      { id: 'style', label: 'Style' }, { id: 'layout', label: 'Layout' },
+    ];
+    return order.map(g => ({ ...g, fields: all.filter(f => f.group === g.id) })).filter(g => g.fields.length);
+  });
+
+  readonly columns = computed(() => (Array.isArray(this.block()?.['columns']) ? this.block()!['columns'] : []) as
+    { id: string; label?: string; field: string; format?: { type?: string } }[]);
+  readonly itemsText = computed(() => (Array.isArray(this.block()?.['items']) ? (this.block()!['items'] as unknown[]).map(String).join('\n') : ''));
+  readonly formatType = computed(() => String((this.block()?.['format'] as { type?: string } | undefined)?.type ?? ''));
+
+  /** Whether the bound field is in the test data: its sample value, or why it is not. */
+  readonly bindingMatch = computed(() => {
+    const binding = this.text('binding');
+    if (!binding) return null;
+    if (!this.hasData()) return { ok: false, missing: false, text: 'Pick test data to check this field.' };
+    const inner = innerPath(binding, this.names());
+    if (inner === null) return { ok: false, missing: false, text: 'Reads another dataset of the template.' };
+    const v = valueAt(this.sample(), inner);
+    if (v === undefined && !this.fields().some(f => f.path === inner)) {
+      return { ok: false, missing: true, text: `${inner} is not in the test data.` };
+    }
+    return { ok: true, missing: false, text: `Data matches · sample: ${sampleText(v)}` };
+  });
+
+  value(key: string): unknown {
+    return this.block()?.[key];
+  }
+
+  text(key: string): string {
+    const v = this.block()?.[key];
+    return v === undefined || v === null ? '' : String(v);
+  }
+
+  json(key: string): string {
+    const v = this.block()?.[key];
+    return v === undefined ? '' : JSON.stringify(v);
+  }
+
+  set(key: string, value: unknown): void {
+    this.changed.emit({ key, value });
+  }
+
+  setEnum(f: PropField, raw: string): void {
+    if (!raw) { this.set(f.key, undefined); return; }
+    const numeric = f.options?.every(o => /^\d+$/.test(o));
+    this.set(f.key, numeric ? Number(raw) : raw);
+  }
+
+  setNumber(key: string, raw: string): void {
+    this.set(key, raw === '' ? undefined : Number(raw));
+  }
+
+  setJson(key: string, raw: string): void {
+    try {
+      this.set(key, raw.trim() ? JSON.parse(raw) : undefined);
+    } catch {
+      // left as it was: the box shows the setting again on the next draw
+    }
+  }
+
+  setItems(raw: string): void {
+    const items = raw.split('\n').map(l => l.trim()).filter(Boolean);
+    this.set('items', items.length ? items : undefined);
+  }
+
+  setBinding(raw: string): void {
+    const v = raw.trim();
+    this.set('binding', v || undefined);
+  }
+
+  /** A collection's path inside the data (the binding without its dataset name). */
+  collectionOf(key: string): string {
+    const v = this.text(key);
+    return v ? (innerPath(v, this.names()) ?? v) : '';
+  }
+
+  hasList(path: string): boolean {
+    return this.lists().some(c => c.path === path);
+  }
+
+  setCollection(key: string, path: string): void {
+    this.set(key, path ? `${this.primary()}.${path}` : undefined);
+  }
+
+  itemsOf(key: string): SchemaField[] {
+    return itemFields(this.fields(), this.collectionOf(key));
+  }
+
+  hasItemField(key: string, field: string): boolean {
+    return this.itemsOf(key).some(f => f.path === field);
+  }
+
+  /** Whether a list binding is in the test data, and how many sample rows it has. */
+  listMatch(key: string): { ok: boolean; missing: boolean; text: string } | null {
+    const path = this.collectionOf(key);
+    if (!path) return null;
+    if (!this.hasData()) return { ok: false, missing: false, text: 'Pick test data to check this collection.' };
+    const n = lengthAt(this.tree(), path);
+    const v = valueAt(this.sample(), path);
+    const count = n ?? (Array.isArray(v) ? v.length : null);
+    if (count === null) return { ok: false, missing: true, text: `${path} is not a list in the test data.` };
+    const missing = this.columns().filter(c => !this.hasItemField(key, c.field)).map(c => c.field);
+    if (key === 'dataset' && missing.length) {
+      return { ok: false, missing: true, text: `${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} not in the items · ${count} sample rows` };
+    }
+    return { ok: true, missing: false, text: `Data matches · ${count} sample row${count === 1 ? '' : 's'}` };
+  }
+
+  private columnList(): { id: string; label?: string; field: string; format?: Record<string, unknown> }[] {
+    return JSON.parse(JSON.stringify(this.columns())) as { id: string; label?: string; field: string; format?: Record<string, unknown> }[];
+  }
+
+  setColumn(i: number, key: 'label' | 'field', value: string | undefined): void {
+    const cols = this.columnList();
+    if (!cols[i]) return;
+    if (value === undefined) delete cols[i][key]; else cols[i][key] = value;
+    this.set('columns', cols);
+  }
+
+  setColumnFormat(i: number, type: string): void {
+    const cols = this.columnList();
+    if (!cols[i]) return;
+    if (!type) delete cols[i].format; else cols[i].format = { ...(cols[i].format ?? {}), type };
+    this.set('columns', cols);
+  }
+
+  addColumn(): void {
+    const cols = this.columnList();
+    const taken = new Set(cols.map(c => c.id));
+    let n = cols.length + 1;
+    while (taken.has(`c${n}`)) n++;
+    const field = this.itemsOf('dataset').find(f => !cols.some(c => c.field === f.path))?.path ?? 'field';
+    cols.push({ id: `c${n}`, label: field, field });
+    this.set('columns', cols);
+  }
+
+  removeColumn(i: number): void {
+    const cols = this.columnList();
+    cols.splice(i, 1);
+    this.set('columns', cols);
+  }
+
+  formatValue(key: string): string {
+    const f = this.block()?.['format'] as Record<string, unknown> | undefined;
+    const v = f?.[key];
+    return v === undefined || v === null ? '' : String(v);
+  }
+
+  setFormat(key: string, value: string): void {
+    const f = { ...((this.block()?.['format'] as Record<string, unknown> | undefined) ?? {}) };
+    if (key === 'type' && !value) { this.set('format', undefined); return; }
+    if (value) f[key] = value; else delete f[key];
+    if (!f['type']) f['type'] = 'text';
+    this.set('format', f);
+  }
+
+  setFormatNumber(key: string, raw: string): void {
+    const f = { ...((this.block()?.['format'] as Record<string, unknown> | undefined) ?? {}) };
+    if (raw === '') delete f[key]; else f[key] = Math.max(0, Math.min(10, Number(raw)));
+    this.set('format', f);
+  }
+
+  styleLabel(key: string): string {
+    const words: Record<string, string> = { align: 'Align', fontSize: 'Text size', color: 'Text colour', background: 'Background', padding: 'Padding',
+      marginTop: 'Space above', marginBottom: 'Space below', bold: 'Bold', italic: 'Italic', uppercase: 'Capitals', border: 'Border' };
+    return words[key] ?? key;
+  }
+
+  styleValue(key: string): string {
+    const s = this.block()?.['style'] as Record<string, unknown> | undefined;
+    return s?.[key] === undefined ? '' : String(s[key]);
+  }
+
+  styleFlag(key: string): boolean {
+    return (this.block()?.['style'] as Record<string, unknown> | undefined)?.[key] === true;
+  }
+
+  setStyle(key: string, value: unknown): void {
+    const s = { ...((this.block()?.['style'] as Record<string, unknown> | undefined) ?? {}) };
+    if (value === '' || value === undefined) delete s[key]; else s[key] = value;
+    this.set('style', Object.keys(s).length ? s : undefined);
+  }
+
+  sizeValue(key: 'width' | 'height'): string {
+    const s = this.block()?.['size'] as Record<string, string> | undefined;
+    return (s?.[key] ?? '').replace(/mm$/, ' mm');
+  }
+
+  sizeBad(key: 'width' | 'height'): boolean {
+    const v = this.sizeValue(key).replace(/\s+/g, '');
+    return !!v && !(key === 'width' ? SIZE_PATTERN : HEIGHT_PATTERN).test(v);
+  }
+
+  setSize(key: 'width' | 'height', raw: string): void {
+    let v = raw.replace(/\s+/g, '').toLowerCase();
+    if (/^\d{1,3}(\.\d)?$/.test(v)) v += 'mm';
+    const s = { ...((this.block()?.['size'] as Record<string, string> | undefined) ?? {}) };
+    if (!v) delete s[key];
+    else if ((key === 'width' ? SIZE_PATTERN : HEIGHT_PATTERN).test(v)) s[key] = v;
+    else return;
+    this.set('size', Object.keys(s).length ? s : undefined);
+  }
+}

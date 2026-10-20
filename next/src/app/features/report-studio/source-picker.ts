@@ -3,14 +3,17 @@ import { UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { Icon } from '../../shared/ui/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
 import { RunOutput } from '../jobs/run-steps/run-steps.model';
 import { RunRow } from '../tasks/steps/steps.model';
 import { ReportStudioApi } from './report-studio.api';
 import { DataSourceRow, PASTE_MAX_BYTES, SampleRow, SourceRef, jsonProblem } from './report-studio.model';
+import { BucketSummary, StorageService } from '../objects/storage.service';
+import { API_SUCCESS } from '../../core/api/api.config';
 
-export type SourceMode = 'paste' | 'run' | 'saved' | 'sample';
+export type SourceMode = 'paste' | 'run' | 'bucket' | 'saved' | 'sample';
 type Mode = SourceMode;
 
 /** A pipeline output a report can read: a kept file or dataset in JSON, CSV or a table format (a PDF is not data). */
@@ -24,10 +27,10 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
  */
 @Component({
   selector: 'app-report-source-picker',
-  imports: [FormsModule, Segmented, ServerTimePipe, UpperCasePipe],
+  imports: [FormsModule, Segmented, ServerTimePipe, UpperCasePipe, Icon],
   template: `
     <div class="flex flex-col gap-3">
-      @if (modes().length > 1) { <app-segmented [options]="modes()" [(value)]="mode" ariaLabel="Where the data comes from" /> }
+      @if (modes().length > 1) { <div class="rs-source-modes"><app-segmented [options]="modes()" [(value)]="mode" ariaLabel="Where the data comes from" /></div> }
       @switch (mode()) {
         @case ('paste') {
           <label class="field">
@@ -75,7 +78,24 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
               </select>
             </label>
           }
+          @if (newerRun(); as newest) {
+            <button type="button" class="link-inline text-sm self-start" (click)="useNewest()"><app-icon name="refresh" />Use a newer run (#{{ newest }})</button>
+          }
           <p class="field-note text-[color:var(--text-muted)]">Read as you: a run you cannot open in Runs is refused.</p>
+        }
+        @case ('bucket') {
+          <label class="field">
+            <span class="label">Bucket</span>
+            <select class="input" [ngModel]="bucket()" (ngModelChange)="bucket.set($event); publish()" aria-label="Bucket">
+              <option value="">{{ buckets().length ? 'Choose a bucket' : 'No buckets you may browse' }}</option>
+              @for (b of buckets(); track b.bucket) { <option [value]="b.bucket">{{ b.label || b.bucket }}</option> }
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">File (JSON or CSV)</span>
+            <input class="input mono" [ngModel]="key()" (ngModelChange)="key.set($event); publish()" aria-label="File key" placeholder="reference/quality_targets_2026.json" />
+          </label>
+          <p class="field-note text-[color:var(--text-muted)]">Read only, as you: a bucket or file you cannot open in Storage is refused.</p>
         }
         @case ('saved') {
           <label class="field">
@@ -105,6 +125,7 @@ export class ReportSourcePicker implements OnInit {
   private readonly generated = inject(GeneratedService);
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
+  private readonly storage = inject(StorageService);
 
   /** The template's saved test samples, when the picker is for a template. */
   readonly samples = input<SampleRow[]>([]);
@@ -126,11 +147,20 @@ export class ReportSourcePicker implements OnInit {
   readonly datasetId = signal<number | null>(null);
   readonly sourceId = signal<string | null>(null);
   readonly sampleId = signal<string | null>(null);
+  readonly buckets = signal<BucketSummary[]>([]);
+  readonly bucket = signal('');
+  readonly key = signal('');
+  /** The schedule's newest run, when a run before it is picked ("Use a newer run"). */
+  readonly newerRun = computed(() => {
+    const newest = this.runs()[0]?.jobQueueId;
+    return newest !== undefined && this.runId() !== null && newest !== this.runId() ? newest : null;
+  });
 
   readonly modes = computed<SegmentOption<Mode>[]>(() => this.allModes().filter(m => !this.only() || this.only()!.includes(m.id)));
   private readonly allModes = computed<SegmentOption<Mode>[]>(() => [
     { id: 'paste', label: 'Paste JSON' },
     { id: 'run', label: 'Pipeline run' },
+    { id: 'bucket', label: 'Bucket file' },
     ...(this.auth.canOpen('report-data') ? [{ id: 'saved' as Mode, label: 'Uploads' }] : []),
     ...(this.samples().length ? [{ id: 'sample' as Mode, label: `Samples (${this.samples().length})` }] : []),
   ]);
@@ -151,6 +181,7 @@ export class ReportSourcePicker implements OnInit {
     effect(() => {
       if (this.mode() === 'run' && !this.jobs().length) untracked(() => this.loadJobs());
       if (this.mode() === 'saved' && !this.saved().length) untracked(() => this.loadSaved());
+      if (this.mode() === 'bucket' && !this.buckets().length) untracked(() => this.loadBuckets());
     });
   }
 
@@ -171,6 +202,9 @@ export class ReportSourcePicker implements OnInit {
       case 'saved':
         this.source.set(this.sourceId() ? { connector: 'SOURCE', sourceId: this.sourceId()! } : null);
         break;
+      case 'bucket':
+        this.source.set(this.bucket() && this.key().trim() ? { connector: 'BUCKET_OBJECT', bucket: this.bucket(), key: this.key().trim() } : null);
+        break;
       case 'sample':
         this.source.set(this.sampleId() ? { connector: 'SAMPLE', sampleId: this.sampleId()! } : null);
         break;
@@ -183,6 +217,21 @@ export class ReportSourcePicker implements OnInit {
       next: all => this.jobs.set(all.map(j => ({ jobId: j.jobId, label: `${j.jobName ?? 'Schedule ' + j.jobId}${pipelineOf(j) ? ' · ' + pipelineOf(j) : ''}` }))),
       error: () => this.runsError.set('Your schedules could not be read (they need the Schedules or Runs pages).'),
     });
+  }
+
+  private loadBuckets(): void {
+    this.storage.buckets().subscribe({
+      next: r => this.buckets.set(r.status === API_SUCCESS ? (r.data ?? []) : []),
+      error: () => this.buckets.set([]),
+    });
+  }
+
+  /** "Use a newer run": the schedule's newest run, its output of the same name when it has one. */
+  useNewest(): void {
+    const newest = this.runs()[0];
+    if (!newest) return;
+    const name = this.outputs().find(o => o.runDatasetId === this.datasetId())?.name;
+    this.pickRun(newest.jobQueueId, name ?? null);
   }
 
   private loadSaved(): void {
@@ -200,15 +249,20 @@ export class ReportSourcePicker implements OnInit {
     this.generated.runs(jobId, 10).subscribe({ next: runs => this.runs.set(runs), error: () => this.runs.set([]) });
   }
 
-  pickRun(runId: number | null): void {
+  pickRun(runId: number | null, keepOutput: string | null = null): void {
     this.runId.set(runId);
     this.datasetId.set(null);
     this.outputs.set([]);
     this.publish();
     if (runId === null) return;
     this.generated.runOutputs(runId).subscribe({
-      next: list => this.outputs.set((list ?? []).filter(o => o.kind === 'file' && o.runDatasetId != null && !o.expired
-        && DATA_FORMATS.has(String(o.format ?? '').toLowerCase()))),
+      next: list => {
+        const outputs = (list ?? []).filter(o => o.kind === 'file' && o.runDatasetId != null && !o.expired
+          && DATA_FORMATS.has(String(o.format ?? '').toLowerCase()));
+        this.outputs.set(outputs);
+        const same = keepOutput ? outputs.find(o => o.name === keepOutput) : outputs.length === 1 ? outputs[0] : undefined;
+        if (same?.runDatasetId != null) this.pickDataset(same.runDatasetId);
+      },
       error: () => this.outputs.set([]),
     });
   }

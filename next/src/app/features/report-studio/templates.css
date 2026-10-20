@@ -1,0 +1,18 @@
+/* The template library's cards (MIG-404, Figma frame 2): the first page on top -- the server's picture of it, or a
+   page outline while it comes -- then the name, the versions, who made it and the next step. */
+:host { display: block; }
+.rst-grid { display: grid; gap: 1rem; padding: 1rem; grid-template-columns: repeat(auto-fill, minmax(17.5rem, 1fr)); }
+@media (min-width: 1800px) { .rst-grid { grid-template-columns: repeat(auto-fill, minmax(19rem, 1fr)); } }
+.rst-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
+.rst-card:hover { border-color: var(--border-strong); }
+.rst-thumb { position: relative; display: flex; justify-content: center; align-items: flex-start; height: 11rem; overflow: hidden; padding-top: 1rem;
+  background: var(--surface-sunken); border-bottom: 1px solid var(--border-subtle); }
+.rst-thumb img { width: 9.5rem; box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); }
+.rst-cat { position: absolute; top: 0.625rem; left: 0.625rem; }
+.rst-paper { display: flex; flex-direction: column; gap: 0.4rem; width: 9.5rem; height: 13rem; padding: 0.875rem; background: var(--surface-raised);
+  box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 12%, transparent); }
+.rst-paper > i { height: 0.375rem; border-radius: var(--radius-sm); background: var(--border-subtle); }
+.rst-paper > i:first-child { width: 60%; height: 0.5rem; background: var(--border-strong); }
+.rst-paper > b { height: 3rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent-mark) 22%, var(--surface-sunken)); }
+.rst-body { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.875rem 1rem 1rem; flex: 1; }

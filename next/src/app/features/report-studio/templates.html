@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">Reports</h1>
-        <p class="page-subtitle">Templates are data: a page layout, its blocks and the data paths they show. Published versions never change.</p>
+        <p class="page-subtitle">Design report templates once, fill them from pipeline runs, and keep every version.</p>
       </div>
       <div class="flex items-center gap-2">
         <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
@@ -17,93 +17,168 @@
   </app-page-header>
 
   <app-table-shell heading="Templates" columnsKey="report-templates" [loading]="loading()" [error]="error()" [isEmpty]="!filtered().length"
-                   [shown]="filtered().length" [total]="templates().length" emptyIcon="template" (retry)="load()"
-                   [emptyMessage]="search() || state() ? 'No template matches the filters.' : archived() ? 'No archived templates.'
-                     : 'No templates yet. Start from a starter below, import one, or begin blank.'">
+                   [scrollRows]="view() === 'table'"
+                   [shown]="filtered().length" [total]="items().length" emptyIcon="template" (retry)="load()"
+                   [emptyMessage]="group() === 'shared' ? 'Nothing is shared with this workspace yet. Sharing between workspaces comes with Teams.'
+                     : search() || state() || category() || owner() ? 'No template matches the filters.' : archived() ? 'No archived templates.'
+                     : 'No templates yet. Use a starter, import one, or begin blank.'">
     <ng-container toolbar>
-      <select class="input max-w-40" [value]="state()" aria-label="State" (change)="state.set($any($event.target).value)">
-        <option value="">All states</option>
-        <option value="PUBLISHED">Published</option>
-        <option value="DRAFT">Never published</option>
-        <option value="HAS_DRAFT">With a draft</option>
-      </select>
+      <app-segmented [options]="groups()" [value]="group()" (valueChange)="group.set($event)" ariaLabel="Which templates" />
       <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, category or tag" aria-label="Search templates" [value]="search()"
+        <input class="input" placeholder="Search name, owner or description" aria-label="Search templates" [value]="search()"
                (input)="search.set($any($event.target).value)" />
       </div>
+      <select class="input max-w-44" aria-label="Category" (change)="category.set($any($event.target).value)">
+        <option value="" [selected]="!category()">All categories</option>
+        @for (c of categories(); track c) { <option [value]="c" [selected]="c === category()">{{ c }}</option> }
+      </select>
+      <select class="input max-w-40" aria-label="State" (change)="state.set($any($event.target).value)">
+        <option value="" [selected]="!state()">All states</option>
+        <option value="PUBLISHED" [selected]="state() === 'PUBLISHED'">Published</option>
+        <option value="DRAFT" [selected]="state() === 'DRAFT'">Never published</option>
+        <option value="HAS_DRAFT" [selected]="state() === 'HAS_DRAFT'">With a draft</option>
+      </select>
+      <select class="input max-w-40" aria-label="Owner" (change)="owner.set($any($event.target).value)">
+        <option value="" [selected]="!owner()">Anyone</option>
+        <option value="me" [selected]="owner() === 'me'">Made by me</option>
+        <option value="starter" [selected]="owner() === 'starter'">From a starter</option>
+        <option value="copy" [selected]="owner() === 'copy'">Copies and imports</option>
+      </select>
       <label class="inline-flex items-center gap-2 text-sm whitespace-nowrap">
-        <input type="checkbox" [checked]="archived()" (change)="showArchived($any($event.target).checked)" />Archived
+        <input type="checkbox" class="checkbox" [checked]="archived()" (change)="showArchived($any($event.target).checked)" />Archived
       </label>
+      <app-view-toggle [(value)]="view" key="report-templates" cardsIcon="template" />
     </ng-container>
-    <table class="table-modern">
-      <thead>
-        <tr>
-          <th>Template</th><th>Category</th><th>Versions</th><th>From</th><th>Updated</th>
-          <th class="w-12 th-actions">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        @for (t of filtered(); track t.templateId) {
-          <tr>
-            <td class="max-w-96">
-              <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
-              @if (t.description) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ t.description }}</div> }
-            </td>
-            <td class="text-sm">{{ t.category || '—' }}</td>
-            <td>
-              <div class="flex flex-wrap gap-1">
-                @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
-                @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
-                @if (t.status === 'ARCHIVED') { <app-status label="Archived" /> }
+
+    @if (view() === 'cards') {
+      <div class="rst-grid">
+        @for (i of filtered(); track i.id) {
+          <article class="rst-card" [attr.data-template]="i.kind === 'template' ? i.id : null">
+            <div class="rst-thumb">
+              @if (i.category) { <span class="pill pill-neutral rst-cat">{{ i.category }}</span> }
+              @if (i.template && thumbs()[i.id]; as src) {
+                <img [src]="src" [alt]="'First page of ' + i.name" />
+              } @else {
+                <span class="rst-paper" aria-hidden="true"><i></i><i></i><i></i><b></b><i></i></span>
+              }
+            </div>
+            <div class="rst-body">
+              <div class="flex items-start justify-between gap-2">
+                <h3 class="font-semibold min-w-0">
+                  @if (i.template; as t) { <a class="link-inline" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a> } @else { {{ i.name }} }
+                </h3>
+                @if (i.template; as t) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm shrink-0" [cdkMenuTriggerFor]="cardMenu" [attr.aria-label]="'Actions for ' + t.name">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #cardMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/reports/templates', t.templateId]"><app-icon name="eye" />View template</a>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(t)"><app-icon name="play" />Test with data</button>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="exportJson(t)"><app-icon name="download" />Export JSON</button>
+                      @if (canEdit()) {
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(t)"><app-icon name="copy" />Make a copy</button>
+                        @if (t.status !== 'ARCHIVED') { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="archive(t)"><app-icon name="inbox" />Archive</button> }
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(t)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                      }
+                    </div>
+                  </ng-template>
+                }
               </div>
-            </td>
-            <td class="text-xs">{{ originWord(t) }}</td>
-            <td class="text-xs whitespace-nowrap">{{ t.updatedAt | serverTime: 'dateTime' }}</td>
-            <td>
-              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + t.name">
-                <app-icon name="dots" size="1.05em" />
-              </button>
-              <ng-template #rowMenu>
-                <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
-                  <a cdkMenuItem class="menu-item" [routerLink]="['/reports/templates', t.templateId]"><app-icon name="eye" />Open</a>
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(t)"><app-icon name="play" />Test with data</button>
-                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="exportJson(t)"><app-icon name="download" />Export JSON</button>
-                  @if (canEdit()) {
-                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(t)"><app-icon name="copy" />Make a copy</button>
-                    @if (t.status !== 'ARCHIVED') { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="archive(t)"><app-icon name="inbox" />Archive</button> }
-                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(t)"><app-icon name="trash" class="icon-crit" />Delete</button>
+              <p class="text-sm text-[color:var(--text-secondary)] line-clamp-2">{{ i.description || 'No description.' }}</p>
+              <div class="flex flex-wrap gap-1">
+                @if (i.template; as t) {
+                  @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+                  @if (t.hasDraft) { <span class="pill pill-brand">Draft{{ t.currentPublishedVersion ? ' v' + (t.currentPublishedVersion + 1) : '' }}</span> }
+                  @if (t.status === 'ARCHIVED') { <app-status label="Archived" /> }
+                } @else {
+                  <span class="pill pill-neutral">Starter</span><span class="pill pill-neutral">{{ i.starter!.components }} blocks</span>
+                }
+              </div>
+              <div class="flex flex-wrap justify-between gap-2 text-xs text-[color:var(--text-muted)]">
+                @if (i.template; as t) {
+                  <span>{{ ownerOf(t) }}</span><span>Updated {{ t.updatedAt | serverTime: 'date' }}@if (pagesOf(t)) { · {{ pagesOf(t) }} }</span>
+                } @else { <span>Report Studio starter</span><span>Copied into your workspace</span> }
+              </div>
+              <div class="flex flex-wrap gap-2 mt-auto pt-1">
+                @if (i.template; as t) {
+                  @if (canGenerate() && t.currentPublishedVersion && t.status !== 'ARCHIVED') {
+                    <button type="button" class="btn btn-primary btn-sm" (click)="createReport(t)"><app-icon name="play" />Create report</button>
                   }
-                </div>
-              </ng-template>
-            </td>
-          </tr>
+                  @if (canEdit() && t.status !== 'ARCHIVED') {
+                    <button type="button" class="btn btn-default btn-sm" (click)="edit(t)"><app-icon name="edit" />{{ t.hasDraft ? 'Edit draft' : 'New draft' }}</button>
+                  } @else {
+                    <a class="btn btn-default btn-sm" [routerLink]="['/reports/templates', t.templateId]">View template</a>
+                  }
+                } @else if (canEdit()) {
+                  <button type="button" class="btn btn-default btn-sm" (click)="create(i.starter!)"><app-icon name="copy" />Use starter</button>
+                }
+              </div>
+            </div>
+          </article>
         }
-      </tbody>
-    </table>
+      </div>
+    } @else {
+      <table class="table-modern">
+        <thead>
+          <tr><th>Template</th><th>Category</th><th>Versions</th><th>From</th><th>Pages</th><th>Updated</th><th class="w-12 th-actions">Actions</th></tr>
+        </thead>
+        <tbody>
+          @for (i of filtered(); track i.id) {
+            <tr>
+              <td class="max-w-96">
+                @if (i.template; as t) { <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a> }
+                @else { <span class="font-medium">{{ i.name }}</span> }
+                @if (i.description) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ i.description }}</div> }
+              </td>
+              <td class="text-sm">{{ i.category || '—' }}</td>
+              <td>
+                <div class="flex flex-wrap gap-1">
+                  @if (i.template; as t) {
+                    @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+                    @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
+                    @if (t.status === 'ARCHIVED') { <app-status label="Archived" /> }
+                  } @else { <span class="pill pill-neutral">Starter</span> }
+                </div>
+              </td>
+              <td class="text-xs">@if (i.template; as t) { {{ ownerOf(t) }} } @else { Report Studio starter }</td>
+              <td class="text-xs">@if (i.template; as t) { {{ pagesOf(t) || '—' }} } @else { — }</td>
+              <td class="text-xs whitespace-nowrap">@if (i.template; as t) { {{ t.updatedAt | serverTime: 'dateTime' }} } @else { — }</td>
+              <td>
+                @if (i.template; as t) {
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + t.name">
+                    <app-icon name="dots" size="1.05em" />
+                  </button>
+                  <ng-template #rowMenu>
+                    <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                      <a cdkMenuItem class="menu-item" [routerLink]="['/reports/templates', t.templateId]"><app-icon name="eye" />View template</a>
+                      @if (canEdit() && t.status !== 'ARCHIVED') { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="edit(t)"><app-icon name="edit" />{{ t.hasDraft ? 'Edit draft' : 'New draft' }}</button> }
+                      @if (canGenerate() && t.currentPublishedVersion && t.status !== 'ARCHIVED') { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="createReport(t)"><app-icon name="play" />Create report</button> }
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(t)"><app-icon name="play" />Test with data</button>
+                      <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="exportJson(t)"><app-icon name="download" />Export JSON</button>
+                      @if (canEdit()) {
+                        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(t)"><app-icon name="copy" />Make a copy</button>
+                        @if (t.status !== 'ARCHIVED') { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="archive(t)"><app-icon name="inbox" />Archive</button> }
+                        <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(t)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                      }
+                    </div>
+                  </ng-template>
+                } @else if (canEdit()) {
+                  <button type="button" class="btn btn-default btn-sm" (click)="create(i.starter!)">Use starter</button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
   </app-table-shell>
 
-  <section class="mt-6" aria-labelledby="rsStarters">
-    <div class="flex flex-wrap items-baseline gap-2 mb-3">
-      <h2 id="rsStarters" class="section-title">Starters</h2>
-      <span class="text-xs text-[color:var(--text-muted)]">The platform's generic layouts. Using one copies it into your workspace as a draft.</span>
-    </div>
-    <div class="rs-cards">
-      @for (s of starters(); track s.key) {
-        <article class="card p-4 flex flex-col gap-2">
-          <div class="flex items-start gap-2">
-            <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
-            <div class="min-w-0 flex-1">
-              <h3 class="font-semibold">{{ s.name }}</h3>
-              <p class="text-xs text-[color:var(--text-muted)]">{{ s.category }} · {{ s.components }} blocks</p>
-            </div>
-          </div>
-          @if (s.description) { <p class="text-sm text-[color:var(--text-secondary)]">{{ s.description }}</p> }
-          @if (canEdit()) {
-            <div class="mt-auto"><button type="button" class="btn btn-default btn-sm" (click)="create(s)"><app-icon name="copy" />Use starter</button></div>
-          }
-        </article>
-      }
-    </div>
-  </section>
+  <div class="rs-banner rs-banner-info mt-4" role="note">
+    <app-icon name="info" class="shrink-0" />
+    <div class="min-w-0 flex-1 text-sm"><b>Published versions never change.</b> Edits go into a new draft. Every report keeps the exact template version it was made from.</div>
+    <button type="button" class="btn btn-default btn-sm" disabled [title]="isAdmin() ? 'Who may edit and publish is the workspace\'s page access' : 'Workspace administrators decide who may edit and publish'">
+      <app-icon name="lock" />Manage access · admins</button>
+  </div>
 </div>

@@ -1,5 +1,4 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
-import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Subscription, interval } from 'rxjs';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -9,13 +8,11 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
-import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { JobRow, ReportRow, chipWord, isRunning, stageWord } from './report-studio.model';
-import { GeneratePanel, GeneratePanelData } from './generate-panel';
 
 type View = 'reports' | 'jobs';
 
@@ -32,7 +29,6 @@ type View = 'reports' | 'jobs';
 export class ReportLibrary implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
-  private readonly dialog = inject(Dialog);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceDirectory);
   /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
@@ -88,10 +84,5 @@ export class ReportLibrary implements OnInit {
       error: e => { this.error.set(studioError(e, 'The reports could not be read.').message); this.loading.set(false); },
     });
     this.api.jobs('', scope).subscribe({ next: j => this.jobs.set(j), error: () => { /* the reports' error says enough */ } });
-  }
-
-  generate(): void {
-    this.dialog.open<string | undefined, GeneratePanelData>(GeneratePanel, sidePanelConfig<GeneratePanelData>({}, 'wide', 'right'))
-      .closed.subscribe(() => this.load());
   }
 }

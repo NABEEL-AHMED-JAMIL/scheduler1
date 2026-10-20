@@ -68,12 +68,30 @@ export interface SampleRow {
   createdAt?: string | null;
 }
 
+/** An open "Ask for approval" on the draft (MIG-404): who asked, when, for which revision, and whether it is still that one. */
+export interface ApprovalRequest {
+  requestedBy?: number | null;
+  requestedByName?: string | null;
+  requestedAt?: string | null;
+  revision: number;
+  note?: string | null;
+  current: boolean;
+}
+
 export interface TemplateDetail extends TemplateRow {
   draft?: VersionRow;
   published?: VersionRow;
   versions: VersionRow[];
   samples: SampleRow[];
   reports: number;
+  activity?: ActivityRow[];
+  approval?: ApprovalRequest | null;
+}
+
+/** A template's data contract, as the Data tab and Create report read it (MIG-404): paths only. */
+export interface ContractField { path: string; type: string; required: boolean; label?: string | null; }
+export interface TemplateContract {
+  templateId: string; tenantId: number; name: string; version: number; state: string; rootPath: string; fields: ContractField[];
 }
 
 /** Where a report's data comes from: each read as the person asking (media-service's Connectors). */
@@ -125,8 +143,15 @@ export interface PreviewResult {
   html?: string | null;
   records: number;
   label?: string | null;
+  /** The distinct data paths the template reads (the designer's "N data fields used"). */
+  fields?: number;
   problems: Problem[];
   summary: { errors: number; warnings: number; valid: boolean };
+}
+
+/** A pipeline run reports were asked from lately (MIG-404, the Overview's "Connected pipelines"). */
+export interface PipelineRunUse {
+  tenantId: number; pipelineRunId: number; lastUsedAt: string; jobs: number; failed: number; templateIds: string[];
 }
 
 export interface OutputRow { format: 'PDF' | 'HTML'; bytes: number; pages?: number | null; sha256: string; fileName: string; }
@@ -180,6 +205,8 @@ export interface JobRow {
   pipelineRunId?: number | null;
   resultVersion?: number | null;
   requestedBy?: number | null;
+  /** The name the console sent with the request (MIG-404). */
+  requestedByName?: string | null;
   createdAt?: string | null;
   startedAt?: string | null;
   finishedAt?: string | null;
@@ -217,6 +244,7 @@ export interface StudioOverview {
   recentJobs: JobRow[];
   failedJobs: JobRow[];
   templateActivity: TemplateRow[];
+  pipelineRuns?: PipelineRunUse[];
 }
 
 /** A job still on its way: the console polls it. */

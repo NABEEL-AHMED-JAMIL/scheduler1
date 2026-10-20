@@ -2924,6 +2924,22 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   th.th-actions { text-align: right; white-space: nowrap; }
 }
 
+/* MIG-404: a page that takes the whole width (the report designer, route data `canvas`): no page padding, no cap. */
+.app-main-canvas { max-width: none; padding: 0; }
+/* MIG-404: the report designer's side panels -- a block's properties and the page settings -- in groups of fields. */
+@layer components {
+  .rsd-eyebrow { margin: 0.75rem 0 0.375rem; font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+                 color: var(--text-muted); }
+  .rsd-props-head { display: flex; align-items: center; gap: 0.5rem; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-subtle);
+                    position: sticky; top: 0; background: var(--surface-raised); z-index: 1; }
+  .rsd-props-group { display: flex; flex-direction: column; gap: 0.625rem; padding: 0.75rem 1rem 1rem; border-bottom: 1px solid var(--border-subtle); }
+  .rsd-props-group .rsd-eyebrow { margin: 0; }
+  .rsd-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.5rem; }
+  .rsd-four { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.375rem; }
+  .rsd-check { display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem; color: var(--text-secondary); }
+  .rsd-colour { height: 2rem; padding: 0.125rem; }
+}
+
 /* Report Studio (MIG-403): the hub's cards, callouts and two-column layouts. Tokens only. */
 @layer components {
   .rs-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem;
@@ -2962,4 +2978,16 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .rs-tree > li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.375rem; }
   .rs-tree > li.rs-depth-1 { padding-left: 0.75rem; } .rs-tree > li.rs-depth-2 { padding-left: 1.5rem; } .rs-tree > li.rs-depth-3 { padding-left: 2.25rem; }
   .rs-tree > li.rs-depth-4 { padding-left: 3rem; } .rs-tree > li.rs-depth-5 { padding-left: 3.75rem; } .rs-tree > li.rs-depth-6 { padding-left: 4.5rem; }
+  /* MIG-404: the hub's right-hand side panel (Overview, the report page, Data): sections under one card, rows of a label
+     and its action; a small progress bar in a table. */
+  .rs-side { display: flex; flex-direction: column; }
+  .rs-side-sec { display: flex; flex-direction: column; gap: 0.625rem; padding: 1rem; }
+  .rs-side-sec + .rs-side-sec { border-top: 1px solid var(--border-subtle); }
+  .rs-side-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.875rem; min-width: 0; }
+  .rs-progress-sm { display: inline-block; width: 5rem; height: 0.375rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
+  .rs-progress-sm > i { display: block; height: 100%; background: var(--accent-mark-strong); }
+  .rs-banner-ok { border-color: var(--ok-text); }
+  /* MIG-404: the data picker's five ways in wrap in a narrow column rather than running out of it. */
+  .rs-source-modes .seg { flex-wrap: wrap; }
+  .rs-banner-warn { border-color: var(--warn-text); }
 }
