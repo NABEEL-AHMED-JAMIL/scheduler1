@@ -151,7 +151,7 @@
                     <tr [class.rsw-missing]="r.state === 'missing'">
                       <td>
                         <b class="mono text-xs rsw-path">{{ r.field.path }}@if (r.field.required) {<span class="text-[color:var(--crit-text)]" aria-label="required">&nbsp;*</span>}</b>
-                        <div class="text-xs text-[color:var(--text-muted)]">{{ r.field.label ? r.field.label + ' · ' : '' }}{{ typeWords(r.field.type) }} · {{ r.field.required ? 'required' : 'optional' }}</div>
+                        <div class="text-xs rsw-field-type">{{ r.field.label ? r.field.label + ' · ' : '' }}{{ typeWords(r.field.type) }} · {{ r.field.required ? 'required' : 'optional' }}</div>
                       </td>
                       <td>
                         <select class="input mono text-xs" [attr.aria-invalid]="r.state === 'missing' || null" [disabled]="!inspect()"

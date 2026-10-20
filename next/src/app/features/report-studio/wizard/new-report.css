@@ -48,4 +48,5 @@
 /* The template field's name has room to stay on one line with its asterisk (drawing 4's widest column). */
 .rsw-match th:first-child { width: 40%; }
 /* On the missing row's red tint the muted grey fell to 4.23:1 (axe, light theme): the secondary text colour holds AA. */
-.rsw-missing .text-\[color\:var\(--text-muted\)\] { color: var(--text-secondary); }
+.rsw-field-type { color: var(--text-muted); }
+.rsw-missing .rsw-field-type { color: var(--text-secondary); }
