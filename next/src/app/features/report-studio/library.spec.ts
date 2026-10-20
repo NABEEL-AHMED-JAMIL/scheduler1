@@ -4,6 +4,8 @@ import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse, provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
+import { Dialog } from '@angular/cdk/dialog';
+import { ToastService } from '../../shared/ui/toast.service';
 import { of, throwError } from 'rxjs';
 import { API_BASE } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
@@ -30,7 +32,12 @@ function screenWith(opts: { view?: string; platform?: boolean; reports?: Library
   const api = {
     reports: vi.fn((_q: LibraryQuery, _t?: number | null) => of(opts.reports ?? page([report(1), report(2)], 120))),
     jobs: vi.fn((_q: LibraryQuery, _t?: number | null) => of(opts.jobs ?? page([job(1)], 61))),
+    deleteReport: vi.fn((id: string) => id === 'R9'
+      ? throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'REPORT_SIGNED', message: 'This report has an approved version.' } }))
+      : of({ reportId: id, deleted: true, versions: 1, files: 2, filesLeft: 0 })),
   };
+  const dialog = { open: vi.fn(() => ({ closed: of(true) })) };
+  const toast = { success: vi.fn(), error: vi.fn() };
   const tabCounts = { refresh: vi.fn() };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -41,10 +48,12 @@ function screenWith(opts: { view?: string; platform?: boolean; reports?: Library
       { provide: RsTabCounts, useValue: tabCounts },
       { provide: WorkspaceDirectory, useValue: { remembered: () => (opts.platform ? null : 2960) } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => opts.platform ?? false, canOpen: () => true } },
+      { provide: Dialog, useValue: dialog },
+      { provide: ToastService, useValue: toast },
     ],
   });
   const screen = TestBed.runInInjectionContext(() => new ReportLibrary());
-  return { api, tabCounts, screen };
+  return { api, tabCounts, screen, dialog, toast };
 }
 
 afterEach(() => vi.useRealTimers());
@@ -200,5 +209,61 @@ describe('ReportStudioApi -- the library\'s pages', () => {
     req.flush(ok({ jobs: [job(1), job(2)] }));
     expect(got!.total).toBe(2);
     http.verify();
+  });
+});
+
+describe('ReportLibrary -- delete (owner 2026-10-20)', () => {
+  const kept = { ...report(3), approved: true } as ReportRow;
+
+  it('never picks a kept record (an approved version), on its own or with the page', () => {
+    const { screen } = screenWith({ reports: page([report(1), report(2), kept], 3) });
+    screen.ngOnInit();
+    screen.togglePick(kept);
+    expect(screen.isPicked(kept)).toBe(false);
+    screen.togglePage(true);
+    expect([...screen.picked()]).toEqual(['R1', 'R2']);
+    expect(screen.allPicked()).toBe(true);
+    screen.togglePage(false);
+    expect(screen.picked().size).toBe(0);
+  });
+
+  it('deletes the picked ones one at a time after the confirm, says how many, and reads the same page again', async () => {
+    const { api, screen, dialog, toast } = screenWith({ reports: page([report(1), report(2), kept], 120) });
+    screen.ngOnInit();
+    screen.goTo(2);
+    screen.togglePick(report(1));
+    screen.togglePick(report(2));
+    api.reports.mockClear();
+    screen.removePicked();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(dialog.open).toHaveBeenCalledTimes(1);
+    expect(api.deleteReport.mock.calls.map(c => c[0])).toEqual(['R1', 'R2']);
+    expect(toast.success).toHaveBeenCalledWith('2 reports deleted.');
+    expect(screen.picked().size).toBe(0);
+    expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 50 }, null);
+  });
+
+  it('says each refusal on its own (the service still says REPORT_SIGNED for a report signed meanwhile)', async () => {
+    const { api, screen, toast } = screenWith({ reports: page([report(1), report(9)], 2) });
+    screen.ngOnInit();
+    screen.togglePage(true);
+    screen.removePicked();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(api.deleteReport).toHaveBeenCalledTimes(2);
+    expect(toast.success).toHaveBeenCalledWith('Wound report 1 deleted.');
+    expect(toast.error).toHaveBeenCalledWith('Wound report 9: This report has an approved version.');
+  });
+
+  it('a row\'s own Delete asks first and leaves a kept record alone', async () => {
+    const { api, screen, dialog } = screenWith({ reports: page([report(1), kept], 2) });
+    screen.ngOnInit();
+    screen.removeOne(kept);
+    expect(dialog.open).not.toHaveBeenCalled();
+    screen.removeOne(report(1));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(api.deleteReport).toHaveBeenCalledWith('R1');
   });
 });

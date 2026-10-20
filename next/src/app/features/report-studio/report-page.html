@@ -20,7 +20,9 @@
         <div class="flex items-center gap-2">
           <app-refresh-button [loading]="loading()" (refresh)="load()" />
           <button type="button" class="btn btn-default btn-sm" (click)="share()"><app-icon name="link" />Share</button>
-          @if (canGenerate()) { <button type="button" class="btn btn-default btn-sm" (click)="archive()"><app-icon name="inbox" />Archive</button> }
+          @if (canGenerate()) { <button type="button" class="btn btn-default btn-sm" (click)="archive()"><app-icon name="inbox" />Archive</button>
+            <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="remove()" [disabled]="r.approved"
+                    [title]="r.approved ? keptWords : 'Delete this report, its versions and files'" data-report-delete><app-icon name="trash" />Delete</button> }
           @if (current()) { <button type="button" class="btn btn-primary btn-sm" (click)="downloadCurrent()"><app-icon name="download" />Download</button> }
         </div>
       </div>

@@ -237,6 +237,12 @@ export class ReportStudioApi {
       { reportId, version, reason }));
   }
 
+  /** Owner 2026-10-20: a report no version of which was approved, with everything it has (REPORT_SIGNED otherwise). */
+  deleteReport(reportId: string): Observable<{ reportId: string; deleted: boolean; versions: number; files: number; filesLeft: number }> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<{ reportId: string; deleted: boolean; versions: number; files: number; filesLeft: number }>>(
+      `${this.generating}/deleteReport`, null, { params: { reportId } }));
+  }
+
   archiveReport(reportId: string): Observable<ReportDetail> {
     return ReportStudioApi.data$(this.http.post<ApiResponse<ReportDetail>>(`${this.generating}/archiveReport`, null, { params: { reportId } }));
   }

@@ -31,10 +31,22 @@
         </div>
       </ng-container>
       <table class="table-modern">
-        <thead><tr><th>Report</th><th>Template</th><th>Version</th><th>Files</th><th>Status</th><th>Signed</th><th>Last job</th><th>Updated</th></tr></thead>
+        <thead><tr>
+          @if (canGenerate()) {
+            <th class="w-8"><input type="checkbox" [checked]="allPicked()" [disabled]="!pickable().length || deleting()"
+                                   (change)="togglePage($any($event.target).checked)" aria-label="Select the deletable reports on this page" data-pick-page /></th>
+          }
+          <th>Report</th><th>Template</th><th>Version</th><th>Files</th><th>Status</th><th>Signed</th><th>Last job</th><th>Updated</th>
+          @if (canGenerate()) { <th class="text-right"><span class="sr-only">Actions</span></th> }
+        </tr></thead>
         <tbody>
           @for (r of reports(); track r.reportId) {
-            <tr>
+            <tr [class.is-selected]="isPicked(r)">
+              @if (canGenerate()) {
+                <td><input type="checkbox" [checked]="isPicked(r)" [disabled]="r.approved || deleting()" (change)="togglePick(r)"
+                           [attr.aria-label]="r.approved ? r.name + ': ' + keptWords : 'Select ' + r.name" [title]="r.approved ? keptWords : ''"
+                           data-pick-report /></td>
+              }
               <td class="max-w-96">
                 <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
                 <div class="text-xs text-[color:var(--text-muted)] mono">{{ r.label }}</div>
@@ -54,10 +66,28 @@
                 } @else { — }
               </td>
               <td class="text-xs whitespace-nowrap">{{ r.updatedAt | rsTime: 'recent' }}</td>
+              @if (canGenerate()) {
+                <td class="text-right">
+                  <button type="button" class="btn btn-ghost btn-xs btn-intent-crit" (click)="removeOne(r)" [disabled]="r.approved || deleting()"
+                          [title]="r.approved ? keptWords : 'Delete ' + r.name" [attr.aria-label]="'Delete ' + r.name" data-delete-report>
+                    <app-icon name="trash" /></button>
+                </td>
+              }
             </tr>
           }
         </tbody>
       </table>
+      @if (picked().size) {
+        <div class="rs-bulk-bar" role="region" aria-label="The selected reports" data-delete-bar>
+          <span class="font-semibold tabular">{{ picked().size }} selected</span>
+          <span class="text-xs text-[color:var(--text-secondary)]">Reports with an approved version cannot be selected: they are kept records.</span>
+          <span class="ml-auto flex gap-2">
+            <button type="button" class="btn btn-default btn-sm" (click)="clearPicked()" [disabled]="deleting()">Clear</button>
+            <button type="button" class="btn btn-default btn-sm btn-intent-crit" (click)="removePicked()" [disabled]="deleting()" data-delete-picked>
+              @if (deleting()) { <span class="spinner"></span> } @else { <app-icon name="trash" /> }Delete {{ picked().size }}</button>
+          </span>
+        </div>
+      }
       <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
     </app-table-shell>
   } @else {

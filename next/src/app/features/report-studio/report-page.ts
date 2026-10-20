@@ -17,7 +17,8 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
-  JobRow, OutputRow, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, idempotencyKey, isRunning, size, stageWord,
+  JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, idempotencyKey,
+  isRunning, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
 import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
@@ -311,6 +312,20 @@ export class ReportPage implements OnInit {
         if (!isRunning(job.status)) { this.poll?.unsubscribe(); this.load(); }
       },
       error: () => this.poll?.unsubscribe(),
+    });
+  }
+
+  readonly keptWords = REPORT_KEPT_WORDS;
+
+  remove(): void {
+    const r = this.r();
+    if (!r || r.approved) return;
+    void confirmWith(this.dialog, { title: `Delete ${r.name}?`, body: REPORT_DELETE_WORDS, confirmLabel: 'Delete', danger: true }).then(ok => {
+      if (!ok) return;
+      this.api.deleteReport(r.reportId).subscribe({
+        next: () => { this.toast.success(`${r.name} deleted.`); void this.router.navigate(['/reports/library']); },
+        error: e => this.toast.error(studioError(e).message),
+      });
     });
   }
 

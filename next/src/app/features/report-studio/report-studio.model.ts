@@ -322,6 +322,8 @@ export interface ReportRow {
   templateName: string;
   status: 'GENERATED' | 'FAILED' | 'ARCHIVED';
   currentVersion?: number | null;
+  /** A version was approved (or signed): a kept record, which is voided or archived, never deleted (owner 2026-10-20). */
+  approved?: boolean;
   createdAt?: string | null;
   updatedAt?: string | null;
   current?: ReportVersionRow;
@@ -414,3 +416,10 @@ export function idempotencyKey(): string {
   const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Math.random()).slice(2);
   return `console#${random}`;
 }
+
+/** What deleting a report does, said the same on the report and in the library (owner 2026-10-20). */
+export const REPORT_DELETE_WORDS = 'Every version, its files and its frozen data are deleted for good; the activity record keeps a line '
+  + 'saying who deleted it. A report with an approved version is a kept record and cannot be deleted: void the version, or archive the report.';
+
+/** Why a kept record has no Delete. */
+export const REPORT_KEPT_WORDS = 'A version was approved: this report is a kept record. Void the version, or archive the report.';
