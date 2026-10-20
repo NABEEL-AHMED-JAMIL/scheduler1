@@ -95,6 +95,10 @@ const TASK_ICONS: Record<string, string> = {
   write_database: 'database', legacy: 'history',
   // Owner #16 (2026-10-19): the common tasks added to the registry.
   dedupe: 'layers', split_column: 'code', pivot: 'table', unpivot: 'list', fill_missing: 'check',
+  // Files a run reads, turned into rows (media-service; kind Process, so stepKind's fallback leaves them 'process'): a
+  // recording's text under the microphone, and a file in another format under the turning arrows -- 'file' already
+  // stands for Read file, Render PDF and Generate report, so a conversion beside them would not read as one.
+  transcribe_audio: 'mic', convert_file: 'refresh',
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && !!x);

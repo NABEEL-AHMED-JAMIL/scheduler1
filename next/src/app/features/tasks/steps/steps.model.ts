@@ -660,9 +660,20 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
       const right = definition.steps.findIndex(s => s.key === config['with']);
       return union(input(), right >= 0 && right < index ? outputColumns(definition, right, tasks) : null);
     }
-    case 'filter': case 'save_file': case 'send_notification': case 'validate':
+    case 'filter': case 'save_file': case 'upload_bucket': case 'send_notification': case 'validate':
     case 'dedupe': case 'fill_missing': case 'sort': case 'limit':
       return input();
+    // Transcribe audio and Convert file: a row per file, then what each file gave.
+    case 'transcribe_audio': {
+      const tracked = config['onError'] === 'skip' || config['onError'] === 'null';
+      return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'transcript', 'language', 'duration_seconds',
+        ...(config['timestamps'] === true ? ['segments'] : []), ...(tracked ? ['transcribe_status', 'transcribe_error'] : [])]);
+    }
+    case 'convert_file': {
+      const tracked = config['onError'] === 'skip' || config['onError'] === 'null';
+      return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'converted_key', 'converted_pages', 'converted_bytes',
+        'convert_status', ...(tracked ? ['convert_error'] : [])]);
+    }
     // Owner #16 (2026-10-19): the common tasks added to the registry.
     case 'unpivot': {
       const columns = input();
@@ -695,12 +706,32 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
   }
 }
 
+/** The place of the step whose rows a step reads (the one it names, else the one before it), or -1 when there is none. */
+function inputIndex(definition: Definition, index: number): number {
+  const step = definition.steps[index];
+  if (!step) return -1;
+  const from = step.input ? definition.steps.findIndex(s => s.key === step.input) : index - 1;
+  return from >= 0 && from < index ? from : -1;
+}
+
 /** The columns a step reads: the output of the step it names, else of the step before it. */
 export function inputColumns(definition: Definition, index: number, tasks: StepTaskEntry[] = []): string[] | null {
-  const step = definition.steps[index];
-  if (!step) return null;
-  const from = step.input ? definition.steps.findIndex(s => s.key === step.input) : index - 1;
-  return from >= 0 && from < index ? outputColumns(definition, from, tasks) : null;
+  const from = inputIndex(definition, index);
+  return from >= 0 ? outputColumns(definition, from, tasks) : null;
+}
+
+/**
+ * A step that reads files (Transcribe audio, Convert file): its rows are the run's own files -- bucket and key -- when it
+ * names no key column and its input has no key column; else they are its input's rows. Then the columns it adds. null
+ * when that cannot be told: a key column named, or a step before it, whose columns are not known.
+ */
+function fileRowColumns(definition: Definition, index: number, tasks: StepTaskEntry[], own: string[]): string[] | null {
+  const config = definition.steps[index]?.config ?? {};
+  const keyColumn = typeof config['keyColumn'] === 'string' ? (config['keyColumn'] as string).trim() : '';
+  const from = inputIndex(definition, index);
+  const input = from >= 0 ? outputColumns(definition, from, tasks) : null;
+  if (input) return union(!keyColumn && !input.includes('key') ? ['bucket', 'key'] : input, own);
+  return keyColumn || from >= 0 ? null : union(['bucket', 'key'], own);
 }
 
 // ---------------------------------------------------------------------------------------------- a config form

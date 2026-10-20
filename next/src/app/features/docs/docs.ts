@@ -392,6 +392,13 @@ export class Docs implements AfterViewInit {
         'To make a finished report, add a Generate report step and choose where its design comes from: Design the report here '
           + '(the designer opens on the step\'s own data from the pipeline\'s latest run; publish the design for the step to run it) '
           + 'or Use a saved template. Each run keeps the report\'s PDF with its outputs and adds a version to Reports › Library.',
+        'To work on files rather than rows, add a Transcribe audio step (each recording\'s text, its language and length; with '
+          + 'Timestamps, each stretch of speech with its start and end) or a Convert file step (each file in another format — '
+          + 'pdf, docx, xlsx, csv, png and more — written to a bucket or kept with the run). Both read the files the run was '
+          + 'started for, or those a File key column names; When a file fails says whether the step stops, skips that file or keeps it with the reason.',
+        'Save File and Upload to bucket write all the rows as one file; with One file per row they write a file for each row '
+          + '— a folder of recordings, one insight file each — named from the row\'s columns, as in {{file_stem}}-insight.json. '
+          + 'JSON columns are written as lists and objects rather than as text; Generate report reads its JSON columns the same way.',
         'In the pipeline\'s Settings, choose whether its results wait for a review, and whether that review may be decided in bulk or only one by one.',
         'For a sign-off in the middle of a run, add an Approval step and say who approves it in Approval workflows.',
       ],

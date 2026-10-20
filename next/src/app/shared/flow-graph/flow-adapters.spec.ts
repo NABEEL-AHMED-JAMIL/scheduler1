@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
   FLOW_REVIEW, FLOW_START, PipelineStepLike, PipelineTaskLike, WORKFLOW_END, WORKFLOW_REJECTED, WORKFLOW_START, aiFlowGraph, pipelineEdges,
-  pipelineGraph, readsInput, stepRefs, workflowGraph,
+  pipelineGraph, readsInput, stepKind, stepRefs, workflowGraph,
 } from './flow-adapters';
-import { layoutFlow, sameGraph } from './flow-graph.model';
+import { flowIconPaths, layoutFlow, sameGraph } from './flow-graph.model';
 
 /**
  * The adapters every flow screen draws through (the step builder's Flow view, the Workflow designer, the AI Assistant's
@@ -89,6 +89,18 @@ describe('a pipeline as a flow', () => {
     expect(g.nodes[2].label).toBe('Summarise');
     expect(g.nodes[3].pending).toBe(true);
     expect(pairs(g.edges)).toEqual(['@start>read:payload', 'read>ask', 'ask>save', 'save>@review:results (dashed)']);
+  });
+
+  it('draws Transcribe audio under a microphone and Convert file under turning arrows, both as processing steps', () => {
+    const media = (code: string): PipelineTaskLike => ({ code, kind: 'Process', backingService: 'media-service', inputSchema: rows('Rows naming files.'),
+      configSchema: { type: 'object', properties: { targetFormat: { type: 'string', title: 'Convert to' }, writeTo: { type: 'string', title: 'Write the result to' } } } });
+    const steps = [step('hear', 'transcribe_audio'), step('turn', 'convert_file', { config: { targetFormat: 'pdf', writeTo: 'bucket' } }), step('save', 'save_file')];
+    const g = pipelineGraph(steps, { tasks: [...TASKS, media('transcribe_audio'), media('convert_file')] });
+    expect(g.nodes.map(n => [n.id, n.kind, n.icon])).toEqual([['hear', 'process', 'mic'], ['turn', 'process', 'refresh'], ['save', 'output', 'download']]);
+    expect(g.nodes[1].metrics).toEqual([{ label: 'Convert to', value: 'pdf' }, { label: 'Write the result to', value: 'bucket' }]);
+    // Before the registry answers, too; and each glyph is its own, not the process kind's cog.
+    expect(['transcribe_audio', 'convert_file'].map(t => stepKind(t))).toEqual(['process', 'process']);
+    for (const icon of ['mic', 'refresh']) expect(flowIconPaths(icon, 'process')).not.toEqual(flowIconPaths(null, 'process'));
   });
 
   it('draws 100 steps (the engine\'s cap) with a branch, laid out without overlap in good time', () => {

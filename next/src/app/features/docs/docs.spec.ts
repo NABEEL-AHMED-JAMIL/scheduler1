@@ -147,6 +147,14 @@ describe('Docs for what shipped by 2026-10-20', () => {
     expect(run).toContain('View');
   });
 
+  it('names the steps that work on files, and One file per row, by the names the step form gives them', () => {
+    const build = section(mount(), 'build').textContent!;
+    for (const words of ['Transcribe audio', 'Timestamps', 'Convert file', 'File key column', 'When a file fails', 'Save File',
+      'Upload to bucket', 'One file per row', '{{file_stem}}-insight.json', 'JSON columns']) {
+      expect(build, words).toContain(words);
+    }
+  });
+
   it('names Rebuild dataset files and Cost & usage\'s parts as the console does', () => {
     const page = mount();
     expect(section(page, 'data-in').textContent).toContain('Rebuild dataset files');
