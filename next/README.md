@@ -49,7 +49,7 @@ npx ng test --watch=false
 
 ### End-to-end (Playwright)
 
-`e2e/` holds the Playwright suite (40 specs, Chromium), run against a running console and backend:
+`e2e/` holds the Playwright suite (48 specs, Chromium), run against a running console and backend:
 
 ```bash
 npx playwright install chromium   # once
@@ -65,6 +65,31 @@ E2E_MINT=1 npx playwright test    # or: npx playwright test e2e/inbox.spec.ts
 - **Written test cases.** `docs/test-cases/` lists a screen's cases with their inputs, expected results and limits;
   each automated test names the cases it runs (`TC-...`). `docs/test-cases/tools.md`: the Document Converter (with
   the every-pair matrix) and Audio Transcript.
+
+#### Report Studio
+
+```bash
+npm run e2e:reports               # = E2E_MINT=1 playwright test e2e/report-studio (about 30 s, 12 tests)
+npm run e2e:reports -- --reporter=line e2e/report-studio-reports.spec.ts   # one area
+```
+
+Run it after every Report Studio change, against a stack you have just deployed (console and media-service are
+containers: they do not reload from source). It needs the rebuild's state file and the mint script; without them every
+test skips with the reason. People: Riverside Health's admin, reviewer and viewer (roles admin, user, viewer), Meridian's
+admin (minted by id with `sessionAsPerson`), and the test platform administrator (role platform).
+
+| Spec | What it drives |
+| --- | --- |
+| `report-studio-designer.spec.ts` | Blank template, pasted test data, heading, text, a table bound to the data, an image from the library; reorder (Alt+Up), undo/redo, autosave; Preview with pasted JSON (the PDF's page count); publish v1 |
+| `report-studio-reports.spec.ts` | Create report: Missing blocks Generate, matched data generates v1 (PDF and HTML); Generate again makes v2 and keeps v1; the generator cannot approve (UI and API), the reviewer approves and it is Signed; verify by version, by the downloaded PDF, and a one-byte change fails |
+| `report-studio-assets.spec.ts` | Upload a generated PNG (approved on upload); a PDF renamed .png refused; brand profile: colours, WCAG check refusing a low-contrast pair (UI and API), publish, make default |
+| `report-studio-access.spec.ts` | Meridian's admin gets "not found" for Riverside's template, report and asset (API and screens); the viewer is refused every page; the reviewer reads and may approve, nothing more; the platform administrator's designer is read only |
+
+What the specs make is Riverside's, synthetic (fictional patients, generated pictures) and named "E2E ..." with a run
+stamp, and it stays: Report Studio keeps versions by design and the owner removes test data. The access spec reuses its
+three "E2E isolation wound ..." rows by name. The brand spec makes its profile the workspace default and hands the default
+back to the previous profile afterwards. Setup the UI is not testing goes through media-service's API
+(`e2e/support/report-studio.ts`).
 
 The backend's own end-to-end suites drive the HTTP API through the real security chain.
 
