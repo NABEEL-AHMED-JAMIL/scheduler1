@@ -429,12 +429,21 @@ export class Docs implements AfterViewInit {
       where: [
         { label: 'See results › Dashboards', path: '/data/analytics/dashboards' },
         { label: 'See results › Analysis', path: '/data' },
+        { label: 'See results › Reports', path: '/reports/library' },
       ],
       todo: [
         'Dashboards: boards of tiles over your pipelines\' results; each board names the pipelines that feed it.',
         'Ask your data: ask a question in plain words and read the answer with the rows behind it; pin it to a dashboard.',
         'Analytics Studio and the Data Catalog: explore datasets, and find what was made from what.',
         'Generated reports and Files: the documents and files runs wrote.',
+        'Reports: PDF and HTML reports made from a published template with your data. Generating again makes a new version; '
+          + 'nothing is overwritten. Someone other than the person who generated it approves a version and signs its PDF.',
+      ],
+      notes: [
+        'A version you no longer stand behind is marked Void: it stays, and every download of it says VOID.',
+        'Archive takes a report out of the library and keeps it. Delete removes a report, its versions and files for good, '
+          + 'and only while no version of it was approved: an approved report is a kept record, so void the version or archive the report.',
+        'You can delete several reports at once in Reports: tick them, then Delete. Approved ones cannot be ticked.',
       ],
     },
     {
