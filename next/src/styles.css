@@ -2945,9 +2945,16 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .rs-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 0.5rem;
              padding: 0.875rem 1rem; border-bottom: 1px solid var(--border-subtle); }
   .rs-banner { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem;
+               font-size: 0.875rem; line-height: 1.35rem;
                border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised); }
-  .rs-banner-crit { border-color: var(--crit-text); }
-  .rs-banner-info { border-color: var(--border-strong); background: var(--surface-sunken); }
+  /* Approved drawings (screens 1, 4, 6, 7, 9, 10): each callout is tinted in its own tone -- red for a blocked job, blue for
+     a note, green for a version made, amber for a warning -- with the body text kept in the page's text colour, so it
+     reads at the same contrast in all five themes. */
+  .rs-banner-crit { border-color: color-mix(in oklab, var(--crit-text) 55%, var(--border-subtle));
+                    background: color-mix(in oklab, var(--crit-text) 8%, var(--surface-raised)); }
+  .rs-banner-info { border-color: color-mix(in oklab, var(--info-mark) 45%, var(--border-subtle));
+                    background: color-mix(in oklab, var(--info-mark) 8%, var(--surface-raised)); }
+  .rs-banner-info > app-icon { color: var(--info-text); }
   /* A main column and a side column on a wide screen (1920 and up use the width: owner, 09-30); one column on a tablet. */
   .rs-overview, .rs-split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
   @media (min-width: 1100px) {
@@ -2986,8 +2993,13 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .rs-side-row { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; font-size: 0.875rem; min-width: 0; }
   .rs-progress-sm { display: inline-block; width: 5rem; height: 0.375rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
   .rs-progress-sm > i { display: block; height: 100%; background: var(--accent-mark-strong); }
-  .rs-banner-ok { border-color: var(--ok-text); }
+  .rs-banner-ok { border-color: color-mix(in oklab, var(--ok-text) 55%, var(--border-subtle));
+                  background: color-mix(in oklab, var(--ok-text) 8%, var(--surface-raised)); }
   /* MIG-404: the data picker's five ways in wrap in a narrow column rather than running out of it. */
-  .rs-source-modes .seg { flex-wrap: wrap; }
-  .rs-banner-warn { border-color: var(--warn-text); }
+  /* ... as an even grid of equal buttons that fills the column, so a second row reads as part of the switch rather
+     than as one button left over (drawing 4, a 1440 screen's 24rem column). */
+  .rs-source-modes .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr)); width: 100%; }
+  .rs-source-modes .seg-btn { justify-content: center; }
+  .rs-banner-warn { border-color: color-mix(in oklab, var(--warn-text) 55%, var(--border-subtle));
+                    background: color-mix(in oklab, var(--warn-text) 9%, var(--surface-raised)); }
 }
