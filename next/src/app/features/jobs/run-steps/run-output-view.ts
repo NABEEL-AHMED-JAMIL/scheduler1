@@ -55,23 +55,25 @@ export function viewKind(name: string, format: string | null | undefined): 'pdf'
       } @else if (kind === 'pdf' && url()) {
         <app-pdf-viewer [src]="url()" />
       } @else if (kind === 'table' && columns().length) {
-        <div class="flex-1 min-h-0 overflow-auto" data-test="run-output-table">
-          <table class="table text-xs">
-            <thead class="sticky top-0 bg-[color:var(--surface-raised)]">
-              <tr>
-                <th class="tabular text-right w-12">#</th>
-                @for (c of columns(); track $index) { <th class="whitespace-nowrap">{{ c }}</th> }
-              </tr>
-            </thead>
-            <tbody>
-              @for (r of rows(); track $index; let i = $index) {
+        <div class="flex-1 min-h-0 p-3">
+          <div class="h-full overflow-auto rounded border border-subtle bg-code" data-test="run-output-table">
+            <table class="table-modern preview-grid">
+              <thead>
                 <tr>
-                  <td class="tabular text-right text-[color:var(--text-muted)]">{{ i + 1 }}</td>
-                  @for (v of r; track $index) { <td class="max-w-[24rem] truncate" [title]="v ?? ''">{{ v ?? '' }}</td> }
+                  <th class="tabular text-[color:var(--text-muted)] text-right">#</th>
+                  @for (c of columns(); track $index) { <th [title]="c">{{ c }}</th> }
                 </tr>
-              }
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                @for (r of rows(); track $index; let i = $index) {
+                  <tr>
+                    <td class="tabular text-right text-[color:var(--text-muted)]">{{ i + 1 }}</td>
+                    @for (v of r; track $index) { <td [title]="v ?? ''">{{ v ?? '' }}</td> }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       } @else {
         <div class="flex flex-col items-center justify-center gap-3 py-20">
