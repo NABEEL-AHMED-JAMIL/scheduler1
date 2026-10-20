@@ -10,7 +10,7 @@
             <h1 class="page-title">{{ p.name }}</h1>
             <span pills class="flex flex-wrap gap-1">
               @if (p.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
-              @else if (canEdit()) { <span class="pill pill-brand">Draft v{{ editingVersion() }}</span> }
+              @else if (canEdit()) { <span class="pill pill-info">Draft v{{ editingVersion() }}</span> }
               @if (dirty()) { <span class="pill pill-warn">Unsaved changes</span> }
             </span>
           </div>
@@ -30,7 +30,7 @@
 
     <div class="rs-banner rs-banner-info mb-4" role="status">
       <app-icon name="info" class="shrink-0" />
-      <div class="min-w-0 flex-1">
+      <div class="min-w-0 flex-1 text-sm">
         @if (p.currentPublishedVersion) {
           <span class="pill pill-neutral mr-1">{{ p.isDefault ? 'Workspace default · ' : '' }}published v{{ p.currentPublishedVersion }}</span>
         } @else { <span class="pill pill-neutral mr-1">Not published yet</span> }
@@ -54,13 +54,13 @@
                 @if (def().logo?.assetId; as id) { <app-rs-asset-picture [assetId]="id" [alt]="logo()?.name || 'Logo'" maxHeight="4rem" /> }
                 @else { <span class="text-xs text-[color:var(--text-muted)]">No logo</span> }
               </div>
-              <div class="flex flex-col gap-1.5 min-w-0">
+              <div class="flex flex-col gap-1.5 min-w-0 flex-1 basis-56">
                 <b class="text-sm">Logo · optional</b>
                 <span class="text-xs text-[color:var(--text-muted)]">@if (logo(); as l) { {{ l.name }} · v{{ l.currentVersion }} } @else { The workspace default's, or none }</span>
                 <div class="flex items-center gap-2">
-                  <select class="input input-sm w-auto" aria-label="Logo" [ngModel]="def().logo?.assetId ?? ''" (ngModelChange)="setLogo($event)">
+                  <select class="input input-sm w-auto min-w-0 max-w-full" aria-label="Logo" [ngModel]="def().logo?.assetId ?? ''" (ngModelChange)="setLogo($event)">
                     <option value="">Choose asset</option>
-                    @for (a of logos(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
+                    @for (a of logoChoices(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
                   </select>
                   @if (def().logo) { <button type="button" class="link-inline text-sm" (click)="setLogo('')">Remove</button> }
                 </div>
@@ -159,6 +159,7 @@
           <div class="rs-head"><h2 class="section-title">Live preview</h2><span class="text-xs text-[color:var(--text-muted)]">A4 · page 1@if (previewing()) { · drawing… }</span></div>
           <div class="rsb-preview-body">
             @if (previewDoc(); as doc) { <iframe class="rsb-frame" title="Live preview of the brand" sandbox="" [srcdoc]="doc"></iframe> }
+            @else if (previewError()) { <p class="text-sm text-[color:var(--text-muted)] py-12 px-4 text-center" role="status">{{ previewError() }}</p> }
             @else { <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Drawing the preview"></span></div> }
             <span class="text-xs text-[color:var(--text-muted)]">Preview uses a sample wound assessment report with synthetic values. No report is generated or changed.</span>
           </div>
@@ -208,7 +209,7 @@
               @for (v of p.versions; track v.versionId) {
                 <li class="px-4 py-2 flex items-center justify-between gap-2">
                   <span>v{{ v.version }} · {{ v.state === 'DRAFT' ? 'Draft' : v.state === 'PUBLISHED' ? 'Published' : 'Replaced' }}@if (v.changeSummary) { · {{ v.changeSummary }} }</span>
-                  <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ (v.publishedAt || v.updatedAt) | serverTime: 'dateTime' }}</span>
+                  <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ (v.publishedAt || v.updatedAt) | rsTime: 'recent' }}</span>
                 </li>
               }
             </ul>

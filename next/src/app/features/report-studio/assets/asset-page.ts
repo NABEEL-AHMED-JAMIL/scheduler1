@@ -6,7 +6,7 @@ import { of, switchMap } from 'rxjs';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
-import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { RsTimePipe } from '../rs-time.pipe';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
@@ -26,7 +26,7 @@ import { UploadData, UploadPanel } from './upload-panel';
  */
 @Component({
   selector: 'app-asset-page',
-  imports: [PageHeader, Icon, LoadError, ServerTimePipe, FormsModule, RouterLink, AssetPicture],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture],
   templateUrl: './asset-page.html',
   styleUrl: './assets.css',
 })
@@ -52,6 +52,10 @@ export class AssetPage implements OnInit {
   readonly placeAt = signal<'end' | 'inline'>('end');
   readonly placeWidth = signal('40mm');
   readonly placeAlign = signal<'left' | 'center' | 'right'>('left');
+  /** Drawing 10's one "Width · alignment" choice: "40 mm · left". */
+  /** The activity's every entry (drawing 10's "Full audit"), not only the latest eight. */
+  readonly fullAudit = signal(false);
+  readonly aligns = [{ value: 'left', label: 'left' }, { value: 'center', label: 'centre' }, { value: 'right', label: 'right' }];
   readonly placeStamp = signal('');
   readonly kindWords = KIND_WORDS;
   readonly stateWord = stateWord;

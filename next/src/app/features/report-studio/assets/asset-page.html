@@ -81,9 +81,9 @@
                       @default { <span class="pill pill-neutral">Replaced</span> }
                     }</td>
                   <td>{{ v.uploadedByName }}</td>
-                  <td [class.rsa-muted]="v.state === 'PENDING'">{{ reviewOf(v) }}@if (v.reviewedAt) { · {{ v.reviewedAt | serverTime: 'dateTime' }} }
+                  <td [class.rsa-muted]="v.state === 'PENDING'">{{ reviewOf(v) }}@if (v.reviewedAt) { · {{ v.reviewedAt | rsTime: 'recent' }} }
                     @if (v.reviewNote) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.reviewNote }}</div> }</td>
-                  <td class="whitespace-nowrap">{{ v.uploadedAt | serverTime: 'dateTime' }}</td>
+                  <td class="whitespace-nowrap">{{ v.uploadedAt | rsTime: 'recent' }}</td>
                 </tr>
               }
             </tbody>
@@ -177,7 +177,7 @@
               <dt>Signs as</dt><dd>{{ d.signsAs }}</dd>
               <dt>When</dt><dd>{{ d.when }}</dd>
               <dt>Certificate</dt><dd>{{ d.workspace }} · platform test certificate<br><span class="text-xs text-[color:var(--text-muted)]">A trusted certificate replaces it on AWS</span></dd>
-              <dt>Last used</dt><dd>@if (d.lastReportId) { <a class="link-inline" [routerLink]="['/reports/library', d.lastReportId]">{{ d.lastReportLabel }} v{{ d.lastVersion }}</a> · {{ d.lastUsedAt | serverTime: 'dateTime' }} } @else { Not yet }</dd>
+              <dt>Last used</dt><dd>@if (d.lastReportId) { <a class="link-inline" [routerLink]="['/reports/library', d.lastReportId]">{{ d.lastReportLabel }} v{{ d.lastVersion }}</a> · {{ d.lastUsedAt | rsTime: 'recent' }} } @else { Not yet }</dd>
             </dl>
             <span class="text-xs text-[color:var(--text-muted)]">How to check a signed PDF: open the report, then Verify signature — by its version, or by uploading the file someone sent you.</span>
           </section>
@@ -201,14 +201,12 @@
                   <option value="end">Last page · end</option><option value="inline">Before the footer · movable</option>
                 </select></label>
               <label class="field"><span class="label">Width · alignment</span>
-                <span class="flex gap-1">
-                  <select class="input min-w-0 flex-1" aria-label="Width" [ngModel]="placeWidth()" (ngModelChange)="placeWidth.set($event)">
-                    @for (w of ['30mm', '40mm', '50mm', '60mm']; track w) { <option [value]="w">{{ w.replace('mm', ' mm') }}</option> }
-                  </select>
-                  <select class="input min-w-0 flex-1" aria-label="Alignment" [ngModel]="placeAlign()" (ngModelChange)="placeAlign.set($event)">
-                    <option value="left">left</option><option value="center">centre</option><option value="right">right</option>
-                  </select>
-                </span></label>
+                <select class="input" aria-label="Width and alignment" [ngModel]="placeWidth() + '|' + placeAlign()"
+                        (ngModelChange)="placeWidth.set($event.split('|')[0]); placeAlign.set($any($event.split('|')[1]))">
+                  @for (w of ['30mm', '40mm', '50mm', '60mm']; track w) {
+                    @for (al of aligns; track al.value) { <option [value]="w + '|' + al.value">{{ w.replace('mm', ' mm') }} · {{ al.label }}</option> }
+                  }
+                </select></label>
             </div>
             @if (a.kind === 'SIGNATURE') {
               <label class="field"><span class="label">Stamp · optional</span>
@@ -225,11 +223,12 @@
         }
 
         <section class="rs-side-sec">
-          <h2 class="rsa-eyebrow">Activity</h2>
-          @for (e of a.activity.slice(0, 8); track $index) {
+          <div class="flex items-center justify-between gap-2"><h2 class="rsa-eyebrow">Activity</h2>
+            @if (a.activity.length > 8) { <button type="button" class="link-inline text-xs" (click)="fullAudit.set(!fullAudit())">{{ fullAudit() ? 'Latest only' : 'Full audit →' }}</button> }</div>
+          @for (e of (fullAudit() ? a.activity : a.activity.slice(0, 8)); track $index) {
             <div class="flex gap-2 text-sm"><app-icon name="clock" class="text-[color:var(--text-muted)] mt-0.5 shrink-0" />
               <span class="min-w-0"><b>{{ activityWord(e.action) }}</b><br>
-                <span class="text-xs text-[color:var(--text-muted)]">{{ e.actorName }}@if (detailOf(e.detail)) { · {{ detailOf(e.detail) }} } · {{ e.at | serverTime: 'dateTime' }}</span></span></div>
+                <span class="text-xs text-[color:var(--text-muted)]">{{ e.actorName }}@if (detailOf(e.detail)) { · {{ detailOf(e.detail) }} } · {{ e.at | rsTime: 'recent' }}</span></span></div>
           } @empty { <span class="text-xs text-[color:var(--text-muted)]">Nothing yet.</span> }
         </section>
       </aside>

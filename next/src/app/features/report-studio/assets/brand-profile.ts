@@ -8,7 +8,7 @@ import { Subject, debounceTime, switchMap, catchError, of } from 'rxjs';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
-import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { RsTimePipe } from '../rs-time.pipe';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { confirmWith } from '../../../shared/ui/confirm';
 import { AuthService } from '../../../core/auth/auth.service';
@@ -31,7 +31,7 @@ const FONTS = ['Noto Sans', 'Noto Serif', 'Noto Sans Mono', 'DejaVu Sans'];
  */
 @Component({
   selector: 'app-brand-profile',
-  imports: [PageHeader, Icon, LoadError, ServerTimePipe, FormsModule, AssetPicture],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture],
   templateUrl: './brand-profile.html',
   styleUrl: './assets.css',
 })
@@ -55,6 +55,8 @@ export class BrandProfilePage implements OnInit {
   /** The server's page (compiled through SafeHtml, with its own CSP: no scripts, images as data only) in a sandboxed frame, as the test panel shows it. */
   readonly previewDoc = computed<SafeHtml | null>(() => this.previewHtml() ? this.sanitizer.bypassSecurityTrustHtml(this.previewHtml()) : null);
   readonly previewing = signal(false);
+  /** Why the live preview is not drawn (a reader the server does not draw it for): said in its place, not as a spinner. */
+  readonly previewError = signal('');
   readonly logos = signal<AssetCard[]>([]);
   readonly signatures = signal<AssetCard[]>([]);
   readonly stamps = signal<AssetCard[]>([]);
@@ -69,14 +71,17 @@ export class BrandProfilePage implements OnInit {
   readonly textRatio = computed(() => contrastRatio(this.def().colors.text || PRINTED_LOOK.text, this.def().colors.background || PRINTED_LOOK.background));
   readonly mainRatio = computed(() => contrastRatio(this.def().colors.primary || PRINTED_LOOK.primary, this.def().colors.background || PRINTED_LOOK.background));
   readonly passes = computed(() => this.textRatio() >= 4.5 && this.mainRatio() >= 3);
-  readonly logo = computed(() => this.logos().find(a => a.assetId === this.def().logo?.assetId) ?? null);
+  /** The logos to choose from; a platform administrator, who reads no asset library, sees the profile's own. */
+  readonly logoChoices = computed(() => this.logos().length ? this.logos()
+    : (this.p()?.assets ?? []).filter(a => a.kind === 'LOGO' || a.kind === 'IMAGE'));
+  readonly logo = computed(() => this.logoChoices().find(a => a.assetId === this.def().logo?.assetId) ?? null);
 
   ngOnInit(): void {
     this.load();
     const sub = this.redraw.pipe(debounceTime(500), switchMap(d => {
       this.previewing.set(true);
-      return this.api.previewBrand(this.profileId(), d).pipe(catchError(e => { this.saveError.set(studioError(e).message); return of(null); }));
-    })).subscribe(r => { this.previewing.set(false); if (r) this.previewHtml.set(r.html); });
+      return this.api.previewBrand(this.profileId(), d).pipe(catchError(e => { this.previewError.set(studioError(e, 'The preview could not be drawn.').message); return of(null); }));
+    })).subscribe(r => { this.previewing.set(false); if (r) { this.previewError.set(''); this.previewHtml.set(r.html); } });
     this.destroy.onDestroy(() => sub.unsubscribe());
   }
 
