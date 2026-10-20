@@ -299,6 +299,82 @@
             <label class="field"><span class="label">Main colour</span>
               <input class="input rsd-colour" type="color" [ngModel]="themeSetting('primaryColor') || primaryDefault()" (change)="setTheme('primaryColor', $any($event.target).value.toUpperCase())" [disabled]="!editable()" aria-label="Main colour" /></label>
           </section>
+          <section class="rsd-props-group" aria-label="Watermark">
+            <h3 class="rsd-eyebrow">Watermark</h3>
+            <div class="rsd-two">
+              <label class="field"><span class="label">Text</span>
+                <select class="input" [ngModel]="watermarkPreset()" (ngModelChange)="setWatermarkPreset($event)" [disabled]="!editable()" aria-label="Watermark">
+                  <option value="">None</option>
+                  @for (w of watermarkPresets; track w) { <option [value]="w">{{ w }}</option> }
+                  <option value="__own">Own words…</option>
+                </select></label>
+              @if (watermarkPreset() === '__own') {
+                <label class="field"><span class="label">Own words</span>
+                  <input class="input" maxlength="40" [ngModel]="watermark()['text'] ?? ''" (change)="setWatermark('text', $any($event.target).value)" [disabled]="!editable()" aria-label="Watermark words" /></label>
+              }
+            </div>
+            @if (watermark()['text']) {
+              <div class="rsd-two">
+                <label class="field"><span class="label">Strength</span>
+                  <select class="input" [ngModel]="watermarkNumber('opacity', 0.12)" (ngModelChange)="setWatermark('opacity', +$event)" [disabled]="!editable()" aria-label="Watermark strength">
+                    @for (o of opacities; track o.v) { <option [ngValue]="o.v">{{ o.label }}</option> }
+                  </select></label>
+                <label class="field"><span class="label">Angle</span>
+                  <select class="input" [ngModel]="watermarkNumber('angle', 45)" (ngModelChange)="setWatermark('angle', +$event)" [disabled]="!editable()" aria-label="Watermark angle">
+                    @for (a of angles; track a) { <option [ngValue]="a">{{ a }}°</option> }
+                  </select></label>
+                <label class="field"><span class="label">Pages</span>
+                  <select class="input" [ngModel]="watermark()['pages'] ?? 'all'" (ngModelChange)="setWatermark('pages', $event)" [disabled]="!editable()" aria-label="Watermark pages">
+                    <option value="all">Every page</option><option value="first">First page only</option>
+                  </select></label>
+                <label class="field"><span class="label">Layer</span>
+                  <select class="input" [ngModel]="watermark()['layer'] ?? 'under'" (ngModelChange)="setWatermark('layer', $event)" [disabled]="!editable()" aria-label="Watermark layer">
+                    <option value="under">Under the content</option><option value="over">Over the content</option>
+                  </select></label>
+                <label class="field"><span class="label">Colour</span>
+                  <select class="input" [ngModel]="watermark()['color'] ?? 'muted'" (ngModelChange)="setWatermark('color', $event)" [disabled]="!editable()" aria-label="Watermark colour">
+                    @for (t of tones; track t.id) { <option [value]="t.id">{{ t.colour }}</option> }
+                  </select></label>
+              </div>
+              <label class="field"><span class="label">Only when (optional)</span>
+                <input class="input mono text-xs" maxlength="2000" [ngModel]="watermark()['when'] ?? ''" (change)="setWatermark('when', $any($event.target).value)" [disabled]="!editable()"
+                       placeholder="isReprint = true" aria-label="Watermark condition" /></label>
+              <p class="text-xs text-[color:var(--text-muted)]">Text under it stays readable: a mark too strong is drawn lighter. Previews always say DRAFT.</p>
+            }
+          </section>
+          <section class="rsd-props-group" aria-label="Background">
+            <h3 class="rsd-eyebrow">Page background</h3>
+            <div class="rsd-two">
+              <label class="field"><span class="label">Tint</span>
+                <select class="input" [ngModel]="pageSetting('backgroundTint')" (ngModelChange)="setPage('backgroundTint', $event)" [disabled]="!editable()" aria-label="Page tint">
+                  <option value="">None (white)</option>
+                  @for (t of tones; track t.id) { <option [value]="t.id">Soft {{ t.colour }}</option> }
+                </select></label>
+              <label class="field"><span class="label">On</span>
+                <select class="input" [ngModel]="pageSetting('backgroundPages') || 'all'" (ngModelChange)="setPage('backgroundPages', $event === 'all' ? '' : $event)" [disabled]="!editable()" aria-label="Background pages">
+                  <option value="all">Every page</option><option value="first">First page only</option>
+                </select></label>
+            </div>
+            <label class="field"><span class="label">Letterhead</span>
+              <select class="input" [ngModel]="letterheadAsset()" (ngModelChange)="pickLetterhead($event)" [disabled]="!editable()" aria-label="Letterhead">
+                <option value="">None</option>
+                @for (a of letterheadChoices(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
+              </select></label>
+            @if (letterheadAsset()) {
+              <div class="rsd-two">
+                <label class="field"><span class="label">Fit</span>
+                  <select class="input" [ngModel]="letterhead()['fit'] ?? 'cover'" (ngModelChange)="setLetterhead('fit', $event)" [disabled]="!editable()" aria-label="Letterhead fit">
+                    <option value="cover">Cover the page</option><option value="contain">Fit inside</option><option value="stretch">Stretch</option>
+                  </select></label>
+                <label class="field"><span class="label">Pages</span>
+                  <select class="input" [ngModel]="letterhead()['pages'] ?? 'all'" (ngModelChange)="setLetterhead('pages', $event)" [disabled]="!editable()" aria-label="Letterhead pages">
+                    <option value="all">Every page</option><option value="first">First page only</option>
+                  </select></label>
+              </div>
+            }
+            <label class="rsd-check"><input type="checkbox" class="checkbox" [checked]="outputSetting('copyAfterFirstDownload')" [disabled]="!editable()"
+                   (change)="setOutput('copyAfterFirstDownload', $any($event.target).checked)" /><span>Every download after the first says COPY</span></label>
+          </section>
           <section class="rsd-props-group" aria-label="Data">
             <h3 class="rsd-eyebrow">Data</h3>
             <p class="text-xs text-[color:var(--text-muted)]">Blocks read <span class="mono">{{ names()[0] }}</span>, which starts at <span class="mono">{{ testRoot() }}</span> in the data.</p>

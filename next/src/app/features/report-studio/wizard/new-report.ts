@@ -147,6 +147,8 @@ export class NewReport implements OnInit {
   readonly pdf = signal(true);
   readonly html = signal(true);
   readonly reason = signal('');
+  /** Phase 4: "Mark this version as COPY" -- the version carries COPY on every page. */
+  readonly markCopy = signal(false);
   readonly job = signal<JobRow | null>(null);
   readonly generating = signal(false);
   readonly generateError = signal('');
@@ -446,6 +448,7 @@ export class NewReport implements OnInit {
       ...this.body(), formats,
       ...(this.report() ? { reportId: this.report()!.reportId } : { name: this.name().trim() || t.name }),
       ...(this.reason().trim() ? { reason: this.reason().trim() } : {}),
+      ...(this.markCopy() ? { markAsCopy: true } : {}),
     };
     this.api.generate(body, this.key).subscribe({
       next: job => {

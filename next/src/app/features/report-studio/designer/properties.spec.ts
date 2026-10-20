@@ -213,3 +213,55 @@ describe('row filters, as media-service compares them', () => {
     expect(opValue('in', [])).toEqual({ in: [''] });
   });
 });
+
+/** Report Studio phase 4: a chart's, KPI's and condition's settings each get a control; none falls to "Edited as JSON". */
+describe('phase 4 settings', () => {
+  const phase4 = {
+    ...definitions,
+    chartComponent: { properties: { id: {}, type: {}, chartType: { enum: ['bar', 'horizontalBar', 'line', 'pie'] }, dataset: { type: 'string' },
+      categoryField: { type: 'string' }, seriesField: { type: 'string' }, series: { type: 'array', items: { type: 'object' } },
+      axis: { type: 'object', properties: { min: { type: 'number' }, max: { type: 'number' }, title: { type: 'string' } } },
+      target: { type: 'object', properties: { value: { type: 'number' }, label: { type: 'string' } } }, showValues: { type: 'boolean' } } },
+    conditionalComponent: { properties: { id: {}, type: {}, condition: { type: 'object', properties: { left: { type: 'string' },
+      operator: { enum: ['eq', 'gt', 'in'] }, right: { type: ['string', 'number', 'boolean', 'null', 'array'] } } }, when: { type: 'string', maxLength: 2000 },
+      children: { type: 'array' } } },
+  };
+
+  it('draws a chart with pickers for its fields, a series editor and small forms for the axis and target line', () => {
+    const f = fieldsFor('chart', phase4 as never);
+    const kind = (k: string) => f.find(x => x.key === k)?.kind;
+    expect(kind('categoryField')).toBe('itemField');
+    expect(kind('seriesField')).toBe('itemField');
+    expect(kind('series')).toBe('series');
+    expect(kind('axis')).toBe('object');
+    expect(kind('target')).toBe('object');
+    expect(f.find(x => x.key === 'chartType')?.optionLabels?.['horizontalBar']).toBe('Horizontal bar');
+    expect(f.some(x => x.kind === 'json')).toBe(false);
+  });
+
+  it('edits series, a target line and a condition as the schema says', () => {
+    const p = panel({ id: 'c1', type: 'chart', chartType: 'bar', dataset: 'primary.rows', categoryField: 'site', series: [{ name: 'Accuracy', field: 'accuracy' }] });
+    p.fixture.componentRef.setInput('definitions', { ...definitions, chartComponent: {
+      properties: { id: {}, type: {}, dataset: { type: 'string' }, series: { type: 'array', items: { type: 'object' } },
+        target: { type: 'object', properties: { value: { type: 'number' }, label: { type: 'string' } } } } } });
+    p.fixture.detectChanges();
+    p.pick('Series 1 aggregate', 'avg');
+    expect(p.last()).toEqual({ key: 'series', value: [{ name: 'Accuracy', field: 'accuracy', aggregate: 'avg' }] });
+    p.write('Target line Value', '12');
+    expect(p.last()).toEqual({ key: 'target', value: { value: 12 } });
+    const c = panel({ id: 'k1', type: 'conditional', condition: { left: 'primary.period', operator: 'in' }, children: [] });
+    c.fixture.componentRef.setInput('definitions', phase4);
+    c.fixture.detectChanges();
+    c.write('Show when Value', 'Sep, Oct');
+    expect(c.last()).toEqual({ key: 'condition', value: { left: 'primary.period', operator: 'in', right: ['Sep', 'Oct'] } });
+  });
+
+  it('gives a table column a total and style rules, a value or another field', () => {
+    const p = panel({ id: 't1', type: 'table', dataset: 'primary.rows', columns: [{ id: 'a', field: 'accuracy' }] });
+    p.pick('Column 1 total', 'avg');
+    expect(p.last()).toEqual({ key: 'columns', value: [{ id: 'a', field: 'accuracy', total: 'avg' }] });
+    p.fixture.componentInstance.addRule(0);
+    p.write('Column 1 rule 1 value', '@ref_high');
+    expect((p.last().value as { rules: unknown[] }[])[0].rules).toEqual([{ operator: 'gt', field: 'ref_high', tone: 'danger', style: 'fill' }]);
+  });
+});

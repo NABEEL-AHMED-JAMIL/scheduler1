@@ -107,6 +107,7 @@ const PATHS: Record<string, string> = {
   columns:   'M3 4h18v16H3ZM12 4v16',
   pageBreak: 'M3 12h4M10 12h4M17 12h4M5 3v5h14V3M5 21v-5h14v5',
   hash:      'M4 9h16M4 15h16M10 3 8 21M16 3l-2 18',
+  qr:        'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h3v3h-3zM18 18h3v3h-3zM14 20h2M20 14v2',
   spacer:    'M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4',
 };
 

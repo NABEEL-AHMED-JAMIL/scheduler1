@@ -10,7 +10,7 @@ import { CANVAS_ID, clean, idOf, splitCanvas } from './canvas-doc';
 import {
   Block, PaletteEntry, allIds, canHold, cloneWithNewIds, collections, fieldsUsed, find, fromPalette, innerPath, insertBlock, itemFields,
   layerRows, lengthAt, moveBlock, newId, pageSizeMm, pagesOf, primaryNames, removeBlock, rulerMarks, scalars, valueAt,
-  looksLikePicture, firstTextAt,
+  looksLikePicture, firstTextAt, typeIcon, typeWord,
 } from './designer-model';
 import { fieldsFor } from './properties';
 import { wantsCanvas } from '../../shell/shell';
@@ -72,6 +72,19 @@ describe('the designer model', () => {
     const copy = cloneWithNewIds(find(blocks, 'footer')!.block, allIds(blocks));
     expect(copy.id).not.toBe('footer');
     expect(copy.children![0].id).not.toBe('pn');
+  });
+
+  it('lets a conditional or repeated block hold blocks, but not in a header or footer (phase 4)', () => {
+    const repeat = { id: 'r', type: 'repeat', dataset: 'primary.rows', children: [] } as Block;
+    const cond = { id: 'c', type: 'conditional', when: 'true', children: [] } as Block;
+    const table = { id: 't', type: 'table', dataset: 'primary.rows', columns: [] } as Block;
+    const header = { id: 'h', type: 'section', role: 'header', children: [] } as Block;
+    expect(canHold(repeat, table)).toBe(true);
+    expect(canHold(cond, repeat)).toBe(true);
+    expect(canHold(header, repeat)).toBe(false);
+    expect(canHold(repeat, { id: 'col', type: 'column', children: [] } as Block)).toBe(false);
+    expect(typeWord('qrCode')).toBe('QR code');
+    expect(typeIcon('metric')).toBe('trendingUp');
   });
 
   it('lists layers in tree order and counts the data fields the template reads', () => {

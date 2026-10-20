@@ -13,7 +13,7 @@ export interface PropField {
   key: string;
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
-    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField';
+    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField' | 'series' | 'object';
   group: 'content' | 'data' | 'format' | 'style' | 'layout';
   options?: string[];
   /** The words for an enum's options, where its own values are not words (QA 2026-10-20: emphasis). */
@@ -23,7 +23,12 @@ export interface PropField {
   min?: number;
   max?: number;
   hint?: string;
+  /** An object setting's own settings (phase 4: a chart's axis and target line, a KPI's comparison, a condition). */
+  props?: Record<string, JsonSchema>;
 }
+
+/** A table column's conditional style (phase 4): compare with a value or another field, or an expression; a theme tone. */
+export interface ColumnRule { operator?: string; value?: string | number | boolean; field?: string; when?: string; tone?: string; style?: string; }
 
 /** A change to one setting: the new value, or undefined to remove it. */
 export interface PropChange { key: string; value: unknown; }
@@ -45,9 +50,42 @@ const LABELS: Record<string, string> = {
   captionField: 'Caption field', captionFields: 'Caption fields (up to 4, joined with ·)', imageHeight: 'Picture height', maxItems: 'At most pictures', columns_grid: 'Pictures a row',
   // QA 2026-10-20 (media 3e1cb7d): row filters, a list's field, the value's size.
   filter: 'Show only rows where', field: 'Show this field of the first row', emphasis: 'Value size',
+  // Report Studio phase 4: charts, KPI tiles, QR codes, conditional and repeated blocks.
+  chartType: 'Type', subtitle: 'Subtitle', description: 'Text description (for readers who cannot see it)', categoryField: 'Category',
+  seriesField: 'One series per', series: 'Values', stacking: 'Stacking', legend: 'Legend', maxCategories: 'At most categories',
+  showValues: 'Show value labels', markers: 'Markers on the points', beginAtZero: 'Axis starts at zero', axis: 'Axis', target: 'Target line',
+  palette: 'Colours (#RRGGBB, one per line)', showTable: 'Its figures as a table under it', nullLabel: 'Name of blank categories',
+  comparison: 'Compare with', direction: 'Better when', thresholds: 'Status rules', sparkline: 'Trend line', nullText: 'When empty',
+  sizeMm: 'Size (mm)', errorCorrection: 'Error correction', quietZone: 'Quiet zone (modules)', text_qr: 'Text',
+  condition: 'Show when', when: 'Or an expression', as: 'Each item is called', divider: 'A line between items',
+};
+
+/** The words for the phase-4 enums. */
+const OPTION_WORDS: Record<string, Record<string, string>> = {
+  chartType: { bar: 'Bar', horizontalBar: 'Horizontal bar', stackedBar: 'Stacked bar', line: 'Line', area: 'Area', pie: 'Pie', doughnut: 'Doughnut',
+    scatter: 'Scatter' },
+  stacking: { none: 'Side by side', stacked: 'Stacked', percent: '100 % stacked' },
+  legend: { auto: 'Automatic', top: 'Above', bottom: 'Below', right: 'Right', none: 'None' },
+  sort: { none: 'As in the data', label: 'By name', valueAsc: 'Smallest first', valueDesc: 'Largest first' },
+  direction: { up: 'Higher is better', down: 'Lower is better', neutral: 'Neither' },
+  content: { verifyLink: 'Verify this report (signed in)', reportId: 'The report id', binding: 'A value from the data', text: 'Fixed text' },
+  errorCorrection: { L: 'L · 7 %', M: 'M · 15 %', Q: 'Q · 25 %', H: 'H · 30 %' },
+  operator: { eq: 'equals', ne: 'is not', lt: 'is below', lte: 'is at most', gt: 'is above', gte: 'is at least', isNull: 'is empty',
+    isNotNull: 'is not empty', in: 'is one of', notIn: 'is none of', contains: 'contains', startsWith: 'starts with', endsWith: 'ends with' },
+  aggregate: { sum: 'Sum', avg: 'Average', min: 'Lowest', max: 'Highest', count: 'Count', rows: 'Rows', countDistinct: 'Distinct values',
+    percentOfTotal: '% of total' },
+};
+
+/** The fields of an object setting the phase-4 forms draw, in this order. */
+const OBJECT_HINTS: Record<string, string> = {
+  target: 'A dashed line at this value, with its label.', comparison: 'A field of the data, or a fixed value, to compare the KPI with.',
+  sparkline: 'A list in the data, and the field of each item, drawn as a small trend line.',
+  condition: 'The field on the left, how it compares, and the value on the right (a number, a word, or values separated by commas).',
 };
 
 const GROUPS: Record<string, PropField['group']> = {
+  categoryField: 'data', seriesField: 'data', series: 'data', stacking: 'content', axis: 'format', target: 'content', comparison: 'data',
+  sparkline: 'data', condition: 'data', when: 'data', as: 'data', maxCategories: 'data', palette: 'style', thresholds: 'format',
   binding: 'data', dataset: 'data', columns: 'data', itemField: 'data', emptyText: 'data', emptyState: 'data', maxRows: 'data', sort: 'data', captionFields: 'data',
   repeatHeader: 'data', striped: 'data', allowPageBreak: 'layout', format: 'format', style: 'style', size: 'layout', keepTogether: 'layout',
   pageBreakBefore: 'layout', pageBreakAfter: 'layout', hidden: 'layout', width: 'layout', height: 'layout', gap: 'layout',
@@ -93,13 +131,20 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     else if (key === 'imageSource') field = { key, label, kind: 'imageSource', group: 'data' };
     else if (key === 'binding' && type === 'imageGrid') field = { key, label: 'List', kind: 'listBinding', group: 'data' };
     else if (key === 'imageField' || key === 'captionField') field = { key, label, kind: 'itemField', group: 'data' };
+    else if (key === 'categoryField' || key === 'seriesField') field = { key, label, kind: 'itemField', group: 'data' };
+    else if (key === 'series') field = { key, label, kind: 'series', group: 'data' };
+    else if (key === 'text' && type === 'qrCode') field = { key, label: LABELS['text_qr'], kind: 'text', group: 'content' };
+    else if (key === 'when') field = { key, label, kind: 'textarea', group: 'data',
+      hint: "e.g. primary.summary.rate > 12 and primary.site = 'North'. Paths, numbers, 'words', and, or, not, is null." };
+    else if (s.type === 'object' && s.properties && Object.values(s.properties).every(p => p.type !== 'array' && p.type !== 'object'))
+      field = { key, label, kind: 'object', group, props: s.properties, hint: OBJECT_HINTS[key] };
     else if (key === 'columns' && type === 'imageGrid') field = { key, label: LABELS['columns_grid'], kind: 'enum', group: 'layout', options: ['1', '2', '3', '4', '5', '6'] };
     else if (key === 'binding') field = { key, label, kind: type === 'list' ? 'listBinding' : 'binding', group: 'data' };
     else if (key === 'dataset') field = { key, label, kind: 'collection', group: 'data' };
     else if (key === 'columns') field = { key, label, kind: 'columns', group: 'data' };
     else if (key === 'items') field = { key, label, kind: 'items', group: 'content', hint: 'One per line, used when no data is bound.' };
     else if (key === 'itemField') field = { key, label, kind: 'itemField', group: 'data' };
-    else if (Array.isArray(s.enum)) field = { key, label, kind: 'enum', group, options: s.enum.map(String) };
+    else if (Array.isArray(s.enum)) field = { key, label, kind: 'enum', group, options: s.enum.map(String), optionLabels: OPTION_WORDS[key] };
     else if (s.type === 'boolean') field = { key, label, kind: 'boolean', group };
     else if (s.type === 'integer' || s.type === 'number') {
       field = s.minimum !== undefined && s.maximum !== undefined && s.maximum - s.minimum <= 6
@@ -261,8 +306,8 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                   <span class="label">{{ f.label }}</span>
                   <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set(f.key, $any($event.target).value || undefined)">
                     <option value="" [selected]="!text(f.key)">{{ f.key === 'itemField' ? 'The item itself' : 'None' }}</option>
-                    @for (c of itemsOf('binding'); track c.path) { <option [value]="c.path" [selected]="c.path === text(f.key)">{{ c.path }} · {{ c.type }}</option> }
-                    @if (text(f.key) && !hasItemField('binding', text(f.key))) { <option [value]="text(f.key)" selected>{{ text(f.key) }}</option> }
+                    @for (c of itemsOf(listKey()); track c.path) { <option [value]="c.path" [selected]="c.path === text(f.key)">{{ c.path }} · {{ c.type }}</option> }
+                    @if (text(f.key) && !hasItemField(listKey(), text(f.key))) { <option [value]="text(f.key)" selected>{{ text(f.key) }}</option> }
                   </select>
                 </label>
               }
@@ -317,6 +362,63 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                   </div>
                 }
               }
+              @case ('series') {
+                <div class="flex flex-col gap-2" role="group" [attr.aria-label]="f.label">
+                  <span class="label">{{ f.label }}</span>
+                  @for (x of seriesList(); track $index; let i = $index) {
+                    <div class="rsd-column">
+                      <div class="rsd-column-top">
+                        <input class="input text-sm" [value]="x.name ?? ''" [disabled]="readonly()" [attr.aria-label]="'Series ' + (i + 1) + ' name'"
+                               placeholder="Name in the legend" (change)="setSeries(i, 'name', $any($event.target).value || undefined)" />
+                        <input class="input rsd-colour" type="color" [value]="x.color ?? ''" title="The series' colour (automatic when not set)" [disabled]="readonly()" [attr.aria-label]="'Series ' + (i + 1) + ' colour'"
+                               (change)="setSeries(i, 'color', $any($event.target).value.toUpperCase())" />
+                        @if (!readonly() && seriesList().length > 1) {
+                          <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove series ' + (i + 1)" (click)="removeSeries(i)"><app-icon name="close" /></button>
+                        }
+                      </div>
+                      <div class="rsd-two">
+                        <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="'Series ' + (i + 1) + ' field'" (change)="setSeries(i, 'field', $any($event.target).value)">
+                          @if (!hasItemField('dataset', x.field)) { <option [value]="x.field" selected>{{ x.field || 'Choose a field' }}</option> }
+                          @for (c of itemsOf('dataset'); track c.path) { <option [value]="c.path" [selected]="c.path === x.field">{{ c.path }} · {{ c.type }}</option> }
+                        </select>
+                        <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Series ' + (i + 1) + ' aggregate'" (change)="setSeries(i, 'aggregate', $any($event.target).value)">
+                          @for (a of aggregates; track a) { <option [value]="a" [selected]="a === (x.aggregate ?? 'sum')">{{ words.aggregate[a] }}</option> }
+                        </select>
+                      </div>
+                    </div>
+                  }
+                  @if (!readonly() && seriesList().length < 12) {
+                    <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addSeries()"><app-icon name="plus" />Series</button>
+                  }
+                </div>
+              }
+              @case ('object') {
+                <div class="flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
+                  <div class="rsd-filter-head">
+                    <span class="label">{{ f.label }}</span>
+                    @if (block()?.[f.key] && !readonly()) {
+                      <button type="button" class="btn btn-ghost btn-sm" [attr.aria-label]="'Clear ' + f.label" (click)="set(f.key, undefined)"><app-icon name="close" />Clear</button>
+                    }
+                  </div>
+                  <div class="rsd-two">
+                    @for (k of objectKeys(f); track k) {
+                      <label class="field" [class.rsd-span]="k === 'title' || k === 'categoryTitle' || k === 'left' || k === 'binding'">
+                        <span class="label text-xs">{{ subLabel(k) }}</span>
+                        @if (f.props![k].enum) {
+                          <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="f.label + ' ' + subLabel(k)" (change)="setSub(f.key, k, $any($event.target).value, f.props![k])">
+                            <option value="" [selected]="!subText(f.key, k)">—</option>
+                            @for (o of f.props![k].enum!; track o) { <option [value]="o" [selected]="String(o) === subText(f.key, k)">{{ words.operator[String(o)] ?? o }}</option> }
+                          </select>
+                        } @else {
+                          <input class="input text-xs" [class.mono]="k === 'left' || k === 'binding' || k === 'field'" [value]="subText(f.key, k)" [disabled]="readonly()"
+                                 [attr.aria-label]="f.label + ' ' + subLabel(k)" (change)="setSub(f.key, k, $any($event.target).value, f.props![k])" />
+                        }
+                      </label>
+                    }
+                  </div>
+                  @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
+                </div>
+              }
               @case ('columns') {
                 <div class="flex flex-col gap-2">
                   <span class="label">Columns</span>
@@ -350,6 +452,35 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                           <option value="" [selected]="!c.chip">Plain value (no chip)</option>
                           @for (t of tones; track t.id) { <option [value]="t.id" [selected]="t.id === c.chip">Chip · {{ t.colour }} ({{ t.id }})</option> }
                         </select>
+                      }
+                      @if (c.type !== 'image') {
+                        <div class="rsd-two">
+                          <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' total'" (change)="setColumnTotal(i, $any($event.target).value)">
+                            <option value="" [selected]="!c.total">No total</option>
+                            @for (a of totals; track a) { <option [value]="a" [selected]="a === c.total">Total · {{ words.aggregate[a] }}</option> }
+                          </select>
+                          <span class="text-xs text-[color:var(--text-muted)] self-center">{{ ruleCount(c) }}</span>
+                        </div>
+                        @for (r of c.rules ?? []; track $index; let k = $index) {
+                          <div class="rsd-rule">
+                            <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' rule ' + (k + 1) + ' operator'" (change)="setRule(i, k, 'operator', $any($event.target).value)">
+                              @for (o of ruleOps; track o) { <option [value]="o" [selected]="o === (r.operator ?? 'gt')">{{ words.operator[o] }}</option> }
+                            </select>
+                            <input class="input text-xs" [value]="r.field ? '@' + r.field : (r.value ?? '')" [disabled]="readonly()" placeholder="Value, or @field"
+                                   [attr.aria-label]="'Column ' + (i + 1) + ' rule ' + (k + 1) + ' value'" (change)="setRule(i, k, 'value', $any($event.target).value)" />
+                            <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' rule ' + (k + 1) + ' tone'" (change)="setRule(i, k, 'tone', $any($event.target).value)">
+                              @for (t of tones; track t.id) { <option [value]="t.id" [selected]="t.id === (r.tone ?? 'danger')">{{ t.colour }}</option> }
+                            </select>
+                            <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' rule ' + (k + 1) + ' style'" (change)="setRule(i, k, 'style', $any($event.target).value)">
+                              <option value="fill" [selected]="(r.style ?? 'fill') === 'fill'">Fill</option><option value="text" [selected]="r.style === 'text'">Text</option>
+                              <option value="chip" [selected]="r.style === 'chip'">Chip</option>
+                            </select>
+                            @if (!readonly()) { <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove rule ' + (k + 1)" (click)="removeRule(i, k)"><app-icon name="close" /></button> }
+                          </div>
+                        }
+                        @if (!readonly() && (c.rules?.length ?? 0) < 10) {
+                          <button type="button" class="btn btn-ghost btn-sm self-start" (click)="addRule(i)"><app-icon name="plus" />Style rule</button>
+                        }
                       }
                       @if (c.type === 'image') {
                         <input class="input mono text-xs" [value]="c.imageSource?.bucket ?? ''" [disabled]="readonly()" placeholder="Bucket of the pictures"
@@ -513,6 +644,8 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
       border-radius: var(--radius-md); }
     .rsd-column-top { display: flex; align-items: center; gap: 0.25rem; }
     .rsd-span { grid-column: 1 / -1; }
+    .rsd-rule { display: grid; grid-template-columns: 1fr 1fr 0.8fr 0.7fr auto; gap: 0.25rem; align-items: center; }
+    .rsd-colour { width: 2.25rem; padding: 0.125rem; flex: none; }
     .rsd-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.75rem; }
     .rsd-filter-head .label { margin-bottom: 0; }
   `,
@@ -577,7 +710,124 @@ export class PropertiesPanel {
   });
 
   readonly columns = computed(() => (Array.isArray(this.block()?.['columns']) ? this.block()!['columns'] : []) as
-    { id: string; label?: string; field: string; format?: { type?: string }; type?: string; imageSource?: { kind?: string; bucket?: string }; chip?: string }[]);
+    { id: string; label?: string; field: string; format?: { type?: string }; type?: string; imageSource?: { kind?: string; bucket?: string }; chip?: string;
+      total?: string; rules?: ColumnRule[] }[]);
+
+  // ---------------------------------------------------------------- phase 4: series, small objects, totals and rules
+
+  readonly words = OPTION_WORDS as Record<string, Record<string, string>> & { aggregate: Record<string, string>; operator: Record<string, string> };
+  readonly aggregates = ['sum', 'avg', 'min', 'max', 'count', 'rows', 'countDistinct', 'percentOfTotal'];
+  readonly totals = ['sum', 'avg', 'min', 'max', 'count', 'countDistinct'];
+  readonly ruleOps = ['gt', 'gte', 'lt', 'lte', 'eq', 'ne', 'isNull', 'isNotNull'];
+  readonly String = String;
+  /** The list whose items the field pickers offer: a chart's or repeat's collection, else the bound list. */
+  readonly listKey = computed(() => (this.block()?.['dataset'] !== undefined || ['chart', 'repeat'].includes(this.block()?.type ?? '') ? 'dataset' : 'binding'));
+  readonly seriesList = computed(() => (Array.isArray(this.block()?.['series']) ? this.block()!['series'] : []) as
+    { name?: string; field: string; aggregate?: string; color?: string }[]);
+
+  private seriesCopy(): Record<string, unknown>[] {
+    return JSON.parse(JSON.stringify(this.seriesList())) as Record<string, unknown>[];
+  }
+
+  setSeries(i: number, key: string, value: string | undefined): void {
+    const list = this.seriesCopy();
+    if (!list[i]) return;
+    if (value === undefined || (key === 'aggregate' && value === 'sum')) delete list[i][key]; else list[i][key] = value;
+    this.set('series', list);
+  }
+
+  addSeries(): void {
+    const list = this.seriesCopy();
+    const first = this.itemsOf('dataset').find(f => f.type === 'number' || f.type === 'integer');
+    list.push({ name: `Series ${list.length + 1}`, field: first?.path ?? 'value' });
+    this.set('series', list);
+  }
+
+  removeSeries(i: number): void {
+    const list = this.seriesCopy();
+    list.splice(i, 1);
+    this.set('series', list);
+  }
+
+  objectKeys(f: PropField): string[] {
+    return Object.keys(f.props ?? {});
+  }
+
+  subLabel(k: string): string {
+    return ({ min: 'From', max: 'To', title: 'Axis title', categoryTitle: 'Category axis title', value: 'Value', label: 'Label', binding: 'Data',
+      field: 'Field of each item', left: 'Field', operator: 'Comparison', right: 'Value' } as Record<string, string>)[k] ?? k;
+  }
+
+  subText(key: string, k: string): string {
+    const o = this.block()?.[key] as Record<string, unknown> | undefined;
+    const v = o?.[k];
+    return v === undefined || v === null ? '' : Array.isArray(v) ? v.join(', ') : String(v);
+  }
+
+  /** One setting of an object setting: numbers as numbers, a condition's values separated by commas as a list. */
+  setSub(key: string, k: string, raw: string, schema: JsonSchema): void {
+    const o = { ...((this.block()?.[key] ?? {}) as Record<string, unknown>) };
+    const v = raw.trim();
+    const types = Array.isArray(schema.type) ? schema.type : [schema.type];
+    if (!v) delete o[k];
+    else if (types.includes('number') && !types.includes('string')) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return;
+      o[k] = n;
+    } else if (k === 'right') {
+      const op = String(o['operator'] ?? '');
+      o[k] = op === 'in' || op === 'notIn' ? v.split(',').map(x => x.trim()).filter(Boolean)
+        : /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === 'true' ? true : v === 'false' ? false : v;
+    } else o[k] = v;
+    this.set(key, Object.keys(o).length ? o : undefined);
+  }
+
+  setColumnTotal(i: number, total: string): void {
+    const cols = this.columnList() as Record<string, unknown>[];
+    if (!cols[i]) return;
+    if (total) cols[i]['total'] = total; else delete cols[i]['total'];
+    this.set('columns', cols);
+  }
+
+  ruleCount(c: { rules?: ColumnRule[] }): string {
+    const n = c.rules?.length ?? 0;
+    return n ? `${n} style rule${n === 1 ? '' : 's'} · the first that holds wins` : 'No style rules';
+  }
+
+  private rulesOf(i: number): { cols: Record<string, unknown>[]; rules: ColumnRule[] } {
+    const cols = this.columnList() as Record<string, unknown>[];
+    return { cols, rules: (cols[i]?.['rules'] as ColumnRule[] | undefined) ?? [] };
+  }
+
+  addRule(i: number): void {
+    const { cols, rules } = this.rulesOf(i);
+    if (!cols[i]) return;
+    cols[i]['rules'] = [...rules, { operator: 'gt', value: 0, tone: 'danger', style: 'fill' }];
+    this.set('columns', cols);
+  }
+
+  removeRule(i: number, k: number): void {
+    const { cols, rules } = this.rulesOf(i);
+    rules.splice(k, 1);
+    if (rules.length) cols[i]['rules'] = rules; else delete cols[i]['rules'];
+    this.set('columns', cols);
+  }
+
+  /** A rule's setting; a value written "@ref_high" compares with that field of the row. */
+  setRule(i: number, k: number, key: 'operator' | 'value' | 'tone' | 'style', raw: string): void {
+    const { cols, rules } = this.rulesOf(i);
+    const r = { ...(rules[k] ?? {}) } as ColumnRule;
+    if (key === 'value') {
+      const v = raw.trim();
+      delete r.value;
+      delete r.field;
+      if (v.startsWith('@')) r.field = v.slice(1);
+      else if (v) r.value = /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v;
+    } else (r as Record<string, unknown>)[key] = raw;
+    rules[k] = r;
+    cols[i]['rules'] = rules;
+    this.set('columns', cols);
+  }
   readonly itemsText = computed(() => (Array.isArray(this.block()?.['items']) ? (this.block()!['items'] as unknown[]).map(String).join('\n') : ''));
   readonly formatType = computed(() => String((this.block()?.['format'] as { type?: string } | undefined)?.type ?? ''));
 

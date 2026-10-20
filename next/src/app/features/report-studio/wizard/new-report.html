@@ -273,6 +273,7 @@
             <label class="rsw-out"><input type="checkbox" class="checkbox" [ngModel]="html()" (ngModelChange)="html.set($event)" /><span><b>HTML</b><br><span class="text-xs text-[color:var(--text-muted)]">Opens in any browser · self-contained</span></span></label>
             <label class="field"><span class="label">Why (optional)</span>
               <input class="input" [ngModel]="reason()" (ngModelChange)="reason.set($event)" aria-label="Reason" placeholder="Target mapped" /></label>
+            <label class="rsw-out"><input type="checkbox" class="checkbox" [ngModel]="markCopy()" (ngModelChange)="markCopy.set($event)" /><span><b>Mark this version as COPY</b><br><span class="text-xs text-[color:var(--text-muted)]">COPY on every page, over the content</span></span></label>
             <p class="text-xs text-[color:var(--text-muted)]">
               This creates version {{ nextVersion() }}@if (nextVersion() > 1) {; version {{ nextVersion() - 1 }} is kept}. The template version and the data are recorded with it.
             </p>

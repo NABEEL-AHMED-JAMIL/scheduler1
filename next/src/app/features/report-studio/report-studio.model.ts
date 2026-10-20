@@ -238,6 +238,8 @@ export interface ReportVersionRow {
   config?: Record<string, unknown>;
   /** MIG-406: its approval, and the certification signature that approval put on its PDF. */
   approval?: Approval | null;
+  /** Phase 4: marked VOID -- why, by whom, when; every download of it is a VOID copy. */
+  void?: { reason: string; by?: string | null; at?: string | null } | null;
 }
 
 /** A report version's approval (MIG-406): never by whoever generated it; signed when its PDF was certified. */

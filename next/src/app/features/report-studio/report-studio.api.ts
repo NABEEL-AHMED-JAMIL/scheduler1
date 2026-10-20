@@ -231,6 +231,12 @@ export class ReportStudioApi {
     return ReportStudioApi.data$(this.http.post<ApiResponse<JobRow>>(`${this.generating}/cancelJob`, null, { params: { jobId } }));
   }
 
+  /** Phase 4: marks a version VOID, with the reason; not taken back. */
+  voidVersion(reportId: string, version: number, reason: string): Observable<{ reportId: string; version: number; void: boolean }> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<{ reportId: string; version: number; void: boolean }>>(`${this.generating}/voidVersion`,
+      { reportId, version, reason }));
+  }
+
   archiveReport(reportId: string): Observable<ReportDetail> {
     return ReportStudioApi.data$(this.http.post<ApiResponse<ReportDetail>>(`${this.generating}/archiveReport`, null, { params: { reportId } }));
   }

@@ -29,7 +29,7 @@ import {
   rootPathOf, rulerMarks, typeIcon, typeWord, walk, looksLikePicture,
 } from './designer-model';
 import { PageFrame } from './page-frame';
-import { PropChange, PropertiesPanel } from './properties';
+import { PropChange, PropertiesPanel, TONES } from './properties';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
 import { AssetCard, UsableProfile } from '../assets.model';
 
@@ -939,6 +939,96 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       def.template['page'] = page;
       return true;
     }, `margin:${side}`);
+  }
+
+  // ---------------------------------------------------------------- phase 4: watermark, page background, copies
+
+  readonly watermarkPresets = ['DRAFT', 'COPY', 'CONFIDENTIAL', 'VOID', 'SAMPLE'];
+  readonly opacities = [{ v: 0.06, label: 'Faint' }, { v: 0.12, label: 'Light' }, { v: 0.2, label: 'Medium' }, { v: 0.3, label: 'Strong' }];
+  readonly angles = [0, 30, 45, 60, 90];
+  readonly tones = TONES;
+
+  /** The template's watermark as an object (a plain text is {text}). */
+  readonly watermark = computed(() => {
+    const w = ((this.def()?.template['output'] ?? {}) as Record<string, unknown>)['watermark'];
+    return (typeof w === 'string' ? (w ? { text: w } : {}) : (w ?? {})) as Record<string, unknown>;
+  });
+
+  readonly watermarkPreset = computed(() => {
+    const text = String(this.watermark()['text'] ?? '');
+    return !text ? '' : this.watermarkPresets.includes(text) ? text : '__own';
+  });
+
+  watermarkNumber(key: string, fallback: number): number {
+    const v = this.watermark()[key];
+    return typeof v === 'number' ? v : fallback;
+  }
+
+  setWatermarkPreset(choice: string): void {
+    if (choice === '__own') { this.setWatermark('text', 'For internal review'); return; }
+    this.setWatermark('text', choice);
+  }
+
+  setWatermark(key: string, value: unknown): void {
+    this.edit((_blocks, def) => {
+      const output = { ...((def.template['output'] ?? {}) as Record<string, unknown>) };
+      const w = { ...this.watermark() };
+      if (value === '' || value === undefined || value === null) delete w[key]; else w[key] = typeof value === 'string' ? value.trim() : value;
+      if (!w['text']) delete output['watermark']; else output['watermark'] = w;
+      def.template['output'] = output;
+      return true;
+    }, `watermark:${key}`);
+  }
+
+  outputSetting(key: string): boolean {
+    return ((this.def()?.template['output'] ?? {}) as Record<string, unknown>)[key] === true;
+  }
+
+  setOutput(key: string, on: boolean): void {
+    this.edit((_blocks, def) => {
+      const output = { ...((def.template['output'] ?? {}) as Record<string, unknown>) };
+      if (on) output[key] = true; else delete output[key];
+      def.template['output'] = output;
+      return true;
+    }, `output:${key}`);
+  }
+
+  readonly letterhead = computed(() => ((((this.def()?.template['page'] ?? {}) as Record<string, unknown>)['letterhead']) ?? {}) as Record<string, unknown>);
+  /** Approved pictures that can be a letterhead (images and logos). */
+  readonly letterheadChoices = computed(() => this.usableAssets().filter(a => a.kind === 'IMAGE' || a.kind === 'LOGO'));
+  readonly letterheadAsset = computed(() => {
+    const id = String(this.letterhead()['asset'] ?? '');
+    const entry = this.templateAssets().find(e => e['id'] === id);
+    return entry ? String(entry['assetRef'] ?? '') : '';
+  });
+
+  /** A letterhead: the picked library picture as the template's background asset, behind every page or the first. */
+  pickLetterhead(assetId: string): void {
+    const asset = assetId ? this.usableAssets().find(a => a.assetId === assetId) : null;
+    this.edit((_blocks, def) => {
+      const page = { ...((def.template['page'] ?? {}) as Record<string, unknown>) };
+      const entries = ((def.template['assets'] ?? []) as Record<string, unknown>[]).filter(e => e['id'] !== 'letterhead');
+      if (!asset) {
+        delete page['letterhead'];
+      } else {
+        entries.push({ id: 'letterhead', purpose: 'background', assetRef: asset.assetId, alt: asset.name });
+        page['letterhead'] = { ...this.letterhead(), asset: 'letterhead' };
+      }
+      def.template['assets'] = entries;
+      def.template['page'] = page;
+      return true;
+    }, 'page:letterhead');
+  }
+
+  setLetterhead(key: string, value: string): void {
+    this.edit((_blocks, def) => {
+      const page = { ...((def.template['page'] ?? {}) as Record<string, unknown>) };
+      const lh = { ...this.letterhead() };
+      if (!value || (key === 'fit' && value === 'cover') || (key === 'pages' && value === 'all')) delete lh[key]; else lh[key] = value;
+      page['letterhead'] = lh;
+      def.template['page'] = page;
+      return true;
+    }, `letterhead:${key}`);
   }
 
   themeSetting(key: string): string {

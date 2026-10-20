@@ -22,6 +22,7 @@ import {
 import { fileNameOf, saveBlob } from './report-files';
 import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
 import { VerifyData, VerifyPanel } from './verify-panel';
+import { askVoidReason } from './void-dialog';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 
 type Tab = 'details' | 'versions' | 'activity' | 'access';
@@ -60,6 +61,12 @@ export class ReportPage implements OnInit {
   readonly templateVersions = signal<VersionRow[]>([]);
   readonly againVersion = signal<number | null>(null);
   readonly againData = signal<'same' | 'other'>('same');
+  /** Phase 4: "Mark this version as COPY" -- the new version carries COPY on every page. */
+  readonly againCopy = signal(false);
+  /** Phase 4: the console's verify link (a report's QR code) opens Verify signature for its version. */
+  readonly verify = input<string | undefined>();
+  readonly version = input<string | undefined>();
+  private verifyOpened = false;
   readonly againJob = signal<JobRow | null>(null);
   readonly againError = signal('');
   readonly againBusy = signal(false);
@@ -117,6 +124,12 @@ export class ReportPage implements OnInit {
         this.loading.set(false);
         this.loadThumb(r);
         if (this.canGenerate()) this.loadVersions(r.templateId);
+        const asked = Number(this.version());
+        const v = this.verify() === '1' && !this.verifyOpened ? r.versions.find(x => x.version === asked) : undefined;
+        if (v) {
+          this.verifyOpened = true;
+          this.verifyVersion(v);
+        }
       },
       error: e => { this.error.set(studioError(e, 'The report could not be read.').message); this.loading.set(false); },
     });
@@ -199,7 +212,19 @@ export class ReportPage implements OnInit {
     });
   }
 
-  verify(v: ReportVersionRow): void {
+  /** Phase 4: marks a version VOID after the person says why. */
+  async voidIt(v: ReportVersionRow): Promise<void> {
+    const r = this.r();
+    if (!r) return;
+    const reason = await askVoidReason(this.dialog, { label: r.label, version: v.version, signed: !!v.approval?.signed });
+    if (!reason) return;
+    this.api.voidVersion(r.reportId, v.version, reason).subscribe({
+      next: () => { this.toast.success(`v${v.version} is VOID. Every download of it now says so.`); this.load(); },
+      error: e => this.toast.error(studioError(e).message),
+    });
+  }
+
+  verifyVersion(v: ReportVersionRow): void {
     const r = this.r();
     if (!r) return;
     this.dialog.open<void, VerifyData>(VerifyPanel, sidePanelConfig<VerifyData>({ reportId: r.reportId, version: v.version, label: r.label }, 'narrow', 'right'));
@@ -266,6 +291,7 @@ export class ReportPage implements OnInit {
       reportId: r.reportId, version: String(this.againVersion() ?? v.templateVersion), source: { connector: 'SNAPSHOT', snapshotId: v.snapshotId },
       rootPath: (v.config?.['rootPath'] as string | undefined) ?? '$', ...(v.config?.['mapping'] ? { mapping: v.config['mapping'] } : {}),
       reason: `Again from v${v.version}'s data, template v${this.againVersion() ?? v.templateVersion}`,
+      ...(this.againCopy() ? { markAsCopy: true } : {}),
     }, this.againKey).subscribe({
       next: job => {
         this.againBusy.set(false);
