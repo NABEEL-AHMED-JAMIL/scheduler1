@@ -64,6 +64,10 @@ export interface SampleRow {
   templateId: string;
   name: string;
   kind: 'INLINE_JSON' | 'RUN_OUTPUT';
+  /** Where the kept data came from (media 2026-10-20): BUNDLE for several files kept as one sample. */
+  sourceKind?: string;
+  /** A bundle's part names. */
+  parts?: string[];
   format: string;
   bytes?: number | null;
   jobQueueId?: number;

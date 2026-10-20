@@ -144,7 +144,7 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
             <select class="input" [ngModel]="sampleId()" (ngModelChange)="sampleId.set($event); publish()" aria-label="Test sample">
               <option [ngValue]="null">Choose a sample</option>
               @for (s of samples(); track s.sampleId) {
-                <option [ngValue]="s.sampleId">{{ s.name }} · {{ s.kind === 'RUN_OUTPUT' ? 'run #' + s.jobQueueId : 'pasted' }}</option>
+                <option [ngValue]="s.sampleId">{{ s.name }} · {{ s.kind === 'RUN_OUTPUT' ? 'run #' + s.jobQueueId : s.sourceKind === 'BUNDLE' ? 'several files' : 'pasted' }}</option>
               }
             </select>
           </label>
