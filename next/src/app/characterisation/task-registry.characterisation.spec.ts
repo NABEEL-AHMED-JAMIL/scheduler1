@@ -133,9 +133,8 @@ describe('MIG-250: Configuration › Task Registry', () => {
   it('Edit registry task from a Legacy row\'s panel opens its page', async () => {
     const v = await visit('/settings/task-registry', 'TENANT_ADMIN', null, ANSWERS);
     await click(v, 'Open Reference: CSV check and summarise');
+    // The page is lazy-loaded; click() settles only once the navigation has landed (harness.ts).
     const requests = await click(v, 'Edit registry task');
-    // The page is lazy-loaded: under a busy test run the navigation can land a few settles later.
-    for (let i = 0; i < 20 && TestBed.inject(Router).url === '/settings/task-registry'; i++) requests.push(...await v.settle());
     pin(FILE, 'Edit registry task from a Legacy row\'s panel opens its page', { requests, url: TestBed.inject(Router).url }, PINNED);
   });
 });

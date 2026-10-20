@@ -196,14 +196,20 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
     ],
   });
   const http = TestBed.inject(HttpTestingController);
+  const router = TestBed.inject(Router);
   const seen: string[] = [];
+  // A navigation still in flight is not quiet: a lazily loaded route (loadComponent) arrives after however many ticks
+  // its chunk takes -- a few when another spec in the same worker already loaded it (ng test runs specs unisolated,
+  // one module cache per worker), more when this is the first. Counting those ticks as quiet made what a click pinned
+  // depend on which specs ran before it (the New / Edit registry task pages, 2026-10-19).
+  const navigating = () => router.currentNavigation() !== null;
   const answer = async (): Promise<string[]> => {
     const made: string[] = [];
     let quiet = 0;
-    for (let i = 0; i < 400 && quiet < 6; i++) {
+    for (let i = 0; quiet < 6 && (i < 400 || (navigating() && i < 4000)); i++) {
       await tick();
       const pending = http.match(() => true);
-      quiet = pending.length ? 0 : quiet + 1;
+      quiet = pending.length || navigating() ? 0 : quiet + 1;
       for (const req of pending) {
         const described = describeRequest(req);
         // The top bar's picture is the shell's, not the screen's, and when it is asked for depends on the image's own
@@ -232,7 +238,6 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
   await answer();
   const root = harness.fixture.nativeElement as HTMLElement;
   const main = (root.querySelector('main#main') as HTMLElement | null) ?? root;
-  const router = TestBed.inject(Router);
   return {
     surface: { url: normalise(router.url), requests: [...seen], ...surfaceOf(main) },
     main,

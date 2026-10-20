@@ -97,7 +97,9 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the New registry task page": {
-    "fromTheList": [],
+    "fromTheList": [
+      "GET /setting.json/topics?limit=1&q="
+    ],
     "url": "/settings/task-registry/new",
     "requests": [
       "GET /taskInbox.json/count",
