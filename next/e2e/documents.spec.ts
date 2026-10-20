@@ -1,6 +1,7 @@
 import { test, expect, APIRequestContext, Browser, Page, TestInfo } from '@playwright/test';
 import { api, authOf, canSignIn, NEEDS, pageAs as signedIn, Session, sessionFor } from './support/session';
-import { bestEffort, deleteObject, getJson, keptRun as keptRunOf, outputsOf, Output, tasks } from './support/workspace';
+import { bestEffort, deleteObject, getJson, keptRun as keptRunOf, outputsOf, Output, runsOf, tasks } from './support/workspace';
+import { waitOnOwnerData } from './support/owner-data';
 import { hasFixtures, NEEDS_FIXTURES, pipeline, riverside } from './support/fixtures';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -196,7 +197,11 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     await expect(page.locator('[data-render-result]').getByRole('link', { name: 'Open in storage' })).toBeVisible();
   });
 
-  test('Reports lists the kept run\'s outputs and the saved PDF, and previews the run\'s dataset', async ({ browser }, info) => {
+  test('Reports lists the kept run\'s outputs and the saved PDF, and previews the run\'s dataset', async ({ browser, request }, info) => {
+    // Reports reads each schedule's newest three runs. Once the daily readmission runs after the kept one have failed for
+    // want of their Kaggle input, the kept run is older than that and the page rightly does not list it: waiting on owner data.
+    const newest = (await runsOf(request, s, pipeline('readmission').jobId)).slice(0, 3).map(r => r.jobQueueId);
+    if (!newest.includes(RUN)) await waitOnOwnerData(request, s, 'readmission');
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     const bucket = await bucketReadable(page.request);
