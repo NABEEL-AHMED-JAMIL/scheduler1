@@ -183,6 +183,11 @@ export async function visit(url: string, role: Role, pageKeys: string[] | null,
   useChicago();
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
+  // A visit is a fresh browser session. sessionStorage is the environment's own (useMemoryStorage replaces localStorage
+  // only) and ng test runs spec files unisolated, so whatever an earlier spec in the worker kept for the session -- a
+  // platform administrator's workspace choice (WorkspaceDirectory, etl_workspace_choice) above all -- would otherwise
+  // open this screen filtered to that workspace.
+  clearSession();
   signIn(role, role === 'TENANT_USER' ? pageKeys : pageKeys ?? null, extraClaims);
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -368,4 +373,9 @@ export function restoreClock(): void {
   restoreZone();
   vi.useRealTimers();
   localStorage.removeItem('etl_auth_user');
+  clearSession();
+}
+
+function clearSession(): void {
+  try { sessionStorage.clear(); } catch { /* no sessionStorage in this environment */ }
 }
