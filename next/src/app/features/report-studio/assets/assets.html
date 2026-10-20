@@ -59,7 +59,7 @@
           <div class="rsa-grid">
             @for (a of shown(); track a.assetId) {
               <article class="rsa-card">
-                <a class="rsa-card-pic" [class.rsa-card-pic-white]="a.kind === 'SIGNATURE'" [routerLink]="['/reports/assets', a.assetId]" [attr.aria-label]="'Open ' + a.name">
+                <a class="rsa-card-pic rsa-card-pic-white" [routerLink]="['/reports/assets', a.assetId]" [attr.aria-label]="'Open ' + a.name">
                   <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion ?? a.latestVersion" [tenantId]="isPlatformAdmin() ? a.tenantId : null"
                                         [alt]="a.name" maxHeight="4.5rem" />
                 </a>

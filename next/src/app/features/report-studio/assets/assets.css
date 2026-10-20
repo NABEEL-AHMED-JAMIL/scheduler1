@@ -11,7 +11,7 @@
 .rsa-card:hover { border-color: var(--border-strong); }
 .rsa-card-pic { display: grid; place-items: center; height: 7rem; padding: 0.75rem; background: var(--surface-sunken);
   border-bottom: 1px solid var(--border-subtle); }
-/* A signature on no background reads on white whatever the theme, as it will on the page. */
+/* Every asset is printed on paper: a picture on no background (a dark logo, a signature) reads on white whatever the theme. */
 .rsa-card-pic-white app-rs-asset-picture { background: var(--signature-paper); padding: 0.375rem 0.75rem; border-radius: var(--radius-sm); }
 .rsa-card-body { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 0.875rem 0.875rem; flex: 1; min-width: 0; }
 .rsa-card-title { font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
@@ -27,6 +27,7 @@
 .rsb-body.rsb-two, .rsb-two { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .rsb-three { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .rsb-wide { grid-column: 1 / -1; }
+.rsb-logo app-rs-asset-picture { background: var(--signature-paper); padding: 0.375rem 0.75rem; border-radius: var(--radius-sm); }
 .rsb-logo { display: grid; place-items: center; width: 12.5rem; height: 6rem; padding: 0.5rem; background: var(--surface-sunken);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
 .rsb-colour { display: flex; align-items: center; gap: 0.375rem; }
@@ -47,7 +48,7 @@
 @media (min-width: 1700px) { .rsa-detail { grid-template-columns: minmax(0, 1fr) 30rem; } }
 .rsa-hero { display: grid; place-items: center; min-height: 10.5rem; padding: 1rem; background: var(--surface-sunken);
   border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
-/* A signature or stamp on no background is shown on white, as it prints. */
+/* An asset is shown on white, as it prints. */
 .rsa-hero-white app-rs-asset-picture { background: var(--signature-paper); padding: 0.75rem 1rem; border-radius: var(--radius-sm); }
 .rsa-hero-caption { color: var(--text-muted); }
 .rsa-muted { color: var(--text-muted); }

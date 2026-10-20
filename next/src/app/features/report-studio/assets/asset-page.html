@@ -40,7 +40,7 @@
           <div class="rs-head"><h2 class="section-title">Current approved version</h2>
             @if (current(); as v) { <span class="pill pill-ok">Approved · v{{ v.version }}</span> } @else { <span class="pill pill-warn">Nothing approved yet</span> }</div>
           <div class="p-4 flex flex-col gap-3">
-            <div class="rsa-hero" [class.rsa-hero-white]="a.restricted">
+            <div class="rsa-hero rsa-hero-white">
               @if (a.currentVersion || pending()) {
                 <div class="flex flex-col items-center gap-1">
                   <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion ?? pending()?.version" [alt]="a.name" maxHeight="8rem" />
