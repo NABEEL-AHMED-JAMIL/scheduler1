@@ -4,13 +4,21 @@
   <div class="rsd" #editor>
     <header class="rsd-head">
       <div class="min-w-0">
-        <nav class="rsd-crumb" aria-label="Breadcrumb">
-          <a routerLink="/reports/overview">Reports</a><span aria-hidden="true">›</span>
-          <a routerLink="/reports/templates">Templates</a><span aria-hidden="true">›</span>
-          <a [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
-        </nav>
+        @if (t.ownerKind === 'STEP') {
+          <nav class="rsd-crumb" aria-label="Breadcrumb">
+            @if (back()) { <a [href]="back()" data-back-to-pipeline>Back to the pipeline</a><span aria-hidden="true">›</span> }
+            <span>A pipeline step's report</span>
+          </nav>
+        } @else {
+          <nav class="rsd-crumb" aria-label="Breadcrumb">
+            <a routerLink="/reports/overview">Reports</a><span aria-hidden="true">›</span>
+            <a routerLink="/reports/templates">Templates</a><span aria-hidden="true">›</span>
+            <a [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
+          </nav>
+        }
         <div class="flex flex-wrap items-center gap-2 mt-0.5">
           <h1 class="rsd-title">{{ t.name }}</h1>
+          @if (t.ownerKind === 'STEP') { <span class="pill pill-neutral" title="Made inside a pipeline step from its data; not on the Templates page" data-step-design>Step design</span> }
           @if (t.draft) { <span class="pill pill-info">Draft v{{ t.draft.version }}</span> }
           @else if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
           @if (approval(); as a) {

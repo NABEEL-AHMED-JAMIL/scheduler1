@@ -78,7 +78,7 @@ export function stepKind(task: string, entry?: PipelineTaskLike | null): FlowNod
   }
   if (task.startsWith('read_') || task === 'sample') return 'read';
   if (task === 'ai_prompt' || task === 'measure_image') return 'ai';
-  if (['save_file', 'upload_bucket', 'render_pdf', 'send_notification', 'write_database', 'send_webhook', 'call_api'].includes(task)) return 'output';
+  if (['save_file', 'upload_bucket', 'render_pdf', 'generate_report', 'send_notification', 'write_database', 'send_webhook', 'call_api'].includes(task)) return 'output';
   return 'process';
 }
 
@@ -88,6 +88,8 @@ const TASK_ICONS: Record<string, string> = {
   filter: 'filter', select: 'table', transform: 'code', compute: 'code', aggregate: 'chart', join: 'link', append: 'layers',
   sort: 'sort', limit: 'filter', validate: 'check', enrich: 'plug', ai_prompt: 'sparkle', measure_image: 'image', approval: 'user',
   save_file: 'download', upload_bucket: 'upload', render_pdf: 'file', send_notification: 'mail', send_webhook: 'send',
+  // Report Studio phase 5: a report from the step's rows, made with the step's own design or a template.
+  generate_report: 'file',
   // Owner #25: Call API sends to a saved request and keeps the answer.
   call_api: 'send',
   write_database: 'database', legacy: 'history',

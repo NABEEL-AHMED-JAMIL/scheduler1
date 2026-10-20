@@ -25,6 +25,9 @@ export interface TemplateRow {
   hasDraft: boolean;
   origin: 'BLANK' | 'STARTER' | 'COPY' | 'IMPORT';
   originRef?: string | null;
+  /** Phase 5: WORKSPACE (the Templates page's), or STEP -- a pipeline step's own design, owned by "pipeline:<key>#<step>". */
+  ownerKind?: 'WORKSPACE' | 'STEP';
+  ownerRef?: string | null;
   rowVersion: number;
   createdBy?: number | null;
   updatedBy?: number | null;

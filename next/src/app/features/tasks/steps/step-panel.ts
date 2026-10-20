@@ -6,8 +6,9 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
+import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './report-step-design';
 import {
-  LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
+  LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
   validKey,
 } from './steps.model';
 
@@ -32,6 +33,8 @@ export interface StepPanelData {
   apiRequests?: ApiRequestChoice[];
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
+  /** Report Studio phase 5: the pipeline the step is in (key null while never saved), its name and its schedules. */
+  pipeline?: { key: number | null; name: string; jobIds: number[] };
   /** The settings' on-error, for what "Default" means here. */
   defaultOnError?: string;
   canManage: boolean;
@@ -47,7 +50,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {
@@ -61,7 +64,13 @@ export class StepPanel {
 
   readonly edit = signal<Step>(structuredClone(this.data.step));
   /** Whether the task's schema can draw a form at all: an object with at least one setting. */
-  readonly hasForm = !!this.data.task?.configSchema && fieldsOf(this.data.task.configSchema).length > 0;
+  /** Report Studio phase 5: a generate_report step's design settings are edited by ReportStepDesign, the rest by the form. */
+  readonly reportStep = this.data.task?.code === 'generate_report';
+  readonly formSchema = this.reportStep && this.data.task?.configSchema ? withoutProperties(this.data.task.configSchema, REPORT_DESIGN_KEYS)
+    : this.data.task?.configSchema;
+  readonly hasForm = !!this.formSchema && fieldsOf(this.formSchema).length > 0;
+  /** The step the report reads: the one its input names, else the one before it. */
+  readonly upstreamKey = this.data.step.input ?? (this.data.earlierKeys.length ? this.data.earlierKeys[this.data.earlierKeys.length - 1] : null);
   readonly configMode = signal<ConfigMode>(this.hasForm ? 'form' : 'json');
   readonly configText = signal(this.jsonOf(this.data.step.config));
   readonly configError = signal('');
@@ -110,7 +119,17 @@ export class StepPanel {
   }
 
   setConfig(config: Record<string, unknown>): void {
+    // The form knows only its own keys: the design's are kept as they are.
+    const design = this.reportStep ? Object.fromEntries(REPORT_DESIGN_KEYS.filter(k => this.edit().config?.[k] !== undefined)
+      .map(k => [k, this.edit().config![k]])) : {};
+    this.patch({ config: { ...config, ...design } });
+  }
+
+  setDesign(d: ReportDesignSettings): void {
+    const config: Record<string, unknown> = { ...(this.edit().config ?? {}), design: d.design, templateVersion: d.templateVersion ?? 'latest' };
+    if (d.templateId) config['templateId'] = d.templateId; else delete config['templateId'];
     this.patch({ config });
+    this.configText.set(this.jsonOf(config));
   }
 
   typeConfig(text: string): void {
@@ -149,4 +168,12 @@ export class StepPanel {
   private jsonOf(config: unknown): string {
     return config === undefined || config === null ? '' : JSON.stringify(config, null, 2);
   }
+}
+
+/** The schema without some of its properties (and out of its required list). */
+export function withoutProperties(schema: JsonSchema, keys: string[]): JsonSchema {
+  const props = { ...((schema as { properties?: Record<string, unknown> }).properties ?? {}) };
+  for (const k of keys) delete props[k];
+  const required = ((schema as { required?: string[] }).required ?? []).filter(r => !keys.includes(r));
+  return { ...schema, properties: props, required } as JsonSchema;
 }

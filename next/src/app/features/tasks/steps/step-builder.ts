@@ -85,6 +85,9 @@ export class StepBuilder implements OnInit {
   readonly canManage = input(true);
   /** A workspace administrator: may add a task that needs one. The workspace's task switches are Task Registry's. */
   readonly isAdmin = input(true);
+  /** Report Studio phase 5: the pipeline's name and its schedules, for a generate_report step's own design. */
+  readonly pipelineName = input('');
+  readonly jobIds = input<number[]>([]);
   /** A save made a new version (or found none to make): the page's copy is stale. */
   readonly saved = output<DefinitionView>();
 
@@ -386,6 +389,7 @@ export class StepBuilder implements OnInit {
       webhooks: this.webhookChoices() ?? [],
       documentTypes: this.documentTypeChoices() ?? [],
       apiRequests: this.apiRequestChoices() ?? [],
+      pipeline: { key: this.view().stored ? this.view().pipelineKey : null, name: this.pipelineName(), jobIds: this.jobIds() },
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose
     // list then opened over the cards.

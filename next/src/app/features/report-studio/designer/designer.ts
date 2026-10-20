@@ -67,6 +67,12 @@ const DRAW_MS = 300;
 })
 export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly templateId = input.required<string>();
+  /** Phase 5: opened from a generate_report step -- where "Back to the pipeline" goes (a path of this console only). */
+  readonly backParam = input<string | undefined>(undefined, { alias: 'back' });
+  readonly back = computed(() => {
+    const b = this.backParam();
+    return b && b.startsWith('/') && !b.startsWith('//') ? b : null;
+  });
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
   private readonly dialog = inject(Dialog);

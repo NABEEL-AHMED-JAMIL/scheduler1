@@ -110,6 +110,15 @@ export class ReportStudioApi {
       { params: { templateId, version } }));
   }
 
+  /**
+   * Phase 5 (plan 1.11.1): a generate_report step's own design, made when it has none -- seeded from the step's data
+   * (source: the upstream step's dataset of a run) and kept with it as the design's test sample.
+   */
+  stepDesign(body: { jobId: number; stepKey: string; pipelineName?: string; stepName?: string; source?: SourceRef | null }):
+    Observable<TemplateDetail & { created: boolean }> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<TemplateDetail & { created: boolean }>>(`${this.templates}/stepDesign`, body));
+  }
+
   create(body: Record<string, unknown>): Observable<TemplateDetail> {
     return ReportStudioApi.data$(this.http.post<ApiResponse<TemplateDetail>>(`${this.templates}/create`, body));
   }

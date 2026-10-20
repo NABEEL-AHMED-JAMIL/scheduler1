@@ -857,6 +857,8 @@ export class TaskEdit implements OnInit {
 
   /** The schedules that run this pipeline: Run now runs one, the Schedules tab lists them, the overview counts them. */
   readonly jobs = signal<LinkedJob[]>([]);
+  /** Report Studio phase 5: the pipeline's schedules, whose latest run is a generate_report step's data. */
+  readonly jobIdsOf = computed(() => this.jobs().map(j => j.jobId));
   readonly jobsLoaded = signal(false);
   readonly running = signal(false);
   readonly runLabel = computed(() => (this.dirty() && !this.locked() ? 'Save & run now' : 'Run now'));
