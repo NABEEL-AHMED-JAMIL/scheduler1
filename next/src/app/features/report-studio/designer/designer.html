@@ -216,7 +216,7 @@
         }
         @if (previewDef()) {
           <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-ai-preview-banner><app-icon name="sparkle" class="shrink-0" />
-            <span class="text-sm">The AI's proposal, shown on the page. Nothing in the draft changes until you accept it; outlined blocks are new or changed.</span></div>
+            <span class="min-w-0 flex-1 text-sm">The AI's proposal, shown on the page. Nothing in the draft changes until you accept it; outlined blocks are new or changed.</span></div>
         }
         @if (canvas(); as doc) {
           @for (p of pages(); track p.index; let i = $index) {
