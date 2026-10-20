@@ -1,3 +1,4 @@
+import { RunReviewCard } from './run-review-card';
 import { Avatar } from '../../shared/ui/avatar';
 import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -44,7 +45,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -790,6 +791,17 @@ export class TaskInbox implements OnInit {
       time: compactTime(at, now, undefined, true), timeTitle: at ? 'Started ' + exactTime(at) : '', crit: false, workflow: r.workflowName,
       group: pastGroup(at, now), haystack: [r.title, r.workflowName, r.currentStep, this.name(r.requestedBy)].join(' ').toLowerCase(),
     };
+  }
+
+  /** The run a "Pipeline run review" task is about, from its subject ("pipeline-run:8517" and the run's own fields). */
+  runOf(d: { subjectId?: string | null; subject?: Record<string, unknown> | null }): { jobQueueId: number; attempt: number; link: string | null } | null {
+    const fromId = /^pipeline-run:(\d+)$/.exec(d.subjectId ?? '');
+    const subject = d.subject ?? {};
+    const id = Number(subject['jobQueueId'] ?? (fromId ? fromId[1] : NaN));
+    if (!Number.isFinite(id) || id <= 0) return null;
+    const attempt = Number(subject['attempt'] ?? 1) || 1;
+    const link = typeof subject['link'] === 'string' && (subject['link'] as string).startsWith('/') ? subject['link'] as string : null;
+    return { jobQueueId: id, attempt, link };
   }
 
   private fieldViews(subject: Record<string, unknown> | undefined | null): FieldView[] {
