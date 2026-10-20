@@ -37,7 +37,8 @@ export interface ReportFileView {
         <button type="button" class="btn btn-ghost btn-sm" (click)="download()" [disabled]="!blob()"><app-icon name="download" />Download</button>
         <button type="button" class="btn btn-ghost btn-icon btn-sm" (click)="ref.close()" aria-label="Close"><app-icon name="close" /></button>
       </div>
-      <div class="flex-1 min-h-0 h-[76vh] flex flex-col">
+      <!-- A fixed height, not flex-1: in a column sized by its content, flex-1 collapsed the frame to a thin strip. -->
+      <div class="h-[76vh] max-h-[calc(90vh-3.5rem)] min-h-0 flex flex-col">
         @if (error()) {
           <div class="flex-1 flex flex-col items-center justify-center gap-2 text-center p-8">
             <app-icon name="alert" size="1.6rem" class="icon-crit" /><p class="text-sm text-crit-500">{{ error() }}</p>
@@ -47,7 +48,7 @@ export interface ReportFileView {
         } @else if (data.format === 'PDF') {
           <app-pdf-viewer [src]="url()" />
         } @else {
-          <iframe class="flex-1 w-full border-0 bg-[color:var(--paper)]" [src]="frameUrl()" sandbox="" referrerpolicy="no-referrer"
+          <iframe class="flex-1 w-full h-full min-h-0 border-0 bg-[color:var(--paper)]" [src]="frameUrl()" sandbox="" referrerpolicy="no-referrer"
                   [title]="data.title + ' (HTML)'" data-test="report-html-frame"></iframe>
         }
       </div>
