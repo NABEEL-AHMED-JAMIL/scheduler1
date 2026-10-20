@@ -205,7 +205,10 @@ test.describe('Documents: converter, Reports and file details (live)', () => {
     const page = await pageAs(browser, s);
     const renders = await recordRenders(page);
     const bucket = await bucketReadable(page.request);
-    await page.goto('/data/reports');
+    // MIG-403: a pipeline's generated files are Reports › From pipelines (/data/reports opens Report Studio's Library, which
+    // lists reports, not run outputs: the 10-20 failure was this page, before any run was looked for).
+    await page.goto('/reports/from-pipelines');
+    await expect(page.getByRole('textbox', { name: 'Find a report' })).toBeVisible();
     const rows = page.locator('table tbody tr');
     if (bucket) await expect(rows.filter({ hasText: `${SAVED}.pdf` })).toBeVisible();
     else await expect(page.getByRole('alert')).toContainText(`${BUCKET}/reports/ could not be read`);
