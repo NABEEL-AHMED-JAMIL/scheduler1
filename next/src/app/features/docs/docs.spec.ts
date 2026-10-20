@@ -150,7 +150,8 @@ describe('Docs for what shipped by 2026-10-20', () => {
   it('names the steps that work on files, and One file per row, by the names the step form gives them', () => {
     const build = section(mount(), 'build').textContent!;
     for (const words of ['Transcribe audio', 'Timestamps', 'Convert file', 'File key column', 'When a file fails', 'Save File',
-      'Upload to bucket', 'One file per row', '{{file_stem}}-insight.json', 'JSON columns']) {
+      'Upload to bucket', 'One file per row', '{{file_stem}}-insight.json', 'JSON columns', 'Which objects', 'last_run',
+      'The run\'s own files first', 'One report per row']) {
       expect(build, words).toContain(words);
     }
   });
