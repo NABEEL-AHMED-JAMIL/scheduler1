@@ -3,7 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
-import { RunOutputView, RunOutputViewData, VIEW_ROWS, viewKind } from './run-output-view';
+import { RunOutputView, RunOutputViewData, VIEW_ROWS, prettyJson, viewKind } from './run-output-view';
 
 /** Owner 2026-10-20: a run's kept file is viewed in place -- a PDF as itself, a table as its first rows. */
 function mount(data: RunOutputViewData) {
@@ -23,6 +23,29 @@ describe('Run output view', () => {
     expect(viewKind('notes.bin', 'bin')).toBeNull();
   });
 
+  it('opens a kept JSON file as formatted JSON, one row as the object it is, with Table a click away (owner 2026-10-20)', () => {
+    const { fixture, http, el } = mount({ name: 'call-insight.json', runDatasetId: 7, format: 'json', rowCount: 1 });
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush([{ summary: 'A short call.', actions: [{ action: 'Call back' }] }]);
+    fixture.detectChanges();
+    const pre = el.querySelector('[data-test="run-output-json"] pre')!;
+    expect(pre.textContent).toBe(JSON.stringify({ summary: 'A short call.', actions: [{ action: 'Call back' }] }, null, 2));
+    expect(el.querySelector('[data-test="run-output-table"]')).toBeNull();
+    fixture.componentInstance.mode.set('table');
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="run-output-table"]')).not.toBeNull();
+  });
+
+  it('formats several rows as their list, and JSON that is not rows still shows', () => {
+    expect(prettyJson([{ a: 1 }, { a: 2 }])).toBe(JSON.stringify([{ a: 1 }, { a: 2 }], null, 2));
+    expect(prettyJson([{ answer: '{"summary":"ok","list":[1,2]}', note: '[not json' }]))
+      .toBe(JSON.stringify({ answer: { summary: 'ok', list: [1, 2] }, note: '[not json' }, null, 2));
+    const { fixture, http, el } = mount({ name: 'nested.json', runDatasetId: 8, format: 'json', rowCount: 1 });
+    http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush({ not: 'rows' });
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="run-output-json"] pre')?.textContent).toContain('"not": "rows"');
+    expect(el.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('draws a kept table: its columns and rows, read as JSON', () => {
     const { fixture, http, el } = mount({ name: 'accuracy.csv', runDatasetId: 6327, format: 'csv', rowCount: 2 });
     const req = http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'));
@@ -40,6 +63,7 @@ describe('Run output view', () => {
   it('shows the first rows of a long table and says so', () => {
     const { fixture, http, el } = mount({ name: 'big.json', runDatasetId: 1, format: 'json', rowCount: 900 });
     http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset')).flush(Array.from({ length: 900 }, (_, i) => ({ id: i })));
+    fixture.componentInstance.mode.set('table');
     fixture.detectChanges();
     expect(el.querySelectorAll('tbody tr').length).toBe(VIEW_ROWS);
     expect(el.textContent).toContain('First 500 of 900 rows');
