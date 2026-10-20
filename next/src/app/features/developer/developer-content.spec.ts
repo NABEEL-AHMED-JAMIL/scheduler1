@@ -26,10 +26,11 @@ describe('The developer portal\'s changelog', () => {
     expect(dates).toEqual([...dates].sort().reverse());
   });
 
-  it('has the Generate report and Spring Boot 4.1.1 entries of 2026-10-20 on top', () => {
-    expect(headings[0]).toContain('(2026-10-20)');
-    expect(headings.slice(0, 2).join('\n')).toMatch(/Generate report/);
-    expect(headings.slice(0, 2).join('\n')).toMatch(/Spring Boot 4\.1\.1/);
+  it('lists the Generate report and Spring Boot 4.1.1 entries among the 2026-10-20 ones (newer entries may sit above them)', () => {
+    const day = headings.filter(h => h.includes('(2026-10-20)'));
+    expect(day.length).toBeGreaterThanOrEqual(2);
+    expect(day.join('\n')).toMatch(/Generate report/);
+    expect(day.join('\n')).toMatch(/Spring Boot 4\.1\.1/);
   });
 });
 
