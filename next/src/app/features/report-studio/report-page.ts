@@ -17,7 +17,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
-  JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, idempotencyKey,
+  JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, deletedWords, idempotencyKey,
   isRunning, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
@@ -323,7 +323,7 @@ export class ReportPage implements OnInit {
     void confirmWith(this.dialog, { title: `Delete ${r.name}?`, body: REPORT_DELETE_WORDS, confirmLabel: 'Delete', danger: true }).then(ok => {
       if (!ok) return;
       this.api.deleteReport(r.reportId).subscribe({
-        next: () => { this.toast.success(`${r.name} deleted.`); void this.router.navigate(['/reports/library']); },
+        next: d => { this.toast.success(deletedWords(r.name, d.filesLeft)); void this.router.navigate(['/reports/library']); },
         error: e => this.toast.error(studioError(e).message),
       });
     });

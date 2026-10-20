@@ -11,7 +11,7 @@ import { API_BASE } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { LibraryPage, LibraryQuery, ReportStudioApi } from './report-studio.api';
-import { JobRow, ReportRow } from './report-studio.model';
+import { JobRow, ReportRow, deletedWords } from './report-studio.model';
 import { RsTabCounts } from './rs-tab-counts';
 import { ReportLibrary } from './library';
 
@@ -34,7 +34,7 @@ function screenWith(opts: { view?: string; platform?: boolean; reports?: Library
     jobs: vi.fn((_q: LibraryQuery, _t?: number | null) => of(opts.jobs ?? page([job(1)], 61))),
     deleteReport: vi.fn((id: string) => id === 'R9'
       ? throwError(() => new HttpErrorResponse({ status: 409, error: { code: 'REPORT_SIGNED', message: 'This report has an approved version.' } }))
-      : of({ reportId: id, deleted: true, versions: 1, files: 2, filesLeft: 0 })),
+      : of({ reportId: id, deleted: true, versions: 1, files: id === 'R2' ? 0 : 2, filesLeft: id === 'R2' ? 3 : 0 })),
   };
   const dialog = { open: vi.fn(() => ({ closed: of(true) })) };
   const toast = { success: vi.fn(), error: vi.fn() };
@@ -239,7 +239,7 @@ describe('ReportLibrary -- delete (owner 2026-10-20)', () => {
     await Promise.resolve();
     expect(dialog.open).toHaveBeenCalledTimes(1);
     expect(api.deleteReport.mock.calls.map(c => c[0])).toEqual(['R1', 'R2']);
-    expect(toast.success).toHaveBeenCalledWith('2 reports deleted.');
+    expect(toast.success).toHaveBeenCalledWith('2 reports deleted. Their 3 stored files stay in storage until an operator removes them.');
     expect(screen.picked().size).toBe(0);
     expect(api.reports).toHaveBeenLastCalledWith({ status: '', q: '', limit: 50, offset: 50 }, null);
   });
@@ -265,5 +265,13 @@ describe('ReportLibrary -- delete (owner 2026-10-20)', () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(api.deleteReport).toHaveBeenCalledWith('R1');
+  });
+});
+
+describe('deletedWords (owner 2026-10-20)', () => {
+  it('says plainly when stored files stay', () => {
+    expect(deletedWords('Wound report 1', 0)).toBe('Wound report 1 deleted.');
+    expect(deletedWords('Wound report 1', 1)).toBe('Wound report 1 deleted. Its 1 stored file stays in storage until an operator removes it.');
+    expect(deletedWords('Wound report 1', 24)).toBe('Wound report 1 deleted. Its 24 stored files stay in storage until an operator removes them.');
   });
 });

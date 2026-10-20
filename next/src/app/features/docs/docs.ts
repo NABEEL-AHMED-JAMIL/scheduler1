@@ -441,8 +441,9 @@ export class Docs implements AfterViewInit {
       ],
       notes: [
         'A version you no longer stand behind is marked Void: it stays, and every download of it says VOID.',
-        'Archive takes a report out of the library and keeps it. Delete removes a report, its versions and files for good, '
-          + 'and only while no version of it was approved: an approved report is a kept record, so void the version or archive the report.',
+        'Archive takes a report out of the library and keeps it. Delete removes a report and its versions for good, and only while '
+          + 'no version of it was approved: an approved report is a kept record, so void the version or archive the report. Stored files '
+          + 'that storage does not remove stay until an operator removes them; the message after a delete says so.',
         'You can delete several reports at once in Reports: tick them, then Delete. Approved ones cannot be ticked.',
       ],
     },

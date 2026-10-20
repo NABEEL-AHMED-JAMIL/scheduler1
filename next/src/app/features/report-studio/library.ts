@@ -15,7 +15,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { LibraryQuery, ReportStudioApi, studioError } from './report-studio.api';
-import { JobRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportRow, chipWord, isRunning, stageWord } from './report-studio.model';
+import { JobRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportRow, chipWord, deletedWords, isRunning, stageWord } from './report-studio.model';
 import { RsTabCounts } from './rs-tab-counts';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -119,13 +119,21 @@ export class ReportLibrary implements OnInit {
   private deleteAll(rows: ReportRow[]): void {
     this.deleting.set(true);
     from(rows).pipe(
-      concatMap(r => this.api.deleteReport(r.reportId).pipe(map(() => ({ r, error: '' })), catchError(e => of({ r, error: studioError(e).message })))),
+      concatMap(r => this.api.deleteReport(r.reportId).pipe(map(d => ({ r, error: '', left: d.filesLeft ?? 0 })),
+        catchError(e => of({ r, error: studioError(e).message, left: 0 })))),
       toArray(),
     ).subscribe(results => {
       this.deleting.set(false);
       const failed = results.filter(x => x.error);
       const done = results.length - failed.length;
-      if (done) this.toast.success(done === 1 ? `${results.find(x => !x.error)!.r.name} deleted.` : `${done} reports deleted.`);
+      const left = results.reduce((n, x) => n + x.left, 0);
+      if (done === 1) {
+        const one = results.find(x => !x.error)!;
+        this.toast.success(deletedWords(one.r.name, one.left));
+      } else if (done) {
+        this.toast.success(left ? `${done} reports deleted. Their ${left} stored files stay in storage until an operator removes them.`
+          : `${done} reports deleted.`);
+      }
       for (const f of failed) this.toast.error(`${f.r.name}: ${f.error}`);
       this.clearPicked();
       this.refresh();

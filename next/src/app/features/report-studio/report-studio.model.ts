@@ -421,8 +421,20 @@ export function idempotencyKey(): string {
 }
 
 /** What deleting a report does, said the same on the report and in the library (owner 2026-10-20). */
-export const REPORT_DELETE_WORDS = 'Every version, its files and its frozen data are deleted for good; the activity record keeps a line '
-  + 'saying who deleted it. A report with an approved version is a kept record and cannot be deleted: void the version, or archive the report.';
+export const REPORT_DELETE_WORDS = 'The report, every version and its frozen data are deleted for good; the activity record keeps a line '
+  + 'saying who deleted it. Stored files that storage does not remove stay until an operator removes them. A report with an approved '
+  + 'version is a kept record and cannot be deleted: void the version, or archive the report.';
 
 /** Why a kept record has no Delete. */
 export const REPORT_KEPT_WORDS = 'A version was approved: this report is a kept record. Void the version, or archive the report.';
+
+/**
+ * Owner 2026-10-20: a deleted report's stored files that storage could not remove stay until an operator removes them
+ * (media logs and audits them as report.files.left); said plainly, so nobody thinks they are gone.
+ */
+export function deletedWords(name: string, filesLeft: number): string {
+  return filesLeft > 0
+    ? `${name} deleted. Its ${filesLeft} stored file${filesLeft === 1 ? '' : 's'} stay${filesLeft === 1 ? 's' : ''} in storage until an operator `
+      + `removes ${filesLeft === 1 ? 'it' : 'them'}.`
+    : `${name} deleted.`;
+}

@@ -142,7 +142,13 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     const range = /\/ByteRange\s*\[\s*(\d+)\s+(\d+)/.exec(signed.toString('latin1'));
     expect(range, 'the PDF carries a signature').toBeTruthy();
     const tampered = Buffer.from(signed);
-    const at = Math.floor(Number(range![2]) / 2);
+    // A byte inside a content stream of the signed part (final-regression 10-20: a byte between objects made the file
+    // unreadable as a PDF, so the check never reached "changed after signing"). The middle of the first stream's data.
+    const text = signed.toString('latin1');
+    const start = text.indexOf('stream', 0) + 'stream'.length + 2;
+    const end = text.indexOf('endstream', start);
+    expect(start > 'stream'.length + 1 && end > start && end < Number(range![2]), 'a content stream inside the signed bytes').toBe(true);
+    const at = Math.floor((start + end) / 2);
     tampered[at] ^= 0x01;
 
     const page = await view(browser, admin);
