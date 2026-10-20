@@ -1,0 +1,120 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Design report templates once, fill them from pipeline runs and files, and keep every version.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canTemplates()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="newTemplate()"><app-icon name="plus" />New template</button>
+        }
+        @if (canGenerate()) {
+          <button type="button" class="btn btn-primary btn-sm" (click)="generate()"><app-icon name="play" />New report</button>
+        }
+      </div>
+    </div>
+  </app-page-header>
+
+  @if (error()) {
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (data(); as d) {
+    <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Reports at a glance" />
+
+    @for (j of d.failedJobs.slice(0, 1); track j.jobId) {
+      <div class="rs-banner rs-banner-crit mt-4" role="status">
+        <app-icon name="alert" class="icon-crit shrink-0" />
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold">{{ j.reportName }} · generation failed</div>
+          <div class="text-sm">{{ j.label }}: {{ j.error }} <span class="mono text-xs">({{ j.errorCode }})</span> No version was made; the report keeps its last one.</div>
+        </div>
+        <a class="btn btn-default btn-sm shrink-0" [routerLink]="['/reports/library', j.reportId]"><app-icon name="arrowRight" />Open the report</a>
+      </div>
+    }
+
+    <div class="rs-overview mt-4">
+      <div class="flex flex-col gap-4 min-w-0">
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Recent reports</h2><p class="text-xs text-[color:var(--text-muted)]">Each report keeps its own versions.</p></div>
+            @if (canLibrary()) { <a class="btn btn-ghost btn-sm" routerLink="/reports/library">View all reports</a> }
+          </div>
+          @if (!d.recentReports.length) {
+            <p class="p-4 text-sm text-[color:var(--text-muted)]">No reports yet. Publish a template, then generate one from a pipeline run or pasted data.</p>
+          } @else {
+            <table class="table-modern">
+              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Updated</th></tr></thead>
+              <tbody>
+                @for (r of d.recentReports; track r.reportId) {
+                  <tr>
+                    <td class="max-w-80">
+                      <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ r.label }} · from {{ r.templateName }}</div>
+                    </td>
+                    <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
+                    <td><app-status [label]="chipWord(r.status)" /></td>
+                    <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'dateTime' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Generation jobs</h2><p class="text-xs text-[color:var(--text-muted)]">A failed job never replaces an earlier version.</p></div>
+            @if (canLibrary()) { <a class="btn btn-ghost btn-sm" routerLink="/reports/library" [queryParams]="{ view: 'jobs' }">View all</a> }
+          </div>
+          @if (!d.recentJobs.length) {
+            <p class="p-4 text-sm text-[color:var(--text-muted)]">No jobs yet.</p>
+          } @else {
+            <table class="table-modern">
+              <thead><tr><th>Job · report</th><th>Progress</th><th>Started</th></tr></thead>
+              <tbody>
+                @for (j of d.recentJobs; track j.jobId) {
+                  <tr>
+                    <td class="max-w-80"><span class="font-medium mono">{{ j.label }}</span> · {{ j.reportName }}
+                      <div class="text-xs text-[color:var(--text-muted)]">{{ j.templateName }}@if (j.templateVersion) { · v{{ j.templateVersion }} }</div></td>
+                    <td>
+                      @if (isRunning(j.status)) { <span class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span> }
+                      @else { <app-status [label]="chipWord(j.status)" /> @if (j.errorCode) { <span class="text-xs mono ml-1">{{ j.errorCode }}</span> } }
+                    </td>
+                    <td class="text-xs whitespace-nowrap">{{ j.createdAt | serverTime: 'dateTime' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      </div>
+
+      <aside class="flex flex-col gap-4 min-w-0">
+        <section class="card p-4 flex flex-col gap-2">
+          <h2 class="section-title">Start here</h2>
+          @if (canGenerate()) { <button type="button" class="menu-item" (click)="generate()"><app-icon name="play" />Create a report</button> }
+          @if (canTemplates()) { <a class="menu-item" routerLink="/reports/templates"><app-icon name="layers" />Build or copy a template</a> }
+          @if (canData()) { <a class="menu-item" routerLink="/reports/data"><app-icon name="database" />Browse data</a> }
+        </section>
+        <section class="card p-4 flex flex-col gap-3">
+          <h2 class="section-title">Template activity</h2>
+          @if (!d.templateActivity.length) { <p class="text-sm text-[color:var(--text-muted)]">No templates yet: start from a starter or import one.</p> }
+          @for (t of d.templateActivity; track t.templateId) {
+            <div class="flex flex-col gap-0.5">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
+                @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+                @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
+              </div>
+              <span class="text-xs text-[color:var(--text-muted)]">Updated {{ t.updatedAt | serverTime: 'dateTime' }}</span>
+            </div>
+          }
+          <p class="text-xs text-[color:var(--text-muted)]">Published versions never change: edits go into a new draft.</p>
+        </section>
+      </aside>
+    </div>
+  } @else {
+    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+  }
+</div>

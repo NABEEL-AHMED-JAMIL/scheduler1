@@ -29,7 +29,11 @@ export type PageKey =
   | 'developer-portal'
   // UX review 2026-10-12: Saved Analyses reads the boards; saving, pinning and deleting are Edit dashboards' (or the
   // Studio's). Identity's PageKey has the same split, and the gateway refuses the writes with a 403.
-  | 'dashboards-edit';
+  | 'dashboards-edit'
+  // MIG-403: See results › Reports (Report Studio), one key per tab and per action, each on its own media-service prefix:
+  // the hub's Overview, templates, publishing (an action), data, generating (an action) and the library. Identity's
+  // PageKey has the same six; the gateway refuses another key's calls.
+  | 'report-studio' | 'report-templates' | 'report-publish' | 'report-data' | 'report-generate' | 'report-library';
 
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
@@ -82,6 +86,12 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'workflow-designer': 'Approval workflows',
   'developer-portal': 'Developer portal',
   'dashboards-edit': 'Edit dashboards',
+  'report-studio': 'Reports overview',
+  'report-templates': 'Report templates',
+  'report-publish': 'Publish report templates',
+  'report-data': 'Report data',
+  'report-generate': 'Generate reports',
+  'report-library': 'Reports',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

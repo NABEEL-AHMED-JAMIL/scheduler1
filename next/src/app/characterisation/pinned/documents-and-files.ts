@@ -271,8 +271,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics",
       "/data/ask",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "the object browser, no bucket chosen": {
@@ -299,8 +298,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics",
       "/data/ask",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   }
 };

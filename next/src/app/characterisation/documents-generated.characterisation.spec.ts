@@ -66,12 +66,12 @@ describe('MIG-253: Documents -- the converter\'s render modes, Reports, and a fi
   });
 
   it('Reports, as a workspace administrator', async () => {
-    const v = await visit('/data/reports', 'TENANT_ADMIN', null, { ...RUNS, ...REPORTS_FOLDER });
+    const v = await visit('/reports/from-pipelines', 'TENANT_ADMIN', null, { ...RUNS, ...REPORTS_FOLDER });
     pin(FILE, 'Reports, as a workspace administrator', v.surface, PINNED);
   });
 
   it('Reports, as a tenant user without the page', async () => {
-    const v = await visit('/data/reports', 'TENANT_USER', TU_PAGES);
+    const v = await visit('/reports/from-pipelines', 'TENANT_USER', TU_PAGES);
     pin(FILE, 'Reports, as a tenant user without the page', v.surface, PINNED);
   });
 

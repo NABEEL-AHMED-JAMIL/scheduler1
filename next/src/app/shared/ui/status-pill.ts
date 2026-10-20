@@ -67,6 +67,15 @@ const LOOK: Record<string, StatusLook> = {
   'in review':     { tone: 'warn',    glyph: 'eye' },
   'auto-approved': { tone: 'ok',      glyph: 'checkCircle' },
   unclassified:    { tone: 'warn',    glyph: 'alert' },
+
+  // Report Studio (MIG-403): a template's versions and a report's state. A job uses the run words above (Queued,
+  // Running, Completed, Failed); Cancelled is a job someone stopped.
+  published:  { tone: 'ok',      glyph: 'checkCircle' },
+  draft:      { tone: 'brand',   glyph: 'edit' },
+  ready:      { tone: 'ok',      glyph: 'checkCircle' },
+  archived:   { tone: 'neutral', glyph: 'inbox' },
+  superseded: { tone: 'neutral', glyph: 'history' },
+  cancelled:  { tone: 'neutral', glyph: 'stop', run: true },
 };
 
 const UNKNOWN: StatusLook = { tone: 'neutral', glyph: '' };

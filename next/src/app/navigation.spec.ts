@@ -110,7 +110,6 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/jobs/new', '/pipelines/schedules/new'],
   ['/objects', '/data/files'],
   ['/queue', '/runs/by-date'],
-  ['/reports', '/runs/analytics'],
   ['/settings/forms', '/settings/task-registry'],
   ['/settings/lookup', '/settings/values'],
   ['/settings/pipeline-forms', '/settings/task-registry'],
@@ -160,7 +159,8 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/integration/developer/guides/quickstart', '/developers/portal/guides/quickstart'],
   ['/documents/intelligence', '/documents/in'],
   ['/documents/inbox', '/documents/file-drop'],
-  ['/documents/reports', '/data/reports'],
+  ['/documents/reports', '/reports/library'],
+  ['/data/reports', '/reports/library'],
   ['/documents/files', '/data/files'],
   ['/documents/converter', '/tools/converter'],
   ['/documents/transcript', '/tools/transcript'],
@@ -266,8 +266,13 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
     ['/documents/file-drop', 'File drop', 'objects', 'TENANT_USER'],
     ['/tools/converter', 'Document Converter', 'tools-converter', undefined],
-    // MIG-253: generated outputs, behind the converter's key (no key of its own yet).
-    ['/data/reports', 'Generated reports', 'tools-converter', undefined],
+    // MIG-253's generated outputs, beneath Reports since MIG-403, still behind the converter's key.
+    ['/reports/from-pipelines', 'Reports from pipelines', 'tools-converter', undefined],
+    // MIG-403: Report Studio's tabs and pages (Templates and a template open to report-generate too: pageKeys).
+    ['/reports/overview', 'Reports overview', 'report-studio', undefined],
+    ['/reports/library', 'Reports', 'report-library', undefined],
+    ['/reports/library/:reportId', 'Report', 'report-library', undefined],
+    ['/reports/data', 'Report data', 'report-data', undefined],
     ['/tools/transcript', 'Audio Transcript', 'tools-transcript', undefined],
     ['/data/analytics', 'Analytics Studio', 'analytics', undefined],
     ['/data/analytics/dashboards', 'Dashboards', 'analytics-dashboards', undefined],
@@ -393,6 +398,8 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const REVIEW = 'Run & review › Review -> /review';
   const DASHBOARDS = 'See results › Dashboards -> /data/analytics/dashboards';
   const ANALYSIS = 'See results › Analysis -> /data';
+  // MIG-403: Report Studio's hub, between Analysis and Tools.
+  const REPORTS = 'See results › Reports -> /reports';
   const TOOLS = 'See results › Tools -> /tools';
   const ADMINISTRATION = 'Administration & billing › Administration -> /administration';
   const BILLING = 'Administration & billing › Billing -> /billing';
@@ -400,7 +407,7 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
   const DEVELOPERS = 'Administration & billing › Developers -> /developers';
   const EVERY_MEMBER_PAGE = [
     ...HOME, CONNECTIONS, DOCUMENTS, FORMS, PIPELINES, AI_ASSISTANT, APPROVALS, RUNS, REVIEW,
-    DASHBOARDS, ANALYSIS, TOOLS,
+    DASHBOARDS, ANALYSIS, REPORTS, TOOLS,
   ];
   const ADMIN_MENU = [...EVERY_MEMBER_PAGE, ADMINISTRATION, BILLING, SETTINGS, DEVELOPERS];
 
@@ -447,6 +454,13 @@ describe('MIG-246 / MIG-267: the menu each role sees', () => {
       'dashboards-edit'])).toEqual([...HOME, FORMS, RUNS, REVIEW, DASHBOARDS]);
     expect(menuFor('TENANT_USER', ['document-review'])).toEqual([...HOME, REVIEW]);
     expect(menuFor('TENANT_USER', ['reports', 'analytics-dashboards'])).not.toContain(REVIEW);
+  });
+
+  // MIG-403: a reviewer's profile gets the Reports hub and library (identity V8.11); the hub shows its tabs the key opens.
+  it('shows Reports to whoever holds any of its tab keys', () => {
+    expect(menuFor('TENANT_USER', ['report-library'])).toEqual([...HOME, REPORTS]);
+    // An action key alone (publishing) opens no tab.
+    expect(menuFor('TENANT_USER', ['report-publish'])).toEqual(HOME);
   });
 
   it('a tenant user with no page', () => {

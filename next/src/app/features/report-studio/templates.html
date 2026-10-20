@@ -1,0 +1,108 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Templates are data: a page layout, its blocks and the data paths they show. Published versions never change.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canEdit()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="importJson()"><app-icon name="upload" />Import JSON</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="create(null)"><app-icon name="plus" />New template</button>
+        }
+      </div>
+    </div>
+  </app-page-header>
+
+  <app-table-shell heading="Templates" columnsKey="report-templates" [loading]="loading()" [error]="error()" [isEmpty]="!filtered().length"
+                   [shown]="filtered().length" [total]="templates().length" emptyIcon="template" (retry)="load()"
+                   [emptyMessage]="search() || state() ? 'No template matches the filters.' : archived() ? 'No archived templates.'
+                     : 'No templates yet. Start from a starter below, import one, or begin blank.'">
+    <ng-container toolbar>
+      <select class="input max-w-40" [value]="state()" aria-label="State" (change)="state.set($any($event.target).value)">
+        <option value="">All states</option>
+        <option value="PUBLISHED">Published</option>
+        <option value="DRAFT">Never published</option>
+        <option value="HAS_DRAFT">With a draft</option>
+      </select>
+      <div class="search-field max-w-64">
+        <app-icon name="search" size="0.95em" />
+        <input class="input" placeholder="Search name, category or tag" aria-label="Search templates" [value]="search()"
+               (input)="search.set($any($event.target).value)" />
+      </div>
+      <label class="inline-flex items-center gap-2 text-sm whitespace-nowrap">
+        <input type="checkbox" [checked]="archived()" (change)="showArchived($any($event.target).checked)" />Archived
+      </label>
+    </ng-container>
+    <table class="table-modern">
+      <thead>
+        <tr>
+          <th>Template</th><th>Category</th><th>Versions</th><th>From</th><th>Updated</th>
+          <th class="w-12 th-actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (t of filtered(); track t.templateId) {
+          <tr>
+            <td class="max-w-96">
+              <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
+              @if (t.description) { <div class="text-xs text-[color:var(--text-muted)] truncate">{{ t.description }}</div> }
+            </td>
+            <td class="text-sm">{{ t.category || '—' }}</td>
+            <td>
+              <div class="flex flex-wrap gap-1">
+                @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
+                @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
+                @if (t.status === 'ARCHIVED') { <app-status label="Archived" /> }
+              </div>
+            </td>
+            <td class="text-xs">{{ originWord(t) }}</td>
+            <td class="text-xs whitespace-nowrap">{{ t.updatedAt | serverTime: 'dateTime' }}</td>
+            <td>
+              <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + t.name">
+                <app-icon name="dots" size="1.05em" />
+              </button>
+              <ng-template #rowMenu>
+                <div cdkMenu class="card shadow-xl py-1 min-w-52 text-sm">
+                  <a cdkMenuItem class="menu-item" [routerLink]="['/reports/templates', t.templateId]"><app-icon name="eye" />Open</a>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="test(t)"><app-icon name="play" />Test with data</button>
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="exportJson(t)"><app-icon name="download" />Export JSON</button>
+                  @if (canEdit()) {
+                    <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="copy(t)"><app-icon name="copy" />Make a copy</button>
+                    @if (t.status !== 'ARCHIVED') { <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="archive(t)"><app-icon name="inbox" />Archive</button> }
+                    <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove(t)"><app-icon name="trash" class="icon-crit" />Delete</button>
+                  }
+                </div>
+              </ng-template>
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </app-table-shell>
+
+  <section class="mt-6" aria-labelledby="rsStarters">
+    <div class="flex flex-wrap items-baseline gap-2 mb-3">
+      <h2 id="rsStarters" class="section-title">Starters</h2>
+      <span class="text-xs text-[color:var(--text-muted)]">The platform's generic layouts. Using one copies it into your workspace as a draft.</span>
+    </div>
+    <div class="rs-cards">
+      @for (s of starters(); track s.key) {
+        <article class="card p-4 flex flex-col gap-2">
+          <div class="flex items-start gap-2">
+            <span class="stat-glyph shrink-0"><app-icon name="template" /></span>
+            <div class="min-w-0 flex-1">
+              <h3 class="font-semibold">{{ s.name }}</h3>
+              <p class="text-xs text-[color:var(--text-muted)]">{{ s.category }} · {{ s.components }} blocks</p>
+            </div>
+          </div>
+          @if (s.description) { <p class="text-sm text-[color:var(--text-secondary)]">{{ s.description }}</p> }
+          @if (canEdit()) {
+            <div class="mt-auto"><button type="button" class="btn btn-default btn-sm" (click)="create(s)"><app-icon name="copy" />Use starter</button></div>
+          }
+        </article>
+      }
+    </div>
+  </section>
+</div>

@@ -1,0 +1,139 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">The data a report can read: pipeline outputs, files in your buckets, and uploads. Each is read as you.</p>
+      </div>
+      <div class="flex items-center gap-2"><app-refresh-button [loading]="loading()" (refresh)="load()" /></div>
+    </div>
+  </app-page-header>
+
+  <div class="rs-banner rs-banner-info mb-4" role="note">
+    <app-icon name="shield" class="shrink-0" />
+    <div class="text-sm">Only {{ workspaceName() }}'s data. You see a source's schema and at most 100 of its records, and use it in reports.
+      Connection settings and passwords are never asked for or shown; a run or file you cannot open elsewhere is refused here too.</div>
+  </div>
+
+  <div class="rs-split">
+    <div class="flex flex-col gap-4 min-w-0">
+      <section class="card">
+        <div class="rs-head"><div><h2 class="section-title">Pipeline outputs</h2><p class="text-xs text-[color:var(--text-muted)]">A run's kept files and datasets.</p></div></div>
+        <div class="p-4 flex flex-col gap-3">
+          <app-report-source-picker [(source)]="picked" mode="run" [only]="['run']" />
+          <button type="button" class="btn btn-default btn-sm self-start" [disabled]="busy() || !picked() || picked()!.connector !== 'RUN_OUTPUT'"
+                  (click)="inspectPicked()"><app-icon name="eye" />Inspect</button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="rs-head"><div><h2 class="section-title">Storage buckets</h2><p class="text-xs text-[color:var(--text-muted)]">A JSON or CSV file, read only.</p></div></div>
+        <div class="p-4 flex flex-col gap-3">
+          <label class="field">
+            <span class="label">Bucket</span>
+            <select class="input" [ngModel]="bucket()" (ngModelChange)="bucket.set($event)" aria-label="Bucket">
+              <option value="">{{ buckets().length ? 'Choose a bucket' : 'No buckets you may browse' }}</option>
+              @for (b of buckets(); track b.bucket) { <option [value]="b.bucket">{{ b.label || b.bucket }}</option> }
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">File</span>
+            <input class="input mono" [ngModel]="key()" (ngModelChange)="key.set($event)" aria-label="File key" placeholder="reference/quality_targets_2026.csv" />
+          </label>
+          <button type="button" class="btn btn-default btn-sm self-start" [disabled]="busy() || !bucket() || !key().trim()" (click)="inspectBucket()">
+            <app-icon name="eye" />Inspect
+          </button>
+        </div>
+      </section>
+
+      <section class="card">
+        <div class="rs-head"><div><h2 class="section-title">Uploads</h2><p class="text-xs text-[color:var(--text-muted)]">JSON or CSV, kept for reports.</p></div></div>
+        <div class="p-4 flex flex-col gap-3">
+          <label class="field">
+            <span class="label">Name (optional)</span>
+            <input class="input" [ngModel]="uploadName()" (ngModelChange)="uploadName.set($event)" aria-label="Upload name" placeholder="Board notes" />
+          </label>
+          <app-file-dropzone accept=".json,.csv,.tsv,application/json,text/csv" prompt="Drop a JSON or CSV file" [disabled]="busy()" (picked)="upload($event)" />
+          @if (error()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ error() }}</p> }
+          <ul class="divide-y divide-[color:var(--border-subtle)]">
+            @for (s of sources(); track s.sourceId) {
+              <li class="py-2 flex items-center gap-2">
+                <button type="button" class="menu-item flex-1 min-w-0" [class.is-active]="selected() === s.sourceId" (click)="inspectSaved(s)">
+                  <app-icon [name]="s.connector === 'UPLOAD' ? 'file' : s.connector === 'RUN_OUTPUT' ? 'history' : 'database'" />
+                  <span class="min-w-0 flex flex-col items-start">
+                    <span class="truncate font-medium">{{ s.name }}</span>
+                    <span class="text-xs text-[color:var(--text-muted)]">{{ s.format }}@if (s.bytes) { · {{ size(s.bytes) }} } · {{ s.createdAt | serverTime: 'dateTime' }}</span>
+                  </span>
+                </button>
+                <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + s.name" (click)="archive(s)"><app-icon name="trash" /></button>
+              </li>
+            } @empty {
+              <li class="py-2 text-sm text-[color:var(--text-muted)]">Nothing uploaded or saved yet.</li>
+            }
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <section class="card min-w-0" aria-live="polite">
+      @if (busy()) {
+        <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Reading"></span></div>
+      } @else if (inspectError()) {
+        <p class="p-4 text-sm text-[color:var(--crit-text)]" role="alert">{{ inspectError() }}</p>
+      } @else if (result(); as r) {
+        <div class="rs-head">
+          <div class="min-w-0">
+            <h2 class="section-title truncate">{{ r.label }}</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">{{ r.format }} · {{ size(r.bytes) }} · {{ r.records }} record{{ r.records === 1 ? '' : 's' }} at {{ r.rootPath }}
+              · sha256 <span class="mono">{{ r.sha256.slice(0, 12) }}</span></p>
+          </div>
+          @if (canKeep()) {
+            <div class="flex flex-wrap items-center gap-2">
+              <input class="input max-w-56" [ngModel]="saveName()" (ngModelChange)="saveName.set($event)" aria-label="Source name" />
+              <button type="button" class="btn btn-default btn-sm" [disabled]="!saveName().trim()" (click)="keep()"><app-icon name="save" />Save as a source</button>
+            </div>
+          }
+        </div>
+        <div class="p-4 grid gap-4 lg:grid-cols-2">
+          <div class="flex flex-col gap-3 min-w-0">
+            <label class="field">
+              <span class="label">Report data starts at</span>
+              <input class="input mono" [ngModel]="rootPath()" (change)="reroot($any($event.target).value)" aria-label="Root path" />
+              <span class="field-note text-[color:var(--text-muted)]">A template's paths are read from here. Pick a list or object below.</span>
+            </label>
+            <ul class="rs-tree">
+              @for (t of flatTree(); track t.node.path) {
+                <li [class]="'rs-depth-' + (t.depth > 6 ? 6 : t.depth)">
+                  <button type="button" class="link-inline mono text-xs" (click)="reroot(t.node.path)">{{ t.node.path }}</button>
+                  <span class="text-xs text-[color:var(--text-muted)]">{{ t.node.type }}@if (t.node.length != null) { · {{ t.node.length }} items }</span>
+                </li>
+              }
+            </ul>
+          </div>
+          <div class="flex flex-col gap-3 min-w-0">
+            <h3 class="text-sm font-semibold">Schema</h3>
+            <table class="table-modern">
+              <thead><tr><th>Path</th><th>Type</th><th>Empty?</th></tr></thead>
+              <tbody>
+                @for (f of r.schema; track f.path) {
+                  <tr><td class="mono text-xs">{{ f.path }}</td><td class="text-xs">{{ f.type }}</td><td class="text-xs">{{ f.nullable ? 'Sometimes' : 'Never' }}</td></tr>
+                }
+              </tbody>
+            </table>
+            @if (r.warnings.length) {
+              <ul class="text-xs flex flex-col gap-1" aria-label="Warnings">
+                @for (w of r.warnings; track $index) { <li class="flex gap-1.5"><app-icon name="alert" class="icon-warn shrink-0" />{{ w }}</li> }
+              </ul>
+            }
+          </div>
+          <div class="lg:col-span-2 flex flex-col gap-2 min-w-0">
+            <h3 class="text-sm font-semibold">Sample · {{ r.sampleRecords }} of {{ r.records }} record{{ r.records === 1 ? '' : 's' }}</h3>
+            <pre class="rs-code">{{ sampleText() }}</pre>
+          </div>
+        </div>
+      } @else {
+        <div class="p-8 text-center text-sm text-[color:var(--text-muted)]">Pick a pipeline output, a bucket file or an upload to see its schema and a sample.</div>
+      }
+    </section>
+  </div>
+</div>

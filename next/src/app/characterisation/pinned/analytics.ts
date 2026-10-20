@@ -44,8 +44,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics",
       "/data/ask",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "Analytics Studio, as a tenant user with every page": {
@@ -81,8 +80,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics",
       "/data/analytics/dashboards",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "Analytics Studio, as a workspace administrator": {
@@ -120,8 +118,7 @@ export const PINNED: Record<string, unknown> = {
       "/data/analytics/dashboards",
       "/data/ask",
       "/data/catalog",
-      "/data/files",
-      "/data/reports"
+      "/data/files"
     ]
   },
   "a dashboard, opened": {

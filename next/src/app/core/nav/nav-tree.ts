@@ -207,8 +207,20 @@ export const NAV: NavItem[] = [
           { label: 'Ask your data', path: '/data/ask', pageKey: 'ask-data', icon: 'chat' },
           { label: 'Analytics Studio', path: '/data/analytics', pageKey: 'analytics', icon: 'chart' },
           { label: 'Data Catalog', path: '/data/catalog', pageKey: 'data-catalog', icon: 'database' },
-          { label: 'Generated reports', path: '/data/reports', pageKey: 'tools-converter', icon: 'layers' },
           { label: 'Files', path: '/data/files', pageKey: 'objects', icon: 'folder' },
+        ],
+      },
+      {
+        // MIG-403 (Report Studio): templates designed once, filled from pipeline runs and files, every version kept. A hub
+        // under See results (owner-approved 2026-10-19): Overview, Templates, Reports, Data; Assets & branding comes with
+        // phase 3. The old Analysis › Generated reports moved here (its pipeline files: /reports/from-pipelines).
+        label: 'Reports', path: '/reports', icon: 'file',
+        hint: 'Report templates, the reports made from them, and their data',
+        tabs: [
+          { label: 'Overview', path: '/reports/overview', pageKey: 'report-studio', icon: 'chart' },
+          { label: 'Templates', path: '/reports/templates', pageKeys: ['report-templates', 'report-generate'], icon: 'template' },
+          { label: 'Reports', path: '/reports/library', pageKey: 'report-library', icon: 'file' },
+          { label: 'Data', path: '/reports/data', pageKey: 'report-data', icon: 'database' },
         ],
       },
       {

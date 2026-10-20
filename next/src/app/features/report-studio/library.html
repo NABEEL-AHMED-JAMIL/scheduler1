@@ -1,0 +1,98 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Every report and its versions. Generating again makes a new version; nothing is overwritten.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canPipelineFiles()) { <a class="btn btn-default btn-sm" routerLink="/reports/from-pipelines"><app-icon name="folder" />From pipelines</a> }
+        @if (canGenerate()) { <button type="button" class="btn btn-primary btn-sm" (click)="generate()"><app-icon name="play" />New report</button> }
+      </div>
+    </div>
+  </app-page-header>
+
+  <div class="mb-3"><app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" /></div>
+
+  @if (view() === 'reports') {
+    <app-table-shell heading="Reports" columnsKey="report-library" [loading]="loading()" [error]="error()" [isEmpty]="!shownReports().length"
+                     [shown]="shownReports().length" [total]="reports().length" emptyIcon="file" (retry)="load()"
+                     [emptyMessage]="search() || status() ? 'No report matches the filters.' : 'No reports yet: publish a template, then generate one.'">
+      <ng-container toolbar>
+        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
+          <option value="">All</option><option value="GENERATED">Ready</option><option value="FAILED">Failed</option>
+        </select>
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search report or template" aria-label="Search reports" [value]="search()"
+                 (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+      <table class="table-modern">
+        <thead><tr><th>Report</th><th>Template</th><th>Version</th><th>Files</th><th>Status</th><th>Last job</th><th>Updated</th></tr></thead>
+        <tbody>
+          @for (r of shownReports(); track r.reportId) {
+            <tr>
+              <td class="max-w-96">
+                <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
+                <div class="text-xs text-[color:var(--text-muted)] mono">{{ r.label }}</div>
+              </td>
+              <td class="text-sm"><a class="link-inline" [routerLink]="['/reports/templates', r.templateId]">{{ r.templateName }}</a>
+                @if (r.current) { <span class="text-xs text-[color:var(--text-muted)]"> · v{{ r.current.templateVersion }}</span> }</td>
+              <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
+              <td class="text-xs">@for (o of r.current?.outputs ?? []; track o.format) { <span class="pill pill-neutral mr-1">{{ o.format }}</span> }</td>
+              <td><app-status [label]="chipWord(r.status)" /></td>
+              <td class="text-xs">
+                @if (r.lastJob; as j) {
+                  @if (isRunning(j.status)) { {{ stageWord(j.status) }} · {{ j.progressPct }}% }
+                  @else { <span class="mono">{{ j.label }}</span> {{ chipWord(j.status) }}@if (j.errorCode) { · <span class="mono">{{ j.errorCode }}</span> } }
+                } @else { — }
+              </td>
+              <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'dateTime' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  } @else {
+    <app-table-shell heading="Generation jobs" columnsKey="report-jobs" [loading]="loading()" [error]="error()" [isEmpty]="!shownJobs().length"
+                     [shown]="shownJobs().length" [total]="jobs().length" emptyIcon="history" (retry)="load()"
+                     [emptyMessage]="search() || status() ? 'No job matches the filters.' : 'No jobs yet.'">
+      <ng-container toolbar>
+        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
+          <option value="">All</option><option value="RUNNING">Running</option><option value="SUCCEEDED">Completed</option>
+          <option value="FAILED">Failed</option><option value="CANCELLED">Cancelled</option>
+        </select>
+        <div class="search-field max-w-64">
+          <app-icon name="search" size="0.95em" />
+          <input class="input" placeholder="Search job, report or code" aria-label="Search jobs" [value]="search()"
+                 (input)="search.set($any($event.target).value)" />
+        </div>
+      </ng-container>
+      <table class="table-modern">
+        <thead><tr><th>Job</th><th>Report</th><th>Template</th><th>Progress</th><th>Made</th><th>Started</th><th>Finished</th></tr></thead>
+        <tbody>
+          @for (j of shownJobs(); track j.jobId) {
+            <tr>
+              <td class="mono whitespace-nowrap">{{ j.label }}</td>
+              <td class="max-w-80"><a class="link-inline" [routerLink]="['/reports/library', j.reportId]">{{ j.reportName }}</a>
+                <div class="text-xs text-[color:var(--text-muted)] mono">{{ j.reportLabel }}</div></td>
+              <td class="text-sm">{{ j.templateName }}@if (j.templateVersion) { · v{{ j.templateVersion }} }</td>
+              <td>
+                @if (isRunning(j.status)) { <span class="text-sm">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span> }
+                @else {
+                  <app-status [label]="chipWord(j.status)" />
+                  @if (j.errorCode) { <div class="text-xs mono mt-0.5">{{ j.errorCode }}</div> <div class="text-xs text-[color:var(--text-muted)] max-w-80">{{ j.error }}</div> }
+                }
+              </td>
+              <td class="text-xs">@if (j.resultVersion) { v{{ j.resultVersion }}@if (j.pages) { · {{ j.pages }} p. } } @else { — }</td>
+              <td class="text-xs whitespace-nowrap">{{ (j.startedAt || j.createdAt) | serverTime: 'dateTime' }}</td>
+              <td class="text-xs whitespace-nowrap">{{ j.finishedAt | serverTime: 'dateTime' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  }
+</div>

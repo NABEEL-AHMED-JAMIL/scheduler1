@@ -381,9 +381,61 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/data/reports",
-      "title": "Generated reports",
+      "path": "/reports/from-pipelines",
+      "title": "Reports from pipelines",
       "pageKey": "tools-converter",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/overview",
+      "title": "Reports overview",
+      "pageKey": "report-studio",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates",
+      "title": "Report templates",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/templates/:templateId",
+      "title": "Report template",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library",
+      "title": "Reports",
+      "pageKey": "report-library",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/library/:reportId",
+      "title": "Report",
+      "pageKey": "report-library",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/data",
+      "title": "Report data",
+      "pageKey": "report-data",
       "guards": [
         "pageGuard"
       ],
@@ -930,6 +982,11 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
+      "path": "/reports",
+      "guards": [],
+      "lazy": false
+    },
+    {
       "path": "/tools",
       "guards": [],
       "lazy": false
@@ -1057,7 +1114,13 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/reports",
-      "redirectTo": "data/reports",
+      "redirectTo": "reports/library",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/data/reports",
+      "redirectTo": "reports/library",
       "guards": [],
       "lazy": false
     },
@@ -1452,12 +1515,6 @@ export const PINNED: Record<string, unknown> = {
       "lazy": false
     },
     {
-      "path": "/reports",
-      "redirectTo": "runs/analytics",
-      "guards": [],
-      "lazy": false
-    },
-    {
       "path": "/objects",
       "redirectTo": "data/files",
       "guards": [],
@@ -1768,6 +1825,10 @@ export const PINNED: Record<string, unknown> = {
     "lands": "/settings/values",
     "heading": "Configuration values"
   },
+  "old address /data/reports": {
+    "lands": "/reports/library",
+    "heading": "Reports"
+  },
   "old address /documents/converter": {
     "lands": "/tools/converter",
     "heading": "Document Converter"
@@ -1785,8 +1846,8 @@ export const PINNED: Record<string, unknown> = {
     "heading": "Documents in"
   },
   "old address /documents/reports": {
-    "lands": "/data/reports",
-    "heading": "Generated reports"
+    "lands": "/reports/library",
+    "heading": "Reports"
   },
   "old address /documents/review": {
     "lands": "/review/documents",
@@ -1979,10 +2040,6 @@ export const PINNED: Record<string, unknown> = {
   "old address /queue": {
     "lands": "/runs/by-date",
     "heading": "Runs"
-  },
-  "old address /reports": {
-    "lands": "/runs/analytics",
-    "heading": "Run analytics"
   },
   "old address /settings/forms": {
     "lands": "/settings/task-registry",

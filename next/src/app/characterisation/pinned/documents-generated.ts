@@ -1,13 +1,13 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "Reports, as a tenant user without the page": {
-    "url": "/unauthorized?page=tools-converter&title=Generated%20reports",
+    "url": "/unauthorized?page=tools-converter&title=Reports%20from%20pipelines",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Generated reports isn't part of your access"
+      "Reports from pipelines isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -19,7 +19,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "Reports, as a workspace administrator": {
-    "url": "/data/reports",
+    "url": "/reports/from-pipelines",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -31,7 +31,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /sourceJob.json/runOutputs?jobQueueId=7405"
     ],
     "headings": [
-      "Generated reports",
+      "Reports from pipelines",
       "Generated outputs (3 of 3)"
     ],
     "buttons": [
@@ -62,13 +62,8 @@ export const PINNED: Record<string, unknown> = {
       "reports/"
     ],
     "links": [
-      "/data",
-      "/data/analytics",
-      "/data/ask",
-      "/data/catalog",
-      "/data/files",
-      "/data/reports",
       "/pipelines/schedules/2849/runs/7405",
+      "/reports",
       "/tools/converter?mode=dataset"
     ]
   },

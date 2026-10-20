@@ -389,12 +389,55 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        // MIG-253: generated outputs -- renders saved to a bucket and what recent runs put out. Behind the
-        // converter's key: it lists what the converter makes, and there is no page key of its own yet.
-        path: 'data/reports',
-        title: 'Generated reports',
+        // MIG-253's generated outputs -- renders saved to a bucket and what recent runs' render_pdf steps put out -- now
+        // beneath Reports (MIG-403): the Reports tab links here as "From pipelines". Still the converter's key.
+        path: 'reports/from-pipelines',
+        title: 'Reports from pipelines',
         loadComponent: () => import('./features/documents/generated/generated-reports').then(m => m.GeneratedReports),
         data: { pageKey: 'tools-converter' },
+        canActivate: [pageGuard],
+      },
+      // MIG-403: See results › Reports (Report Studio). Each tab its own page key; the detail pages their tab's.
+      {
+        path: 'reports/overview',
+        title: 'Reports overview',
+        loadComponent: () => import('./features/report-studio/overview').then(m => m.ReportOverview),
+        data: { pageKey: 'report-studio' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'reports/templates',
+        title: 'Report templates',
+        loadComponent: () => import('./features/report-studio/templates').then(m => m.ReportTemplates),
+        data: { pageKeys: ['report-templates', 'report-generate'] },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'reports/templates/:templateId',
+        title: 'Report template',
+        loadComponent: () => import('./features/report-studio/template-page').then(m => m.ReportTemplatePage),
+        data: { pageKeys: ['report-templates', 'report-generate'] },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'reports/library',
+        title: 'Reports',
+        loadComponent: () => import('./features/report-studio/library').then(m => m.ReportLibrary),
+        data: { pageKey: 'report-library' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'reports/library/:reportId',
+        title: 'Report',
+        loadComponent: () => import('./features/report-studio/report-page').then(m => m.ReportPage),
+        data: { pageKey: 'report-library' },
+        canActivate: [pageGuard],
+      },
+      {
+        path: 'reports/data',
+        title: 'Report data',
+        loadComponent: () => import('./features/report-studio/data').then(m => m.ReportData),
+        data: { pageKey: 'report-data' },
         canActivate: [pageGuard],
       },
       {
@@ -906,7 +949,7 @@ export const routes: Routes = [
       // reader may open (core/nav/nav-access.ts), and the console's 403 page when there is none. The tabs are the
       // routes above, each with its own guard: the redirect only picks one, it never opens one.
       // ---------------------------------------------------------------------------------------------
-      ...['connections', 'documents', 'forms', 'pipelines', 'runs', 'review', 'data', 'tools', 'administration', 'billing',
+      ...['connections', 'documents', 'forms', 'pipelines', 'runs', 'review', 'data', 'reports', 'tools', 'administration', 'billing',
         'settings', 'developers', 'platform'].map(path => ({ path, pathMatch: 'full' as const, redirectTo: toFirstTab })),
       // ---------------------------------------------------------------------------------------------
       // Old addresses. Every one a full match: a prefix redirect also catches every longer address
@@ -935,7 +978,9 @@ export const routes: Routes = [
         ['integration/developer/guides/:slug', 'developers/portal/guides/:slug'],
         ['documents/intelligence', 'documents/in'],
         ['documents/inbox', 'documents/file-drop'],
-        ['documents/reports', 'data/reports'],
+        ['documents/reports', 'reports/library'],
+        // MIG-403: Analysis › Generated reports is Reports now (its pipeline files are Reports › From pipelines).
+        ['data/reports', 'reports/library'],
         ['documents/files', 'data/files'],
         ['documents/converter', 'tools/converter'],
         ['documents/transcript', 'tools/transcript'],
@@ -1012,7 +1057,6 @@ export const routes: Routes = [
         ['tasks/new', 'pipelines/new'],
         ['tasks/bulk', 'pipelines/bulk'],
         ['tasks/:taskDetailId/edit', 'pipelines/:taskDetailId/edit'],
-        ['reports', 'runs/analytics'],
         ['objects', 'data/files'],
         ['analytics', 'data/analytics'],
         ['analytics/dashboards', 'data/analytics/dashboards'],
