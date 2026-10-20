@@ -451,6 +451,32 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/reports/assets",
+      "title": "Assets & branding",
+      "pageKey": "report-assets",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets/branding/:profileId",
+      "title": "Brand profile",
+      "pageKey": "report-assets",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/reports/assets/:assetId",
+      "title": "Asset",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/reports/data",
       "title": "Report data",
       "pageKey": "report-data",

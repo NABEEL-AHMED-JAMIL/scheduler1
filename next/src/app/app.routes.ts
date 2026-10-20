@@ -451,6 +451,31 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-406 (approved screen 8): logos, images, signatures and stamps, and brand profiles; report-assets.
+        path: 'reports/assets',
+        title: 'Assets & branding',
+        loadComponent: () => import('./features/report-studio/assets/assets').then(m => m.ReportAssets),
+        data: { pageKey: 'report-assets' },
+        canActivate: [pageGuard],
+      },
+      {
+        // MIG-406 (screen 9): one brand profile's draft over its published version, with a live preview; report-assets.
+        path: 'reports/assets/branding/:profileId',
+        title: 'Brand profile',
+        loadComponent: () => import('./features/report-studio/assets/brand-profile').then(m => m.BrandProfilePage),
+        data: { pageKey: 'report-assets' },
+        canActivate: [pageGuard],
+      },
+      {
+        // MIG-406 (screen 10): one asset -- versions, use, grants, its digital signature. The approver it belongs to opens
+        // it too (report-approve) to approve a picture and grant its use.
+        path: 'reports/assets/:assetId',
+        title: 'Asset',
+        loadComponent: () => import('./features/report-studio/assets/asset-page').then(m => m.AssetPage),
+        data: { pageKeys: ['report-assets', 'report-approve'] },
+        canActivate: [pageGuard],
+      },
+      {
         path: 'reports/data',
         title: 'Report data',
         loadComponent: () => import('./features/report-studio/data').then(m => m.ReportData),

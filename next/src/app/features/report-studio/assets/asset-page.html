@@ -1,0 +1,241 @@
+<div class="page">
+  @if (error()) {
+    <app-page-header title="Asset" />
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (a(); as a) {
+    <app-page-header [crumb]="a.name">
+      <div class="page-head">
+        <div>
+          <div class="page-head-title">
+            <h1 class="page-title">{{ a.name }}</h1>
+            <span pills class="flex flex-wrap gap-1"><span class="pill" [class]="stateTone(a.state)">{{ stateWord(a.state) }}</span></span>
+          </div>
+          <p class="page-subtitle">Asset {{ a.label }} · {{ kindWords[a.kind] }} · {{ a.restricted ? 'Limited use' : 'Editors manage' }}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a class="btn btn-default btn-sm" routerLink="/reports/assets" [queryParams]="a.restricted ? { tab: 'restricted' } : {}"><app-icon name="arrowLeft" />Back to assets</a>
+          @if (canManage() && a.status === 'ACTIVE') {
+            @if (!a.templates && !a.reports && !a.profiles && !a.usage.length) { <button type="button" class="btn btn-ghost btn-sm" (click)="remove()"><app-icon name="trash" />Delete</button> }
+            <button type="button" class="btn btn-default btn-sm" (click)="retire()"><app-icon name="inbox" />Retire</button>
+          }
+          <button type="button" class="btn btn-primary btn-sm" [disabled]="!canManage() || a.status !== 'ACTIVE' || !!pending()" (click)="newVersion()"
+                  [title]="pending() ? 'v' + pending()!.version + ' waits for approval first' : !canManage() ? (a.restricted ? 'Workspace admins upload signatures and stamps' : '') : ''">
+            <app-icon name="upload" />Upload new version</button>
+        </div>
+      </div>
+    </app-page-header>
+
+    @if (a.kind === 'SIGNATURE') {
+      <div class="rs-banner rs-banner-info mb-4" role="note">
+        <app-icon name="shield" class="shrink-0" />
+        <div class="min-w-0 flex-1"><b>Two parts: a picture and a digital signature</b><br>
+          This picture is how the signature looks on the page. When {{ ownerWord() }} approves a report, the PDF is also digitally signed in
+          their name with the time. That signature is what proves who approved, and it breaks if the file is changed afterwards.</div>
+      </div>
+    }
+
+    <div class="rsa-detail">
+      <div class="flex flex-col gap-4 min-w-0">
+        <section class="card">
+          <div class="rs-head"><h2 class="section-title">Current approved version</h2>
+            @if (current(); as v) { <span class="pill pill-ok">Approved · v{{ v.version }}</span> } @else { <span class="pill pill-warn">Nothing approved yet</span> }</div>
+          <div class="p-4 flex flex-col gap-3">
+            <div class="rsa-hero" [class.rsa-hero-white]="a.restricted">
+              @if (a.currentVersion || pending()) {
+                <div class="flex flex-col items-center gap-1">
+                  <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion ?? pending()?.version" [alt]="a.name" maxHeight="8rem" />
+                  @if (a.ownerName) { <span class="text-xs rsa-hero-caption">{{ a.ownerName }}@if (a.ownerTitle) { · {{ a.ownerTitle }} }</span> }
+                </div>
+              }
+            </div>
+            @if (current() ?? pending(); as v) {
+              <div class="rsb-three text-sm">
+                <div><span class="text-xs text-[color:var(--text-muted)]">File</span><br><span class="mono text-xs">{{ v.originalName || '—' }}</span></div>
+                <div><span class="text-xs text-[color:var(--text-muted)]">Size</span><br>{{ v.width }} × {{ v.height }} px · {{ size(v.bytes) }}</div>
+                <div><span class="text-xs text-[color:var(--text-muted)]">Background</span><br>{{ v.alpha ? 'Transparent PNG' : (v.contentType === 'image/png' ? 'PNG' : 'JPEG') }}</div>
+              </div>
+            }
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              @if (a.ownerName) { <span class="pill pill-neutral">Belongs to {{ a.ownerName }}</span> } @else { <span></span> }
+              @if (a.currentVersion) { <button type="button" class="link-inline text-sm" (click)="fullSize()">View full size <app-icon name="arrowRight" /></button> }
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Versions</h2>
+              <p class="text-xs text-[color:var(--text-muted)]">@if (a.restricted) { A new upload needs approval. The current version stays in use until then. } @else { A new upload is in use at once; old reports keep theirs. }</p></div>
+            <span class="pill pill-neutral">{{ a.versions.length }} version{{ a.versions.length === 1 ? '' : 's' }}</span>
+          </div>
+          <div class="overflow-x-auto"><table class="table-modern">
+            <thead><tr><th>Version · state</th><th>Uploaded by</th><th>Review</th><th>Date</th></tr></thead>
+            <tbody>
+              @for (v of a.versions; track v.version) {
+                <tr>
+                  <td class="whitespace-nowrap">v{{ v.version }} ·
+                    @switch (v.state) {
+                      @case ('PENDING') { <span class="pill pill-warn">Waiting for approval</span> }
+                      @case ('APPROVED') { <span class="pill pill-ok">Current</span> }
+                      @case ('REJECTED') { <span class="pill pill-crit">Rejected</span> }
+                      @default { <span class="pill pill-neutral">Replaced</span> }
+                    }</td>
+                  <td>{{ v.uploadedByName }}</td>
+                  <td [class.rsa-muted]="v.state === 'PENDING'">{{ reviewOf(v) }}@if (v.reviewedAt) { · {{ v.reviewedAt | serverTime: 'dateTime' }} }
+                    @if (v.reviewNote) { <div class="text-xs text-[color:var(--text-muted)]">{{ v.reviewNote }}</div> }</td>
+                  <td class="whitespace-nowrap">{{ v.uploadedAt | serverTime: 'dateTime' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table></div>
+          @if (a.restricted) {
+            <div class="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-subtle">
+              <span class="text-xs text-[color:var(--text-muted)]">The uploader and the approver must be different people.</span>
+              @if (pending(); as v) {
+                <div class="flex gap-2">
+                  <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !canApprove() || v.uploadedBy === a.you.userId" (click)="review(v.version, false)">Reject v{{ v.version }}</button>
+                  <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !canApprove() || v.uploadedBy === a.you.userId" (click)="review(v.version, true)"
+                          [title]="v.uploadedBy === a.you.userId ? 'You uploaded it; someone else approves it' : !canApprove() ? 'Approvers approve it' : ''">Approve v{{ v.version }}</button>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="card">
+          <div class="rs-head"><div><h2 class="section-title">Where it's used</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">{{ a.usageTemplates }} template{{ a.usageTemplates === 1 ? '' : 's' }} · {{ a.usageReports }} report{{ a.usageReports === 1 ? '' : 's' }} keep the version they were made with.</p></div></div>
+          <div class="overflow-x-auto"><table class="table-modern">
+            <thead><tr><th>Used in</th><th>Version</th><th>Use</th></tr></thead>
+            <tbody>
+              @for (u of a.usage; track $index) {
+                <tr>
+                  <td>@if (u.templateId) { <a class="link-inline" [routerLink]="['/reports/templates', u.templateId]">{{ u.name }} · v{{ u.templateVersion }}</a>@if (u.templateVersionState === 'DRAFT') { <span class="text-xs text-[color:var(--text-muted)]"> (draft)</span> } }
+                      @else { {{ u.name }} (brand profile) }</td>
+                  <td>@if (u.assetVersion) { v{{ u.assetVersion }} } @else { — }</td>
+                  <td>@if (u.kind === 'TEMPLATE') { {{ u.reports }} report{{ u.reports === 1 ? '' : 's' }} } @else { Approved choice }</td>
+                </tr>
+              } @empty { <tr><td colspan="3" class="text-sm text-[color:var(--text-muted)]">Not used yet.</td></tr> }
+            </tbody>
+          </table></div>
+        </section>
+
+        <div class="rs-banner rs-banner-info" role="note">
+          <app-icon name="info" class="shrink-0" />
+          <div class="min-w-0 flex-1"><b>Replacing never rewrites history</b><br>A new version doesn't change old reports. Templates keep their version until an editor
+            picks the new one. Retiring stops new use but keeps old reports and the audit trail.</div>
+        </div>
+      </div>
+
+      <aside class="card rs-side min-w-0">
+        <section class="rs-side-sec">
+          <div class="flex items-center justify-between gap-2"><h2 class="section-title">Permissions and approval</h2>
+            <span class="pill" [class]="a.restricted ? 'pill-warn' : 'pill-ok'">{{ a.restricted ? 'Limited' : 'Editors manage' }}</span></div>
+          <div class="rsb-two text-sm">
+            <div><span class="text-xs text-[color:var(--text-muted)]">Uploaded by</span><br>{{ a.versions[a.versions.length - 1]?.uploadedByName || a.createdByName || '—' }}</div>
+            <div><span class="text-xs text-[color:var(--text-muted)]">Approved by@if (current()) { · v{{ current()!.version }} }</span><br>{{ current()?.reviewedByName || (a.restricted ? '—' : 'Usable on upload') }}</div>
+          </div>
+          <ul class="rsa-perms">
+            <li><app-icon [name]="a.you.mayPlace ? 'checkCircle' : 'lock'" [class]="a.you.mayPlace ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />
+              <span><b>Place it on a template</b><br><span class="text-xs text-[color:var(--text-muted)]">
+                @if (a.kind === 'SIGNATURE') { {{ a.ownerName || 'Its owner' }}, or someone they grant it to. } @else if (a.restricted) { Whoever is granted it. } @else { Every editor of the workspace. }
+                @if (a.grants.length) { Granted to {{ a.grants.length }} {{ a.grants.length === 1 ? 'person' : 'people' }}. }</span></span></li>
+            <li><app-icon name="lock" class="text-[color:var(--text-muted)]" /><span><b>Upload, replace, retire</b><br>
+              <span class="text-xs text-[color:var(--text-muted)]">{{ a.restricted ? 'Workspace admins only.' : 'Editors of Assets & branding.' }}</span></span></li>
+            @if (a.restricted) {
+              <li><app-icon name="lock" class="text-[color:var(--text-muted)]" /><span><b>Approve or reject</b><br>
+                <span class="text-xs text-[color:var(--text-muted)]">Approvers only, and never their own upload.</span></span></li>
+            }
+          </ul>
+          @if (a.restricted) {
+            <div class="flex flex-col gap-1.5">
+              <span class="label">Grants</span>
+              @for (g of a.grants; track g.grantId) {
+                <div class="rs-side-row text-xs">
+                  <span class="min-w-0">{{ g.granteeName }} · {{ g.templateId ? 'one template' : 'any template' }} · by {{ g.grantedByName }}
+                    @if (!g.active) { <span class="pill pill-neutral ml-1">Ended</span> }</span>
+                  @if (g.active && (a.you.mayGrant)) { <button type="button" class="link-inline" (click)="revoke(g.grantId)">End</button> }
+                </div>
+              } @empty { <span class="text-xs text-[color:var(--text-muted)]">No grants.</span> }
+              @if (a.you.mayGrant && a.status === 'ACTIVE') {
+                <div class="flex flex-wrap gap-2 items-end">
+                  <select class="input input-sm w-auto" aria-label="Grant to" [ngModel]="grantTo()" (ngModelChange)="grantTo.set($event)">
+                    <option [ngValue]="null">Grant use to…</option>
+                    @for (p of people(); track p.userId) { @if (p.userId !== a.ownerUserId) { <option [ngValue]="p.userId">{{ p.name }}</option> } }
+                  </select>
+                  <button type="button" class="btn btn-default btn-sm" [disabled]="!grantTo()" (click)="grant()">Grant</button>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        @if (a.digitalSignature; as d) {
+          <section class="rs-side-sec">
+            <div class="flex items-center justify-between gap-2"><h2 class="rsa-eyebrow">Digital signature</h2><span class="pill pill-ok">On</span></div>
+            <dl class="rs-kv">
+              <dt>Signs as</dt><dd>{{ d.signsAs }}</dd>
+              <dt>When</dt><dd>{{ d.when }}</dd>
+              <dt>Certificate</dt><dd>{{ d.workspace }} · platform test certificate<br><span class="text-xs text-[color:var(--text-muted)]">A trusted certificate replaces it on AWS</span></dd>
+              <dt>Last used</dt><dd>@if (d.lastReportId) { <a class="link-inline" [routerLink]="['/reports/library', d.lastReportId]">{{ d.lastReportLabel }} v{{ d.lastVersion }}</a> · {{ d.lastUsedAt | serverTime: 'dateTime' }} } @else { Not yet }</dd>
+            </dl>
+            <span class="text-xs text-[color:var(--text-muted)]">How to check a signed PDF: open the report, then Verify signature — by its version, or by uploading the file someone sent you.</span>
+          </section>
+        }
+
+        @if (a.restricted && a.you.mayPlace && canTemplates() && a.status === 'ACTIVE' && a.currentVersion) {
+          <section class="rs-side-sec">
+            <div class="flex items-center justify-between gap-2"><h2 class="rsa-eyebrow">Placement on a template</h2><span class="pill pill-neutral">Optional</span></div>
+            <label class="field"><span class="label">Template</span>
+              <select class="input" aria-label="Template" [ngModel]="placeTemplate()" (ngModelChange)="placeTemplate.set($event)">
+                <option value="">Choose a template</option>
+                @for (t of templates(); track t.templateId) { <option [value]="t.templateId">{{ t.name }}{{ t.hasDraft ? ' · draft' : t.currentPublishedVersion ? ' · v' + t.currentPublishedVersion : '' }}</option> }
+              </select></label>
+            <label class="field"><span class="label">{{ a.kind === 'STAMP' ? 'Stamp' : 'Signature' }} version</span>
+              <select class="input" [attr.aria-label]="(a.kind === 'STAMP' ? 'Stamp' : 'Signature') + ' version'" [ngModel]="placeVersion()" (ngModelChange)="placeVersion.set($event)">
+                @for (v of approvedVersions(); track v.version) { <option [ngValue]="v.version">{{ a.name }} · v{{ v.version }}</option> }
+              </select></label>
+            <div class="rsb-two">
+              <label class="field"><span class="label">Position</span>
+                <select class="input" aria-label="Position" [ngModel]="placeAt()" (ngModelChange)="placeAt.set($event)">
+                  <option value="end">Last page · end</option><option value="inline">Before the footer · movable</option>
+                </select></label>
+              <label class="field"><span class="label">Width · alignment</span>
+                <span class="flex gap-1">
+                  <select class="input min-w-0 flex-1" aria-label="Width" [ngModel]="placeWidth()" (ngModelChange)="placeWidth.set($event)">
+                    @for (w of ['30mm', '40mm', '50mm', '60mm']; track w) { <option [value]="w">{{ w.replace('mm', ' mm') }}</option> }
+                  </select>
+                  <select class="input min-w-0 flex-1" aria-label="Alignment" [ngModel]="placeAlign()" (ngModelChange)="placeAlign.set($event)">
+                    <option value="left">left</option><option value="center">centre</option><option value="right">right</option>
+                  </select>
+                </span></label>
+            </div>
+            @if (a.kind === 'SIGNATURE') {
+              <label class="field"><span class="label">Stamp · optional</span>
+                <select class="input" aria-label="Stamp" [ngModel]="placeStamp()" (ngModelChange)="placeStamp.set($event)">
+                  <option value="">No stamp</option>@for (s of stamps(); track s.assetId) { <option [value]="s.assetId">{{ s.name }}</option> }
+                </select></label>
+            }
+            <span class="text-xs text-[color:var(--text-muted)]">Keeps the picture's shape and keeps it with the end of the report. A template without it set up leaves it out.</span>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !placeTemplate()" (click)="place()"><app-icon name="plus" />Add to the template's draft</button>
+              @if (placeTemplate()) { <a class="link-inline text-sm" [routerLink]="['/reports/templates', placeTemplate(), 'design']">Open in the template designer <app-icon name="arrowRight" /></a> }
+            </div>
+          </section>
+        }
+
+        <section class="rs-side-sec">
+          <h2 class="rsa-eyebrow">Activity</h2>
+          @for (e of a.activity.slice(0, 8); track $index) {
+            <div class="flex gap-2 text-sm"><app-icon name="clock" class="text-[color:var(--text-muted)] mt-0.5 shrink-0" />
+              <span class="min-w-0"><b>{{ activityWord(e.action) }}</b><br>
+                <span class="text-xs text-[color:var(--text-muted)]">{{ e.actorName }}@if (detailOf(e.detail)) { · {{ detailOf(e.detail) }} } · {{ e.at | serverTime: 'dateTime' }}</span></span></div>
+          } @empty { <span class="text-xs text-[color:var(--text-muted)]">Nothing yet.</span> }
+        </section>
+      </aside>
+    </div>
+  } @else {
+    <app-page-header title="Asset" />
+    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+  }
+</div>

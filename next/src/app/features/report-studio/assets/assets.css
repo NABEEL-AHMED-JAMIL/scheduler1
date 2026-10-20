@@ -1,0 +1,54 @@
+/* Assets & branding (MIG-406, approved screen 8): the cards beside the side panel; tokens only, every theme. */
+:host { display: block; }
+.rsa-split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 1100px) { .rsa-split { grid-template-columns: minmax(0, 1fr) 22rem; } }
+@media (min-width: 1700px) { .rsa-split { grid-template-columns: minmax(0, 1fr) 26rem; } }
+.rsa-filters { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.rsa-grid { display: grid; gap: 0.875rem; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); }
+@media (min-width: 1800px) { .rsa-grid { grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr)); } }
+.rsa-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; background: var(--surface-raised);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-card); }
+.rsa-card:hover { border-color: var(--border-strong); }
+.rsa-card-pic { display: grid; place-items: center; height: 7rem; padding: 0.75rem; background: var(--surface-sunken);
+  border-bottom: 1px solid var(--border-subtle); }
+/* A signature on no background reads on white whatever the theme, as it will on the page. */
+.rsa-card-pic-white app-rs-asset-picture { background: var(--signature-paper); padding: 0.375rem 0.75rem; border-radius: var(--radius-sm); }
+.rsa-card-body { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.75rem 0.875rem 0.875rem; flex: 1; min-width: 0; }
+.rsa-card-title { font-size: 0.9375rem; font-weight: 600; color: var(--text-primary); overflow-wrap: anywhere; }
+.rsa-profile { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; padding: 0.75rem 1rem; }
+.rsa-eyebrow { font-size: 0.6875rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-secondary); }
+.rsa-perms { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.8125rem; }
+.rsa-perms > li { display: flex; align-items: flex-start; gap: 0.5rem; }
+.rsa-perms > li > app-icon { margin-top: 0.125rem; flex-shrink: 0; }
+/* The brand profile editor (screen 9): the form on the left, the live A4 preview and the precedence on the right. */
+.rsb-split { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .rsb-split { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+.rsb-body { display: flex; flex-direction: column; gap: 0.875rem; padding: 1rem; border: 0; margin: 0; min-width: 0; }
+.rsb-body.rsb-two, .rsb-two { display: grid; gap: 0.75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.rsb-three { display: grid; gap: 0.75rem; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.rsb-wide { grid-column: 1 / -1; }
+.rsb-logo { display: grid; place-items: center; width: 12.5rem; height: 6rem; padding: 0.5rem; background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.rsb-colour { display: flex; align-items: center; gap: 0.375rem; }
+.rsb-colour input[type="color"] { width: 2rem; height: 2rem; padding: 0; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+  background: none; flex-shrink: 0; }
+.rsb-chip { display: inline-flex; align-items: center; gap: 0.25rem; align-self: flex-start; padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  font-size: 0.8125rem; border: 1px solid var(--border-subtle); border-radius: var(--radius-full); background: var(--surface-sunken); }
+.rsb-switch { display: flex; align-items: center; justify-content: space-between; gap: 1rem; font-size: 0.875rem; }
+.rsb-lock { display: flex; align-items: flex-start; gap: 0.625rem; }
+.rsb-lock > app-icon { margin-top: 0.125rem; flex-shrink: 0; }
+.rsb-preview { background: var(--surface-sunken); }
+.rsb-preview-body { display: flex; flex-direction: column; gap: 0.625rem; padding: 1rem; align-items: center; }
+.rsb-frame { width: 100%; height: 46rem; border: 0; background: var(--surface-sunken); border-radius: var(--radius-md); }
+@media (max-width: 899px) { .rsb-three { grid-template-columns: minmax(0, 1fr); } .rsb-body.rsb-two, .rsb-two { grid-template-columns: minmax(0, 1fr); } }
+/* One asset (screen 10): the asset on the left, permissions, digital signature, placement and activity beside it. */
+.rsa-detail { display: grid; gap: 1rem; grid-template-columns: minmax(0, 1fr); align-items: start; }
+@media (min-width: 1100px) { .rsa-detail { grid-template-columns: minmax(0, 1fr) 25rem; } }
+@media (min-width: 1700px) { .rsa-detail { grid-template-columns: minmax(0, 1fr) 30rem; } }
+.rsa-hero { display: grid; place-items: center; min-height: 10.5rem; padding: 1rem; background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+/* A signature or stamp on no background is shown on white, as it prints. */
+.rsa-hero-white app-rs-asset-picture { background: var(--signature-paper); padding: 0.75rem 1rem; border-radius: var(--radius-sm); }
+.rsa-hero-caption { color: var(--text-muted); }
+.rsa-muted { color: var(--text-muted); }
+.rsb-wrap { white-space: normal; }

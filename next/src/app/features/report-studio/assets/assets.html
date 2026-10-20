@@ -1,0 +1,152 @@
+<div class="page">
+  <app-page-header>
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Reports</h1>
+        <p class="page-subtitle">Design report templates once, fill them from pipeline runs, and keep every version.</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (canLibrary()) { <button type="button" class="btn btn-default btn-sm" (click)="newProfile()"><app-icon name="plus" />New brand profile</button> }
+        @if (canLibrary() || canCustodian()) { <button type="button" class="btn btn-primary btn-sm" (click)="upload()"><app-icon name="upload" />Upload asset</button> }
+      </div>
+    </div>
+  </app-page-header>
+
+  <div class="rsa-split">
+    <div class="flex flex-col gap-4 min-w-0">
+      <div class="tabs" role="tablist" aria-label="Assets and branding">
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'assets'" [attr.aria-selected]="tab() === 'assets'" (click)="setTab('assets')">
+          Assets <span class="rs-count">{{ assets().length }}</span></button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'profiles'" [attr.aria-selected]="tab() === 'profiles'" (click)="setTab('profiles')">
+          Brand profiles <span class="rs-count">{{ profiles().length }}</span></button>
+        <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'restricted'" [attr.aria-selected]="tab() === 'restricted'" (click)="setTab('restricted')">
+          Signatures and stamps <span class="rs-count">{{ restrictedCount() }}</span></button>
+      </div>
+
+      @if (error()) {
+        <app-load-error [message]="error()" (retry)="load()" />
+      } @else if (tab() !== 'profiles') {
+        <div class="rsa-filters">
+          <div class="search-field flex-1 min-w-48">
+            <app-icon name="search" size="0.95em" />
+            <input class="input" placeholder="Search assets by name or uploader" aria-label="Search assets" [value]="search()" (input)="search.set($any($event.target).value)" />
+          </div>
+          @if (tab() === 'assets') {
+            <select class="input w-auto" aria-label="Type" [value]="kind()" (change)="kind.set($any($event.target).value)">
+              <option value="">All types</option><option value="LOGO">Logos</option><option value="IMAGE">Images</option>
+              <option value="SIGNATURE">Signatures</option><option value="STAMP">Stamps</option>
+            </select>
+          }
+          <select class="input w-auto" aria-label="State" [value]="state()" (change)="state.set($any($event.target).value)">
+            <option value="">All states</option><option value="APPROVED">Approved</option><option value="IN_REVIEW">In review</option><option value="RETIRED">Retired</option>
+          </select>
+          <select class="input w-auto" aria-label="Where used" [value]="used()" (change)="used.set($any($event.target).value)">
+            <option value="">Used anywhere</option><option value="USED">In use</option><option value="UNUSED">Not used yet</option>
+          </select>
+        </div>
+
+        @if (loading()) {
+          <div class="flex justify-center py-12"><span class="spinner" role="status" aria-label="Loading"></span></div>
+        } @else if (!shown().length) {
+          <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
+            @if (assets().length) { No asset matches the filters. }
+            @else if (tab() === 'restricted') { No signatures or stamps yet.@if (canCustodian()) { Upload one: it waits for an approver. } }
+            @else { No assets yet.@if (canLibrary()) { Upload a logo to start a brand profile. } }
+          </div>
+        } @else {
+          <div class="rsa-grid">
+            @for (a of shown(); track a.assetId) {
+              <article class="rsa-card">
+                <a class="rsa-card-pic" [class.rsa-card-pic-white]="a.kind === 'SIGNATURE'" [routerLink]="['/reports/assets', a.assetId]" [attr.aria-label]="'Open ' + a.name">
+                  <app-rs-asset-picture [assetId]="a.assetId" [version]="a.currentVersion ?? a.latestVersion" [tenantId]="isPlatformAdmin() ? a.tenantId : null"
+                                        [alt]="a.name" maxHeight="4.5rem" />
+                </a>
+                <div class="rsa-card-body">
+                  <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs text-[color:var(--text-muted)]">{{ kindWords[a.kind] }} · {{ typeOf(a) }} · v{{ a.currentVersion ?? a.latestVersion }}</span>
+                    <span class="pill" [class]="stateTone(a.state)">{{ stateWord(a.state) }}</span>
+                  </div>
+                  <h3 class="rsa-card-title">{{ a.name }}</h3>
+                  <span class="text-xs text-[color:var(--text-muted)]">{{ usedWord(a) }}</span>
+                  <span class="text-xs text-[color:var(--text-muted)]">Updated {{ a.updatedAt | serverTime: 'date' }}@if (a.updatedByName) { · {{ a.updatedByName }} }</span>
+                  @if (a.pendingVersion && a.state !== 'IN_REVIEW') { <span class="text-xs text-[color:var(--warn-text)]">v{{ a.pendingVersion }} waiting for approval</span> }
+                  <div class="flex items-center justify-between gap-2 text-xs mt-auto pt-1">
+                    <span class="text-[color:var(--text-muted)]">@if (a.restricted) { <app-icon name="lock" /> Limited use } @else { <app-icon name="edit" /> Editors manage }</span>
+                    <a class="link-inline" [routerLink]="['/reports/assets', a.assetId]">Details <app-icon name="arrowRight" /></a>
+                  </div>
+                </div>
+              </article>
+            }
+          </div>
+        }
+      }
+
+      @if (!error() && tab() !== 'restricted') {
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Brand profiles</h2><p class="text-xs text-[color:var(--text-muted)]">Optional defaults so every report looks the same.</p></div>
+            @if (tab() === 'assets' && profiles().length) { <button type="button" class="link-inline text-sm" (click)="setTab('profiles')">View all <app-icon name="arrowRight" /></button> }
+          </div>
+          <ul class="divide-y divide-[color:var(--border-subtle)]">
+            @for (p of profiles(); track p.profileId) {
+              <li class="rsa-profile">
+                <div class="min-w-0">
+                  <a class="font-semibold link-inline" [routerLink]="['/reports/assets/branding', p.profileId]">{{ p.name }}</a>
+                  @if (p.isDefault) { <span class="pill pill-neutral ml-1">Workspace default</span> }
+                  @if (p.hasDraft) { <span class="pill pill-brand ml-1">Draft</span> }
+                  <div class="text-xs text-[color:var(--text-muted)]">
+                    @if (p.currentPublishedVersion) { v{{ p.currentPublishedVersion }} } @else { Not published yet } ·
+                    {{ p.templates }} template{{ p.templates === 1 ? '' : 's' }} · updated {{ p.updatedAt | serverTime: 'date' }}@if (p.updatedByName) { by {{ p.updatedByName }} }
+                  </div>
+                </div>
+                <a class="link-inline text-sm whitespace-nowrap" [routerLink]="['/reports/assets/branding', p.profileId]">{{ canLibrary() ? 'Edit profile' : 'Open' }} <app-icon name="arrowRight" /></a>
+              </li>
+            } @empty {
+              <li class="p-4 text-sm text-[color:var(--text-muted)]">No brand profile yet. Reports use the platform's look until one is published.
+                @if (canLibrary()) { <button type="button" class="link-inline" (click)="newProfile()">Make one</button> }</li>
+            }
+          </ul>
+        </section>
+      }
+    </div>
+
+    <aside class="card rs-side min-w-0">
+      <section class="rs-side-sec">
+        <h2 class="rsa-eyebrow">What you can do here</h2>
+        <span class="pill pill-neutral self-start">{{ roleWord() }} · {{ workspace() }}</span>
+        <span class="text-xs text-[color:var(--text-muted)]">These permissions only apply in this workspace.</span>
+        <ul class="rsa-perms">
+          <li><app-icon [name]="canLibrary() || canApprove() ? 'checkCircle' : 'lock'" [class]="canLibrary() || canApprove() ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />Use approved assets</li>
+          <li><app-icon [name]="canLibrary() ? 'checkCircle' : 'lock'" [class]="canLibrary() ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />Upload logos and images</li>
+          <li><app-icon [name]="canLibrary() ? 'checkCircle' : 'lock'" [class]="canLibrary() ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />Edit brand profile drafts</li>
+          <li><app-icon [name]="canCustodian() ? 'checkCircle' : 'lock'" [class]="canCustodian() ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />
+            {{ canCustodian() ? 'Upload signatures and stamps' : 'Upload signatures and stamps: workspace admins' }}</li>
+          <li><app-icon name="lock" class="text-[color:var(--text-muted)]" />Place a signature: only the person it belongs to, or with their grant</li>
+          <li><app-icon [name]="canApprove() ? 'checkCircle' : 'lock'" [class]="canApprove() ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />
+            {{ canApprove() ? 'Approve signatures, stamps and reports' : 'Approve assets: approvers' }}</li>
+          <li><app-icon [name]="canPublish() ? 'checkCircle' : 'lock'" [class]="canPublish() ? 'icon-ok' : 'text-[color:var(--text-muted)]'" />
+            {{ canPublish() ? 'Publish brand profiles' : 'Publish brand profiles: publishers' }}</li>
+        </ul>
+        <span class="text-xs text-[color:var(--text-muted)]">More access is your workspace admin's to give (Administration › Access).</span>
+      </section>
+      <section class="rs-side-sec">
+        <h2 class="rsa-eyebrow">Signature picture vs digital signature</h2>
+        <span class="text-sm">The <b>picture</b> is only how the page looks. The <b>digital signature</b> is added to the PDF when the approver approves.
+          It records who approved and when, and any later change to the file breaks it.</span>
+        <span class="text-xs text-[color:var(--text-muted)]">Test certificate now · trusted certificate on AWS.</span>
+      </section>
+      <section class="rs-side-sec">
+        <h2 class="rsa-eyebrow">Replacing and retiring</h2>
+        <span class="text-sm"><b>Replace</b> makes a new version. Old reports keep the version they used.</span>
+        <span class="text-sm"><b>Retire</b> stops new use. Old reports and their history stay.</span>
+        <span class="text-xs text-[color:var(--text-muted)]">An asset's page shows where it is used before you retire it; only an asset nothing ever used can be deleted.</span>
+      </section>
+      <section class="rs-side-sec text-xs text-[color:var(--text-muted)]">
+        <span><app-icon name="info" /> SVG, PNG or JPG, up to 10 MB. Each picture is checked by its content and re-encoded. Signatures and stamps need an admin
+          to upload and an approver to approve.</span>
+      </section>
+    </aside>
+  </div>
+</div>

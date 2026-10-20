@@ -30,6 +30,9 @@ export interface TemplateRow {
   updatedBy?: number | null;
   createdAt?: string | null;
   updatedAt?: string | null;
+  /** MIG-406: who made it and who changed it last, by name (Identity). */
+  ownerName?: string | null;
+  updatedByName?: string | null;
 }
 
 export interface StarterRow { key: string; name: string; description?: string | null; category?: string | null; components: number; }
@@ -180,6 +183,45 @@ export interface ReportVersionRow {
   diagnostics: Problem[];
   snapshot?: SnapshotRow;
   config?: Record<string, unknown>;
+  /** MIG-406: its approval, and the certification signature that approval put on its PDF. */
+  approval?: Approval | null;
+}
+
+/** A report version's approval (MIG-406): never by whoever generated it; signed when its PDF was certified. */
+export interface Approval {
+  approvalId: string;
+  reportId: string;
+  version: number;
+  approvedBy: number;
+  approverName?: string | null;
+  approvedAt: string;
+  note?: string | null;
+  signed: boolean;
+  notSignedReason?: string | null;
+  signedSha256?: string | null;
+  signedBytes?: number | null;
+  originalSha256?: string | null;
+  certificateSha256?: string | null;
+  certificateSubject?: string | null;
+  reason?: string | null;
+}
+
+/** What Verify signature says (MIG-406): the file's own signature facts and whether it is one of the workspace's approved versions. */
+export interface VerifyResult {
+  source: 'stored' | 'uploaded';
+  sha256: string;
+  verified: boolean;
+  matchesStored: boolean;
+  certificateMatches: boolean;
+  problems: string[];
+  reportId?: string;
+  reportLabel?: string;
+  reportName?: string;
+  version?: number;
+  approval?: Approval;
+  signature: { signed: boolean; intact: boolean; coversWholeFile: boolean; certified: boolean; signerName?: string | null;
+    signatureName?: string | null; reason?: string | null; location?: string | null; signedAt?: string | null; certificateSha256?: string | null;
+    certificateNotAfter?: string | null; };
 }
 
 export type JobStatus = 'QUEUED' | 'PROCESSING' | 'VALIDATING' | 'RENDERING_HTML' | 'RENDERING_PDF' | 'STORING_OUTPUT' | 'SUCCEEDED'
@@ -229,6 +271,8 @@ export interface ReportRow {
   updatedAt?: string | null;
   current?: ReportVersionRow;
   lastJob?: JobRow;
+  /** MIG-406: the current version is approved and its PDF certified. */
+  signed?: boolean;
 }
 
 export interface ActivityRow { actor?: number | null; action: string; at: string; detail: Record<string, unknown>; }

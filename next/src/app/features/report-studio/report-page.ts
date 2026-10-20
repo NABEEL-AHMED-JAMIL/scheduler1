@@ -20,6 +20,8 @@ import {
   JobRow, OutputRow, ReportDetail, ReportVersionRow, VersionRow, chipWord, idempotencyKey, isRunning, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
+import { VerifyData, VerifyPanel } from './verify-panel';
+import { sidePanelConfig } from '../../shared/ui/side-panel';
 
 type Tab = 'details' | 'versions' | 'activity' | 'access';
 
@@ -84,6 +86,10 @@ export class ReportPage implements OnInit {
   readonly workspace = computed(() => this.auth.user()?.tenantName || '');
   readonly nextVersion = computed(() => (this.r()?.currentVersion ?? 0) + 1);
   readonly records = computed(() => this.current()?.snapshot?.records ?? null);
+  /** MIG-406: an approver (report-approve) approves a version they did not generate; it certifies the PDF in their name. */
+  readonly canApprove = computed(() => this.auth.canOpen('report-approve') && !this.auth.isPlatformAdmin() && this.r()?.status !== 'ARCHIVED');
+  readonly me = computed(() => this.auth.user()?.appUserId ?? null);
+  readonly approving = signal(false);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -133,6 +139,34 @@ export class ReportPage implements OnInit {
       },
       error: () => this.templateVersions.set([]),
     });
+  }
+
+  /** Whether this person may approve a version: an approver who did not generate it, and it is not approved yet. */
+  mayApprove(v: ReportVersionRow): boolean {
+    return this.canApprove() && !v.approval && v.createdBy !== this.me();
+  }
+
+  async approve(v: ReportVersionRow): Promise<void> {
+    const r = this.r();
+    if (!r) return;
+    const ok = await confirmWith(this.dialog, { title: `Approve ${r.label} v${v.version}?`, confirmLabel: 'Approve and sign',
+      body: 'Its PDF is digitally signed in your name with the time. Any later change to the file breaks the signature. A new version needs its own approval.' });
+    if (!ok) return;
+    this.approving.set(true);
+    this.api.approve(r.reportId, v.version).subscribe({
+      next: a => {
+        this.approving.set(false);
+        this.toast.success(a.signed ? `v${v.version} approved and its PDF signed.` : `v${v.version} approved. ${a.notSignedReason ?? ''}`);
+        this.load();
+      },
+      error: e => { this.approving.set(false); this.toast.error(studioError(e).message); },
+    });
+  }
+
+  verify(v: ReportVersionRow): void {
+    const r = this.r();
+    if (!r) return;
+    this.dialog.open<void, VerifyData>(VerifyPanel, sidePanelConfig<VerifyData>({ reportId: r.reportId, version: v.version, label: r.label }, 'narrow', 'right'));
   }
 
   tabTo(tab: Tab): void {

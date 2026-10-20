@@ -31,6 +31,7 @@ import {
 import { PageFrame } from './page-frame';
 import { PropChange, PropertiesPanel } from './properties';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
+import { AssetCard, UsableProfile } from '../assets.model';
 
 type LeftTab = 'components' | 'layers' | 'data';
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'conflict' | 'error' | 'readonly';
@@ -205,6 +206,17 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     }
   });
   readonly approval = computed(() => this.t()?.approval ?? null);
+  // MIG-406: the Brand chip and the assets the properties may place (approved; signatures and stamps only this person's to place).
+  readonly usableAssets = signal<AssetCard[]>([]);
+  readonly profiles = signal<UsableProfile[]>([]);
+  readonly templateAssets = computed(() => ((this.def()?.template['assets'] ?? []) as Record<string, unknown>[]));
+  readonly branding = computed(() => (this.def()?.template['branding'] ?? {}) as { profileId?: string; disabled?: boolean });
+  readonly brandWord = computed(() => {
+    const b = this.branding();
+    if (b.disabled) return 'No branding';
+    const p = b.profileId ? this.profiles().find(x => x.profileId === b.profileId) : this.profiles().find(x => x.isDefault);
+    return p ? p.name : b.profileId ? 'A profile not published' : 'None yet';
+  });
 
   constructor() {
     this.destroy.onDestroy(() => {
@@ -266,6 +278,12 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         this.testRoot.set(this.def() ? rootPathOf(this.def()!) : '$');
         this.inspectTestData();
         this.draw(true);
+        if (!this.isPlatformAdmin()) {
+          this.api.usable(t.templateId).subscribe({
+            next: u => { this.usableAssets.set(u.assets); this.profiles.set(u.profiles); },
+            error: () => { this.usableAssets.set([]); this.profiles.set([]); },
+          });
+        }
       },
       error: e => { this.error.set(studioError(e, 'The template could not be read.').message); this.loading.set(false); },
     });
@@ -401,6 +419,65 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       else at.block[change.key] = change.value;
       return true;
     }, `${id}:${change.key}`);
+  }
+
+  /** MIG-406: the Brand chip -- the workspace default (no profile named), a named profile, or no branding. */
+  setBrand(choice: string): void {
+    this.edit((_blocks, def) => {
+      if (!choice) delete def.template['branding'];
+      else if (choice === 'off') def.template['branding'] = { disabled: true };
+      else def.template['branding'] = { profileId: choice };
+      return true;
+    });
+  }
+
+  /**
+   * MIG-406: a library asset picked in the properties: the template's asset entry for it (added once, named after its
+   * number) and the selected block pointing at it. The server pins the version on save and checks this person may place it.
+   */
+  pickAsset(pick: { key: string; assetId: string | null }): void {
+    const id = this.selected();
+    if (!id) return;
+    const asset = pick.assetId ? this.usableAssets().find(a => a.assetId === pick.assetId) : null;
+    this.edit((blocks, def) => {
+      const at = find(blocks, id);
+      if (!at) return false;
+      if (!asset) { delete at.block[pick.key]; return true; }
+      const entries = ((def.template['assets'] ?? []) as Record<string, unknown>[]).slice();
+      const purpose = asset.kind === 'SIGNATURE' ? 'signature' : asset.kind === 'STAMP' ? 'stamp' : asset.kind === 'LOGO' ? 'logo' : 'image';
+      let entry = entries.find(e => e['assetRef'] === asset.assetId);
+      if (!entry) {
+        entry = { id: `${purpose}-${asset.assetNo}`, purpose, assetRef: asset.assetId, alt: asset.name };
+        entries.push(entry);
+      }
+      def.template['assets'] = entries;
+      at.block[pick.key] = entry['id'];
+      return true;
+    }, `${id}:${pick.key}`);
+  }
+
+  /** Whether a data field reads like a picture's key (the Data tab offers "show as image"). */
+  looksLikeImage(path: string, type: string): boolean {
+    return /string|text/i.test(type) && /(image|photo|picture|img|scan|thumb|wound|key)$/i.test(path.split(/[.[\]]/).filter(Boolean).pop() ?? '');
+  }
+
+  /**
+   * MIG-406: "show as image" -- a field naming a picture becomes an image block bound to it, or, when it is a field of
+   * each item of a list, an image grid over that list. The pictures come from the test data's bucket when it is a bucket
+   * file, else the bucket is asked for in the properties.
+   */
+  showAsImage(path: string): void {
+    const src = this.testSource() as (SourceRef & { bucket?: string }) | null;
+    const bucket = src?.connector === 'BUCKET_OBJECT' ? (src as { bucket?: string }).bucket ?? '' : '';
+    const name = this.names()[0];
+    const list = path.includes('[]') ? path.slice(0, path.indexOf('[]')) : null;
+    const entry = list
+      ? { type: 'imageGrid', group: 'Media', label: 'Image grid', description: '', defaults: { binding: `${name}.${list}`, imageField: path.slice(path.indexOf('[]') + 3) || 'image',
+        columns: 3, missing: 'placeholder', imageSource: { kind: 'BUCKET', bucket } } }
+      : { type: 'image', group: 'Media', label: 'Image from data', description: '', defaults: { binding: `${name}.${path}`, width: '60mm', missing: 'placeholder',
+        alt: path, imageSource: { kind: 'BUCKET', bucket } } };
+    this.add(entry as PaletteEntry);
+    if (!bucket) this.toast.info('Say which bucket the pictures are in: Data › Pictures from, in the properties.');
   }
 
   /** Adds a palette entry: after the selected block (or into it, when it is a container that may hold it), else at the end. */

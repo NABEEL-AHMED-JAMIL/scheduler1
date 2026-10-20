@@ -17,6 +17,8 @@ import {
 import { ReportSourcePicker, SourceMode } from '../source-picker';
 import { ProblemList } from '../problem-list';
 import { PdfPages } from '../pdf-pages';
+import { AssetPicture } from '../assets/asset-picture';
+import { UsableProfile } from '../assets.model';
 import {
   collections, componentsOf, firstRecord, innerPath, itemFields, lengthAt, pagesOf, primaryNames, rootPathOf, sampleText, scalars, valueAt, walk,
 } from '../designer/designer-model';
@@ -84,7 +86,8 @@ export function neededFields(def: TemplateDefinition): NeededField[] {
  */
 @Component({
   selector: 'app-new-report',
-  imports: [PageHeader, Icon, StatusPill, ServerTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect],
+  imports: [PageHeader, Icon, StatusPill, ServerTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect,
+    AssetPicture],
   templateUrl: './new-report.html',
   styleUrl: './new-report.css',
 })
@@ -144,6 +147,17 @@ export class NewReport implements OnInit {
     return this.templates().filter(t => !q || [t.name, t.description, t.category].some(v => (v ?? '').toLowerCase().includes(q)));
   });
   readonly version = computed(() => this.t()?.currentPublishedVersion ?? null);
+  // MIG-406: the Branding box -- the brand profile this report is made in (the template's, the workspace default's, or another).
+  readonly profiles = signal<UsableProfile[]>([]);
+  readonly brandProfileId = signal('');
+  readonly brandOff = computed(() => !!((this.def()?.template as { branding?: { disabled?: boolean } } | undefined)?.branding?.disabled));
+  readonly templateProfileId = computed(() => ((this.def()?.template as { branding?: { profileId?: string } } | undefined)?.branding?.profileId) ?? '');
+  readonly brand = computed<UsableProfile | null>(() => {
+    if (this.brandOff()) return null;
+    const id = this.brandProfileId() || this.templateProfileId();
+    return this.profiles().find(p => (id ? p.profileId === id : p.isDefault)) ?? null;
+  });
+  readonly canBrand = computed(() => this.auth.canOpen('report-assets'));
   readonly needed = computed<NeededField[]>(() => (this.def() ? neededFields(this.def()!) : []));
   readonly schema = computed<SchemaField[]>(() => this.inspect()?.schema ?? []);
   readonly sample = computed(() => firstRecord(this.inspect()));
@@ -261,6 +275,7 @@ export class NewReport implements OnInit {
         this.api.version(templateId, String(t.currentPublishedVersion)).subscribe({
           next: v => {
             this.def.set(v.definition ?? null);
+            this.api.usable(t.templateId).subscribe({ next: u => this.profiles.set(u.profiles), error: () => this.profiles.set([]) });
             if (v.definition) this.rootPath.set(rootPathOf(v.definition));
             if (jump || this.step() === 1) this.go(2);
           },
@@ -328,7 +343,7 @@ export class NewReport implements OnInit {
   private body(): Record<string, unknown> {
     return {
       templateId: this.t()?.templateId, version: String(this.version()), source: this.source(), rootPath: this.rootPath().trim() || '$',
-      mapping: this.mappingBody(),
+      mapping: this.mappingBody(), ...(this.brandProfileId() ? { brandProfileId: this.brandProfileId() } : {}),
     };
   }
 

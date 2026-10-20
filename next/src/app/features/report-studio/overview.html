@@ -50,7 +50,7 @@
             <p class="p-4 text-sm text-[color:var(--text-muted)]">No reports yet. Publish a template, then create a report from a pipeline run or pasted data.</p>
           } @else {
             <table class="table-modern">
-              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Updated</th><th class="w-12"><span class="sr-only">Open</span></th></tr></thead>
+              <thead><tr><th>Report</th><th>Version</th><th>Status</th><th>Signed</th><th>Updated</th><th class="w-12"><span class="sr-only">Open</span></th></tr></thead>
               <tbody>
                 @for (r of d.recentReports; track r.reportId) {
                   <tr>
@@ -60,6 +60,9 @@
                     </td>
                     <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
                     <td><app-status [label]="r.lastJob && isRunning(r.lastJob.status) ? 'Running' : chipWord(r.status)" /></td>
+                    <td>@if (r.current?.approval?.signed) { <span class="pill pill-ok" [title]="'Approved and signed by ' + r.current!.approval!.approverName">{{ r.current!.approval!.approverName }}</span> }
+                      @else if (r.current?.approval) { <span class="pill pill-neutral">Approved</span> }
+                      @else if (r.currentVersion) { <span class="text-xs text-[color:var(--text-muted)]">Not yet</span> } @else { — }</td>
                     <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'recent' }}</td>
                     <td><a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/reports/library', r.reportId]" [attr.aria-label]="'Open ' + r.name"><app-icon name="chevronRight" /></a></td>
                   </tr>

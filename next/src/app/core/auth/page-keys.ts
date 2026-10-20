@@ -33,7 +33,10 @@ export type PageKey =
   // MIG-403: See results › Reports (Report Studio), one key per tab and per action, each on its own media-service prefix:
   // the hub's Overview, templates, publishing (an action), data, generating (an action) and the library. Identity's
   // PageKey has the same six; the gateway refuses another key's calls.
-  | 'report-studio' | 'report-templates' | 'report-publish' | 'report-data' | 'report-generate' | 'report-library';
+  | 'report-studio' | 'report-templates' | 'report-publish' | 'report-data' | 'report-generate' | 'report-library'
+  // MIG-406: Assets & branding (the tab), the custodian of signatures and stamps (an action), and the approver who approves
+  // a report version -- certifying its PDF -- and a signature or stamp picture (an action). Identity's PageKey has the same three.
+  | 'report-assets' | 'report-asset-custodian' | 'report-approve';
 
 /** A catalogue row as /pageAccess.json/pages serves it. */
 export interface PageCatalogueEntry {
@@ -92,6 +95,9 @@ export const PAGE_LABELS: Record<PageKey, string> = {
   'report-data': 'Report data',
   'report-generate': 'Generate reports',
   'report-library': 'Reports',
+  'report-assets': 'Report assets and branding',
+  'report-asset-custodian': 'Upload signatures and stamps',
+  'report-approve': 'Approve and sign reports',
 };
 
 export function isPageKey(value: string | null | undefined): value is PageKey {

@@ -218,6 +218,24 @@ describe('tab hubs: the breadcrumb reads group › hub › tab', () => {
     expect(crumbsFor('/review/requests', 'My requests')).toEqual([{ label: 'Run & review' }, { label: 'My requests' }]);
   });
 
+  /** MIG-406 (owner 10-19): no step repeats a word -- Reports › Library, Reports › Assets & branding › the asset. */
+  it('reads See results › Reports › Assets & branding, then the asset or brand profile by name', () => {
+    expect(crumbsFor('/reports/library', 'Reports')).toEqual([{ label: 'See results' }, { label: 'Reports', link: '/reports' }, { label: 'Library' }]);
+    expect(crumbsFor('/reports/assets', 'Assets & branding')).toEqual([
+      { label: 'See results' }, { label: 'Reports', link: '/reports' }, { label: 'Assets & branding' },
+    ]);
+    const asset = crumbsFor('/reports/assets/01M5BPGVJ6SGVJ60MQESY15388', 'Quality lead signature');
+    expect(asset).toEqual([
+      { label: 'See results' }, { label: 'Reports', link: '/reports' },
+      { label: 'Assets & branding', link: '/reports/assets' }, { label: 'Quality lead signature' },
+    ]);
+    expect(crumbsFor('/reports/assets/branding/01M5BPGVJ6SGVJ60MQESY15387', 'Riverside Health · Default').slice(-2)).toEqual([
+      { label: 'Assets & branding', link: '/reports/assets' }, { label: 'Riverside Health · Default' },
+    ]);
+    const words = asset.map(c => c.label);
+    expect(new Set(words).size).toBe(words.length);
+  });
+
   /** UX review DR2 (2026-10-13): the Review hub -- its tabs, and a document opened from its Documents tab. */
   it('reads Run & review › Review › the tab, and the document under Documents', () => {
     expect(crumbsFor('/review/all', 'Review')).toEqual([{ label: 'Run & review' }, { label: 'Review', link: '/review' }, { label: 'All waiting' }]);

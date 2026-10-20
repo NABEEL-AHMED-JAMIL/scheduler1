@@ -238,9 +238,26 @@
           </section>
           <section class="rsw-sec">
             <h3 class="rsd-eyebrow-plain">Branding</h3>
-            <label class="field"><span class="label">Brand profile</span>
-              <select class="input" disabled aria-label="Brand profile"><option>The template's own look</option></select></label>
-            <p class="text-xs text-[color:var(--text-muted)]">Brand profiles arrive with Assets &amp; branding.</p>
+            @if (brandOff()) {
+              <p class="text-sm">The template switches branding off: it prints in its own look.</p>
+            } @else {
+              <label class="field"><span class="label">Brand profile</span>
+                <select class="input" aria-label="Brand profile" [ngModel]="brandProfileId()" (ngModelChange)="brandProfileId.set($event); check()">
+                  <option value="">{{ templateProfileId() ? "The template's profile" : 'The workspace default' }}@if (!brandProfileId() && brand(); as b) { · {{ b.name }} }</option>
+                  @for (p of profiles(); track p.profileId) { <option [value]="p.profileId">{{ p.name }} · v{{ p.version }}{{ p.isDefault ? ' (workspace default)' : '' }}</option> }
+                </select></label>
+              @if (brand(); as b) {
+                <div class="flex items-center gap-2 text-sm min-w-0">
+                  @if (b.logoAssetId) { <app-rs-asset-picture class="rsw-logo" [assetId]="b.logoAssetId" [alt]="b.logoName || 'Logo'" maxHeight="1.25rem" />
+                    <span class="truncate text-[color:var(--text-secondary)]">{{ b.logoName }}</span> }
+                  @else { <span class="text-[color:var(--text-muted)]">No logo</span> }
+                  @if (canBrand()) { <a class="link-inline ml-auto" [routerLink]="['/reports/assets/branding', b.profileId]">Replace</a> }
+                </div>
+                <p class="text-xs text-[color:var(--text-muted)]">@if (b.signOnApproval !== false) { Its approval signs the PDF in the approver's name. } @else { Approving does not sign the PDF. }</p>
+              } @else {
+                <p class="text-xs text-[color:var(--text-muted)]">No published brand profile yet: the report prints in the platform's look.</p>
+              }
+            }
           </section>
           <section class="rsw-sec">
             <h3 class="rsd-eyebrow-plain">Outputs</h3>

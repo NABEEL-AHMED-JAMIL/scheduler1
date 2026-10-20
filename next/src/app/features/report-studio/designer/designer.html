@@ -68,7 +68,14 @@
       <span class="rsd-sep" aria-hidden="true"></span>
       <span class="rsd-tool">Select</span>
       <button type="button" class="btn btn-ghost btn-sm" [class.rsd-on]="!selected()" [attr.aria-pressed]="!selected()" (click)="select(null)">Page settings</button>
-      <span class="rsd-chip rsd-chip-muted" title="Brand profiles arrive with Assets & branding">Brand: none yet</span>
+      <label class="rsd-chip rsd-brand" [title]="'The brand this template prints in: ' + brandWord()">
+        <span>Brand:</span>
+        <select class="rsd-brand-select" aria-label="Brand profile" [disabled]="!editable()" (change)="setBrand($any($event.target).value)">
+          <option value="" [selected]="!branding().profileId && !branding().disabled">Workspace default{{ !branding().profileId && !branding().disabled && brandWord() !== 'None yet' ? ' · ' + brandWord() : '' }}</option>
+          @for (p of profiles(); track p.profileId) { <option [value]="p.profileId" [selected]="branding().profileId === p.profileId">{{ p.name }}</option> }
+          <option value="off" [selected]="!!branding().disabled">No branding</option>
+        </select>
+      </label>
       <span class="flex-1"></span>
       <button type="button" class="rsd-chip" (click)="openTestData()" [disabled]="isPlatformAdmin()"
               [title]="isPlatformAdmin() ? 'Test data is a workspace member\'s: the template is drawn with its paths showing' : ''"
@@ -181,6 +188,10 @@
                           <span class="mono text-xs truncate flex-1 text-left">{{ f.path }}</span>
                           <span class="text-xs text-[color:var(--text-muted)]">{{ f.type }}</span>
                         </button>
+                        @if (editable() && looksLikeImage(f.path, f.type)) {
+                          <button type="button" class="btn btn-ghost btn-xs rsd-as-image" (click)="showAsImage(f.path)" [title]="'Show ' + f.path + ' as pictures'">
+                            <app-icon name="image" />Show as image</button>
+                        }
                       </li>
                     }
                   </ul>
@@ -248,6 +259,7 @@
         @if (selectedBlock()) {
           <app-rs-properties [block]="selectedBlock()" [label]="selectedLabel()" [definitions]="definitions()" [readonly]="!editable()"
                              [fields]="dataFields()" [sample]="sample()" [tree]="inspect()?.tree" [names]="names()"
+                             [assets]="usableAssets()" [templateAssets]="templateAssets()" (assetPicked)="pickAsset($event)"
                              (changed)="setProperty($event)" (duplicate)="duplicateSelected()" (remove)="removeSelected()" />
         } @else if (def(); as d) {
           <div class="rsd-props-head"><app-icon name="file" size="1.05rem" class="text-[color:var(--text-muted)]" /><div class="min-w-0 flex-1"><h2 class="text-sm font-semibold">Page settings</h2><p class="text-xs text-[color:var(--text-muted)]">Size, margins and type for every page.</p></div></div>

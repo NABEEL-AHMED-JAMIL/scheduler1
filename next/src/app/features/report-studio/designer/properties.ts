@@ -2,6 +2,7 @@ import { Component, computed, input, output } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { Icon } from '../../../shared/ui/icon';
 import { SchemaField, TreeNode } from '../report-studio.model';
+import { AssetCard } from '../assets.model';
 import {
   Block, collections, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
 } from './designer-model';
@@ -11,7 +12,7 @@ export interface PropField {
   key: string;
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
-    | 'format' | 'style' | 'size' | 'itemField' | 'json';
+    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource';
   group: 'content' | 'data' | 'format' | 'style' | 'layout';
   options?: string[];
   min?: number;
@@ -34,6 +35,9 @@ const LABELS: Record<string, string> = {
   fit: 'Fit', missing: 'When the image is missing', thickness: 'Thickness', color: 'Colour', items: 'Items', itemField: 'Field of each item',
   format: 'Format', style: 'Style', size: 'Size', keepTogether: "Keep together · don't split across pages", pageBreakBefore: 'Start a new page before it',
   pageBreakAfter: 'Start a new page after it', hidden: 'Hidden (not in the report)', sort: 'Sort', size_spacer: 'Space',
+  // MIG-406: signatures, stamps, images from the data, the grid.
+  stampRef: 'Stamp beside it', caption: 'Caption', placement: 'Where', imageSource: 'Pictures from', imageField: 'Picture field',
+  captionField: 'Caption field', imageHeight: 'Picture height', maxItems: 'At most pictures', columns_grid: 'Pictures a row',
 };
 
 const GROUPS: Record<string, PropField['group']> = {
@@ -64,6 +68,12 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     if (s.$ref === '#/definitions/format') field = { key, label, kind: 'format', group: 'format' };
     else if (s.$ref === '#/definitions/style') field = { key, label, kind: 'style', group: 'style' };
     else if (s.$ref === '#/definitions/size') field = { key, label, kind: 'size', group: 'layout' };
+    else if (key === 'assetRef' || key === 'stampRef') field = { key, label: type === 'signature' && key === 'assetRef' ? 'Signature' : type === 'stamp' && key === 'assetRef' ? 'Stamp' : label,
+      kind: 'asset', group: 'content', hint: key === 'assetRef' && (type === 'signature' || type === 'stamp') ? 'Approved, and yours to place (or granted to you).' : undefined };
+    else if (key === 'imageSource') field = { key, label, kind: 'imageSource', group: 'data' };
+    else if (key === 'binding' && type === 'imageGrid') field = { key, label: 'List', kind: 'listBinding', group: 'data' };
+    else if (key === 'imageField' || key === 'captionField') field = { key, label, kind: 'itemField', group: 'data' };
+    else if (key === 'columns' && type === 'imageGrid') field = { key, label: LABELS['columns_grid'], kind: 'enum', group: 'layout', options: ['1', '2', '3', '4', '5', '6'] };
     else if (key === 'binding') field = { key, label, kind: type === 'list' ? 'listBinding' : 'binding', group: 'data' };
     else if (key === 'dataset') field = { key, label, kind: 'collection', group: 'data' };
     else if (key === 'columns') field = { key, label, kind: 'columns', group: 'data' };
@@ -187,9 +197,10 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
               @case ('itemField') {
                 <label class="field">
                   <span class="label">{{ f.label }}</span>
-                  <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set('itemField', $any($event.target).value || undefined)">
-                    <option value="" [selected]="!text('itemField')">The item itself</option>
-                    @for (c of itemsOf('binding'); track c.path) { <option [value]="c.path" [selected]="c.path === text('itemField')">{{ c.path }} · {{ c.type }}</option> }
+                  <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set(f.key, $any($event.target).value || undefined)">
+                    <option value="" [selected]="!text(f.key)">{{ f.key === 'itemField' ? 'The item itself' : 'None' }}</option>
+                    @for (c of itemsOf('binding'); track c.path) { <option [value]="c.path" [selected]="c.path === text(f.key)">{{ c.path }} · {{ c.type }}</option> }
+                    @if (text(f.key) && !hasItemField('binding', text(f.key))) { <option [value]="text(f.key)" selected>{{ text(f.key) }}</option> }
                   </select>
                 </label>
               }
@@ -215,10 +226,15 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                         </select>
                         <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' format'"
                                 (change)="setColumnFormat(i, $any($event.target).value)">
-                          <option value="" [selected]="!c.format?.type">As written</option>
-                          @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === c.format?.type">{{ t }}</option> }
+                          <option value="" [selected]="!c.format?.type && c.type !== 'image'">As written</option>
+                          <option value="__image" [selected]="c.type === 'image'">Picture (a bucket key)</option>
+                          @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === c.format?.type && c.type !== 'image'">{{ t }}</option> }
                         </select>
                       </div>
+                      @if (c.type === 'image') {
+                        <input class="input mono text-xs" [value]="c.imageSource?.bucket ?? ''" [disabled]="readonly()" placeholder="Bucket of the pictures"
+                               [attr.aria-label]="'Column ' + (i + 1) + ' bucket'" (change)="setColumnBucket(i, $any($event.target).value)" />
+                      }
                     </div>
                   }
                   @if (!readonly()) {
@@ -301,6 +317,39 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                 </div>
                 <p class="text-xs text-[color:var(--text-muted)]">Width in mm or a share of the line (170 mm, 50%); height in mm, the least it takes.</p>
               }
+              @case ('asset') {
+                <label class="field">
+                  <span class="label">{{ f.label }}</span>
+                  <select class="input" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="pickAsset(f.key, $any($event.target).value)">
+                    <option value="" [selected]="!text(f.key)">{{ f.key === 'stampRef' ? 'No stamp' : 'Choose an approved asset' }}</option>
+                    @for (a of assetChoices(f.key); track a.assetId) {
+                      <option [value]="a.assetId" [selected]="a.assetId === pickedAsset(f.key)" [disabled]="a.mayPlace === false">{{ a.name }} · v{{ a.currentVersion }}{{ a.mayPlace === false ? ' (needs a grant)' : '' }}</option>
+                    }
+                    @if (text(f.key) && !pickedAsset(f.key)) { <option [value]="''" selected>{{ text(f.key) }} (embedded)</option> }
+                  </select>
+                  @if (f.hint) { <span class="text-xs text-[color:var(--text-muted)]">{{ f.hint }}</span> }
+                </label>
+              }
+              @case ('imageSource') {
+                <div class="flex flex-col gap-1.5">
+                  <span class="label">{{ f.label }}</span>
+                  <div class="rsd-two">
+                    <select class="input text-xs" [disabled]="readonly()" aria-label="Pictures from" (change)="setSource('kind', $any($event.target).value)">
+                      <option value="BUCKET" [selected]="sourceOf().kind !== 'RUN_FILE'">A bucket (the field is a key)</option>
+                      <option value="RUN_FILE" [selected]="sourceOf().kind === 'RUN_FILE'">A run's files (the field is a file id)</option>
+                    </select>
+                    @if (sourceOf().kind !== 'RUN_FILE') {
+                      <input class="input mono text-xs" [value]="sourceOf().bucket ?? ''" [disabled]="readonly()" placeholder="Bucket" aria-label="Bucket"
+                             (change)="setSource('bucket', $any($event.target).value)" />
+                    }
+                  </div>
+                  @if (sourceOf().kind !== 'RUN_FILE') {
+                    <input class="input mono text-xs" [value]="sourceOf().prefix ?? ''" [disabled]="readonly()" placeholder="Folder before the key (optional)" aria-label="Folder"
+                           (change)="setSource('prefix', $any($event.target).value)" />
+                  }
+                  <span class="text-xs text-[color:var(--text-muted)]">Read as the person making the report; checked, and scaled to the size it prints at. Never a web address.</span>
+                </div>
+              }
               @case ('json') {
                 <label class="field">
                   <span class="label">{{ f.label }}</span>
@@ -352,6 +401,11 @@ export class PropertiesPanel {
   readonly tree = input<TreeNode | undefined>(undefined);
   /** The primary dataset's names (its id, and its alias when it starts at the root); the first is written in new bindings. */
   readonly names = input<string[]>(['primary']);
+  /** MIG-406: what this person may place (approved assets, their own or granted), and the template's asset entries. */
+  readonly assets = input<AssetCard[]>([]);
+  readonly templateAssets = input<Record<string, unknown>[]>([]);
+  /** A library asset picked for a setting: the designer adds the template's asset entry and points the block at it. */
+  readonly assetPicked = output<{ key: string; assetId: string | null }>();
   readonly changed = output<PropChange>();
   readonly duplicate = output<void>();
   readonly remove = output<void>();
@@ -382,7 +436,7 @@ export class PropertiesPanel {
   });
 
   readonly columns = computed(() => (Array.isArray(this.block()?.['columns']) ? this.block()!['columns'] : []) as
-    { id: string; label?: string; field: string; format?: { type?: string } }[]);
+    { id: string; label?: string; field: string; format?: { type?: string }; type?: string; imageSource?: { kind?: string; bucket?: string } }[]);
   readonly itemsText = computed(() => (Array.isArray(this.block()?.['items']) ? (this.block()!['items'] as unknown[]).map(String).join('\n') : ''));
   readonly formatType = computed(() => String((this.block()?.['format'] as { type?: string } | undefined)?.type ?? ''));
 
@@ -496,10 +550,57 @@ export class PropertiesPanel {
   }
 
   setColumnFormat(i: number, type: string): void {
-    const cols = this.columnList();
+    const cols = this.columnList() as ({ type?: string; imageSource?: Record<string, unknown>; imageWidth?: string } & { format?: Record<string, unknown> })[];
     if (!cols[i]) return;
-    if (!type) delete cols[i].format; else cols[i].format = { ...(cols[i].format ?? {}), type };
+    if (type === '__image') {
+      cols[i].type = 'image';
+      delete cols[i].format;
+      cols[i].imageSource = cols[i].imageSource ?? { kind: 'BUCKET', bucket: '' };
+      cols[i].imageWidth = cols[i].imageWidth ?? '20mm';
+    } else {
+      delete cols[i].type;
+      delete cols[i].imageSource;
+      delete cols[i].imageWidth;
+      if (!type) delete cols[i].format; else cols[i].format = { ...(cols[i].format ?? {}), type };
+    }
     this.set('columns', cols);
+  }
+
+  setColumnBucket(i: number, bucket: string): void {
+    const cols = this.columnList() as ({ imageSource?: Record<string, unknown> })[];
+    if (!cols[i]) return;
+    cols[i].imageSource = { kind: 'BUCKET', bucket: bucket.trim() };
+    this.set('columns', cols);
+  }
+
+  /** The approved assets a setting may pick: signatures for a signature, stamps for a stamp, logos and images otherwise. */
+  assetChoices(key: string): AssetCard[] {
+    const type = this.block()?.type;
+    const want = key === 'stampRef' || type === 'stamp' ? ['STAMP'] : type === 'signature' ? ['SIGNATURE'] : ['LOGO', 'IMAGE'];
+    return this.assets().filter(a => want.includes(a.kind));
+  }
+
+  /** The library asset a block's setting points at (through the template's asset entry), or null. */
+  pickedAsset(key: string): string | null {
+    const ref = this.text(key);
+    const entry = this.templateAssets().find(e => e['id'] === ref);
+    return entry && typeof entry['assetRef'] === 'string' ? (entry['assetRef'] as string) : null;
+  }
+
+  pickAsset(key: string, assetId: string): void {
+    this.assetPicked.emit({ key, assetId: assetId || null });
+  }
+
+  sourceOf(): { kind?: string; bucket?: string; prefix?: string } {
+    return (this.value('imageSource') ?? {}) as { kind?: string; bucket?: string; prefix?: string };
+  }
+
+  setSource(key: 'kind' | 'bucket' | 'prefix', v: string): void {
+    const s = { ...this.sourceOf() } as Record<string, unknown>;
+    if (key === 'kind' && v === 'RUN_FILE') { this.set('imageSource', { kind: 'RUN_FILE' }); return; }
+    s['kind'] = s['kind'] ?? 'BUCKET';
+    if (v.trim()) s[key] = v.trim(); else delete s[key];
+    this.set('imageSource', s);
   }
 
   addColumn(): void {

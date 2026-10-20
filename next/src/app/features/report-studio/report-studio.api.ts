@@ -4,8 +4,11 @@ import { Observable, map } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 import { PaletteEntry } from './designer/designer-model';
 import {
-  DataSourceRow, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
-  TemplateContract, TemplateDetail, TemplateLibrary, VersionRow,
+  AssetDetail, AssetLibrary, BrandDefinition, BrandProfileDetail, BrandProfileRow, Contrast, Person, Usable,
+} from './assets.model';
+import {
+  Approval, DataSourceRow, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
+  TemplateContract, TemplateDetail, TemplateLibrary, VerifyResult, VersionRow,
 } from './report-studio.model';
 
 /** What a refusal says (spec section 22): a stable code, a sentence, and the problems that blocked it. */
@@ -36,6 +39,10 @@ export class ReportStudioApi {
   private readonly data = `${API_BASE}/reportData.json`;
   private readonly generating = `${API_BASE}/reportGenerate.json`;
   private readonly library = `${API_BASE}/reportLibrary.json`;
+  // MIG-406: Assets & branding (report-assets), signatures and stamps (report-asset-custodian), the approver (report-approve).
+  private readonly assetsBase = `${API_BASE}/reportAsset.json`;
+  private readonly custodian = `${API_BASE}/reportAssetCustodian.json`;
+  private readonly approving = `${API_BASE}/reportApprove.json`;
 
   private static data$<T>(o: Observable<ApiResponse<T>>): Observable<T> {
     return o.pipe(map(r => r.data as T));
@@ -223,6 +230,136 @@ export class ReportStudioApi {
 
   job(jobId: string): Observable<JobRow> {
     return ReportStudioApi.data$(this.http.get<ApiResponse<JobRow>>(`${this.library}/job`, { params: { jobId } }));
+  }
+
+  // ---------------------------------------------------------------- MIG-406: approvals that sign, and verify
+
+  /** Approve a report version (report-approve; never the person who generated it): its PDF is certified in the approver's name. */
+  approve(reportId: string, version: number, note = ''): Observable<Approval> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<Approval>>(`${this.approving}/approve`, { reportId, version, note }));
+  }
+
+  verify(reportId: string, version: number): Observable<VerifyResult> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<VerifyResult>>(`${this.library}/verify`, { reportId, version }));
+  }
+
+  verifyFile(file: File): Observable<VerifyResult> {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    return ReportStudioApi.data$(this.http.post<ApiResponse<VerifyResult>>(`${this.library}/verifyFile`, form));
+  }
+
+  // ---------------------------------------------------------------- MIG-406: assets
+
+  assets(filters: { q?: string; kind?: string; state?: string; used?: string } = {}, tenantId?: number | null): Observable<AssetLibrary> {
+    const params: Record<string, string> = { ...ReportStudioApi.scope(tenantId) };
+    for (const [k, v] of Object.entries(filters)) if (v) params[k] = v;
+    return ReportStudioApi.data$(this.http.get<ApiResponse<AssetLibrary>>(`${this.assetsBase}/assets`, { params }));
+  }
+
+  asset(assetId: string, tenantId?: number | null): Observable<AssetDetail> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<AssetDetail>>(`${this.assetsBase}/asset`,
+      { params: { assetId, ...ReportStudioApi.scope(tenantId) } }));
+  }
+
+  /** A version's picture (the current approved one when none is named), as a blob the page shows through an object URL. */
+  assetFile(assetId: string, version?: number | null, tenantId?: number | null): Observable<Blob> {
+    return this.http.get(`${this.assetsBase}/file`, { params: { assetId, ...(version ? { version: String(version) } : {}),
+      ...ReportStudioApi.scope(tenantId) }, responseType: 'blob' });
+  }
+
+  usable(templateId?: string | null): Observable<Usable> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<Usable>>(`${this.assetsBase}/usable`, { params: templateId ? { templateId } : {} }));
+  }
+
+  people(): Observable<Person[]> {
+    return this.http.get<ApiResponse<{ people: Person[] }>>(`${this.assetsBase}/people`).pipe(map(r => r.data?.people ?? []));
+  }
+
+  /** A logo or image (report-assets), or a signature or stamp (report-asset-custodian): the file and its details. */
+  uploadAsset(file: Blob, fileName: string, fields: Record<string, string | number | null | undefined>, restricted: boolean): Observable<AssetDetail> {
+    const form = new FormData();
+    form.append('file', file, fileName);
+    for (const [k, v] of Object.entries(fields)) if (v !== null && v !== undefined && String(v) !== '') form.append(k, String(v));
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${restricted ? this.custodian : this.assetsBase}/upload`, form));
+  }
+
+  uploadAssetVersion(assetId: string, file: Blob, fileName: string, restricted: boolean): Observable<AssetDetail> {
+    const form = new FormData();
+    form.append('file', file, fileName);
+    form.append('assetId', assetId);
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${restricted ? this.custodian : this.assetsBase}/version/upload`, form));
+  }
+
+  renameAsset(body: { assetId: string; rowVersion: number; name?: string; description?: string; category?: string; ownerTitle?: string }):
+    Observable<AssetDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${this.assetsBase}/rename`, body));
+  }
+
+  retireAsset(assetId: string, restricted: boolean): Observable<AssetDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${restricted ? this.custodian : this.assetsBase}/retire`, { assetId }));
+  }
+
+  deleteAsset(assetId: string): Observable<unknown> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse>(`${this.assetsBase}/delete`, { assetId }));
+  }
+
+  reviewAsset(assetId: string, version: number, approve: boolean, note = ''): Observable<AssetDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${this.approving}/asset/${approve ? 'approve' : 'reject'}`,
+      { assetId, version, note }));
+  }
+
+  grant(assetId: string, userId: number, templateId?: string | null, expiresAt?: string | null): Observable<AssetDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${this.assetsBase}/grant`, { assetId, userId, templateId, expiresAt }));
+  }
+
+  revokeGrant(grantId: string): Observable<AssetDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<AssetDetail>>(`${this.assetsBase}/grant/revoke`, { grantId }));
+  }
+
+  // ---------------------------------------------------------------- MIG-406: brand profiles
+
+  brandProfiles(tenantId?: number | null): Observable<BrandProfileRow[]> {
+    return this.http.get<ApiResponse<{ profiles: BrandProfileRow[] }>>(`${this.assetsBase}/brandProfiles`, { params: ReportStudioApi.scope(tenantId) })
+      .pipe(map(r => r.data?.profiles ?? []));
+  }
+
+  brandProfile(profileId: string, tenantId?: number | null): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<BrandProfileDetail>>(`${this.assetsBase}/brandProfile`,
+      { params: { profileId, ...ReportStudioApi.scope(tenantId) } }));
+  }
+
+  createBrandProfile(name: string, fromProfileId?: string | null): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<BrandProfileDetail>>(`${this.assetsBase}/brandProfile/create`,
+      { name, ...(fromProfileId ? { fromProfileId } : {}) }));
+  }
+
+  saveBrandDraft(profileId: string, revision: number | null, definition: BrandDefinition, name?: string): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<BrandProfileDetail>>(`${this.assetsBase}/brandProfile/draft/save`,
+      { profileId, ...(revision ? { revision } : {}), definition, ...(name ? { name } : {}) }));
+  }
+
+  askBrandApproval(profileId: string, note = ''): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<BrandProfileDetail>>(`${this.assetsBase}/brandProfile/requestApproval`, { profileId, note }));
+  }
+
+  archiveBrandProfile(profileId: string): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<BrandProfileDetail>>(`${this.assetsBase}/brandProfile/archive`, { profileId }));
+  }
+
+  previewBrand(profileId: string | null, definition: BrandDefinition): Observable<{ html: string; contrast: Contrast; problems: Problem[];
+    sources?: Record<string, string> }> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<{ html: string; contrast: Contrast; problems: Problem[]; sources?: Record<string, string> }>>(
+      `${this.assetsBase}/brandProfile/preview`, { ...(profileId ? { profileId } : {}), definition }));
+  }
+
+  publishBrand(profileId: string, revision: number, changeSummary = ''): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<BrandProfileDetail>>(`${this.publishing}/brandProfile/publish`,
+      { profileId, revision, changeSummary }));
+  }
+
+  setDefaultBrand(profileId: string): Observable<BrandProfileDetail> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<BrandProfileDetail>>(`${this.publishing}/brandProfile/setDefault`, { profileId }));
   }
 
   /** One output as a file: a signed link (five minutes, the reader's own), then the proxied download. */

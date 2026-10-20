@@ -1,0 +1,223 @@
+<div class="page">
+  @if (error()) {
+    <app-page-header title="Brand profile" />
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (p(); as p) {
+    <app-page-header [crumb]="p.name">
+      <div class="page-head">
+        <div>
+          <div class="page-head-title">
+            <h1 class="page-title">{{ p.name }}</h1>
+            <span pills class="flex flex-wrap gap-1">
+              @if (p.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
+              @else if (canEdit()) { <span class="pill pill-brand">Draft v{{ editingVersion() }}</span> }
+              @if (dirty()) { <span class="pill pill-warn">Unsaved changes</span> }
+            </span>
+          </div>
+          <p class="page-subtitle">Optional brand defaults for reports. A template can use this profile without using every part of it.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          @if (canEdit()) {
+            <button type="button" class="btn btn-ghost btn-sm" (click)="archive()"><app-icon name="inbox" />Archive</button>
+            @if (canPublish() && p.currentPublishedVersion && !p.isDefault) { <button type="button" class="btn btn-default btn-sm" (click)="makeDefault()">Make the workspace default</button> }
+            @if (canPublish() && p.draft) { <button type="button" class="btn btn-default btn-sm" [disabled]="dirty() || !passes()" (click)="publish()"><app-icon name="check" />Publish v{{ p.draft.version }}</button> }
+            <button type="button" class="btn btn-default btn-sm" [disabled]="!dirty()" (click)="cancel()">Cancel</button>
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="busy() || !dirty()" (click)="save()"><app-icon name="save" />Save draft</button>
+          }
+        </div>
+      </div>
+    </app-page-header>
+
+    <div class="rs-banner rs-banner-info mb-4" role="status">
+      <app-icon name="info" class="shrink-0" />
+      <div class="min-w-0 flex-1">
+        @if (p.currentPublishedVersion) {
+          <span class="pill pill-neutral mr-1">{{ p.isDefault ? 'Workspace default · ' : '' }}published v{{ p.currentPublishedVersion }}</span>
+        } @else { <span class="pill pill-neutral mr-1">Not published yet</span> }
+        {{ p.templates }} template{{ p.templates === 1 ? ' uses' : 's use' }} this profile.
+        @if (canEdit()) {
+          You're editing draft v{{ editingVersion() }}@if (p.currentPublishedVersion) {; v{{ p.currentPublishedVersion }} and existing reports don't change}.
+        }
+        @if (p.approval; as a) { <span class="block text-xs mt-1">Approval asked{{ a.requestedByName ? ' by ' + a.requestedByName : '' }}{{ a.current ? '' : ' · the draft changed since' }}.</span> }
+      </div>
+      @if (canEdit() && p.draft && !canPublish()) { <button type="button" class="link-inline text-sm" (click)="askApproval()">Ask for approval <app-icon name="arrowRight" /></button> }
+    </div>
+    @if (saveError()) { <p class="field-note text-[color:var(--crit-text)] mb-3" role="alert">{{ saveError() }}</p> }
+
+    <div class="rsb-split">
+      <div class="flex flex-col gap-4 min-w-0">
+        <section class="card">
+          <div class="rs-head"><div><h2 class="section-title">Look</h2><p class="text-xs text-[color:var(--text-muted)]">Every field is optional. An empty field uses the value it inherits.</p></div></div>
+          <fieldset class="rsb-body" [disabled]="!canEdit()">
+            <div class="flex flex-wrap gap-4 items-start">
+              <div class="rsb-logo">
+                @if (def().logo?.assetId; as id) { <app-rs-asset-picture [assetId]="id" [alt]="logo()?.name || 'Logo'" maxHeight="4rem" /> }
+                @else { <span class="text-xs text-[color:var(--text-muted)]">No logo</span> }
+              </div>
+              <div class="flex flex-col gap-1.5 min-w-0">
+                <b class="text-sm">Logo · optional</b>
+                <span class="text-xs text-[color:var(--text-muted)]">@if (logo(); as l) { {{ l.name }} · v{{ l.currentVersion }} } @else { The workspace default's, or none }</span>
+                <div class="flex items-center gap-2">
+                  <select class="input input-sm w-auto" aria-label="Logo" [ngModel]="def().logo?.assetId ?? ''" (ngModelChange)="setLogo($event)">
+                    <option value="">Choose asset</option>
+                    @for (a of logos(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
+                  </select>
+                  @if (def().logo) { <button type="button" class="link-inline text-sm" (click)="setLogo('')">Remove</button> }
+                </div>
+              </div>
+            </div>
+            <div class="rsb-three">
+              @for (c of [['primary', 'Main colour'], ['text', 'Text'], ['background', 'Background']]; track c[0]) {
+                <label class="field"><span class="label">{{ c[1] }}</span>
+                  <span class="rsb-colour">
+                    <input type="color" [attr.aria-label]="c[1] + ' picker'" [value]="$any(def().colors)[c[0]] || $any(printed)[c[0]]"
+                           (input)="setColor($any(c[0]), $any($event.target).value)" />
+                    <input class="input mono" maxlength="7" [attr.aria-label]="c[1]" [value]="$any(def().colors)[c[0]] || ''" placeholder="Inherited"
+                           (change)="setColor($any(c[0]), $any($event.target).value)" />
+                  </span></label>
+              }
+            </div>
+            <div class="rsb-two">
+              <label class="field"><span class="label">Heading font</span>
+                <select class="input" aria-label="Heading font" [ngModel]="def().fonts.heading ?? ''" (ngModelChange)="setFont('heading', $event)">
+                  <option value="">Inherited</option>@for (f of fonts; track f) { <option [value]="f">{{ f }}</option> }
+                </select></label>
+              <label class="field"><span class="label">Body font</span>
+                <select class="input" aria-label="Body font" [ngModel]="def().fonts.body ?? ''" (ngModelChange)="setFont('body', $event)">
+                  <option value="">Inherited</option>@for (f of fonts; track f) { <option [value]="f">{{ f }}</option> }
+                </select></label>
+            </div>
+            @if (passes()) { <span class="text-xs text-[color:var(--ok-text)]"><app-icon name="check" /> Text and background pass WCAG AA contrast ({{ textRatio().toFixed(1) }} : 1)</span> }
+            @else { <span class="text-xs text-[color:var(--crit-text)]"><app-icon name="alert" /> Contrast too low: text {{ textRatio().toFixed(1) }} : 1 (at least 4.5), main colour {{ mainRatio().toFixed(1) }} : 1 (at least 3). It cannot be published like this.</span> }
+            <span class="text-xs text-[color:var(--text-muted)]">Fonts are the bundled set — nothing is downloaded.</span>
+          </fieldset>
+        </section>
+
+        <section class="card">
+          <div class="rs-head"><h2 class="section-title">Contact and page defaults</h2></div>
+          <fieldset class="rsb-body rsb-two" [disabled]="!canEdit()">
+            <label class="field"><span class="label">Organisation name</span>
+              <input class="input" maxlength="160" [value]="def().contact.organisation ?? ''" (change)="setContact('organisation', $any($event.target).value)" /></label>
+            <label class="field"><span class="label">Contact email</span>
+              <input class="input" maxlength="250" [value]="def().contact.email ?? ''" (change)="setContact('email', $any($event.target).value)" /></label>
+            <label class="field"><span class="label">Website</span>
+              <input class="input" maxlength="200" [value]="def().contact.website ?? ''" (change)="setContact('website', $any($event.target).value)" /></label>
+            <label class="field"><span class="label">Phone · optional</span>
+              <input class="input" maxlength="40" [value]="def().contact.phone ?? ''" placeholder="Not set" (change)="setContact('phone', $any($event.target).value)" /></label>
+            <label class="field rsb-wide"><span class="label">Header</span>
+              <input class="input mono" maxlength="200" [value]="def().header ?? ''" placeholder="QUALITY & SAFETY / {{ '{{' }}report.period{{ '}}' }}" (change)="setText('header', $any($event.target).value)" /></label>
+            <label class="field"><span class="label">Footer</span>
+              <input class="input mono" maxlength="200" [value]="def().footer ?? ''" (change)="setText('footer', $any($event.target).value)" /></label>
+            <label class="field"><span class="label">Confidentiality line</span>
+              <input class="input" maxlength="120" [value]="def().confidentiality ?? ''" (change)="setText('confidentiality', $any($event.target).value)" /></label>
+            <span class="text-xs text-[color:var(--text-muted)] rsb-wide">Header and footer may name {{ '{{' }}report.period{{ '}}' }}, {{ '{{' }}contact.email{{ '}}' }} and {{ '{{' }}website{{ '}}' }}; they print on templates without a header or footer of their own.</span>
+          </fieldset>
+        </section>
+
+        <section class="card">
+          <div class="rs-head">
+            <div><h2 class="section-title">Approved signatures and stamps</h2><p class="text-xs text-[color:var(--text-muted)]">A list templates may choose from. Nothing is placed automatically.</p></div>
+            <span class="pill pill-neutral">Optional</span>
+          </div>
+          <fieldset class="rsb-body" [disabled]="!canEdit()">
+            <div class="rsb-two">
+              <div class="field"><span class="label">Signatures</span>
+                @for (s of def().signatures; track s.assetId) {
+                  <span class="rsb-chip">{{ nameOf(signatures(), s.assetId) }}
+                    @if (canEdit()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Remove ' + nameOf(signatures(), s.assetId)" (click)="removeFrom('signatures', s.assetId)"><app-icon name="close" /></button> }</span>
+                }
+                <select class="input" aria-label="Add a signature" (change)="addTo('signatures', $any($event.target).value); $any($event.target).value = ''">
+                  <option value="">Add an approved signature</option>
+                  @for (a of signatures(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
+                </select>
+                <span class="text-xs text-[color:var(--text-muted)]">Approved · a template still needs its owner's grant</span>
+              </div>
+              <div class="field"><span class="label">Stamps</span>
+                @for (s of def().stamps; track s.assetId) {
+                  <span class="rsb-chip">{{ nameOf(stamps(), s.assetId) }}
+                    @if (canEdit()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Remove ' + nameOf(stamps(), s.assetId)" (click)="removeFrom('stamps', s.assetId)"><app-icon name="close" /></button> }</span>
+                }
+                <select class="input" aria-label="Add a stamp" (change)="addTo('stamps', $any($event.target).value); $any($event.target).value = ''">
+                  <option value="">Add an approved stamp</option>
+                  @for (a of stamps(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
+                </select>
+                <span class="text-xs text-[color:var(--text-muted)]">Approved</span>
+              </div>
+            </div>
+            <label class="rsb-switch">
+              <span><b>Digitally sign PDFs when approved</b><br>
+                <span class="text-xs text-[color:var(--text-muted)]">Adds a verifiable signature with the approver's name and time. Uses the workspace certificate.</span></span>
+              <input type="checkbox" role="switch" class="checkbox" [checked]="def().signOnApproval" aria-label="Digitally sign PDFs when approved"
+                     (change)="setSign($any($event.target).checked)" />
+            </label>
+          </fieldset>
+        </section>
+      </div>
+
+      <div class="flex flex-col gap-4 min-w-0">
+        <section class="card rsb-preview">
+          <div class="rs-head"><h2 class="section-title">Live preview</h2><span class="text-xs text-[color:var(--text-muted)]">A4 · page 1@if (previewing()) { · drawing… }</span></div>
+          <div class="rsb-preview-body">
+            @if (previewDoc(); as doc) { <iframe class="rsb-frame" title="Live preview of the brand" sandbox="" [srcdoc]="doc"></iframe> }
+            @else { <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Drawing the preview"></span></div> }
+            <span class="text-xs text-[color:var(--text-muted)]">Preview uses a sample wound assessment report with synthetic values. No report is generated or changed.</span>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="rs-head"><h2 class="section-title">Which setting wins</h2></div>
+          <div class="rsb-body">
+            <span class="text-sm text-[color:var(--text-muted)]">Highest first:</span>
+            <div class="rs-code rsb-wrap">Allowed report override → Template setting → Brand profile → Workspace default → Platform default</div>
+            <div class="rsb-lock">
+              <app-icon [name]="def().locks.look === 'LOCKED' ? 'lock' : 'checkCircle'" [class]="def().locks.look === 'LOCKED' ? 'text-[color:var(--text-muted)]' : 'icon-ok'" />
+              <div class="min-w-0 flex-1"><b class="text-sm">Logo and colours</b><br>
+                <select class="input input-sm w-auto mt-1" aria-label="Logo and colours" [disabled]="!canEdit()" [ngModel]="def().locks.look" (ngModelChange)="setLock('look', $event)">
+                  <option value="REPORT">Templates and allowed report overrides can replace them</option>
+                  <option value="TEMPLATE">Templates can replace them; single reports can't</option>
+                  <option value="LOCKED">Fixed to this profile</option>
+                </select></div>
+              <span class="pill" [class]="def().locks.look === 'LOCKED' ? 'pill-neutral' : 'pill-ok'">{{ lockWord(def().locks.look) }}</span>
+            </div>
+            <div class="rsb-lock">
+              <app-icon [name]="def().locks.fontsContact === 'LOCKED' ? 'lock' : 'checkCircle'" [class]="def().locks.fontsContact === 'LOCKED' ? 'text-[color:var(--text-muted)]' : 'icon-ok'" />
+              <div class="min-w-0 flex-1"><b class="text-sm">Fonts and contact details</b><br>
+                <select class="input input-sm w-auto mt-1" aria-label="Fonts and contact details" [disabled]="!canEdit()" [ngModel]="def().locks.fontsContact" (ngModelChange)="setLock('fontsContact', $event)">
+                  <option value="TEMPLATE">Templates can override; single reports can't</option>
+                  <option value="LOCKED">Fixed to this profile</option>
+                </select></div>
+              <span class="pill" [class]="def().locks.fontsContact === 'LOCKED' ? 'pill-neutral' : 'pill-ok'">{{ lockWord(def().locks.fontsContact) }}</span>
+            </div>
+            <div class="rsb-lock">
+              <app-icon [name]="def().locks.confidentiality === 'LOCKED' ? 'lock' : 'checkCircle'" [class]="def().locks.confidentiality === 'LOCKED' ? 'text-[color:var(--text-muted)]' : 'icon-ok'" />
+              <div class="min-w-0 flex-1"><b class="text-sm">Confidentiality line, signatures and stamps</b><br>
+                <select class="input input-sm w-auto mt-1" aria-label="Confidentiality line, signatures and stamps" [disabled]="!canEdit()" [ngModel]="def().locks.confidentiality" (ngModelChange)="setLock('confidentiality', $event)">
+                  <option value="LOCKED">Fixed to approved settings</option>
+                  <option value="TEMPLATE">Templates may use their own</option>
+                </select></div>
+              <span class="pill" [class]="def().locks.confidentiality === 'LOCKED' ? 'pill-neutral' : 'pill-ok'">{{ lockWord(def().locks.confidentiality) }}</span>
+            </div>
+            <span class="text-xs text-[color:var(--text-muted)]">Publishing a profile needs an approver. New versions apply to future reports only; old reports keep their brand and assets.</span>
+          </div>
+        </section>
+
+        @if (p.versions.length) {
+          <section class="card">
+            <div class="rs-head"><h2 class="section-title">Versions</h2></div>
+            <ul class="divide-y divide-[color:var(--border-subtle)] text-sm">
+              @for (v of p.versions; track v.versionId) {
+                <li class="px-4 py-2 flex items-center justify-between gap-2">
+                  <span>v{{ v.version }} · {{ v.state === 'DRAFT' ? 'Draft' : v.state === 'PUBLISHED' ? 'Published' : 'Replaced' }}@if (v.changeSummary) { · {{ v.changeSummary }} }</span>
+                  <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ (v.publishedAt || v.updatedAt) | serverTime: 'dateTime' }}</span>
+                </li>
+              }
+            </ul>
+          </section>
+        }
+      </div>
+    </div>
+  } @else {
+    <app-page-header title="Brand profile" />
+    <div class="flex justify-center py-16"><span class="spinner" role="status" aria-label="Loading"></span></div>
+  }
+</div>

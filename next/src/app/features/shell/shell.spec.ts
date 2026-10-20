@@ -57,7 +57,7 @@ describe('shell navigation', () => {
       '/connections/databases', '/connections/sources', '/data/analytics', '/data/analytics/dashboards', '/data/ask',
       '/data/catalog', '/data/files', '/developers/portal', '/documents/datasets', '/documents/email-in',
       '/documents/file-drop', '/documents/in', '/documents/types', '/forms/builder', '/forms/submissions',
-      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/reports/data', '/reports/library', '/reports/overview',
+      '/pipelines/list', '/pipelines/prompts', '/pipelines/schedules', '/reports/assets', '/reports/data', '/reports/library', '/reports/overview',
       '/reports/templates', '/review/all', '/review/approvals', '/review/documents',
       '/review/requests', '/review/runs', '/runs/analytics', '/runs/backfills', '/runs/by-date', '/runs/failed',
       '/runs/latest',

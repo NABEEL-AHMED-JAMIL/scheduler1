@@ -36,3 +36,4 @@
 .rsw-out { display: flex; align-items: flex-start; gap: 0.5rem; font-size: 0.875rem; }
 .rsw-progress { height: 0.5rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
 .rsw-progress > i { display: block; height: 100%; background: var(--accent-mark-strong); transition: width 300ms ease; }
+.rsw-logo { width: 4.5rem; flex-shrink: 0; justify-items: start; }
