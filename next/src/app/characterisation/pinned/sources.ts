@@ -237,8 +237,10 @@ export const PINNED: Record<string, unknown> = {
       ]
     ],
     "fields": [
+      "All workspaces",
       "Kind",
-      "Search sources"
+      "Search sources",
+      "Workspace"
     ],
     "links": [
       "/connections",
