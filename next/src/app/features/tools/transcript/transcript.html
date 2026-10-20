@@ -61,7 +61,6 @@
       </app-actions-bar>
     </app-section>
 
-
   @if (error()) {
     <div class="card p-4 flex flex-wrap items-center gap-2" role="alert" [attr.data-busy]="busy() || null" data-test="transcript-error">
       @if (busy()) { <app-icon name="clock" class="icon-warn shrink-0" /> } @else { <app-icon name="alert" class="icon-crit shrink-0" /> }

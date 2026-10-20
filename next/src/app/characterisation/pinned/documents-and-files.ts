@@ -131,8 +131,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Document Converter",
-      "1 Convert",
-      "Limits and queue",
+      "Convert",
       "Recent conversions (1 of 1)"
     ],
     "buttons": [
@@ -146,9 +145,9 @@ export const PINNED: Record<string, unknown> = {
       "From a bucket",
       "PDF from a dataset",
       "PDF from a run",
-      "Read the queue again",
+      "Read the limits and queue again",
       "Refresh",
-      "Supported formats2 families",
+      "Supported formats 2",
       "Upload a file",
       "View the converted file",
       "View the original file"

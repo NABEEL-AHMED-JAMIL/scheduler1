@@ -206,7 +206,6 @@
   </div>
   </app-section>
 
-
   <app-table-shell heading="Recent conversions" [shown]="pagedTasks().length" [total]="shownTasks().length"
                    [loading]="tasksLoading()" [error]="tasksError()" (retry)="loadTasks()"
                    [isEmpty]="!shownTasks().length" emptyIcon="file"
