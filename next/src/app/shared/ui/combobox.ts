@@ -167,6 +167,10 @@ export class Combobox implements ControlValueAccessor {
   readonly disabled = signal(false);
   readonly open = signal(false);
   readonly query = signal('');
+  /** Owner 2026-10-19: opening a box that already shows a choice lists every option, not only the ones matching the
+   *  chosen label (the workspace selector showed just "Riverside Health…" until it was cleared). Filtering starts at the
+   *  first keystroke. */
+  readonly typed = signal(false);
   readonly highlighted = signal(-1);
 
   private onChange: (v: string) => void = () => {};
@@ -174,7 +178,7 @@ export class Combobox implements ControlValueAccessor {
 
   /** What the option list narrows to once accounting for the label AND the hint text. */
   readonly filtered = computed(() => {
-    const q = this.query().trim().toLowerCase();
+    const q = this.typed() ? this.query().trim().toLowerCase() : '';
     const opts = this.options();
     if (!q || this.remote()) return opts;
     return opts.filter(o =>
@@ -216,6 +220,7 @@ export class Combobox implements ControlValueAccessor {
   setDisabledState(isDisabled: boolean): void { this.disabled.set(isDisabled); }
 
   onFocus(): void {
+    this.typed.set(false);
     this.open.set(true);
     this.query.set(this.labelForValue());
     this.highlighted.set(-1);
@@ -228,6 +233,7 @@ export class Combobox implements ControlValueAccessor {
   }
 
   onInput(text: string): void {
+    this.typed.set(true);
     this.query.set(text);
     this.open.set(true);
     this.highlighted.set(this.filtered().length ? 0 : -1);
