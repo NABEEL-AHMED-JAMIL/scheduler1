@@ -78,6 +78,10 @@ describe('MIG-253: Documents -- the converter\'s render modes, Reports, and a fi
   it('a file\'s details, written by a recent run', async () => {
     const v = await visit(`/data/files?bucket=${LIVE_IDS.bucket}&prefix=registry-live-check/`, 'TENANT_ADMIN', null, {
       ...RUNS, ...REPORTS_FOLDER,
+      // Core's object -> run lookup (2026-10-20): the panel asks it first, and searches the recent runs only without it.
+      'GET /sourceJob.json/objectWriter': ok({ jobQueueId: 7405, jobId: 2849, jobName: 'UI-CHECK registry chain job 0929',
+        pipelineName: 'UI-CHECK registry chain task 0929', owner: 'Claude Demo Admin', attempt: 1, stepKey: 'publish',
+        task: 'upload_bucket', recordedAt: '2026-09-29T07:07:05.863214', bucket: LIVE_IDS.bucket, key: KEY }, 'Written by run 7405.'),
       'GET /storage.json/listObjects': ok({ objects: [{ name: 'customers-clean.json', key: KEY, folder: false, size: 169,
         lastModified: '2026-09-29T12:07:05Z', contentType: 'application/json' }] }),
     });

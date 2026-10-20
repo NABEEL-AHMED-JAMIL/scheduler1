@@ -70,9 +70,7 @@ export const PINNED: Record<string, unknown> = {
   "a file's details, written by a recent run": {
     "requests": [
       "GET /storage.json/objectMetadata?bucket=ui-review-s3&key=registry-live-check/customers-clean.json",
-      "GET /sourceJob.json/listSourceJob",
-      "GET /sourceJob.json/fetchSourceJobQueueListWithJobId?jobId=2849&limit=3",
-      "GET /sourceJob.json/runOutputs?jobQueueId=7405"
+      "GET /sourceJob.json/objectWriter?bucket=ui-review-s3&key=registry-live-check/customers-clean.json"
     ],
     "headings": [
       "customers-clean.json",
