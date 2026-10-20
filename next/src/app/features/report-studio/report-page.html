@@ -244,6 +244,7 @@
                 <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verify(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | rsTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }
                   @else if (v.approval) { <span class="pill pill-neutral" [title]="v.approval.notSignedReason || ''">Approved</span> }
                   @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-ghost btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
+                  @else if (superseded(v)) { <span class="text-xs text-[color:var(--text-muted)]" title="A newer version replaced it; only the current version can be approved.">Superseded</span> }
                   @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>
                 <td class="whitespace-nowrap text-right">
                   @for (o of outputsOf(v); track o.format) {

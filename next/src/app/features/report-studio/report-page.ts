@@ -168,9 +168,18 @@ export class ReportPage implements OnInit {
     });
   }
 
-  /** Whether this person may approve a version: an approver who did not generate it, and it is not approved yet. */
+  /**
+   * Whether this person may approve a version: an approver who did not generate it, it is not approved yet, and it is the
+   * report's current version (media refuses a superseded one: a newer version exists).
+   */
   mayApprove(v: ReportVersionRow): boolean {
-    return this.canApprove() && !v.approval && v.createdBy !== this.me();
+    return this.canApprove() && !v.approval && v.createdBy !== this.me() && v.version === this.r()?.currentVersion;
+  }
+
+  /** An older version nobody approved: a newer one replaced it, so only the current version can be approved now. */
+  superseded(v: ReportVersionRow): boolean {
+    const current = this.r()?.currentVersion;
+    return !v.approval && current != null && v.version < current;
   }
 
   async approve(v: ReportVersionRow): Promise<void> {

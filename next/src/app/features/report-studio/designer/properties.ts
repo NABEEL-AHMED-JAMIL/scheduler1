@@ -41,13 +41,13 @@ const LABELS: Record<string, string> = {
   pageBreakAfter: 'Start a new page after it', hidden: 'Hidden (not in the report)', sort: 'Sort', size_spacer: 'Space',
   // MIG-406: signatures, stamps, images from the data, the grid.
   stampRef: 'Stamp beside it', caption: 'Caption', placement: 'Where', imageSource: 'Pictures from', imageField: 'Picture field',
-  captionField: 'Caption field', imageHeight: 'Picture height', maxItems: 'At most pictures', columns_grid: 'Pictures a row',
+  captionField: 'Caption field', captionFields: 'Caption fields (up to 4, joined with ·)', imageHeight: 'Picture height', maxItems: 'At most pictures', columns_grid: 'Pictures a row',
   // QA 2026-10-20 (media 3e1cb7d): row filters, a list's field, the value's size.
   filter: 'Show only rows where', field: 'Show this field of the first row', emphasis: 'Value size',
 };
 
 const GROUPS: Record<string, PropField['group']> = {
-  binding: 'data', dataset: 'data', columns: 'data', itemField: 'data', emptyText: 'data', emptyState: 'data', maxRows: 'data', sort: 'data',
+  binding: 'data', dataset: 'data', columns: 'data', itemField: 'data', emptyText: 'data', emptyState: 'data', maxRows: 'data', sort: 'data', captionFields: 'data',
   repeatHeader: 'data', striped: 'data', allowPageBreak: 'layout', format: 'format', style: 'style', size: 'layout', keepTogether: 'layout',
   pageBreakBefore: 'layout', pageBreakAfter: 'layout', hidden: 'layout', width: 'layout', height: 'layout', gap: 'layout',
 };
