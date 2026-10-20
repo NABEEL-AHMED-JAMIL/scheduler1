@@ -28,8 +28,8 @@
         <app-icon name="alert" class="icon-crit shrink-0" />
         <div class="min-w-0 flex-1">
           <div class="font-semibold">{{ j.reportName }} · generation {{ isMapping(j) ? 'blocked' : 'failed' }}</div>
-          <div class="text-sm">{{ j.label }} could not make @if (j.resultVersion) { a version } @else { a new version }: {{ j.error }}
-            <span class="mono text-xs">({{ j.errorCode }})</span> The report's last version is unchanged.</div>
+          <div class="text-sm">{{ j.label }} could not make a new version: {{ j.error }}
+            The report's last version is unchanged.</div>
         </div>
         @if (isMapping(j) && canGenerate()) {
           <button type="button" class="btn btn-default btn-sm shrink-0" (click)="fixMapping(j)"><app-icon name="arrowRight" />Fix field mapping</button>
@@ -60,10 +60,10 @@
                     </td>
                     <td class="tabular">@if (r.currentVersion) { v{{ r.currentVersion }} } @else { — }</td>
                     <td><app-status [label]="r.lastJob && isRunning(r.lastJob.status) ? 'Running' : chipWord(r.status)" /></td>
-                    <td>@if (r.current?.approval?.signed) { <span class="pill pill-ok" [title]="'Approved and signed by ' + r.current!.approval!.approverName">{{ r.current!.approval!.approverName }}</span> }
-                      @else if (r.current?.approval) { <span class="pill pill-neutral">Approved</span> }
-                      @else if (r.currentVersion) { <span class="text-xs text-[color:var(--text-muted)]">Not yet</span> } @else { — }</td>
-                    <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'recent' }}</td>
+                    <td>@if (r.current?.approval?.signed) { <span class="pill pill-ok" [title]="'Approved and signed by ' + r.current!.approval!.approverName">Signed</span> }
+                      @else if (r.current?.approval) { <span class="pill pill-neutral" [title]="'Approved by ' + r.current!.approval!.approverName">Approved</span> }
+                      @else { <span class="text-[color:var(--text-muted)]" title="Not approved yet">—</span> }</td>
+                    <td class="text-xs whitespace-nowrap">{{ r.updatedAt | rsTime: 'recent' }}</td>
                     <td><a class="btn btn-ghost btn-icon btn-sm" [routerLink]="['/reports/library', r.reportId]" [attr.aria-label]="'Open ' + r.name"><app-icon name="chevronRight" /></a></td>
                   </tr>
                 }
@@ -93,11 +93,11 @@
                         <div class="flex items-center gap-2"><span class="rs-progress-sm" role="progressbar" [attr.aria-valuenow]="j.progressPct" aria-valuemin="0" aria-valuemax="100"
                              [attr.aria-label]="stageWord(j.status)"><i [style.width.%]="j.progressPct"></i></span><span class="text-xs text-[color:var(--text-muted)]">{{ stageWord(j.status) }} · {{ j.progressPct }}%</span></div>
                       } @else {
-                        <app-status [label]="chipWord(j.status)" />
-                        @if (j.errorCode) { <span class="text-xs mono ml-1">{{ j.errorCode }}</span> }
+                        <span class="pill" [class.pill-ok]="j.status === 'SUCCEEDED'" [class.pill-crit]="j.status === 'FAILED'" [class.pill-neutral]="j.status !== 'SUCCEEDED' && j.status !== 'FAILED'"
+                              [title]="j.errorCode ? j.errorCode + (j.error ? ': ' + j.error : '') : ''"><app-icon [name]="j.status === 'FAILED' ? 'alert' : j.status === 'SUCCEEDED' ? 'checkCircle' : 'clock'" size="0.9em" />{{ jobChip(j) }}</span>
                       }
                     </td>
-                    <td class="text-xs whitespace-nowrap">{{ j.createdAt | serverTime: 'recent' }}</td>
+                    <td class="text-xs whitespace-nowrap">{{ j.createdAt | rsTime: 'recent' }}</td>
                     <td class="whitespace-nowrap">
                       @if (j.status === 'FAILED' && isMapping(j) && canGenerate()) { <button type="button" class="link-inline text-sm" (click)="fixMapping(j)">Fix mapping</button> }
                       @else if (j.status === 'SUCCEEDED' && canLibrary()) { <a class="link-inline text-sm" [routerLink]="['/reports/library', j.reportId]">View report</a> }
@@ -113,7 +113,7 @@
 
       <aside class="card rs-side min-w-0">
         <section class="rs-side-sec">
-          <h2 class="section-title">Start here</h2>
+          <h2 class="rsd-eyebrow m-0">Start here</h2>
           @if (canGenerate()) {
             <div class="rs-side-row"><span class="flex items-center gap-2"><app-icon name="file" />Create a report</span><button type="button" class="link-inline text-sm" (click)="newReport()">Start</button></div>
           }
@@ -125,13 +125,13 @@
           }
         </section>
         <section class="rs-side-sec">
-          <h2 class="section-title">Connected pipelines</h2>
+          <h2 class="rsd-eyebrow m-0">Connected pipelines</h2>
           @for (p of pipelines(); track p.jobId) {
             <div class="flex flex-col gap-1">
               <div class="rs-side-row"><b class="truncate">{{ p.pipeline || p.name }}</b><app-status [label]="runWord(p.lastRun)" /></div>
               <dl class="rs-kv">
-                <dt>Last run</dt><dd class="mono text-xs">@if (p.lastRun) { #{{ p.lastRun.jobQueueId }} · {{ p.lastRun.startTime | serverTime: 'recent' }} } @else { — }</dd>
-                <dt>Feeds</dt><dd>{{ p.templates }} template{{ p.templates === 1 ? '' : 's' }} · used run #{{ p.usedRun }}</dd>
+                <dt>Last run</dt><dd class="mono text-xs">@if (p.lastRun) { #{{ p.lastRun.jobQueueId }} · {{ p.lastRun.startTime | rsTime: 'recent' }} } @else { — }</dd>
+                <dt>Feeds</dt><dd>{{ p.templates }} template{{ p.templates === 1 ? '' : 's' }}</dd>
               </dl>
             </div>
           } @empty {
@@ -143,18 +143,18 @@
           @if (canData()) { <a class="link-inline text-sm" routerLink="/reports/data">Inspect source and schema →</a> }
         </section>
         <section class="rs-side-sec">
-          <h2 class="section-title">Template activity</h2>
+          <h2 class="rsd-eyebrow m-0">Template activity</h2>
           @if (!d.templateActivity.length) { <p class="text-sm text-[color:var(--text-muted)]">No templates yet: start from a starter or import one.</p> }
           @for (t of d.templateActivity; track t.templateId) {
             <div class="flex flex-col gap-0.5">
               <div class="flex flex-wrap items-center gap-1.5">
-                @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
+                @if (t.hasDraft) { <span class="pill pill-info">Draft</span> }
                 @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
                 <a class="link-inline font-medium" [routerLink]="['/reports/templates', t.templateId]">{{ t.name }}</a>
               </div>
               <span class="text-xs text-[color:var(--text-muted)]">
                 @if (t.hasDraft && t.currentPublishedVersion) { Draft changes; published v{{ t.currentPublishedVersion }} is unchanged · }
-                Updated {{ t.updatedAt | serverTime: 'recent' }}
+                Updated {{ t.updatedAt | rsTime: 'recent' }}
               </span>
               @if (t.hasDraft && canTemplates()) { <a class="link-inline text-xs" [routerLink]="['/reports/templates', t.templateId, 'design']">Continue editing the draft →</a> }
             </div>

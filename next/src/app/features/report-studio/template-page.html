@@ -10,13 +10,13 @@
             <h1 class="page-title">{{ t.name }}</h1>
             <span pills class="flex flex-wrap gap-1">
               @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
-              @if (t.draft) { <span class="pill pill-brand">Draft v{{ t.draft.version }} · revision {{ t.draft.revision }}</span> }
+              @if (t.draft) { <span class="pill pill-info">Draft v{{ t.draft.version }} · revision {{ t.draft.revision }}</span> }
               @if (t.status === 'ARCHIVED') { <span class="pill pill-neutral">Archived</span> }
             </span>
           </div>
           <p class="page-subtitle">{{ t.description || 'No description.' }}</p>
           <p class="text-xs text-[color:var(--text-muted)] mt-1">
-            {{ originWord(t) }} · {{ t.reports }} report{{ t.reports === 1 ? '' : 's' }} · updated {{ t.updatedAt | serverTime: 'dateTime' }}
+            {{ originWord(t) }} · {{ t.reports }} report{{ t.reports === 1 ? '' : 's' }} · updated {{ t.updatedAt | rsTime: 'recent' }}
           </p>
         </div>
         <div class="flex items-center gap-2">
@@ -91,14 +91,14 @@
                 <div class="flex flex-wrap items-center gap-1.5">
                   <span class="font-medium">v{{ v.version }}</span>
                   @switch (v.state) {
-                    @case ('DRAFT') { <span class="pill pill-brand">Draft · revision {{ v.revision }}</span> }
+                    @case ('DRAFT') { <span class="pill pill-info">Draft · revision {{ v.revision }}</span> }
                     @case ('PUBLISHED') { <span class="pill pill-ok">Published</span> }
                     @default { <span class="pill pill-neutral">Superseded</span> }
                   }
                   @if (v.basedOnVersion) { <span class="text-xs text-[color:var(--text-muted)]">from v{{ v.basedOnVersion }}</span> }
                 </div>
                 <span class="text-xs text-[color:var(--text-muted)]">
-                  @if (v.publishedAt) { Published {{ v.publishedAt | serverTime: 'dateTime' }} } @else { Saved {{ v.updatedAt | serverTime: 'dateTime' }} }
+                  @if (v.publishedAt) { Published {{ v.publishedAt | rsTime: 'recent' }} } @else { Saved {{ v.updatedAt | rsTime: 'recent' }} }
                   @if (v.changeSummary) { · {{ v.changeSummary }} }
                 </span>
                 @if (v.state !== 'DRAFT') {

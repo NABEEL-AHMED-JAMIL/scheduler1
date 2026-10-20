@@ -6,7 +6,7 @@ import { Router, RouterLink } from '@angular/router';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LoadError } from '../../shared/ui/load-error';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -33,7 +33,7 @@ export const TEMPLATE_DELETE_WORDS = 'Its versions, drafts and test samples are 
 
 @Component({
   selector: 'app-report-template-page',
-  imports: [PageHeader, RefreshButton, Icon, ServerTimePipe, LoadError, ProblemList, FormsModule, CdkMenu, CdkMenuItem,
+  imports: [PageHeader, RefreshButton, Icon, RsTimePipe, LoadError, ProblemList, FormsModule, CdkMenu, CdkMenuItem,
     CdkMenuTrigger, RouterLink],
   templateUrl: './template-page.html',
 })

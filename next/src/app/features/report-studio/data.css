@@ -25,3 +25,8 @@
 @media (min-width: 1280px) { .rsdt-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); } }
 .rsdt-scroll { max-height: 26rem; overflow: auto; }
 .rs-code-tree { font-family: var(--font-mono); padding: 0.5rem; background: var(--surface-sunken); border-radius: var(--radius-md); }
+/* Sample rows (drawing 7): numbers on the right in even figures, cells a size down so a seven-column CSV fits a 1440
+   screen's card or nearly; past that the table scrolls inside its card and the line above says so. */
+.rsdt-sample th, .rsdt-sample td { padding-inline: 0.625rem; }
+.rsdt-sample td { font-size: 0.8125rem; }
+.rsdt-sample td.rsdt-num { text-align: right; font-variant-numeric: tabular-nums; }

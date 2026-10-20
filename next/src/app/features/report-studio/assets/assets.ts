@@ -5,7 +5,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { Icon } from '../../../shared/ui/icon';
 import { LoadError } from '../../../shared/ui/load-error';
-import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { RsTimePipe } from '../rs-time.pipe';
 import { sidePanelConfig } from '../../../shared/ui/side-panel';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
@@ -16,6 +16,7 @@ import { AssetCard, AssetDetail, BrandProfileRow, KIND_WORDS, stateTone, stateWo
 import { AssetPicture } from './asset-picture';
 import { UploadData, UploadPanel } from './upload-panel';
 import { NewProfilePanel, NewProfileData } from './new-profile-panel';
+import { RsTabCounts } from '../rs-tab-counts';
 
 type Tab = 'assets' | 'profiles' | 'restricted';
 
@@ -30,13 +31,14 @@ const inUse = (a: AssetCard) => a.templates + a.reports + (a.profiles ?? 0) > 0;
 
 @Component({
   selector: 'app-report-assets',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, ServerTimePipe, WorkspaceSelect, RouterLink, AssetPicture],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, RsTimePipe, WorkspaceSelect, RouterLink, AssetPicture],
   templateUrl: './assets.html',
   styleUrl: './assets.css',
 })
 export class ReportAssets implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
+  private readonly tabCounts = inject(RsTabCounts);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -63,7 +65,8 @@ export class ReportAssets implements OnInit {
   readonly canCustodian = computed(() => this.auth.canOpen('report-asset-custodian') && !this.auth.isPlatformAdmin());
   readonly canApprove = computed(() => this.auth.canOpen('report-approve') && !this.auth.isPlatformAdmin());
   readonly canPublish = computed(() => this.auth.canOpen('report-publish') && !this.auth.isPlatformAdmin());
-  readonly workspace = computed(() => this.auth.user()?.tenantName || 'this workspace');
+  readonly workspace = computed(() => (this.auth.isPlatformAdmin() && this.tenantId() ? this.workspaces.nameOf(this.tenantId()) : this.auth.user()?.tenantName)
+    || 'this workspace');
   /** The role word the side panel names, as the console's roles read. */
   readonly roleWord = computed(() => (this.auth.isPlatformAdmin() ? 'Platform administrator' : this.auth.isTenantAdmin() ? 'Admin'
     : this.canApprove() ? 'Approver' : 'Editor'));
@@ -93,6 +96,7 @@ export class ReportAssets implements OnInit {
     this.loading.set(true);
     this.error.set('');
     const scope = this.auth.isPlatformAdmin() ? this.tenantId() : null;
+    this.tabCounts.refresh(scope);
     this.api.assets({}, scope).subscribe({
       next: lib => { this.assets.set(lib.assets); this.profiles.set(lib.profiles ?? []); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The assets could not be read.').message); this.loading.set(false); },

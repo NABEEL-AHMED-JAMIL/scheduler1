@@ -7,12 +7,13 @@ import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe } from './rs-time.pipe';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { JobRow, ReportRow, chipWord, isRunning, stageWord } from './report-studio.model';
+import { RsTabCounts } from './rs-tab-counts';
 
 type View = 'reports' | 'jobs';
 
@@ -23,12 +24,13 @@ type View = 'reports' | 'jobs';
  */
 @Component({
   selector: 'app-report-library',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, ServerTimePipe, RouterLink],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, RsTimePipe, RouterLink],
   templateUrl: './library.html',
 })
 export class ReportLibrary implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
+  private readonly tabCounts = inject(RsTabCounts);
   private readonly route = inject(ActivatedRoute);
   private readonly workspaces = inject(WorkspaceDirectory);
   /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
@@ -79,6 +81,7 @@ export class ReportLibrary implements OnInit {
     if (!quiet) this.loading.set(true);
     this.error.set('');
     const scope = this.auth.isPlatformAdmin() ? this.tenantId() : null;
+    if (!quiet) this.tabCounts.refresh(scope);
     this.api.reports('', scope).subscribe({
       next: r => { this.reports.set(r); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The reports could not be read.').message); this.loading.set(false); },

@@ -70,7 +70,7 @@
                   </div>
                   <h3 class="rsa-card-title">{{ a.name }}</h3>
                   <span class="text-xs text-[color:var(--text-muted)]">{{ usedWord(a) }}</span>
-                  <span class="text-xs text-[color:var(--text-muted)]">Updated {{ a.updatedAt | serverTime: 'date' }}@if (a.updatedByName) { · {{ a.updatedByName }} }</span>
+                  <span class="text-xs text-[color:var(--text-muted)]">Updated {{ a.updatedAt | rsTime: 'day' }}@if (a.updatedByName) { · {{ a.updatedByName }} }</span>
                   @if (a.pendingVersion && a.state !== 'IN_REVIEW') { <span class="text-xs text-[color:var(--warn-text)]">v{{ a.pendingVersion }} waiting for approval</span> }
                   <div class="flex items-center justify-between gap-2 text-xs mt-auto pt-1">
                     <span class="text-[color:var(--text-muted)]">@if (a.restricted) { <app-icon name="lock" /> Limited use } @else { <app-icon name="edit" /> Editors manage }</span>
@@ -95,10 +95,10 @@
                 <div class="min-w-0">
                   <a class="font-semibold link-inline" [routerLink]="['/reports/assets/branding', p.profileId]">{{ p.name }}</a>
                   @if (p.isDefault) { <span class="pill pill-neutral ml-1">Workspace default</span> }
-                  @if (p.hasDraft) { <span class="pill pill-brand ml-1">Draft</span> }
+                  @if (p.hasDraft) { <span class="pill pill-info ml-1">Draft</span> }
                   <div class="text-xs text-[color:var(--text-muted)]">
                     @if (p.currentPublishedVersion) { v{{ p.currentPublishedVersion }} } @else { Not published yet } ·
-                    {{ p.templates }} template{{ p.templates === 1 ? '' : 's' }} · updated {{ p.updatedAt | serverTime: 'date' }}@if (p.updatedByName) { by {{ p.updatedByName }} }
+                    {{ p.templates }} template{{ p.templates === 1 ? '' : 's' }} · updated {{ p.updatedAt | rsTime: 'day' }}@if (p.updatedByName) { by {{ p.updatedByName }} }
                   </div>
                 </div>
                 <a class="link-inline text-sm whitespace-nowrap" [routerLink]="['/reports/assets/branding', p.profileId]">{{ canLibrary() ? 'Edit profile' : 'Open' }} <app-icon name="arrowRight" /></a>

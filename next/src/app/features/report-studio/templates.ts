@@ -10,7 +10,7 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { ListView, ViewToggle } from '../../shared/ui/view-toggle';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
@@ -22,6 +22,7 @@ import { StarterRow, TemplateDetail, TemplateRow, chipWord, originWord } from '.
 import { ImportTemplatePanel, NewTemplateData, NewTemplatePanel } from './template-panels';
 import { TestPanel, TestPanelData } from './test-panel';
 import { downloadJson } from './report-files';
+import { RsTabCounts } from './rs-tab-counts';
 
 /** Which templates the library shows (Figma frame 2's tabs). */
 type Group = 'all' | 'workspace' | 'starters' | 'shared';
@@ -46,14 +47,16 @@ export interface LibraryItem {
  */
 @Component({
   selector: 'app-report-templates',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, ServerTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, RsTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
     Segmented, ViewToggle],
   templateUrl: './templates.html',
   styleUrl: './templates.css',
+  host: { '[style.--rst-brand]': 'brandColour()' },
 })
 export class ReportTemplates implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
+  private readonly tabCounts = inject(RsTabCounts);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly router = inject(Router);
@@ -131,10 +134,32 @@ export class ReportTemplates implements OnInit {
     if (this.route.snapshot.queryParamMap.get('new') && this.canEdit()) this.create(null);
   }
 
+  /** The workspace's own brand colour for the starters' page sketches (drawing 2), from its default brand profile. */
+  readonly brandColour = signal<string | null>(null);
+
+  private loadBrand(scope: number | null): void {
+    this.api.brandProfiles(scope).subscribe({
+      next: rows => {
+        const d = rows.find(r => r.isDefault && r.status === 'ACTIVE');
+        if (!d) { this.brandColour.set(null); return; }
+        this.api.brandProfile(d.profileId, scope).subscribe({
+          next: p => {
+            const c = (p.published ?? p.draft)?.definition?.colors?.primary ?? null;
+            this.brandColour.set(c && /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : null);
+          },
+          error: () => this.brandColour.set(null),
+        });
+      },
+      error: () => this.brandColour.set(null),
+    });
+  }
+
   load(): void {
     this.loading.set(true);
     this.error.set('');
     const scope = this.isPlatformAdmin() ? this.tenantId() : null;
+    this.tabCounts.refresh(scope);
+    this.loadBrand(scope);
     this.api.list(this.archived(), scope).subscribe({
       next: lib => {
         this.templates.set(lib.templates);

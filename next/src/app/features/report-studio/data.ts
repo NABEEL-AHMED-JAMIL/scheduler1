@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
 import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AuthService } from '../../core/auth/auth.service';
@@ -19,6 +19,7 @@ import { ReportStudioApi, studioError } from './report-studio.api';
 import { DataSourceRow, InspectResult, SourceRef, TemplateContract, TreeNode, size } from './report-studio.model';
 import { ReportSourcePicker, SourceMode } from './source-picker';
 import { collections, firstRecord, itemFields, sampleText, valueAt } from './designer/designer-model';
+import { RsTabCounts } from './rs-tab-counts';
 
 /** The three kinds of source across the top (Figma frame 7). */
 type Kind = 'run' | 'bucket' | 'upload';
@@ -36,7 +37,7 @@ export interface SchemaNote { name: string; templateId: string; missing: string[
  */
 @Component({
   selector: 'app-report-data',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, ServerTimePipe, FormsModule, ReportSourcePicker, RouterLink, NgTemplateOutlet],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, RsTimePipe, FormsModule, ReportSourcePicker, RouterLink, NgTemplateOutlet],
   templateUrl: './data.html',
   styleUrl: './data.css',
 })
@@ -45,6 +46,7 @@ export class ReportData implements OnInit {
   private readonly storage = inject(StorageService);
   private readonly generated = inject(GeneratedService);
   private readonly auth = inject(AuthService);
+  private readonly tabCounts = inject(RsTabCounts);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
   private readonly workspaces = inject(WorkspaceDirectory);
@@ -54,7 +56,12 @@ export class ReportData implements OnInit {
 
   readonly sources = signal<DataSourceRow[]>([]);
   readonly buckets = signal<BucketSummary[]>([]);
-  readonly schedules = signal(0);
+  /** The schedules the reader may open: a platform administrator's are every workspace's, so they are counted for the one shown. */
+  private readonly allSchedules = signal<{ tenantId?: number | null }[]>([]);
+  readonly schedules = computed(() => {
+    const scope = this.isPlatformAdmin() ? this.tenantId() : null;
+    return this.allSchedules().filter(j => !scope || j.tenantId == null || j.tenantId === scope).length;
+  });
   readonly contracts = signal<TemplateContract[]>([]);
   readonly loading = signal(true);
   readonly error = signal('');
@@ -75,7 +82,9 @@ export class ReportData implements OnInit {
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
   readonly isAdmin = computed(() => this.auth.role() === 'TENANT_ADMIN');
   readonly canUpload = computed(() => this.auth.canOpen('report-data') && !this.auth.isPlatformAdmin());
-  readonly workspaceName = computed(() => this.auth.user()?.tenantName || 'this workspace');
+  /** The workspace shown: a platform administrator's chosen one by its name, else the reader's own. */
+  readonly workspaceName = computed(() => (this.isPlatformAdmin() && this.tenantId() ? this.workspaces.nameOf(this.tenantId()) : this.auth.user()?.tenantName)
+    || 'this workspace');
   readonly uploads = computed(() => this.filter(this.sources().filter(s => s.connector === 'UPLOAD')));
   readonly runSources = computed(() => this.filter(this.sources().filter(s => s.connector === 'RUN_OUTPUT')));
   readonly bucketSources = computed(() => this.filter(this.sources().filter(s => s.connector === 'BUCKET_OBJECT')));
@@ -131,7 +140,7 @@ export class ReportData implements OnInit {
       next: r => this.buckets.set(r.status === API_SUCCESS ? (r.data ?? []) : []),
       error: () => this.buckets.set([]),
     });
-    this.generated.schedules().subscribe({ next: all => this.schedules.set(all.length), error: () => this.schedules.set(0) });
+    this.generated.schedules().subscribe({ next: all => this.allSchedules.set(all.map(j => ({ tenantId: (j as { tenantId?: number | null }).tenantId }))), error: () => this.allSchedules.set([]) });
   }
 
   private filter(list: DataSourceRow[]): DataSourceRow[] {
@@ -139,10 +148,13 @@ export class ReportData implements OnInit {
     return q ? list.filter(s => s.name.toLowerCase().includes(q) || (s.key ?? '').toLowerCase().includes(q)) : list;
   }
 
+  isNumber(v: unknown): boolean { return typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))); }
+
   load(): void {
     this.loading.set(true);
     this.error.set('');
     const scope = this.isPlatformAdmin() ? this.tenantId() : null;
+    this.tabCounts.refresh(scope);
     this.api.sources(scope).subscribe({
       next: s => { this.sources.set(s); this.loading.set(false); },
       error: e => { this.error.set(studioError(e, 'The sources could not be read.').message); this.loading.set(false); },

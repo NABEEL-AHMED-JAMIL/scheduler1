@@ -2,7 +2,7 @@ import { Component, OnInit, computed, effect, inject, input, model, signal, untr
 import { UpperCasePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe } from './rs-time.pipe';
 import { Icon } from '../../shared/ui/icon';
 import { AuthService } from '../../core/auth/auth.service';
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
@@ -27,7 +27,7 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
  */
 @Component({
   selector: 'app-report-source-picker',
-  imports: [FormsModule, Segmented, ServerTimePipe, UpperCasePipe, Icon],
+  imports: [FormsModule, Segmented, RsTimePipe, UpperCasePipe, Icon],
   template: `
     <div class="flex flex-col gap-3">
       @if (modes().length > 1) { <div class="rs-source-modes"><app-segmented [options]="modes()" [(value)]="mode" ariaLabel="Where the data comes from" /></div> }
@@ -62,7 +62,7 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
               <select class="input" [ngModel]="runId()" (ngModelChange)="pickRun($event)" aria-label="Run">
                 <option [ngValue]="null">{{ runs().length ? 'Choose a run' : 'No runs yet' }}</option>
                 @for (r of runs(); track r.jobQueueId) {
-                  <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | serverTime: 'dateTime' }}</option>
+                  <option [ngValue]="r.jobQueueId">#{{ r.jobQueueId }} · {{ r.jobStatus || '—' }} · {{ r.startTime | rsTime: 'dateTime' }}</option>
                 }
               </select>
             </label>
@@ -129,6 +129,8 @@ export class ReportSourcePicker implements OnInit {
 
   /** The template's saved test samples, when the picker is for a template. */
   readonly samples = input<SampleRow[]>([]);
+  /** A platform administrator's chosen workspace: only its schedules are offered (their list holds every workspace's). */
+  readonly tenantId = input<number | null>(null);
   /** The picked data, or null while nothing usable is picked. */
   readonly source = model<SourceRef | null>(null);
 
@@ -137,7 +139,8 @@ export class ReportSourcePicker implements OnInit {
   readonly only = input<Mode[] | null>(null);
   readonly text = signal('');
   readonly csv = signal(false);
-  readonly jobs = signal<{ jobId: number; label: string }[]>([]);
+  private readonly allJobs = signal<{ jobId: number; label: string; tenantId?: number | null }[]>([]);
+  readonly jobs = computed(() => this.allJobs().filter(j => !this.tenantId() || j.tenantId == null || j.tenantId === this.tenantId()));
   readonly runs = signal<RunRow[]>([]);
   readonly outputs = signal<RunOutput[]>([]);
   readonly saved = signal<DataSourceRow[]>([]);
@@ -179,7 +182,7 @@ export class ReportSourcePicker implements OnInit {
       untracked(() => this.publish());
     });
     effect(() => {
-      if (this.mode() === 'run' && !this.jobs().length) untracked(() => this.loadJobs());
+      if (this.mode() === 'run' && !this.allJobs().length) untracked(() => this.loadJobs());
       if (this.mode() === 'saved' && !this.saved().length) untracked(() => this.loadSaved());
       if (this.mode() === 'bucket' && !this.buckets().length) untracked(() => this.loadBuckets());
     });
@@ -214,7 +217,7 @@ export class ReportSourcePicker implements OnInit {
   private loadJobs(): void {
     this.runsError.set('');
     this.generated.schedules().subscribe({
-      next: all => this.jobs.set(all.map(j => ({ jobId: j.jobId, label: `${j.jobName ?? 'Schedule ' + j.jobId}${pipelineOf(j) ? ' · ' + pipelineOf(j) : ''}` }))),
+      next: all => this.allJobs.set(all.map(j => ({ jobId: j.jobId, tenantId: (j as { tenantId?: number | null }).tenantId, label: `${j.jobName ?? 'Schedule ' + j.jobId}${pipelineOf(j) ? ' · ' + pipelineOf(j) : ''}` }))),
       error: () => this.runsError.set('Your schedules could not be read (they need the Schedules or Runs pages).'),
     });
   }

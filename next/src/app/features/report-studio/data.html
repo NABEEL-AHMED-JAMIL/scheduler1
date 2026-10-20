@@ -25,6 +25,7 @@
     <app-icon name="shield" class="shrink-0" />
     <div class="text-sm min-w-0 flex-1">Only {{ workspaceName() }}'s data. You can browse, see the schema and a sample of up to 100 rows, and use it in
       reports. Connection passwords are never shown; a run or file you cannot open elsewhere is refused here too.</div>
+    @if (isAdmin()) { <a class="link-inline text-sm shrink-0" routerLink="/administration/access-profiles">Who can see what →</a> }
   </div>
 
   <div class="rsdt-kinds">
@@ -56,7 +57,7 @@
         @if (kind() !== 'upload') {
           <div class="rsdt-pick">
             <h3 class="rsd-eyebrow m-0">{{ kind() === 'run' ? 'Pick a run' : 'Pick a file' }}</h3>
-            <app-report-source-picker [(source)]="picked" [mode]="pickMode()" [only]="kind() === 'run' ? ['run'] : ['bucket']" />
+            <app-report-source-picker [(source)]="picked" [mode]="pickMode()" [tenantId]="isPlatformAdmin() ? tenantId() : null" [only]="kind() === 'run' ? ['run'] : ['bucket']" />
             <button type="button" class="btn btn-default btn-sm self-start" [disabled]="busy() || !picked()" (click)="inspectPicked()"><app-icon name="eye" />Inspect</button>
           </div>
         }
@@ -78,7 +79,7 @@
               <li>
                 <button type="button" class="rsdt-source" [class.is-active]="selected() === s.sourceId" (click)="inspectSaved(s)">
                   <b class="truncate"><app-icon name="file" size="0.85em" /> {{ s.name }}</b>
-                  <span class="text-xs text-[color:var(--text-muted)] truncate">{{ s.format }}@if (s.jobQueueId) { · run #{{ s.jobQueueId }} }@if (s.bytes) { · {{ size(s.bytes) }} } · {{ s.createdAt | serverTime: 'date' }}</span>
+                  <span class="text-xs text-[color:var(--text-muted)] truncate">{{ s.format }}@if (s.jobQueueId) { · run #{{ s.jobQueueId }} }@if (s.bytes) { · {{ size(s.bytes) }} } · {{ s.createdAt | rsTime: 'day' }}</span>
                 </button>
                 @if (canUpload()) { <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove ' + s.name" (click)="archive(s)"><app-icon name="trash" /></button> }
               </li>
@@ -167,14 +168,14 @@
           <div class="rs-head">
             <div><h2 class="section-title">Sample rows</h2>
               @if (sampleTable(); as tbl) {
-                <p class="text-xs text-[color:var(--text-muted)]">@if (tbl.path) { <span class="mono">{{ tbl.path }}[]</span> · } {{ tbl.rows.length }} of {{ tbl.total }} row{{ tbl.total === 1 ? '' : 's' }} · samples stop at 100 rows</p>
+                <p class="text-xs text-[color:var(--text-muted)]">@if (tbl.path) { <span class="mono">{{ tbl.path }}[]</span> · } {{ tbl.rows.length }} of {{ tbl.total }} row{{ tbl.total === 1 ? '' : 's' }} · samples stop at 100 rows@if (tbl.cols.length > 6) { · {{ tbl.cols.length }} columns, scroll sideways for the rest }</p>
               }</div>
           </div>
           @if (sampleTable(); as tbl) {
             <div class="rsdt-scroll">
-              <table class="table-modern">
+              <table class="table-modern rsdt-sample">
                 <thead><tr>@for (c of tbl.cols; track c) { <th>{{ c }}</th> }</tr></thead>
-                <tbody>@for (row of tbl.rows; track $index) { <tr>@for (v of row; track $index) { <td class="text-sm whitespace-nowrap">{{ v }}</td> }</tr> }</tbody>
+                <tbody>@for (row of tbl.rows; track $index) { <tr>@for (v of row; track $index) { <td class="whitespace-nowrap" [class.rsdt-num]="isNumber(v)">{{ v }}</td> }</tr> }</tbody>
               </table>
             </div>
           } @else {

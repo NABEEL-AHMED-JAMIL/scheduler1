@@ -16,3 +16,17 @@
 .rst-paper > i:first-child { width: 60%; height: 0.5rem; background: var(--border-strong); }
 .rst-paper > b { height: 3rem; border-radius: var(--radius-sm); background: color-mix(in oklab, var(--accent-mark) 22%, var(--surface-sunken)); }
 .rst-body { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.875rem 1rem 1rem; flex: 1; }
+/* A starter's first page before it has a picture of its own (drawing 2): a page sketch in print colours -- white paper, a
+   header rule, the title, three figures and a small bar chart in the brand's colour -- so it reads as a report page in
+   either theme rather than as a grey placeholder. */
+.rst-sketch { display: flex; flex-direction: column; gap: 0.45rem; width: 9.5rem; height: 13rem; padding: 0.75rem 0.8rem; background: #ffffff;
+  box-shadow: 0 1px 4px color-mix(in oklab, var(--text-primary) 16%, transparent); }
+.rst-sk-head { display: flex; justify-content: space-between; align-items: center; padding-bottom: 0.3rem; border-bottom: 1px solid #1f2937; }
+.rst-sk-head > i { display: block; height: 0.25rem; border-radius: 1px; background: #4b5563; }
+.rst-sk-head > i:first-child { width: 45%; } .rst-sk-head > i:last-child { width: 18%; }
+.rst-sk-title { display: block; width: 55%; height: 0.4rem; border-radius: 1px; background: #111827; }
+.rst-sk-kpis { display: flex; gap: 0.5rem; } .rst-sk-kpis > i { display: block; width: 1.3rem; height: 0.3rem; background: #111827; }
+.rst-sk-bars { display: flex; align-items: flex-end; gap: 0.2rem; height: 1.5rem; }
+.rst-sk-bars > i, .rst-sk-bars > b { display: block; width: 0.6rem; background: color-mix(in oklab, var(--rst-brand, #0f766e) 38%, #ffffff); }
+.rst-sk-bars > b { background: var(--rst-brand, #0f766e); }
+.rst-sk-line { display: block; height: 0.2rem; background: #e5e7eb; }

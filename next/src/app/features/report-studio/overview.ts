@@ -5,7 +5,8 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
 import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe, rsTime } from './rs-time.pipe';
+import { instantOf } from '../../core/instant';
 import { LoadError } from '../../shared/ui/load-error';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
@@ -14,6 +15,7 @@ import { ReportStudioApi, studioError } from './report-studio.api';
 import { JobRow, StudioOverview, chipWord, isRunning, stageWord } from './report-studio.model';
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
 import { RunRow } from '../tasks/steps/steps.model';
+import { RsTabCounts } from './rs-tab-counts';
 
 /** A pipeline whose runs fed reports lately (the Overview's "Connected pipelines"), as the person may see it. */
 export interface ConnectedPipeline {
@@ -22,6 +24,11 @@ export interface ConnectedPipeline {
 
 /** Error codes that mean the data does not fit the template: the way out is the field mapping. */
 const MAPPING_CODES = new Set(['REQUIRED_FIELD_MISSING', 'BINDING_NOT_RESOLVED', 'DATA_SCHEMA_MISMATCH']);
+/** Why a job failed, in a chip's two words; the code itself is the chip's tooltip. */
+const FAIL_WORDS: Record<string, string> = {
+  REQUIRED_FIELD_MISSING: 'required field', BINDING_NOT_RESOLVED: 'field not found', DATA_SCHEMA_MISMATCH: 'data shape',
+  TEMPLATE_INVALID: 'template problem',
+};
 
 /**
  * See results › Reports › Overview (MIG-403, MIG-404; the owner-approved screen 1, Figma frame 1; page report-studio): what
@@ -31,12 +38,13 @@ const MAPPING_CODES = new Set(['REQUIRED_FIELD_MISSING', 'BINDING_NOT_RESOLVED',
  */
 @Component({
   selector: 'app-report-overview',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, ServerTimePipe, LoadError, RouterLink],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, RsTimePipe, LoadError, RouterLink],
   templateUrl: './overview.html',
 })
 export class ReportOverview implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);
+  private readonly tabCounts = inject(RsTabCounts);
   private readonly router = inject(Router);
   private readonly generated = inject(GeneratedService);
   private readonly workspaces = inject(WorkspaceDirectory);
@@ -74,13 +82,31 @@ export class ReportOverview implements OnInit {
   });
 
   /** The newest failed job, when its report made no version since: the banner. */
+  /**
+   * The newest failed job, while it is still its report's last word: a later success in the recent jobs clears it, and so
+   * does the report's own job list (read when the recent jobs no longer reach back that far), so a report that was made
+   * again since is not shown as blocked.
+   */
   readonly blocked = computed(() => {
     const d = this.data();
     const j = d?.failedJobs[0];
     if (!j) return null;
     const later = d!.recentJobs.find(x => x.reportId === j.reportId && x.status === 'SUCCEEDED' && (x.createdAt ?? '') > (j.createdAt ?? ''));
-    return later ? null : j;
+    if (later) return null;
+    return this.stillBlocked() === j.jobId ? j : null;
   });
+  /** The failed job its report's own list confirmed as the latest (null until read). */
+  private readonly stillBlocked = signal<string | null>(null);
+
+  private confirmBlocked(d: StudioOverview): void {
+    const j = d.failedJobs[0];
+    this.stillBlocked.set(null);
+    if (!j) return;
+    this.api.report(j.reportId, this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
+      next: r => this.stillBlocked.set(r.jobs?.[0]?.jobId === j.jobId ? j.jobId : null),
+      error: () => this.stillBlocked.set(null),
+    });
+  }
 
   ngOnInit(): void {
     this.load();
@@ -89,8 +115,9 @@ export class ReportOverview implements OnInit {
   load(): void {
     this.loading.set(true);
     this.error.set('');
+    this.tabCounts.refresh(this.auth.isPlatformAdmin() ? this.tenantId() : null);
     this.api.overview(this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
-      next: d => { this.data.set(d); this.loading.set(false); this.connect(d); },
+      next: d => { this.data.set(d); this.loading.set(false); this.connect(d); this.confirmBlocked(d); },
       error: e => { this.error.set(studioError(e, 'The overview could not be read.').message); this.loading.set(false); },
     });
   }
@@ -132,13 +159,23 @@ export class ReportOverview implements OnInit {
     if (/run|start|queue/.test(s)) return 'Running';
     if (/fail|interrupt/.test(s)) return 'Failed';
     const at = r.endTime ?? r.startTime;
-    return at && at.slice(0, 10) === new Date().toISOString().slice(0, 10) ? 'Ran today' : 'Completed';
+    return at && rsTime(at, 'day') === 'Today' ? 'Ran today' : 'Completed';
   }
 
   startedBy(j: JobRow): string {
     if (j.source && j.source !== 'CONSOLE') return 'Pipeline step';
     if (j.requestedBy && j.requestedBy === this.me()) return 'You';
     return j.requestedByName || 'A workspace member';
+  }
+
+  /** A finished job's chip as the drawing words it: "Completed · 8.4 s", "Failed · required field". */
+  jobChip(j: JobRow): string {
+    if (j.status === 'SUCCEEDED') {
+      const ms = j.startedAt && j.finishedAt ? (instantOf(j.finishedAt)?.getTime() ?? 0) - (instantOf(j.startedAt)?.getTime() ?? 0) : 0;
+      return ms > 0 ? `Completed · ${(ms / 1000).toFixed(1)} s` : 'Completed';
+    }
+    if (j.status === 'FAILED') return FAIL_WORDS[j.errorCode ?? ''] ? `Failed · ${FAIL_WORDS[j.errorCode!]}` : 'Failed';
+    return chipWord(j.status);
   }
 
   /** Whether a failed job's way out is the field mapping. */

@@ -60,7 +60,13 @@
               @if (i.template && thumbs()[i.id]; as src) {
                 <img [src]="src" [alt]="'First page of ' + i.name" />
               } @else {
-                <span class="rst-paper" aria-hidden="true"><i></i><i></i><i></i><b></b><i></i></span>
+                <span class="rst-sketch" aria-hidden="true">
+                  <span class="rst-sk-head"><i></i><i></i></span>
+                  <span class="rst-sk-title"></span>
+                  <span class="rst-sk-kpis"><i></i><i></i><i></i></span>
+                  <span class="rst-sk-bars"><i style="height:30%"></i><i style="height:45%"></i><i style="height:38%"></i><i style="height:60%"></i><i style="height:52%"></i><b style="height:85%"></b></span>
+                  <span class="rst-sk-line"></span><span class="rst-sk-line"></span>
+                </span>
               }
             </div>
             <div class="rst-body">
@@ -90,7 +96,7 @@
               <div class="flex flex-wrap gap-1">
                 @if (i.template; as t) {
                   @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
-                  @if (t.hasDraft) { <span class="pill pill-brand">Draft{{ t.currentPublishedVersion ? ' v' + (t.currentPublishedVersion + 1) : '' }}</span> }
+                  @if (t.hasDraft) { <span class="pill pill-info">Draft{{ t.currentPublishedVersion ? ' v' + (t.currentPublishedVersion + 1) : '' }}</span> }
                   @if (t.status === 'ARCHIVED') { <app-status label="Archived" /> }
                 } @else {
                   <span class="pill pill-neutral">Starter</span><span class="pill pill-neutral">{{ i.starter!.components }} blocks</span>
@@ -98,7 +104,7 @@
               </div>
               <div class="flex flex-wrap justify-between gap-2 text-xs text-[color:var(--text-muted)]">
                 @if (i.template; as t) {
-                  <span>{{ ownerOf(t) }}</span><span>Updated {{ t.updatedAt | serverTime: 'date' }}@if (pagesOf(t)) { · {{ pagesOf(t) }} }</span>
+                  <span>{{ ownerOf(t) }}</span><span>Updated {{ t.updatedAt | rsTime: 'day' }}@if (pagesOf(t)) { · {{ pagesOf(t) }} }</span>
                 } @else { <span>Report Studio starter</span><span>Copied into your workspace</span> }
               </div>
               <div class="flex flex-wrap gap-2 mt-auto pt-1">
@@ -137,14 +143,14 @@
                 <div class="flex flex-wrap gap-1">
                   @if (i.template; as t) {
                     @if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
-                    @if (t.hasDraft) { <span class="pill pill-brand">Draft</span> }
+                    @if (t.hasDraft) { <span class="pill pill-info">Draft</span> }
                     @if (t.status === 'ARCHIVED') { <app-status label="Archived" /> }
                   } @else { <span class="pill pill-neutral">Starter</span> }
                 </div>
               </td>
               <td class="text-xs">@if (i.template; as t) { {{ ownerOf(t) }} } @else { Report Studio starter }</td>
               <td class="text-xs">@if (i.template; as t) { {{ pagesOf(t) || '—' }} } @else { — }</td>
-              <td class="text-xs whitespace-nowrap">@if (i.template; as t) { {{ t.updatedAt | serverTime: 'dateTime' }} } @else { — }</td>
+              <td class="text-xs whitespace-nowrap">@if (i.template; as t) { {{ t.updatedAt | rsTime: 'recent' }} } @else { — }</td>
               <td>
                 @if (i.template; as t) {
                   <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="rowMenu" [attr.aria-label]="'Actions for ' + t.name">
@@ -177,7 +183,7 @@
 
   <div class="rs-banner rs-banner-info mt-4" role="note">
     <app-icon name="info" class="shrink-0" />
-    <div class="min-w-0 flex-1 text-sm"><b>Published versions never change.</b> Edits go into a new draft. Every report keeps the exact template version it was made from.</div>
+    <div class="min-w-0 flex-1 text-sm"><b class="block">Published versions never change</b>Edits go into a new draft. Every report keeps the exact template version it was made from.</div>
     <button type="button" class="btn btn-default btn-sm" disabled [title]="isAdmin() ? 'Who may edit and publish is the workspace\'s page access' : 'Workspace administrators decide who may edit and publish'">
       <app-icon name="lock" />Manage access · admins</button>
   </div>

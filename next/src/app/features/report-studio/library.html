@@ -53,7 +53,7 @@
                   @else { <span class="mono">{{ j.label }}</span> {{ chipWord(j.status) }}@if (j.errorCode) { · <span class="mono">{{ j.errorCode }}</span> } }
                 } @else { — }
               </td>
-              <td class="text-xs whitespace-nowrap">{{ r.updatedAt | serverTime: 'dateTime' }}</td>
+              <td class="text-xs whitespace-nowrap">{{ r.updatedAt | rsTime: 'recent' }}</td>
             </tr>
           }
         </tbody>
@@ -93,8 +93,8 @@
                 }
               </td>
               <td class="text-xs">@if (j.resultVersion) { v{{ j.resultVersion }}@if (j.pages) { · {{ j.pages }} p. } } @else { — }</td>
-              <td class="text-xs whitespace-nowrap">{{ (j.startedAt || j.createdAt) | serverTime: 'dateTime' }}</td>
-              <td class="text-xs whitespace-nowrap">{{ j.finishedAt | serverTime: 'dateTime' }}</td>
+              <td class="text-xs whitespace-nowrap">{{ (j.startedAt || j.createdAt) | rsTime: 'recent' }}</td>
+              <td class="text-xs whitespace-nowrap">{{ j.finishedAt | rsTime: 'recent' }}</td>
             </tr>
           }
         </tbody>
