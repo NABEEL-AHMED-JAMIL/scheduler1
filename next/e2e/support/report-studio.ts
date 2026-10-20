@@ -171,7 +171,7 @@ export async function isolationRows(request: APIRequestContext, s: Session): Pro
   const lib = await data<{ templates: Template[] }>('templates', await request.get(`${api}/reportTemplate.json/fetchAll?archived=false`, { headers: authOf(s) }));
   const tpl = lib.templates.find(t => t.name === TEMPLATE && t.currentPublishedVersion) ?? await publishedTemplate(request, s, TEMPLATE);
   const reports = (await data<{ reports: { reportId: string; name: string; currentVersion: number | null }[] }>('reports',
-    await request.get(`${api}/reportLibrary.json/reports?limit=200`, { headers: authOf(s) }))).reports;
+    await request.get(`${api}/reportLibrary.json/reports?q=${encodeURIComponent(REPORT)}&limit=200`, { headers: authOf(s) }))).reports;
   const made = reports.find(r => r.name === REPORT && r.currentVersion);
   const reportId = made?.reportId ?? (await generated(request, s, { templateId: tpl.templateId, version: '1', name: REPORT, source: pasted() })).reportId;
   const assets = (await data<{ assets: { assetId: string; name: string }[] }>('assets',

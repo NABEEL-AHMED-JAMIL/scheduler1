@@ -7,7 +7,7 @@
       </div>
       <div class="flex items-center gap-2">
         <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
         @if (canPipelineFiles()) { <a class="btn btn-default btn-sm" routerLink="/reports/from-pipelines"><app-icon name="folder" />From pipelines</a> }
         @if (canGenerate()) { <a class="btn btn-primary btn-sm" routerLink="/reports/new"><app-icon name="plus" />New report</a> }
       </div>
@@ -15,25 +15,25 @@
   </app-page-header>
 
   @if (view() === 'reports') {
-    <app-table-shell heading="Reports" columnsKey="report-library" [loading]="loading()" [error]="error()" [isEmpty]="!shownReports().length"
-                     [shown]="shownReports().length" [total]="reports().length" emptyIcon="file" (retry)="load()"
-                     [emptyMessage]="search() || status() ? 'No report matches the filters.' : 'No reports yet: publish a template, then generate one.'">
+    <app-table-shell heading="Reports" columnsKey="report-library" [loading]="loading()" [error]="error()" [isEmpty]="!total()"
+                     [shown]="reports().length" [total]="total()" emptyIcon="file" (retry)="read()"
+                     [emptyMessage]="filtered() ? 'No report matches the filters.' : 'No reports yet: publish a template, then generate one.'">
       <ng-container toolbar>
         <!-- Owner 2026-10-20: Reports / Generation jobs in the table's own top bar, as Table / Cards is on the other lists. -->
         <app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" />
-        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
+        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="setStatus($any($event.target).value)">
           <option value="">All</option><option value="GENERATED">Ready</option><option value="FAILED">Failed</option>
         </select>
         <div class="search-field max-w-64">
           <app-icon name="search" size="0.95em" />
           <input class="input" placeholder="Search report or template" aria-label="Search reports" [value]="search()"
-                 (input)="search.set($any($event.target).value)" />
+                 (input)="onSearch($any($event.target).value)" />
         </div>
       </ng-container>
       <table class="table-modern">
         <thead><tr><th>Report</th><th>Template</th><th>Version</th><th>Files</th><th>Status</th><th>Signed</th><th>Last job</th><th>Updated</th></tr></thead>
         <tbody>
-          @for (r of shownReports(); track r.reportId) {
+          @for (r of reports(); track r.reportId) {
             <tr>
               <td class="max-w-96">
                 <a class="link-inline font-medium" [routerLink]="['/reports/library', r.reportId]">{{ r.name }}</a>
@@ -58,28 +58,29 @@
           }
         </tbody>
       </table>
+      <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
     </app-table-shell>
   } @else {
-    <app-table-shell heading="Generation jobs" columnsKey="report-jobs" [loading]="loading()" [error]="error()" [isEmpty]="!shownJobs().length"
-                     [shown]="shownJobs().length" [total]="jobs().length" emptyIcon="history" (retry)="load()"
-                     [emptyMessage]="search() || status() ? 'No job matches the filters.' : 'No jobs yet.'">
+    <app-table-shell heading="Generation jobs" columnsKey="report-jobs" [loading]="loading()" [error]="error()" [isEmpty]="!total()"
+                     [shown]="jobs().length" [total]="total()" emptyIcon="history" (retry)="read()"
+                     [emptyMessage]="filtered() ? 'No job matches the filters.' : 'No jobs yet.'">
       <ng-container toolbar>
         <!-- Owner 2026-10-20: Reports / Generation jobs in the table's own top bar, as Table / Cards is on the other lists. -->
         <app-segmented [options]="views" [value]="view()" (valueChange)="setView($event)" ariaLabel="Reports or jobs" />
-        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="status.set($any($event.target).value)">
+        <select class="input max-w-40" [value]="status()" aria-label="Status" (change)="setStatus($any($event.target).value)">
           <option value="">All</option><option value="RUNNING">Running</option><option value="SUCCEEDED">Completed</option>
           <option value="FAILED">Failed</option><option value="CANCELLED">Cancelled</option>
         </select>
         <div class="search-field max-w-64">
           <app-icon name="search" size="0.95em" />
           <input class="input" placeholder="Search job, report or code" aria-label="Search jobs" [value]="search()"
-                 (input)="search.set($any($event.target).value)" />
+                 (input)="onSearch($any($event.target).value)" />
         </div>
       </ng-container>
       <table class="table-modern">
         <thead><tr><th>Job</th><th>Report</th><th>Template</th><th>Progress</th><th>Made</th><th>Started</th><th>Finished</th></tr></thead>
         <tbody>
-          @for (j of shownJobs(); track j.jobId) {
+          @for (j of jobs(); track j.jobId) {
             <tr>
               <td class="mono whitespace-nowrap">{{ j.label }}</td>
               <td class="max-w-80"><a class="link-inline" [routerLink]="['/reports/library', j.reportId]">{{ j.reportName }}</a>
@@ -99,6 +100,7 @@
           }
         </tbody>
       </table>
+      <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
     </app-table-shell>
   }
 </div>

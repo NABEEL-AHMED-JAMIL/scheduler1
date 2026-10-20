@@ -11,6 +11,15 @@ import {
   TemplateContract, TemplateDetail, TemplateLibrary, VerifyResult, VersionRow,
 } from './report-studio.model';
 
+/** A page of the report library (reports or jobs): the filters the service applies, then limit (1 to 200) and offset. */
+export interface LibraryQuery { status?: string; q?: string; templateId?: string; limit?: number; offset?: number; }
+
+/** One page of rows, and how many the filters match in all. */
+export interface LibraryPage<T> { rows: T[]; total: number; offset: number; limit: number; }
+
+/** The rows one library read asks for when it names no limit; the service answers 200 at most. */
+export const LIBRARY_PAGE = 50;
+
 /** What a refusal says (spec section 22): a stable code, a sentence, and the problems that blocked it. */
 export interface StudioError { code: string; message: string; problems: Problem[]; retryable: boolean; }
 
@@ -213,9 +222,11 @@ export class ReportStudioApi {
     return ReportStudioApi.data$(this.http.post<ApiResponse<ReportDetail>>(`${this.generating}/archiveReport`, null, { params: { reportId } }));
   }
 
-  reports(status = '', tenantId?: number | null): Observable<ReportRow[]> {
-    return this.http.get<ApiResponse<{ reports: ReportRow[] }>>(`${this.library}/reports`,
-      { params: { ...(status ? { status } : {}), limit: '200', ...ReportStudioApi.scope(tenantId) } }).pipe(map(r => r.data?.reports ?? []));
+  /** One page of the library's reports, newest change first; total is how many the filters match in all. */
+  reports(query: LibraryQuery = {}, tenantId?: number | null): Observable<LibraryPage<ReportRow>> {
+    return this.http.get<ApiResponse<{ reports: ReportRow[]; total?: number; offset?: number; limit?: number }>>(`${this.library}/reports`,
+      { params: { ...ReportStudioApi.page(query), ...(query.templateId ? { templateId: query.templateId } : {}), ...ReportStudioApi.scope(tenantId) } })
+      .pipe(map(r => ReportStudioApi.pageOf(r.data?.reports, r.data)));
   }
 
   report(reportId: string, tenantId?: number | null): Observable<ReportDetail> {
@@ -223,9 +234,22 @@ export class ReportStudioApi {
       { params: { reportId, ...ReportStudioApi.scope(tenantId) } }));
   }
 
-  jobs(status = '', tenantId?: number | null): Observable<JobRow[]> {
-    return this.http.get<ApiResponse<{ jobs: JobRow[] }>>(`${this.library}/jobs`,
-      { params: { ...(status ? { status } : {}), limit: '100', ...ReportStudioApi.scope(tenantId) } }).pipe(map(r => r.data?.jobs ?? []));
+  /** One page of generation jobs, newest first (status RUNNING: every job not finished yet); with total. */
+  jobs(query: LibraryQuery = {}, tenantId?: number | null): Observable<LibraryPage<JobRow>> {
+    return this.http.get<ApiResponse<{ jobs: JobRow[]; total?: number; offset?: number; limit?: number }>>(`${this.library}/jobs`,
+      { params: { ...ReportStudioApi.page(query), ...ReportStudioApi.scope(tenantId) } })
+      .pipe(map(r => ReportStudioApi.pageOf(r.data?.jobs, r.data)));
+  }
+
+  private static page(query: LibraryQuery): Record<string, string> {
+    const q = query.q?.trim();
+    return { ...(query.status ? { status: query.status } : {}), ...(q ? { q } : {}), limit: String(query.limit ?? LIBRARY_PAGE),
+      offset: String(query.offset ?? 0) };
+  }
+
+  private static pageOf<T>(rows: T[] | undefined, data?: { total?: number; offset?: number; limit?: number } | null): LibraryPage<T> {
+    const list = rows ?? [];
+    return { rows: list, total: data?.total ?? list.length, offset: data?.offset ?? 0, limit: data?.limit ?? list.length };
   }
 
   job(jobId: string): Observable<JobRow> {
