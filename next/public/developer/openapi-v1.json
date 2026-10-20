@@ -945,7 +945,7 @@
         ],
         "operationId": "createViewLink",
         "summary": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.",
-        "description": "A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n",
+        "description": "A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show it in an iframe: only the origins the API client's frame allow-list names may frame it (Developers › API Clients; the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A revoked client's links end at once. Nothing is stored and nothing is billed but this call, so no Idempotency-Key: each call answers a new link. Give each visitor a fresh link rather than a long-lived one.\n",
         "security": [
           {
             "clientCredentials": [
@@ -3404,7 +3404,7 @@
           },
           "task": {
             "type": "string",
-            "description": "The step's task, e.g. read_file, validate, save_file; legacy for a run without steps."
+            "description": "The step's task, e.g. read_file, validate, save_file, generate_report; legacy for a run without steps."
           },
           "status": {
             "type": "string",

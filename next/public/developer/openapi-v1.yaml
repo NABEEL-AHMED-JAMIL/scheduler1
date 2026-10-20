@@ -452,7 +452,7 @@ paths:
       description: >
         A link to the console's page /embed/runs/{token}: the run's status and times, its steps, the files it made (each
         with a download) and its review, read-only, with no console navigation and no sign-in. Open it on its own or show
-        it in an iframe: only the origins the API client's frame allow-list names may frame it (Integration › API Clients;
+        it in an iframe: only the origins the API client's frame allow-list names may frame it (Developers › API Clients;
         the page answers Content-Security-Policy frame-ancestors with them, 'none' when there are none), and it refuses
         everything once it has expired. Append `?theme=light` or `dark`, and `accent=<hex colour>` (e.g. 0b6bcb), to fit
         the portal. The link opens that one run only: no other run, no file it does not list, nothing of the API. A
@@ -1290,7 +1290,7 @@ components:
       properties:
         key: { type: string }
         name: { type: [string, 'null'] }
-        task: { type: string, description: "The step's task, e.g. read_file, validate, save_file; legacy for a run without steps." }
+        task: { type: string, description: "The step's task, e.g. read_file, validate, save_file, generate_report; legacy for a run without steps." }
         status: { type: string, enum: [pending, running, completed, failed, skipped, interrupted] }
         rowsIn: { type: [integer, 'null'] }
         rowsOut: { type: [integer, 'null'] }
