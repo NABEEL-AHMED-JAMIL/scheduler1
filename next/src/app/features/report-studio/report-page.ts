@@ -8,7 +8,7 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
 import { StatusPill } from '../../shared/ui/status-pill';
-import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
+import { RsTimePipe, zoneCity } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { LoadError } from '../../shared/ui/load-error';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -35,7 +35,7 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
  */
 @Component({
   selector: 'app-report-page',
-  imports: [PageHeader, RefreshButton, Icon, StatusPill, ServerTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet],
+  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet],
   templateUrl: './report-page.html',
   styleUrl: './report-page.css',
 })
@@ -88,6 +88,7 @@ export class ReportPage implements OnInit {
   readonly running = computed(() => this.r()?.jobs.find(j => isRunning(j.status)) ?? null);
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin() && this.r()?.status !== 'ARCHIVED');
   readonly workspace = computed(() => this.auth.user()?.tenantName || '');
+  readonly zoneCity = zoneCity;
   readonly nextVersion = computed(() => (this.r()?.currentVersion ?? 0) + 1);
   readonly records = computed(() => this.current()?.snapshot?.records ?? null);
   /** MIG-406: an approver (report-approve) approves a version they did not generate; it certifies the PDF in their name. */
