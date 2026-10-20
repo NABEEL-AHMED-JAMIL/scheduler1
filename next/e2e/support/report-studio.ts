@@ -168,7 +168,7 @@ export async function isolationRows(request: APIRequestContext, s: Session): Pro
   const TEMPLATE = 'E2E isolation wound template';
   const REPORT = 'E2E isolation wound report';
   const IMAGE = 'E2E isolation wound icon';
-  const lib = await data<{ templates: Template[] }>('templates', await request.get(`${api}/reportTemplate.json/fetchAll?archived=false`, { headers: authOf(s) }));
+  const lib = await data<{ templates: Template[] }>('templates', await request.get(`${api}/reportTemplate.json/fetchAll?archived=false&q=${encodeURIComponent(TEMPLATE)}`, { headers: authOf(s) }));
   const tpl = lib.templates.find(t => t.name === TEMPLATE && t.currentPublishedVersion) ?? await publishedTemplate(request, s, TEMPLATE);
   const reports = (await data<{ reports: { reportId: string; name: string; currentVersion: number | null }[] }>('reports',
     await request.get(`${api}/reportLibrary.json/reports?q=${encodeURIComponent(REPORT)}&limit=200`, { headers: authOf(s) }))).reports;

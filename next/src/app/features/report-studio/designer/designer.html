@@ -259,7 +259,8 @@
         @if (selectedBlock()) {
           <app-rs-properties [block]="selectedBlock()" [label]="selectedLabel()" [definitions]="definitions()" [readonly]="!editable()"
                              [fields]="dataFields()" [sample]="sample()" [tree]="inspect()?.tree" [names]="names()"
-                             [assets]="usableAssets()" [templateAssets]="templateAssets()" (assetPicked)="pickAsset($event)"
+                             [assets]="usableAssets()" [assetsTotal]="usableTotal()" [assetTotals]="usableTotals()" (findAssets)="findAssets($event)"
+                             [templateAssets]="templateAssets()" (assetPicked)="pickAsset($event)"
                              (changed)="setProperty($event)" (duplicate)="duplicateSelected()" (remove)="removeSelected()" />
         } @else if (def(); as d) {
           <div class="rsd-props-head"><app-icon name="file" size="1.05rem" class="text-[color:var(--text-muted)]" /><div class="min-w-0 flex-1"><h2 class="text-sm font-semibold">Page settings</h2><p class="text-xs text-[color:var(--text-muted)]">Size, margins and type for every page.</p></div></div>

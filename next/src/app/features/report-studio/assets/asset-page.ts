@@ -14,6 +14,7 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { ReportStudioApi, studioError } from '../report-studio.api';
 import { TemplateDefinition, TemplateRow } from '../report-studio.model';
 import { AssetCard, AssetDetail, KIND_WORDS, Person, stateTone, stateWord, typeOf } from '../assets.model';
+import { RsPickSearch } from '../pick-search';
 import { AssetPicture } from './asset-picture';
 import { UploadData, UploadPanel } from './upload-panel';
 
@@ -26,7 +27,7 @@ import { UploadData, UploadPanel } from './upload-panel';
  */
 @Component({
   selector: 'app-asset-page',
-  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, RouterLink, AssetPicture, RsPickSearch],
   templateUrl: './asset-page.html',
   styleUrl: './assets.css',
 })
@@ -44,6 +45,9 @@ export class AssetPage implements OnInit {
   readonly people = signal<Person[]>([]);
   readonly templates = signal<TemplateRow[]>([]);
   readonly stamps = signal<AssetCard[]>([]);
+  /** How many templates and stamps the pickers' searches match in all (the selects hold 200 at most). */
+  readonly templatesTotal = signal(0);
+  readonly stampsTotal = signal(0);
   readonly grantTo = signal<number | null>(null);
   readonly grantTemplate = signal<string>('');
   // Placement on a template (the design's optional section).
@@ -86,11 +90,36 @@ export class AssetPage implements OnInit {
         this.placeVersion.set(a.currentVersion ?? null);
         if (a.you.mayGrant && !this.people().length) this.api.people().subscribe({ next: p => this.people.set(p), error: () => { /* none to pick */ } });
         if (a.restricted && this.canTemplates() && a.you.mayPlace && !this.templates().length) {
-          this.api.list().subscribe({ next: l => this.templates.set(l.templates.filter(t => t.status !== 'ARCHIVED')), error: () => { /* none */ } });
-          this.api.usable().subscribe({ next: u => this.stamps.set(u.assets.filter(x => x.kind === 'STAMP' && x.mayPlace)), error: () => { /* none */ } });
+          this.findTemplates('');
+          this.findStamps('');
         }
       },
       error: e => this.error.set(studioError(e, 'The asset could not be read.').message),
+    });
+  }
+
+  /** The placement's template picker, searched on the service (the first 200 and how many match; the picked one kept). */
+  findTemplates(q: string): void {
+    this.api.list({ q, limit: 200 }).subscribe({
+      next: l => {
+        const picked = this.templates().find(t => t.templateId === this.placeTemplate());
+        this.templates.set([...(picked && !l.templates.some(t => t.templateId === picked.templateId) ? [picked] : []), ...l.templates]);
+        this.templatesTotal.set(l.total);
+      },
+      error: () => { /* none to pick */ },
+    });
+  }
+
+  /** The placement's stamp picker: the stamps this person may place, searched on the service. */
+  findStamps(q: string): void {
+    this.api.usable(null, { q, kinds: ['STAMP'] }).subscribe({
+      next: u => {
+        const picked = this.stamps().find(x => x.assetId === this.placeStamp());
+        const found = u.assets.filter(x => x.mayPlace);
+        this.stamps.set([...(picked && !found.some(x => x.assetId === picked.assetId) ? [picked] : []), ...found]);
+        this.stampsTotal.set(u.total);
+      },
+      error: () => { /* none to pick */ },
     });
   }
 

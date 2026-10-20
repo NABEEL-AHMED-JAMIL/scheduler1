@@ -17,7 +17,7 @@ export class RsTabCounts {
   refresh(tenantId?: number | null): void {
     forkJoin({
       overview: this.api.overview(tenantId).pipe(catchError(() => of(null))),
-      assets: this.api.assets({}, tenantId).pipe(catchError(() => of(null))),
+      assets: this.api.assets({ limit: 1 }, tenantId).pipe(catchError(() => of(null))),
     }).subscribe(({ overview, assets }) => this.tabs.set({
       '/reports/templates': overview?.figures?.templates,
       '/reports/library': overview?.figures?.reports,

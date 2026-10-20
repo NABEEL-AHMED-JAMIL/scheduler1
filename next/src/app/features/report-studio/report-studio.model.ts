@@ -37,7 +37,9 @@ export interface TemplateRow {
 
 export interface StarterRow { key: string; name: string; description?: string | null; category?: string | null; components: number; }
 
-export interface TemplateLibrary { templates: TemplateRow[]; starters: StarterRow[]; }
+/** One page of templates (total: what the filters match; counts.templates: the scope's before them) and every starter. */
+export interface TemplateLibrary { templates: TemplateRow[]; starters: StarterRow[]; total: number; offset?: number; limit?: number;
+  counts: { templates: number }; categories: string[]; }
 
 export interface VersionRow {
   versionId: string;

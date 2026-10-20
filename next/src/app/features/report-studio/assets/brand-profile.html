@@ -57,6 +57,8 @@
               <div class="flex flex-col gap-1.5 min-w-0 flex-1 basis-56">
                 <b class="text-sm">Logo · optional</b>
                 <span class="text-xs text-[color:var(--text-muted)]">@if (logo(); as l) { {{ l.name }} · v{{ l.currentVersion }} } @else { The workspace default's, or none }</span>
+                <app-rs-pick-search [shown]="logos().length" [total]="totals().logos" label="Find a logo" placeholder="Find a logo"
+                                    [disabled]="!canEdit()" (search)="find('logos', $event)" />
                 <div class="flex items-center gap-2">
                   <select class="input input-sm w-auto min-w-0 max-w-full" aria-label="Logo" [ngModel]="def().logo?.assetId ?? ''" (ngModelChange)="setLogo($event)">
                     <option value="">Choose asset</option>
@@ -126,6 +128,8 @@
                   <span class="rsb-chip">{{ nameOf(signatures(), s.assetId) }}
                     @if (canEdit()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Remove ' + nameOf(signatures(), s.assetId)" (click)="removeFrom('signatures', s.assetId)"><app-icon name="close" /></button> }</span>
                 }
+                <app-rs-pick-search [shown]="signatures().length" [total]="totals().signatures" label="Find a signature" placeholder="Find a signature"
+                                    (search)="find('signatures', $event)" />
                 <select class="input" aria-label="Add a signature" (change)="addTo('signatures', $any($event.target).value); $any($event.target).value = ''">
                   <option value="">Add an approved signature</option>
                   @for (a of signatures(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }
@@ -137,6 +141,8 @@
                   <span class="rsb-chip">{{ nameOf(stamps(), s.assetId) }}
                     @if (canEdit()) { <button type="button" class="btn btn-ghost btn-icon btn-xs" [attr.aria-label]="'Remove ' + nameOf(stamps(), s.assetId)" (click)="removeFrom('stamps', s.assetId)"><app-icon name="close" /></button> }</span>
                 }
+                <app-rs-pick-search [shown]="stamps().length" [total]="totals().stamps" label="Find a stamp" placeholder="Find a stamp"
+                                    (search)="find('stamps', $event)" />
                 <select class="input" aria-label="Add a stamp" (change)="addTo('stamps', $any($event.target).value); $any($event.target).value = ''">
                   <option value="">Add an approved stamp</option>
                   @for (a of stamps(); track a.assetId) { <option [value]="a.assetId">{{ a.name }} · v{{ a.currentVersion }}</option> }

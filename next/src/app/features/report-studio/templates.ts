@@ -10,6 +10,8 @@ import { TableShell } from '../../shared/ui/data-table';
 import { StatusPill } from '../../shared/ui/status-pill';
 import { Segmented, SegmentOption } from '../../shared/ui/segmented';
 import { ListView, ViewToggle } from '../../shared/ui/view-toggle';
+import { Pagination } from '../../shared/ui/pagination';
+import { PAGE_SIZES } from '../../shared/ui/pager';
 import { RsTimePipe } from './rs-time.pipe';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
@@ -17,7 +19,7 @@ import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
-import { ReportStudioApi, studioError } from './report-studio.api';
+import { ReportStudioApi, TemplateQuery, studioError } from './report-studio.api';
 import { StarterRow, TemplateDetail, TemplateRow, chipWord, originWord } from './report-studio.model';
 import { ImportTemplatePanel, NewTemplateData, NewTemplatePanel } from './template-panels';
 import { TestPanel, TestPanelData } from './test-panel';
@@ -48,7 +50,7 @@ export interface LibraryItem {
 @Component({
   selector: 'app-report-templates',
   imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, RsTimePipe, RouterLink, CdkMenu, CdkMenuItem, CdkMenuTrigger,
-    Segmented, ViewToggle],
+    Segmented, ViewToggle, Pagination],
   templateUrl: './templates.html',
   styleUrl: './templates.css',
   host: { '[style.--rst-brand]': 'brandColour()' },
@@ -65,8 +67,15 @@ export class ReportTemplates implements OnInit {
   /** A platform administrator's pick (the one workspace selector, owner #5); null is every workspace. Members: their own. */
   readonly tenantId = signal<number | null>(this.workspaces.remembered());
 
+  /** One page of the workspace's templates, as the service answers it; the starters are all of them (a handful, from the code). */
   readonly templates = signal<TemplateRow[]>([]);
   readonly starters = signal<StarterRow[]>([]);
+  /** How many templates the filters match in all, and how many the scope has before them. */
+  readonly templateTotal = signal(0);
+  readonly templateCount = signal(0);
+  readonly serverCategories = signal<string[]>([]);
+  readonly page = signal(1);
+  readonly size = signal(PAGE_SIZES[0]);
   readonly loading = signal(true);
   readonly error = signal('');
   readonly search = signal('');
@@ -89,44 +98,50 @@ export class ReportTemplates implements OnInit {
   readonly isAdmin = computed(() => this.auth.role() === 'TENANT_ADMIN' || this.auth.isPlatformAdmin());
   private readonly me = computed(() => this.auth.user()?.appUserId ?? null);
 
-  readonly items = computed<LibraryItem[]>(() => [
-    ...this.templates().map(t => ({ kind: 'template' as const, id: t.templateId, name: t.name, description: t.description, category: t.category, template: t })),
-    ...this.starters().map(s => ({ kind: 'starter' as const, id: 'starter:' + s.key, name: s.name, description: s.description, category: s.category, starter: s })),
-  ]);
+  /** The starters the filters let through (the old client rules: a starter reads as published and as "from a starter"). */
+  readonly starterMatches = computed<StarterRow[]>(() => {
+    const q = this.search().trim().toLowerCase();
+    return this.starters().filter(s => (!this.category() || s.category === this.category())
+      && (!this.state() || this.state() === 'PUBLISHED') && (!this.owner() || this.owner() === 'starter')
+      && (!q || [s.name, s.description, s.category].some(v => (v ?? '').toLowerCase().includes(q))));
+  });
+  private readonly withTemplates = computed(() => this.group() === 'all' || this.group() === 'workspace');
+  private readonly withStarters = computed(() => this.group() === 'all' || this.group() === 'starters');
+  /**
+   * Owner 2026-10-20: the library pages on the server. One list -- the workspace's templates (newest change first, a page
+   * at a time from the service), then the matching starters -- cut into pages: page p shows its window of both.
+   */
+  readonly total = computed(() => (this.withTemplates() ? this.templateTotal() : 0) + (this.withStarters() ? this.starterMatches().length : 0));
+  readonly filtered = computed<LibraryItem[]>(() => {
+    if (this.group() === 'shared') return [];
+    const start = (this.page() - 1) * this.size();
+    const end = start + this.size();
+    const before = this.withTemplates() ? this.templateTotal() : 0;
+    const rows = this.withTemplates() ? this.templates() : [];
+    const starters = this.withStarters() ? this.starterMatches().slice(Math.max(0, start - before), Math.max(0, end - before)) : [];
+    return [
+      ...rows.map(t => ({ kind: 'template' as const, id: t.templateId, name: t.name, description: t.description, category: t.category, template: t })),
+      ...starters.map(s => ({ kind: 'starter' as const, id: 'starter:' + s.key, name: s.name, description: s.description, category: s.category, starter: s })),
+    ];
+  });
   readonly groups = computed<SegmentOption<Group>[]>(() => [
-    { id: 'all', label: `All ${this.items().length}` },
-    { id: 'workspace', label: `This workspace ${this.templates().length}` },
+    { id: 'all', label: `All ${this.templateCount() + this.starters().length}` },
+    { id: 'workspace', label: `This workspace ${this.templateCount()}` },
     { id: 'starters', label: `Starters ${this.starters().length}` },
     { id: 'shared', label: 'Shared with me 0', title: 'Sharing between workspaces comes with Teams' },
   ]);
-  readonly categories = computed(() => [...new Set(this.items().map(i => i.category).filter((c): c is string => !!c))].sort());
-
-  readonly filtered = computed(() => {
-    const q = this.search().trim().toLowerCase();
-    const g = this.group();
-    return this.items().filter(i => {
-      if (g === 'shared') return false;
-      if (g === 'workspace' && i.kind !== 'template') return false;
-      if (g === 'starters' && i.kind !== 'starter') return false;
-      if (this.category() && i.category !== this.category()) return false;
-      const t = i.template;
-      if (this.state()) {
-        if (!t) return this.state() === 'PUBLISHED';
-        if (this.state() === 'HAS_DRAFT' ? !t.hasDraft : t.status !== this.state()) return false;
-      }
-      if (this.owner()) {
-        if (!t) return this.owner() === 'starter';
-        if (this.owner() === 'me' && t.createdBy !== this.me()) return false;
-        if (this.owner() === 'starter' && t.origin !== 'STARTER') return false;
-        if (this.owner() === 'copy' && t.origin !== 'COPY' && t.origin !== 'IMPORT') return false;
-      }
-      return !q || [i.name, i.description, i.category, ...(t?.tags ?? [])].some(v => (v ?? '').toLowerCase().includes(q));
-    });
-  });
-  readonly shownTemplates = computed(() => this.filtered().filter(i => i.kind === 'template').length);
+  readonly categories = computed(() => [...new Set([...this.serverCategories(), ...this.starters().map(s => s.category)]
+    .filter((c): c is string => !!c))].sort());
+  readonly filtering = computed(() => !!(this.search().trim() || this.state() || this.category() || this.owner()));
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Answers come back in any order: only the latest read's is kept. */
+  private asked = 0;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u)));
+    inject(DestroyRef).onDestroy(() => {
+      Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u));
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+    });
   }
 
   ngOnInit(): void {
@@ -154,21 +169,71 @@ export class ReportTemplates implements OnInit {
     });
   }
 
+  /** Another workspace picked (and the first read): the brand, the tab counts and the list again, from the first page. */
   load(): void {
-    this.loading.set(true);
-    this.error.set('');
-    const scope = this.isPlatformAdmin() ? this.tenantId() : null;
+    this.page.set(1);
+    this.refresh();
+  }
+
+  /** The refresh button: the brand, the tab counts and the page the reader is on. */
+  refresh(): void {
+    const scope = this.scope();
     this.tabCounts.refresh(scope);
     this.loadBrand(scope);
-    this.api.list(this.archived(), scope).subscribe({
+    this.read();
+  }
+
+  /** The current page, with its filters, as the service answers it (the starters come with every answer). */
+  read(): void {
+    this.loading.set(true);
+    this.error.set('');
+    const asked = ++this.asked;
+    const scope = this.scope();
+    const start = (this.page() - 1) * this.size();
+    const owner = this.owner() === 'starter' ? 'STARTER' : this.owner() === 'copy' ? 'COPY' : this.owner() === 'me' ? 'ME' : '';
+    const query: TemplateQuery = { archived: this.archived(), q: this.search(), category: this.category(), state: this.state(), owner,
+      limit: this.size(), offset: start };
+    this.api.list(query, scope).subscribe({
       next: lib => {
-        this.templates.set(lib.templates);
+        if (asked !== this.asked) return;
         this.starters.set(lib.starters);
+        this.templateTotal.set(lib.total);
+        this.templateCount.set(lib.counts.templates);
+        this.serverCategories.set(lib.categories);
+        // A page emptied under the reader (templates archived or deleted): the last page that still has rows.
+        if (this.page() > 1 && start >= this.total() && this.total() > 0) {
+          this.page.set(Math.ceil(this.total() / this.size()));
+          this.read();
+          return;
+        }
+        this.templates.set(this.withTemplates() ? lib.templates : []);
         this.loading.set(false);
-        lib.templates.slice(0, 48).forEach(t => this.thumb(t, scope));
+        if (this.withTemplates()) lib.templates.forEach(t => this.thumb(t, scope));
       },
-      error: e => { this.error.set(studioError(e, 'The templates could not be read.').message); this.loading.set(false); },
+      error: e => {
+        if (asked !== this.asked) return;
+        this.error.set(studioError(e, 'The templates could not be read.').message);
+        this.loading.set(false);
+      },
     });
+  }
+
+  private scope(): number | null {
+    return this.isPlatformAdmin() ? this.tenantId() : null;
+  }
+
+  setGroup(g: Group): void { this.group.set(g); this.page.set(1); this.read(); }
+  setCategory(c: string): void { this.category.set(c); this.page.set(1); this.read(); }
+  setState(v: string): void { this.state.set(v); this.page.set(1); this.read(); }
+  setOwner(v: string): void { this.owner.set(v); this.page.set(1); this.read(); }
+  goTo(page: number): void { this.page.set(page); this.read(); }
+  setSize(size: number): void { this.size.set(size); this.page.set(1); this.read(); }
+
+  /** The service searches: wait for the typing to stop, then ask again from the first page. */
+  onSearch(value: string): void {
+    this.search.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.page.set(1); this.read(); }, 300);
   }
 
   /** A template's first page as a picture (drawn by the server once per version), and its page count. */
@@ -188,7 +253,8 @@ export class ReportTemplates implements OnInit {
 
   showArchived(on: boolean): void {
     this.archived.set(on);
-    this.load();
+    this.page.set(1);
+    this.read();
   }
 
   pagesOf(t: TemplateRow): string {
@@ -255,7 +321,7 @@ export class ReportTemplates implements OnInit {
       + 'Its versions and the reports made from it are kept.', confirmLabel: 'Archive' }).then(ok => {
       if (!ok) return;
       this.api.archive(t.templateId).subscribe({
-        next: () => { this.toast.success(`${t.name} archived.`); this.load(); },
+        next: () => { this.toast.success(`${t.name} archived.`); this.refresh(); },
         error: e => this.toast.error(studioError(e).message),
       });
     });
@@ -265,7 +331,7 @@ export class ReportTemplates implements OnInit {
     void confirmWith(this.dialog, { title: `Delete ${t.name}?`, body: TEMPLATE_DELETE_WORDS, confirmLabel: 'Delete', danger: true }).then(ok => {
       if (!ok) return;
       this.api.remove(t.templateId).subscribe({
-        next: () => { this.toast.success(`${t.name} deleted.`); this.load(); },
+        next: () => { this.toast.success(`${t.name} deleted.`); this.refresh(); },
         error: e => this.toast.error(studioError(e).message),
       });
     });

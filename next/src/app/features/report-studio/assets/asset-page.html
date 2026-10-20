@@ -186,6 +186,8 @@
         @if (a.restricted && a.you.mayPlace && canTemplates() && a.status === 'ACTIVE' && a.currentVersion) {
           <section class="rs-side-sec">
             <div class="flex items-center justify-between gap-2"><h2 class="rsa-eyebrow">Placement on a template</h2><span class="pill pill-neutral">Optional</span></div>
+            <app-rs-pick-search [shown]="templates().length" [total]="templatesTotal()" label="Find a template" placeholder="Find a template"
+                                (search)="findTemplates($event)" />
             <label class="field"><span class="label">Template</span>
               <select class="input" aria-label="Template" [ngModel]="placeTemplate()" (ngModelChange)="placeTemplate.set($event)">
                 <option value="">Choose a template</option>
@@ -209,6 +211,8 @@
                 </select></label>
             </div>
             @if (a.kind === 'SIGNATURE') {
+              <app-rs-pick-search [shown]="stamps().length" [total]="stampsTotal()" label="Find a stamp" placeholder="Find a stamp"
+                                  (search)="findStamps($event)" />
               <label class="field"><span class="label">Stamp · optional</span>
                 <select class="input" aria-label="Stamp" [ngModel]="placeStamp()" (ngModelChange)="placeStamp.set($event)">
                   <option value="">No stamp</option>@for (s of stamps(); track s.assetId) { <option [value]="s.assetId">{{ s.name }}</option> }

@@ -7,7 +7,7 @@
       </div>
       <div class="flex items-center gap-2">
         <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
         @if (canEdit()) {
           <button type="button" class="btn btn-default btn-sm" (click)="importJson()"><app-icon name="upload" />Import JSON</button>
           <button type="button" class="btn btn-primary btn-sm" (click)="create(null)"><app-icon name="plus" />New template</button>
@@ -16,30 +16,30 @@
     </div>
   </app-page-header>
 
-  <app-table-shell heading="Templates" columnsKey="report-templates" [loading]="loading()" [error]="error()" [isEmpty]="!filtered().length"
+  <app-table-shell heading="Templates" columnsKey="report-templates" [loading]="loading()" [error]="error()" [isEmpty]="!total()"
                    [scrollRows]="view() === 'table'"
-                   [shown]="filtered().length" [total]="items().length" emptyIcon="template" (retry)="load()"
+                   [shown]="filtered().length" [total]="total()" emptyIcon="template" (retry)="read()"
                    [emptyMessage]="group() === 'shared' ? 'Nothing is shared with this workspace yet. Sharing between workspaces comes with Teams.'
-                     : search() || state() || category() || owner() ? 'No template matches the filters.' : archived() ? 'No archived templates.'
+                     : filtering() ? 'No template matches the filters.' : archived() ? 'No archived templates.'
                      : 'No templates yet. Use a starter, import one, or begin blank.'">
     <ng-container toolbar>
-      <app-segmented [options]="groups()" [value]="group()" (valueChange)="group.set($event)" ariaLabel="Which templates" />
+      <app-segmented [options]="groups()" [value]="group()" (valueChange)="setGroup($event)" ariaLabel="Which templates" />
       <div class="search-field max-w-64">
         <app-icon name="search" size="0.95em" />
-        <input class="input" placeholder="Search name, owner or description" aria-label="Search templates" [value]="search()"
-               (input)="search.set($any($event.target).value)" />
+        <input class="input" placeholder="Search name, description or tag" aria-label="Search templates" [value]="search()"
+               (input)="onSearch($any($event.target).value)" />
       </div>
-      <select class="input max-w-44" aria-label="Category" (change)="category.set($any($event.target).value)">
+      <select class="input max-w-44" aria-label="Category" (change)="setCategory($any($event.target).value)">
         <option value="" [selected]="!category()">All categories</option>
         @for (c of categories(); track c) { <option [value]="c" [selected]="c === category()">{{ c }}</option> }
       </select>
-      <select class="input max-w-40" aria-label="State" (change)="state.set($any($event.target).value)">
+      <select class="input max-w-40" aria-label="State" (change)="setState($any($event.target).value)">
         <option value="" [selected]="!state()">All states</option>
         <option value="PUBLISHED" [selected]="state() === 'PUBLISHED'">Published</option>
         <option value="DRAFT" [selected]="state() === 'DRAFT'">Never published</option>
         <option value="HAS_DRAFT" [selected]="state() === 'HAS_DRAFT'">With a draft</option>
       </select>
-      <select class="input max-w-40" aria-label="Owner" (change)="owner.set($any($event.target).value)">
+      <select class="input max-w-40" aria-label="Owner" (change)="setOwner($any($event.target).value)">
         <option value="" [selected]="!owner()">Anyone</option>
         <option value="me" [selected]="owner() === 'me'">Made by me</option>
         <option value="starter" [selected]="owner() === 'starter'">From a starter</option>
@@ -179,6 +179,8 @@
         </tbody>
       </table>
     }
+    <!-- Owner 2026-10-20: one pager for the cards and the table (the view toggle keeps the page). -->
+    <app-pagination pager [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
   </app-table-shell>
 
   <div class="rs-banner rs-banner-info mt-4" role="note">

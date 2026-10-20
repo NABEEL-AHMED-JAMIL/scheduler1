@@ -17,6 +17,12 @@ export interface LibraryQuery { status?: string; q?: string; templateId?: string
 /** One page of rows, and how many the filters match in all. */
 export interface LibraryPage<T> { rows: T[]; total: number; offset: number; limit: number; }
 
+/** A page of the template library: the library's paging and the Templates page's filters. */
+export interface TemplateQuery extends LibraryQuery { archived?: boolean; category?: string; state?: string; owner?: string; }
+
+/** A page of the asset library. */
+export interface AssetQuery { q?: string; kind?: string; state?: string; used?: string; limit?: number; offset?: number; }
+
 /** The rows one library read asks for when it names no limit; the service answers 200 at most. */
 export const LIBRARY_PAGE = 50;
 
@@ -78,9 +84,16 @@ export class ReportStudioApi {
 
   // ---------------------------------------------------------------- templates
 
-  list(archived = false, tenantId?: number | null): Observable<TemplateLibrary> {
-    return ReportStudioApi.data$(this.http.get<ApiResponse<TemplateLibrary>>(`${this.templates}/fetchAll`,
-      { params: { archived: String(archived), ...ReportStudioApi.scope(tenantId) } }));
+  /**
+   * One page of the workspace's templates (newest change first) with total, counts and categories, and every starter.
+   * Filters: q, category, state (PUBLISHED, DRAFT, HAS_DRAFT, LIVE = has a published version), owner (ME, STARTER, COPY).
+   */
+  list(query: TemplateQuery = {}, tenantId?: number | null): Observable<TemplateLibrary> {
+    const params: Record<string, string> = { archived: String(!!query.archived), ...ReportStudioApi.page(query), ...ReportStudioApi.scope(tenantId) };
+    for (const k of ['category', 'state', 'owner'] as const) if (query[k]) params[k] = query[k]!;
+    return ReportStudioApi.data$(this.http.get<ApiResponse<TemplateLibrary>>(`${this.templates}/fetchAll`, { params }))
+      .pipe(map(lib => ({ ...lib, total: lib.total ?? lib.templates.length, counts: lib.counts ?? { templates: lib.templates.length },
+        categories: lib.categories ?? [] })));
   }
 
   template(templateId: string, tenantId?: number | null): Observable<TemplateDetail> {
@@ -241,7 +254,7 @@ export class ReportStudioApi {
       .pipe(map(r => ReportStudioApi.pageOf(r.data?.jobs, r.data)));
   }
 
-  private static page(query: LibraryQuery): Record<string, string> {
+  private static page(query: { status?: string; q?: string; limit?: number; offset?: number }): Record<string, string> {
     const q = query.q?.trim();
     return { ...(query.status ? { status: query.status } : {}), ...(q ? { q } : {}), limit: String(query.limit ?? LIBRARY_PAGE),
       offset: String(query.offset ?? 0) };
@@ -275,10 +288,12 @@ export class ReportStudioApi {
 
   // ---------------------------------------------------------------- MIG-406: assets
 
-  assets(filters: { q?: string; kind?: string; state?: string; used?: string } = {}, tenantId?: number | null): Observable<AssetLibrary> {
-    const params: Record<string, string> = { ...ReportStudioApi.scope(tenantId) };
-    for (const [k, v] of Object.entries(filters)) if (v) params[k] = v;
-    return ReportStudioApi.data$(this.http.get<ApiResponse<AssetLibrary>>(`${this.assetsBase}/assets`, { params }));
+  /** One page of the asset library's cards (newest change first) with total and the scope's counts, and the brand profiles. */
+  assets(filters: AssetQuery = {}, tenantId?: number | null): Observable<AssetLibrary> {
+    const params: Record<string, string> = { ...ReportStudioApi.page(filters), ...ReportStudioApi.scope(tenantId) };
+    for (const k of ['kind', 'state', 'used'] as const) if (filters[k]) params[k] = filters[k]!;
+    return ReportStudioApi.data$(this.http.get<ApiResponse<AssetLibrary>>(`${this.assetsBase}/assets`, { params }))
+      .pipe(map(lib => ({ ...lib, total: lib.total ?? lib.assets.length })));
   }
 
   asset(assetId: string, tenantId?: number | null): Observable<AssetDetail> {
@@ -292,8 +307,15 @@ export class ReportStudioApi {
       ...ReportStudioApi.scope(tenantId) }, responseType: 'blob' });
   }
 
-  usable(templateId?: string | null): Observable<Usable> {
-    return ReportStudioApi.data$(this.http.get<ApiResponse<Usable>>(`${this.assetsBase}/usable`, { params: templateId ? { templateId } : {} }));
+  /**
+   * What this person may place (approved, active), searched on the server: q and kinds (LOGO, IMAGE, SIGNATURE, STAMP),
+   * one page (200 at most) with total; and the published brand profiles.
+   */
+  usable(templateId?: string | null, query: { q?: string; kinds?: string[]; limit?: number; offset?: number } = {}): Observable<Usable> {
+    const params: Record<string, string> = { ...ReportStudioApi.page({ q: query.q, limit: query.limit ?? 200, offset: query.offset }),
+      ...(templateId ? { templateId } : {}), ...(query.kinds?.length ? { kinds: query.kinds.join(',') } : {}) };
+    return ReportStudioApi.data$(this.http.get<ApiResponse<Usable>>(`${this.assetsBase}/usable`, { params }))
+      .pipe(map(u => ({ ...u, total: u.total ?? u.assets.length })));
   }
 
   people(): Observable<Person[]> {

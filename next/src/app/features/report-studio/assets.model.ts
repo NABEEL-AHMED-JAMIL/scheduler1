@@ -101,7 +101,9 @@ export interface AssetDetail extends AssetCard {
     lastReportLabel?: string | null; lastVersion?: number | null; lastSigned?: boolean | null };
 }
 
-export interface AssetLibrary { assets: AssetCard[]; counts: { all: number; signaturesAndStamps: number }; profiles: BrandProfileRow[]; }
+/** One page of cards (total: what the filters match) and the scope's counts before them; the brand profiles. */
+export interface AssetLibrary { assets: AssetCard[]; counts: { all: number; signaturesAndStamps: number }; profiles: BrandProfileRow[];
+  total: number; offset?: number; limit?: number; }
 
 export type Lock = 'REPORT' | 'TEMPLATE' | 'LOCKED';
 
@@ -165,7 +167,7 @@ export interface BrandProfileDetail extends BrandProfileRow {
 export interface UsableProfile { profileId: string; name: string; isDefault: boolean; version: number; logoAssetId?: string; logoName?: string;
   signOnApproval?: boolean; }
 
-export interface Usable { assets: AssetCard[]; profiles: UsableProfile[]; }
+export interface Usable { assets: AssetCard[]; profiles: UsableProfile[]; total: number; }
 
 export interface Person { userId: number; name: string; role?: string | null; }
 

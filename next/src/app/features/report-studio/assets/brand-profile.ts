@@ -16,6 +16,7 @@ import { ReportStudioApi, studioError } from '../report-studio.api';
 import {
   AssetCard, BrandDefinition, BrandProfileDetail, Lock, contrastRatio, emptyDefinition,
 } from '../assets.model';
+import { RsPickSearch } from '../pick-search';
 import { AssetPicture } from './asset-picture';
 
 const FONTS = ['Noto Sans', 'Noto Serif', 'Noto Sans Mono', 'DejaVu Sans'];
@@ -29,9 +30,12 @@ const FONTS = ['Noto Sans', 'Noto Serif', 'Noto Sans Mono', 'DejaVu Sans'];
  * setting wins, with what is allowed and what is locked. Publishing needs report-publish; new versions apply to future
  * reports only.
  */
+/** The brand profile's three asset pickers. */
+type Picker = 'logos' | 'signatures' | 'stamps';
+
 @Component({
   selector: 'app-brand-profile',
-  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture],
+  imports: [PageHeader, Icon, LoadError, RsTimePipe, FormsModule, AssetPicture, RsPickSearch],
   templateUrl: './brand-profile.html',
   styleUrl: './assets.css',
 })
@@ -60,6 +64,8 @@ export class BrandProfilePage implements OnInit {
   readonly logos = signal<AssetCard[]>([]);
   readonly signatures = signal<AssetCard[]>([]);
   readonly stamps = signal<AssetCard[]>([]);
+  /** How many each picker's search matches in all (the selects hold 200 at most). */
+  readonly totals = signal<Record<Picker, number>>({ logos: 0, signatures: 0, stamps: 0 });
   readonly fonts = FONTS;
   readonly printed = PRINTED_LOOK;
   private readonly redraw = new Subject<BrandDefinition>();
@@ -98,16 +104,33 @@ export class BrandProfilePage implements OnInit {
       error: e => this.error.set(studioError(e, 'The brand profile could not be read.').message),
     });
     if (!this.auth.isPlatformAdmin()) {
-      this.api.assets().subscribe({
-        next: lib => {
-          const usable = lib.assets.filter(a => a.status === 'ACTIVE' && a.currentVersion);
-          this.logos.set(usable.filter(a => a.kind === 'LOGO' || a.kind === 'IMAGE'));
-          this.signatures.set(usable.filter(a => a.kind === 'SIGNATURE'));
-          this.stamps.set(usable.filter(a => a.kind === 'STAMP'));
-        },
-        error: () => { /* the pickers say there is nothing to choose */ },
-      });
+      this.find('logos', '');
+      this.find('signatures', '');
+      this.find('stamps', '');
     }
+  }
+
+  /**
+   * One picker's choices: the approved, active assets of its kinds, searched on the service (the first 200 and how many
+   * match). What was offered before stays offered, so a pick made from an earlier search keeps its name.
+   */
+  find(picker: Picker, q: string): void {
+    const kinds = picker === 'logos' ? ['LOGO', 'IMAGE'] : picker === 'signatures' ? ['SIGNATURE'] : ['STAMP'];
+    this.api.usable(null, { q, kinds }).subscribe({
+      next: u => {
+        const list = this[picker];
+        const found = new Set(u.assets.map(a => a.assetId));
+        const picked = new Set(this.pickedIds());
+        list.set([...u.assets, ...list().filter(a => !found.has(a.assetId) && picked.has(a.assetId))]);
+        this.totals.update(t => ({ ...t, [picker]: u.total }));
+      },
+      error: () => { /* the pickers say there is nothing to choose */ },
+    });
+  }
+
+  private pickedIds(): string[] {
+    const d = this.def();
+    return [d.logo?.assetId ?? '', ...(d.signatures ?? []).map(s => s.assetId), ...(d.stamps ?? []).map(s => s.assetId)].filter(Boolean);
   }
 
   /** One change to the definition: kept, the preview redrawn. */
@@ -157,7 +180,7 @@ export class BrandProfilePage implements OnInit {
   }
 
   nameOf(list: AssetCard[], id: string): string {
-    const a = list.find(x => x.assetId === id);
+    const a = list.find(x => x.assetId === id) ?? (this.p()?.assets ?? []).find(x => x.assetId === id);
     return a ? `${a.name} · v${a.currentVersion}` : 'An asset no longer usable';
   }
 

@@ -11,6 +11,8 @@ import { AuthService } from '../../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from '../report-studio.api';
+import { Pagination } from '../../../shared/ui/pagination';
+import { PAGE_SIZES } from '../../../shared/ui/pager';
 import {
   InspectResult, JobRow, Problem, ReportDetail, SchemaField, SourceRef, TemplateDefinition, TemplateDetail, TemplateRow, chipWord, idempotencyKey,
   bundleParts, isRunning, stageWord,
@@ -100,7 +102,7 @@ export function neededFields(def: TemplateDefinition): NeededField[] {
  */
 @Component({
   selector: 'app-new-report',
-  imports: [PageHeader, Icon, StatusPill, RsTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect,
+  imports: [PageHeader, Icon, StatusPill, RsTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect, Pagination,
     AssetPicture],
   templateUrl: './new-report.html',
   styleUrl: './new-report.css',
@@ -162,10 +164,13 @@ export class NewReport implements OnInit {
   readonly stepCrumb = computed(() => this.stepNames[this.step() - 1] ?? '');
 
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin());
-  readonly shown = computed(() => {
-    const q = this.search().trim().toLowerCase();
-    return this.templates().filter(t => !q || [t.name, t.description, t.category].some(v => (v ?? '').toLowerCase().includes(q)));
-  });
+  /** Owner 2026-10-20: the published templates a page at a time, searched on the service (LIVE: has a published version). */
+  readonly shown = computed(() => this.templates());
+  readonly templateTotal = signal(0);
+  readonly templatePage = signal(1);
+  readonly templateSize = signal(PAGE_SIZES[0]);
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private templatesAsked = 0;
   readonly version = computed(() => this.t()?.currentPublishedVersion ?? null);
   // MIG-406: the Branding box -- the brand profile this report is made in (the template's, the workspace default's, or another).
   readonly profiles = signal<UsableProfile[]>([]);
@@ -241,6 +246,7 @@ export class NewReport implements OnInit {
       this.poll?.unsubscribe();
       this.dropPdf();
       Object.values(this.thumbs()).forEach(u => URL.revokeObjectURL(u));
+      if (this.searchTimer) clearTimeout(this.searchTimer);
     });
     // A new source is read at once, so the matching table fills as the person picks.
     effect(() => {
@@ -267,16 +273,39 @@ export class NewReport implements OnInit {
     } else if (templateId) {
       this.pick(templateId, true);
     }
-    this.api.list(false, this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
+    this.readTemplates();
+  }
+
+  /** Step 1's cards: one page of the published templates, with the search, as the service answers it. */
+  readTemplates(): void {
+    this.loadingTemplates.set(true);
+    const asked = ++this.templatesAsked;
+    this.api.list({ state: 'LIVE', q: this.search(), limit: this.templateSize(), offset: (this.templatePage() - 1) * this.templateSize() },
+      this.auth.isPlatformAdmin() ? this.tenantId() : null).subscribe({
       next: lib => {
+        if (asked !== this.templatesAsked) return;
         this.loadingTemplates.set(false);
-        const published = lib.templates.filter(t => t.currentPublishedVersion != null && t.status !== 'ARCHIVED');
-        this.templates.set(published);
-        published.slice(0, 24).forEach(t => this.thumb(t.templateId));
+        this.templates.set(lib.templates);
+        this.templateTotal.set(lib.total);
+        lib.templates.forEach(t => { if (!this.thumbs()[t.templateId]) this.thumb(t.templateId); });
       },
-      error: e => { this.loadingTemplates.set(false); this.error.set(studioError(e, 'The templates could not be read.').message); },
+      error: e => {
+        if (asked !== this.templatesAsked) return;
+        this.loadingTemplates.set(false);
+        this.error.set(studioError(e, 'The templates could not be read.').message);
+      },
     });
   }
+
+  /** The service searches: wait for the typing to stop, then ask again from the first page. */
+  searchTemplates(value: string): void {
+    this.search.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.templatePage.set(1); this.readTemplates(); }, 300);
+  }
+
+  templatesGoTo(page: number): void { this.templatePage.set(page); this.readTemplates(); }
+  templatesSize(size: number): void { this.templateSize.set(size); this.templatePage.set(1); this.readTemplates(); }
 
   private thumb(templateId: string): void {
     this.api.templateThumbnail(templateId).subscribe({

@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -17,6 +17,8 @@ import { AssetPicture } from './asset-picture';
 import { UploadData, UploadPanel } from './upload-panel';
 import { NewProfilePanel, NewProfileData } from './new-profile-panel';
 import { RsTabCounts } from '../rs-tab-counts';
+import { Pagination } from '../../../shared/ui/pagination';
+import { PAGE_SIZES } from '../../../shared/ui/pager';
 
 type Tab = 'assets' | 'profiles' | 'restricted';
 
@@ -27,11 +29,9 @@ type Tab = 'assets' | 'profiles' | 'restricted';
  * beside them what this person may do here, the difference between a signature picture and a digital signature, and the
  * replace and retire rules. Signatures and stamps have their own tab.
  */
-const inUse = (a: AssetCard) => a.templates + a.reports + (a.profiles ?? 0) > 0;
-
 @Component({
   selector: 'app-report-assets',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, RsTimePipe, WorkspaceSelect, RouterLink, AssetPicture],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, RsTimePipe, WorkspaceSelect, RouterLink, AssetPicture, Pagination],
   templateUrl: './assets.html',
   styleUrl: './assets.css',
 })
@@ -55,6 +55,15 @@ export class ReportAssets implements OnInit {
   readonly kind = signal('');
   readonly state = signal('');
   readonly used = signal('');
+  /** Owner 2026-10-20: one page of cards from the service, how many the filters match, and the scope's counts. */
+  readonly total = signal(0);
+  readonly counts = signal({ all: 0, signaturesAndStamps: 0 });
+  readonly page = signal(1);
+  readonly size = signal(PAGE_SIZES[0]);
+  readonly filtering = computed(() => !!(this.search().trim() || this.kind() || this.state() || this.used()));
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Answers come back in any order: only the latest read's is kept. */
+  private asked = 0;
   readonly kindWords = KIND_WORDS;
   readonly stateWord = stateWord;
   readonly stateTone = stateTone;
@@ -71,15 +80,12 @@ export class ReportAssets implements OnInit {
   readonly roleWord = computed(() => (this.auth.isPlatformAdmin() ? 'Platform administrator' : this.auth.isTenantAdmin() ? 'Admin'
     : this.canApprove() ? 'Approver' : 'Editor'));
 
-  readonly restrictedCount = computed(() => this.assets().filter(a => a.restricted).length);
-  readonly shown = computed(() => {
-    const q = this.search().trim().toLowerCase();
-    return this.assets().filter(a => (this.tab() !== 'restricted' || a.restricted)
-      && (!this.kind() || a.kind === this.kind())
-      && (!this.state() || a.state === this.state())
-      && (!this.used() || (this.used() === 'USED' ? inUse(a) : !inUse(a)))
-      && (!q || [a.name, a.description, a.updatedByName, a.ownerName, a.label].some(v => (v ?? '').toLowerCase().includes(q))));
-  });
+  readonly restrictedCount = computed(() => this.counts().signaturesAndStamps);
+  readonly shown = computed(() => this.assets());
+
+  constructor() {
+    inject(DestroyRef).onDestroy(() => { if (this.searchTimer) clearTimeout(this.searchTimer); });
+  }
 
   ngOnInit(): void {
     const t = this.route.snapshot.queryParamMap.get('tab');
@@ -88,19 +94,74 @@ export class ReportAssets implements OnInit {
   }
 
   setTab(t: Tab): void {
+    const was = this.tab();
     this.tab.set(t);
     void this.router.navigate([], { queryParams: { tab: t === 'assets' ? null : t }, queryParamsHandling: 'merge', replaceUrl: true });
+    // The cards differ between the two card tabs (the restricted one is signatures and stamps only): page 1 of the new one.
+    if (t !== 'profiles' && t !== was) {
+      if (t === 'restricted') this.kind.set('');
+      this.page.set(1);
+      this.read();
+    }
   }
 
+  /** Another workspace picked (and the first read): the tab counts and the cards again, from the first page. */
   load(): void {
+    this.page.set(1);
+    this.refresh();
+  }
+
+  /** The refresh button: the tab counts and the page the reader is on. */
+  refresh(): void {
+    this.tabCounts.refresh(this.scope());
+    this.read();
+  }
+
+  /** The current page of cards, with the filters, as the service answers it (the brand profiles come with it). */
+  read(): void {
     this.loading.set(true);
     this.error.set('');
-    const scope = this.auth.isPlatformAdmin() ? this.tenantId() : null;
-    this.tabCounts.refresh(scope);
-    this.api.assets({}, scope).subscribe({
-      next: lib => { this.assets.set(lib.assets); this.profiles.set(lib.profiles ?? []); this.loading.set(false); },
-      error: e => { this.error.set(studioError(e, 'The assets could not be read.').message); this.loading.set(false); },
+    const asked = ++this.asked;
+    const offset = (this.page() - 1) * this.size();
+    this.api.assets({ q: this.search(), kind: this.tab() === 'restricted' ? 'SIGNATURES_AND_STAMPS' : this.kind(), state: this.state(),
+      used: this.used(), limit: this.size(), offset }, this.scope()).subscribe({
+      next: lib => {
+        if (asked !== this.asked) return;
+        // A page emptied under the reader (assets retired or deleted): the last page that still has cards.
+        if (!lib.assets.length && lib.total > 0 && this.page() > 1) {
+          this.page.set(Math.ceil(lib.total / this.size()));
+          this.read();
+          return;
+        }
+        this.assets.set(lib.assets);
+        this.total.set(lib.total);
+        this.counts.set(lib.counts ?? { all: lib.total, signaturesAndStamps: 0 });
+        this.profiles.set(lib.profiles ?? []);
+        this.loading.set(false);
+      },
+      error: e => {
+        if (asked !== this.asked) return;
+        this.error.set(studioError(e, 'The assets could not be read.').message);
+        this.loading.set(false);
+      },
     });
+  }
+
+  private scope(): number | null {
+    return this.auth.isPlatformAdmin() ? this.tenantId() : null;
+  }
+
+  setKind(v: string): void { this.kind.set(v); this.page.set(1); this.read(); }
+  setState(v: string): void { this.state.set(v); this.page.set(1); this.read(); }
+  setUsed(v: string): void { this.used.set(v); this.page.set(1); this.read(); }
+  goTo(page: number): void { this.page.set(page); this.read(); }
+  setSize(size: number): void { this.size.set(size); this.page.set(1); this.read(); }
+
+  /** The service searches: wait for the typing to stop, then ask again from the first page. */
+  onSearch(value: string): void {
+    this.search.set(value);
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.page.set(1); this.read(); }, 300);
   }
 
   usedWord(a: AssetCard): string {

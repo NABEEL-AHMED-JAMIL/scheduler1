@@ -3,6 +3,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { Icon } from '../../../shared/ui/icon';
 import { SchemaField, TreeNode } from '../report-studio.model';
 import { AssetCard } from '../assets.model';
+import { RsPickSearch } from '../pick-search';
 import {
   Block, collections, innerPath, itemFields, lengthAt, sampleText, scalars, typeIcon, typeWord, valueAt,
 } from './designer-model';
@@ -156,7 +157,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
  */
 @Component({
   selector: 'app-rs-properties',
-  imports: [Icon, NgTemplateOutlet],
+  imports: [Icon, NgTemplateOutlet, RsPickSearch],
   template: `
     @if (block(); as b) {
       <div class="rsd-props-head">
@@ -439,6 +440,11 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
               @case ('asset') {
                 <label class="field">
                   <span class="label">{{ f.label }}</span>
+                  @if (assetsPartial()) {
+                    <app-rs-pick-search [shown]="assetChoices(f.key).length" [total]="assetTotals()[assetKinds(f.key).join(',')] ?? assetsTotal()"
+                                        [label]="'Find ' + f.label" placeholder="Find an approved asset" [disabled]="readonly()"
+                                        (search)="findAssets.emit({ q: $event, kinds: assetKinds(f.key) })" />
+                  }
                   <select class="input" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="pickAsset(f.key, $any($event.target).value)">
                     <option value="" [selected]="!text(f.key)">{{ f.key === 'stampRef' ? 'No stamp' : 'Choose an approved asset' }}</option>
                     @for (a of assetChoices(f.key); track a.assetId) {
@@ -525,6 +531,15 @@ export class PropertiesPanel {
   readonly names = input<string[]>(['primary']);
   /** MIG-406: what this person may place (approved assets, their own or granted), and the template's asset entries. */
   readonly assets = input<AssetCard[]>([]);
+  /**
+   * Owner 2026-10-20: the designer reads the first 200 assets this person may place; when there are more, each picker
+   * searches the service (findAssets) for its kinds. assetsTotal is what the first read matched, assetTotals each kind
+   * group's last search.
+   */
+  readonly assetsTotal = input(0);
+  readonly assetTotals = input<Record<string, number>>({});
+  readonly assetsPartial = computed(() => this.assetsTotal() > this.assets().length || Object.keys(this.assetTotals()).length > 0);
+  readonly findAssets = output<{ q: string; kinds: string[] }>();
   readonly templateAssets = input<Record<string, unknown>[]>([]);
   /** A library asset picked for a setting: the designer adds the template's asset entry and points the block at it. */
   readonly assetPicked = output<{ key: string; assetId: string | null }>();
@@ -816,9 +831,14 @@ export class PropertiesPanel {
 
   /** The approved assets a setting may pick: signatures for a signature, stamps for a stamp, logos and images otherwise. */
   assetChoices(key: string): AssetCard[] {
-    const type = this.block()?.type;
-    const want = key === 'stampRef' || type === 'stamp' ? ['STAMP'] : type === 'signature' ? ['SIGNATURE'] : ['LOGO', 'IMAGE'];
+    const want = this.assetKinds(key);
     return this.assets().filter(a => want.includes(a.kind));
+  }
+
+  /** The kinds a setting picks from. */
+  assetKinds(key: string): string[] {
+    const type = this.block()?.type;
+    return key === 'stampRef' || type === 'stamp' ? ['STAMP'] : type === 'signature' ? ['SIGNATURE'] : ['LOGO', 'IMAGE'];
   }
 
   /** The library asset a block's setting points at (through the template's asset entry), or null. */

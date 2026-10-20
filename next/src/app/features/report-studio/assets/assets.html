@@ -7,7 +7,7 @@
       </div>
       <div class="flex items-center gap-2">
         <app-workspace-select [(value)]="tenantId" [allowAll]="true" (valueChange)="load()" />
-        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        <app-refresh-button [loading]="loading()" (refresh)="refresh()" />
         @if (canLibrary()) { <button type="button" class="btn btn-default btn-sm" (click)="newProfile()"><app-icon name="plus" />New brand profile</button> }
         @if (canLibrary() || canCustodian()) { <button type="button" class="btn btn-primary btn-sm" (click)="upload()"><app-icon name="upload" />Upload asset</button> }
       </div>
@@ -18,7 +18,7 @@
     <div class="flex flex-col gap-4 min-w-0">
       <div class="tabs" role="tablist" aria-label="Assets and branding">
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'assets'" [attr.aria-selected]="tab() === 'assets'" (click)="setTab('assets')">
-          Assets <span class="rs-count">{{ assets().length }}</span></button>
+          Assets <span class="rs-count">{{ counts().all }}</span></button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'profiles'" [attr.aria-selected]="tab() === 'profiles'" (click)="setTab('profiles')">
           Brand profiles <span class="rs-count">{{ profiles().length }}</span></button>
         <button type="button" role="tab" class="tab" [class.tab-active]="tab() === 'restricted'" [attr.aria-selected]="tab() === 'restricted'" (click)="setTab('restricted')">
@@ -26,23 +26,23 @@
       </div>
 
       @if (error()) {
-        <app-load-error [message]="error()" (retry)="load()" />
+        <app-load-error [message]="error()" (retry)="read()" />
       } @else if (tab() !== 'profiles') {
         <div class="rsa-filters">
           <div class="search-field flex-1 min-w-48">
             <app-icon name="search" size="0.95em" />
-            <input class="input" placeholder="Search assets by name or uploader" aria-label="Search assets" [value]="search()" (input)="search.set($any($event.target).value)" />
+            <input class="input" placeholder="Search assets by name or uploader" aria-label="Search assets" [value]="search()" (input)="onSearch($any($event.target).value)" />
           </div>
           @if (tab() === 'assets') {
-            <select class="input w-auto" aria-label="Type" [value]="kind()" (change)="kind.set($any($event.target).value)">
+            <select class="input w-auto" aria-label="Type" [value]="kind()" (change)="setKind($any($event.target).value)">
               <option value="">All types</option><option value="LOGO">Logos</option><option value="IMAGE">Images</option>
               <option value="SIGNATURE">Signatures</option><option value="STAMP">Stamps</option>
             </select>
           }
-          <select class="input w-auto" aria-label="State" [value]="state()" (change)="state.set($any($event.target).value)">
-            <option value="">All states</option><option value="APPROVED">Approved</option><option value="IN_REVIEW">In review</option><option value="RETIRED">Retired</option>
+          <select class="input w-auto" aria-label="State" [value]="state()" (change)="setState($any($event.target).value)">
+            <option value="">All states</option><option value="APPROVED">Approved</option><option value="IN_REVIEW">In review</option><option value="REJECTED">Rejected</option><option value="RETIRED">Retired</option>
           </select>
-          <select class="input w-auto" aria-label="Where used" [value]="used()" (change)="used.set($any($event.target).value)">
+          <select class="input w-auto" aria-label="Where used" [value]="used()" (change)="setUsed($any($event.target).value)">
             <option value="">Used anywhere</option><option value="USED">In use</option><option value="UNUSED">Not used yet</option>
           </select>
         </div>
@@ -51,7 +51,7 @@
           <div class="flex justify-center py-12"><span class="spinner" role="status" aria-label="Loading"></span></div>
         } @else if (!shown().length) {
           <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">
-            @if (assets().length) { No asset matches the filters. }
+            @if (filtering()) { No asset matches the filters. }
             @else if (tab() === 'restricted') { No signatures or stamps yet.@if (canCustodian()) { Upload one: it waits for an approver. } }
             @else { No assets yet.@if (canLibrary()) { Upload a logo to start a brand profile. } }
           </div>
@@ -81,6 +81,8 @@
             }
           </div>
         }
+        <!-- Owner 2026-10-20: the cards page on the service, with the console's pager. -->
+        <app-pagination [total]="total()" [page]="page()" [size]="size()" (goTo)="goTo($event)" (setSize)="setSize($event)" />
       }
 
       @if (!error() && tab() !== 'restricted') {

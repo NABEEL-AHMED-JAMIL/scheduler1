@@ -36,12 +36,12 @@
       <section class="card">
         <div class="rs-head">
           <div><h2 class="section-title">Which template?</h2><p class="text-xs text-[color:var(--text-muted)]">Only published versions make reports; they never change.</p></div>
-          <input class="input max-w-72" type="search" [ngModel]="search()" (ngModelChange)="search.set($event)" placeholder="Search templates" aria-label="Search templates" />
+          <input class="input max-w-72" type="search" [ngModel]="search()" (ngModelChange)="searchTemplates($event)" placeholder="Search templates" aria-label="Search templates" />
         </div>
         <div class="p-4">
           @if (loadingTemplates()) { <div class="flex justify-center py-12"><span class="spinner" role="status" aria-label="Loading"></span></div> }
           @else if (!shown().length) {
-            <p class="text-sm text-[color:var(--text-muted)] py-6">No published template yet. Publish one in Templates, or start from a starter there.</p>
+            <p class="text-sm text-[color:var(--text-muted)] py-6">@if (search().trim()) { No published template matches the search. } @else { No published template yet. Publish one in Templates, or start from a starter there. }</p>
           } @else {
             <div class="rsw-cards">
               @for (tpl of shown(); track tpl.templateId) {
@@ -57,6 +57,7 @@
             </div>
           }
         </div>
+        <app-pagination [total]="templateTotal()" [page]="templatePage()" [size]="templateSize()" (goTo)="templatesGoTo($event)" (setSize)="templatesSize($event)" />
       </section>
     }
 

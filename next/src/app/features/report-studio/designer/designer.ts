@@ -208,6 +208,9 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly approval = computed(() => this.t()?.approval ?? null);
   // MIG-406: the Brand chip and the assets the properties may place (approved; signatures and stamps only this person's to place).
   readonly usableAssets = signal<AssetCard[]>([]);
+  /** How many the first read of them matched, and each picker's last search on the service (a kind group's total). */
+  readonly usableTotal = signal(0);
+  readonly usableTotals = signal<Record<string, number>>({});
   readonly profiles = signal<UsableProfile[]>([]);
   readonly templateAssets = computed(() => ((this.def()?.template['assets'] ?? []) as Record<string, unknown>[]));
   readonly branding = computed(() => (this.def()?.template['branding'] ?? {}) as { profileId?: string; disabled?: boolean });
@@ -280,7 +283,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         this.draw(true);
         if (!this.isPlatformAdmin()) {
           this.api.usable(t.templateId).subscribe({
-            next: u => { this.usableAssets.set(u.assets); this.profiles.set(u.profiles); },
+            next: u => { this.usableAssets.set(u.assets); this.usableTotal.set(u.total); this.usableTotals.set({}); this.profiles.set(u.profiles); },
             error: () => { this.usableAssets.set([]); this.profiles.set([]); },
           });
         }
@@ -435,6 +438,20 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
    * MIG-406: a library asset picked in the properties: the template's asset entry for it (added once, named after its
    * number) and the selected block pointing at it. The server pins the version on save and checks this person may place it.
    */
+  /** A picker's search on the service: what it finds joins what the pickers offer (nothing offered before is dropped). */
+  findAssets(find: { q: string; kinds: string[] }): void {
+    const t = this.t();
+    if (!t) return;
+    this.api.usable(t.templateId, { q: find.q, kinds: find.kinds }).subscribe({
+      next: u => {
+        const found = new Set(u.assets.map(a => a.assetId));
+        this.usableAssets.update(list => [...u.assets, ...list.filter(a => !found.has(a.assetId))]);
+        this.usableTotals.update(m => ({ ...m, [find.kinds.join(',')]: u.total }));
+      },
+      error: () => { /* the picker keeps what it offered */ },
+    });
+  }
+
   pickAsset(pick: { key: string; assetId: string | null }): void {
     const id = this.selected();
     if (!id) return;
