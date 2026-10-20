@@ -370,6 +370,7 @@ HTML/PDF parity (parity.py): ≥ 85 % (PARITY_MIN; radiology's first page moved 
 | B28 | A PDF ended with a blank page when the sign-off just fit (its bottom margin went past the foot) | The last block chain has no bottom margin in the PDF | media c9cc051 |
 | B29 | An approver could approve a superseded version after Generate again (role-probe did so on every run: v1 of reports at v2) | 409 "Version N is not the current one: version M is newer"; the console offers Approve on the current version only, older unapproved ones read "Superseded"; role-probe sends the current version | media 05c344d, console d8ff0f56, etl-platform 62277bc |
 | B30 | Meridian "Supplier invoices" tile "Documents that failed a check" errored: rules_failed is the list of failed rules (text), the tile compared it with 0 and named two columns the file does not have | The tile keeps rows with a non-empty rules_failed (5 documents) | etl-platform 369952a |
+| B31 | Bone fracture report: the Accuracy section (kept together, a 25-row table beside a 10-row one) was taller than a page under the brand header; the PDF split the right column and moved the left one whole to the next page, leaving its column empty | A kept block is kept together only when its estimated height fits a page's body | media b449861 (RPT-0039 v4 signed) |
 | B26 | Wipe dry run: three unclassified tables | api_client_change T, run_pricing_fact T, rate_card_draft platform (filter keeps drafts of kept cards) | etl-platform f8d1bdf |
 
 ## Added while testing (opt-in, existing templates unchanged)
