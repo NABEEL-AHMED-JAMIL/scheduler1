@@ -33,7 +33,7 @@ export function previewPeriods(now = new Date()): { value: string; label: string
           <div class="text-lg font-semibold tabular" [class.text-crit-500]="p.difference > 0" [class.text-ok-500]="p.difference < 0" data-test="preview-difference">{{ signed(p.difference) }}</div></div>
       </div>
       <p class="text-xs text-[color:var(--text-muted)] mb-2">
-        {{ p.workspaces.length }} {{ p.workspaces.length === 1 ? 'workspace' : 'workspaces' }} with usage in {{ month() }}{{ p.tenantId == null && p.onOwnCard ? ' on the default card; ' + p.onOwnCard + ' on a card of their own are not affected' : '' }}.
+        {{ p.workspaces.length }} {{ p.workspaces.length === 1 ? 'workspace' : 'workspaces' }} with usage in {{ month() }}{{ p.tenantId == null && p.onOwnCard ? ' on the default card; ' + p.onOwnCard + (p.onOwnCard === 1 ? ' on a card of its own is' : ' on a card of their own are') + ' not affected' : '' }}.
         Priced by the same engine as the bills; nothing is saved, and an issued invoice never changes.
       </p>
       @if (!p.workspaces.length) {

@@ -127,7 +127,7 @@ interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: nu
                 <tr [attr.data-rule]="r.rule_no">
                   <td class="tabular text-xs"><div class="font-medium">{{ k + 1 }}</div><div class="text-[11px] text-[color:var(--text-muted)] mono">#{{ r.rule_no }}</div></td>
                   <td>
-                    <select class="input py-1 text-xs" [value]="r.meter" (change)="setRule(r.key, 'meter', $any($event.target).value)" [attr.aria-label]="'Rule ' + r.rule_no + ' meter'">
+                    <select class="input py-1 text-xs min-w-40" [value]="r.meter" (change)="setRule(r.key, 'meter', $any($event.target).value)" [attr.aria-label]="'Rule ' + r.rule_no + ' meter'">
                       @for (it of items(); track it.meter) { <option [value]="it.meter" [selected]="it.meter === r.meter">{{ it.label }}</option> }
                     </select>
                   </td>

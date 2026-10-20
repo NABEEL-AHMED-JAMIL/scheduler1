@@ -432,7 +432,7 @@ describe('RateCards, drafts and rules', () => {
     const rows = [...el.querySelectorAll('[data-test="rules-table"] tbody tr')].map(tr => tr.getAttribute('data-rule'));
     expect(rows).toEqual(['1', '2', '3']);
     const first = el.querySelector('[data-test="rules-table"] tbody tr')!.textContent!;
-    expect(first).toContain('Pipeline X-ray triage (#1933)');
+    expect(first).toContain('X-ray triage (#1933)');
     expect(first).toContain('$0.05 per user-day');
     expect(first).toContain('$0.33 per user-day');
   });

@@ -164,6 +164,7 @@
               </tr>
               <!-- Owner #23: usage pricing rules priced, each rule's part under its meter; the meter's line is their sum. -->
               @if (line.rules?.length) {
+                @if ((line.cardQuantity ?? 0) !== 0 || (line.cardAmount ?? 0) !== 0) {
                 <tr class="rule-part" data-test="rule-part-card">
                   <td class="!pl-6 text-xs text-[color:var(--text-secondary)]">↳ At the card's price</td>
                   <td class="hidden md:table-cell"></td>
@@ -173,6 +174,7 @@
                   <td class="text-right tabular text-xs" [title]="fmtExact(line.cardAmount ?? 0)">{{ fmtAmount(line.cardAmount ?? 0) }}</td>
                   <td></td>
                 </tr>
+                }
                 @for (part of line.rules; track part.ruleNo) {
                   <tr class="rule-part" data-test="rule-part" [attr.data-rule]="part.ruleNo">
                     <td class="!pl-6 text-xs">↳ {{ part.label }} <span class="text-[color:var(--text-muted)]">· pricing rule</span></td>

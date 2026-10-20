@@ -129,6 +129,8 @@ export class RateCards implements OnInit {
   kindLabel(r: RateRule): string { return kindText(r.match_kind); }
   /** What a rule matches: a pipeline by its note (the name the editor took from Core) and id, a tag, a data class. */
   matchLabel(r: RateRule): string { return matchText(r, r.match_kind === 'PIPELINE' ? r.note : null); }
+  /** What a rule matches without its kind (the pill beside it says that): "X-ray triage (#1933)", "research". */
+  matchValue(r: RateRule): string { return r.match_kind === 'PIPELINE' && r.note ? `${r.note} (#${r.match_value})` : r.match_kind === 'PIPELINE' ? `#${r.match_value}` : r.match_value; }
   /** The rule's price beside the card's own for its meter. */
   rulePrice(r: RateRule, items: RateItem[], currency: string): string {
     const it = items.find(i => i.meter === r.meter);
