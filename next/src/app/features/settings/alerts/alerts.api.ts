@@ -97,6 +97,9 @@ export interface ServiceHealth {
   /** Of those, inside a planned deploy window (scripts/deploy.sh announced it): what the rules did not alert on. */
   plannedRestarts24h?: number;
   plannedMinutesNotUp24h?: number;
+  /** Owner 2026-10-19: the service's own deploys in 24 hours and the newest one (no separate list on the page). */
+  deploys24h?: number;
+  lastDeploy?: PlannedDeploy | null;
 }
 
 /**
@@ -120,8 +123,6 @@ export interface PlatformHealth {
   services: ServiceHealth[];
   probes: Probe[];
   incidents: Alert[];
-  /** The 24 hours' planned deploys, newest first (absent from a Core older than them). */
-  deploys?: PlannedDeploy[];
 }
 
 @Injectable({ providedIn: 'root' })

@@ -3,7 +3,7 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">Service health</h1>
-        <p class="page-subtitle">Each service's status, version, restarts and error rate, the planned deploys and the platform's alerts; then pipeline execution and billing against their 99.99% targets. Heap, CPU and request history are CloudWatch's.</p>
+        <p class="page-subtitle">Each service's status, version, restarts and error rate, the background checks and the platform's alerts; then pipeline execution and billing against their 99.99% targets. Heap, CPU and request history are CloudWatch's.</p>
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <button type="button" class="btn btn-ghost btn-sm" data-test="refresh-all" (click)="refreshAll()" [disabled]="health()?.loading()"><app-icon name="refresh" [busy]="!!health()?.loading()" />Refresh</button>
@@ -11,7 +11,7 @@
     </div>
   </app-page-header>
 
-  <!-- Owner #21 (2026-10-19): the services, the planned deploys and the platform's alerts -- no heap, CPU or request charts
+  <!-- Owner #21 (2026-10-19): the services, the background checks and the platform's alerts (the planned-deploy list removed later that day: each row says its own) -- no heap, CPU or request charts
        (CloudWatch's on AWS) and no disk box (the disk rule still alerts). -->
   <app-platform-health />
 

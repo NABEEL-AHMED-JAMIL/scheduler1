@@ -1,3 +1,4 @@
+import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
@@ -26,12 +27,17 @@ export interface AppearanceSettings {
  */
 @Component({
   selector: 'app-workspace-appearance',
-  imports: [Icon, PageHeader, ThemeChooser, Section, WorkspaceSelect],
+  imports: [Icon, PageHeader, ThemeChooser, Section, WorkspaceSelect, RefreshButton],
   template: `
     <div class="page">
       <app-page-header title="Appearance"
                        subtitle="The theme your workspace's people see until they choose their own. Each person can still pick another in the top bar or on their profile.">
-        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
+        <!-- Owner #5 (2026-10-19): the selector sits in the same wrapper, with Refresh, as on every other screen; placed
+             straight in the header it stretched and its clear button floated outside the box. -->
+        <div class="flex items-center gap-2">
+          <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
+          @if (tenantId() !== null) { <app-refresh-button [loading]="loading()" (refresh)="load()" /> }
+        </div>
       </app-page-header>
 
       @if (error()) {

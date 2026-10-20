@@ -1,10 +1,9 @@
 import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
 import { API_SUCCESS } from '../../../core/api/api.config';
 import { StatTile } from '../../../shared/ui/stat-tile';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
-import { AlertsApi, PlannedDeploy, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
+import { AlertsApi, PlatformHealth, Probe, ServiceHealth } from '../../settings/alerts/alerts.api';
 import { AlertRules } from '../../settings/alerts/alert-rules';
 
 /** A status as a person reads it, and the tone of its dot. */
@@ -18,11 +17,61 @@ export function statusWord(status: string | undefined): { word: string; tone: 'o
   }
 }
 
-/** How long a planned deploy's window was open, in words: "2 min", "45 s", or "running". */
-export function deployLength(d: PlannedDeploy): string {
-  if (d.state === 'open') return 'running';
-  const seconds = Math.max(0, Math.round((Date.parse(d.closes) - Date.parse(d.start)) / 1000));
-  return seconds < 90 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+/**
+ * Owner 2026-10-19: what a service's newest deploy says on its row, when it says anything -- a deploy that failed, one that
+ * never closed its window, or one running now. A deploy that went well says nothing beyond "deployed …".
+ */
+export function deployNote(s: ServiceHealth): { text: string; tone: 'crit' | 'warn' | 'info' } | null {
+  const d = s.lastDeploy;
+  if (!d) return null;
+  if (d.outcome === 'failed') return { text: 'last deploy failed', tone: 'crit' };
+  if (d.state === 'expired') return { text: 'last deploy never finished', tone: 'warn' };
+  if (d.state === 'open') return { text: 'deploying now', tone: 'info' };
+  return null;
+}
+
+/** One background check as the page lists it: a name, its result in words, what it found, and when it was read. */
+export interface CheckRow { name: string; ok: boolean | null; tone: 'ok' | 'warn' | 'crit' | 'muted'; result: string; detail: string; readAt: string | null; every: string; }
+
+const CHECK_NAMES: Record<string, { name: string; every: string }> = {
+  'billing-reconcile': { name: 'Billing reconciliation', every: 'hourly' },
+};
+
+/**
+ * Owner 2026-10-19: the checks Core runs on their own (Kafka consumer lag, the billing reconciliation, and any other probe)
+ * as one short table instead of a box each. Kafka's groups are one row: caught up, or how many are behind and the worst.
+ */
+export function backgroundChecks(probes: Probe[]): CheckRow[] {
+  const rows: CheckRow[] = [];
+  const lag = probes.filter(p => p.probe.startsWith('kafka-lag:'));
+  const latest = (list: Probe[]) => list.map(p => p.readAt).filter((t): t is string => !!t).sort().pop() ?? null;
+  if (lag.length) {
+    const behind = lag.filter(p => (p.reading ?? 0) > 0).sort((a, b) => (b.reading ?? 0) - (a.reading ?? 0));
+    const worst = behind[0]?.reading ?? 0;
+    rows.push({
+      name: 'Kafka consumers', ok: !behind.length, tone: !behind.length ? 'ok' : worst >= 1000 ? 'crit' : 'warn',
+      result: !behind.length ? 'Caught up' : `${behind.length} of ${lag.length} behind`,
+      detail: !behind.length ? `${lag.length} consumer ${lag.length === 1 ? 'group' : 'groups'}, none behind`
+        : behind.slice(0, 3).map(p => `${p.probe.replace(/^kafka-lag:/, '')} ${(p.reading ?? 0).toLocaleString('en-US')} behind`).join(' · ')
+          + (behind.length > 3 ? ` · ${behind.length - 3} more` : ''),
+      readAt: latest(lag), every: 'each minute',
+    });
+  } else {
+    rows.push({ name: 'Kafka consumers', ok: null, tone: 'muted', result: 'Not read yet', detail: 'Read each minute once Core reaches Kafka.', readAt: null, every: 'each minute' });
+  }
+  for (const p of probes.filter(x => !x.probe.startsWith('kafka-lag:'))) {
+    const known = CHECK_NAMES[p.probe];
+    const billing = p.probe === 'billing-reconcile';
+    rows.push({
+      name: known?.name ?? p.probe, ok: p.ok, tone: p.ok ? 'ok' : 'crit',
+      result: billing ? (p.ok ? 'Agrees' : 'Does not agree') : (p.ok ? 'OK' : 'Failing'),
+      detail: p.detail ?? '', readAt: p.readAt, every: known?.every ?? '',
+    });
+  }
+  if (!probes.some(p => p.probe === 'billing-reconcile')) {
+    rows.push({ name: 'Billing reconciliation', ok: null, tone: 'muted', result: 'Not read yet', detail: 'Daily lines, invoices and usage events compared hourly.', readAt: null, every: 'hourly' });
+  }
+  return rows;
 }
 
 /** A service's restarts in 24 hours that were not a planned deploy: the ones that alerted. */
@@ -41,22 +90,25 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
 
 /**
  * Platform › Service health's services (owner #21, 2026-10-19; MIG-355's health view, slimmed): every service's status, the
- * version it runs, when it started, its restarts in 24 hours -- planned (a deploy) or not -- and its error rate; the planned
- * deploys; the Kafka consumers and the billing reconciliation, which have rules of their own; then the platform's alerts and
- * the rules that raise them. No heap, CPU or request charts: on AWS those are CloudWatch's (Container Insights). No disk box:
+ * version it runs (and a deploy that failed or never finished, on its own row), when it started, its restarts in 24 hours --
+ * planned (a deploy) or not -- and its error rate; the background checks (Kafka consumer lag, the billing reconciliation) as
+ * one short table; then the platform's alerts and the rules that raise them. The separate list of planned deploys is gone
+ * (owner 2026-10-19): each row already says its version and when it was deployed.
+ * No heap, CPU or request charts: on AWS those are CloudWatch's (Container Insights). No disk box:
  * the disk rule still alerts.
  */
 @Component({
   selector: 'app-platform-health',
-  imports: [StatTile, ServerTimePipe, DecimalPipe, AlertRules],
+  imports: [StatTile, ServerTimePipe, AlertRules],
   styles: `
     .dot { display: inline-block; width: 0.5rem; height: 0.5rem; border-radius: 999px; margin-right: 0.4rem; vertical-align: middle; }
     .dot-ok { background: var(--series-ok); }
     .dot-warn { background: var(--series-warn, var(--warn-text)); }
     .dot-crit { background: var(--series-crit); }
+    .dot-info { background: var(--info-mark); }
+    .note-info { color: var(--text-secondary); }
     .dot-muted { background: var(--border-strong); }
     .rel-table-wrap { overflow-x: auto; }
-    .health-side { display: grid; grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr)); gap: 1rem; }
   `,
   template: `
     <section class="flex flex-col gap-4" aria-labelledby="health-title" data-test="platform-health">
@@ -67,7 +119,8 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
                        [tone]="unplannedTotal() ? 'warn' : 'ok'" foot="in 24 hours; deploys are not counted" />
         <app-stat-tile label="Errors" [value]="erroring().length ? erroring().length + ' services' : 'None'" icon="alert"
                        [tone]="erroring().length ? 'crit' : 'ok'" foot="answering 5xx in the last minutes" />
-        <app-stat-tile label="Planned deploys" [value]="'' + deploys().length" icon="upload" tone="info" foot="in 24 hours" />
+        <app-stat-tile label="Background checks" [value]="checksFailing() ? checksFailing() + ' failing' : 'All OK'" icon="shield"
+                       [tone]="checksFailing() ? 'crit' : 'ok'" foot="Kafka lag and billing reconciliation" />
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
@@ -98,7 +151,8 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
                   @if (s.version) {
                     <span class="mono text-xs">{{ s.version }}</span>
                     @if (s.branch) { <span class="text-[11px] text-[color:var(--text-muted)]"> {{ s.branch }}</span> }
-                    @if (s.deployedAt) { <div class="text-[11px] text-[color:var(--text-muted)]">deployed {{ s.deployedAt | serverTime:'recent' }}</div> }
+                    @if (s.deployedAt) { <div class="text-[11px] text-[color:var(--text-muted)]">deployed {{ s.deployedAt | serverTime:'recent' }}@if ((s.deploys24h ?? 0) > 1) { · {{ s.deploys24h }} deploys in 24 h }</div> }
+                    @if (note(s); as n) { <div class="text-[11px] font-medium" [class.text-crit-500]="n.tone === 'crit'" [class.text-warn-500]="n.tone === 'warn'" [class.note-info]="n.tone === 'info'" data-test="deploy-note">{{ n.text }}</div> }
                   } @else { <span class="text-[color:var(--text-muted)]" title="Recorded by scripts/deploy.sh from the service's next deploy">—</span> }
                 </td>
                 <td class="whitespace-nowrap text-[color:var(--text-secondary)]">{{ s.startedAt ? (s.startedAt | serverTime:'recent') : '—' }}</td>
@@ -115,48 +169,24 @@ export function errorRate(s: ServiceHealth): { text: string; bad: boolean } {
         </table>
       </div>
 
-      <div class="health-side">
-        <section class="card p-4" data-test="planned-deploys" aria-labelledby="deploys-title">
-          <h3 class="chart-title m-0" id="deploys-title">Planned deploys</h3>
-          <p class="chart-sub m-0">The last 24 hours, newest first. A restart inside one raises no alert.</p>
-          @if (deploys().length) {
-            <ul class="list-none m-0 mt-2 p-0 text-sm flex flex-col gap-1">
-              @for (d of shownDeploys(); track d.service + d.start) {
-                <li class="flex justify-between gap-2" [attr.data-service]="d.service" [attr.data-state]="d.state">
-                  <span class="font-medium truncate">{{ d.service }}</span>
-                  <span class="text-[color:var(--text-secondary)] whitespace-nowrap">{{ d.start | serverTime:'recent' }}, {{ length(d) }}
-                    @if (d.outcome === 'failed') { <span class="text-crit-500"> · failed</span> }
-                    @if (d.state === 'expired') { <span class="text-warn-500" title="The deploy never ended its window; it ran out at its maximum."> · expired</span> }
-                  </span>
-                </li>
-              }
-            </ul>
-            @if (deploys().length > DEPLOYS_SHOWN) {
-              <button type="button" class="btn btn-ghost btn-xs mt-1" data-test="deploys-more" (click)="allDeploys.set(!allDeploys())" [attr.aria-expanded]="allDeploys()">
-                {{ allDeploys() ? 'Show fewer' : 'and ' + (deploys().length - DEPLOYS_SHOWN) + ' more' }}
-              </button>
+      <div class="card rel-table-wrap" data-test="background-checks">
+        <div class="px-4 py-3 border-b border-subtle">
+          <h2 class="text-sm font-semibold m-0">Background checks</h2>
+          <p class="text-xs text-[color:var(--text-muted)] m-0">Read on their own schedule; a failing check raises an alert through its rule below.</p>
+        </div>
+        <table class="table-modern">
+          <thead><tr><th>Check</th><th>Result</th><th>What it found</th><th class="text-right">Read</th></tr></thead>
+          <tbody>
+            @for (c of checks(); track c.name) {
+              <tr [attr.data-check]="c.name">
+                <td class="font-medium whitespace-nowrap">{{ c.name }}</td>
+                <td class="whitespace-nowrap"><span class="dot" [class]="'dot dot-' + c.tone"></span>{{ c.result }}</td>
+                <td class="text-[color:var(--text-secondary)]">{{ c.detail || '—' }}</td>
+                <td class="text-right whitespace-nowrap text-[color:var(--text-secondary)]">{{ c.readAt ? (c.readAt | serverTime:'recent') : '—' }}@if (c.every) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ c.every }}</div> }</td>
+              </tr>
             }
-          } @else { <p class="text-sm text-[color:var(--text-muted)] m-0 mt-2">No deploy in the last 24 hours.</p> }
-        </section>
-        <section class="card p-4" aria-labelledby="kafka-title">
-          <h3 class="chart-title m-0" id="kafka-title">Kafka consumers</h3>
-          @if (lagging().length) {
-            <ul class="list-none m-0 mt-2 p-0 text-sm">
-              @for (p of lagging(); track p.probe) {
-                <li class="flex justify-between gap-2"><span class="truncate" [title]="p.probe">{{ group(p) }}</span>
-                  <span class="tabular" [class.text-crit-500]="(p.reading ?? 0) >= 1000">{{ p.reading | number:'1.0-0' }} behind</span></li>
-              }
-            </ul>
-          } @else { <p class="text-sm text-[color:var(--text-secondary)] m-0 mt-2">{{ kafkaRead() ? 'Every consumer group is caught up.' : 'Not read yet.' }}</p> }
-        </section>
-        <section class="card p-4" aria-labelledby="reconcile-title">
-          <h3 class="chart-title m-0" id="reconcile-title">Billing reconciliation</h3>
-          @if (billing(); as b) {
-            <p class="text-sm font-medium m-0 mt-2" [class.text-crit-500]="!b.ok">{{ b.ok ? 'Agrees' : 'Does not agree' }}</p>
-            <p class="text-xs text-[color:var(--text-secondary)] m-0 mt-1">{{ b.detail }}</p>
-            <p class="text-xs text-[color:var(--text-muted)] m-0 mt-1">Read {{ b.readAt | serverTime:'recent' }}, hourly.</p>
-          } @else { <p class="text-sm text-[color:var(--text-muted)] m-0 mt-2">Not read yet (hourly).</p> }
-        </section>
+          </tbody>
+        </table>
       </div>
 
       <h2 class="text-lg font-semibold m-0 mt-2">Platform alerts</h2>
@@ -173,11 +203,6 @@ export class PlatformHealthView implements OnInit, OnDestroy {
   readonly error = signal('');
 
   readonly services = computed(() => this.health()?.services ?? []);
-  readonly deploys = computed(() => this.health()?.deploys ?? []);
-  /** A busy day's deploys would push Kafka and billing off the screen: the newest eight, then "and N more". */
-  readonly DEPLOYS_SHOWN = 8;
-  readonly allDeploys = signal(false);
-  readonly shownDeploys = computed(() => this.allDeploys() ? this.deploys() : this.deploys().slice(0, this.DEPLOYS_SHOWN));
   readonly upCount = computed(() => this.services().filter(s => s.status === 'UP').length);
   readonly unplannedTotal = computed(() => this.services().reduce((n, s) => n + unplannedRestarts(s), 0));
   readonly erroring = computed(() => this.services().filter(s => errorRate(s).bad));
@@ -188,10 +213,8 @@ export class PlatformHealthView implements OnInit, OnDestroy {
   });
   readonly asOfFoot = computed(() => (this.health() ? 'sampled each minute' : 'not sampled yet'));
   private readonly probes = computed(() => this.health()?.probes ?? []);
-  readonly billing = computed(() => this.probes().find(p => p.probe === 'billing-reconcile') ?? null);
-  readonly kafkaRead = computed(() => this.probes().some(p => p.probe.startsWith('kafka-lag:')));
-  readonly lagging = computed(() => this.probes().filter(p => p.probe.startsWith('kafka-lag:') && (p.reading ?? 0) > 0)
-    .sort((a, b) => (b.reading ?? 0) - (a.reading ?? 0)).slice(0, 8));
+  readonly checks = computed(() => backgroundChecks(this.probes()));
+  readonly checksFailing = computed(() => this.checks().filter(c => c.ok === false).length);
 
   ngOnInit(): void {
     this.load();
@@ -221,7 +244,5 @@ export class PlatformHealthView implements OnInit, OnDestroy {
 
   rate(s: ServiceHealth) { return errorRate(s); }
 
-  length(d: PlannedDeploy): string { return deployLength(d); }
-
-  group(p: Probe): string { return p.probe.replace(/^kafka-lag:/, ''); }
+  note(s: ServiceHealth) { return deployNote(s); }
 }

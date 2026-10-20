@@ -9,7 +9,7 @@ import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { AlertRules } from './alert-rules';
 import { Alert, AlertRule, PlannedDeploy, minutes, recommendedRules, ruleSentence } from './alerts.api';
-import { PlatformHealthView, deployLength, errorRate, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
+import { PlatformHealthView, backgroundChecks, deployNote, errorRate, statusWord, unplannedRestarts } from '../../admin/reliability/platform-health';
 import { notificationTarget, openableTarget } from '../../notifications/notification-links';
 
 /** MIG-355: alerts and their rules -- the list, the open alerts with Resolve, the recommended rules, and the words. */
@@ -147,20 +147,31 @@ describe('Alerts', () => {
     expect(errorRate({ service: 'gateway', status: 'UP' })).toEqual({ text: '—', bad: false });
   });
 
-  it('counts a planned deploy\'s restart apart, and says how long each deploy took', () => {
-    const deploys: PlannedDeploy[] = [
-      { service: 'transcriber', start: '2026-10-13T13:30:00Z', end: '2026-10-13T13:31:10Z', expires: '2026-10-13T13:45:00Z',
-        closes: '2026-10-13T13:31:10Z', state: 'ended', outcome: 'ok' },
-      { service: 'process', start: '2026-10-13T12:00:00Z', end: null, expires: '2026-10-13T12:15:00Z', closes: '2026-10-13T12:15:00Z',
-        state: 'expired', outcome: null },
-    ];
-    expect(deployLength(deploys[0])).toBe('70 s');
-    expect(deployLength(deploys[1])).toBe('15 min');
-    expect(deployLength({ ...deploys[0], state: 'open', end: null })).toBe('running');
+  it('counts a planned deploy\'s restart apart, and says a deploy that failed or never finished on its row', () => {
+    const ended: PlannedDeploy = { service: 'transcriber', start: '2026-10-13T13:30:00Z', end: '2026-10-13T13:31:10Z',
+      expires: '2026-10-13T13:45:00Z', closes: '2026-10-13T13:31:10Z', state: 'ended', outcome: 'ok' };
+    expect(deployNote({ service: 'transcriber', status: 'UP', lastDeploy: ended })).toBeNull();
+    expect(deployNote({ service: 'transcriber', status: 'UP', lastDeploy: { ...ended, outcome: 'failed' } })).toEqual({ text: 'last deploy failed', tone: 'crit' });
+    expect(deployNote({ service: 'process', status: 'UP', lastDeploy: { ...ended, end: null, state: 'expired', outcome: null } })!.tone).toBe('warn');
+    expect(deployNote({ service: 'process', status: 'UP', lastDeploy: { ...ended, end: null, state: 'open', outcome: null } })!.text).toBe('deploying now');
+    expect(deployNote({ service: 'process', status: 'UP' })).toBeNull();
     expect(unplannedRestarts({ service: 'transcriber', status: 'UP', restarts24h: 3, plannedRestarts24h: 2 })).toBe(1);
     expect(unplannedRestarts({ service: 'transcriber', status: 'UP', restarts24h: 1, plannedRestarts24h: 2 })).toBe(0);
   });
-  it('shows the newest eight planned deploys, then "and N more" (owner #21)', () => {
+
+  it('lists the background checks as one table: Kafka as one row, billing reconciliation, no deploy list (owner 2026-10-19)', () => {
+    const rows = backgroundChecks([
+      { probe: 'kafka-lag:audit', readAt: '2026-10-19T20:00:00Z', ok: true, reading: 0, detail: null },
+      { probe: 'kafka-lag:analytics', readAt: '2026-10-19T20:01:00Z', ok: false, reading: 1240, detail: null },
+      { probe: 'billing-reconcile', readAt: '2026-10-19T19:46:00Z', ok: true, reading: null, detail: 'The month 2026-10 agrees.' },
+    ]);
+    expect(rows.map(r => r.name)).toEqual(['Kafka consumers', 'Billing reconciliation']);
+    expect([rows[0].result, rows[0].tone, rows[0].readAt]).toEqual(['1 of 2 behind', 'crit', '2026-10-19T20:01:00Z']);
+    expect(rows[0].detail).toBe('analytics 1,240 behind');
+    expect(rows[1].result).toBe('Agrees');
+    const empty = backgroundChecks([]);
+    expect(empty.map(r => r.result)).toEqual(['Not read yet', 'Not read yet']);
+
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [PlatformHealthView],
@@ -171,20 +182,14 @@ describe('Alerts', () => {
     const fixture = TestBed.createComponent(PlatformHealthView);
     fixture.detectChanges();
     const http = TestBed.inject(HttpTestingController);
-    const deploys: PlannedDeploy[] = Array.from({ length: 11 }, (_, i) => ({ service: `svc-${i}`, start: `2026-10-19T1${i % 10}:00:00Z`,
-      end: `2026-10-19T1${i % 10}:01:00Z`, expires: null, closes: null, state: 'ended', outcome: 'ok' }) as unknown as PlannedDeploy);
     http.expectOne(r => r.url === `${API_BASE}/reliability.json/health`).flush({ status: API_SUCCESS, message: '',
-      data: { services: [], probes: [], deploys } });
+      data: { services: [], probes: [{ probe: 'billing-reconcile', readAt: null, ok: false, reading: null, detail: 'Off by $0.02' }] } });
     fixture.detectChanges();
     const el = fixture.nativeElement as HTMLElement;
-    const listed = () => el.querySelectorAll('[data-test="planned-deploys"] li').length;
-    expect(listed()).toBe(8);
-    const more = el.querySelector<HTMLButtonElement>('[data-test="deploys-more"]')!;
-    expect(more.textContent!.trim()).toBe('and 3 more');
-    more.click();
-    fixture.detectChanges();
-    expect(listed()).toBe(11);
-    expect(more.textContent!.trim()).toBe('Show fewer');
+    expect(el.querySelector('[data-test="planned-deploys"]')).toBeNull();
+    expect(el.querySelectorAll('[data-test="background-checks"] tbody tr').length).toBe(2);
+    expect(el.querySelector('[data-check="Billing reconciliation"]')!.textContent).toContain('Does not agree');
+    expect(el.querySelector('[data-test="health-tiles"]')!.textContent).toContain('1 failing');
     clearInterval((fixture.componentInstance as unknown as { timer: ReturnType<typeof setInterval> }).timer);
   });
 });
