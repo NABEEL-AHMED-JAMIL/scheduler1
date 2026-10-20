@@ -53,22 +53,29 @@ test.describe('Report Studio: assets and brand profiles (live)', () => {
   test('an image uploads and is approved; a renamed non-image is refused', async ({ browser, request }) => {
     const page = await view(browser, admin);
     await page.goto('/reports/assets');
+    // The library loads first (the button is there before its list; a click then can land on a re-render).
+    await expect(page.getByRole('button', { name: 'Upload asset' })).toBeEnabled();
+    await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Upload asset' }).click();
-    let panel = page.getByRole('dialog');
+    let panel = page.getByRole('dialog', { name: 'Upload an asset' });
+    await expect(panel).toBeVisible();
     await panel.getByLabel('Kind').selectOption('IMAGE');
     await panel.getByLabel('Name').fill(IMAGE);
     await panel.getByLabel('Description').fill('Synthetic wound-measurement diagram for E2E checks; not a clinical image.');
     await panel.getByLabel('File', { exact: true }).setInputFiles({ name: 'e2e-wound-diagram.png', mimeType: 'image/png', buffer: png() });
     await panel.getByRole('button', { name: 'Upload', exact: true }).click();
-    await expect(page).toHaveURL(/\/reports\/assets\/[0-9A-Z]{26}$/);
+    await expect(page).toHaveURL(/\/reports\/assets\/[0-9A-Z]{26}$/, { timeout: 30_000 });
     await expect(page.getByRole('heading', { level: 1, name: IMAGE })).toBeVisible();
     await expect(page.locator('.pill', { hasText: 'Approved' }).first()).toBeVisible();
     await expect(page.getByText(/· Image · Editors manage/)).toBeVisible();
 
     // A PDF named .png: refused by what it is, not by its name.
     await page.goto('/reports/assets');
+    await expect(page.getByRole('button', { name: 'Upload asset' })).toBeEnabled();
+    await page.waitForLoadState('networkidle');
     await page.getByRole('button', { name: 'Upload asset' }).click();
-    panel = page.getByRole('dialog');
+    panel = page.getByRole('dialog', { name: 'Upload an asset' });
+    await expect(panel).toBeVisible();
     await panel.getByLabel('Kind').selectOption('IMAGE');
     await panel.getByLabel('Name').fill(`${IMAGE} (renamed PDF)`);
     await panel.getByLabel('File', { exact: true }).setInputFiles({ name: 'wound-photo.png', mimeType: 'image/png',

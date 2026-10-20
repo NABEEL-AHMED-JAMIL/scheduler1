@@ -80,8 +80,8 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     reportId = /library\/([0-9A-Z]{26})$/.exec(page.url())![1];
     await expect(page.getByRole('heading', { level: 1, name: REPORT })).toBeVisible();
     await expect(page.getByText('Version 1', { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Download the PDF' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Download the HTML' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Download the PDF', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Download the HTML', exact: true })).toBeVisible();
     await page.context().close();
   });
 
@@ -126,8 +126,9 @@ test.describe('Report Studio: create, regenerate, approve and verify a report (l
     await page.getByRole('button', { name: 'Approve and sign v2' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Approve and sign' }).click();
     await expect(page.getByText('v2 approved and its PDF signed.')).toBeVisible({ timeout: 30_000 });
-    await expect(page.locator('.pill', { hasText: 'Signed' })).toBeVisible();
-    await expect(page.getByText('Approved and signed')).toBeVisible();
+    // The Signed chip shows in the header and on the version's row.
+    await expect(page.locator('.pill', { hasText: 'Signed' }).first()).toBeVisible();
+    await expect(page.getByText('Approved and signed').first()).toBeVisible();
     const r = await report(request, admin, reportId);
     const v2 = r.versions.find((v: { version: number }) => v.version === 2);
     expect(v2.approval.approvedBy).toBe(reviewer.appUserId);
