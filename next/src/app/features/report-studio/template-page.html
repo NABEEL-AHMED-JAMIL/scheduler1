@@ -41,6 +41,9 @@
                 }
                 <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="archive()"><app-icon name="inbox" />Archive</button>
               }
+              @if (canDelete()) {
+                <button cdkMenuItem class="menu-item menu-item-danger" (cdkMenuItemTriggered)="remove()" data-test="template-delete"><app-icon name="trash" class="icon-crit" />Delete template</button>
+              }
             </div>
           </ng-template>
           @if (canPublish() && canEdit() && t.draft) {

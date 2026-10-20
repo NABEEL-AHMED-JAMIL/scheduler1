@@ -230,7 +230,7 @@
             @for (v of r.versions; track v.versionId) {
               <tr>
                 <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }</td>
-                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | serverTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-40 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
+                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | serverTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
                 <td class="text-xs"><span class="whitespace-nowrap">Template v{{ v.templateVersion }}</span>
                   <div class="mono text-[color:var(--text-muted)] max-w-36 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</div></td>
                 <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verify(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | serverTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }

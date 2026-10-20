@@ -27,6 +27,10 @@ interface ContractField { path: string; type: string; required?: boolean; label?
  * before anything is published. Publishing (report-publish) freezes the draft as the next version; "New draft" starts
  * one from any version; "Make a copy" is a new template with its own history.
  */
+/** What deleting a template does, said the same on the list and on the template (owner 2026-10-20). */
+export const TEMPLATE_DELETE_WORDS = 'Its versions, drafts and test samples are deleted for good. A template a report was made from cannot be '
+  + 'deleted, because every report keeps the exact template it came from: archive it instead.';
+
 @Component({
   selector: 'app-report-template-page',
   imports: [PageHeader, RefreshButton, Icon, ServerTimePipe, LoadError, ProblemList, FormsModule, CdkMenu, CdkMenuItem,
@@ -54,6 +58,8 @@ export class ReportTemplatePage implements OnInit {
   readonly size = size;
 
   readonly canEdit = computed(() => this.auth.canOpen('report-templates') && !this.auth.isPlatformAdmin() && this.t()?.status !== 'ARCHIVED');
+  /** Owner 2026-10-20: Delete is on the template's own page too, archived or not; the server refuses one a report was made from. */
+  readonly canDelete = computed(() => this.auth.canOpen('report-templates') && !this.auth.isPlatformAdmin() && !!this.t());
   readonly canPublish = computed(() => this.auth.canOpen('report-publish') && !this.auth.isPlatformAdmin());
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin());
   readonly shown = computed<VersionRow | undefined>(() => this.t()?.draft ?? this.t()?.published);
@@ -198,6 +204,18 @@ export class ReportTemplatePage implements OnInit {
       confirmLabel: 'Delete', danger: true }).then(ok => {
       if (!ok) return;
       this.api.deleteSample(s.sampleId).subscribe({ next: () => this.load(), error: e => this.toast.error(studioError(e).message) });
+    });
+  }
+
+  remove(): void {
+    const t = this.t();
+    if (!t) return;
+    void confirmWith(this.dialog, { title: `Delete ${t.name}?`, body: TEMPLATE_DELETE_WORDS, confirmLabel: 'Delete', danger: true }).then(ok => {
+      if (!ok) return;
+      this.api.remove(t.templateId).subscribe({
+        next: () => { this.toast.success(`${t.name} deleted.`); void this.router.navigate(['/reports/templates']); },
+        error: e => this.toast.error(studioError(e).message),
+      });
     });
   }
 

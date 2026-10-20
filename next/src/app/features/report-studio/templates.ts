@@ -1,3 +1,4 @@
+import { TEMPLATE_DELETE_WORDS } from './template-page';
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
@@ -236,8 +237,7 @@ export class ReportTemplates implements OnInit {
   }
 
   remove(t: TemplateRow): void {
-    void confirmWith(this.dialog, { title: `Delete ${t.name}?`, body: 'Only a template that was never published and made no report can be '
-      + 'deleted; anything else is archived instead.', confirmLabel: 'Delete', danger: true }).then(ok => {
+    void confirmWith(this.dialog, { title: `Delete ${t.name}?`, body: TEMPLATE_DELETE_WORDS, confirmLabel: 'Delete', danger: true }).then(ok => {
       if (!ok) return;
       this.api.remove(t.templateId).subscribe({
         next: () => { this.toast.success(`${t.name} deleted.`); this.load(); },
