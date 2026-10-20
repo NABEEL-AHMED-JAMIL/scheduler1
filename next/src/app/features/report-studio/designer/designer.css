@@ -71,8 +71,7 @@ button.rsd-chip:hover { border-color: var(--border-strong); color: var(--text-pr
 .rsd-selection { position: absolute; pointer-events: none; }
 .rsd-grip { position: absolute; top: -0.25rem; left: -1.875rem; pointer-events: auto; display: inline-flex; align-items: center; justify-content: center;
   width: 1.5rem; height: 1.5rem; border-radius: var(--radius-md); background: var(--accent-mark-strong); color: var(--surface-raised); cursor: grab; }
-/* The selected block's data path, as a tag just under the block's frame (drawing 3) -- never over the block's own title,
-   which it covered when it sat on the top edge. Opaque, so a block below it does not show through. */
+/* data path tag: under the frame, not on the title */
 .rsd-binding { position: absolute; left: 0; top: calc(100% + 0.25rem); max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   font-size: 0.6875rem; padding: 0.0625rem 0.375rem; border-radius: var(--radius-sm); z-index: 2;
   background: var(--surface-raised); border: 1px solid var(--focus-ring); color: var(--accent-text); }
@@ -100,3 +99,8 @@ button.rsd-chip:hover { border-color: var(--border-strong); color: var(--text-pr
 .rsd-brand-select { border: 0; background: transparent; color: var(--text-primary); font: inherit; font-weight: 600; padding: 0; max-width: 22rem; min-width: 0; text-overflow: ellipsis; }
 .rsd-brand-select:focus-visible { outline: 2px solid var(--focus-ring, var(--accent-mark)); outline-offset: 2px; }
 .rsd-as-image { margin: 0 0 0.25rem 0.5rem; }
+/* <1440: tools wrap, not scroll away */
+@media (max-width: 1439px) {
+  .rsd-toolbar { flex-wrap: wrap; row-gap: 0.25rem; overflow-x: visible; }
+}
+.rsd-toolbar > .rsd-chip { max-width: 24rem; overflow: hidden; }
