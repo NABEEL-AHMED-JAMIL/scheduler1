@@ -160,6 +160,23 @@ export interface RunRow {
   run: string; subject_type: string | null; subject_id: string | null; model: string; job_queue_id: number | null;
   actor_user_id: number | null; actor_name?: string | null; source: string | null; first: string; last: string;
   tokens_in: number; tokens_out: number; amount: number; lines: RunLine[];
+  /** The pipeline run's schedule (for its link) and pipeline, as Core names them; absent when Core did not answer. */
+  job_id?: number | null; task_detail_id?: number | null; pipeline?: string | null;
+}
+/** The figures billing.json/runs/summary adds up, for the range, a source or a model. */
+export interface ModelCallFigures { calls: number; runs: number; tokens_in: number; tokens_out: number; amount: number; last: string | null; }
+/** One thing that called a model: a saved prompt (subject_id), or every tool run, document extraction, question or console call. */
+export interface ModelCallSource extends ModelCallFigures { subject_type: string | null; subject_id: string | null; label: string; model: string | null; models: number; }
+export interface ModelCallModel extends ModelCallFigures { model: string | null; }
+/** A rate the calls were priced at: a model's own item (model named) or the meter's. */
+export interface ModelCallRate { meter: string; side: 'in' | 'out'; model: string | null; unit: string; per: number; unit_price: number; }
+/**
+ * Cost & usage redesign (2026-10-19): billing.json/runs/summary -- every page of /runs added up by what called the model
+ * and by model, at the same prices (before the month's allowances and tiers).
+ */
+export interface ModelCallSummary {
+  from: string; to: string; zone: string | null; currency: string | null;
+  totals: ModelCallFigures; bySource: ModelCallSource[]; byModel: ModelCallModel[]; rates: ModelCallRate[];
 }
 /** What every usage read names: a range, a workspace for a platform administrator, and how to group. */
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
@@ -170,10 +187,18 @@ export interface RunCostRow {
   jobQueueId: number; jobId: number | null; schedule: string | null; taskDetailId: number | null; pipeline: string | null;
   status?: string | null; startedAt: string | null; lastUsageAt?: string | null; cost: number; meters: RunCostMeter[];
 }
-export interface PipelineCostRow { taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null; }
+export interface PipelineCostRow {
+  taskDetailId: number | null; pipeline: string | null; runs: number; cost: number; lastRunAt: string | null;
+  /** What the pipeline's runs cost by meter, the dearest first (By pipeline's "mostly model tokens"). */
+  meters?: { meter: string; label: string; cost: number }[];
+}
+/** Which runs By run lists: one pipeline's, a search, a status (billing.json/pipelineCosts' taskDetailId, q, status). */
+export interface RunFilter { taskDetailId?: number | null; q?: string | null; status?: string | null; }
 export interface PipelineCosts {
   from: string; to: string; zone: string | null; currency: string | null; total: number; attributed: number; notTiedToRun: number;
-  namesResolved?: boolean; pipelines: PipelineCostRow[]; runs: { total: number; page: number; limit: number; rows: RunCostRow[]; days?: DayTotal[] };
+  namesResolved?: boolean; pipelines: PipelineCostRow[];
+  runs: { total: number; page: number; limit: number; rows: RunCostRow[]; days?: DayTotal[]; cost?: number;
+    statuses?: { status: string | null; runs: number }[]; filter?: RunFilter };
 }
 export interface RunCost extends RunCostRow { from: string | null; to: string | null; currency: string | null; namesResolved?: boolean; }
 
@@ -317,9 +342,17 @@ export class BillingApi {
   }
   /** Rolls every workspace's last two days again: the platform administrator's refresh. */
   /** UX review B9: what each pipeline and run cost, shared out of the same priced lines (adds up to the range's total). */
-  pipelineCosts(q: UsageQuery, page = 1, limit = 25): Observable<ApiResponse<PipelineCosts>> {
+  pipelineCosts(q: UsageQuery, page = 1, limit = 25, filter: RunFilter = {}): Observable<ApiResponse<PipelineCosts>> {
+    const narrow: Record<string, string> = {};
+    if (filter.taskDetailId) narrow['taskDetailId'] = String(filter.taskDetailId);
+    if (filter.q?.trim()) narrow['q'] = filter.q.trim();
+    if (filter.status) narrow['status'] = filter.status;
     return this.http.get<ApiResponse<PipelineCosts>>(`${this.base}/pipelineCosts`, {
-      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...this.tenantParam(q.tenantId) } });
+      params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...narrow, ...this.tenantParam(q.tenantId) } });
+  }
+  /** AI model calls (Cost & usage redesign): the range's calls added up by source and by model, priced as /runs prices them. */
+  runSummary(q: UsageQuery): Observable<ApiResponse<ModelCallSummary>> {
+    return this.http.get<ApiResponse<ModelCallSummary>>(`${this.base}/runs/summary`, { params: { from: q.from, to: q.to, ...this.tenantParam(q.tenantId) } });
   }
   runCost(jobQueueId: number, tenantId?: string | null): Observable<ApiResponse<RunCost>> {
     return this.http.get<ApiResponse<RunCost>>(`${this.base}/runCost`, { params: { jobQueueId: String(jobQueueId), ...this.tenantParam(tenantId) } });

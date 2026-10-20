@@ -24,6 +24,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
     runs: vi.fn((_q: UsageQuery, page: number) => of({ status: API_SUCCESS, data: { total: 3, page, limit: 25, rows: page === 1 ? RUNS.slice(0, 2) : RUNS.slice(2) } })),
     pipelineCosts: vi.fn(() => of({ status: API_SUCCESS, data: { from: '', to: '', zone: null, currency: 'USD', total: 0, attributed: 0, notTiedToRun: 0, pipelines: [], runs: { total: 0, page: 1, limit: 25, rows: [] } } })),
     runCost: vi.fn(() => of({ status: API_SUCCESS, data: null })),
+    runSummary: vi.fn(() => of({ status: API_SUCCESS, data: null })),
     refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
     refreshWorkspace: vi.fn(() => of({ status: API_SUCCESS })),
   };
@@ -265,6 +266,7 @@ describe('Billing, rendered', () => {
       usageByDay: vi.fn(() => of({ status: API_SUCCESS, data: { rows: DAYS } })),
       subjects: vi.fn(() => of({ status: API_SUCCESS, data: { rows: [] } })),
       runs: vi.fn(() => of({ status: API_SUCCESS, data: { total: 0, page: 1, limit: 25, rows: [] } })),
+      runSummary: vi.fn(() => of({ status: API_SUCCESS, data: null })),
       pipelineCosts: vi.fn(() => of({ status: API_SUCCESS, data: { from: '', to: '', zone: null, currency: 'USD', total: 0, attributed: 0, notTiedToRun: 0, pipelines: [], runs: { total: 0, page: 1, limit: 25, rows: [] } } })),
       runCost: vi.fn(() => of({ status: API_SUCCESS, data: null })),
       refreshUsage: vi.fn(() => of({ status: API_SUCCESS })),
@@ -375,41 +377,6 @@ describe('Billing, rendered', () => {
   });
 });
 
-// MIG-308: Cost & usage shows what each model call cost, at its own model's rate.
-describe('Billing, cost per run', () => {
-  it('reads the month\'s runs a page at a time, newest first, and says what each was and cost', () => {
-    const { component, api } = page();
-    expect(api.runs).toHaveBeenCalledTimes(1);
-    expect((api.runs.mock.calls[0] as unknown[])[1]).toBe(1);
-    expect(component.runs().map(r => r.run)).toEqual(['ai-run#2', 'ai-run#1']);
-    expect(component.runsTotal()).toBe(3);
-    expect(component.moreRuns()).toBe(true);
-    const [small, big] = component.runs();
-    expect(small.amount).toBe(0.175);
-    expect(component.runLabel(small)).toBe('Prompt 12');
-    expect(component.runLabel(big)).toBe('Document extraction');
-    expect(component.runActor(small)).toBe('Pipeline');
-    expect(component.runActor(big)).toBe('Alex Tenant');
-    expect(component.runRates(small)).toBe('2,000 in at ' + component.fmtUnitPrice(0.05, 1000, 'token') + ' · 500 out at ' + component.fmtUnitPrice(0.15, 1000, 'token'));
-    component.loadRuns();
-    expect((api.runs.mock.calls[1] as unknown[])[1]).toBe(2);
-    expect(component.runs().map(r => r.run)).toEqual(['ai-run#2', 'ai-run#1', 'ai-adhoc#9']);
-    expect(component.moreRuns()).toBe(false);
-    expect(component.runLabel(component.runs()[2])).toBe('Console call');
-  });
-
-  it('starts the runs again with the month, and says so when they cannot be read', () => {
-    const { component, api } = page(true);
-    api.runs.mockReturnValueOnce(of({ status: 'ERROR', message: 'Pick a workspace first.' }) as unknown as ReturnType<typeof api.runs>);
-    component.shiftMonth(-1);
-    expect(component.runs()).toEqual([]);
-    expect(component.runsError()).toBe('Pick a workspace first.');
-    component.retryRuns();
-    expect(component.runsError()).toBe('');
-    expect(component.runs()).toHaveLength(2);
-  });
-});
-
 // Owner review 2026-10-12: a day clicked on Cost by day filters Line by line to that day, with a chip to clear it.
 describe('Billing, a day picked on the chart', () => {
   const OCT_DAYS = [
@@ -457,36 +424,5 @@ describe('Billing, a day picked on the chart', () => {
     component.pickDay('2026-10-12');
     component.shiftMonth(-1);
     expect(component.selectedDay()).toBeNull();
-  });
-});
-
-// Owner review 2026-10-12 ("date repeat in the cost"): the model calls by billing day, the rate and the person said once.
-describe('Billing, cost per model call by day', () => {
-  const late = (run: string, last: string, actor: string | null = null) => ({ ...RUNS[0], run, last, first: last, actor_name: actor, actor_user_id: actor ? 4640 : null });
-  function withRuns(rows: object[], days: object[] = []) {
-    const harness = page(false, LINES, DAYS, { timeZone: 'America/Chicago', today: '2026-10-12', currentMonth: '2026-10' });
-    harness.api.runs.mockReturnValue(of({ status: API_SUCCESS, data: { total: 870, page: 1, limit: 25, rows, days } }) as unknown as ReturnType<typeof harness.api.runs>);
-    harness.component.retryRuns();
-    return harness;
-  }
-
-  it('cuts the runs into Chicago days, each header counting and totalling the whole day, each row its time', () => {
-    // 04:30 UTC on the 13th is 23:30 on the 12th in Chicago: the 12th's.
-    const { component } = withRuns([late('ai-run#3', '2026-10-13T04:30:00Z'), late('ai-run#2', '2026-10-13T03:50:00Z'), late('ai-run#1', '2026-10-11T15:00:00Z')],
-      [{ day: '2026-10-12', runs: 868, amount: '67.30' }, { day: '2026-10-11', runs: 2, amount: '0.35' }]);
-    const groups = component.runGroups();
-    expect(groups.map(g => [g.day, g.rows.length, g.count, g.amount])).toEqual([['2026-10-12', 2, 868, 67.3], ['2026-10-11', 1, 2, 0.35]]);
-    expect(component.dayTitle(groups[0].day!)).toBe('Mon 12 Oct 2026');
-    expect(component.runTime(groups[0].rows[0])).toBe('23:30');
-    expect(component.runTime(groups[0].rows[1])).toBe('22:50');
-  });
-
-  it('says the rates once above the table, keeps the full pricing on each row, and drops By when one person made every call', () => {
-    const { component } = withRuns([late('ai-run#2', '2026-10-13T03:50:00Z', 'Riverside Health admin'), late('ai-run#1', '2026-10-12T15:00:00Z', 'Riverside Health admin')]);
-    expect(component.runRateNote()).toEqual(['in $0.05 / out $0.15 per 1,000 tokens (llama3.2:3b)']);
-    expect(component.runRates(component.runs()[0])).toContain('2,000 in at $0.05 per 1,000 tokens');
-    expect(component.runActors()).toEqual(['Riverside Health admin']);
-    const mixed = withRuns([late('ai-run#2', '2026-10-13T03:50:00Z', 'Riverside Health admin'), late('ai-run#1', '2026-10-12T15:00:00Z')]).component;
-    expect(mixed.runActors()).toEqual(['Riverside Health admin', 'Pipeline']);
   });
 });

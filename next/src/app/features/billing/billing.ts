@@ -2,15 +2,15 @@ import { Component, LOCALE_ID, OnInit, computed, inject, signal } from '@angular
 import { DecimalPipe } from '@angular/common';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { PipelineCosts } from './pipeline-costs';
+import { ModelCalls } from './model-calls';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
 import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { WorkspaceSelect } from '../../shared/ui/workspace-select';
 import { TableShell } from '../../shared/ui/data-table';
-import { instantOf } from '../../core/instant';
-import { BillingApi, DayRow, DayTotal, MeterLine, PricedWith, RunRow, SubjectRow, UsageQuery } from './billing.service';
-import { HOURS_PER_DAY, dayHeading, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, groupByDay, moneyDigits, pluralUnit, shiftDay, zonedDay, zonedTime, formatShare } from './billing-format';
+import { BillingApi, DayRow, MeterLine, PricedWith, SubjectRow, UsageQuery } from './billing.service';
+import { HOURS_PER_DAY, dayHeading, daysInMonth, firstOfMonth, formatBytes, formatGb, formatMoney, formatQuantity, formatUnitPrice, pluralUnit, shiftDay, formatShare } from './billing-format';
 import { CostByDay } from './cost-by-day';
 import { CostDay, CostView, forecastAtMonthEnd, forecastPace, orderServices, serviceCssColor } from './cost-by-day-model';
 import { WorkspacePicker } from './workspace-picker';
@@ -20,8 +20,6 @@ import { RefreshButton } from '../../shared/ui/refresh-button';
 
 /** How many subjects a line unfolds to: the top buckets, prompts or objects behind it. */
 const SUBJECTS_SHOWN = 25;
-/** How many runs the Cost per run table reads at a time. */
-const RUNS_PAGE = 25;
 
 /** Under half a cent: rounds to $0.00, so it reads "< $0.01" and waits behind the toggle. */
 function isTiny(amount: number): boolean {
@@ -38,7 +36,7 @@ function isTiny(amount: number): boolean {
  */
 @Component({
   selector: 'app-billing',
-  imports: [RefreshButton, PageHeader, Icon, StatTile, WorkspaceSelect, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts],
+  imports: [RefreshButton, PageHeader, Icon, StatTile, WorkspaceSelect, TableShell, CostByDay, DecimalPipe, ServerTimePipe, RouterLink, PipelineCosts, ModelCalls],
   templateUrl: './billing.html',
   styleUrl: './day-table.css',
 })
@@ -197,44 +195,9 @@ export class Billing implements OnInit {
   /** A drill-down that could not be read says so, rather than "No subject recorded". */
   readonly subjectsError = signal('');
 
-  // ---- cost per run (MIG-308) ----
-  readonly runs = signal<RunRow[]>([]);
-  readonly runsTotal = signal(0);
-  readonly runsLoading = signal(false);
-  readonly runsError = signal('');
-  private runsPage = 0;
   readonly Math = Math;
   /** Owner #7: a service's share, "<1%" for a real amount that rounds to nothing. */
   shareLabel(share: number, amount: number): string { return formatShare(share, amount); }
-
-  /** The precision the run Cost column shares, as the lines' Amount does. */
-  readonly runDigits = computed(() => moneyDigits(this.runs().map(r => r.amount)));
-  readonly moreRuns = computed(() => this.runs().length < this.runsTotal());
-  /** Each billing day's count and total over the whole month (Billing's, every page), for the day headers. */
-  readonly runDays = signal<DayTotal[]>([]);
-  /**
-   * Owner review 2026-10-12 ("date repeat in the cost"): the runs cut into billing days -- a header per day saying its calls
-   * and its cost, and only the time on each row, in the workspace's billing zone.
-   */
-  readonly runGroups = computed(() => {
-    const zone = this.timeZone();
-    const totals = new Map(this.runDays().map(d => [d.day, d]));
-    return groupByDay(this.runs(), r => { const at = instantOf(r.last); return at ? zonedDay(at, zone) : null; }).map(g => {
-      const total = g.day ? totals.get(g.day) : undefined;
-      return { ...g, count: total?.runs ?? g.rows.length, amount: Number(total?.amount ?? g.rows.reduce((n, r) => n + r.amount, 0)) };
-    });
-  });
-  /**
-   * The rates the runs were priced at, said once above the table rather than on every row: per model, "in $0.05 / out $0.15
-   * per 1,000 tokens (qwen3:8b)". A model priced at two rates in the range (a card changed) is listed at each.
-   */
-  readonly runRateNote = computed(() => {
-    const notes = new Set<string>();
-    for (const r of this.runs()) notes.add(this.runRateSentence(r));
-    return [...notes].filter(Boolean);
-  });
-  /** Everyone the runs on screen were by; the By column is shown only when it says something. */
-  readonly runActors = computed(() => [...new Set(this.runs().map(r => this.runActor(r)))]);
 
   ngOnInit(): void {
     this.workspaces.ready(() => this.load());
@@ -263,7 +226,6 @@ export class Billing implements OnInit {
   load(): void {
     this.loading.set(true); this.error.set(''); this.openLine.set(null); this.previousTotal.set(null); this.previousDays.set(null);
     this.selectedDay.set(null);
-    this.runs.set([]); this.runsTotal.set(0); this.runDays.set([]); this.runsPage = 0; this.loadRuns();
     const before = this.previousMonth();
     this.api.usageByMeter(this.query(before)).subscribe({
       next: r => { if (r.status === API_SUCCESS) this.previousTotal.set((r.data?.rows ?? []).reduce((n, l) => n + Number(l.amount), 0)); },
@@ -306,62 +268,6 @@ export class Billing implements OnInit {
       error: err => { this.loading.set(false); this.failed(err?.error?.message); },
     });
   }
-
-  /** The next page of the month's model-call runs, each at its own model's rate. */
-  loadRuns(): void {
-    this.runsLoading.set(true); this.runsError.set('');
-    const page = this.runsPage + 1;
-    this.api.runs(this.query(), page, RUNS_PAGE).subscribe({
-      next: r => {
-        this.runsLoading.set(false);
-        if (r.status !== API_SUCCESS) { this.runsError.set(r.message || 'The runs could not be read.'); return; }
-        this.runsPage = page;
-        this.runsTotal.set(Number(r.data?.total ?? 0));
-        if (r.data?.days) this.runDays.set(r.data.days.map(d => ({ day: d.day, runs: Number(d.runs), amount: Number(d.amount ?? 0) })));
-        this.runs.update(list => [...list, ...(r.data?.rows ?? []).map(x => ({
-          ...x, tokens_in: Number(x.tokens_in), tokens_out: Number(x.tokens_out), amount: Number(x.amount),
-          lines: (x.lines ?? []).map(l => ({ ...l, quantity: Number(l.quantity), per: Number(l.per), unit_price: Number(l.unit_price), amount: Number(l.amount) })),
-        }))]);
-      },
-      error: err => { this.runsLoading.set(false); this.runsError.set(err?.error?.message || 'The runs could not be read.'); },
-    });
-  }
-
-  /** After a failed read: the month's runs from the first page. */
-  retryRuns(): void { this.runs.set([]); this.runsTotal.set(0); this.runsPage = 0; this.loadRuns(); }
-
-  /** What a run was: the prompt, the document step, the tool run, the question, or a console call. */
-  runLabel(r: RunRow): string {
-    switch (r.subject_type) {
-      case 'prompt': return r.subject_id && r.subject_id !== 'prompt' ? `Prompt ${r.subject_id}` : 'Prompt';
-      case 'document': return 'Document extraction';
-      case 'tool_run': return 'Tool run';
-      case 'ask': return 'Question';
-      case 'ad-hoc': return 'Console call';
-      default: return r.subject_type || 'Model call';
-    }
-  }
-  /** Each priced line of a run as "2,000 tokens in at $0.40 / 1,000" -- a row's tooltip. */
-  runRates(r: RunRow): string {
-    return r.lines.map(l => `${Math.round(l.quantity).toLocaleString()} ${l.meter.startsWith('ai.tokens.in') ? 'in' : 'out'} at ${this.fmtUnitPrice(l.unit_price, l.per, l.unit)}`).join(' · ');
-  }
-  /** A run's rates as the note above the table says them: "in $0.05 / out $0.15 per 1,000 tokens (qwen3:8b)". */
-  runRateSentence(r: RunRow): string {
-    const side = (inSide: boolean) => r.lines.find(l => l.meter.startsWith('ai.tokens.in') === inSide);
-    const a = side(true), b = side(false);
-    const model = r.model ? ` (${r.model})` : '';
-    const price = (p: number) => formatMoney(p, this.currency(), moneyDigits([p]));
-    if (a && b && a.per === b.per && a.unit === b.unit) {
-      const per = a.per > 1 ? `${a.per.toLocaleString()} ${pluralUnit(a.unit ?? '')}` : a.unit ?? '';
-      return `in ${price(a.unit_price)} / out ${price(b.unit_price)} per ${per}${model}`;
-    }
-    return [a ? `in ${this.fmtUnitPrice(a.unit_price, a.per, a.unit)}` : '', b ? `out ${this.fmtUnitPrice(b.unit_price, b.per, b.unit)}` : '']
-      .filter(Boolean).join(' / ') + model;
-  }
-  /** A run's time of day in the workspace's billing zone, 24-hour. */
-  runTime(r: RunRow): string { const at = instantOf(r.last); return at ? zonedTime(at, this.timeZone()) : ''; }
-  fmtRunAmount(value: number): string { return formatMoney(value, this.currency(), this.runDigits()); }
-  runActor(r: RunRow): string { return r.actor_name || (r.actor_user_id ? `User #${r.actor_user_id}` : 'Pipeline'); }
 
   private failed(message?: string): void {
     if ((message || '').includes('not configured')) { this.notConfigured.set(true); return; }

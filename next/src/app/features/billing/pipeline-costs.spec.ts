@@ -3,23 +3,32 @@ import { Component, provideZonelessChangeDetection, signal } from '@angular/core
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
-import { BillingApi, UsageQuery } from './billing.service';
-import { PipelineCosts, meterSummary, shareOf } from './pipeline-costs';
+import { BillingApi, RunFilter, UsageQuery } from './billing.service';
+import { PIPELINES_SHOWN, PipelineCosts, meterChips, meterSummary, mostly, reconcile, shareOf } from './pipeline-costs';
 
-/** UX review B9 (BL1): what each pipeline and run cost in Cost & usage, adding up to the month (Riverside, 2026-10). */
+/** UX review B9 (BL1), redesigned 2026-10-19: what each pipeline and run cost in Cost & usage, adding up to the month (Riverside, 2026-10). */
+const pipeline = (id: number, name: string, runs: number, cost: number, meters = [{ meter: 'ai.tokens.out', label: 'Model tokens out', cost }]) =>
+  ({ taskDetailId: id, pipeline: name, runs, cost, lastRunAt: '2026-10-20T00:26:00Z', meters });
 const COSTS = {
-  from: '2026-10-01', to: '2026-10-31', zone: 'America/Chicago', currency: 'USD', total: 75.4916, attributed: 22.6418, notTiedToRun: 52.8498,
+  from: '2026-10-01', to: '2026-10-31', zone: 'America/Chicago', currency: 'USD', total: 205.80331, attributed: 52.91449, notTiedToRun: 152.88882,
   namesResolved: true,
   pipelines: [
-    { taskDetailId: 1932, pipeline: 'Patient 360', runs: 10, cost: 9.8153, lastRunAt: '2026-10-12T11:09:18Z' },
-    { taskDetailId: 1933, pipeline: 'X-ray triage', runs: 102, cost: 5.73825, lastRunAt: '2026-10-07T14:49:59Z' },
+    pipeline(1932, 'Patient 360', 18, 15.87, [{ meter: 'ai.tokens.out', label: 'Model tokens out', cost: 8 }, { meter: 'ai.tokens.in', label: 'Model tokens in', cost: 7.8 },
+      { meter: 'pipeline.runs', label: 'Pipeline runs', cost: 0.07 }]),
+    pipeline(1933, 'X-ray triage', 102, 5.73825, [{ meter: 'convert.documents', label: 'Documents converted', cost: 5.73825 }]),
+    ...Array.from({ length: 8 }, (_, i) => pipeline(2000 + i, `PDF bench ${i}`, 2, 0.002, [{ meter: 'pipeline.runs', label: 'Pipeline runs', cost: 0.002 }])),
   ],
-  runs: { total: 200, page: 1, limit: 25, rows: [
-    { jobQueueId: 8214, jobId: 2907, schedule: 'Patient 360 (daily)', taskDetailId: 1932, pipeline: 'Patient 360', status: 'Completed',
-      startedAt: '2026-10-12T11:08:00Z', cost: 0.84475, meters: [
-        { meter: 'ai.tokens.in', label: 'Model tokens in', quantity: 1000, unit: 'token', cost: 0.6 },
-        { meter: 'pipeline.runs', label: 'Pipeline runs', quantity: 1, unit: 'run', cost: 0.002 }] },
-  ] },
+  runs: { total: 300, page: 1, limit: 25, cost: 52.91449, statuses: [{ status: 'Completed', runs: 290 }, { status: 'Failed', runs: 10 }], rows: [
+    { jobQueueId: 8390, jobId: 2907, schedule: 'Patient 360 (daily)', taskDetailId: 1932, pipeline: 'Patient 360', status: 'Completed',
+      startedAt: '2026-10-20T00:26:00Z', cost: 0.82, meters: [
+        { meter: 'ai.tokens.out', label: 'Model tokens out', quantity: 2000, unit: 'token', cost: 0.40 },
+        { meter: 'ai.tokens.in', label: 'Model tokens in', quantity: 8000, unit: 'token', cost: 0.40 },
+        { meter: 'convert.documents', label: 'Documents converted', quantity: 1, unit: 'document', cost: 0.0195 },
+        { meter: 'storage.ops.read', label: 'Storage reads', quantity: 10, unit: 'op', cost: 0.0004 },
+        { meter: 'pipeline.runs', label: 'Pipeline runs', quantity: 1, unit: 'run', cost: 0.0001 }] },
+    { jobQueueId: 8389, jobId: 2911, schedule: 'Call API check task', taskDetailId: 1940, pipeline: 'Call API check task', status: 'Completed',
+      startedAt: '2026-10-20T00:16:00Z', cost: 0.002, meters: [{ meter: 'pipeline.runs', label: 'Pipeline runs', quantity: 1, unit: 'run', cost: 0.002 }] },
+  ], days: [{ day: '2026-10-19', runs: 9, cost: 1.84 }] },
 };
 
 @Component({
@@ -33,7 +42,7 @@ class Host {
 
 function mount(run: number | null = null) {
   const api = {
-    pipelineCosts: vi.fn(() => of({ status: 'SUCCESS', message: '', data: COSTS })),
+    pipelineCosts: vi.fn((_q: UsageQuery, _page: number, _limit: number, _filter?: RunFilter) => of({ status: 'SUCCESS', message: '', data: COSTS })),
     runCost: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...COSTS.runs.rows[0], from: '2026-10-01', to: '2026-10-31', currency: 'USD' } })),
   };
   TestBed.resetTestingModule();
@@ -44,50 +53,128 @@ function mount(run: number | null = null) {
   return { fixture, api, el: fixture.nativeElement as HTMLElement };
 }
 
+/** An element's text as it reads, a space between elements (textContent runs "2026" and "9 runs" together). */
+const text = (e: Element | null) => {
+  if (!e) return '';
+  const parts: string[] = [];
+  const walk = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) parts.push(n.textContent ?? '');
+  return parts.join(' ').replace(/\s+/g, ' ').trim();
+};
+
 describe('Cost & usage: cost by pipeline and run', () => {
-  it('lists the pipelines by cost and the runs, and says the share-out adds up to the month', async () => {
+  it('splits the month into a bar whose figures add up to its total as shown', async () => {
     const { fixture, el, api } = mount();
     await fixture.whenStable();
-    expect(api.pipelineCosts).toHaveBeenCalledWith({ from: '2026-10-01', to: '2026-10-31', tenantId: null }, 1, 25);
-    expect(el.querySelector('[data-test="costs-reconcile"]')?.textContent).toContain('$22.64 of $75.49 came from pipeline runs; $52.85 is not tied to a run');
-    const pipelines = [...el.querySelectorAll('[data-test="cost-by-pipeline"] tbody tr')].map(r => r.textContent!.replace(/\s+/g, ' ').trim());
-    expect(pipelines[0]).toContain('Patient 360');
-    expect(pipelines[0]).toContain('$9.82');
-    expect(pipelines[0]).toContain('13%');
-    const run = el.querySelector('[data-test="cost-by-run"] tbody tr:not(.day-group)')!;
-    expect(run.querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2907/runs/8214');
-    expect(run.textContent).toContain('$0.84');
+    expect(api.pipelineCosts).toHaveBeenCalledWith({ from: '2026-10-01', to: '2026-10-31', tenantId: null }, 1, 25, { taskDetailId: null, q: '', status: null });
+    expect(text(el.querySelector('[data-test="recon-run"]'))).toBe('From pipeline runs $52.91 · 26%');
+    expect(text(el.querySelector('[data-test="recon-other"]'))).toBe('Not tied to a run $152.89 · 74% (storage kept, analytics, the console\'s reads, API calls)');
+    expect(text(el.querySelector('[data-test="recon-total"]'))).toBe('Month\'s total $205.80');
+    // Cents that add up as shown, whichever way the fifth places round.
+    const r = reconcile(10.005, 3.335);
+    expect(Math.round((r.run + r.other) * 100)).toBe(Math.round(r.total * 100));
+    expect(reconcile(100, 0.2).runShare).toBe('<1%');
+    expect(reconcile(100, 0.2).otherShare).toBe('>99%');
+    expect(reconcile(0, 0)).toMatchObject({ run: 0, other: 0, runWidth: 0 });
+  });
+
+  it('lists the dearest eight pipelines full width with their average, share and what the money went on, then all of them', async () => {
+    const { fixture, el } = mount();
+    await fixture.whenStable();
+    let rows = [...el.querySelectorAll('[data-test="pipeline-row"]')];
+    expect(rows).toHaveLength(PIPELINES_SHOWN);
+    expect(text(rows[0])).toContain('Patient 360');
+    expect(text(rows[0])).toContain('last run 19 Oct, 19:26');
+    expect(text(rows[0])).toContain('$15.87');
+    expect(text(rows[0].querySelector('[data-test="per-run"]'))).toBe('$0.88');
+    expect(text(rows[0])).toContain('8%');
+    expect(text(rows[0].querySelector('[data-test="mostly"]'))).toBe('mostly model tokens');
+    // A pipeline total under a cent stays exact; its average reads "<$0.01".
+    expect(text(rows[2])).toContain('$0.0020');
+    expect(text(rows[2].querySelector('[data-test="per-run"]'))).toBe('<$0.01');
+    expect(text(rows[2])).toContain('<1%');
+    const all = el.querySelector('[data-test="all-pipelines"]') as HTMLButtonElement;
+    expect(text(all)).toBe('Show all 10 pipelines');
+    all.click();
+    fixture.detectChanges();
+    rows = [...el.querySelectorAll('[data-test="pipeline-row"]')];
+    expect(rows).toHaveLength(10);
+  });
+
+  it('narrows By run to a pipeline picked above, with a chip that takes it off, on the server', async () => {
+    const { fixture, el, api } = mount();
+    await fixture.whenStable();
+    (el.querySelectorAll('[data-test="pipeline-runs"]')[0] as HTMLButtonElement).click();
+    fixture.detectChanges();
+    await fixture.whenStable();
+    expect(api.pipelineCosts).toHaveBeenLastCalledWith(expect.anything(), 1, 25, { taskDetailId: 1932, q: '', status: null });
+    expect(text(el.querySelector('[data-test="pipeline-chip"]'))).toContain('Patient 360 · $15.87');
+    expect(el.querySelectorAll('[data-test="pipeline-row"]')[0].classList.contains('is-picked')).toBe(true);
+    (el.querySelector('[data-test="pipeline-chip-clear"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(api.pipelineCosts).toHaveBeenLastCalledWith(expect.anything(), 1, 25, { taskDetailId: null, q: '', status: null });
+    expect(el.querySelector('[data-test="pipeline-chip"]')).toBeNull();
+    // A click on the row does the same; the pipeline's own link does not.
+    (el.querySelectorAll('[data-test="pipeline-row"]')[1] as HTMLElement).click();
+    fixture.detectChanges();
+    expect(api.pipelineCosts).toHaveBeenLastCalledWith(expect.anything(), 1, 25, { taskDetailId: 1933, q: '', status: null });
+  });
+
+  it('filters By run by status and by a search, the search once typing stops', async () => {
+    const { fixture, el, api } = mount();
+    await fixture.whenStable();
+    vi.useFakeTimers();
+    try {
+      const select = el.querySelector('[data-test="run-status"]') as HTMLSelectElement;
+      expect([...select.options].map(o => o.textContent!.trim())).toEqual(['All statuses', 'Completed (290)', 'Failed (10)']);
+      select.value = 'Failed';
+      select.dispatchEvent(new Event('change'));
+      fixture.detectChanges();
+      expect(api.pipelineCosts).toHaveBeenLastCalledWith(expect.anything(), 1, 25, { taskDetailId: null, q: '', status: 'Failed' });
+      const calls = api.pipelineCosts.mock.calls.length;
+      const search = el.querySelector('[data-test="run-search"]') as HTMLInputElement;
+      search.value = '#8390';
+      search.dispatchEvent(new Event('input'));
+      expect(api.pipelineCosts.mock.calls.length).toBe(calls);
+      vi.advanceTimersByTime(400);
+      expect(api.pipelineCosts).toHaveBeenLastCalledWith(expect.anything(), 1, 25, { taskDetailId: null, q: '#8390', status: 'Failed' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('shows each run\'s cost as at most three chips that never cut a word, sub-cent amounts as <$0.01', async () => {
+    const { fixture, el } = mount();
+    await fixture.whenStable();
+    const rows = [...el.querySelectorAll('[data-test="cost-by-run"] tbody tr:not(.day-group)')];
+    expect(rows[0].querySelector('a')?.getAttribute('href')).toBe('/pipelines/schedules/2907/runs/8390');
+    const chips = [...rows[0].querySelectorAll('[data-test="run-meters"] .meter-chip')].map(c => text(c));
+    // Model tokens in and out are one chip; the four chips that leaves are three and "+1".
+    expect(chips).toEqual(['Model tokens $0.80', 'Documents converted $0.02', 'Storage reads <$0.01', '+1']);
+    expect(rows[0].querySelector('[data-test="more-meters"]')?.getAttribute('title')).toBe('Pipeline runs $0.00010');
+    expect(text(rows[0].querySelectorAll('td')[5])).toBe('$0.82');
+    expect(text(rows[1].querySelectorAll('td')[5])).toBe('<$0.01');
+    expect(rows[1].querySelectorAll('td')[5].getAttribute('title')).toBe('$0.00200');
+    // The day header keeps its exact total, over the whole day (Billing's, every page).
+    expect(text(el.querySelector('[data-test="run-day-group"]'))).toBe('Mon 19 Oct 2026 9 runs · $1.84');
+    expect([...el.querySelectorAll('[data-test="run-started"]')].map(t => text(t))).toEqual(['19:26', '19:16']);
     expect(el.querySelector('[data-test="more-run-costs"]')).not.toBeNull();
   });
 
   it('shows a run opened from its run page on its own first', async () => {
-    const { fixture, el, api } = mount(8214);
+    const { fixture, el, api } = mount(8390);
     await fixture.whenStable();
-    expect(api.runCost).toHaveBeenCalledWith(8214, null);
-    expect(el.querySelector('[data-test="run-cost"]')?.textContent).toContain('Run #8214');
-    expect(el.querySelector('[data-test="run-cost"]')?.textContent).toContain('$0.84');
+    expect(api.runCost).toHaveBeenCalledWith(8390, null);
+    expect(text(el.querySelector('[data-test="run-cost"]'))).toContain('Run #8390');
+    expect(text(el.querySelector('[data-test="run-cost"]'))).toContain('$0.82');
   });
 
-  // Owner review 2026-10-12: By run by the Chicago day each run started, a header per day counting and totalling all of
-  // it (Billing's runs.days, every page), and only the time on the row.
-  it('groups the runs by billing day, the time of day on each row', async () => {
-    const late = { ...COSTS.runs.rows[0], jobQueueId: 8215, startedAt: '2026-10-13T04:30:00Z', cost: 0.1 };
-    const costs = { ...COSTS, runs: { ...COSTS.runs, rows: [late, COSTS.runs.rows[0]],
-      days: [{ day: '2026-10-12', runs: 12, cost: 1.23 }] } };
-    const { fixture, el, api } = mount();
-    api.pipelineCosts.mockReturnValue(of({ status: 'SUCCESS', message: '', data: costs as typeof COSTS }));
-    fixture.componentInstance.q.set({ from: '2026-10-01', to: '2026-10-31', tenantId: '2960' });
-    fixture.detectChanges();
-    await fixture.whenStable();
-    const headers = [...el.querySelectorAll('[data-test="run-day-group"]')].map(h => [...h.querySelectorAll('span')].map(x => x.textContent!.trim()).join(' | '));
-    // 04:30 UTC on the 13th is 23:30 on the 12th in Chicago: one day, both runs.
-    expect(headers).toEqual(['Mon 12 Oct 2026 | 12 runs · $1.23']);
-    const times = [...el.querySelectorAll('[data-test="run-started"]')].map(t => t.textContent!.trim());
-    expect(times).toEqual(['23:30', '06:08']);
-  });
-
-  it('words a run\'s meters, the costliest first, and a share of the total', () => {
-    expect(meterSummary(COSTS.runs.rows[0] as any)).toBe('Model tokens in $0.60 · Pipeline runs $0.0020');
+  it('words a run\'s meters and a pipeline\'s, the costliest first, and a share of the total', () => {
+    expect(meterSummary(COSTS.runs.rows[0] as never)).toBe('Model tokens $0.80 · Documents converted $0.02 · Storage reads <$0.01 · 1 more');
+    expect(meterChips([]).length).toBe(0);
+    expect(mostly(COSTS.pipelines[1] as never)).toBe('mostly documents converted');
+    expect(mostly({ ...COSTS.pipelines[1], meters: [{ meter: 'api.calls', label: 'API calls', cost: 1 }] } as never)).toBe('mostly API calls');
+    expect(mostly({ ...COSTS.pipelines[1], meters: [] } as never)).toBe('');
     expect(shareOf(9.8153, 75.4916)).toBe(13);
     expect(shareOf(1, 0)).toBe(0);
   });

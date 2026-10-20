@@ -213,64 +213,9 @@
       <app-pipeline-costs [query]="usageQuery()" [runId]="runParam()" [currency]="currency()" />
     </div>
 
-    <div class="mt-4">
-      <app-table-shell heading="Cost per model call" [shown]="runs().length" [total]="runsTotal()" [loading]="runsLoading() && !runs().length"
-                       [isEmpty]="!runs().length" [error]="runsError()" (retry)="retryRuns()" emptyMessage="No model calls in this month yet." emptyIcon="chart">
-        <ng-container toolbar>
-          <span class="text-xs text-[color:var(--text-muted)]">Each model call at its own model's rate — before the month's allowances and tiers, which the lines above apply.</span>
-        </ng-container>
-        @if (runRateNote().length) {
-          <!-- Owner review 2026-10-12: the rate is said once here, not on every row; a row's tooltip has its full pricing. -->
-          <p class="px-4 py-2 text-xs text-[color:var(--text-secondary)] border-b border-subtle" data-test="run-rates">
-            <b class="font-medium">Rates:</b> {{ runRateNote().join(' · ') }}
-            @if (runActors().length === 1) { <span class="text-[color:var(--text-muted)]"> · every call by {{ runActors()[0] }}</span> }
-          </p>
-        }
-        <div class="day-table-scroll" data-test="model-call-scroll">
-        <table class="table-modern day-table" data-test="model-calls">
-          <thead>
-            <tr>
-              <th class="w-20">Time</th>
-              <th>Run</th>
-              <th>Model</th>
-              <th class="text-right">Tokens in</th>
-              <th class="text-right">Tokens out</th>
-              @if (runActors().length > 1) { <th class="hidden lg:table-cell">By</th> }
-              <th class="text-right">Cost</th>
-            </tr>
-          </thead>
-          @for (g of runGroups(); track g.day) {
-            <tbody>
-              <tr class="day-group" data-test="day-group">
-                <th [attr.colspan]="runActors().length > 1 ? 7 : 6" scope="colgroup">
-                  <div class="day-group-line"><span>{{ g.day ? dayTitle(g.day) : 'Time not known' }}</span>
-                    <span class="day-group-sum">{{ g.count | number: '1.0-0' }} {{ g.count === 1 ? 'call' : 'calls' }} · {{ fmtMoney(g.amount) }}</span></div>
-                </th>
-              </tr>
-              @for (r of g.rows; track r.run) {
-                <tr [title]="runRates(r)">
-                  <td class="text-xs tabular whitespace-nowrap" data-test="run-time">{{ runTime(r) }}</td>
-                  <td>
-                    <div class="font-medium">{{ runLabel(r) }}</div>
-                    <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}@if (r.job_queue_id) { · run {{ r.job_queue_id }} }</div>
-                  </td>
-                  <td class="mono text-xs">{{ r.model || '—' }}</td>
-                  <td class="text-right tabular">{{ r.tokens_in | number: '1.0-0' }}</td>
-                  <td class="text-right tabular">{{ r.tokens_out | number: '1.0-0' }}</td>
-                  @if (runActors().length > 1) { <td class="hidden lg:table-cell text-xs text-[color:var(--text-muted)]">{{ runActor(r) }}</td> }
-                  <td class="text-right tabular font-medium">{{ fmtRunAmount(r.amount) }}</td>
-                </tr>
-              }
-            </tbody>
-          }
-        </table>
-        </div>
-        @if (moreRuns()) {
-          <div class="p-3 text-center">
-            <button type="button" class="btn btn-default btn-sm" (click)="loadRuns()" [disabled]="runsLoading()">{{ runsLoading() ? 'Reading…' : 'Show more runs' }}</button>
-          </div>
-        }
-      </app-table-shell>
+    <!-- Cost & usage redesign (2026-10-19): AI model calls -- the month's calls by what called the model, and every call. -->
+    <div class="mt-6">
+      <app-model-calls [query]="usageQuery()" [currency]="currency()" [timeZone]="timeZone()" />
     </div>
 
     <p class="text-xs text-[color:var(--text-muted)] mt-3 max-w-3xl">

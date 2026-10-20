@@ -20,6 +20,21 @@ export function formatMoney(value: number, currency = 'USD', digits?: number): s
   return new Intl.NumberFormat(undefined, { style: 'currency', currency, minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
 }
 
+/**
+ * A run's or a row's amount as a cell reads it (Cost & usage redesign, 2026-10-19): cents, and "<$0.01" for a real amount
+ * under a cent -- "$0.0020" beside "$0.82" was noise. The exact figure goes on the cell's tooltip (`formatMoneyExact`).
+ * A day's or a pipeline's total keeps `formatMoney`, which shows a sub-cent total exactly.
+ */
+export function formatMoneyCell(value: number, currency = 'USD'): string {
+  const v = Number(value) || 0;
+  return v !== 0 && Math.abs(v) < 0.01 ? `<${formatMoney(0.01, currency, 2)}` : formatMoney(v, currency, 2);
+}
+
+/** An amount to the meter's fifth place, for a tooltip. */
+export function formatMoneyExact(value: number, currency = 'USD'): string {
+  return formatMoney(Number(value) || 0, currency, 5);
+}
+
 /** The precision a column of amounts shares: four decimals when any real amount in it is under a cent. */
 export function moneyDigits(values: number[]): number {
   return values.some(v => { const abs = Math.abs(Number(v) || 0); return abs > 0 && abs < 0.01; }) ? 4 : 2;
@@ -174,6 +189,11 @@ export function zonedDay(at: Date, zone: string | null | undefined): string {
 /** The time of day an instant is in a zone, 24-hour: "22:50". */
 export function zonedTime(at: Date, zone: string | null | undefined): string {
   return zoned(zone, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(at);
+}
+
+/** An instant as a recent-activity cell writes it, 24-hour, in a zone (the workspace's): "19 Oct, 19:26". */
+export function zonedStamp(at: Date, zone: string | null | undefined): string {
+  return `${zoned(zone, { day: 'numeric', month: 'short' }).format(at)}, ${zonedTime(at, zone)}`;
 }
 
 /** A billing day as a day header names it: "Mon 12 Oct 2026". */
