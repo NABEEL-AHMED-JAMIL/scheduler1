@@ -1,10 +1,10 @@
 import { Component, signal } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
 
-type View = 'dashboard' | 'jobs' | 'reports';
+type View = 'dashboard' | 'jobs' | 'review' | 'reports';
 
 /**
- * A working stand-in for the console, shown on the landing page.
+ * A working stand-in for the console, shown on the landing page: Home, Runs, Review and Reports, as the menu names them.
  *
  * Built rather than screenshotted on purpose: it is drawn with the same tokens as the real
  * screens, so it follows the viewer's theme and cannot drift out of date the way an image
@@ -26,14 +26,9 @@ type View = 'dashboard' | 'jobs' | 'reports';
     .panel-head { background: color-mix(in srgb, var(--preview-line) 3.5%, transparent);
                   border-bottom: 1px solid color-mix(in srgb, var(--preview-line) 7%, transparent); }
     .panel-row  { border-bottom: 1px solid color-mix(in srgb, var(--preview-line) 5%, transparent); }
-    .frame      { border: 1px solid color-mix(in srgb, var(--preview-line) 8%, transparent); }
-    .frame-head { background: color-mix(in srgb, var(--preview-line) 3%, transparent); }
     .dim        { color: color-mix(in srgb, var(--preview-ink) 55%, transparent); }
     .key        { color: color-mix(in srgb, var(--preview-ink) 92%, transparent); }
     .live       { background: var(--preview-ok-bar); }
-    .is-ok      { color: var(--preview-ok); }
-    .is-crit    { color: var(--preview-fail); }
-    .is-warn    { color: var(--preview-warn); }
 
     .tab        { color: color-mix(in srgb, var(--preview-ink) 60%, transparent); border-bottom: 2px solid transparent; }
     .tab:hover  { color: color-mix(in srgb, var(--preview-ink) 85%, transparent); }
@@ -45,14 +40,11 @@ type View = 'dashboard' | 'jobs' | 'reports';
                   color: color-mix(in srgb, var(--preview-ink) 72%, transparent); }
     .chip-fail  { background: color-mix(in srgb, var(--preview-fail-fill) 18%, transparent); color: var(--preview-fail); }
 
-    .bar, .bar-idle, .bar-ok, .bar-fail, .bar-stop, .bar-skip { border-radius: var(--radius-sm); }
+    .bar, .bar-idle, .bar-ok, .bar-fail { border-radius: var(--radius-sm); }
     .bar        { background: color-mix(in srgb, var(--preview-bar) 85%, transparent); }
     .bar-idle   { background: color-mix(in srgb, var(--preview-line) 14%, transparent); }
     .bar-ok     { background: color-mix(in srgb, var(--preview-ok-bar) 80%, transparent); }
     .bar-fail   { background: color-mix(in srgb, var(--preview-fail-fill) 55%, transparent); }
-    .bar-stop   { background: color-mix(in srgb, var(--preview-stop) 35%, transparent); }
-    .bar-skip   { background: color-mix(in srgb, var(--preview-warn-fill) 55%, transparent); }
-    .bars       { height: 44px; }
 
     /* Swapping views should feel like the screen changed, not like the page reloaded. */
     .view { animation: fade .28s ease both; }
@@ -112,7 +104,7 @@ type View = 'dashboard' | 'jobs' | 'reports';
         @case ('jobs') {
           <div class="view">
             <div class="px-4 py-2.5 flex items-center gap-3 text-[11px] dim uppercase tracking-wider">
-              <span class="flex-1">Schedule</span>
+              <span class="flex-1">Pipeline</span>
               <span class="w-24 hidden sm:block">When</span>
               <span class="w-20 text-right">Status</span>
             </div>
@@ -120,7 +112,7 @@ type View = 'dashboard' | 'jobs' | 'reports';
               <div class="panel-row px-4 py-3 flex items-center gap-3">
                 <div class="flex-1 min-w-0">
                   <div class="text-[13px] key truncate">{{ row.name }}</div>
-                  <div class="text-[11px] dim mono truncate">{{ row.task }}</div>
+                  <div class="text-[11px] dim mono truncate">{{ row.trigger }}</div>
                 </div>
                 <div class="w-24 hidden sm:block text-[11px] dim mono">{{ row.schedule }}</div>
                 <div class="w-20 flex justify-end">
@@ -132,56 +124,52 @@ type View = 'dashboard' | 'jobs' | 'reports';
           </div>
         }
 
-        @case ('reports') {
-          <div class="view p-4">
-            <div class="flex items-center gap-2 text-[11px] dim mb-3">
-              <app-icon name="filter" size="0.85em" />
-              <span class="mono">rows: task</span>
-              <span class="mono">columns: outcome</span>
-              <span class="mono ml-auto">measure: count</span>
+        @case ('review') {
+          <div class="view">
+            <div class="px-4 py-2.5 flex items-center gap-3 text-[11px] dim uppercase tracking-wider">
+              <span class="flex-1">Waiting for review</span>
+              <span class="w-20 hidden sm:block">Kind</span>
+              <span class="w-16 text-right">Waiting</span>
             </div>
-            <div class="overflow-hidden rounded-sm frame">
-              <div class="px-3 py-2 flex items-center gap-3 text-[11px] dim uppercase tracking-wider frame-head">
-                <span class="flex-1">Task</span>
-                <!-- The same five outcome columns the real report has -- one per JobStatus that
-                     ends a run -- so the preview does not promise a simpler table than the one
-                     behind the sign-in. Abbreviated to fit a 500px panel; the full words are
-                     in the title. -->
-                <span class="w-12 text-right" title="Completed">Done</span>
-                <span class="w-10 text-right" title="Failed">Failed</span>
-                <span class="w-10 text-right" title="Interrupted">Intr.</span>
-                <span class="w-10 text-right" title="Skipped">Skip</span>
-                <span class="w-10 text-right" title="Missed">Miss</span>
-                <span class="w-10 text-right">Total</span>
+            @for (row of reviewRows; track row.name) {
+              <div class="panel-row px-4 py-3 flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] key truncate">{{ row.name }}</div>
+                  <div class="text-[11px] dim truncate">{{ row.note }}</div>
+                </div>
+                <div class="w-20 hidden sm:block"><span class="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap" [class]="row.chip">{{ row.kind }}</span></div>
+                <div class="w-16 text-right text-[11px] dim mono">{{ row.waiting }}</div>
               </div>
-              @for (row of reportRows; track row.task) {
-                <div class="px-3 py-2 flex items-center gap-3 text-[12px] panel-row">
-                  <span class="flex-1 key truncate">{{ row.task }}</span>
-                  <span class="w-12 text-right mono is-ok">{{ row.done }}</span>
-                  <span class="w-10 text-right mono" [class.is-crit]="!!row.failed" [class.dim]="!row.failed">{{ row.failed }}</span>
-                  <span class="w-10 text-right mono" [class.is-crit]="!!row.stopped" [class.dim]="!row.stopped">{{ row.stopped }}</span>
-                  <span class="w-10 text-right mono" [class.is-warn]="!!row.skipped" [class.dim]="!row.skipped">{{ row.skipped }}</span>
-                  <span class="w-10 text-right mono" [class.is-warn]="!!row.missed" [class.dim]="!row.missed">{{ row.missed }}</span>
-                  <span class="w-10 text-right mono key">{{ total(row) }}</span>
-                </div>
-              }
+            }
+            <div class="px-4 py-3 flex items-center gap-2 text-[11px] dim">
+              <app-icon name="sparkle" size="0.85em" />
+              <span>A model's answer is a draft until a person approves it</span>
             </div>
-            <!-- Scaled against the largest column rather than by a fixed divisor: at done/2 a
-                 96 became 48px inside a 40px box, so every bar overflowed and they all looked
-                 the same height. -->
-            <div class="mt-3 flex items-end gap-1.5 bars">
-              @for (row of reportRows; track row.task) {
-                <div class="flex-1 flex flex-col justify-end gap-px">
-                  <div class="bar-skip" [style.height.px]="barPx(row.skipped + row.missed)"></div>
-                  <div class="bar-stop" [style.height.px]="barPx(row.stopped)"></div>
-                  <div class="bar-fail" [style.height.px]="barPx(row.failed)"></div>
-                  <div class="bar-ok" [style.height.px]="barPx(row.done)"></div>
-                </div>
-              }
+          </div>
+        }
+
+        @case ('reports') {
+          <div class="view">
+            <div class="px-4 py-2.5 flex items-center gap-3 text-[11px] dim uppercase tracking-wider">
+              <span class="flex-1">Report</span>
+              <span class="w-14 hidden sm:block">Version</span>
+              <span class="w-24 text-right">Approval</span>
             </div>
-            <div class="mt-3 flex items-center gap-2 text-[11px] dim">
-              <app-icon name="download" size="0.85em" />
-              <span>Export as CSV or XLSX, to your machine or a bucket</span>
+            @for (row of reportRows; track row.name) {
+              <div class="panel-row px-4 py-3 flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                  <div class="text-[13px] key truncate">{{ row.name }}</div>
+                  <div class="text-[11px] dim truncate">{{ row.from }}</div>
+                </div>
+                <div class="w-14 hidden sm:block text-[11px] dim mono">v{{ row.version }}</div>
+                <div class="w-24 flex justify-end">
+                  <span class="text-[11px] px-2 py-0.5 rounded-full whitespace-nowrap" [class]="row.chip">{{ row.state }}</span>
+                </div>
+              </div>
+            }
+            <div class="px-4 py-3 flex items-center gap-2 text-[11px] dim">
+              <app-icon name="shield" size="0.85em" />
+              <span>Approved by someone other than who generated it, and digitally signed</span>
             </div>
           </div>
         }
@@ -193,49 +181,42 @@ export class ConsolePreview {
   readonly view = signal<View>('dashboard');
 
   readonly tabs: { id: View; label: string }[] = [
-    { id: 'dashboard', label: 'Dashboard' },
-    { id: 'jobs', label: 'Schedules' },
+    { id: 'dashboard', label: 'Home' },
+    { id: 'jobs', label: 'Runs' },
+    { id: 'review', label: 'Review' },
     { id: 'reports', label: 'Reports' },
   ];
 
   readonly tiles = [
-    { label: 'Total schedules', value: 40 },
-    { label: 'Active', value: 30 },
-    { label: 'Running', value: 2 },
+    { label: 'Schedules', value: 40 },
+    { label: 'Running now', value: 2 },
+    { label: 'To review', value: 7 },
     { label: 'Completed', value: 914 },
   ];
 
   /** Relative heights; a zero is a quiet day rather than a missing one. */
   readonly weekBars = [38, 62, 45, 88, 54, 0, 0, 71, 96, 60, 42, 78];
 
+  /** Runs › Latest: each schedule's newest run, by its pipeline. Invented, domain-neutral rows (b97b1880). */
   readonly jobRows = [
-    { name: 'Sales orders — nightly load', task: 'Orders Import',
-      schedule: 'Daily 03:00', status: 'Completed', chip: 'chip-ok' },
-    { name: 'Customer records — hourly refresh', task: 'Customer Sync',
-      schedule: 'Hourly', status: 'Running', chip: 'chip-run' },
-    { name: 'Inventory snapshot — Mon and Thu', task: 'Inventory Snapshot',
-      schedule: 'Mon, Thu', status: 'Queued', chip: 'chip-wait' },
-    { name: 'Web log archive — fortnightly', task: 'Log Archive',
-      schedule: 'Every 2 wks', status: 'Failed', chip: 'chip-fail' },
-    { name: 'Ledger export — month end', task: 'Ledger Export',
-      schedule: 'Last day', status: 'Completed', chip: 'chip-ok' },
+    { name: 'Orders import', trigger: 'Nightly load', schedule: 'Daily 03:00', status: 'Completed', chip: 'chip-ok' },
+    { name: 'Customer sync', trigger: 'Hourly refresh', schedule: 'Hourly', status: 'Running', chip: 'chip-run' },
+    { name: 'Supplier invoices', trigger: 'Email-in', schedule: 'On arrival', status: 'To review', chip: 'chip-wait' },
+    { name: 'Web log archive', trigger: 'Fortnightly', schedule: 'Every 2 wks', status: 'Failed', chip: 'chip-fail' },
+    { name: 'Ledger export', trigger: 'Month end', schedule: 'Last day', status: 'Completed', chip: 'chip-ok' },
   ];
 
-  /** Tallest column fills the box; everything else is drawn in proportion to it. */
-  barPx(value: number): number {
-    const tallest = Math.max(...this.reportRows.map(r => this.total(r)));
-    return Math.round((value / tallest) * 42);
-  }
+  /** Waiting for a person: an approval, a run's results, a document -- the three kinds Review lists. Invented rows. */
+  readonly reviewRows = [
+    { name: 'Orders import — run 1840', note: 'Results held for review: 3 rows flagged', kind: 'Run', chip: 'chip-run', waiting: '12 min' },
+    { name: 'Supplier invoice INV-2207', note: '2 values to check, least sure: total', kind: 'Document', chip: 'chip-wait', waiting: '40 min' },
+    { name: 'Ledger export — month end', note: 'Approval step: the finance lead signs off', kind: 'Approval', chip: 'chip-ok', waiting: '2 h' },
+  ];
 
-  total(row: { done: number; failed: number; stopped: number; skipped: number; missed: number }): number {
-    return row.done + row.failed + row.stopped + row.skipped + row.missed;
-  }
-
-  /** Every way a run can end, so the mock shows the same columns as the real table. */
+  /** The Reports library: every version kept, approved and signed by a person. Invented rows. */
   readonly reportRows = [
-    { task: 'Orders import', done: 96, failed: 2, stopped: 1, skipped: 3, missed: 0 },
-    { task: 'Customer sync', done: 74, failed: 5, stopped: 0, skipped: 1, missed: 2 },
-    { task: 'Inventory snapshot', done: 61, failed: 0, stopped: 0, skipped: 0, missed: 0 },
-    { task: 'Ledger export', done: 48, failed: 3, stopped: 2, skipped: 4, missed: 1 },
+    { name: 'Monthly operations summary', from: 'From the pipeline Orders import', version: 3, state: 'Signed', chip: 'chip-ok' },
+    { name: 'Weekly inventory report', from: 'Created by hand from a dataset', version: 12, state: 'Not approved yet', chip: 'chip-wait' },
+    { name: 'Quarterly supplier review', from: 'From the pipeline Ledger export', version: 2, state: 'Void', chip: 'chip-fail' },
   ];
 }
