@@ -9,14 +9,13 @@ import { Icon } from '../../../shared/ui/icon';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
 import { DataText } from '../../../shared/ui/data-text';
 import { StatStrip, StatStripItem } from '../../../shared/ui/stat-strip';
-import { Combobox, ComboboxOption } from '../../../shared/ui/combobox';
 import { formatSize } from '../../../shared/ui/format-size';
 import { ImportResult, brunoFiles, reportRows } from './api-collections.model';
 import { ApiCollectionsApi, BrunoImport, PostmanImport } from './api-collections.service';
 
 export interface ImportDialogData {
-  /** A platform administrator's workspaces: an import names the one it is for. */
-  tenants?: ComboboxOption[];
+  /** The workspace a platform administrator picked on the page; none for a workspace's people (their own). */
+  tenantId?: number | null;
 }
 
 type Format = 'POSTMAN' | 'BRUNO';
@@ -29,7 +28,7 @@ type Format = 'POSTMAN' | 'BRUNO';
  */
 @Component({
   selector: 'app-import-dialog',
-  imports: [FormDialog, Field, Icon, Segmented, DataText, StatStrip, Combobox],
+  imports: [FormDialog, Field, Icon, Segmented, DataText, StatStrip],
   template: `
     <app-form-dialog [heading]="result() ? 'Import report' : 'Import a collection'"
                      [subtitle]="result() ? resultLine() : 'Postman v2.1 or Bruno. The files are read in your browser; nothing in them is run.'"
@@ -62,11 +61,6 @@ type Format = 'POSTMAN' | 'BRUNO';
       } @else {
         <div class="form-stack">
           <app-segmented [(value)]="format" [options]="formats" ariaLabel="Import from" />
-          @if (data.tenants) {
-            <app-field label="Workspace" for="impTenant" [required]="true">
-              <app-combobox id="impTenant" [selected]="tenantId()" (selectedChange)="tenantId.set($event || null)" [options]="data.tenants" [allowClear]="false" placeholder="Search workspaces…" />
-            </app-field>
-          }
           @if (format() === 'POSTMAN') {
             <app-field label="Collection file" for="impCollection" [required]="true" hint="Exported from Postman as Collection v2.1 (.json).">
               <div class="flex flex-wrap items-center gap-2">
@@ -122,7 +116,6 @@ export class ImportDialog {
   readonly environmentFiles = signal<File[]>([]);
   readonly brunoPicked = signal<File[]>([]);
   readonly name = signal('');
-  readonly tenantId = signal<string | null>(null);
   readonly importing = signal(false);
   readonly error = signal('');
   readonly result = signal<ImportResult | null>(null);
@@ -160,12 +153,8 @@ export class ImportDialog {
 
   /** The request to send, or what to fix. */
   private async body(): Promise<PostmanImport | BrunoImport | { error: string }> {
-    const extra: { name?: string; tenantId?: number } = {};
+    const extra: { name?: string } = {};
     if (this.name().trim()) extra.name = this.name().trim();
-    if (this.data.tenants) {
-      if (!this.tenantId()) return { error: 'Choose the workspace to import into.' };
-      extra.tenantId = Number(this.tenantId());
-    }
     if (this.format() === 'BRUNO') {
       const files = await brunoFiles(this.brunoPicked());
       if (!files.length) return { error: this.brunoPicked().length ? 'No .bru files in what was picked.' : 'Choose the Bruno folder or its .bru files.' };
@@ -190,7 +179,7 @@ export class ImportDialog {
     if ('error' in body) { this.error.set(body.error); return; }
     this.importing.set(true);
     try {
-      const r = await firstValueFrom(this.api.import(body));
+      const r = await firstValueFrom(this.api.import(body, this.data.tenantId));
       if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message); return; }
       this.result.set(r.data);
       this.toast.success(r.message);

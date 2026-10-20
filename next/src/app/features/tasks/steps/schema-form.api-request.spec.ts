@@ -80,5 +80,18 @@ describe('StepsApi.apiRequests', () => {
     expect(choices).toEqual([{ id: 12, label: 'Referrals › Create referral', method: 'POST', collectionId: 3, collection: 'Referrals',
       enabled: true, environments: [{ id: 7, label: 'Sandbox (default)' }] }]);
     expect(get).toHaveBeenCalledTimes(2);
+    expect(get.mock.calls.map(c => (c[1] as { params: Record<string, unknown> }).params['tenantId'])).toEqual([undefined, undefined]);
+  });
+
+  it('names the pipeline\'s workspace on every read when one is given (a platform administrator\'s)', async () => {
+    const get = vi.fn((url: string, options?: { params?: Record<string, unknown> }) => of(url.endsWith('/list')
+      ? { data: [{ collectionId: 3, name: 'Referrals' }] }
+      : { status: 'SUCCESS', data: { collection: { collectionId: options!.params!['collectionId'], name: 'Referrals' }, requests: [],
+        environments: [] } }));
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [{ provide: HttpClient, useValue: { get } }, { provide: DocumentsApi, useValue: {} }] });
+    await new Promise(done => TestBed.inject(StepsApi).apiRequests(2960).subscribe(done));
+    expect(get.mock.calls.map(c => (c[1] as { params: Record<string, unknown> }).params)).toEqual([
+      { page: 1, limit: 50, tenantId: 2960 }, { collectionId: 3, tenantId: 2960 }]);
   });
 });

@@ -60,6 +60,8 @@ export class StepFlow {
   readonly tasks = input<readonly StepTaskEntry[]>([]);
   readonly problems = input<Record<number, StepProblem[]>>({});
   readonly selected = input<string | null>(null);
+  /** The pipeline's workspace: a platform administrator's name reads (an API request's) name it. Null: the reader's own. */
+  readonly tenantId = input<number | null>(null);
   /** A step's node was picked: its index in the definition. */
   readonly open = output<number>();
 
@@ -85,7 +87,7 @@ export class StepFlow {
       problems: i => problems[i]?.length ?? 0,
       change: s => stepChange(s as Step, saved),
       // UX review 2026-10-12: an id a step names is shown as the name of what it points at.
-      names: this.names.lookup,
+      names: this.names.lookupIn(this.tenantId()),
     });
   });
 

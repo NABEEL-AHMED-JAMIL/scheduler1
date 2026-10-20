@@ -42,19 +42,16 @@ describe('CollectionDialog -- a new collection', () => {
     dialog.name.set('  UI-CHECK Clinic  ');
     dialog.save();
     expect(stub.saveCollection).toHaveBeenCalledWith({ collectionId: null, name: 'UI-CHECK Clinic', description: null,
-      sensitivity: null, status: 'Active', defaultAuth: null });
+      sensitivity: null, status: 'Active', defaultAuth: null }, undefined);
     expect(ref.close).toHaveBeenCalledWith(7);
   });
 
-  it('asks a platform administrator which workspace it is for', () => {
-    const { dialog, stub } = dialogWith({ tenants: [{ value: '2924', label: 'Claude Demo' }] });
+  it('makes a platform administrator\'s collection in the workspace the page picked, named on the call', () => {
+    const { dialog, stub } = dialogWith({ tenantId: 2960 });
     dialog.name.set('x');
     dialog.save();
-    expect(stub.saveCollection).not.toHaveBeenCalled();
-    expect(dialog.error()).toBe('Choose the workspace the collection is for.');
-    dialog.tenantId.set('2924');
-    dialog.save();
-    expect(stub.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ tenantId: 2924 }));
+    expect(stub.saveCollection).toHaveBeenCalledWith(expect.not.objectContaining({ tenantId: expect.anything() }), 2960);
+    expect(document.body.textContent).not.toContain('Search workspaces');
   });
 
   it('refuses a secret typed into the auth, and asks for a {{variable}}', () => {
@@ -76,7 +73,7 @@ describe('CollectionDialog -- a new collection', () => {
     dialog.save();
     expect(stub.saveCollection).toHaveBeenCalledWith(expect.objectContaining({
       defaultAuth: { type: 'APIKEY', apikey: { key: 'X-Api-Key', value: '{{apiKey}}' } },
-    }));
+    }), undefined);
   });
 });
 
@@ -89,7 +86,7 @@ describe('CollectionDialog -- editing', () => {
     dialog.description.set('All patients');
     dialog.save();
     expect(stub.saveCollection).toHaveBeenCalledWith({ collectionId: 7, name: 'Clinic API', description: 'All patients', sensitivity: 'PHI',
-      status: 'Active', defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' }, apikey: { key: 'X-Key', value: '{{k}}' } } });
+      status: 'Active', defaultAuth: { type: 'BEARER', bearer: { token: '{{token}}' }, apikey: { key: 'X-Key', value: '{{k}}' } } }, undefined);
   });
 
   it('opens a collection with no default auth on None', () => {
@@ -111,7 +108,7 @@ describe('CollectionDialog -- sensitivity (MIG-243)', () => {
     const { dialog, stub } = dialogWith({ collection: { ...ROW, sensitivity: 'sensitive', sensitivityLabel: 'PHI' } });
     expect(dialog.sensitivity()).toBe('PHI');
     dialog.save();
-    expect(stub.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }));
+    expect(stub.saveCollection).toHaveBeenCalledWith(expect.objectContaining({ sensitivity: 'PHI' }), undefined);
   });
 
   it('reads a collection nobody set as not set, though the service reads it as internal', () => {

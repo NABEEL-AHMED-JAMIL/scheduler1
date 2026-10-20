@@ -17,6 +17,7 @@
         }
       </div>
       <div class="flex items-center gap-2">
+        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
         <app-refresh-button [loading]="loading()" (refresh)="load()" />
         @if (canManage() && collection()) {
           <button type="button" class="btn btn-default btn-sm" (click)="editDetails()"><app-icon name="edit" />Edit details</button>
@@ -26,7 +27,11 @@
   </app-page-header>
   <app-managed-banner what="API collections" />
 
-  @if (!detail() && error()) {
+  @if (needsWorkspace()) {
+    <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]" data-test="pick-workspace">
+      Pick a workspace to see its API collections.
+    </div>
+  } @else if (!detail() && error()) {
     <app-table-shell heading="API collection" [error]="error()" [errorRetryable]="!missing()" (retry)="load()">
       <a error-action class="btn btn-default btn-sm" routerLink="/connections/api-collections"><app-icon name="arrowLeft" />Back to API Collections</a>
     </app-table-shell>

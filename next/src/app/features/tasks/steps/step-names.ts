@@ -12,7 +12,15 @@ import { StepsApi } from './steps.service';
  * Read on demand and once: `lookup` answers what is known (null for the rest, which the node shows as "#1083") and asks
  * for what is not; the answer lands in `names`, a signal, so the flow redraws with it. A refused or failed read is
  * remembered as unknown and not asked again -- a member without API Collections keeps the id.
+ *
+ * A platform administrator's API-library reads name the pipeline's workspace (`lookupIn`): integration-service refuses
+ * his read that names none. Ids are the platform's own, so a name read once holds for every workspace.
  */
+/** The query, with a platform administrator's workspace when one is named. */
+function scoped(params: Record<string, number>, tenantId: number | null): Record<string, number> {
+  return tenantId ? { ...params, tenantId } : params;
+}
+
 @Injectable({ providedIn: 'root' })
 export class StepNames {
   private readonly http = inject(HttpClient);
@@ -24,26 +32,31 @@ export class StepNames {
   /** requestId -> its collection, for an environment the step names beside it. */
   private readonly collectionOf = new Map<number, number>();
 
-  readonly lookup: StepNameLookup = (format, value, step) => {
-    const key = `${format}:${value}`;
-    const known = this.names()[key];
-    if (known !== undefined) return known;
-    // Asked after the drawing that wanted it: a computed must not write the signal it reads.
-    queueMicrotask(() => this.want(format, Number(value), step));
-    return null;
-  };
+  readonly lookup: StepNameLookup = this.lookupIn(null);
+
+  /** The lookup for a pipeline of this workspace (null: the reader's own). */
+  lookupIn(tenantId: number | null): StepNameLookup {
+    return (format, value, step) => {
+      const key = `${format}:${value}`;
+      const known = this.names()[key];
+      if (known !== undefined) return known;
+      // Asked after the drawing that wanted it: a computed must not write the signal it reads.
+      queueMicrotask(() => this.want(format, Number(value), step, tenantId));
+      return null;
+    };
+  }
 
   private put(entries: Record<string, string>): void {
     if (Object.keys(entries).length) this.names.update(n => ({ ...n, ...entries }));
   }
 
-  private want(format: string, id: number, step: PipelineStepLike): void {
+  private want(format: string, id: number, step: PipelineStepLike, tenantId: number | null): void {
     if (!Number.isFinite(id)) return;
     switch (format) {
-      case 'api-request': return this.request(id);
+      case 'api-request': return this.request(id, tenantId);
       case 'api-environment': {
         const requestId = Number(step.config?.['requestId']);
-        if (Number.isFinite(requestId)) this.request(requestId);
+        if (Number.isFinite(requestId)) this.request(requestId, tenantId);
         return;
       }
       case 'prompt': return this.once('prompt', () => this.steps.prompts().pipe(catchError(() => of([]))).subscribe(list =>
@@ -63,21 +76,21 @@ export class StepNames {
   }
 
   /** A request's name, then its collection's environments (whose names the step's environmentId may want). */
-  private request(requestId: number): void {
+  private request(requestId: number, tenantId: number | null): void {
     this.once(`api-request:${requestId}`, () => this.http.get<ApiResponse<{ name?: string; collectionId?: number }>>(
-      `${API_BASE}/apiCollection.json/request/get`, { params: { requestId } }).pipe(catchError(() => of(null))).subscribe(r => {
+      `${API_BASE}/apiCollection.json/request/get`, { params: scoped({ requestId }, tenantId) }).pipe(catchError(() => of(null))).subscribe(r => {
       if (!r || r.status !== API_SUCCESS || !r.data) return;
       if (r.data.name) this.put({ [`api-request:${requestId}`]: r.data.name });
       const collectionId = Number(r.data.collectionId);
       if (!Number.isFinite(collectionId)) return;
       this.collectionOf.set(requestId, collectionId);
-      this.collection(collectionId);
+      this.collection(collectionId, tenantId);
     }));
   }
 
-  private collection(collectionId: number): void {
+  private collection(collectionId: number, tenantId: number | null): void {
     this.once(`collection:${collectionId}`, () => this.http.get<ApiResponse<{ environments?: { environmentId: number; name: string }[] }>>(
-      `${API_BASE}/apiCollection.json/get`, { params: { collectionId } }).pipe(catchError(() => of(null))).subscribe(r => {
+      `${API_BASE}/apiCollection.json/get`, { params: scoped({ collectionId }, tenantId) }).pipe(catchError(() => of(null))).subscribe(r => {
       if (!r || r.status !== API_SUCCESS) return;
       this.put(Object.fromEntries((r.data?.environments ?? []).map(e => [`api-environment:${e.environmentId}`, e.name])));
     }));

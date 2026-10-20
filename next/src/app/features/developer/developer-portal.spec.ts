@@ -12,6 +12,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
 import { ToastService } from '../../shared/ui/toast.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
+import { ApiCollectionsApi } from '../integration/api-collections/api-collections.service';
 import { DEVELOPER_ROUTES } from './developer.routes';
 import { DOCS, Guide, guideTitle } from './developer-docs';
 import { DeveloperLayout } from './developer-layout';
@@ -246,5 +247,38 @@ describe('Owner #28: Your API clients for each role', () => {
     fixture.detectChanges();
     expect(api.list).toHaveBeenCalledWith(2960);
     expect(el.querySelector('[data-test="pick-workspace"]')).toBeNull();
+  });
+});
+
+describe('APIs this workspace calls, for each role', () => {
+  function connected(platform?: { remembered: number | null }) {
+    const collections = {
+      list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ collectionId: 7, name: 'Public health APIs' }] })),
+      get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { collection: { collectionId: 7, name: 'Public health APIs' }, requests: [] } })),
+      sample: vi.fn(() => of({ status: 'SUCCESS', message: '', data: null })),
+    };
+    configure(true, undefined, platform);
+    TestBed.overrideProvider(ApiCollectionsApi, { useValue: collections });
+    const fixture = TestBed.createComponent(DeveloperConnected);
+    fixture.detectChanges();
+    return { collections, fixture, page: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it('a workspace\'s people read their own collections, with no selector', () => {
+    const { collections, el } = connected();
+    expect(collections.list).toHaveBeenCalledWith('', 1, 50, null);
+    expect(collections.get).toHaveBeenCalledWith(7, null);
+    expect(el.querySelector('[data-test="pick-workspace"]')).toBeNull();
+  });
+
+  it('a platform administrator picks the workspace first, then reads only that one\'s', () => {
+    const { collections, fixture, page, el } = connected({ remembered: null });
+    expect(collections.list).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="pick-workspace"]')!.textContent).toContain('Pick a workspace to see the APIs it calls.');
+    page.pickWorkspace(2960);
+    fixture.detectChanges();
+    expect(collections.list).toHaveBeenCalledWith('', 1, 50, 2960);
+    expect(collections.get).toHaveBeenCalledWith(7, 2960);
+    expect(el.querySelector('[data-collection="7"]')).not.toBeNull();
   });
 });

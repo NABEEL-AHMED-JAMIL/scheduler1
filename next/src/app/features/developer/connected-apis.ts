@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { forkJoin, of } from 'rxjs';
 import { catchError, map } from 'rxjs/operators';
@@ -11,6 +11,8 @@ import { ApiCollectionsApi } from '../integration/api-collections/api-collection
 import { RequestRow, RequestSample } from '../integration/api-collections/api-collections.model';
 import { methodClass } from './reference-model';
 import { DevCode } from './code-block';
+import { WorkspaceSelect } from '../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 
 interface CollectionView { collectionId: number; name: string; description: string | null; requests: RequestRow[] }
 
@@ -18,16 +20,23 @@ interface CollectionView { collectionId: number; name: string; description: stri
  * Owner #28 (2026-10-19): the other half of the portal -- every API this workspace's pipelines and workflows call out to:
  * each saved request of its API collections with its method and address template (secrets are {{variables}} kept in
  * integration-service, never here), and its last answer as the runner kept it (masked, cut), opened on demand. Where a
- * Call API step or Read API step points, a developer can see what it sends and what came back.
+ * Call API step or Read API step points, a developer can see what it sends and what came back. A platform administrator
+ * picks the workspace in the header (the shared selector, opening on this session's last pick); until then nothing is read.
  */
 @Component({
   selector: 'app-developer-connected',
-  imports: [PageHeader, RouterLink, Icon, LoadError, ServerTimePipe, DevCode],
+  imports: [PageHeader, RouterLink, Icon, LoadError, ServerTimePipe, DevCode, WorkspaceSelect],
   template: `
     <div class="page" data-developer-connected>
       <app-page-header title="APIs this workspace calls"
-                       subtitle="The saved requests pipelines and workflows send (Read API, Enrich, Call API), and what each last answered." />
-      @if (error()) {
+                       subtitle="The saved requests pipelines and workflows send (Read API, Enrich, Call API), and what each last answered.">
+        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event)" />
+      </app-page-header>
+      @if (needsWorkspace()) {
+        <section class="card p-8 text-center text-sm text-[color:var(--text-muted)]" data-test="pick-workspace">
+          Pick a workspace to see the APIs it calls.
+        </section>
+      } @else if (error()) {
         <app-load-error [message]="error()" (retry)="load()" />
       } @else if (loading()) {
         <p class="text-sm text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Reading the collections…</p>
@@ -81,6 +90,11 @@ interface CollectionView { collectionId: number; name: string; description: stri
 })
 export class DeveloperConnected {
   private readonly api = inject(ApiCollectionsApi);
+  private readonly directory = inject(WorkspaceDirectory);
+
+  /** The workspace a platform administrator picked; null for anyone else (their own). */
+  readonly tenantId = signal<number | null>(this.directory.remembered());
+  readonly needsWorkspace = computed(() => this.directory.picks() && this.tenantId() === null);
 
   readonly collections = signal<CollectionView[]>([]);
   readonly loading = signal(false);
@@ -89,18 +103,30 @@ export class DeveloperConnected {
   readonly samples = signal<Record<number, RequestSample | null | undefined>>({});
 
   constructor() {
-    this.load();
+    if (!this.needsWorkspace()) this.load();
+  }
+
+  pickWorkspace(id: number | null): void {
+    this.tenantId.set(id);
+    this.collections.set([]);
+    this.open.set(null);
+    this.samples.set({});
+    if (id !== null) this.load();
   }
 
   load(): void {
     this.loading.set(true);
     this.error.set('');
-    this.api.list('', 1, 50).subscribe({
+    const asked = this.tenantId();
+    this.api.list('', 1, 50, asked).subscribe({
       next: list => {
+        if (asked !== this.tenantId()) return;
         const rows = Array.isArray(list?.data) ? list.data : [];
         if (!rows.length) { this.loading.set(false); this.collections.set([]); return; }
-        forkJoin(rows.map(c => this.api.get(c.collectionId).pipe(map(r => r.status === API_SUCCESS ? r.data : null), catchError(() => of(null)))))
+        forkJoin(rows.map(c => this.api.get(c.collectionId, asked).pipe(map(r => r.status === API_SUCCESS ? r.data : null),
+          catchError(() => of(null)))))
           .subscribe(details => {
+            if (asked !== this.tenantId()) return;
             this.loading.set(false);
             this.collections.set(details.filter(d => !!d).map(d => ({
               collectionId: d!.collection.collectionId, name: d!.collection.name, description: d!.collection.description ?? null,
@@ -108,7 +134,11 @@ export class DeveloperConnected {
             })));
           });
       },
-      error: err => { this.loading.set(false); this.error.set(err?.error?.message || 'Could not read the API collections.'); },
+      error: err => {
+        if (asked !== this.tenantId()) return;
+        this.loading.set(false);
+        this.error.set(err?.error?.message || 'Could not read the API collections.');
+      },
     });
   }
 
@@ -116,7 +146,7 @@ export class DeveloperConnected {
     if (this.open() === requestId) { this.open.set(null); return; }
     this.open.set(requestId);
     if (this.samples()[requestId] !== undefined) return;
-    this.api.sample(requestId).subscribe({
+    this.api.sample(requestId, this.tenantId()).subscribe({
       next: r => this.samples.update(s => ({ ...s, [requestId]: r.status === API_SUCCESS ? r.data ?? null : null })),
       error: () => this.samples.update(s => ({ ...s, [requestId]: null })),
     });

@@ -13,6 +13,8 @@ export interface EnvironmentDialogData {
   environment?: EnvironmentRow;
   /** The collection has no environment yet: this one becomes the default. */
   first?: boolean;
+  /** The workspace a platform administrator picked on the page; none for a workspace's people (their own). */
+  tenantId?: number | null;
 }
 
 /**
@@ -139,7 +141,7 @@ export class EnvironmentDialog {
     this.api.saveEnvironment({
       environmentId: this.data.environment?.environmentId ?? null, collectionId: this.data.collectionId, name,
       isDefault: this.isDefault(), variables: variableSaves(this.rows()),
-    }).subscribe({
+    }, this.data.tenantId).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }

@@ -133,17 +133,20 @@ export class StepsApi {
   /**
    * Owner #25: the workspace's saved API requests, each with its collection's environments -- what an api-request setting
    * offers. The first 50 collections (the list's own order), each read once; a collection that cannot be read is left out.
+   * tenantId: the pipeline's workspace, which a platform administrator names (integration-service refuses his read that
+   * names none); left out for a workspace's people.
    */
-  apiRequests(): Observable<ApiRequestChoice[]> {
+  apiRequests(tenantId?: number | null): Observable<ApiRequestChoice[]> {
+    const scoped = (params: Record<string, string | number>) => (tenantId ? { ...params, tenantId } : params);
     type Row = { collectionId: number; name: string };
     type Detail = { collection: Row; requests: { requestId: number; name: string; method: string; enabled: boolean }[];
       environments: { environmentId: number; name: string; isDefault?: boolean }[] };
-    return this.http.get<{ data?: Row[] }>(`${API_BASE}/apiCollection.json/list`, { params: { page: 1, limit: 50 } }).pipe(
+    return this.http.get<{ data?: Row[] }>(`${API_BASE}/apiCollection.json/list`, { params: scoped({ page: 1, limit: 50 }) }).pipe(
       switchMap(list => {
         const rows = (Array.isArray(list?.data) ? list.data : []).filter(c => c.collectionId != null);
         if (!rows.length) return of([] as ApiRequestChoice[]);
         return forkJoin(rows.map(c => this.http.get<ApiResponse<Detail>>(`${API_BASE}/apiCollection.json/get`,
-          { params: { collectionId: c.collectionId } }).pipe(map(r => r.data ?? null)))).pipe(
+          { params: scoped({ collectionId: c.collectionId }) }).pipe(map(r => r.data ?? null)))).pipe(
           map(details => details.flatMap(d => !d ? [] : (d.requests ?? []).map(r => ({
             id: Number(r.requestId),
             label: `${d.collection.name} › ${r.name}`,

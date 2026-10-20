@@ -85,7 +85,7 @@ describe('SourcePanel -- opening', () => {
       path: null, requestId: 70, version: 2, environmentId: 41 } })) });
     const panel = TestBed.runInInjectionContext(() => new SourcePanel());
     expect(coll.getRequest).toHaveBeenCalledWith(70);
-    expect(coll.get).toHaveBeenCalledWith(7);
+    expect(coll.get).toHaveBeenCalledWith(7, null);
     expect(panel.edit()).toMatchObject({ kind: 'API', collectionId: 7, requestId: 70, version: 2 });
     expect(panel.requests().map(r => r.name)).toEqual(['List patients']);
     expect(panel.dirty()).toBe(false);

@@ -52,7 +52,7 @@ describe('RequestPanel -- opening', () => {
   it('reads the whole definition of a saved API', () => {
     const { stub } = panelWith({});
     const panel = TestBed.runInInjectionContext(() => new RequestPanel());
-    expect(stub.getRequest).toHaveBeenCalledWith(1000);
+    expect(stub.getRequest).toHaveBeenCalledWith(1000, undefined);
     expect(panel.edit()?.urlTemplate).toBe('https://example.com/');
     expect(panel.heading()).toBe('Edit API · Get status');
     expect(panel.dirty()).toBe(false);
@@ -88,7 +88,7 @@ describe('RequestPanel -- save and test', () => {
     panel.runVariables.set([{ key: 'clinic', value: 'north', enabled: true }, { key: 'off', value: 'x', enabled: false }]);
     panel.test();
     expect(stub.saveRequest).not.toHaveBeenCalled();
-    expect(stub.test).toHaveBeenCalledWith({ requestId: 1000, environmentId: 41, variables: { clinic: 'north' } });
+    expect(stub.test).toHaveBeenCalledWith({ requestId: 1000, environmentId: 41, variables: { clinic: 'north' } }, undefined);
     expect(panel.result()?.statusCode).toBe(200);
   });
 
@@ -98,7 +98,7 @@ describe('RequestPanel -- save and test', () => {
     panel.patch({ urlTemplate: 'https://httpbin.org/anything' });
     expect(panel.testLabel()).toBe('Save & test');
     panel.test();
-    expect(stub.saveRequest).toHaveBeenCalledWith(expect.objectContaining({ requestId: 1000, urlTemplate: 'https://httpbin.org/anything' }));
+    expect(stub.saveRequest).toHaveBeenCalledWith(expect.objectContaining({ requestId: 1000, urlTemplate: 'https://httpbin.org/anything' }), undefined);
     expect(stub.test).toHaveBeenCalled();
     expect(panel.dirty()).toBe(false);
   });
@@ -110,7 +110,7 @@ describe('RequestPanel -- save and test', () => {
     const panel = TestBed.runInInjectionContext(() => new RequestPanel());
     panel.patch({ name: 'UI-CHECK anything', urlTemplate: 'https://httpbin.org/anything' });
     panel.save();
-    expect(stub.saveRequest).toHaveBeenCalledWith(expect.objectContaining({ requestId: null, collectionId: 1000, name: 'UI-CHECK anything' }));
+    expect(stub.saveRequest).toHaveBeenCalledWith(expect.objectContaining({ requestId: null, collectionId: 1000, name: 'UI-CHECK anything' }), undefined);
     expect(panel.edit()?.requestId).toBe(1002);
     expect(panel.heading()).toBe('Edit API · UI-CHECK anything');
     panel.close();

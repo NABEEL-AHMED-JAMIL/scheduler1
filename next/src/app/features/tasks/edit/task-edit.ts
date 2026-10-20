@@ -153,6 +153,8 @@ export class TaskEdit implements OnInit {
   readonly isEdit = computed(() => !!this.taskDetailId());
   /** UX review 2026-10-12 (P4): the page is titled with the pipeline's name, and its status beside it. */
   readonly loadedName = signal('');
+  /** The loaded pipeline's workspace, for the step builder's reads a platform administrator makes in it. */
+  readonly pipelineTenantId = signal<number | null>(null);
   readonly loadedStatus = signal('');
   readonly heading = computed(() => this.isEdit() ? (this.loadedName() || 'Pipeline') : 'New pipeline');
 
@@ -388,6 +390,7 @@ export class TaskEdit implements OnInit {
         this.topicFromLoad.set(task.sourceTaskType?.sourceTaskTypeId ?? null);
         this.topicVersion.set('load');
         this.taskTenantId = task.tenantId ?? null;
+        this.pipelineTenantId.set(this.taskTenantId);
         this.loadReferences(this.taskTenantId);
         const topicId = task.sourceTaskType?.sourceTaskTypeId ?? null;
         if (topicId != null) {

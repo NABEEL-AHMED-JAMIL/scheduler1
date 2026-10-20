@@ -5,6 +5,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { AuthService } from '../../../core/auth/auth.service';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ApiCollectionsApi } from './api-collections.service';
 import { Collection } from './collection';
@@ -35,7 +36,7 @@ const DETAIL = {
   access: [], imports: [],
 };
 
-function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; confirm?: boolean } = {}) {
+function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; confirm?: boolean; platform?: { remembered: number | null } } = {}) {
   const api = {
     get: vi.fn(() => of({ status: 'SUCCESS', message: '', data: structuredClone(DETAIL) })),
     version: vi.fn(),
@@ -55,7 +56,10 @@ function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; 
       { provide: ApiCollectionsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false, isPlatformAdmin: () => false, user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { isTenantAdmin: () => opts.admin ?? true, canBuild: () => opts.admin ?? true, builderLocked: () => false,
+        isPlatformAdmin: () => !!opts.platform, isManagedSession: () => false, user: signal({ appUserId: 4537 }) } },
+      ...(opts.platform ? [{ provide: WorkspaceDirectory, useValue: { picks: () => true, remembered: () => opts.platform!.remembered,
+        workspaces: () => [], recent: () => [], names: () => new Map(), load: () => of([]), choose: vi.fn(), nameOf: (id: number) => `Workspace ${id}` } }] : []),
     ],
   });
   const fixture = TestBed.createComponent(Collection);
@@ -67,9 +71,9 @@ function setup(opts: { admin?: boolean; api?: Partial<Record<string, unknown>>; 
 describe('Collection -- reading', () => {
   it('reads the collection, its default auth as /get says it (MIG-310), and who uses it', () => {
     const { api, screen } = setup();
-    expect(api.get).toHaveBeenCalledWith(1000);
+    expect(api.get).toHaveBeenCalledWith(1000, null);
     expect(api.version).not.toHaveBeenCalled();
-    expect(api.usage).toHaveBeenCalledWith(1000);
+    expect(api.usage).toHaveBeenCalledWith(1000, null);
     expect(screen.defaultAuth()).toEqual({ type: 'BEARER', bearer: { token: '{{token}}' } });
     expect(Object.fromEntries(screen.kpis().map(k => [k.label, k.value]))).toEqual({ APIs: 3, Enabled: 2, Folders: 1, Environments: 1, Version: 'v3' });
   });
@@ -129,7 +133,7 @@ describe('Collection -- writing', () => {
   it('switches an API off and on', () => {
     const { screen, api } = setup();
     screen.toggleEnabled(DETAIL.requests[0]);
-    expect(api.setEnabled).toHaveBeenCalledWith(1000, false);
+    expect(api.setEnabled).toHaveBeenCalledWith(1000, false, null);
     expect(api.get).toHaveBeenCalledTimes(2);
   });
 
@@ -143,7 +147,7 @@ describe('Collection -- writing', () => {
   it('edits an environment in its dialog', () => {
     const { screen, opened } = setup();
     screen.editEnvironment(DETAIL.environments[0]);
-    expect(opened.find(o => o.component === EnvironmentDialog)!.config.data).toEqual({ collectionId: 1000, environment: DETAIL.environments[0] });
+    expect(opened.find(o => o.component === EnvironmentDialog)!.config.data).toEqual({ collectionId: 1000, environment: DETAIL.environments[0], tenantId: null });
   });
 });
 
@@ -189,5 +193,33 @@ describe('Collection -- the overview stays short, every version under History (U
     const rows = Array.from(el.querySelectorAll('[data-test="versions"] tbody tr')).map(r => r.textContent!.replace(/\s+/g, ' ').trim());
     expect(rows.length).toBe(2);
     expect(rows[0]).toMatch(/^v3\s*current/);
+  });
+});
+
+describe('Collection -- a platform administrator', () => {
+  it('asks for a workspace first and reads nothing', () => {
+    const { api, el } = setup({ platform: { remembered: null } });
+    expect(api.get).not.toHaveBeenCalled();
+    expect(el.querySelector('[data-test="pick-workspace"]')!.textContent).toContain('Pick a workspace to see its API collections.');
+  });
+
+  it('reads and writes in the workspace picked, and hands it to every dialog', async () => {
+    const { api, opened, screen } = setup({ platform: { remembered: 2960 } });
+    expect(api.get).toHaveBeenCalledWith(1000, 2960);
+    expect(api.usage).toHaveBeenCalledWith(1000, 2960);
+    screen.toggleEnabled(DETAIL.requests[0] as never);
+    expect(api.setEnabled).toHaveBeenCalledWith(1000, false, 2960);
+    await screen.removeRequest(DETAIL.requests[0] as never);
+    expect(api.deleteRequest).toHaveBeenCalledWith(1000, 2960);
+    await screen.removeEnvironment(DETAIL.environments[0] as never);
+    expect(api.deleteEnvironment).toHaveBeenCalledWith(41, 2960);
+    screen.editDetails();
+    screen.openRequest(DETAIL.requests[0] as never);
+    screen.newEnvironment();
+    const data = opened.map(o => o.config?.data).filter(d => d && 'tenantId' in d);
+    expect(data.length).toBe(3);
+    expect(data.every(d => d.tenantId === 2960)).toBe(true);
+    screen.pickWorkspace(2945);
+    expect(api.get).toHaveBeenLastCalledWith(1000, 2945);
   });
 });

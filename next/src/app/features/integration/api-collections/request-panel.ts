@@ -26,6 +26,8 @@ export interface RequestPanelData {
   /** The collection's default auth (only {{variables}}), for what "From the collection" signs in with. */
   defaultAuth: unknown;
   canManage: boolean;
+  /** The workspace a platform administrator picked on the page; none for a workspace's people (their own). */
+  tenantId?: number | null;
 }
 
 type Tab = 'params' | 'headers' | 'auth' | 'body' | 'schemas' | 'settings';
@@ -114,7 +116,7 @@ export class RequestPanel {
   constructor() {
     if (this.data.requestId) {
       this.loading.set(true);
-      this.api.getRequest(this.data.requestId).subscribe({
+      this.api.getRequest(this.data.requestId, this.data.tenantId).subscribe({
         next: r => {
           this.loading.set(false);
           if (r.status !== API_SUCCESS || !r.data) { this.loadError.set(r.message); return; }
@@ -159,7 +161,7 @@ export class RequestPanel {
     if ('error' in out) { this.error.set(out.error); return; }
     this.error.set('');
     this.saving.set(true);
-    this.api.saveRequest(out.body).subscribe({
+    this.api.saveRequest(out.body, this.data.tenantId).subscribe({
       next: r => {
         this.saving.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.error.set(r.message); return; }
@@ -184,7 +186,7 @@ export class RequestPanel {
     const variables = Object.fromEntries(this.runVariables().filter(v => v.enabled && v.key.trim()).map(v => [v.key.trim(), v.value]));
     this.testing.set(true);
     this.error.set('');
-    this.api.test({ requestId, environmentId: this.environmentId(), variables }).subscribe({
+    this.api.test({ requestId, environmentId: this.environmentId(), variables }, this.data.tenantId).subscribe({
       next: r => {
         this.testing.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.result.set(null); this.error.set(r.message); return; }

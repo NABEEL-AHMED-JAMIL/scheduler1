@@ -272,7 +272,7 @@
     @if (stepsMode() && stepsView(); as view) {
       <app-step-builder [class.hidden]="activeTab() === 'details' || activeTab() === 'schedules'" [view]="view" [tab]="builderTab()"
                         [canManage]="!locked()" [isAdmin]="isAdmin()" [pipelineName]="loadedName()" [jobIds]="jobIdsOf()"
-                        (saved)="stepsSaved($event)" />
+                        [tenantId]="pipelineTenantId()" (saved)="stepsSaved($event)" />
     }
     @if (activeTab() === 'schedules') {
       <app-section title="Schedules & triggers" [card]="true" data-test="pipeline-schedules"

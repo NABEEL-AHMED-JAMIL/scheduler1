@@ -88,6 +88,8 @@ export class StepBuilder implements OnInit {
   /** Report Studio phase 5: the pipeline's name and its schedules, for a generate_report step's own design. */
   readonly pipelineName = input('');
   readonly jobIds = input<number[]>([]);
+  /** The pipeline's workspace: a platform administrator's reads of its API requests name it. Null: the reader's own. */
+  readonly tenantId = input<number | null>(null);
   /** A save made a new version (or found none to make): the page's copy is stale. */
   readonly saved = output<DefinitionView>();
 
@@ -192,6 +194,7 @@ export class StepBuilder implements OnInit {
       view.setInput('tasks', this.tasks());
       view.setInput('problems', this.grouped().steps);
       view.setInput('selected', this.selected());
+      view.setInput('tenantId', this.tenantId());
     });
     // Leaving a text tab applies what was typed to the draft; entering one shows the draft as that text.
     effect(() => {
@@ -359,7 +362,7 @@ export class StepBuilder implements OnInit {
     }
     if (this.apiRequestChoices() === null && usesApiRequest(schema)) {
       // Likewise: without the list a saved request still shows by its id.
-      this.api.apiRequests().subscribe({
+      this.api.apiRequests(this.tenantId()).subscribe({
         next: requests => { this.apiRequestChoices.set(requests); this.open(index); },
         error: () => { this.apiRequestChoices.set([]); this.open(index); },
       });

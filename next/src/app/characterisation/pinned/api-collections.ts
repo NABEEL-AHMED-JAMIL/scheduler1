@@ -171,44 +171,20 @@ export const PINNED: Record<string, unknown> = {
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
-      "GET /apiCollection.json/list?limit=50&page=1",
       "GET /tenant.json/listTenants"
     ],
     "headings": [
-      "API Collections",
-      "Collections (1 of 1)"
+      "API Collections"
     ],
-    "buttons": [
-      "Actions for LIVE-CHECK 0928 httpbin",
-      "Cards",
-      "Columns",
-      "Import",
-      "New collection",
-      "Refresh",
-      "Table"
-    ],
-    "columns": [
-      [
-        "Collection",
-        "Source",
-        "Sensitivity",
-        "APIs",
-        "Folders",
-        "Version",
-        "Updated",
-        "Workspace",
-        "State",
-        "Actions"
-      ]
-    ],
+    "buttons": [],
+    "columns": [],
     "fields": [
-      "Search collections",
-      "State"
+      "Pick a workspace",
+      "Workspace"
     ],
     "links": [
       "/connections",
       "/connections/api-collections",
-      "/connections/api-collections/1000",
       "/connections/connectors",
       "/connections/contracts",
       "/connections/databases",
