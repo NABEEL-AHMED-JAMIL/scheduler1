@@ -130,6 +130,7 @@
                 <tr>
                   <td>{{ l.description }}@if (l.periodLabel) { <span class="pill pill-neutral ml-1">{{ l.periodLabel }}</span> }@if (l.manual) { <span class="pill pill-neutral ml-1">Manual</span> }
                     @if (l.meter) { <div class="text-[11px] mono text-[color:var(--text-muted)]">{{ l.meter }}</div> }
+                    @if (l.ruleNo) { <div class="text-[11px] text-[color:var(--text-muted)]" data-rule-line>Pricing rule {{ l.ruleNo }} of rate card v{{ i.rateCardVersion }}: this usage's own price</div> }
                     @if (l.pricedFromVersion) { <div class="text-[11px] text-[color:var(--text-muted)]" data-priced-from>Priced from the {{ l.pricedFromName || 'standard' }} card (v{{ l.pricedFromVersion }}): not on this workspace's card</div> }
                     @if (l.includedQuantity) { <div class="text-[11px] text-[color:var(--text-muted)]">Includes {{ quantity({ quantity: l.includedQuantity, unit: l.unit }) }} at no charge · {{ quantity({ quantity: l.billableQuantity ?? l.quantity, unit: l.unit }) }} billable</div> }
                     @for (x of subjects(l); track $index) { <div class="text-[11px] text-[color:var(--text-muted)]" data-line-subject>{{ subjectName(x) }}: {{ quantity({ quantity: x.quantity, unit: l.unit }) }}</div> }

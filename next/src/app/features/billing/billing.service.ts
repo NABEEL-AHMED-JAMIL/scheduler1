@@ -32,6 +32,8 @@ export interface InvoiceLine {
   breakdown?: string | null;
   /** Rate card fallback: the default card that priced the line, when the workspace's own card does not name its meter. */
   pricedFromVersion?: number | null; pricedFromName?: string | null;
+  /** Owner #23: the pricing rule of the invoice's rate card version that priced this line (its meter's usage that matched). */
+  ruleNo?: number | null;
 }
 /** One subject of a line's breakdown (MIG-337). */
 export interface LineSubject { subjectType: string; subjectId: string | null; quantity: number }
@@ -50,6 +52,17 @@ export interface RateItem {
 export interface RateCard {
   version: number; name: string; tenant_id: number | null; tenantName?: string | null; effective_from: string; currency: string;
   based_on_version?: number | null; note?: string | null; created_at?: string; items: RateItem[];
+  /** Owner #23: the version's pricing rules, most specific first (absent: none). */
+  rules?: RateRule[];
+}
+/** What a pricing rule matches (owner #23): one pipeline, the pipelines with a tag, or a data class. */
+export type RuleKind = 'PIPELINE' | 'TAG' | 'CLASS';
+/**
+ * A pricing rule (owner #23): one meter's unit price for the usage of a pipeline (its id), of the pipelines with a tag,
+ * or of a data class. The most specific wins -- pipeline, then tag (the lowest number), then class -- then the card's item.
+ */
+export interface RateRule {
+  rule_no: number; meter: string; match_kind: RuleKind; match_value: string; unit_price: number | string; note?: string | null; label?: string;
 }
 /** What a card is saved as: everything but the version, which the meter assigns. */
 export interface RateCardDraft {
@@ -57,6 +70,30 @@ export interface RateCardDraft {
   items: { meter: string; unit: string; per: number; unit_price: number; included_quantity: number; tiers: RateTier[] }[];
   /** Per-model items of the card it is drafted from to leave out (MIG-308). */
   removed?: string[];
+  /** Owner #23: every pricing rule the version carries; absent carries the based-on version's over. */
+  rules?: RateRule[];
+}
+/** A version being prepared (owner #23): saved, previewed, then published; it prices nothing until then. */
+export interface RateCardDraftRow {
+  draft_id: number; tenant_id: number | null; tenantName?: string | null; based_on_version: number | null; name: string; effective_from: string;
+  card: RateCardDraft; created_at?: string; updated_at?: string; created_by?: number | null; updated_by?: number | null;
+}
+/** One rule's share of a meter's period (owner #23), as Cost &amp; usage and the preview list it. */
+export interface RulePart {
+  ruleNo: number; matchKind: RuleKind; matchValue: string; label: string; quantity: number; includedQuantity: number; billableQuantity: number;
+  unitPrice: number; amount: number;
+}
+/** What a month would have cost with a draft (owner #23), per workspace. */
+export interface RatePreview {
+  period: string; tenantId: number | null; draftId?: number | null; current: number; draft: number; difference: number; onOwnCard: number;
+  rules: RateRule[];
+  workspaces: {
+    tenantId: number; tenantName?: string | null; zone: string; currentVersion: number | null; currentName: string | null;
+    current: number; draft: number; difference: number;
+    invoice?: { number: string; status: string; total: number; currency: string; rateCardVersion: number | null } | null;
+    changes: { meter: string; label: string; service: string; quantity: number; current: number; draft: number; difference: number;
+      currentUnitPrice: number | null; draftUnitPrice: number | null; rules: RulePart[] }[];
+  }[];
 }
 export interface PaymentRow {
   paymentId: number; amount: number; method: string; reference?: string; note?: string; status: 'submitted' | 'verified' | 'rejected';
@@ -123,6 +160,12 @@ export interface MeterLine {
   unpriced?: boolean;
   /** Not on the workspace's own card: priced from the default card in effect (rate card fallback). */
   pricedFrom?: { version: number; name: string } | null;
+  /**
+   * Owner #23: usage pricing rules priced, each rule's part (the line's quantity and amount include them), and the card's
+   * own part: its quantity and amount. Absent when no rule priced this meter.
+   */
+  rules?: RulePart[];
+  cardQuantity?: number; cardAmount?: number; cardIncludedQuantity?: number; cardBillableQuantity?: number;
 }
 /** The card a period is priced with, as the meter names it. */
 export interface PricedWith {
@@ -182,7 +225,8 @@ export interface ModelCallSummary {
 export interface UsageQuery { from: string; to: string; tenantId?: string | null; }
 
 /** UX review B9 (BL1): one run's share of the priced lines (billing.json/pipelineCosts, runCost). */
-export interface RunCostMeter { meter: string; label: string; quantity: number; unit: string; cost: number; }
+/** Owner #23: `line` and `ruleNo` name a pricing rule's part of a meter (its label says the rule). */
+export interface RunCostMeter { meter: string; label: string; quantity: number; unit: string; cost: number; line?: string; ruleNo?: number | null; }
 export interface RunCostRow {
   jobQueueId: number; jobId: number | null; schedule: string | null; taskDetailId: number | null; pipeline: string | null;
   status?: string | null; startedAt: string | null; lastUsageAt?: string | null; cost: number; meters: RunCostMeter[];
@@ -369,6 +413,25 @@ export class BillingApi {
     return this.http.get<ApiResponse<RateCard>>(`${this.base}/rateCard`, { params: { ...this.tenantParam(tenantId), ...(day ? { day } : {}) } });
   }
   saveRateCard(card: RateCardDraft): Observable<ApiResponse<RateCard>> { return this.http.put<ApiResponse<RateCard>>(`${this.base}/rateCard`, card); }
+  // Owner #23: drafts, publishing and the preview (Billing › Settings, platform administrators).
+  rateCardDrafts(): Observable<ApiResponse<{ drafts: RateCardDraftRow[] }>> {
+    return this.http.get<ApiResponse<{ drafts: RateCardDraftRow[] }>>(`${this.base}/rateCardDrafts`);
+  }
+  /** A draft saved: a new one, or `draftId` changed. A refusal carries one sentence per problem in data.problems. */
+  saveRateCardDraft(card: RateCardDraft, draftId?: number | null): Observable<ApiResponse<RateCardDraftRow>> {
+    return this.http.put<ApiResponse<RateCardDraftRow>>(`${this.base}/rateCardDraft`, card, { params: draftId ? { draftId: String(draftId) } : {} });
+  }
+  deleteRateCardDraft(draftId: number): Observable<ApiResponse<unknown>> {
+    return this.http.delete<ApiResponse<unknown>>(`${this.base}/rateCardDraft`, { params: { draftId: String(draftId) } });
+  }
+  publishRateCardDraft(draftId: number): Observable<ApiResponse<RateCard>> {
+    return this.http.post<ApiResponse<RateCard>>(`${this.base}/rateCardDraft/publish`, null, { params: { draftId: String(draftId) } });
+  }
+  /** What last month (or `period`, YYYY-MM) would have cost with a saved draft, or with the card given. Read only. */
+  previewRateCard(what: { draftId: number } | { card: RateCardDraft }, period?: string): Observable<ApiResponse<RatePreview>> {
+    const params: Record<string, string> = { ...('draftId' in what ? { draftId: String(what.draftId) } : {}), ...(period ? { period } : {}) };
+    return this.http.post<ApiResponse<RatePreview>>(`${this.base}/rateCard/preview`, 'card' in what ? what.card : null, { params });
+  }
   costTrends(from: string, to: string, tenantId?: number | null): Observable<ApiResponse<CostTrends>> {
     return this.http.get<ApiResponse<CostTrends>>(`${this.base}/costTrends`, { params: { from, to, ...(tenantId ? { tenantId: String(tenantId) } : {}) } });
   }

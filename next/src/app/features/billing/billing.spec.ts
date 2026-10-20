@@ -311,6 +311,28 @@ describe('Billing, rendered', () => {
     expect(warning.textContent).toContain("on neither this workspace's card nor Standard 2026");
   });
 
+  // Owner #23: the usage pricing rules priced is listed under its meter, each rule's part at its price; the line is their sum.
+  it("lists the parts pricing rules priced under their meter, and the card's own part", () => {
+    const rows = [{ meter: 'pipeline.runs', label: 'Pipeline runs', service: 'Pipelines', unit: 'run', per: 1, unitPrice: '0.002', quantity: '23', amount: '0.036',
+      days: 5, includedQuantity: '2', billableQuantity: '21', tiers: [], cardQuantity: '6', cardAmount: '0.008', cardIncludedQuantity: '2', cardBillableQuantity: '4',
+      rules: [{ ruleNo: 1, matchKind: 'PIPELINE', matchValue: '1933', label: 'X-ray triage', quantity: '10', includedQuantity: '0', billableQuantity: '10',
+        unitPrice: '0.001', amount: '0.01' }, { ruleNo: 4, matchKind: 'CLASS', matchValue: 'sensitive', label: 'data class sensitive', quantity: '3',
+        includedQuantity: '0', billableQuantity: '3', unitPrice: '0.004', amount: '0.012' }] }];
+    const { el, component, fixture } = view({ usageByMeter: vi.fn(() => of({ status: API_SUCCESS, data: { rows, rateCard: { version: 40, name: 'Rules', currency: 'USD',
+      tenantSpecific: false, effectiveFrom: '2026-09-01' } } })) });
+    component.showTinyLines.set(true);
+    fixture.detectChanges();
+    expect(component.lines()[0].rules?.map(p => p.amount)).toEqual([0.01, 0.012]);
+    const parts = [...el.querySelectorAll('[data-test="rule-part"]')].map(tr => tr.textContent!.replace(/\s+/g, ' ').trim());
+    expect(parts[0]).toContain('X-ray triage');
+    expect(parts[0]).toContain('$0.001 per run');
+    expect(parts[1]).toContain('data class sensitive');
+    expect(el.querySelector('[data-test="rule-part-card"]')!.textContent).toContain("At the card's price");
+    // A day picked on the chart is before the month's allowance, tiers and rule parts.
+    component.selectedDay.set('2026-09-05');
+    expect(component.dayLines()?.every(l => !l.rules)).toBe(true);
+  });
+
   it('warns about nothing when every line has a price', () => {
     const { el } = view();
     expect(el.querySelector('[data-unpriced-warning]')).toBeNull();

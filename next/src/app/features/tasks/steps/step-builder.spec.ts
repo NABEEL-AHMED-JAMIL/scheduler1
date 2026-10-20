@@ -344,6 +344,22 @@ describe('StepBuilder -- Settings', () => {
     expect(builder.draft().settings).toEqual({ defaultTimeoutSeconds: 120, defaultOnError: 'continue' });
   });
 
+  /** Owner #23: a pipeline's tags, which a rate card's Tag rule may price by. */
+  it('takes tags as comma-separated words, drops blanks and repeats, and takes them back', () => {
+    const { tab, el, builder, fixture } = build();
+    tab('settings');
+    const box = el.querySelector<HTMLInputElement>('#defTags')!;
+    box.value = ' research, pilot,, research ';
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.draft().settings).toEqual({ tags: ['research', 'pilot'] });
+    expect(box.value).toBe('research, pilot');
+    box.value = ' ';
+    box.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+    expect(builder.draft().settings).toBeUndefined();
+  });
+
   it('declares the level of the data the pipeline handles, and takes it back', () => {
     const { tab, el, builder, fixture } = build();
     tab('settings');

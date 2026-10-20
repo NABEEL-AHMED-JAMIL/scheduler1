@@ -68,6 +68,12 @@
                 @for (s of sensitivities; track s) { <option [value]="s" [selected]="draft().settings?.sensitivity === s">{{ sensitivityText(s) }}</option> }
               </select>
             </app-field>
+            <!-- Owner #23: what a rate card's pricing rule may price this pipeline by (Billing › Settings, a Tag rule). -->
+            <app-field label="Tags" for="defTags" [error]="tagProblems()"
+                       hint="Short words, separated by commas — say research, pilot. A rate card may price a tag's pipelines at a price of their own.">
+              <input id="defTags" class="input" [value]="tagsText()" [disabled]="!canManage()" placeholder="research, pilot"
+                     (change)="setTags($any($event.target).value)" />
+            </app-field>
           </div>
         </app-section>
         <!-- MIG-237, MIG-334: whose review a run's results wait for. The customer decides through the API

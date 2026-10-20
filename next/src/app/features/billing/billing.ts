@@ -92,6 +92,8 @@ export class Billing implements OnInit {
       return {
         ...(line ?? { meter, label: meter, service: 'Other', unit: '', per: 1, unitPrice: 0, days: 1, tiers: [] } as unknown as MeterLine),
         quantity: use.quantity, amount: use.amount, includedQuantity: 0, billableQuantity: use.quantity, tiers: [], days: 1,
+        // A day's figure is before the month's allowance, tiers and rule parts: those are the month's.
+        rules: undefined,
       };
     }).sort((a, b) => b.amount - a.amount);
   });
@@ -255,6 +257,13 @@ export class Billing implements OnInit {
           ...l, quantity: Number(l.quantity), amount: Number(l.amount), unitPrice: Number(l.unitPrice),
           includedQuantity: Number(l.includedQuantity ?? 0), billableQuantity: Number(l.billableQuantity ?? l.quantity),
           tiers: (l.tiers ?? []).map(t => ({ from: Number(t.from), to: t.to == null ? null : Number(t.to), units: Number(t.units), unit_price: Number(t.unit_price) })),
+          // Owner #23: the parts pricing rules priced, and the card's own part.
+          ...(l.rules?.length ? {
+            rules: l.rules.map(p => ({ ...p, quantity: Number(p.quantity), includedQuantity: Number(p.includedQuantity), billableQuantity: Number(p.billableQuantity),
+              unitPrice: Number(p.unitPrice), amount: Number(p.amount) })),
+            cardQuantity: Number(l.cardQuantity), cardAmount: Number(l.cardAmount), cardIncludedQuantity: Number(l.cardIncludedQuantity ?? 0),
+            cardBillableQuantity: Number(l.cardBillableQuantity ?? 0),
+          } : { rules: undefined }),
         })));
         this.api.usageByDay(this.query()).subscribe({
           next: d => {

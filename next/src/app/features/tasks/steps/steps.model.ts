@@ -42,6 +42,8 @@ export interface Settings {
   defaultOnError?: string;
   /** MIG-243: public, internal or sensitive -- the level of the data the pipeline handles; the data policy for it applies. */
   sensitivity?: string;
+  /** Owner #23: short words a rate card's pricing rule may price this pipeline's usage by (a TAG rule); none when absent. */
+  tags?: string[] | null;
   /**
    * MIG-237: whose review the run's results wait for (internal, customer); absent means no review. MIG-361: whose Task
    * inbox the internal review goes to (reviewers). Bulk review (2026-10-12): individual -- the run's review and the
@@ -255,7 +257,7 @@ const DEFINITION_ORDER = ['version', 'source', 'parameters', 'steps', 'settings'
 const PARAMETER_ORDER = ['name', 'type', 'label', 'description', 'required', 'default', 'choices'];
 const STEP_ORDER = ['key', 'name', 'task', 'input', 'config', 'retry', 'timeoutSeconds', 'onError'];
 const RETRY_ORDER = ['maxAttempts', 'delaySeconds'];
-const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'review'];
+const SETTINGS_ORDER = ['datasetRetentionHours', 'defaultTimeoutSeconds', 'defaultOnError', 'sensitivity', 'tags', 'review'];
 const SOURCE_ORDER = ['type', 'config'];
 
 const blank = (value: unknown) => value === undefined || value === null || value === '';

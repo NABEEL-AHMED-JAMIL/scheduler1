@@ -44,13 +44,26 @@
         <div class="lookup-rail-empty"><app-icon name="refresh" class="spin icon-muted" /> Loading…</div>
       } @else if (error()) {
         <div class="lookup-rail-empty text-crit-500">{{ error() }}<button type="button" class="btn btn-default btn-sm mt-2" (click)="load()">Try again</button></div>
-      } @else if (!visible().length) {
+      } @else if (!visible().length && !visibleDrafts().length) {
         <div class="lookup-rail-empty">
           <app-icon name="layers" size="1.4rem" class="icon-muted" />
           {{ cards().length ? 'No version matches.' : 'No rate card yet — the meter seeds one on its first start.' }}
         </div>
       } @else {
         <ul class="lookup-rail-list" role="listbox" aria-label="Rate card versions">
+          <!-- Owner #23: drafts first -- versions being prepared, which price nothing until they are published. -->
+          @for (d of visibleDrafts(); track d.draft_id) {
+            <li role="presentation">
+              <button type="button" class="lookup-rail-item" role="option" data-test="draft-item" [attr.aria-selected]="selectedDraftId() === d.draft_id" [class.is-selected]="selectedDraftId() === d.draft_id" (click)="selectDraft(d)">
+                <span class="lookup-rail-glyph"><app-icon name="edit" size="0.9em" /></span>
+                <span class="min-w-0 flex-1">
+                  <span class="lookup-rail-key">{{ d.name }} <span class="pill pill-warn ml-1">Draft</span></span>
+                  <span class="lookup-rail-sub">From {{ d.effective_from | serverTime: 'date' }} · {{ draftForLabel(d) }}@if (d.based_on_version) { · from v{{ d.based_on_version }} }</span>
+                </span>
+                <app-icon name="chevronRight" size="0.9em" class="lookup-rail-chev" />
+              </button>
+            </li>
+          }
           @for (c of visible(); track c.version) {
             <li role="presentation">
               <button type="button" class="lookup-rail-item" role="option" [attr.aria-selected]="selectedVersion() === c.version" [class.is-selected]="selectedVersion() === c.version" (click)="select(c)">
@@ -71,7 +84,76 @@
     </aside>
 
     <section class="lookup-detail" aria-live="polite">
-      @if (selected(); as c) {
+      @if (selectedDraft(); as d) {
+        <header class="lookup-detail-head" data-test="draft-detail">
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="pill pill-warn">Draft</span>
+              @if (d.tenant_id == null) { <span class="pill pill-neutral"><app-icon name="globe" size="0.8em" class="opacity-70" />Every workspace</span> }
+              @else { <span class="pill pill-brand"><app-icon name="building" size="0.8em" class="opacity-70" />{{ draftForLabel(d) }}</span> }
+              <span class="pill pill-neutral">{{ d.card.currency }}</span>
+            </div>
+            <div class="flex items-baseline gap-2 mt-1 min-w-0 flex-wrap">
+              <h2 class="lookup-detail-key" [title]="d.name">{{ d.name }}</h2>
+              <span class="text-xs text-[color:var(--text-muted)]">
+                Would take effect {{ d.effective_from | serverTime: 'date' }}
+                @if (d.based_on_version) { · drafted from v{{ d.based_on_version }} }
+                @if (d.updated_at) { · saved {{ d.updated_at | serverTime: 'dateTime' }} }
+              </span>
+            </div>
+            <p class="text-sm mt-1 text-[color:var(--text-secondary)]">A draft prices nothing. Preview what last month would have cost with it, then publish it as a new version.</p>
+            @if (d.card.note) { <p class="text-sm mt-1 text-[color:var(--text-secondary)]">{{ d.card.note }}</p> }
+          </div>
+          <div class="flex items-center gap-1.5 shrink-0 flex-wrap justify-end">
+            <button type="button" class="btn btn-default btn-sm" (click)="editDraft(d)" data-test="edit-draft"><app-icon name="edit" />Edit draft</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="previewDraft(d)" [disabled]="previewing()" data-test="preview-draft"><app-icon name="eye" />Preview last month</button>
+            <button type="button" class="btn btn-primary btn-sm" (click)="publishDraft(d)" [disabled]="busy()" data-test="publish-draft"><app-icon name="check" />Publish</button>
+            <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="draftMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
+            <ng-template #draftMenu>
+              <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
+                <button cdkMenuItem class="menu-item text-crit-500" (cdkMenuItemTriggered)="discardDraft(d)"><app-icon name="trash" />Discard draft</button>
+                @if (d.based_on_version) {
+                  <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="selectVersion(d.based_on_version!)"><app-icon name="history" />Show v{{ d.based_on_version }} it was drafted from</button>
+                }
+              </div>
+            </ng-template>
+          </div>
+        </header>
+        @if (preview() || previewing() || previewError()) {
+          <section class="lookup-entries" data-test="draft-preview" aria-labelledby="draftPreviewTitle">
+            <div class="lookup-entries-head"><h3 class="section-title" id="draftPreviewTitle">What last month would have cost with it</h3></div>
+            <div class="p-3">
+              @if (previewing()) { <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Pricing last month…</span> }
+              @else if (previewError()) { <span class="text-xs text-crit-500" role="alert">{{ previewError() }}</span> }
+              @else { <app-rate-preview [preview]="preview()" [currency]="d.card.currency" /> }
+            </div>
+          </section>
+        }
+        <ng-container *ngTemplateOutlet="rulesTable; context: { rules: d.card.rules ?? [], items: draftItems(d), currency: d.card.currency }" />
+        <section class="lookup-entries">
+          <div class="lookup-entries-head">
+            <h3 class="section-title">Meters <span class="text-[color:var(--text-muted)] font-normal">({{ d.card.items.length }})</span></h3>
+          </div>
+          <div class="lookup-entries-scroll">
+            <table class="table-modern lookup-entry-table">
+              <thead><tr><th>Meter</th><th class="text-right">Price</th><th class="text-right hidden md:table-cell">Included / month</th><th class="hidden lg:table-cell">Tiers</th></tr></thead>
+              <tbody>
+                @for (g of draftGroups(d); track g.service) {
+                  <tr class="bg-sunken"><td colspan="4" class="text-xs font-semibold uppercase tracking-wide text-[color:var(--text-muted)] !py-1.5">{{ g.service }}</td></tr>
+                  @for (i of g.items; track i.meter) {
+                    <tr>
+                      <td><div>{{ i.label ?? i.meter }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ i.meter }}</div></td>
+                      <td class="text-right tabular whitespace-nowrap">{{ i.tiers?.length ? 'Tiered' : price(i, d.card.currency) }}</td>
+                      <td class="text-right tabular hidden md:table-cell">{{ i.included_quantity ? units(i, i.included_quantity) : '—' }}</td>
+                      <td class="hidden lg:table-cell text-xs">@for (t of tierText(i, d.card.currency); track t) { <div>{{ t }}</div> } @empty { <span class="text-[color:var(--text-muted)]">Flat</span> }</td>
+                    </tr>
+                  }
+                }
+              </tbody>
+            </table>
+          </div>
+        </section>
+      } @else if (selected(); as c) {
         <header class="lookup-detail-head">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 flex-wrap">
@@ -137,6 +219,7 @@
             </table>
           </div>
         </section>
+        <ng-container *ngTemplateOutlet="rulesTable; context: { rules: c.rules ?? [], items: c.items, currency: c.currency }" />
       } @else if (!loading()) {
         <div class="lookup-entries-empty lookup-detail-empty">
           <app-icon name="layers" size="1.5rem" class="icon-muted" />
@@ -146,21 +229,36 @@
     </section>
   </div>
 
-  <!-- Owner #23 (2026-10-19): the redesign's pricing rules. The data model is in (billing V12.0, meter.rate_card_rule, on each
-       card version); the rating engine, the editor and the preview are the plan's next steps (etl-platform
-       docs/plans/rate-card-rules.md). Said plainly here so nobody looks for a rule that prices nothing yet. -->
-  <section class="card p-4 mt-4" data-test="pricing-rules" aria-labelledby="pricing-rules-title">
-    <div class="flex flex-wrap items-center gap-2">
-      <h2 class="section-title m-0" id="pricing-rules-title">Pricing rules</h2>
-      <span class="pill pill-neutral">Coming next</span>
-    </div>
-    <p class="text-sm text-[color:var(--text-secondary)] mt-2 mb-0 max-w-4xl">
-      A rule will give one meter its own price for one pipeline, for the pipelines with a tag, or for a data class (public,
-      internal, sensitive) — the most specific rule wins, then the card's own price. Rules belong to a card version, so they are
-      versioned with it and an issued invoice keeps the version it was priced with. Before a version is saved, a preview will show
-      what last month would have cost with it. Every price today still comes from the card's own items.
-    </p>
-  </section>
+  <!-- Owner #23: a version's pricing rules, in the order usage is matched against them (one template for a version and a draft). -->
+  <ng-template #rulesTable let-rules="rules" let-items="items" let-currency="currency">
+    <section class="lookup-entries" data-test="pricing-rules" aria-labelledby="pricingRulesTitle">
+      <div class="lookup-entries-head">
+        <h3 class="section-title" id="pricingRulesTitle">Pricing rules <span class="text-[color:var(--text-muted)] font-normal">({{ rules.length }})</span></h3>
+        <span class="text-xs text-[color:var(--text-muted)]">A pipeline first, then a tag (the lower number first), then a data class; else the card's price</span>
+      </div>
+      @if (rules.length) {
+        <div class="lookup-entries-scroll">
+          <table class="table-modern lookup-entry-table" data-test="rules-table">
+            <thead><tr><th class="w-14">Order</th><th>Matches</th><th>Meter</th><th class="text-right">Price</th><th class="text-right hidden md:table-cell">Card price</th><th class="hidden lg:table-cell">Note</th></tr></thead>
+            <tbody>
+              @for (r of rulesOf(rules); track r.rule_no; let k = $index) {
+                <tr [attr.data-rule]="r.rule_no">
+                  <td class="tabular"><span class="font-medium">{{ k + 1 }}</span> <span class="text-[11px] mono text-[color:var(--text-muted)]">#{{ r.rule_no }}</span></td>
+                  <td><span class="pill pill-neutral mr-1">{{ kindLabel(r) }}</span>{{ matchLabel(r) }}</td>
+                  <td><div>{{ meterLabel(r.meter, items) }}</div><div class="text-[11px] mono text-[color:var(--text-muted)]">{{ r.meter }}</div></td>
+                  <td class="text-right tabular whitespace-nowrap font-medium">{{ rulePrice(r, items, currency) }}</td>
+                  <td class="text-right tabular whitespace-nowrap hidden md:table-cell text-[color:var(--text-muted)]">{{ itemPrice(r.meter, items, currency) }}</td>
+                  <td class="hidden lg:table-cell text-xs text-[color:var(--text-secondary)]">{{ r.note || '—' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      } @else {
+        <p class="text-sm text-[color:var(--text-secondary)] px-3 pb-3 m-0">No pricing rules: every meter is priced by the card's own price. A new version can add a meter's own price for one pipeline, the pipelines with a tag, or a data class.</p>
+      }
+    </section>
+  </ng-template>
 
   <!-- Owner #10 (MIG-393, billing UI batch): the receipt stamp and signature, a component of its own (receipt-stamp-settings.ts). -->
   @defer (on viewport) { <app-receipt-stamp-settings class="block mt-6" /> } @placeholder { <div class="mt-6 h-24" aria-hidden="true"></div> }

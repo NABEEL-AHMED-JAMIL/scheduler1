@@ -454,6 +454,15 @@ export class StepBuilder implements OnInit {
   /** The braces a step names a parameter with, said in the section's line (Angular would read them as its own). */
   readonly parameterHint = 'What a run is given (by Run with…, a backfill or the API); a scheduled run takes the defaults. A step reads one as {{param.name}}, and any run its day as {{run.date}}.';
 
+  /** Owner #23: the pipeline's tags as the field shows them. */
+  tagsText(): string { return (this.draft().settings?.tags ?? []).join(', '); }
+
+  /** The tags typed, comma-separated: trimmed, blanks and repeats dropped; none left drops the setting. */
+  setTags(raw: string): void {
+    const tags = [...new Set(raw.split(',').map(t => t.trim()).filter(t => t.length > 0))];
+    this.draft.update(d => updateSettings(d, { tags: tags.length ? tags : null }));
+  }
+
   setSetting(field: keyof Settings, raw: string): void {
     let value: string | number | null = raw;
     if (field !== 'defaultOnError' && field !== 'sensitivity') {
@@ -495,6 +504,11 @@ export class StepBuilder implements OnInit {
 
   settingProblem(path: string): string {
     return this.grouped().other.filter(p => p.path === path).map(p => p.message).join(' · ');
+  }
+
+  /** Owner #23: the tags' problems -- the list's and each tag's (settings.tags[1]). */
+  tagProblems(): string {
+    return this.grouped().other.filter(p => p.path === 'settings.tags' || p.path.startsWith('settings.tags[')).map(p => p.message).join(' · ');
   }
 
   private reloadTasks(): void {

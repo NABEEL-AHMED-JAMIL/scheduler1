@@ -4,11 +4,13 @@ import { Dialog, DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { of } from 'rxjs';
 import { RateCards } from './rate-cards';
 import { RateCardEditor } from './rate-card-editor';
-import { BillingApi, RateCard } from './billing.service';
+import { BillingApi, RateCard, RateCardDraft, RateCardDraftRow, RatePreview } from './billing.service';
 import { priceDigits } from './billing-format';
 import { WorkspacePicker } from './workspace-picker';
 import { ToastService } from '../../shared/ui/toast.service';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { provideHttpClient } from '@angular/common/http';
+import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 
 /**
  * Rate cards: every version listed with who it is for and whether it prices today; a new
@@ -26,8 +28,30 @@ const CARDS = [
   { version: 1, name: 'Standard', tenant_id: null, tenantName: null, effective_from: '2026-01-01', currency: 'USD', based_on_version: null, note: '', items: ITEMS },
 ];
 
+/** Owner #23: a version with rules, a draft of it, and what the preview answers. */
+const RULES = [
+  { rule_no: 2, meter: 'seats.user_days', match_kind: 'TAG', match_value: 'research', unit_price: '0.10', note: null, label: 'tag research' },
+  { rule_no: 1, meter: 'seats.user_days', match_kind: 'PIPELINE', match_value: '1933', unit_price: '0.05', note: 'X-ray triage', label: 'X-ray triage' },
+  { rule_no: 3, meter: 'ai.tokens.in', match_kind: 'CLASS', match_value: 'sensitive', unit_price: '0.08', note: null, label: 'data class sensitive' },
+];
+const DRAFT = {
+  draft_id: 31, tenant_id: null, tenantName: null, based_on_version: 1, name: 'Rules for November', effective_from: '2099-11-01',
+  card: { name: 'Rules for November', tenant_id: null, effective_from: '2099-11-01', currency: 'USD', based_on_version: 1, note: 'research pricing',
+    items: ITEMS.map(i => ({ meter: i.meter, unit: i.unit, per: i.per, unit_price: Number(i.unit_price), included_quantity: Number(i.included_quantity), tiers: [] })),
+    rules: RULES },
+} as unknown as RateCardDraftRow;
+const PREVIEW = {
+  period: '2026-09', tenantId: null, current: 1.5, draft: 1.2, difference: -0.3, onOwnCard: 1, rules: RULES,
+  workspaces: [{ tenantId: 2905, tenantName: 'MedAxis', zone: 'America/Chicago', currentVersion: 2, currentName: 'Standard', current: 1.5, draft: 1.2,
+    difference: -0.3, invoice: { number: 'INV-2026-09-0001', status: 'issued', total: 1.5, currency: 'USD', rateCardVersion: 2 },
+    changes: [{ meter: 'seats.user_days', label: 'Seats', service: 'Seats', quantity: 10, current: 1.5, draft: 1.2, difference: -0.3, currentUnitPrice: 0.33,
+      draftUnitPrice: 0.33, rules: [{ ruleNo: 1, matchKind: 'PIPELINE', matchValue: '1933', label: 'X-ray triage', quantity: 4, includedQuantity: 0,
+        billableQuantity: 4, unitPrice: 0.05, amount: 0.2 }] }] }],
+} as unknown as RatePreview;
+
 function page() {
-  const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+  const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn(),
+    rateCardDrafts: vi.fn(() => of({ status: API_SUCCESS, data: { drafts: [] } })) };
   const dialog = { open: vi.fn(() => ({ closed: of(null) })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
@@ -93,7 +117,8 @@ describe('RateCards', () => {
 /** MIG-211: the card reads in sentence case, a free meter says Free, and "today" is the viewer's day, not UTC's. */
 describe('RateCards, as rendered', () => {
   function rendered() {
-    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn(),
+    rateCardDrafts: vi.fn(() => of({ status: API_SUCCESS, data: { drafts: [] } })) };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ imports: [RateCards], providers: [
       { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: { open: vi.fn() } },
@@ -136,13 +161,17 @@ describe('RateCards, as rendered', () => {
   });
 });
 
-function editor(base: RateCard, saved = { status: API_SUCCESS, data: { ...base, version: 9, name: 'Nine' } }) {
-  const api = { saveRateCard: vi.fn(() => of(saved)) };
+function editor(base: RateCard, saved: unknown = { status: API_SUCCESS, data: { ...base, version: 9, name: 'Nine' } }, draft: RateCardDraftRow | null = null) {
+  const api = { saveRateCard: vi.fn(() => of(saved)),
+    saveRateCardDraft: vi.fn((card: RateCardDraft) => of({ status: API_SUCCESS, data: { draft_id: draft?.draft_id ?? 31, name: card.name, card } })),
+    publishRateCardDraft: vi.fn(() => of({ status: API_SUCCESS, data: { ...base, version: 12, name: 'Published' } })),
+    previewRateCard: vi.fn(() => of({ status: API_SUCCESS, data: PREVIEW })) };
   const ref = { close: vi.fn() };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
+    provideHttpClient(), provideHttpClientTesting(),
     { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
-    { provide: DialogRef, useValue: ref }, { provide: DIALOG_DATA, useValue: { base, workspaces: [{ value: '2905', label: 'MedAxis' }] } },
+    { provide: DialogRef, useValue: ref }, { provide: DIALOG_DATA, useValue: { base, draft, workspaces: [{ value: '2905', label: 'MedAxis' }] } },
   ] });
   const component = TestBed.runInInjectionContext(() => new RateCardEditor());
   return { component, api, ref };
@@ -229,7 +258,8 @@ describe('RateCardEditor', () => {
 /** Audit 09-22: the page as drawn -- one primary action, tier prices at any width, neutral workspace glyph. */
 describe('RateCards, rendered', () => {
   function view() {
-    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn() };
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: CARDS } })), saveRateCard: vi.fn(),
+    rateCardDrafts: vi.fn(() => of({ status: API_SUCCESS, data: { drafts: [] } })) };
     const dialog = { open: vi.fn(() => ({ closed: of(null) })) };
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
@@ -287,3 +317,148 @@ describe('RateCardEditor, rendered', () => {
   });
 });
 
+/** Owner #23, steps 3 and 4: rules edited in the side panel, drafts saved and published, the preview of last month. */
+describe('RateCardEditor, pricing rules', () => {
+  it("carries the base version's rules over, in the order usage is matched, and sends every one", () => {
+    const base = RateCards.numeric({ ...CARDS[3], rules: RULES } as unknown as RateCard);
+    const { component } = editor(base);
+    TestBed.inject(HttpTestingController).match(() => true).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    expect(component.orderedRules().map(r => r.rule_no)).toEqual([1, 2, 3]);
+    component.name.set('With rules');
+    const draft = component.draft();
+    if (typeof draft === 'string') throw new Error(draft);
+    expect(draft.rules?.map(r => [r.rule_no, r.match_kind, r.match_value, r.unit_price])).toEqual([[1, 'PIPELINE', '1933', '0.05'], [2, 'TAG', 'research', '0.1'],
+      [3, 'CLASS', 'sensitive', '0.08']]);
+  });
+
+  it('adds, changes and removes a rule, and refuses one the server would refuse, in its words', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component } = editor(base);
+    component.name.set('With rules');
+    component.addRule();
+    const http = TestBed.inject(HttpTestingController);
+    http.expectOne(r => r.url.endsWith('/sourceTask.json/listSourceTask')).flush({ status: API_SUCCESS,
+      data: [{ taskDetailId: 1933, taskName: 'X-ray triage', tenantId: 2905, tenantName: 'MedAxis' }] });
+    const key = component.rules()[0].key;
+    expect(component.problems()).toContain('Rule 1 needs a pipeline of 1 to 120 characters, with no space at either end.');
+    expect(component.draft()).toBe('Fix the pricing rules first.');
+    component.pickPipeline(key, '1933');
+    expect(component.rules()[0]).toMatchObject({ match_value: '1933', note: 'X-ray triage' });
+    expect(component.pipelineOptions()[0].label).toBe('X-ray triage — MedAxis (#1933)');
+    component.setRule(key, 'unit_price', '0.001');
+    expect(component.problems()).toEqual([]);
+    component.setKind(key, 'CLASS');
+    expect(component.rules()[0].match_value).toBe('sensitive');
+    component.setRule(key, 'match_value', 'secret');
+    expect(component.problems()).toContain('Rule 1: a data class is one of public, internal, sensitive.');
+    component.removeRule(key);
+    expect(component.rules()).toEqual([]);
+  });
+
+  it('raises a tag rule above the tag tried before it by swapping their numbers', () => {
+    const base = RateCards.numeric({ ...CARDS[3], rules: [RULES[0], { ...RULES[0], rule_no: 4, match_value: 'pilot' }] } as unknown as RateCard);
+    const { component } = editor(base);
+    const pilot = component.rules().find(r => r.match_value === 'pilot')!;
+    component.raiseTag(pilot.key);
+    expect(component.orderedRules().map(r => r.match_value)).toEqual(['pilot', 'research']);
+  });
+
+  it('saves a draft, which prices nothing, and closes with it', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component, api, ref } = editor(base);
+    component.name.set('Drafted');
+    component.saveDraft();
+    expect(api.saveRateCardDraft).toHaveBeenCalledWith(expect.objectContaining({ name: 'Drafted', rules: [] }), undefined);
+    expect(api.saveRateCard).not.toHaveBeenCalled();
+    expect(ref.close).toHaveBeenCalledWith(expect.objectContaining({ draft_id: 31 }));
+  });
+
+  it('opens a saved draft, saves to it, and publishes it as a new version on Save version', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component, api, ref } = editor(base, undefined, DRAFT);
+    TestBed.inject(HttpTestingController).match(() => true).forEach(r => r.flush({ status: API_SUCCESS, data: [] }));
+    expect(component.name()).toBe('Rules for November');
+    expect(component.effectiveFrom()).toBe('2099-11-01');
+    expect(component.rules().length).toBe(3);
+    expect(component.items()[0].label).toBe('Seats');
+    component.save();
+    expect(api.saveRateCardDraft).toHaveBeenCalledWith(expect.objectContaining({ name: 'Rules for November' }), 31);
+    expect(api.publishRateCardDraft).toHaveBeenCalledWith(31);
+    expect(ref.close).toHaveBeenCalledWith(expect.objectContaining({ version: 12 }));
+  });
+
+  it("shows the server's sentence per rule problem under the rules", () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const refused = { status: 'ERROR', message: 'Rule 1 prices api.calls (and 1 more)', data: { problems: ['Rule 1 prices api.calls, which this card has no price for.', 'Rule 2: x'] } };
+    const { component, ref } = editor(base, refused);
+    component.name.set('Refused');
+    component.save();
+    expect(component.problems()).toEqual(['Rule 1 prices api.calls, which this card has no price for.', 'Rule 2: x']);
+    expect(component.error()).toBe('2 problems: see below.');
+    expect(ref.close).not.toHaveBeenCalled();
+  });
+
+  it('previews last month with the card as it stands in the panel', () => {
+    const base = RateCards.numeric(CARDS[3] as unknown as RateCard);
+    const { component, api } = editor(base);
+    component.name.set('Previewed');
+    component.runPreview();
+    expect(api.previewRateCard).toHaveBeenCalledWith({ card: expect.objectContaining({ name: 'Previewed' }) });
+    expect(component.preview()?.difference).toBe(-0.3);
+  });
+});
+
+describe('RateCards, drafts and rules', () => {
+  function withDrafts(confirm = true) {
+    const api = { rateCards: vi.fn(() => of({ status: API_SUCCESS, data: { cards: [{ ...CARDS[0] }, { ...CARDS[1] }, { ...CARDS[2], rules: RULES }, CARDS[3]] } })),
+      rateCardDrafts: vi.fn(() => of({ status: API_SUCCESS, data: { drafts: [DRAFT] } })),
+      publishRateCardDraft: vi.fn(() => of({ status: API_SUCCESS, data: { ...CARDS[0], version: 12, name: 'Rules for November' } })),
+      deleteRateCardDraft: vi.fn(() => of({ status: API_SUCCESS, data: {} })),
+      previewRateCard: vi.fn(() => of({ status: API_SUCCESS, data: PREVIEW })), saveRateCard: vi.fn() };
+    const dialog = { open: vi.fn(() => ({ closed: of(confirm) })) };
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }, { provide: Dialog, useValue: dialog },
+      { provide: WorkspacePicker, useValue: { tenantId: () => '2905', options: () => [{ value: '2905', label: 'MedAxis' }], ready: (then: () => void) => then() } },
+    ] });
+    const fixture = TestBed.createComponent(RateCards);
+    fixture.detectChanges();
+    return { fixture, api, dialog, component: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  }
+
+  it("lists a version's rules in the order usage is matched, beside the card's own price", () => {
+    const { el } = withDrafts();
+    const rows = [...el.querySelectorAll('[data-test="rules-table"] tbody tr')].map(tr => tr.getAttribute('data-rule'));
+    expect(rows).toEqual(['1', '2', '3']);
+    const first = el.querySelector('[data-test="rules-table"] tbody tr')!.textContent!;
+    expect(first).toContain('Pipeline X-ray triage (#1933)');
+    expect(first).toContain('$0.05 per user-day');
+    expect(first).toContain('$0.33 per user-day');
+  });
+
+  it('lists drafts first; a draft shows its rules, previews last month and publishes after asking', async () => {
+    const { el, component, api, fixture, dialog } = withDrafts();
+    expect(el.querySelector('[data-test="draft-item"]')!.textContent).toContain('Rules for November');
+    component.selectDraft(DRAFT);
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="draft-detail"]')!.textContent).toContain('A draft prices nothing');
+    expect(el.querySelectorAll('[data-test="rules-table"] tbody tr').length).toBe(3);
+    (el.querySelector('[data-test="preview-draft"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+    expect(api.previewRateCard).toHaveBeenCalledWith({ draftId: 31 });
+    expect(el.querySelector('[data-test="preview-difference"]')!.textContent).toContain('−$0.3');
+    expect(el.querySelector('[data-test="preview-workspaces"]')!.textContent).toContain('INV-2026-09-0001 issued (kept)');
+    await component.publishDraft(DRAFT);
+    expect(dialog.open).toHaveBeenCalled();
+    expect(api.publishRateCardDraft).toHaveBeenCalledWith(31);
+    expect(api.rateCards).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not publish or discard when the person says no', async () => {
+    const { component, api } = withDrafts(false);
+    await component.publishDraft(DRAFT);
+    await component.discardDraft(DRAFT);
+    expect(api.publishRateCardDraft).not.toHaveBeenCalled();
+    expect(api.deleteRateCardDraft).not.toHaveBeenCalled();
+  });
+});

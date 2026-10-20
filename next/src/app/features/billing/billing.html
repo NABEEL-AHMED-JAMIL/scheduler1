@@ -162,6 +162,29 @@
                             [attr.aria-label]="'Show what is behind ' + line.label" (click)="$event.stopPropagation(); toggleLine(line)">
                   <app-icon [name]="openLine()?.meter === line.meter ? 'chevronDown' : 'chevronRight'" size="0.9em" class="icon-muted" /></button></td>
               </tr>
+              <!-- Owner #23: usage pricing rules priced, each rule's part under its meter; the meter's line is their sum. -->
+              @if (line.rules?.length) {
+                <tr class="rule-part" data-test="rule-part-card">
+                  <td class="!pl-6 text-xs text-[color:var(--text-secondary)]">↳ At the card's price</td>
+                  <td class="hidden md:table-cell"></td>
+                  <td class="text-right tabular text-xs">{{ fmtUnits(line, line.cardQuantity ?? 0) }}
+                    @if ((line.cardIncludedQuantity ?? 0) > 0) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ fmtUnits(line, line.cardIncludedQuantity ?? 0) }} included</div> }</td>
+                  <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtRate(line) }}</td>
+                  <td class="text-right tabular text-xs" [title]="fmtExact(line.cardAmount ?? 0)">{{ fmtAmount(line.cardAmount ?? 0) }}</td>
+                  <td></td>
+                </tr>
+                @for (part of line.rules; track part.ruleNo) {
+                  <tr class="rule-part" data-test="rule-part" [attr.data-rule]="part.ruleNo">
+                    <td class="!pl-6 text-xs">↳ {{ part.label }} <span class="text-[color:var(--text-muted)]">· pricing rule</span></td>
+                    <td class="hidden md:table-cell"></td>
+                    <td class="text-right tabular text-xs">{{ fmtUnits(line, part.quantity) }}
+                      @if (part.includedQuantity > 0) { <div class="text-[11px] text-[color:var(--text-muted)]">{{ fmtUnits(line, part.includedQuantity) }} included</div> }</td>
+                    <td class="text-right tabular text-xs text-[color:var(--text-muted)] hidden md:table-cell whitespace-nowrap">{{ fmtUnitPrice(part.unitPrice, line.per, line.unit) }}</td>
+                    <td class="text-right tabular text-xs" [title]="fmtExact(part.amount)">{{ fmtAmount(part.amount) }}</td>
+                    <td></td>
+                  </tr>
+                }
+              }
               @if (openLine()?.meter === line.meter) {
                 <tr class="bg-sunken">
                   <td colspan="6" class="!py-3">
