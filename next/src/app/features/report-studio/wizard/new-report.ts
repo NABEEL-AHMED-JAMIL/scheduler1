@@ -13,7 +13,7 @@ import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { ReportStudioApi, studioError } from '../report-studio.api';
 import {
   InspectResult, JobRow, Problem, ReportDetail, SchemaField, SourceRef, TemplateDefinition, TemplateDetail, TemplateRow, chipWord, idempotencyKey,
-  isRunning, stageWord,
+  bundleParts, isRunning, stageWord,
 } from '../report-studio.model';
 import { ReportSourcePicker, SourceMode } from '../source-picker';
 import { ProblemList } from '../problem-list';
@@ -72,7 +72,10 @@ export function neededFields(def: TemplateDefinition): NeededField[] {
       const v = b[key];
       if (typeof v !== 'string') continue;
       const inner = innerPath(v, names);
-      if (inner && !out.has(inner)) out.set(inner, { path: inner, type: key === 'dataset' || b.type === 'list' ? 'array' : 'string', required: true });
+      // A list's binding, and a label and value that reads a list (its first row's field, a filter, a count: QA 2026-10-20).
+      const list = key === 'dataset' || b.type === 'list' || b.type === 'imageGrid' || (b.type === 'labelValue'
+        && (!!b['field'] || !!b['filter'] || (b['format'] as { type?: string } | undefined)?.type === 'count'));
+      if (inner && !out.has(inner)) out.set(inner, { path: inner, type: list ? 'array' : 'string', required: true });
     }
   });
   return [...out.values()];
@@ -120,6 +123,8 @@ export class NewReport implements OnInit {
   readonly inspecting = signal(false);
   readonly inspectError = signal('');
   readonly view = signal<SourceView>('sample');
+  /** Several files' parts by name, as the read names them (media's label). */
+  readonly bundleParts = bundleParts;
   readonly mapping = signal<Record<string, string>>({});
   readonly pdfUrl = signal<string | null>(null);
   readonly checking = signal(false);

@@ -1,0 +1,207 @@
+import { describe, it, expect } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { Block } from './designer-model';
+import { PropChange, PropertiesPanel, fieldsFor, filterRows, filterValues, opValue } from './properties';
+import { neededFields } from '../wizard/new-report';
+
+/**
+ * QA 2026-10-20 (media 3e1cb7d, e79e89c): the template's soft tints, chips, a label and value's size and list field, row
+ * filters and the count format each get a control in the properties panel -- none of them falls to "Edited as JSON".
+ */
+const definitions = {
+  style: {},
+  labelValueComponent: { properties: { id: {}, type: {}, label: { type: 'string', maxLength: 200 }, binding: { type: 'string' },
+    format: { $ref: '#/definitions/format' }, layout: { enum: ['inline', 'stacked'] }, filter: { $ref: '#/definitions/rowFilter' },
+    field: { type: 'string', maxLength: 200 }, emphasis: { enum: ['kpi', 'normal'] }, style: { $ref: '#/definitions/style' } } },
+  tableComponent: { properties: { id: {}, type: {}, dataset: { type: 'string' }, columns: { type: 'array' }, filter: { $ref: '#/definitions/rowFilter' },
+    style: { $ref: '#/definitions/style' } } },
+  listComponent: { properties: { id: {}, type: {}, binding: { type: 'string' }, filter: { $ref: '#/definitions/rowFilter' } } },
+  imageGridComponent: { properties: { id: {}, type: {}, binding: { type: 'string' }, filter: { $ref: '#/definitions/rowFilter' } } },
+};
+
+const fields = [
+  { path: 'period', type: 'string', nullable: false },
+  { path: 'rows', type: 'list', nullable: false },
+  { path: 'rows[].site', type: 'string', nullable: false },
+  { path: 'rows[].status', type: 'string', nullable: false },
+  { path: 'rows[].accuracy', type: 'number', nullable: false },
+];
+const sample = { period: 'Sep', rows: [
+  { site: 'North', status: 'Overall', accuracy: 0.91 }, { site: 'South', status: 'open', accuracy: 0.8 }, { site: 'East', status: ' OPEN ', accuracy: 0.7 },
+] };
+
+function panel(block: Block) {
+  TestBed.resetTestingModule();
+  TestBed.configureTestingModule({ imports: [PropertiesPanel] });
+  const fixture = TestBed.createComponent(PropertiesPanel);
+  fixture.componentRef.setInput('definitions', definitions);
+  fixture.componentRef.setInput('block', block);
+  fixture.componentRef.setInput('fields', fields);
+  fixture.componentRef.setInput('sample', sample);
+  const changes: PropChange[] = [];
+  fixture.componentInstance.changed.subscribe(c => {
+    changes.push(c);
+    fixture.componentRef.setInput('block', { ...(fixture.componentInstance.block() as Block), [c.key]: c.value });
+    fixture.detectChanges();
+  });
+  fixture.detectChanges();
+  const el = fixture.nativeElement as HTMLElement;
+  const select = (label: string) => el.querySelector(`select[aria-label="${label}"]`) as HTMLSelectElement | null;
+  const pick = (label: string, value: string) => {
+    const s = select(label)!;
+    s.value = value;
+    s.dispatchEvent(new Event('change'));
+  };
+  const write = (label: string, value: string) => {
+    const i = el.querySelector(`[aria-label="${label}"]`) as HTMLInputElement | HTMLTextAreaElement;
+    i.value = value;
+    i.dispatchEvent(new Event('change'));
+  };
+  return { fixture, el, changes, select, pick, write, last: () => changes[changes.length - 1] };
+}
+
+const options = (s: HTMLSelectElement | null) => [...(s?.options ?? [])].map(o => o.textContent!.trim());
+
+describe('the properties panel: the template features of 2026-10-20', () => {
+  it('draws filter, a list\'s field and the value size as their own editors, not JSON', () => {
+    const lv = fieldsFor('labelValue', definitions);
+    expect(lv.find(f => f.key === 'filter')).toEqual(expect.objectContaining({ kind: 'filter', group: 'data', label: 'Show only rows where' }));
+    expect(lv.find(f => f.key === 'field')).toEqual(expect.objectContaining({ kind: 'rowField', group: 'data', label: 'Show this field of the first row' }));
+    expect(lv.find(f => f.key === 'emphasis')).toEqual(expect.objectContaining({ kind: 'enum', label: 'Value size',
+      optionLabels: { kpi: 'Large (KPI)', normal: 'Normal (detail field)' } }));
+    for (const type of ['table', 'list', 'imageGrid']) expect(fieldsFor(type, definitions).find(f => f.key === 'filter')?.kind).toBe('filter');
+    expect([...lv, ...fieldsFor('table', definitions)].some(f => f.kind === 'json')).toBe(false);
+  });
+
+  it('offers the soft tints with words, and the chip toggle in Style', () => {
+    const p = panel({ id: 'kpi', type: 'labelValue', label: 'Rate', binding: 'primary.period' });
+    const bg = options(p.select('Background'));
+    expect(bg).toEqual(expect.arrayContaining(['Soft blue (primary)', 'Soft grey (muted)', 'Soft teal (accent)', 'Soft green (success)',
+      'Soft amber (warning)', 'Soft red (danger)', 'None (transparent)']));
+    p.pick('Background', 'success-soft');
+    expect(p.last()).toEqual({ key: 'style', value: { background: 'success-soft' } });
+    const chip = [...p.el.querySelectorAll('label.rsd-check')].find(l => l.textContent!.includes('Show as a chip (small rounded badge)'))!;
+    const box = chip.querySelector('input') as HTMLInputElement;
+    box.checked = true;
+    box.dispatchEvent(new Event('change'));
+    expect(p.last()).toEqual({ key: 'style', value: { background: 'success-soft', chip: true } });
+    box.checked = false;
+    box.dispatchEvent(new Event('change'));
+    expect(p.last()).toEqual({ key: 'style', value: { background: 'success-soft' } });
+  });
+
+  it('sets the value size in words, and says it needs the stacked layout', () => {
+    const p = panel({ id: 'kpi', type: 'labelValue', label: 'Rate', binding: 'primary.period' });
+    expect(options(p.select('Value size'))).toEqual(['Default (large)', 'Large (KPI)', 'Normal (detail field)']);
+    expect(p.el.textContent).toContain('Takes effect with the stacked layout.');
+    p.pick('Layout', 'stacked');
+    p.pick('Value size', 'normal');
+    expect(p.last()).toEqual({ key: 'emphasis', value: 'normal' });
+    expect(p.el.textContent).not.toContain('Takes effect with the stacked layout.');
+  });
+
+  it('gives a table column a chip tone, and none again', () => {
+    const p = panel({ id: 't', type: 'table', dataset: 'primary.rows', columns: [{ id: 'c1', field: 'site' }, { id: 'c2', field: 'status' }] });
+    expect(options(p.select('Column 2 chip'))).toEqual(['Plain value (no chip)', 'Chip · blue (primary)', 'Chip · grey (muted)', 'Chip · teal (accent)',
+      'Chip · green (success)', 'Chip · amber (warning)', 'Chip · red (danger)']);
+    p.pick('Column 2 chip', 'warning');
+    expect(p.last()).toEqual({ key: 'columns', value: [{ id: 'c1', field: 'site' }, { id: 'c2', field: 'status', chip: 'warning' }] });
+    p.pick('Column 2 chip', '');
+    expect(p.last()).toEqual({ key: 'columns', value: [{ id: 'c1', field: 'site' }, { id: 'c2', field: 'status' }] });
+  });
+
+  it('builds a table\'s filter from the test data: field, is / is not / is one of, the values, and clears it', () => {
+    const p = panel({ id: 't', type: 'table', dataset: 'primary.rows', columns: [{ id: 'c1', field: 'site' }] });
+    expect(options(p.select('Filter field'))).toEqual(['All rows', 'site', 'status', 'accuracy']);
+    expect(p.select('Filter operator')!.disabled).toBe(true);
+    p.pick('Filter field', 'status');
+    expect(p.last()).toEqual({ key: 'filter', value: { field: 'status', equals: '' } });
+    p.write('Filter value', 'open');
+    expect(p.last()).toEqual({ key: 'filter', value: { field: 'status', equals: 'open' } });
+    expect(p.el.textContent).toContain('Keeps 2 of 3 sample rows');
+    const suggested = [...p.el.querySelectorAll('#rsd-filter-values option')].map(o => (o as HTMLOptionElement).value);
+    expect(suggested).toEqual(['Overall', 'open', 'OPEN']);
+    p.pick('Filter operator', 'notEquals');
+    expect(p.last()).toEqual({ key: 'filter', value: { field: 'status', notEquals: 'open' } });
+    expect(p.el.textContent).toContain('Keeps 1 of 3 sample rows');
+    p.pick('Filter operator', 'in');
+    expect(p.last()).toEqual({ key: 'filter', value: { field: 'status', in: ['open'] } });
+    p.write('Filter values', 'open\nOverall\n\nopen');
+    expect(p.last()).toEqual({ key: 'filter', value: { field: 'status', in: ['open', 'Overall'] } });
+    expect(p.el.textContent).toContain('Keeps 3 of 3 sample rows');
+    p.write('Filter values', 'closed');
+    expect(p.el.textContent).toContain('Keeps none of the 3 sample rows');
+    (p.el.querySelector('button[aria-label="Clear the filter"]') as HTMLButtonElement).click();
+    expect(p.last()).toEqual({ key: 'filter', value: undefined });
+    expect(p.el.querySelector('button[aria-label="Clear the filter"]')).toBeNull();
+  });
+
+  it('types the filter\'s field when there is no test data', () => {
+    const p = panel({ id: 'g', type: 'list', binding: 'primary.items' });
+    p.fixture.componentRef.setInput('fields', []);
+    p.fixture.detectChanges();
+    expect(p.select('Filter field')).toBeNull();
+    p.write('Filter field', 'kind');
+    expect(p.last()).toEqual({ key: 'filter', value: { field: 'kind', equals: '' } });
+    expect(p.el.textContent).toContain('Pick test data to see which rows it keeps.');
+    p.write('Filter field', 'not a field');
+    expect(p.changes.length).toBe(1);
+  });
+
+  it('shows a list\'s field and filter on a label and value only when its binding is a list', () => {
+    const scalar = panel({ id: 'kpi', type: 'labelValue', label: 'Period', binding: 'primary.period' });
+    expect(scalar.select('Show this field of the first row')).toBeNull();
+    expect(scalar.el.querySelector('[aria-label="Filter field"]')).toBeNull();
+    const p = panel({ id: 'kpi', type: 'labelValue', label: 'Accuracy', binding: 'primary.rows' });
+    expect(p.el.textContent).toContain('A list of 3: pick its field below, or Format › count.');
+    p.pick('Filter field', 'status');
+    p.write('Filter value', 'overall');
+    p.pick('Show this field of the first row', 'accuracy');
+    expect(p.last()).toEqual({ key: 'field', value: 'accuracy' });
+    expect(p.el.textContent).toContain("Data matches · first row's accuracy: 0.91");
+    const datalist = [...p.el.querySelectorAll('#rsd-scalars option')].map(o => (o as HTMLOptionElement).value);
+    expect(datalist).toContain('primary.rows');
+  });
+
+  it('lists count among the formats and says what it is', () => {
+    const p = panel({ id: 'kpi', type: 'labelValue', label: 'Open', binding: 'primary.rows' });
+    expect(options(p.select('Format'))).toContain('count (how many items)');
+    p.pick('Format', 'count');
+    expect(p.last()).toEqual({ key: 'format', value: { type: 'count' } });
+    expect(p.el.textContent).toContain('Data matches · 3 rows');
+    p.fixture.componentRef.setInput('tree', { path: '$', type: 'object', children: [{ path: '$.rows', type: 'list', length: 40 }] });
+    p.pick('Filter field', 'status');
+    p.write('Filter value', 'open');
+    expect(p.el.textContent).toContain("Data matches · 2 of the sample's 3 rows (the data has 40)");
+    expect(p.el.textContent).toContain('Keeps 2 of 3 sample rows (the data has 40)');
+  });
+});
+
+describe('Create report\'s fields', () => {
+  it('needs a list where a label and value reads one (its field, a filter or a count)', () => {
+    const def = { schemaVersion: '1.0', template: { name: 'T', datasets: [{ id: 'primary', rootPath: '$' }], components: [
+      { id: 'a', type: 'labelValue', binding: 'primary.accuracy', field: 'accuracy_pct' },
+      { id: 'b', type: 'labelValue', binding: 'primary.results', format: { type: 'count' } },
+      { id: 'c', type: 'labelValue', binding: 'primary.period' },
+    ] } };
+    expect(neededFields(def).map(f => `${f.path}:${f.type}`)).toEqual(['accuracy:array', 'results:array', 'period:string']);
+  });
+});
+
+describe('row filters, as media-service compares them', () => {
+  const rows = [{ s: 'Open' }, { s: ' open ' }, { s: null }, {}, { s: 2 }];
+  it('compares as text, ignoring case and outer spaces; a missing value is blank', () => {
+    expect(filterRows(rows, { field: 's', equals: 'OPEN' }).length).toBe(2);
+    expect(filterRows(rows, { field: 's', notEquals: 'open' }).length).toBe(3);
+    expect(filterRows(rows, { field: 's', equals: '' }).length).toBe(2);
+    expect(filterRows(rows, { field: 's', in: ['2', 'open'] }).length).toBe(3);
+    expect(filterRows(rows, null)).toBe(rows);
+  });
+
+  it('carries the values over when the operator changes', () => {
+    expect(filterValues({ field: 'x', in: ['a', 'b'] })).toEqual(['a', 'b']);
+    expect(opValue('equals', ['a', 'b'])).toEqual({ equals: 'a' });
+    expect(opValue('notEquals', [])).toEqual({ notEquals: '' });
+    expect(opValue('in', [])).toEqual({ in: [''] });
+  });
+});

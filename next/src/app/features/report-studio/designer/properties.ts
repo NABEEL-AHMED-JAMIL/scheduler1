@@ -12,9 +12,13 @@ export interface PropField {
   key: string;
   label: string;
   kind: 'text' | 'textarea' | 'number' | 'boolean' | 'enum' | 'binding' | 'listBinding' | 'collection' | 'columns' | 'items'
-    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource';
+    | 'format' | 'style' | 'size' | 'itemField' | 'json' | 'asset' | 'imageSource' | 'filter' | 'rowField';
   group: 'content' | 'data' | 'format' | 'style' | 'layout';
   options?: string[];
+  /** The words for an enum's options, where its own values are not words (QA 2026-10-20: emphasis). */
+  optionLabels?: Record<string, string>;
+  /** The enum's first option, when "Default" alone does not say what the default is. */
+  defaultLabel?: string;
   min?: number;
   max?: number;
   hint?: string;
@@ -38,6 +42,8 @@ const LABELS: Record<string, string> = {
   // MIG-406: signatures, stamps, images from the data, the grid.
   stampRef: 'Stamp beside it', caption: 'Caption', placement: 'Where', imageSource: 'Pictures from', imageField: 'Picture field',
   captionField: 'Caption field', imageHeight: 'Picture height', maxItems: 'At most pictures', columns_grid: 'Pictures a row',
+  // QA 2026-10-20 (media 3e1cb7d): row filters, a list's field, the value's size.
+  filter: 'Show only rows where', field: 'Show this field of the first row', emphasis: 'Value size',
 };
 
 const GROUPS: Record<string, PropField['group']> = {
@@ -46,10 +52,19 @@ const GROUPS: Record<string, PropField['group']> = {
   pageBreakBefore: 'layout', pageBreakAfter: 'layout', hidden: 'layout', width: 'layout', height: 'layout', gap: 'layout',
 };
 
-const FORMAT_TYPES = ['text', 'number', 'integer', 'currency', 'percent', 'date', 'datetime', 'boolean', 'uppercase', 'lowercase', 'capitalize', 'mask'];
+const FORMAT_TYPES = ['text', 'number', 'integer', 'currency', 'percent', 'date', 'datetime', 'boolean', 'uppercase', 'lowercase', 'capitalize', 'mask',
+  'count'];
+/** A format type's words in the pickers, where its id alone does not say it ("count": how many items a list has). */
+export const FORMAT_WORDS: Record<string, string> = { count: 'count (how many items)' };
+/** The tones a chip (a small rounded badge) and a soft tint come in, with the colour each one is by default. */
+export const TONES: { id: string; colour: string }[] = [
+  { id: 'primary', colour: 'blue' }, { id: 'muted', colour: 'grey' }, { id: 'accent', colour: 'teal' }, { id: 'success', colour: 'green' },
+  { id: 'warning', colour: 'amber' }, { id: 'danger', colour: 'red' },
+];
 const STYLE_ENUMS: Record<string, string[]> = {
   align: ['left', 'center', 'right', 'justify'], fontSize: ['xs', 'sm', 'md', 'lg', 'xl', 'xxl'],
-  color: ['primary', 'text', 'muted', 'accent', 'success', 'warning', 'danger'], background: ['primary', 'muted', 'accent', 'background', 'success', 'warning', 'danger'],
+  color: ['primary', 'text', 'muted', 'accent', 'success', 'warning', 'danger'],
+  background: ['primary', 'muted', 'accent', 'background', 'success', 'warning', 'danger', ...TONES.map(t => `${t.id}-soft`), 'none'],
   padding: ['none', 'xs', 'sm', 'md', 'lg', 'xl'], marginTop: ['none', 'xs', 'sm', 'md', 'lg', 'xl'], marginBottom: ['none', 'xs', 'sm', 'md', 'lg', 'xl'],
 };
 const SIZE_PATTERN = /^(\d{1,3}(\.\d)?mm|\d{1,3}%)$/;
@@ -68,6 +83,10 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     if (s.$ref === '#/definitions/format') field = { key, label, kind: 'format', group: 'format' };
     else if (s.$ref === '#/definitions/style') field = { key, label, kind: 'style', group: 'style' };
     else if (s.$ref === '#/definitions/size') field = { key, label, kind: 'size', group: 'layout' };
+    else if (s.$ref === '#/definitions/rowFilter') field = { key, label, kind: 'filter', group: 'data' };
+    else if (key === 'field' && type === 'labelValue') field = { key, label, kind: 'rowField', group: 'data' };
+    else if (key === 'emphasis' && Array.isArray(s.enum)) field = { key, label, kind: 'enum', group, options: s.enum.map(String),
+      optionLabels: { kpi: 'Large (KPI)', normal: 'Normal (detail field)' }, defaultLabel: 'Default (large)' };
     else if (key === 'assetRef' || key === 'stampRef') field = { key, label: type === 'signature' && key === 'assetRef' ? 'Signature' : type === 'stamp' && key === 'assetRef' ? 'Stamp' : label,
       kind: 'asset', group: 'content', hint: key === 'assetRef' && (type === 'signature' || type === 'stamp') ? 'Approved, and yours to place (or granted to you).' : undefined };
     else if (key === 'imageSource') field = { key, label, kind: 'imageSource', group: 'data' };
@@ -90,6 +109,42 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     out.push(field);
   }
   return out;
+}
+
+/** A component's row filter (the schema's rowFilter): a field, and the value it equals, does not equal, or the values it is one of. */
+export interface RowFilter { field: string; equals?: string; notEquals?: string; in?: string[]; }
+export type FilterOp = 'equals' | 'notEquals' | 'in';
+const FILTER_FIELD = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+
+function withoutOp(f: RowFilter): RowFilter {
+  const { equals: _e, notEquals: _n, in: _i, ...rest } = f;
+  return rest;
+}
+
+/** The value(s) a filter compares with, whatever its operator. */
+export function filterValues(f: RowFilter | null): string[] {
+  if (!f) return [];
+  if (Array.isArray(f.in)) return f.in.map(String);
+  const v = f.notEquals ?? f.equals;
+  return v === undefined ? [] : [String(v)];
+}
+
+/** One operator's part of a filter: "is" and "is not" take the first value, "is one of" all of them (at least one). */
+export function opValue(op: FilterOp, values: string[]): Partial<RowFilter> {
+  if (op === 'in') return { in: values.length ? values : [''] };
+  return op === 'notEquals' ? { notEquals: values[0] ?? '' } : { equals: values[0] ?? '' };
+}
+
+/** The rows a filter keeps, compared as media-service does: as text, ignoring case and outer spaces (a missing value is blank). */
+export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
+  if (!f) return rows;
+  const norm = (v: unknown) => (v === undefined || v === null ? '' : String(v)).trim().toLowerCase();
+  const want = filterValues(f).map(norm);
+  return rows.filter(r => {
+    const v = norm(valueAt(r, f.field));
+    if (Array.isArray(f.in)) return want.includes(v);
+    return f.notEquals !== undefined ? v !== want[0] : v === (want[0] ?? '');
+  });
 }
 
 /**
@@ -131,9 +186,12 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                 <label class="field">
                   <span class="label">{{ f.label }}</span>
                   <select class="input" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="setEnum(f, $any($event.target).value)">
-                    <option value="" [selected]="!text(f.key)">Default</option>
-                    @for (o of f.options; track o) { <option [value]="o" [selected]="o === text(f.key)">{{ o }}</option> }
+                    <option value="" [selected]="!text(f.key)">{{ f.defaultLabel ?? 'Default' }}</option>
+                    @for (o of f.options; track o) { <option [value]="o" [selected]="o === text(f.key)">{{ f.optionLabels?.[o] ?? o }}</option> }
                   </select>
+                  @if (f.key === 'emphasis' && text('layout') !== 'stacked') {
+                    <span class="block field-note text-[color:var(--text-muted)]">Takes effect with the stacked layout.</span>
+                  }
                 </label>
               }
               @case ('number') {
@@ -168,6 +226,9 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                          placeholder="{{ primary() }}.summary.total" (change)="setBinding($any($event.target).value)" />
                   <datalist id="rsd-scalars">
                     @for (s of scalarFields(); track s.path) { <option [value]="primary() + '.' + s.path">{{ s.type }}</option> }
+                    @if (b.type === 'labelValue') {
+                      @for (c of lists(); track c.path) { <option [value]="primary() + '.' + c.path">list · one of its rows, or how many</option> }
+                    }
                   </datalist>
                   <ng-container *ngTemplateOutlet="match; context: { $implicit: bindingMatch() }" />
                 </div>
@@ -204,6 +265,57 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                   </select>
                 </label>
               }
+              @case ('rowField') {
+                @if (rowsShown()) {
+                  <label class="field">
+                    <span class="label">{{ f.label }}</span>
+                    <select class="input mono text-xs" [disabled]="readonly()" [attr.aria-label]="f.label" (change)="set('field', $any($event.target).value || undefined)">
+                      <option value="" [selected]="!text('field')">None · the list itself (Format: count)</option>
+                      @for (c of itemsOf('binding'); track c.path) { <option [value]="c.path" [selected]="c.path === text('field')">{{ c.path }} · {{ c.type }}</option> }
+                      @if (text('field') && !hasItemField('binding', text('field'))) { <option [value]="text('field')" selected>{{ text('field') }}</option> }
+                    </select>
+                  </label>
+                }
+              }
+              @case ('filter') {
+                @if (b.type !== 'labelValue' || rowsShown()) {
+                  <div class="flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
+                    <div class="rsd-filter-head">
+                      <span class="label">{{ f.label }}</span>
+                      @if (filter() && !readonly()) {
+                        <button type="button" class="btn btn-ghost btn-sm" aria-label="Clear the filter" (click)="set('filter', undefined)"><app-icon name="close" />Clear</button>
+                      }
+                    </div>
+                    <div class="rsd-two">
+                      @if (filterFields().length) {
+                        <select class="input mono text-xs" [disabled]="readonly()" aria-label="Filter field" (change)="setFilterField($any($event.target).value)">
+                          <option value="" [selected]="!filter()">All rows</option>
+                          @for (x of filterFields(); track x.path) { <option [value]="x.path" [selected]="x.path === filter()?.field">{{ x.path }}</option> }
+                          @if (filter() && !hasFilterField(filter()!.field)) { <option [value]="filter()!.field" selected>{{ filter()!.field }}</option> }
+                        </select>
+                      } @else {
+                        <input class="input mono text-xs" [value]="filter()?.field ?? ''" [disabled]="readonly()" aria-label="Filter field"
+                               placeholder="Field (all rows)" (change)="setFilterField($any($event.target).value)" />
+                      }
+                      <select class="input text-xs" [disabled]="readonly() || !filter()" aria-label="Filter operator" (change)="setFilterOp($any($event.target).value)">
+                        @for (o of filterOps; track o.id) { <option [value]="o.id" [selected]="o.id === filterOp()">{{ o.label }}</option> }
+                      </select>
+                    </div>
+                    @if (filter()) {
+                      @if (filterOp() === 'in') {
+                        <textarea class="input text-sm" rows="3" [value]="filterValue()" [disabled]="readonly()" aria-label="Filter values"
+                                  placeholder="One value per line" (change)="setFilterValue($any($event.target).value)"></textarea>
+                      } @else {
+                        <input class="input text-sm" maxlength="200" [value]="filterValue()" [disabled]="readonly()" aria-label="Filter value" list="rsd-filter-values"
+                               placeholder="Value (empty: a blank cell)" (change)="setFilterValue($any($event.target).value)" />
+                      }
+                      <datalist id="rsd-filter-values">@for (v of filterSuggestions(); track v) { <option [value]="v"></option> }</datalist>
+                      <span class="block field-note text-[color:var(--text-muted)]">Compared as text, ignoring capitals and spaces at the ends.</span>
+                    }
+                    <ng-container *ngTemplateOutlet="match; context: { $implicit: filterMatch() }" />
+                  </div>
+                }
+              }
               @case ('columns') {
                 <div class="flex flex-col gap-2">
                   <span class="label">Columns</span>
@@ -228,9 +340,16 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                                 (change)="setColumnFormat(i, $any($event.target).value)">
                           <option value="" [selected]="!c.format?.type && c.type !== 'image'">As written</option>
                           <option value="__image" [selected]="c.type === 'image'">Picture (a bucket key)</option>
-                          @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === c.format?.type && c.type !== 'image'">{{ t }}</option> }
+                          @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === c.format?.type && c.type !== 'image'">{{ formatWords[t] ?? t }}</option> }
                         </select>
                       </div>
+                      @if (c.type !== 'image') {
+                        <select class="input text-xs" [disabled]="readonly()" [attr.aria-label]="'Column ' + (i + 1) + ' chip'"
+                                (change)="setColumnChip(i, $any($event.target).value)">
+                          <option value="" [selected]="!c.chip">Plain value (no chip)</option>
+                          @for (t of tones; track t.id) { <option [value]="t.id" [selected]="t.id === c.chip">Chip · {{ t.colour }} ({{ t.id }})</option> }
+                        </select>
+                      }
                       @if (c.type === 'image') {
                         <input class="input mono text-xs" [value]="c.imageSource?.bucket ?? ''" [disabled]="readonly()" placeholder="Bucket of the pictures"
                                [attr.aria-label]="'Column ' + (i + 1) + ' bucket'" (change)="setColumnBucket(i, $any($event.target).value)" />
@@ -248,7 +367,7 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
                     <span class="label">Format</span>
                     <select class="input" [disabled]="readonly()" aria-label="Format" (change)="setFormat('type', $any($event.target).value)">
                       <option value="" [selected]="!formatType()">As written</option>
-                      @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === formatType()">{{ t }}</option> }
+                      @for (t of formatTypes; track t) { <option [value]="t" [selected]="t === formatType()">{{ formatWords[t] ?? t }}</option> }
                     </select>
                   </label>
                   @if (formatType() === 'currency') {
@@ -286,11 +405,11 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
               @case ('style') {
                 <div class="rsd-two">
                   @for (s of styleKeys; track s) {
-                    <label class="field">
+                    <label class="field" [class.rsd-span]="s === 'background'">
                       <span class="label">{{ styleLabel(s) }}</span>
                       <select class="input" [disabled]="readonly()" [attr.aria-label]="styleLabel(s)" (change)="setStyle(s, $any($event.target).value)">
                         <option value="" [selected]="!styleValue(s)">Default</option>
-                        @for (o of styleEnums[s]; track o) { <option [value]="o" [selected]="o === styleValue(s)">{{ o }}</option> }
+                        @for (o of styleEnums[s]; track o) { <option [value]="o" [selected]="o === styleValue(s)">{{ styleOptionLabel(s, o) }}</option> }
                       </select>
                     </label>
                   }
@@ -387,6 +506,9 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
     .rsd-column { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem; border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md); }
     .rsd-column-top { display: flex; align-items: center; gap: 0.25rem; }
+    .rsd-span { grid-column: 1 / -1; }
+    .rsd-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.75rem; }
+    .rsd-filter-head .label { margin-bottom: 0; }
   `,
 })
 export class PropertiesPanel {
@@ -414,8 +536,12 @@ export class PropertiesPanel {
   readonly dateStyles = [{ id: '', label: '19 Oct 2026' }, { id: 'long', label: '19 October 2026' }, { id: 'short', label: 'Short' },
     { id: 'iso', label: '2026-10-19' }];
   readonly styleEnums = STYLE_ENUMS;
-  readonly styleKeys = ['align', 'fontSize', 'color', 'background', 'padding', 'marginTop', 'marginBottom'];
-  readonly styleFlags = ['bold', 'italic', 'uppercase', 'border'];
+  /** Background last, on a row of its own: its soft tints' words do not fit half the panel. */
+  readonly styleKeys = ['align', 'fontSize', 'color', 'padding', 'marginTop', 'marginBottom', 'background'];
+  readonly styleFlags = ['bold', 'italic', 'uppercase', 'border', 'chip'];
+  readonly formatWords = FORMAT_WORDS;
+  readonly tones = TONES;
+  readonly filterOps: { id: FilterOp; label: string }[] = [{ id: 'equals', label: 'is' }, { id: 'notEquals', label: 'is not' }, { id: 'in', label: 'is one of' }];
 
   readonly primary = computed(() => this.names()[0] ?? 'primary');
   readonly hasData = computed(() => this.fields().length > 0);
@@ -436,7 +562,7 @@ export class PropertiesPanel {
   });
 
   readonly columns = computed(() => (Array.isArray(this.block()?.['columns']) ? this.block()!['columns'] : []) as
-    { id: string; label?: string; field: string; format?: { type?: string }; type?: string; imageSource?: { kind?: string; bucket?: string } }[]);
+    { id: string; label?: string; field: string; format?: { type?: string }; type?: string; imageSource?: { kind?: string; bucket?: string }; chip?: string }[]);
   readonly itemsText = computed(() => (Array.isArray(this.block()?.['items']) ? (this.block()!['items'] as unknown[]).map(String).join('\n') : ''));
   readonly formatType = computed(() => String((this.block()?.['format'] as { type?: string } | undefined)?.type ?? ''));
 
@@ -451,8 +577,114 @@ export class PropertiesPanel {
     if (v === undefined && !this.fields().some(f => f.path === inner)) {
       return { ok: false, missing: true, text: `${inner} is not in the test data.` };
     }
+    if (Array.isArray(v) && this.block()?.type === 'labelValue') {
+      const rows = filterRows(v, this.filter());
+      const field = this.text('field');
+      const total = lengthAt(this.tree(), inner) ?? v.length;
+      if (field) return { ok: true, missing: false, text: `Data matches · first row's ${field}: ${rows.length ? sampleText(valueAt(rows[0], field)) : 'no row'}` };
+      if (this.formatType() === 'count') {
+        return { ok: true, missing: false, text: !this.filter() ? `Data matches · ${total} rows`
+          : `Data matches · ${rows.length} of the sample's ${v.length} rows${total > v.length ? ` (the data has ${total})` : ''}` };
+      }
+      return { ok: false, missing: false, text: `A list of ${total}: pick its field below, or Format › count.` };
+    }
     return { ok: true, missing: false, text: `Data matches · sample: ${sampleText(v)}` };
   });
+
+  // ---------------------------------------------------------------- row filters and a list's field (QA 2026-10-20)
+
+  /** The setting whose list a filter's rows come from: a table's collection, else the block's own binding. */
+  readonly rowsKey = computed(() => (this.block()?.type === 'table' ? 'dataset' : 'binding'));
+
+  /** A label and value shows its list's settings when its binding is a list (or they are set already). */
+  readonly rowsShown = computed(() => {
+    const path = this.collectionOf('binding');
+    return (!!path && this.hasList(path)) || !!this.text('field') || !!this.filter();
+  });
+
+  readonly filter = computed(() => {
+    const f = this.block()?.['filter'];
+    return f && typeof f === 'object' && typeof (f as RowFilter).field === 'string' ? (f as RowFilter) : null;
+  });
+
+  readonly filterOp = computed<FilterOp>(() => {
+    const f = this.filter();
+    return f && Array.isArray(f.in) ? 'in' : f && f.notEquals !== undefined ? 'notEquals' : 'equals';
+  });
+
+  readonly filterValue = computed(() => filterValues(this.filter()).join(this.filterOp() === 'in' ? '\n' : ''));
+
+  readonly filterFields = computed(() => this.itemsOf(this.rowsKey()).filter(f => !/object|list|array/i.test(f.type)));
+
+  /** The sample's rows of the filter's list, or null when the test data does not have it. */
+  private readonly sampleRows = computed(() => {
+    const path = this.collectionOf(this.rowsKey());
+    if (!path || !this.hasData()) return null;
+    const v = valueAt(this.sample(), path);
+    return Array.isArray(v) ? v : null;
+  });
+
+  /** The values the filter's field takes in the sample (at most 30), offered as the value. */
+  readonly filterSuggestions = computed(() => {
+    const field = this.filter()?.field;
+    const rows = this.sampleRows();
+    if (!field || !rows) return [];
+    const seen = new Set<string>();
+    for (const r of rows) {
+      const v = valueAt(r, field);
+      if (v !== undefined && v !== null && typeof v !== 'object' && String(v).trim()) seen.add(String(v).trim());
+      if (seen.size >= 30) break;
+    }
+    return [...seen];
+  });
+
+  /** How many sample rows the filter keeps. */
+  readonly filterMatch = computed(() => {
+    const f = this.filter();
+    if (!f) return null;
+    const rows = this.sampleRows();
+    if (!rows) return { ok: false, missing: false, text: this.hasData() ? 'The list is not in the test data.' : 'Pick test data to see which rows it keeps.' };
+    if (rows.length && !rows.some(r => valueAt(r, f.field) !== undefined)) return { ok: false, missing: true, text: `${f.field} is not in the rows.` };
+    const kept = filterRows(rows, f).length;
+    const total = lengthAt(this.tree(), this.collectionOf(this.rowsKey())) ?? rows.length;
+    const of = `${rows.length} sample row${rows.length === 1 ? '' : 's'}${total > rows.length ? ` (the data has ${total})` : ''}`;
+    return kept ? { ok: true, missing: false, text: `Keeps ${kept} of ${of}` } : { ok: false, missing: true, text: `Keeps none of the ${of}` };
+  });
+
+  hasFilterField(field: string): boolean {
+    return this.filterFields().some(f => f.path === field);
+  }
+
+  /** A field starts a filter ("is", no value yet: a blank cell); no field removes it. */
+  setFilterField(raw: string): void {
+    const field = raw.trim();
+    if (!field) { this.set('filter', undefined); return; }
+    if (!FILTER_FIELD.test(field)) return;
+    const f = this.filter();
+    this.set('filter', f ? { ...withoutOp(f), field, ...opValue(this.filterOp(), filterValues(f)) } : { field, equals: '' });
+  }
+
+  /** Another operator keeps the value(s) written so far. */
+  setFilterOp(op: string): void {
+    const f = this.filter();
+    if (!f || (op !== 'equals' && op !== 'notEquals' && op !== 'in')) return;
+    this.set('filter', { ...withoutOp(f), ...opValue(op, filterValues(f)) });
+  }
+
+  setFilterValue(raw: string): void {
+    const f = this.filter();
+    if (!f) return;
+    const op = this.filterOp();
+    const values = op === 'in' ? [...new Set(raw.split('\n').map(v => v.trim().slice(0, 200)).filter(Boolean))].slice(0, 20) : [raw.trim().slice(0, 200)];
+    this.set('filter', { ...withoutOp(f), ...opValue(op, values) });
+  }
+
+  styleOptionLabel(key: string, option: string): string {
+    if (key !== 'background') return option;
+    if (option === 'none') return 'None (transparent)';
+    const tone = TONES.find(t => `${t.id}-soft` === option);
+    return tone ? `Soft ${tone.colour} (${tone.id})` : option;
+  }
 
   value(key: string): unknown {
     return this.block()?.[key];
@@ -555,6 +787,7 @@ export class PropertiesPanel {
     if (type === '__image') {
       cols[i].type = 'image';
       delete cols[i].format;
+      delete (cols[i] as { chip?: string }).chip;
       cols[i].imageSource = cols[i].imageSource ?? { kind: 'BUCKET', bucket: '' };
       cols[i].imageWidth = cols[i].imageWidth ?? '20mm';
     } else {
@@ -563,6 +796,14 @@ export class PropertiesPanel {
       delete cols[i].imageWidth;
       if (!type) delete cols[i].format; else cols[i].format = { ...(cols[i].format ?? {}), type };
     }
+    this.set('columns', cols);
+  }
+
+  /** A column's values as small rounded badges in a tone, or plain. */
+  setColumnChip(i: number, tone: string): void {
+    const cols = this.columnList() as ({ chip?: string })[];
+    if (!cols[i]) return;
+    if (TONES.some(t => t.id === tone)) cols[i].chip = tone; else delete cols[i].chip;
     this.set('columns', cols);
   }
 
@@ -641,7 +882,8 @@ export class PropertiesPanel {
 
   styleLabel(key: string): string {
     const words: Record<string, string> = { align: 'Align', fontSize: 'Text size', color: 'Text colour', background: 'Background', padding: 'Padding',
-      marginTop: 'Space above', marginBottom: 'Space below', bold: 'Bold', italic: 'Italic', uppercase: 'Capitals', border: 'Border' };
+      marginTop: 'Space above', marginBottom: 'Space below', bold: 'Bold', italic: 'Italic', uppercase: 'Capitals', border: 'Border',
+      chip: 'Show as a chip (small rounded badge)' };
     return words[key] ?? key;
   }
 
