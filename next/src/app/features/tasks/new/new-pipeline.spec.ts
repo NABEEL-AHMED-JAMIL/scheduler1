@@ -16,7 +16,7 @@ const SOURCES = [
   { taskDetailId: 1500, taskName: 'Old XML task', pipelineId: null, taskStatus: 'Active' },
 ];
 
-function screen() {
+function screen(tenantId: number | null = 2960) {
   const posts: { url: string; body: any }[] = [];
   const get = vi.fn((url: string, opts?: { params?: Record<string, unknown> }) => {
     if (url.endsWith('/setting.json/topics')) return of({ status: 'SUCCESS', data: [{ sourceTaskTypeId: 11858, serviceName: 'etl.reference', status: 'Active' }] });
@@ -40,7 +40,7 @@ function screen() {
     providers: [
       provideZonelessChangeDetection(), provideRouter([]),
       { provide: HttpClient, useValue: { get, post } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4640, tenantId: 2960 }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: 4640, tenantId }) } },
     ],
   });
   const fixture = TestBed.createComponent(NewPipeline);
@@ -89,5 +89,13 @@ describe('New pipeline', () => {
     expect(steps.body.pipelineKey).not.toBe(100480);
     expect(posts.find(p => p.url.endsWith('/sourceTask.json/addSourceTask'))!.body).toMatchObject({ taskStatus: 'Inactive' });
     expect(navigate).toHaveBeenCalledWith(['/pipelines', 1950, 'edit'], { queryParams: { tab: 'steps' } });
+  });
+
+  it('sends a sign-in with no workspace (a platform administrator) to open one first, and reads no topics', () => {
+    const { el, posts } = screen(null);
+    expect(el.querySelector('[data-test="needs-workspace"]')).not.toBeNull();
+    expect(el.querySelector('[data-test="start-with"]')).toBeNull();
+    expect(el.querySelector('[data-test="needs-workspace"] a')?.getAttribute('href')).toBe('/platform/workspaces');
+    expect(posts.length).toBe(0);
   });
 });

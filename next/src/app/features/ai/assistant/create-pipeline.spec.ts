@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { provideZonelessChangeDetection } from '@angular/core';
+import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpClient } from '@angular/common/http';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
@@ -8,6 +8,7 @@ import { of } from 'rxjs';
 import { ConversationApi } from './conversation.api';
 import { CreatePipeline, CreatePipelineData } from './create-pipeline';
 import { PipelineFlowArtifact } from './flow.model';
+import { AuthService } from '../../../core/auth/auth.service';
 
 /**
  * AI hard-workflow test (2026-10-13): the Create dialog says what will really happen -- a scheduled flow runs on its own --
@@ -18,7 +19,7 @@ const flow = (trigger: PipelineFlowArtifact['trigger']): PipelineFlowArtifact =>
   flow: { nodes: [], edges: [] }, definition: { version: 1, steps: [{ key: 'read', task: 'read_api' }] },
 });
 
-function open(data: CreatePipelineData) {
+function open(data: CreatePipelineData, tenantId: number | null = 2960) {
   const posted: { url: string; body: unknown }[] = [];
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({
@@ -26,6 +27,7 @@ function open(data: CreatePipelineData) {
     providers: [provideZonelessChangeDetection(), provideRouter([]),
       { provide: DIALOG_DATA, useValue: data },
       { provide: DialogRef, useValue: { close: vi.fn() } },
+      { provide: AuthService, useValue: { user: signal({ appUserId: 4640, tenantId }) } },
       { provide: ConversationApi, useValue: { pipelineCreated: vi.fn(() => of({ status: 'SUCCESS' })) } },
       { provide: HttpClient, useValue: {
         get: () => of({ status: 'SUCCESS', data: [{ sourceTaskTypeId: 1, serviceName: 'Pipelines' }] }),
@@ -58,5 +60,12 @@ describe('the Create pipeline dialog', () => {
     expect(fixture.componentInstance.created()).toMatchObject({ pipelineKey: 1428, version: 2 });
     await fixture.componentInstance.create();
     expect(posted).toHaveLength(1);
+  });
+
+  it('a sign-in with no workspace (a platform administrator) is told to open one, and cannot create (owner 2026-10-20)', () => {
+    const { el, fixture } = open({ flow: flow({ type: 'manual' }), definition: flow({ type: 'manual' }).definition }, null);
+    expect(el.textContent).toContain('Work in this workspace');
+    expect(fixture.componentInstance.topics()).toEqual([]);
+    expect(fixture.componentInstance.canCreate()).toBe(false);
   });
 });

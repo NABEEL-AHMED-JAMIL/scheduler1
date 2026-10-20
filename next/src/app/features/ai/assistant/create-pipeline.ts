@@ -8,6 +8,7 @@ import { SERVER_ZONE } from '../../../core/instant';
 import { Icon } from '../../../shared/ui/icon';
 import { CreatedFlow, FlowDefinition, FlowTrigger, PipelineFlowArtifact, pipelineIdOf, triggerWhen } from './flow.model';
 import { ConversationApi } from './conversation.api';
+import { AuthService } from '../../../core/auth/auth.service';
 
 export interface CreatePipelineData {
   flow: PipelineFlowArtifact;
@@ -162,6 +163,7 @@ export class CreatePipeline implements OnInit {
   readonly ref = inject<DialogRef<CreatedPipeline | null>>(DialogRef);
   readonly data = inject<CreatePipelineData>(DIALOG_DATA);
   private readonly http = inject(HttpClient);
+  private readonly auth = inject(AuthService);
   private readonly router = inject(Router, { optional: true });
   private readonly conversations = inject(ConversationApi);
 
@@ -193,6 +195,12 @@ export class CreatePipeline implements OnInit {
   });
 
   ngOnInit(): void {
+    // A platform administrator's own sign-in has no workspace: the topics are then every workspace's, and a pipeline made
+    // on one of them is refused ("That topic belongs to another workspace", owner 2026-10-20). They open the workspace first.
+    if (!this.auth.user()?.tenantId) {
+      this.topicsError.set('Pipelines belong to a workspace: open it with "Work in this workspace" on Platform › Workspaces first.');
+      return;
+    }
     this.http.get<ApiResponse<Topic[]>>(`${API_BASE}/setting.json/topics`, { params: { q: '', limit: 50 } }).subscribe({
       next: r => {
         const list = (r.status === API_SUCCESS ? r.data ?? [] : []).filter(t => (t.status ?? 'Active') === 'Active');
