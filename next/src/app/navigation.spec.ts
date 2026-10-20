@@ -270,7 +270,7 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/reports/from-pipelines', 'Reports from pipelines', 'tools-converter', undefined],
     // MIG-403: Report Studio's tabs and pages (Templates and a template open to report-generate too: pageKeys).
     ['/reports/overview', 'Reports overview', 'report-studio', undefined],
-    ['/reports/library', 'Reports', 'report-library', undefined],
+    ['/reports/library', 'Report library', 'report-library', undefined],
     ['/reports/library/:reportId', 'Report', 'report-library', undefined],
     ['/reports/data', 'Report data', 'report-data', undefined],
     ['/tools/transcript', 'Audio Transcript', 'tools-transcript', undefined],

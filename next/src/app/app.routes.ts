@@ -438,7 +438,7 @@ export const routes: Routes = [
       },
       {
         path: 'reports/library',
-        title: 'Reports',
+        title: 'Report library',
         loadComponent: () => import('./features/report-studio/library').then(m => m.ReportLibrary),
         data: { pageKey: 'report-library' },
         canActivate: [pageGuard],

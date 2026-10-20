@@ -434,7 +434,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/reports/library",
-      "title": "Reports",
+      "title": "Report library",
       "pageKey": "report-library",
       "guards": [
         "pageGuard"
