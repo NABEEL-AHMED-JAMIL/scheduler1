@@ -64,6 +64,9 @@ describe('MIG-336: the developer portal\'s routes and menu', () => {
     expect(guideTitle('no-such-guide')).toBe('Guide');
   });
 
+  // It draws the whole API reference (every operation and schema) and the changelog in jsdom: ~1 s alone, ~3.5 s in a
+  // full ng test run (2026-10-19, the suite's slowest test) -- pure work, no waiting -- so vitest's 5 s default timed it
+  // out whenever the machine was busy. Its budget matches the work it does.
   it('lands each address on its page', async () => {
     configure(true);
     const harness = await RouterTestingHarness.create();
@@ -73,7 +76,7 @@ describe('MIG-336: the developer portal\'s routes and menu', () => {
     expect(harness.routeNativeElement!.querySelector('#op-createToken')).not.toBeNull();
     await harness.navigateByUrl('/developers/portal/changelog');
     expect(harness.routeNativeElement!.querySelector('[data-changelog]')!.textContent).toContain('v1.0.0-draft');
-  });
+  }, 20_000);
 
   it('lists the overview, the guides, the reference by tag, events, problems, the changelog and downloads on the left', () => {
     const labels = DeveloperLayout.links().map(l => l.label);
