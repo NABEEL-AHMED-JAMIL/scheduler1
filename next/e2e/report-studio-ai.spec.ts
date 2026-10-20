@@ -60,11 +60,15 @@ test.describe('Report Studio: the AI assistant (live)', () => {
     await panel.scrollIntoViewIfNeeded();
     await shot(page, info, 'ai-designer-1920-light');
     await page.emulateMedia({ colorScheme: 'dark' });
+    await page.waitForTimeout(600); // the theme's colour transitions settle before the picture
     await shot(page, info, 'ai-designer-1920-dark');
     await page.setViewportSize({ width: 1024, height: 768 });
+    await page.getByRole('button', { name: 'Fit', exact: true }).click();
     await panel.locator('[data-ai-proposal]').scrollIntoViewIfNeeded();
+    await page.waitForTimeout(600);
     await shot(page, info, 'ai-designer-1024-dark');
     await page.emulateMedia({ colorScheme: 'light' });
+    await page.waitForTimeout(600);
     await shot(page, info, 'ai-designer-1024-light');
     await page.setViewportSize({ width: 1920, height: 1080 });
 
