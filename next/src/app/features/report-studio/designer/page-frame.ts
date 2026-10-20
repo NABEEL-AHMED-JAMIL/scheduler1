@@ -42,7 +42,10 @@ export class PageFrame {
       this.picked.emit(hit ? idOf(hit) : null);
     });
     effect(() => {
-      this.root.innerHTML = `<style>${this.css()}\n${canvasCss(this.page(), this.pages(), this.heightMm())}</style><div class="rs-sheet">${this.html()}</div>`;
+      // A later page's sheet is not the first of its type (the empty div before it), so the report's first-page rules -- a
+      // letterhead, a tint on the first page only -- hold on page 1 alone, as in the PDF.
+      const later = this.page() > 1 ? '<div hidden></div>' : '';
+      this.root.innerHTML = `<style>${this.css()}\n${canvasCss(this.page(), this.pages(), this.heightMm())}</style>${later}<div class="rs-sheet">${this.html()}</div>`;
       this.marked = null;
       this.target = null;
       this.mark(this.selected());

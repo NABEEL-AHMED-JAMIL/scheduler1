@@ -97,7 +97,8 @@ const FORMAT_TYPES = ['text', 'number', 'integer', 'currency', 'percent', 'date'
 export const FORMAT_WORDS: Record<string, string> = { count: 'count (how many items)' };
 /** The tones a chip (a small rounded badge) and a soft tint come in, with the colour each one is by default. */
 export const TONES: { id: string; colour: string }[] = [
-  { id: 'primary', colour: 'blue' }, { id: 'muted', colour: 'grey' }, { id: 'accent', colour: 'teal' }, { id: 'success', colour: 'green' },
+  // primary and accent are the theme's (a brand's main colour may be any colour), the others the palette's fixed ones.
+  { id: 'primary', colour: 'main colour' }, { id: 'muted', colour: 'grey' }, { id: 'accent', colour: 'accent colour' }, { id: 'success', colour: 'green' },
   { id: 'warning', colour: 'amber' }, { id: 'danger', colour: 'red' },
 ];
 const STYLE_ENUMS: Record<string, string[]> = {

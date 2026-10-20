@@ -148,6 +148,36 @@ describe('the canvas document', () => {
     el.className = `rs-text ${CANVAS_ID}abc`;
     expect(idOf(el)).toBe('abc');
   });
+
+  it('keeps the server\'s figures (inline SVG shapes) and nothing else an svg could carry', () => {
+    // Live 10-20: the cleaner dropped every svg, so charts, KPI tiles and QR codes were blank on the canvas.
+    const root = new DOMParser().parseFromString(`<div class="rs-figure"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10">
+      <title>Chart</title><desc>Visits by month.</desc><rect x="0" y="0" width="5" height="5" fill="#0F766E"></rect>
+      <path d="M0 0L5 5" stroke="#1F2933"></path><circle cx="1" cy="1" r="1"></circle><line x1="0" y1="0" x2="1" y2="1"></line>
+      <text x="1" y="9" font-size="2">Jan</text>
+      <script>alert(1)</script><foreignObject><div>x</div></foreignObject><use href="#a"></use><image href="https://example.com/x.png"></image>
+      <a href="https://example.com"><text>link</text></a><animate attributeName="x"></animate><style>rect{fill:red}</style>
+      <rect style="fill:url(https://example.com/x)" fill="url(https://example.com/p)" onclick="y()" width="1" height="1"></rect>
+      <svg><rect></rect></svg></svg></div>`, 'text/html');
+    clean(root);
+    const svg = root.querySelector('svg')!;
+    expect(svg).not.toBeNull();
+    expect(Array.from(svg.querySelectorAll('*')).map(e => e.localName).sort())
+      .toEqual(['circle', 'desc', 'line', 'path', 'rect', 'rect', 'text', 'title']);
+    const last = svg.querySelectorAll('rect')[1];
+    expect(Array.from(last.attributes).map(a => a.name).sort()).toEqual(['height', 'width']);
+    expect(svg.querySelector('text')!.textContent).toBe('Jan');
+  });
+
+  it('keeps a first-page-only watermark off the later pages', () => {
+    const marked = html.replace('<div class="rs-header', '<div class="rs-watermark rs-watermark--first" aria-hidden="true"><span>DRAFT</span></div><div class="rs-header');
+    const doc = splitCanvas(marked);
+    expect(doc.pages.length).toBe(2);
+    expect(doc.pages[0]).toContain('DRAFT');
+    expect(doc.pages[1]).not.toContain('DRAFT');
+    const every = splitCanvas(html.replace('<div class="rs-header', '<div class="rs-watermark" aria-hidden="true"><span>COPY</span></div><div class="rs-header'));
+    for (const p of every.pages) expect(p).toContain('COPY');
+  });
 });
 
 describe('the properties panel', () => {

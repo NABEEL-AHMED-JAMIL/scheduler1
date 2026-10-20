@@ -317,11 +317,11 @@
               <div class="rsd-two">
                 <label class="field"><span class="label">Strength</span>
                   <select class="input" [ngModel]="watermarkNumber('opacity', 0.12)" (ngModelChange)="setWatermark('opacity', +$event)" [disabled]="!editable()" aria-label="Watermark strength">
-                    @for (o of opacities; track o.v) { <option [ngValue]="o.v">{{ o.label }}</option> }
+                    @for (o of opacityChoices(); track o.v) { <option [ngValue]="o.v">{{ o.label }}</option> }
                   </select></label>
                 <label class="field"><span class="label">Angle</span>
                   <select class="input" [ngModel]="watermarkNumber('angle', 45)" (ngModelChange)="setWatermark('angle', +$event)" [disabled]="!editable()" aria-label="Watermark angle">
-                    @for (a of angles; track a) { <option [ngValue]="a">{{ a }}°</option> }
+                    @for (a of angleChoices(); track a) { <option [ngValue]="a">{{ a }}°</option> }
                   </select></label>
                 <label class="field"><span class="label">Pages</span>
                   <select class="input" [ngModel]="watermark()['pages'] ?? 'all'" (ngModelChange)="setWatermark('pages', $event)" [disabled]="!editable()" aria-label="Watermark pages">
@@ -333,7 +333,7 @@
                   </select></label>
                 <label class="field"><span class="label">Colour</span>
                   <select class="input" [ngModel]="watermark()['color'] ?? 'muted'" (ngModelChange)="setWatermark('color', $event)" [disabled]="!editable()" aria-label="Watermark colour">
-                    @for (t of tones; track t.id) { <option [value]="t.id">{{ t.colour }}</option> }
+                    @for (t of tones; track t.id) { <option [value]="t.id">{{ t.colour.charAt(0).toUpperCase() + t.colour.slice(1) }}</option> }
                   </select></label>
               </div>
               <label class="field"><span class="label">Only when (optional)</span>
@@ -348,7 +348,7 @@
               <label class="field"><span class="label">Tint</span>
                 <select class="input" [ngModel]="pageSetting('backgroundTint')" (ngModelChange)="setPage('backgroundTint', $event)" [disabled]="!editable()" aria-label="Page tint">
                   <option value="">None (white)</option>
-                  @for (t of tones; track t.id) { <option [value]="t.id">Soft {{ t.colour }}</option> }
+                  @for (t of tones; track t.id) { <option [value]="t.id">Soft {{ t.colour }} ({{ t.id }})</option> }
                 </select></label>
               <label class="field"><span class="label">On</span>
                 <select class="input" [ngModel]="pageSetting('backgroundPages') || 'all'" (ngModelChange)="setPage('backgroundPages', $event === 'all' ? '' : $event)" [disabled]="!editable()" aria-label="Background pages">

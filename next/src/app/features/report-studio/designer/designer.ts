@@ -959,6 +959,19 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     return !text ? '' : this.watermarkPresets.includes(text) ? text : '__own';
   });
 
+  /** The strengths offered, with the template's own when it is none of them (an imported 0.16 shows as 16 %). */
+  readonly opacityChoices = computed(() => {
+    const v = this.watermark()['opacity'];
+    return typeof v === 'number' && !this.opacities.some(o => o.v === v)
+      ? [...this.opacities, { v, label: `${Math.round(v * 100)} %` }].sort((a, b) => a.v - b.v) : this.opacities;
+  });
+
+  /** The angles offered, with the template's own when it is none of them. */
+  readonly angleChoices = computed(() => {
+    const v = this.watermark()['angle'];
+    return typeof v === 'number' && !this.angles.includes(v) ? [...this.angles, v].sort((a, b) => a - b) : this.angles;
+  });
+
   watermarkNumber(key: string, fallback: number): number {
     const v = this.watermark()[key];
     return typeof v === 'number' ? v : fallback;

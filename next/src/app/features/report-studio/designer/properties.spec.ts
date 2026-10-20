@@ -76,7 +76,7 @@ describe('the properties panel: the template features of 2026-10-20', () => {
   it('offers the soft tints with words, and the chip toggle in Style', () => {
     const p = panel({ id: 'kpi', type: 'labelValue', label: 'Rate', binding: 'primary.period' });
     const bg = options(p.select('Background'));
-    expect(bg).toEqual(expect.arrayContaining(['Soft blue (primary)', 'Soft grey (muted)', 'Soft teal (accent)', 'Soft green (success)',
+    expect(bg).toEqual(expect.arrayContaining(['Soft main colour (primary)', 'Soft grey (muted)', 'Soft accent colour (accent)', 'Soft green (success)',
       'Soft amber (warning)', 'Soft red (danger)', 'None (transparent)']));
     p.pick('Background', 'success-soft');
     expect(p.last()).toEqual({ key: 'style', value: { background: 'success-soft' } });
@@ -102,7 +102,7 @@ describe('the properties panel: the template features of 2026-10-20', () => {
 
   it('gives a table column a chip tone, and none again', () => {
     const p = panel({ id: 't', type: 'table', dataset: 'primary.rows', columns: [{ id: 'c1', field: 'site' }, { id: 'c2', field: 'status' }] });
-    expect(options(p.select('Column 2 chip'))).toEqual(['Plain value (no chip)', 'Chip · blue (primary)', 'Chip · grey (muted)', 'Chip · teal (accent)',
+    expect(options(p.select('Column 2 chip'))).toEqual(['Plain value (no chip)', 'Chip · main colour (primary)', 'Chip · grey (muted)', 'Chip · accent colour (accent)',
       'Chip · green (success)', 'Chip · amber (warning)', 'Chip · red (danger)']);
     p.pick('Column 2 chip', 'warning');
     expect(p.last()).toEqual({ key: 'columns', value: [{ id: 'c1', field: 'site' }, { id: 'c2', field: 'status', chip: 'warning' }] });

@@ -5,7 +5,9 @@
  *
  * The HTML comes from media-service's compiler, whose values are DOM text and whose markup is its own closed set; it is
  * put through this cleaner as well before it is drawn, so nothing that runs or reaches out can get onto the console's
- * page: no script, frame, object, embed, link, base, form or meta; no event attribute; no javascript: address.
+ * page: no script, frame, object, embed, link, base, form or meta; no event attribute; no javascript: address. A figure
+ * (chart, KPI tile, QR code; report phase 4) is the server's inline SVG, a closed set of shapes: only those elements are
+ * kept inside an svg, with no link, no style attribute and no url() reference.
  */
 
 /** A canvas page: the sheet's inner HTML (header, the page's blocks, footer). */
@@ -14,11 +16,24 @@ export interface CanvasDoc { css: string; pages: string[]; }
 /** The class that names a component's element on the canvas (media's Compiler.CANVAS_ID). */
 export const CANVAS_ID = 'rs-id--';
 
-const DROP_TAGS = 'script, iframe, frame, frameset, object, embed, link, base, form, meta, noscript, template, svg, math';
+const DROP_TAGS = 'script, iframe, frame, frameset, object, embed, link, base, form, meta, noscript, template, math';
+
+/** What media's SvgWriter draws a figure with: anything else inside an svg is dropped. */
+const SVG_TAGS = new Set(['svg', 'title', 'desc', 'g', 'rect', 'line', 'circle', 'path', 'text', 'tspan']);
 
 /** Removes everything that could run or load, from a parsed document, in place. */
 export function clean(root: ParentNode): void {
   root.querySelectorAll(DROP_TAGS).forEach(e => e.remove());
+  root.querySelectorAll('svg svg').forEach(e => e.remove());
+  root.querySelectorAll('svg *').forEach(e => {
+    if (!SVG_TAGS.has(e.localName) || e.localName === 'svg') e.remove();
+  });
+  root.querySelectorAll('svg, svg *').forEach(e => {
+    for (const a of Array.from(e.attributes)) {
+      const name = a.name.toLowerCase();
+      if (name === 'style' || name.includes('href') || a.value.toLowerCase().includes('url(')) e.removeAttribute(a.name);
+    }
+  });
   root.querySelectorAll('*').forEach(e => {
     for (const a of Array.from(e.attributes)) {
       const name = a.name.toLowerCase();
@@ -48,7 +63,10 @@ export function splitCanvas(html: string): CanvasDoc {
   const sheet = doc.querySelector('.rs-sheet');
   if (!sheet) return { css, pages: [''] };
   const own = (selector: string) => Array.from(sheet.children).find(c => c.matches(selector)) ?? null;
-  const watermark = own('.rs-watermark')?.outerHTML ?? '';
+  // A watermark on the first page only (rs-watermark--first) stays off the later pages.
+  const mark = own('.rs-watermark');
+  const watermark = mark?.outerHTML ?? '';
+  const firstOnly = mark?.classList.contains('rs-watermark--first') ?? false;
   const header = own('.rs-header')?.outerHTML ?? '';
   const footer = own('.rs-footer')?.outerHTML ?? '';
   const body = own('.rs-body');
@@ -60,7 +78,7 @@ export function splitCanvas(html: string): CanvasDoc {
       chunks[chunks.length - 1].push(e.outerHTML);
     }
   }
-  const pages = chunks.map(c => `${watermark}${header}<div class="rs-doc rs-body">${c.join('')}</div>${footer}`);
+  const pages = chunks.map((c, i) => `${firstOnly && i > 0 ? '' : watermark}${header}<div class="rs-doc rs-body">${c.join('')}</div>${footer}`);
   return { css, pages };
 }
 
