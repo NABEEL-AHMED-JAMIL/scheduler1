@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { Dialog } from '@angular/cdk/dialog';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { FormBuilder } from './form-builder';
@@ -22,10 +23,17 @@ const FORMS: FormSummary[] = [
   { formId: 1000, name: 'Wound intake', status: 'Active', version: 3, fieldCount: 2, startsJob: true, jobId: 2833,
     jobName: 'Wound triage', submissions: 4, dateUpdated: '2026-10-01T15:00:00Z' },
   { formId: 1001, name: 'Discharge checklist', status: 'Draft', version: 1, fieldCount: 0, startsJob: false, submissions: 0 },
+  { formId: 1003, name: 'Visit log', status: 'Active', version: 1, fieldCount: 1, startsJob: false, submissions: 3,
+    dataset: { analyticsDatasetId: 77, name: 'Form: Visit log', connection: 'clinic-inbox', path: 'datasets/forms/form-1003/*.json' } },
 ];
 
-function screenWith(opts: { admin?: boolean; locked?: boolean } = {}) {
+function screenWith(opts: { admin?: boolean; locked?: boolean; confirm?: boolean } = {}) {
   const admin = opts.admin ?? true;
+  const asked: { title: string; body: string }[] = [];
+  const dialog = { open: vi.fn((_c: unknown, config: { data: { title: string; body: string } }) => {
+    asked.push(config.data);
+    return { closed: of(opts.confirm ?? true) };
+  }) };
   const api = {
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: admin ? FORMS : FORMS.filter(f => f.status === 'Active') })),
     fetch: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...FORMS[0], fields: FIELDS } })),
@@ -33,6 +41,7 @@ function screenWith(opts: { admin?: boolean; locked?: boolean } = {}) {
     save: vi.fn(() => of({ status: 'SUCCESS', message: 'Form created.', data: { ...FORMS[1], formId: 1002 } })),
     setStatus: vi.fn(() => of({ status: 'SUCCESS', message: 'The form is archived.', data: FORMS[0] })),
     shareLinks: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { enabled: false, shareable: true, links: [] } })),
+    rebuildDataset: vi.fn(() => of({ status: 'SUCCESS', message: 'Rebuilt 3 of 3 submission file(s); no answers changed.', data: null })),
   };
   const toast = { success: vi.fn(), error: vi.fn() };
   TestBed.resetTestingModule();
@@ -42,6 +51,7 @@ function screenWith(opts: { admin?: boolean; locked?: boolean } = {}) {
       provideRouter([]),
       { provide: FormsApi, useValue: api },
       { provide: ToastService, useValue: toast },
+      { provide: Dialog, useValue: dialog },
       { provide: AuthService, useValue: {
         isTenantAdmin: () => admin, canBuild: () => admin && !opts.locked, builderLocked: () => !!opts.locked, canOpen: () => true,
         user: signal({ appUserId: 4537 }),
@@ -50,7 +60,7 @@ function screenWith(opts: { admin?: boolean; locked?: boolean } = {}) {
   });
   const fixture = TestBed.createComponent(FormBuilder);
   fixture.detectChanges();
-  return { api, toast, fixture, screen: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
+  return { api, toast, asked, fixture, screen: fixture.componentInstance, el: fixture.nativeElement as HTMLElement };
 }
 
 const labels = (el: HTMLElement) => Array.from(el.querySelectorAll('button, a'))
@@ -95,6 +105,49 @@ describe('Form builder -- the list', () => {
     expect(names.some(n => n === 'New form' || n.startsWith('Edit') || n.startsWith('Archive'))).toBe(false);
     const heads = Array.from(el.querySelectorAll('thead th')).map(th => th.textContent!.trim());
     expect(heads).toEqual(['Form', 'Status', 'Fields', 'Actions']); // Actions as a screen reader's heading over the ⋮
+  });
+
+  it('offers an administrator "Rebuild dataset files" on a dataset form only, in a MANAGED workspace too', () => {
+    const { el, fixture } = screenWith();
+    const names = offered(el, fixture);
+    expect(names).toContain('Rebuild dataset files of Visit log');
+    expect(names.filter(n => n.startsWith('Rebuild dataset files'))).toHaveLength(1);
+    const locked = screenWith({ locked: true });
+    expect(offered(locked.el, locked.fixture)).toContain('Rebuild dataset files of Visit log');
+    const member = screenWith({ admin: false });
+    expect(offered(member.el, member.fixture).some(n => n.startsWith('Rebuild'))).toBe(false);
+  });
+
+  it('rebuilds a dataset form\'s files after saying what it does, and shows the answer', async () => {
+    const { api, toast, asked, screen } = screenWith();
+    await screen.rebuildDataset(FORMS[2]);
+    expect(asked).toHaveLength(1);
+    expect(asked[0].title).toBe('Rebuild the dataset files of Visit log?');
+    expect(asked[0].body).toContain('clinic-inbox / datasets/forms/form-1003/*.json');
+    expect(asked[0].body).toContain('No answers change.');
+    expect(api.rebuildDataset).toHaveBeenCalledWith(1003);
+    expect(toast.success).toHaveBeenCalledWith('Rebuilt 3 of 3 submission file(s); no answers changed.');
+    expect(screen.rebuilding()).toBeNull();
+
+    await screen.rebuildDataset(FORMS[0]);
+    expect(api.rebuildDataset).toHaveBeenCalledTimes(1); // not a dataset: nothing to rebuild
+  });
+
+  it('sends nothing when the rebuild is cancelled, and shows a refusal or a failure as an error', async () => {
+    const cancelled = screenWith({ confirm: false });
+    await cancelled.screen.rebuildDataset(FORMS[2]);
+    expect(cancelled.api.rebuildDataset).not.toHaveBeenCalled();
+
+    const refused = screenWith();
+    refused.api.rebuildDataset.mockReturnValueOnce(of({ status: 'ERROR', message: 'Rebuilt 2 of 3 submission file(s); no answers '
+      + 'changed. 1 could not be written; try again.', data: null }));
+    await refused.screen.rebuildDataset(FORMS[2]);
+    expect(refused.toast.error).toHaveBeenCalledWith(expect.stringContaining('1 could not be written'));
+
+    refused.api.rebuildDataset.mockReturnValueOnce(throwError(() => ({ error: {} })));
+    await refused.screen.rebuildDataset(FORMS[2]);
+    expect(refused.toast.error).toHaveBeenLastCalledWith('The dataset files were not rebuilt. Try again.');
+    expect(refused.screen.rebuilding()).toBeNull();
   });
 
   it('archives a form and reads the list again', () => {

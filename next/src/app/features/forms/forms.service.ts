@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
-import { FormDraft, FormStatus, FormSummary, LinkableJob, PublicFormView, SharePolicy, ShareLink, ShareLinks, ShareLinkDraft,
+import { DatasetRebuild, FormDraft, FormStatus, FormSummary, LinkableJob, PublicFormView, SharePolicy, ShareLink, ShareLinks, ShareLinkDraft,
   Submission, UploadRef } from './forms.model';
 
 /**
@@ -34,6 +34,11 @@ export class FormsApi {
 
   setStatus(formId: number, status: FormStatus): Observable<ApiResponse<FormSummary>> {
     return this.http.post<ApiResponse<FormSummary>>(`${this.forms}/status`, { formId, status });
+  }
+
+  /** A dataset form's files written again in its bucket, one per submission; no answer changes (an administrator's). */
+  rebuildDataset(formId: number): Observable<ApiResponse<DatasetRebuild>> {
+    return this.http.post<ApiResponse<DatasetRebuild>>(`${this.forms}/rebuildDataset`, null, { params: { formId: String(formId) } });
   }
 
   /** A refusal of the answers comes back as ERROR with `data.problems`, a sentence per field key. */

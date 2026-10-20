@@ -468,6 +468,12 @@
                         <app-icon [name]="canBuild() ? 'edit' : 'eye'" />{{ canBuild() ? 'Edit' : 'View' }}
                       </button>
                     }
+                    @if (isAdmin() && f.dataset?.analyticsDatasetId) {
+                      <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="rebuildDataset(f)" [disabled]="rebuilding() !== null"
+                              [attr.aria-label]="'Rebuild dataset files of ' + f.name" data-rebuild-dataset>
+                        <app-icon name="refresh" />{{ rebuilding() === f.formId ? 'Rebuilding files…' : 'Rebuild dataset files' }}
+                      </button>
+                    }
                     @if (canBuild()) {
                       @if (f.status !== 'Active') {
                         <button cdkMenuItem type="button" class="menu-item" (cdkMenuItemTriggered)="setStatus(f, 'Active')" [attr.aria-label]="'Activate ' + f.name">
