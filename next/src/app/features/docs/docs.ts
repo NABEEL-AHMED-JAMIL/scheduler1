@@ -366,7 +366,12 @@ export class Docs implements AfterViewInit {
         'Documents: define a document type (for example a synthetic intake form or a sample invoice) with the fields to read, then upload, mail in (Email-in) or drop files (File drop).',
         'Forms: build a form whose answers start a pipeline or feed a review.',
       ],
-      notes: ['Values a document type is unsure of go to Review › Documents for a person to check.'],
+      notes: [
+        'Values a document type is unsure of go to Review › Documents for a person to check.',
+        'A form that keeps its answers as a dataset writes a file per submission to your bucket. If those files are lost or '
+          + 'were written by an older version, an administrator can choose Rebuild dataset files in the form\'s row menu (⋮): '
+          + 'each file is written again from the submission as it is kept, and no answer changes.',
+      ],
       warn: 'Give each workspace its own bucket. A shared bucket lets one workspace\'s runs write where another reads.',
     },
     {
@@ -380,12 +385,21 @@ export class Docs implements AfterViewInit {
         { label: 'Build › Approval workflows', path: '/workflows/designer' },
       ],
       todo: [
-        'Describe it to the AI Assistant ("read the synthetic claims file each night, flag amounts over 10,000, write a summary"), check the steps it proposes, and save; or add the steps yourself.',
+        'Describe it to the AI Assistant ("read the orders file each night, flag amounts over 10,000, write a summary"), check the steps it proposes, and save; or add the steps yourself.',
+        'Steps are grouped by stage: read, check, transform, AI, review and write. Show them as a List or as a Flow; in the Flow '
+          + 'view a long pipeline folds each stage into one node with its stage button, or all at once with Collapse all and Expand all.',
         'For an AI step, pick a prompt (Prompts) and the model connection it runs on (Settings › Model connections).',
+        'To make a finished report, add a Generate report step and choose where its design comes from: Design the report here '
+          + '(the designer opens on the step\'s own data from the pipeline\'s latest run; publish the design for the step to run it) '
+          + 'or Use a saved template. Each run keeps the report\'s PDF with its outputs and adds a version to Reports › Library.',
         'In the pipeline\'s Settings, choose whether its results wait for a review, and whether that review may be decided in bulk or only one by one.',
         'For a sign-off in the middle of a run, add an Approval step and say who approves it in Approval workflows.',
       ],
-      notes: ['Data policies (Administration › Data policies) decide which models may see each level of data and how long a run keeps it.'],
+      notes: [
+        'Data policies (Administration › Data policies) decide which models may see each level of data and how long a run keeps it.',
+        'A pipeline belongs to one workspace. A platform administrator opens the workspace first, with Work in this workspace on '
+          + 'Platform › Workspaces, before New pipeline offers anything.',
+      ],
     },
     {
       id: 'run', title: 'Run and schedule it',
@@ -397,7 +411,8 @@ export class Docs implements AfterViewInit {
       todo: [
         'Add a schedule: the pipeline, a frequency (see the reference below), a start, and optionally an end, retries and who hears about it.',
         'Or a trigger: a file dropped, an email in, a document approved, a form submitted.',
-        'Follow runs under Runs: Latest, By date, Analytics, Failed and Backfills. A run\'s page shows its steps, its log and what it produced.',
+        'Follow runs under Runs: Latest, By date, Analytics, Failed and Backfills. A run\'s page has the tabs Steps, Map, AI answers, Outputs and Log.',
+        'On Outputs, View shows a file in place: a kept PDF in the PDF viewer, a kept table as a table, a file the run put in a bucket in the file preview. Download takes it away.',
         'Retry a failed run from the step that failed (Runs › Failed groups failures by their error), or run a schedule for each period of a past range (Backfills).',
       ],
       notes: ['A run missed while the system was down is recorded as Missed, and a run stopped before it finished as Interrupted, so a gap in the history is never silent.'],
@@ -419,6 +434,9 @@ export class Docs implements AfterViewInit {
         'Each tab — Approvals, Runs, Documents — is that kind\'s own list with its own filters.',
       ],
       notes: [
+        'A run\'s review shows what is being reviewed, from the result the pipeline kept for it: the image a field names, the '
+          + 'first fields a reviewer looks at (with a DRAFT mark where the pipeline marks a model\'s answer as a draft), the rest on '
+          + 'demand, the run\'s PDF and Open the run. A model\'s answer is a draft for a person to check, never a decision.',
         'A pipeline set to individual review is never decided in bulk, and a document someone has claimed is theirs to decide.',
         'Whether runs and documents may be approved in bulk at all is the workspace\'s choice, under Administration › Data policies.',
       ],
@@ -435,17 +453,49 @@ export class Docs implements AfterViewInit {
         'Dashboards: boards of tiles over your pipelines\' results; each board names the pipelines that feed it.',
         'Ask your data: ask a question in plain words and read the answer with the rows behind it; pin it to a dashboard.',
         'Analytics Studio and the Data Catalog: explore datasets, and find what was made from what.',
-        'Generated reports and Files: the documents and files runs wrote.',
-        'Reports: PDF and HTML reports made from a published template with your data. Generating again makes a new version; '
-          + 'nothing is overwritten. Someone other than the person who generated it approves a version and signs its PDF.',
+        'Files: the files runs wrote and the uploads, by connection and folder, each with a preview.',
+        'Reports: finished PDF and HTML reports made from a template with your data, approved and signed by a person; the next part says how.',
+      ],
+    },
+    {
+      id: 'reports', title: 'Make signed reports',
+      intro: 'Reports turns data into a finished report from a template designed once: filled from a pipeline\'s run, a dataset or '
+           + 'a file, every version kept, and approved and digitally signed by someone other than whoever generated it.',
+      where: [
+        { label: 'See results › Reports › Overview', path: '/reports/overview' },
+        { label: 'Reports › Templates', path: '/reports/templates' },
+        { label: 'Reports › Library', path: '/reports/library' },
+        { label: 'Reports › Data', path: '/reports/data' },
+        { label: 'Reports › Assets & branding', path: '/reports/assets' },
+      ],
+      todo: [
+        'Assets & branding: upload logos and images, and make a brand profile so every report has the same header, footer, '
+          + 'colours and logo. Signatures and stamps are uploaded by one person and approved by another before anyone may place them.',
+        'Templates › New template makes a draft you lay out in the designer: text, fields, tables with totals, pictures from the data, charts, '
+          + 'KPI tiles and QR codes; show a block only when a condition holds, or repeat it for each item of a list; add a '
+          + 'watermark (DRAFT, COPY, CONFIDENTIAL, VOID, SAMPLE or your own words), a page tint or a letterhead. Try it with test '
+          + 'data, then publish it.',
+        'Create report: pick a published template, the data (a run\'s output, a saved source, a file, or several files as one) '
+          + 'and how its fields map, read the checks and the preview, and generate. Every generate is a new version; nothing is overwritten.',
+        'From a pipeline: a Generate report step makes a version on every run, with a design made inside the step or a saved '
+          + 'template (see Build a pipeline).',
+        'A report\'s page in the Library lists its versions. Someone allowed to approve, who did not generate that version, '
+          + 'chooses Approve and sign: the PDF gets a digital signature in their name. Only the current version can be approved; '
+          + 'an older one that was never approved reads Superseded.',
+        'Verify signature checks a version\'s PDF, or a file someone sent you, against the workspace\'s approved reports.',
       ],
       notes: [
-        'A version you no longer stand behind is marked Void: it stays, and every download of it says VOID.',
+        'Mark this version as COPY when you generate it, or let a template say Every download after the first says COPY.',
+        'A version you no longer stand behind is marked Void with a reason: it stays, and every copy served from then on says VOID. '
+          + 'The approved file itself is never changed, so its signature still verifies.',
         'Archive takes a report out of the library and keeps it. Delete removes a report and its versions for good, and only while '
           + 'no version of it was approved: an approved report is a kept record, so void the version or archive the report. Stored files '
           + 'that storage does not remove stay until an operator removes them; the message after a delete says so.',
-        'You can delete several reports at once in Reports: tick them, then Delete. Approved ones cannot be ticked.',
+        'You can delete several reports at once in the Library: tick them, then Delete. Approved ones cannot be ticked.',
+        'The Library, Templates and Assets lists page and search on the server, so a large library opens as quickly as a small one.',
       ],
+      warn: 'An approval is a person\'s decision about what they have read. The signature proves who approved which file and that it '
+          + 'has not changed since, not that its content is right.',
     },
     {
       id: 'monitor', title: 'Monitor and get alerted',
@@ -460,6 +510,8 @@ export class Docs implements AfterViewInit {
         'Read failures grouped by error pattern under Runs › Failed, and retry them from there.',
         'The bell in the top bar holds every notification; Notifications is the whole list.',
       ],
+      notes: ['A platform administrator also reads Platform › Service health: each service\'s health, its deploys in the last 24 '
+        + 'hours, and the Background checks (Kafka consumers and the billing reconciliation): each one\'s result, what it found and when it was read.'],
     },
     {
       id: 'billing', title: 'See what it costs',
@@ -468,13 +520,37 @@ export class Docs implements AfterViewInit {
         { label: 'Administration & billing › Billing', path: '/billing' },
       ],
       todo: [
-        'Cost & usage: month to date, a forecast at the last week\'s pace, cost by day and by pipeline, and line by line what is behind each charge.',
+        'Cost & usage: month to date and a forecast at the last week\'s pace; Cost by day (daily or cumulative); Cost by pipeline, '
+          + 'with By pipeline and, for the pipeline you pick, By run; AI model calls by source or every call; By service; and Line by '
+          + 'line, what is behind each charge. A run\'s own page links to what it cost.',
         'Invoices: each closed month, its lines frozen with the rate card that priced them, with payment slips, credit notes and a PDF.',
         'Billing documents: every bill, slip and statement in one place.',
       ],
       fields: [
         { name: 'What is metered', required: false, note: 'Storage kept (measured nightly), bytes written, read and deleted, storage operations, pipeline runs and their minutes, model tokens, images described, documents converted, analytics queries, API calls and seats.' },
         { name: 'Rate cards', required: false, note: 'Kept as versions by a platform administrator on Billing › Settings. A change is a new version with an effective date; a bill already drafted or issued keeps the version it names.' },
+        { name: 'Pricing rules', required: false, note: 'A rate card version may price some usage differently: a rule for one pipeline, then for a pipeline tag, then for a data class, else the card\'s own price. A rule changes only the unit price. Drafts are previewed against last month or this month so far before they are published.' },
+      ],
+    },
+    {
+      id: 'developers', title: 'Connect your own systems',
+      intro: 'Your own systems use the customer API (/v1): start runs, send files and events, read what runs made, and be told by '
+           + 'webhooks. Its documentation, with samples to copy, is the Developer portal.',
+      where: [
+        { label: 'Administration & billing › Developers › API Clients', path: '/developers/api-clients' },
+        { label: 'Developers › Developer portal', path: '/developers/portal' },
+      ],
+      todo: [
+        'API Clients: a workspace administrator makes one client for each system, with only the scopes it needs. Its secret is shown once. Webhooks and event routes are set up on the same page.',
+        'Sandbox: once your account team has made one, make test keys under API Clients › Sandbox. They work only in the sandbox, and nothing there is billed.',
+        'Developer portal: guides with samples in curl, Python and Node.js, the API reference, the event and problem types, the rate limits, the changelog, and the OpenAPI document and a Postman collection to download.',
+        'Your API clients, in the portal, shows what each client may call; APIs this workspace calls lists the saved requests your pipelines send out, and what each last answered.',
+      ],
+      notes: [
+        'A report a pipeline\'s Generate report step made is listed in the run\'s outputs, and webhooks are told when it is there. '
+          + 'Approving, signing and verifying reports are done in Reports; the API has no calls for the Reports library yet.',
+        'By default each client may make 600 calls a minute (bursts of 100), and all of a workspace\'s clients together 1,200 (bursts of 200), unless the platform sets other limits.',
+        'A platform administrator has no workspace of their own: API Clients, Your API clients and APIs this workspace calls ask which workspace first, and every change is made in the one picked.',
       ],
     },
     {
@@ -486,7 +562,11 @@ export class Docs implements AfterViewInit {
         'Under Administration › Data policies, choose which models may see sensitive data and how long runs keep it.',
         'Give reviewers and viewers profiles that open only the pages their work needs.',
       ],
-      notes: ['Meeting your organisation\'s privacy and regulatory obligations depends on how you configure and use the console; it does not by itself make a workspace compliant with any law or standard.'],
+      notes: [
+        'A model\'s answer is a draft: a person approves or rejects it in Review, and a report is approved and signed by a person.',
+        'The Sensitive data level starts as Local only: only model connections your organisation runs itself may see it, until an administrator says otherwise.',
+        'Meeting your organisation\'s privacy and regulatory obligations depends on how you configure and use the console; it does not by itself make a workspace compliant with any law or standard.',
+      ],
     },
   ];
 
