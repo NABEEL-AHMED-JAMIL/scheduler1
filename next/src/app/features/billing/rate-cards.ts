@@ -14,7 +14,7 @@ import { BillingApi, RateCard, RateCardDraftRow, RateItem, RatePreview, RateRule
 import { formatQuantity, formatUnitPrice, localIsoDate } from './billing-format';
 import { RateCardEditor, RateCardEditorData, RateCardEditorResult } from './rate-card-editor';
 import { byPrecedence, kindText, matchText } from './rate-rules';
-import { RatePreviewView } from './rate-preview';
+import { RatePreviewView, previewPeriods } from './rate-preview';
 import { confirmWith } from '../../shared/ui/confirm';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
@@ -53,6 +53,8 @@ export class RateCards implements OnInit {
   readonly selectedDraftId = signal<number | null>(null);
   readonly selectedDraft = computed(() => this.drafts().find(d => d.draft_id === this.selectedDraftId()) ?? null);
   readonly preview = signal<RatePreview | null>(null);
+  readonly periods = previewPeriods();
+  readonly previewPeriod = signal(this.periods[0].value);
   readonly previewing = signal(false);
   readonly previewError = signal('');
   readonly busy = signal(false);
@@ -160,7 +162,7 @@ export class RateCards implements OnInit {
   /** What last month would have cost with the picked draft. */
   previewDraft(d: RateCardDraftRow): void {
     this.previewing.set(true); this.previewError.set(''); this.preview.set(null);
-    this.api.previewRateCard({ draftId: d.draft_id }).subscribe({
+    this.api.previewRateCard({ draftId: d.draft_id }, this.previewPeriod()).subscribe({
       next: r => { this.previewing.set(false); if (r.status !== API_SUCCESS || !r.data) { this.previewError.set(r.message); return; } this.preview.set(r.data); },
       error: err => { this.previewing.set(false); this.previewError.set(err?.error?.message || 'The preview could not be priced.'); },
     });

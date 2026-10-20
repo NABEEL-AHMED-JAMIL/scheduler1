@@ -13,7 +13,7 @@ import { BillingApi, MODEL_PRICED_METERS, RateCard, RateCardDraft, RateCardDraft
   modelOfMeter } from './billing.service';
 import { firstOfMonth, formatUnitPrice } from './billing-format';
 import { DATA_CLASSES, RULE_KINDS, byPrecedence, kindText, ruleProblems } from './rate-rules';
-import { RatePreviewView } from './rate-preview';
+import { RatePreviewView, previewPeriods } from './rate-preview';
 
 /** One item as it is being edited: strings in the inputs, numbers on save. */
 interface EditItem {
@@ -180,7 +180,12 @@ interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: nu
 
       @if (preview() || previewing() || previewError()) {
         <section class="card p-4 mt-3" data-test="editor-preview" aria-labelledby="rcPreviewTitle">
-          <h3 id="rcPreviewTitle" class="text-sm font-semibold mb-2">What last month would have cost with it</h3>
+          <div class="flex items-center justify-between gap-2 flex-wrap mb-2">
+            <h3 id="rcPreviewTitle" class="text-sm font-semibold m-0">What {{ previewPeriod() === periods[0].value ? 'last month' : 'this month so far' }} would have cost with it</h3>
+            <select class="input py-1 text-xs w-56" aria-label="Month to preview" [value]="previewPeriod()" (change)="previewPeriod.set($any($event.target).value); runPreview()">
+              @for (m of periods; track m.value) { <option [value]="m.value" [selected]="m.value === previewPeriod()">{{ m.label }}</option> }
+            </select>
+          </div>
           @if (previewing()) { <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Pricing last month…</span> }
           @else if (previewError()) { <span class="text-xs text-crit-500" role="alert">{{ previewError() }}</span> }
           @else { <app-rate-preview [preview]="preview()" [currency]="data.base.currency" /> }
@@ -251,6 +256,8 @@ export class RateCardEditor {
   });
   // ---- the preview (owner #23, step 4) ----
   readonly preview = signal<RatePreview | null>(null);
+  readonly periods = previewPeriods();
+  readonly previewPeriod = signal(this.periods[0].value);
   readonly previewing = signal(false);
   readonly previewError = signal('');
 
@@ -451,7 +458,7 @@ export class RateCardEditor {
     const draft = this.draft();
     if (typeof draft === 'string') { this.error.set(draft); return; }
     this.error.set(''); this.previewing.set(true); this.previewError.set('');
-    this.api.previewRateCard({ card: draft }).subscribe({
+    this.api.previewRateCard({ card: draft }, this.previewPeriod()).subscribe({
       next: r => {
         this.previewing.set(false);
         if (r.status !== API_SUCCESS || !r.data) { this.preview.set(null); this.previewError.set(r.message); this.refused(r); return; }

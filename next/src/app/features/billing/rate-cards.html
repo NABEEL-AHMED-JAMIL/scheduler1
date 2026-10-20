@@ -121,7 +121,12 @@
         </header>
         @if (preview() || previewing() || previewError()) {
           <section class="lookup-entries" data-test="draft-preview" aria-labelledby="draftPreviewTitle">
-            <div class="lookup-entries-head"><h3 class="section-title" id="draftPreviewTitle">What last month would have cost with it</h3></div>
+            <div class="lookup-entries-head">
+              <h3 class="section-title" id="draftPreviewTitle">What {{ previewPeriod() === periods[0].value ? 'last month' : 'this month so far' }} would have cost with it</h3>
+              <select class="input py-1 text-xs w-56" aria-label="Month to preview" [value]="previewPeriod()" (change)="previewPeriod.set($any($event.target).value); previewDraft(d)">
+                @for (m of periods; track m.value) { <option [value]="m.value" [selected]="m.value === previewPeriod()">{{ m.label }}</option> }
+              </select>
+            </div>
             <div class="p-3">
               @if (previewing()) { <span class="text-xs text-[color:var(--text-muted)]"><span class="spinner inline-block align-middle mr-2"></span>Pricing last month…</span> }
               @else if (previewError()) { <span class="text-xs text-crit-500" role="alert">{{ previewError() }}</span> }

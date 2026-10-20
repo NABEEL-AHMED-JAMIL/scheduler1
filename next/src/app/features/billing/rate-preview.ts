@@ -1,7 +1,17 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { Icon } from '../../shared/ui/icon';
 import { RatePreview } from './billing.service';
-import { formatMoneyExact, formatQuantity, formatUnitPrice, monthShort } from './billing-format';
+import { formatMoneyExact, formatQuantity, formatUnitPrice, monthShort, yearMonth } from './billing-format';
+
+/**
+ * The months a preview may price: last month (the plan's "what last month would have cost") and, for a platform whose
+ * last month is empty -- a fresh environment, a new customer -- this month so far.
+ */
+export function previewPeriods(now = new Date()): { value: string; label: string }[] {
+  const last = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return [{ value: yearMonth(last), label: `Last month (${monthShort(yearMonth(last))})` },
+    { value: yearMonth(now), label: `This month so far (${monthShort(yearMonth(now))})` }];
+}
 
 /**
  * Owner #23, step 4: what a month (last month, unless asked) would have cost with a draft -- per workspace, as priced now

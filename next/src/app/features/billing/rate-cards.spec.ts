@@ -403,7 +403,8 @@ describe('RateCardEditor, pricing rules', () => {
     const { component, api } = editor(base);
     component.name.set('Previewed');
     component.runPreview();
-    expect(api.previewRateCard).toHaveBeenCalledWith({ card: expect.objectContaining({ name: 'Previewed' }) });
+    expect(api.previewRateCard).toHaveBeenCalledWith({ card: expect.objectContaining({ name: 'Previewed' }) }, component.periods[0].value);
+    expect(component.periods.map(p => p.label)[1]).toMatch(/^This month so far \(/);
     expect(component.preview()?.difference).toBe(-0.3);
   });
 });
@@ -445,7 +446,7 @@ describe('RateCards, drafts and rules', () => {
     expect(el.querySelectorAll('[data-test="rules-table"] tbody tr').length).toBe(3);
     (el.querySelector('[data-test="preview-draft"]') as HTMLButtonElement).click();
     fixture.detectChanges();
-    expect(api.previewRateCard).toHaveBeenCalledWith({ draftId: 31 });
+    expect(api.previewRateCard).toHaveBeenCalledWith({ draftId: 31 }, component.periods[0].value);
     expect(el.querySelector('[data-test="preview-difference"]')!.textContent).toContain('−$0.3');
     expect(el.querySelector('[data-test="preview-workspaces"]')!.textContent).toContain('INV-2026-09-0001 issued (kept)');
     await component.publishDraft(DRAFT);
