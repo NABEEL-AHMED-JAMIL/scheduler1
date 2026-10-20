@@ -370,7 +370,7 @@ export function fieldsFor(type: string, definitions: Record<string, JsonSchema>)
       }
       <ng-template #match let-m>
         @if (m) {
-          <p class="text-xs" [class]="m.ok ? 'text-[color:var(--ok-text)]' : m.missing ? 'text-[color:var(--crit-text)]' : 'text-[color:var(--text-muted)]'" role="status">
+          <p class="text-xs flex items-center gap-1" [class]="m.ok ? 'text-[color:var(--ok-text)]' : m.missing ? 'text-[color:var(--crit-text)]' : 'text-[color:var(--text-muted)]'" role="status">
             <app-icon [name]="m.ok ? 'checkCircle' : m.missing ? 'alert' : 'info'" />{{ m.text }}
           </p>
         }

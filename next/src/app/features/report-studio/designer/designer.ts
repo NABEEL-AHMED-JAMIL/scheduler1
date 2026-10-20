@@ -1,5 +1,5 @@
 import {
-  Component, DestroyRef, ElementRef, HostListener, LOCALE_ID, OnInit, computed, effect, inject, input, signal, untracked, viewChild, viewChildren,
+  Component, DestroyRef, ElementRef, HostListener, OnInit, computed, effect, inject, input, signal, untracked, viewChild, viewChildren,
 } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { CdkDrag, CdkDragDrop, CdkDragMove, CdkDragPreview, CdkDropList, CdkDropListGroup } from '@angular/cdk/drag-drop';
@@ -15,7 +15,7 @@ import { HasUnsavedChanges } from '../../../shared/ui/unsaved-changes.guard';
 import { AuthService } from '../../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
-import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { RsTimePipe } from '../rs-time.pipe';
 import { ReportStudioApi, studioError } from '../report-studio.api';
 import { InspectResult, Problem, SourceRef, TemplateDefinition, TemplateDetail } from '../report-studio.model';
 import { ProblemList } from '../problem-list';
@@ -75,7 +75,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   private readonly destroy = inject(DestroyRef);
   private readonly host: HTMLElement = inject(ElementRef<HTMLElement>).nativeElement;
   /** Times as the console writes them: 24-hour, the server's wall clock read as an instant. */
-  private readonly clock = new ServerTimePipe(inject(LOCALE_ID));
+  private readonly clock = new RsTimePipe();
 
   private readonly workspaces = inject(WorkspaceDirectory);
   /** The one workspace selector (owner #5), first in the header for a platform administrator: picking one goes to its library. */

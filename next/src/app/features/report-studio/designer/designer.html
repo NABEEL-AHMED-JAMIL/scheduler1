@@ -11,7 +11,7 @@
         </nav>
         <div class="flex flex-wrap items-center gap-2 mt-0.5">
           <h1 class="rsd-title">{{ t.name }}</h1>
-          @if (t.draft) { <span class="pill pill-brand">Draft v{{ t.draft.version }}</span> }
+          @if (t.draft) { <span class="pill pill-info">Draft v{{ t.draft.version }}</span> }
           @else if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
           @if (approval(); as a) {
             <span class="pill" [class]="a.current ? 'pill-warn' : 'pill-neutral'" [title]="a.note || ''">
