@@ -32,6 +32,9 @@ import { PageFrame } from './page-frame';
 import { PropChange, PropertiesPanel, TONES } from './properties';
 import { TestDataChoice, TestDataData, TestDataPanel } from './test-data-panel';
 import { AssetCard, UsableProfile } from '../assets.model';
+import { AiDataContext, Proposal } from '../ai-designer.api';
+import { AiPanel } from './ai-panel';
+import { applyPatch } from './json-patch';
 
 type LeftTab = 'components' | 'layers' | 'data';
 type SaveState = 'saved' | 'saving' | 'unsaved' | 'conflict' | 'error' | 'readonly';
@@ -56,12 +59,13 @@ const DRAW_MS = 300;
  * to reorder (on the page and in Layers), and the draft saved five seconds after the last change, optimistic on its
  * revision -- someone else's save in between is a conflict that offers Reload or Save as a copy. The header previews,
  * validates, asks for approval and publishes (report-publish). The test data (pasted JSON, a run's output, an upload or a
- * saved sample) fills the canvas live. The AI suggestion card arrives with phase 6.
+ * saved sample) fills the canvas live. The AI assistant (phase 6) proposes changes in the right pane: shown as a list and on
+ * the page (added blocks outlined), applied only when the person accepts, as one undo step, and saved like any edit.
  */
 @Component({
   selector: 'app-report-designer',
   imports: [Icon, LoadError, ProblemList, PropertiesPanel, PageFrame, FormsModule, RouterLink, UpperCasePipe, CdkDrag, CdkDragPreview, CdkDropList,
-    CdkDropListGroup, WorkspaceSelect],
+    CdkDropListGroup, WorkspaceSelect, AiPanel],
   templateUrl: './designer.html',
   styleUrl: './designer.css',
 })
@@ -136,7 +140,13 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly canEditTemplates = computed(() => this.auth.canOpen('report-templates') && !this.auth.isPlatformAdmin());
   readonly canPublish = computed(() => this.auth.canOpen('report-publish') && !this.auth.isPlatformAdmin());
   readonly editable = computed(() => this.canEditTemplates() && !!this.t()?.draft && this.t()?.status !== 'ARCHIVED');
-  readonly blocks = computed<Block[]>(() => (this.def() ? componentsOf(this.def()!) : []));
+  /** Phase 6: an AI proposal shown on the page (the draft with its patch), or null; editing puts the draft back. */
+  readonly previewDef = signal<TemplateDefinition | null>(null);
+  readonly previewIds = signal<string[]>([]);
+  readonly blocks = computed<Block[]>(() => {
+    const shown = this.previewDef() ?? this.def();
+    return shown ? componentsOf(shown) : [];
+  });
   readonly pages = computed<CanvasPage[]>(() => pagesOf(this.blocks()));
   readonly layers = computed<LayerRow[]>(() => layerRows(this.blocks()));
   readonly types = computed(() => {
@@ -174,6 +184,18 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly warnings = computed(() => this.problems().filter(p => p.severity === 'WARNING'));
   readonly structureValid = computed(() => !this.problems().some(p => p.severity === 'ERROR' && (p.stage === 'SCHEMA' || p.stage === 'COMPONENTS')));
   readonly dataFields = computed(() => this.inspect()?.schema ?? []);
+  /** What the AI may be told of the test data: its fields, and its first records only when the person ticks it (the panel). */
+  readonly aiData = computed<AiDataContext | null>(() => {
+    const i = this.inspect();
+    if (!i || !this.testSource()) return null;
+    return {
+      label: this.testLabel() || i.label, shape: i.shape,
+      fields: i.schema.filter(f => f.path !== '$').map(f => ({ path: f.path, type: f.type })),
+      records: (i.sample ?? []).slice(0, 20),
+    };
+  });
+  readonly draftVersion = computed(() => this.t()?.draft?.version ?? 0);
+  readonly draftRevision = signal(0);
   readonly sample = computed(() => firstRecord(this.inspect()));
   readonly dropTargets = computed(() => [...this.pages().map(p => `rsd-page-${p.index}`), 'rsd-layers']);
   readonly paletteGroups = computed(() => {
@@ -276,6 +298,8 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
         const shown = t.draft ?? t.published;
         this.def.set(shown?.definition ? JSON.parse(JSON.stringify(shown.definition)) as TemplateDefinition : null);
         this.revision = t.draft?.revision ?? 0;
+        this.draftRevision.set(this.revision);
+        this.previewDef.set(null);
         this.undoStack.set([]);
         this.redoStack.set([]);
         this.saveState.set(this.editable() ? 'saved' : 'readonly');
@@ -313,6 +337,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     this.api.saveDraft(t.templateId, this.revision, def).subscribe({
       next: saved => {
         this.revision = saved.draft?.revision ?? this.revision + 1;
+        this.draftRevision.set(this.revision);
         this.t.set({ ...saved, draft: saved.draft ? { ...saved.draft, definition: undefined } : saved.draft });
         this.savedAt.set(this.hhmm(new Date()));
         this.saveError.set('');
@@ -374,6 +399,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   edit(change: (blocks: Block[], def: TemplateDefinition) => boolean | void, coalesceKey?: string): boolean {
     const before = this.def();
     if (!before || !this.editable()) return false;
+    if (this.previewDef()) { this.previewDef.set(null); this.previewIds.set([]); }
     const next = JSON.parse(JSON.stringify(before)) as TemplateDefinition;
     if (change(componentsOf(next), next) === false) return false;
     const now = Date.now();
@@ -632,6 +658,49 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
     }
   }
 
+  // ---------------------------------------------------------------- the AI assistant (phase 6)
+
+  /** A proposal shown on the page, or the draft again (null). Nothing is changed. */
+  aiPreview(p: Proposal | null): void {
+    const def = this.def();
+    if (!p || !def) {
+      this.previewDef.set(null);
+      this.previewIds.set([]);
+      this.draw(true);
+      return;
+    }
+    try {
+      this.previewDef.set(applyPatch(def, p.patch));
+      this.previewIds.set((p.changes?.added ?? []).map(b => b.id).concat((p.changes?.changed ?? []).map(b => b.id)));
+      this.selected.set(null);
+      this.draw(true);
+    } catch (e) {
+      this.toast.error(`The proposal does not fit this draft: ${(e as Error).message}`);
+    }
+  }
+
+  /** An accepted proposal: applied to the draft as one undo step, then saved at once (a new draft revision). */
+  aiApply(p: Proposal): void {
+    const before = this.def();
+    if (!before || !this.editable()) return;
+    let next: TemplateDefinition;
+    try {
+      next = applyPatch(before, p.patch);
+    } catch (e) {
+      this.toast.error(`The proposal could not be applied: ${(e as Error).message}`);
+      return;
+    }
+    this.previewDef.set(null);
+    this.previewIds.set([]);
+    this.undoStack.update(s => [...s.slice(-(UNDO_DEPTH - 1)), JSON.stringify(before)]);
+    this.redoStack.set([]);
+    this.coalesce = null;
+    this.def.set(next);
+    this.changed();
+    this.saveNow();
+    this.toast.success('The proposal is in the draft. Undo (Ctrl+Z) takes it back.');
+  }
+
   // ---------------------------------------------------------------- the canvas
 
   /** Draws the canvas from the template as it stands, soon (or now): the server's compiler, the test data in it. */
@@ -641,7 +710,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   }
 
   private drawNow(): void {
-    const def = this.def();
+    const def = this.previewDef() ?? this.def();
     if (!def) return;
     const seq = ++this.drawSeq;
     this.drawing.set(true);

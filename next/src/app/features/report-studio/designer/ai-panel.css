@@ -1,0 +1,33 @@
+/* The designer's AI assistant (Report Studio phase 6): a card at the foot of the right pane, on the console's tokens. */
+:host { display: block; }
+.rsa { gap: 0.625rem; }
+.rsa-head { display: flex; align-items: center; gap: 0.5rem; }
+.rsa-mark { display: inline-flex; align-items: center; justify-content: center; width: 1.75rem; height: 1.75rem; flex: none;
+  border-radius: var(--radius-md); background: var(--accent-soft); color: var(--accent-text); }
+.rsa-actions { display: flex; flex-wrap: wrap; gap: 0.25rem; }
+.rsa-action { font-size: 0.75rem; padding: 0.25rem 0.5rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);
+  color: var(--text-secondary); background: var(--surface-raised); }
+.rsa-action:hover:not(:disabled) { border-color: var(--border-strong); color: var(--text-primary); }
+.rsa-action.is-on { background: var(--accent-soft); border-color: var(--focus-ring); color: var(--accent-text); font-weight: 600; }
+.rsa-action:disabled { opacity: 0.6; }
+.rsa-card { display: flex; flex-direction: column; gap: 0.5rem; padding: 0.75rem; border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--focus-ring); border-radius: var(--radius-lg); background: var(--surface-sunken); }
+.rsa-card.is-invalid { border-left-color: var(--crit-border, var(--crit-text)); }
+.rsa-question { display: flex; gap: 0.375rem; align-items: flex-start; font-size: 0.8125rem; color: var(--text-primary); }
+.rsa-table { width: 100%; font-size: 0.75rem; border-collapse: collapse; table-layout: fixed; }
+.rsa-table th { text-align: left; font-weight: 600; color: var(--text-muted); padding: 0.25rem 0.25rem; border-bottom: 1px solid var(--border-subtle); }
+.rsa-table td { padding: 0.25rem 0.25rem; border-bottom: 1px solid var(--border-subtle); overflow-wrap: anywhere; vertical-align: top; }
+.rsa-table th:last-child, .rsa-table td:last-child { width: 3rem; }
+.rsa-low { color: var(--warn-text); font-weight: 600; }
+.rsa-list { margin: 0; padding-left: 1.125rem; display: flex; flex-direction: column; gap: 0.375rem; }
+.rsa-changes ul, .rsa-notes { list-style: none; margin: 0; padding: 0; font-size: 0.75rem; display: flex; flex-direction: column; gap: 0.125rem; }
+.rsa-changes .rsd-eyebrow { margin: 0.25rem 0 0.125rem; }
+.rsa-add { color: var(--ok-text); }
+.rsa-change { color: var(--text-secondary); }
+.rsa-remove { color: var(--crit-text); }
+.rsa-notes { margin-top: 0.25rem; padding-left: 0.5rem; }
+.rsa-history ul { list-style: none; margin: 0.375rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.125rem; }
+.rsa-history-row { display: flex; align-items: center; gap: 0.375rem; width: 100%; font-size: 0.75rem; padding: 0.25rem 0.375rem;
+  border-radius: var(--radius-md); color: var(--text-secondary); min-width: 0; }
+.rsa-history-row:hover { background: var(--surface-sunken); color: var(--text-primary); }
+.btn.is-active { border-color: var(--focus-ring); color: var(--accent-text); }

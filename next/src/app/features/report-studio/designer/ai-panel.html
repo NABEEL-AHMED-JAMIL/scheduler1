@@ -1,0 +1,143 @@
+<section class="rsd-props-group rsa" aria-label="AI assistant" data-ai-panel>
+  <div class="rsa-head">
+    <span class="rsa-mark" aria-hidden="true"><app-icon name="sparkle" /></span>
+    <div class="min-w-0 flex-1">
+      <h2 class="text-sm font-semibold">AI assistant</h2>
+      <p class="text-xs text-[color:var(--text-muted)]">
+        @if (status(); as s) {
+          @if (s.available) { Proposes changes; you accept or dismiss them · {{ s.model }}{{ s.local ? ' (local)' : '' }} }
+          @else { Not available here now }
+        } @else { Checking the workspace's model… }
+      </p>
+    </div>
+  </div>
+
+  <div class="rsa-actions" role="radiogroup" aria-label="What the AI should do">
+    @for (a of actions; track a.kind) {
+      <button type="button" role="radio" class="rsa-action" [class.is-on]="kind() === a.kind" [attr.aria-checked]="kind() === a.kind"
+              [disabled]="busy()" (click)="choose(a.kind)">{{ a.label }}</button>
+    }
+  </div>
+  <p class="text-xs text-[color:var(--text-muted)]">{{ action().hint }}</p>
+
+  @if (action().placeholder) {
+    <label class="field">
+      <span class="label">{{ action().needsWords ? 'In plain words' : 'In plain words (optional)' }}</span>
+      <textarea class="input text-sm" rows="4" [maxlength]="status()?.instructionMaxChars ?? 2000" [ngModel]="words()" (ngModelChange)="words.set($event)"
+                [disabled]="busy() || !editable()" [placeholder]="action().placeholder" aria-label="Instruction for the AI"></textarea>
+    </label>
+  }
+  @if (kind() === 'DRAFT_TEXT') {
+    <p class="text-xs text-[color:var(--text-muted)]">Goes {{ selectedId() ? 'after ' + (selectedLabel() || selectedId()) : 'before the footer' }}.</p>
+  }
+  @if (hasData()) {
+    <label class="rsd-check"><input type="checkbox" class="checkbox" [ngModel]="includeValues()" (ngModelChange)="includeValues.set($event)" [disabled]="busy()" />
+      <span>Include sample values (at most {{ status()?.maxRecords ?? 20 }} records, identifying values masked)</span></label>
+    <p class="text-xs text-[color:var(--text-muted)]">Otherwise only the test data's field names and types are sent.</p>
+  }
+
+  @if (why()) { <p class="text-xs text-[color:var(--text-muted)]" data-ai-why>{{ why() }}</p> }
+  <div class="flex items-center gap-2">
+    @if (busy()) {
+      <span class="spinner" role="status" aria-label="The AI is drafting"></span>
+      <span class="text-xs text-[color:var(--text-secondary)]" aria-live="polite">Drafting · {{ elapsed() }} s{{ status()?.local ? ' · a local model can take a minute' : '' }}</span>
+      <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="cancel()">Stop waiting</button>
+    } @else {
+      <button type="button" class="btn btn-primary btn-sm" [disabled]="!canAsk()" (click)="ask()" data-ai-ask><app-icon name="sparkle" />{{ action().label }}</button>
+    }
+  </div>
+  @if (error()) { <p class="field-note text-[color:var(--crit-text)]" role="alert">{{ error() }}</p> }
+
+  @if (proposal(); as p) {
+    <article class="rsa-card" [class.is-invalid]="p.state === 'INVALID'" aria-label="Proposal" data-ai-proposal>
+      <div class="flex flex-wrap items-center gap-1.5">
+        <span class="pill" [class]="stateClass(p)">{{ stateWord(p) }}</span>
+        <span class="text-xs font-semibold">{{ kindWord(p.kind) }}</span>
+        @if (p.confidence !== undefined && p.confidence !== null) { <span class="text-xs text-[color:var(--text-muted)]">lowest confidence {{ percent(p.confidence) }}</span> }
+      </div>
+      @if (p.question) { <p class="rsa-question"><app-icon name="info" /> {{ p.question }}</p> }
+      @if (p.summary) { <p class="text-sm">{{ p.summary }}</p> }
+      @if (p.state === 'INVALID' && p.validation?.reason) {
+        <p class="text-xs text-[color:var(--crit-text)]" data-ai-invalid>Not offered: {{ p.validation!.reason }}</p>
+      }
+      @if (stale()) { <p class="text-xs text-[color:var(--warn-text)]">The draft was saved since this was proposed; ask again to accept one.</p> }
+
+      @if (p.mappings?.length) {
+        <table class="rsa-table" aria-label="Suggested mappings">
+          <thead><tr><th>Template field</th><th>Reads</th><th class="text-right">Sure</th></tr></thead>
+          <tbody>
+            @for (m of p.mappings!; track m.field) {
+              <tr [title]="m.reason || ''"><td class="mono">{{ m.field }}</td><td class="mono">{{ m.source }}</td>
+                <td class="text-right" [class.rsa-low]="m.confidence < 0.6">{{ percent(m.confidence) }}</td></tr>
+            }
+          </tbody>
+        </table>
+        <p class="text-xs text-[color:var(--text-muted)]">Hover a row for why. Nothing is mapped until you accept.</p>
+      }
+
+      @if (p.explanations?.length) {
+        <ol class="rsa-list">
+          @for (x of p.explanations!; track $index) {
+            <li><span class="mono text-xs">{{ x.code }}{{ x.componentId ? ' · ' + x.componentId : '' }}</span>
+              <span class="block text-sm">{{ x.explanation }}</span>
+              @if (x.fix) { <span class="block text-xs text-[color:var(--text-secondary)]">Fix: {{ x.fix }}</span> }</li>
+          }
+        </ol>
+      }
+
+      @if (p.patch.length) {
+        <div class="rsa-changes" aria-label="What changes">
+          @if (changes().added.length) {
+            <h3 class="rsd-eyebrow">Added · {{ changes().added.length }}</h3>
+            <ul>@for (b of changes().added.slice(0, 12); track b.id) { <li class="rsa-add">+ {{ blockWord(b) }}</li> }
+              @if (changes().added.length > 12) { <li class="text-[color:var(--text-muted)]">and {{ changes().added.length - 12 }} more</li> }</ul>
+          }
+          @if (changes().changed.length) {
+            <h3 class="rsd-eyebrow">Changed · {{ changes().changed.length }}</h3>
+            <ul>@for (b of changes().changed.slice(0, 12); track b.id) { <li class="rsa-change">~ {{ blockWord(b) }}@if (b.keys?.length) { <span class="text-[color:var(--text-muted)]"> ({{ b.keys!.join(', ') }})</span> }</li> }</ul>
+          }
+          @if (changes().removed.length) {
+            <h3 class="rsd-eyebrow">Removed · {{ changes().removed.length }}</h3>
+            <ul>@for (b of changes().removed.slice(0, 12); track b.id) { <li class="rsa-remove">− {{ blockWord(b) }}</li> }
+              @if (changes().removed.length > 12) { <li class="text-[color:var(--text-muted)]">and {{ changes().removed.length - 12 }} more</li> }</ul>
+          }
+          @if (changes().template.length) { <p class="text-xs text-[color:var(--text-muted)]">Also the template's {{ changes().template.join(', ') }}.</p> }
+        </div>
+      }
+
+      @if (p.notes?.length) {
+        <details class="text-xs text-[color:var(--text-secondary)]"><summary>{{ p.notes!.length }} note{{ p.notes!.length === 1 ? '' : 's' }} from the checks</summary>
+          <ul class="rsa-notes">@for (n of p.notes!; track $index) { <li>{{ n }}</li> }</ul></details>
+      }
+      <p class="text-xs text-[color:var(--text-muted)]">Sent: {{ p.dataSent || 'no test data' }}@if (p.model) { · {{ p.model }}@if (p.connection) { on {{ p.connection }} } }</p>
+
+      @if (p.state === 'PROPOSED') {
+        <div class="flex flex-wrap gap-2">
+          @if (p.patch.length) {
+            <button type="button" class="btn btn-default btn-sm" [class.is-active]="previewing()" [attr.aria-pressed]="previewing()" [disabled]="stale()"
+                    (click)="togglePreview()" data-ai-preview><app-icon name="eye" />{{ previewing() ? 'Hide on the page' : 'Show on the page' }}</button>
+            <button type="button" class="btn btn-primary btn-sm" [disabled]="deciding() || stale() || !editable()" (click)="accept()" data-ai-accept><app-icon name="check" />Accept</button>
+          }
+          <button type="button" class="btn btn-ghost btn-sm" [disabled]="deciding()" (click)="dismiss()" data-ai-dismiss>{{ p.patch.length ? 'Dismiss' : 'Close' }}</button>
+        </div>
+      } @else if (p.state === 'ACCEPTED') {
+        <p class="text-xs text-[color:var(--ok-text)]">Applied to the draft and saved. Undo (Ctrl+Z) takes it back.</p>
+      }
+    </article>
+  }
+
+  @if (history().length) {
+    <details class="rsa-history">
+      <summary class="text-xs text-[color:var(--text-secondary)]">Earlier proposals · {{ history().length }}</summary>
+      <ul>
+        @for (h of history(); track h.proposalId) {
+          <li><button type="button" class="rsa-history-row" (click)="open(h)">
+            <span class="pill" [class]="stateClass(h)">{{ h.state === 'PROPOSED' ? 'Proposed' : stateWord(h) }}</span>
+            <span class="truncate">{{ kindWord(h.kind) }}</span>
+            <span class="ml-auto text-[color:var(--text-muted)] whitespace-nowrap">{{ h.createdAt | rsTime: 'time' }}</span></button></li>
+        }
+      </ul>
+    </details>
+  }
+  <p class="text-xs text-[color:var(--text-muted)]">The AI never saves, publishes or sends. Its text states only the data's own values.</p>
+</section>

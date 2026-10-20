@@ -523,6 +523,12 @@ export class Docs implements AfterViewInit {
           + 'that storage does not remove stay until an operator removes them; the message after a delete says so.',
         'You can delete several reports at once in the Library: tick them, then Delete. Approved ones cannot be ticked.',
         'The Library, Templates and Assets lists page and search on the server, so a large library opens as quickly as a small one.',
+        'In a template\'s designer (and a pipeline step\'s own design) the AI assistant, in the right pane, drafts a template from '
+          + 'plain words, suggests field mappings (with how sure it is) and charts for your test data, explains the checks\' problems '
+          + 'and writes a paragraph of the data\'s own values, labelled "Drafted with AI". Each is a proposal: shown as a list of '
+          + 'changes and on the page, applied only when you accept it (Undo takes it back), and refused once the draft was saved '
+          + 'since. Only the test data\'s field names and types are sent unless you tick sample values; it uses your workspace\'s '
+          + 'model connection, and its calls count as AI usage in Cost & usage.',
       ],
       warn: 'An approval is a person\'s decision about what they have read. The signature proves who approved which file and that it '
           + 'has not changed since, not that its content is right.',

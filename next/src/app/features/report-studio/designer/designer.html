@@ -214,6 +214,10 @@
         @if (drawError()) {
           <div class="rs-banner rs-banner-crit rsd-canvas-note" role="alert"><app-icon name="alert" class="icon-crit shrink-0" /><span class="text-sm">{{ drawError() }}</span></div>
         }
+        @if (previewDef()) {
+          <div class="rs-banner rs-banner-info rsd-canvas-note" role="status" data-ai-preview-banner><app-icon name="sparkle" class="shrink-0" />
+            <span class="text-sm">The AI's proposal, shown on the page. Nothing in the draft changes until you accept it; outlined blocks are new or changed.</span></div>
+        }
         @if (canvas(); as doc) {
           @for (p of pages(); track p.index; let i = $index) {
             <div class="rsd-page-head" [style.width.px]="pageWidthPx() * zoom()">
@@ -229,7 +233,7 @@
               <div class="rsd-clip">
                 <div class="rsd-paper" [style.width.px]="pageWidthPx()" [style.transform]="'scale(' + zoom() + ')'">
                   <app-rs-page-frame [html]="doc.pages[i] ?? ''" [css]="doc.css" [page]="i + 1" [pages]="pages().length" [heightMm]="page().height"
-                                     [selected]="selected()" [dropInto]="dropInto()?.page === i ? dropInto()!.id : null"
+                                     [selected]="selected()" [dropInto]="dropInto()?.page === i ? dropInto()!.id : null" [proposed]="previewIds()"
                                      (picked)="pick($event)" (measured)="measured(i, $event)" />
                 </div>
               </div>
@@ -388,7 +392,11 @@
             <p class="text-xs text-[color:var(--text-muted)]">Blocks read <span class="mono">{{ names()[0] }}</span>, which starts at <span class="mono">{{ testRoot() }}</span> in the data.</p>
           </section>
         }
-        <!-- The AI suggestion card (Figma frame 3) belongs here: it comes with Report Studio phase 6 and proposes; it never changes the draft by itself. -->
+        @if (canEditTemplates() && t.draft) {
+          <app-rs-ai-panel [templateId]="t.templateId" [version]="draftVersion()" [revision]="draftRevision()" [editable]="editable()"
+                           [saveState]="saveState()" [data]="aiData()" [problems]="problems()" [selectedId]="selected()" [selectedLabel]="selectedLabel()"
+                           [shown]="!!previewDef()" (preview)="aiPreview($event)" (apply)="aiApply($event)" (save)="saveNow()" />
+        }
       </aside>
     </div>
 

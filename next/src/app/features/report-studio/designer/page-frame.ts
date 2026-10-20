@@ -23,6 +23,8 @@ export class PageFrame {
   readonly heightMm = input(297);
   readonly selected = input<string | null>(null);
   readonly dropInto = input<string | null>(null);
+  /** Phase 6: blocks an AI proposal adds or changes, outlined while it is shown on the page. */
+  readonly proposed = input<string[]>([]);
   /** The component clicked, or null for the page itself. */
   readonly picked = output<string | null>();
   /** The content's height in CSS pixels, unscaled. */
@@ -50,6 +52,7 @@ export class PageFrame {
       this.target = null;
       this.mark(this.selected());
       this.markDrop(this.dropInto());
+      this.markProposal(this.proposed());
       const sheet = this.root.querySelector('.rs-sheet');
       if (sheet && sizes) {
         sizes.disconnect();
@@ -59,6 +62,15 @@ export class PageFrame {
     });
     effect(() => this.mark(this.selected()));
     effect(() => this.markDrop(this.dropInto()));
+    effect(() => this.markProposal(this.proposed()));
+  }
+
+  private proposalMarks: Element[] = [];
+
+  private markProposal(ids: string[]): void {
+    this.proposalMarks.forEach(e => e.classList.remove('rsd-ai-added'));
+    this.proposalMarks = ids.map(id => this.element(id)).filter((e): e is Element => !!e);
+    this.proposalMarks.forEach(e => e.classList.add('rsd-ai-added'));
   }
 
   private mark(id: string | null): void {
