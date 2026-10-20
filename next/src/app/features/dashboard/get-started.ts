@@ -25,18 +25,18 @@ export interface StartState {
 const STEPS: Omit<StartStep, 'done'>[] = [
   { key: 'storage', title: 'Connect your storage', link: '/connections/storage', linkLabel: 'Connections › Storage',
     why: 'Where pipelines read files from and keep what they write: an S3, Azure, MinIO or FTP connection of your own.' },
-  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/file-drop', linkLabel: 'Inbox', optional: true,
+  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/file-drop', linkLabel: 'Documents › File drop', optional: true,
     why: 'Files people upload land in your storage, each under a key a pipeline step can read. A schedule can also start when one arrives.' },
-  { key: 'topic', title: 'Add a topic', link: '/settings/kafka', linkLabel: 'Kafka & Topics',
+  { key: 'topic', title: 'Add a topic', link: '/settings/kafka', linkLabel: 'Settings › Kafka & Topics',
     why: 'Every pipeline publishes on a topic. It goes through the platform’s Kafka connection unless you add your own.' },
-  { key: 'registry', title: 'Define its registry task', link: '/settings/task-registry', linkLabel: 'Task Registry',
+  { key: 'registry', title: 'Define its registry task', link: '/settings/task-registry', linkLabel: 'Settings › Task Registry',
     why: 'New pipeline there: an id, a name and the topic. This is what a pipeline picks as its registry task.' },
   { key: 'pipeline', title: 'Create the pipeline and build its steps', link: '/pipelines/new', linkLabel: 'New pipeline',
     why: 'Pick the topic and the registry task, create it, then Build its steps: read a file, work on the rows, keep the result.' },
   { key: 'schedule', title: 'Schedule it', link: '/pipelines/schedules/new', linkLabel: 'New schedule',
     why: 'A schedule says when the pipeline runs. Manual is fine to start with: it runs when you say so.' },
-  { key: 'run', title: 'Run it and look at the output', link: '/pipelines/schedules', linkLabel: 'Schedules',
-    why: 'Run now from the schedule’s menu. The run’s Logs page shows each step and the files it kept.' },
+  { key: 'run', title: 'Run it and look at the output', link: '/pipelines/schedules', linkLabel: 'Schedules & triggers',
+    why: 'Run now from the schedule’s menu. The run’s page shows each step, and its Outputs the files it kept, each with View.' },
 ];
 
 /** The checklist for a workspace in the state given: every step, each marked done or not. */
