@@ -26,7 +26,7 @@ import { CanvasDoc, splitCanvas } from './canvas-doc';
 import {
   Block, CanvasPage, LayerRow, PX_PER_MM, PaletteEntry, allIds, blockLabel, canHold, cloneWithNewIds, componentsOf, fieldsUsed, find,
   firstRecord, fromPalette, innerPath, insertBlock, layerRows, moveBlock, pageSizeMm, pagesOf, parts, pathsOf, primaryNames, removeBlock,
-  rootPathOf, rulerMarks, typeIcon, typeWord, walk,
+  rootPathOf, rulerMarks, typeIcon, typeWord, walk, looksLikePicture,
 } from './designer-model';
 import { PageFrame } from './page-frame';
 import { PropChange, PropertiesPanel } from './properties';
@@ -458,7 +458,7 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
 
   /** Whether a data field reads like a picture's key (the Data tab offers "show as image"). */
   looksLikeImage(path: string, type: string): boolean {
-    return /string|text/i.test(type) && /(image|photo|picture|img|scan|thumb|wound|key)$/i.test(path.split(/[.[\]]/).filter(Boolean).pop() ?? '');
+    return looksLikePicture(path, type, this.inspect()?.sample ?? []);
   }
 
   /**

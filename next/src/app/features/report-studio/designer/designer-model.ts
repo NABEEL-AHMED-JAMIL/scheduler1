@@ -410,3 +410,37 @@ export function rulerMarks(widthMm: number): { mm: number; label: string }[] {
   else if (out.length) out[out.length - 1].label = String(edge);
   return out;
 }
+
+/** A picture file's name, by its extension. */
+const PICTURE_FILE = /\.(png|jpe?g|gif|webp)$/i;
+/** A field named for a picture or its key, in generic words ("image", "photo", "scan", "image_key", "thumbnail_path"). */
+const PICTURE_NAME = /(image|photo|picture|img|scan|thumb(nail)?)s?(_?(key|path|file|name|url))?$/i;
+
+/** The first text value at a data path ("visits[].imageAfter") in the inspected sample rows, if any. */
+export function firstTextAt(sample: unknown, path: string): string | null {
+  const steps = path.split('.').filter(Boolean);
+  const walk = (node: unknown, i: number): string | null => {
+    if (Array.isArray(node)) {
+      for (const item of node) { const v = walk(item, i); if (v != null) return v; }
+      return null;
+    }
+    if (i === steps.length) return typeof node === 'string' ? node : null;
+    if (node == null || typeof node !== 'object') return null;
+    const key = steps[i].replace(/\[\]$/, '');
+    return walk((node as Record<string, unknown>)[key], i + 1);
+  };
+  return walk(sample, 0);
+}
+
+/**
+ * Whether a data field reads like a picture (the Data tab offers "show as image"): a text field whose name says so in
+ * generic words, or whose sample value names a picture file. Nothing domain-specific: a wound report's imageAfter is
+ * found by its values ("p-1042-after.jpg"), an outcomes file's image_key by its name.
+ */
+export function looksLikePicture(path: string, type: string, sample: unknown): boolean {
+  if (!/string|text/i.test(type)) return false;
+  const name = path.split(/[.[\]]/).filter(Boolean).pop() ?? '';
+  if (PICTURE_NAME.test(name)) return true;
+  const value = firstTextAt(sample, path);
+  return value != null && PICTURE_FILE.test(value.trim());
+}

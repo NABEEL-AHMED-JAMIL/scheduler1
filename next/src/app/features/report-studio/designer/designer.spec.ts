@@ -10,6 +10,7 @@ import { CANVAS_ID, clean, idOf, splitCanvas } from './canvas-doc';
 import {
   Block, PaletteEntry, allIds, canHold, cloneWithNewIds, collections, fieldsUsed, find, fromPalette, innerPath, insertBlock, itemFields,
   layerRows, lengthAt, moveBlock, newId, pageSizeMm, pagesOf, primaryNames, removeBlock, rulerMarks, scalars, valueAt,
+  looksLikePicture, firstTextAt,
 } from './designer-model';
 import { fieldsFor } from './properties';
 import { wantsCanvas } from '../../shell/shell';
@@ -30,6 +31,21 @@ const tree = (): Block[] => [
 ];
 
 describe('the designer model', () => {
+  it('guesses picture fields in generic words or by their values, never by a domain word', () => {
+    const wound = { visits: [{ patient: 'P-1042', imageAfter: 'p-1042-after.jpg', note: 'Edges advancing' }],
+      gallery: [{ image: 'p-1042-before.jpg', caption: 'before' }] };
+    expect(looksLikePicture('visits[].imageAfter', 'string', wound)).toBe(true);           // found by its value
+    expect(looksLikePicture('gallery[].image', 'string', wound)).toBe(true);               // by its name
+    expect(looksLikePicture('latest[].image_key', 'string', {})).toBe(true);               // outcomes files: image_key
+    expect(looksLikePicture('results[].thumbnail_path', 'string', {})).toBe(true);
+    expect(looksLikePicture('visits[].note', 'string', wound)).toBe(false);
+    expect(looksLikePicture('visits[].patient', 'string', wound)).toBe(false);
+    expect(looksLikePicture('wound', 'string', { wound: 'stage 2' })).toBe(false);         // no domain words
+    expect(looksLikePicture('api_key', 'string', { api_key: 'abc' })).toBe(false);         // "key" alone is not a picture
+    expect(looksLikePicture('gallery[].image', 'number', wound)).toBe(false);
+    expect(firstTextAt([{ a: [{ b: 'x.png' }] }], 'a[].b')).toBe('x.png');
+  });
+
   it('cuts the body into pages at its page breaks, named by their first heading', () => {
     const pages = pagesOf(tree());
     expect(pages.map(p => p.title)).toEqual(['Monthly …', 'Department detail']);
