@@ -120,7 +120,8 @@ interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: nu
           The meter's unit, allowance and tiers stay the card's: the card's own usage takes the allowance first.
         </p>
         @if (rules().length) {
-          <table class="table-modern rate-edit lookup-entry-table" data-test="rule-table">
+          <!-- Scrolls sideways inside the card on a narrow panel, never past its edge. -->
+          <div class="overflow-x-auto"><table class="table-modern rate-edit lookup-entry-table" data-test="rule-table">
             <thead><tr><th class="w-12">Order</th><th>Meter</th><th>Matches</th><th class="text-right">Price</th><th>Note</th><th class="w-16"></th></tr></thead>
             <tbody>
               @for (r of orderedRules(); track r.key; let k = $index) {
@@ -138,7 +139,7 @@ interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: nu
                       </select>
                       @switch (r.match_kind) {
                         @case ('PIPELINE') {
-                          <app-combobox class="w-56" [options]="pipelineOptions()" [selected]="r.match_value" (selectedChange)="pickPipeline(r.key, $event)"
+                          <app-combobox class="w-48" [options]="pipelineOptions()" [selected]="r.match_value" (selectedChange)="pickPipeline(r.key, $event)"
                                         [ariaLabel]="'Rule ' + r.rule_no + ' pipeline'" [placeholder]="pipelinesLoading() ? 'Loading pipelines…' : 'Find a pipeline'" [allowClear]="false" />
                         }
                         @case ('TAG') {
@@ -157,7 +158,7 @@ interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: nu
                     <input class="input py-1 text-xs w-24 text-right mono" type="number" min="0" step="any" [value]="r.unit_price" (input)="setRule(r.key, 'unit_price', $any($event.target).value)" [attr.aria-label]="'Rule ' + r.rule_no + ' price'" />
                     <div class="text-[11px] text-[color:var(--text-muted)] whitespace-nowrap">card {{ cardPrice(r.meter) }}</div>
                   </td>
-                  <td><input class="input py-1 text-xs w-40" [value]="r.note" maxlength="200" (input)="setRule(r.key, 'note', $any($event.target).value)" placeholder="What the bill calls it" [attr.aria-label]="'Rule ' + r.rule_no + ' note'" /></td>
+                  <td><input class="input py-1 text-xs w-32" [value]="r.note" maxlength="200" (input)="setRule(r.key, 'note', $any($event.target).value)" placeholder="What the bill calls it" [attr.aria-label]="'Rule ' + r.rule_no + ' note'" /></td>
                   <td class="whitespace-nowrap">
                     @if (r.match_kind === 'TAG' && k > 0 && orderedRules()[k - 1].match_kind === 'TAG') {
                       <button type="button" class="btn btn-ghost btn-icon btn-xs" (click)="raiseTag(r.key)" [attr.aria-label]="'Try rule ' + r.rule_no + ' before the tag above'" title="Try before the tag above"><app-icon name="chevronUp" size="0.8em" /></button>
@@ -167,7 +168,7 @@ interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: nu
                 </tr>
               }
             </tbody>
-          </table>
+          </table></div>
         } @else {
           <p class="text-xs text-[color:var(--text-secondary)] m-0">No rules: every meter is priced by the card's own price.</p>
         }
