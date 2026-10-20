@@ -1,5 +1,5 @@
 <div class="page">
-  <app-page-header [crumb]="report() ? 'Generate again' : 'New report'">
+  <app-page-header [trail]="trail()" [crumb]="stepCrumb()">
     <div class="page-head">
       <div>
         <h1 class="page-title">{{ step() === 2 ? 'Connect the right data' : step() === 3 ? 'Check before you generate' : step() === 4 ? 'Generating the report' : report() ? 'Generate ' + report()!.name + ' again' : 'Create a report' }}</h1>
@@ -120,9 +120,9 @@
                       </dl>
                     }
                     @if (sampleTable(); as tbl) {
-                      <div class="overflow-x-auto"><table class="table-modern">
+                      <div class="overflow-x-auto"><table class="table-modern rsw-sample">
                         <thead><tr><th class="mono">{{ tbl.path }}[]</th>@for (c of tbl.cols.slice(1); track c) { <th>{{ c }}</th> }</tr></thead>
-                        <tbody>@for (r of tbl.rows; track $index) { <tr>@for (v of r; track $index) { <td class="text-sm">{{ v }}</td> }</tr> }</tbody>
+                        <tbody>@for (r of tbl.rows; track $index) { <tr>@for (v of r; track $index) { <td class="text-sm" [class.tabular]="isNumber(v)">{{ v }}</td> }</tr> }</tbody>
                       </table></div>
                     }
                   }
@@ -150,7 +150,7 @@
                   @for (r of rows(); track r.field.path) {
                     <tr [class.rsw-missing]="r.state === 'missing'">
                       <td>
-                        <b class="mono text-xs">{{ r.field.path }}</b>@if (r.field.required) { <span class="text-[color:var(--crit-text)]" aria-label="required"> *</span> }
+                        <b class="mono text-xs rsw-path">{{ r.field.path }}@if (r.field.required) {<span class="text-[color:var(--crit-text)]" aria-label="required">&nbsp;*</span>}</b>
                         <div class="text-xs text-[color:var(--text-muted)]">{{ r.field.label ? r.field.label + ' · ' : '' }}{{ typeWords(r.field.type) }} · {{ r.field.required ? 'required' : 'optional' }}</div>
                       </td>
                       <td>
@@ -221,7 +221,7 @@
         <aside class="card rsw-side">
           <section class="rsw-sec">
             <div class="flex items-center justify-between gap-2">
-              <div><h2 class="section-title">Checks</h2><span class="text-xs text-[color:var(--text-muted)]">{{ problems().length + passed() }} checks@if (checkedAt(); as at) { · {{ at | serverTime: 'time' }} }</span></div>
+              <div><h2 class="section-title">Checks</h2><span class="text-xs text-[color:var(--text-muted)]">{{ problems().length + passed() }} checks@if (checkedAt(); as at) { · {{ at | rsTime: 'time' }} }</span></div>
               <button type="button" class="btn btn-default btn-sm" [disabled]="checking()" (click)="check()"><app-icon name="refresh" />Check again</button>
             </div>
             <div class="flex flex-wrap gap-1">
@@ -229,10 +229,10 @@
               <span class="pill" [class]="warnings().length ? 'pill-warn' : 'pill-neutral'">{{ warnings().length }} warning{{ warnings().length === 1 ? '' : 's' }}</span>
               <span class="pill pill-ok">{{ passed() }} passed</span>
             </div>
-            @if (problems().length) { <app-report-problems [problems]="problems()" [summary]="false" /> }
-            @if (errors().length || missing().length) {
+            @if (problems().length) { <app-report-problems [problems]="problems()" [summary]="false" fixText="Fix the data mapping →" (fix)="step.set(2)" /> }
+            @if (!errors().length && missing().length) {
               <button type="button" class="link-inline text-sm self-start" (click)="step.set(2)">Fix the data mapping →</button>
-            } @else {
+            } @else if (!errors().length) {
               <p class="text-xs text-[color:var(--ok-text)]"><app-icon name="checkCircle" /> Data contract, bindings, assets and layout pass.</p>
             }
           </section>
@@ -243,7 +243,7 @@
             } @else {
               <label class="field"><span class="label">Brand profile</span>
                 <select class="input" aria-label="Brand profile" [ngModel]="brandProfileId()" (ngModelChange)="brandProfileId.set($event); check()">
-                  <option value="">{{ templateProfileId() ? "The template's profile" : 'The workspace default' }}@if (!brandProfileId() && brand(); as b) { · {{ b.name }} }</option>
+                  <option value="">@if (!brandProfileId() && brand(); as b) { {{ b.name }} } @else { {{ templateProfileId() ? "The template's profile" : 'The workspace default' }} }</option>
                   @for (p of profiles(); track p.profileId) { <option [value]="p.profileId">{{ p.name }} · v{{ p.version }}{{ p.isDefault ? ' (workspace default)' : '' }}</option> }
                 </select></label>
               @if (brand(); as b) {

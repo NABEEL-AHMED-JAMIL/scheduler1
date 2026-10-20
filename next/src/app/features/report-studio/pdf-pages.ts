@@ -5,6 +5,17 @@ import { Icon } from '../../shared/ui/icon';
 interface PdfPage { getViewport(o: { scale: number }): { width: number; height: number }; render(o: unknown): { promise: Promise<void> }; }
 interface PdfDoc { numPages: number; getPage(n: number): Promise<PdfPage>; destroy?(): void; }
 
+/** The paper a page size is, as the drawing names it ("A4 portrait"); empty for a size of its own. */
+export function paperName(w: number, h: number): string {
+  const near = (a: number, b: number) => Math.abs(a - b) <= 2;
+  const sizes: [string, number, number][] = [['A4', 210, 297], ['A3', 297, 420], ['A5', 148, 210], ['Letter', 216, 279], ['Legal', 216, 356]];
+  for (const [name, sw, sh] of sizes) {
+    if (near(w, sw) && near(h, sh)) return `${name} portrait`;
+    if (near(w, sh) && near(h, sw)) return `${name} landscape`;
+  }
+  return '';
+}
+
 /** Pages drawn as thumbnails at most (a long report shows its first pages; the viewer still turns to every one). */
 const THUMBS = 12;
 
@@ -27,7 +38,7 @@ const THUMBS = 12;
           </button>
         }
         @if (count()) {
-          <span class="text-xs text-[color:var(--text-muted)]">{{ sizeWord() }}<br>{{ count() }} page{{ count() === 1 ? '' : 's' }}</span>
+          <span class="text-xs text-[color:var(--text-muted)]">@if (paperWord()) { {{ paperWord() }}<br> }{{ sizeWord() }}<br>{{ count() }} page{{ count() === 1 ? '' : 's' }}</span>
         }
       </div>
       <div class="rsp-main">
@@ -71,6 +82,7 @@ export class PdfPages {
   readonly thumbs = signal<number[]>([]);
   readonly error = signal('');
   readonly sizeWord = signal('');
+  readonly paperWord = signal('');
   private readonly big = viewChild<ElementRef<HTMLCanvasElement>>('big');
   private readonly scroller = viewChild<ElementRef<HTMLElement>>('scroller');
   private readonly thumbCanvases = viewChildren<ElementRef<HTMLCanvasElement>>('thumb');
@@ -116,6 +128,7 @@ export class PdfPages {
       const v = first.getViewport({ scale: 1 });
       const mm = (pt: number) => Math.round(pt / 72 * 25.4);
       this.sizeWord.set(`${mm(v.width)} × ${mm(v.height)} mm`);
+      this.paperWord.set(paperName(mm(v.width), mm(v.height)));
       this.count.set(this.doc.numPages);
       this.thumbs.set(Array.from({ length: Math.min(THUMBS, this.doc.numPages) }, (_, i) => i + 1));
       this.page.set(1);

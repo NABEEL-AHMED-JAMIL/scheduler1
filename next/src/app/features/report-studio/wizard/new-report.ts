@@ -3,9 +3,10 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Subscription, interval, switchMap } from 'rxjs';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { Crumb, crumbsFor } from '../../../core/nav/nav-tree';
 import { Icon } from '../../../shared/ui/icon';
 import { StatusPill } from '../../../shared/ui/status-pill';
-import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
+import { RsTimePipe } from '../rs-time.pipe';
 import { AuthService } from '../../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
@@ -86,7 +87,7 @@ export function neededFields(def: TemplateDefinition): NeededField[] {
  */
 @Component({
   selector: 'app-new-report',
-  imports: [PageHeader, Icon, StatusPill, ServerTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect,
+  imports: [PageHeader, Icon, StatusPill, RsTimePipe, FormsModule, RouterLink, ReportSourcePicker, ProblemList, PdfPages, WorkspaceSelect,
     AssetPicture],
   templateUrl: './new-report.html',
   styleUrl: './new-report.css',
@@ -139,7 +140,11 @@ export class NewReport implements OnInit {
   readonly stageWord = stageWord;
   readonly isRunning = isRunning;
   readonly typeWords = typeWords;
+  isNumber(v: unknown): boolean { return typeof v === 'number' || (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))); }
   readonly stepNames = ['Template', 'Data and mapping', 'Preview and check', 'Generate'];
+  /** The trail names the step too (drawings 4 and 5): Reports › New report › Data and mapping. */
+  readonly trail = computed<Crumb[]>(() => crumbsFor('/reports/new', this.report() ? 'Generate again' : 'New report', true));
+  readonly stepCrumb = computed(() => this.stepNames[this.step() - 1] ?? '');
 
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin());
   readonly shown = computed(() => {

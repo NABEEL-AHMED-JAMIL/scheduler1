@@ -37,3 +37,13 @@
 .rsw-progress { height: 0.5rem; border-radius: var(--radius-full); background: var(--surface-sunken); overflow: hidden; }
 .rsw-progress > i { display: block; height: 100%; background: var(--accent-mark-strong); transition: width 300ms ease; }
 .rsw-logo { width: 4.5rem; flex-shrink: 0; justify-items: start; background: var(--signature-paper); padding: 0.125rem 0.25rem; border-radius: var(--radius-sm); }
+/* "What the source holds" fits its column at 1440 (drawing 4): tighter cells, numbers on the right, the array's name
+   free to wrap -- the table scrolled sideways and cut its last column before. */
+.rsw-sample th, .rsw-sample td { padding-inline: 0.5rem; white-space: normal; }
+.rsw-sample th:first-child, .rsw-sample td:first-child { padding-left: 1rem; overflow-wrap: anywhere; }
+.rsw-sample th:last-child, .rsw-sample td:last-child { padding-right: 1rem; }
+.rsw-sample td.tabular, .rsw-sample th:not(:first-child) { text-align: right; }
+.rsw-path { overflow-wrap: anywhere; }
+.rsw-sample th { white-space: nowrap; }
+/* The template field's name has room to stay on one line with its asterisk (drawing 4's widest column). */
+.rsw-match th:first-child { width: 40%; }
