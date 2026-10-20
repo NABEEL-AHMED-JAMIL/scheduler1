@@ -14,6 +14,8 @@ export interface TemplateDialogData {
   installed: string[];
   /** A platform administrator's workspaces: a template is installed into one. */
   tenants?: ComboboxOption[];
+  /** Owner #5: the workspace the page's selector picked, the default owner. */
+  tenantId?: number | null;
 }
 
 /** The templates of one group, as the dialog lists them. */
@@ -96,7 +98,7 @@ export class TemplateDialog {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly installing = signal('');
-  readonly tenantId = signal<number | null>(null);
+  readonly tenantId = signal<number | null>(this.data.tenantId ?? null);
   private readonly installed = signal(new Set(this.data.installed ?? []));
   private done = false;
 

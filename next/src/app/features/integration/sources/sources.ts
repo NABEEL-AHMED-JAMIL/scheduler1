@@ -30,6 +30,8 @@ import { TemplateDialog, TemplateDialogData } from './template-dialog';
 import { ContractSampleDialog, ContractSampleData } from './contract-sample-dialog';
 import { SensitivityTag } from '../../../shared/ui/sensitivity';
 import { ManagedBanner } from '../../../shared/ui/managed-banner';
+import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
+import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { PipelineRead, PipelineReads, readsSentence } from './pipeline-reads';
@@ -54,7 +56,7 @@ export const SOURCES_VIEW_PATHS: Record<SourcesTab, string> = {
  */
 @Component({
   selector: 'app-sources',
-  imports: [RouterLink, RefreshButton, PipelineReads, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
+  imports: [WorkspaceSelect, RouterLink, RefreshButton, PipelineReads, PageHeader, SensitivityTag, Icon, TableShell, StatusPill, StatStrip, ViewToggle, Pagination, DataText, ServerTimePipe, CdkMenu, CdkMenuItem, CdkMenuTrigger, ManagedBanner],
   templateUrl: './sources.html',
 })
 export class Sources implements OnInit {
@@ -80,6 +82,11 @@ export class Sources implements OnInit {
   readonly heading = computed(() => ({ sources: 'Sources', connections: 'Database connections', contracts: 'Data contracts' })[this.tab()]);
   readonly canManage = computed(() => this.auth.canBuild());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
+  /**
+   * Owner #5: THE workspace selector in the header -- a platform administrator's lists, KPIs and new rows follow the workspace
+   * picked (remembered for the session), or span every workspace. The service honours tenantId for them only.
+   */
+  readonly workspaceFilter = signal<number | null>(inject(WorkspaceDirectory).remembered() ?? null);
   private readonly tenants = signal<ComboboxOption[]>([]);
   private readonly names = computed(() => new Map(this.tenants().map(t => [t.value, t.label])));
 
@@ -200,6 +207,21 @@ export class Sources implements OnInit {
     else { this.load(); this.loadPipelineReads(); }
   }
 
+  /** The workspace a platform administrator picked, for the service; null for every workspace (and for anyone else). */
+  private pickedWorkspace(): number | null {
+    return this.isPlatformAdmin() ? this.workspaceFilter() : null;
+  }
+
+  /** Owner #5: another workspace picked -- every tab read again for it, from the first page. */
+  pickWorkspace(tenantId: number | null): void {
+    this.workspaceFilter.set(tenantId);
+    this.page.set(1);
+    this.sourcesRead = false;
+    this.connectionsRead = false;
+    this.contractsRead = false;
+    this.refresh();
+  }
+
   /** What the pipelines read: once with the Sources tab, and again on Refresh. */
   loadPipelineReads(): void {
     if (!this.showPipelineReads()) return;
@@ -222,7 +244,7 @@ export class Sources implements OnInit {
     this.sourcesRead = true;
     this.loading.set(true);
     this.error.set('');
-    this.api.list(this.search(), this.page(), this.size()).subscribe({
+    this.api.list(this.search(), this.page(), this.size(), this.pickedWorkspace()).subscribe({
       next: r => {
         this.loading.set(false);
         if (r.status !== API_SUCCESS) { this.error.set(r.message); return; }
@@ -238,7 +260,7 @@ export class Sources implements OnInit {
     this.connectionsRead = true;
     this.connectionsLoading.set(true);
     this.connectionsError.set('');
-    this.api.connections().subscribe({
+    this.api.connections(this.pickedWorkspace()).subscribe({
       next: r => {
         this.connectionsLoading.set(false);
         if (r.status !== API_SUCCESS) { this.connectionsError.set(r.message); return; }
@@ -252,7 +274,7 @@ export class Sources implements OnInit {
     this.contractsRead = true;
     this.contractsLoading.set(true);
     this.contractsError.set('');
-    this.api.contracts().subscribe({
+    this.api.contracts('', this.pickedWorkspace()).subscribe({
       next: r => {
         this.contractsLoading.set(false);
         if (r.status !== API_SUCCESS) { this.contractsError.set(r.message); return; }
@@ -289,6 +311,7 @@ export class Sources implements OnInit {
   private panel(sourceId: number | null): void {
     const data: SourcePanelData = {
       sourceId, canManage: this.canManage(), tenants: this.isPlatformAdmin() ? this.tenants() : undefined,
+      tenantId: this.pickedWorkspace(),
     };
     this.dialog.open<boolean>(SourcePanel, sidePanelConfig(data, 'wide', 'right')).closed.subscribe(changed => {
       if (changed) { this.load(); if (this.connectionsRead) this.loadConnections(); }
@@ -314,7 +337,8 @@ export class Sources implements OnInit {
   // -------------------------------------------------------------------------------------------- connections: actions
 
   private connectionDialog(connection: ConnectionRow | null): void {
-    const data: ConnectionDialogData = { connection, tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
+    const data: ConnectionDialogData = { connection, tenants: this.isPlatformAdmin() ? this.tenants() : undefined,
+      tenantId: this.pickedWorkspace() };
     this.dialog.open<ConnectionRow | null>(ConnectionDialog, { data }).closed.subscribe(saved => { if (saved) this.loadConnections(); });
   }
 
@@ -355,15 +379,16 @@ export class Sources implements OnInit {
 
   installTemplate(): void {
     const data: TemplateDialogData = {
-      // A platform administrator's list spans workspaces, so it cannot say what one workspace has installed.
-      installed: this.isPlatformAdmin() ? [] : this.contracts().filter(c => !c.system).map(c => c.name),
+      // A platform administrator's list spans workspaces unless one is picked: only then can it say what is installed.
+      installed: this.isPlatformAdmin() && !this.pickedWorkspace() ? [] : this.contracts().filter(c => !c.system).map(c => c.name),
       tenants: this.isPlatformAdmin() ? this.tenants() : undefined,
+      tenantId: this.pickedWorkspace(),
     };
     this.dialog.open<boolean>(TemplateDialog, { data }).closed.subscribe(done => { if (done) this.loadContracts(); });
   }
 
   newContract(): void {
-    const data: ContractSampleData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined };
+    const data: ContractSampleData = { tenants: this.isPlatformAdmin() ? this.tenants() : undefined, tenantId: this.pickedWorkspace() };
     this.dialog.open<boolean>(ContractSampleDialog, { data }).closed.subscribe(done => { if (done) this.loadContracts(); });
   }
 }

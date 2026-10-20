@@ -28,9 +28,11 @@ export class SourcesApi {
 
   // ------------------------------------------------------------------------------------------ sources
 
-  list(search: string, page: number, limit: number): Observable<PagedResponse<SourceRow[]>> {
+  /** tenantId (owner #5): a platform administrator's one workspace; the service ignores it for anyone else. */
+  list(search: string, page: number, limit: number, tenantId?: number | null): Observable<PagedResponse<SourceRow[]>> {
     const params: Record<string, string | number> = { page, limit };
     if (search.trim()) params['search'] = search.trim();
+    if (tenantId) params['tenantId'] = tenantId;
     return this.http.get<PagedResponse<SourceRow[]>>(`${SOURCES}/list`, { params });
   }
 
@@ -75,8 +77,8 @@ export class SourcesApi {
 
   // ------------------------------------------------------------------------------------------ connections
 
-  connections(): Observable<ApiResponse<ConnectionRow[]>> {
-    return this.http.get<ApiResponse<ConnectionRow[]>>(`${SOURCES}/connection/list`);
+  connections(tenantId?: number | null): Observable<ApiResponse<ConnectionRow[]>> {
+    return this.http.get<ApiResponse<ConnectionRow[]>>(`${SOURCES}/connection/list`, { params: tenantId ? { tenantId } : {} });
   }
 
   /** The password is write-only: sent only when typed; left out, the stored one stays. */
@@ -101,9 +103,10 @@ export class SourcesApi {
 
   // ------------------------------------------------------------------------------------------ contracts
 
-  contracts(search = ''): Observable<ApiResponse<ContractRow[]>> {
+  contracts(search = '', tenantId?: number | null): Observable<ApiResponse<ContractRow[]>> {
     const params: Record<string, string> = {};
     if (search.trim()) params['search'] = search.trim();
+    if (tenantId) params['tenantId'] = String(tenantId);
     return this.http.get<ApiResponse<ContractRow[]>>(`${CONTRACTS}/list`, { params });
   }
 

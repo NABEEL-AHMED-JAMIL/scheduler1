@@ -26,6 +26,8 @@ export interface SourcePanelData {
   canManage: boolean;
   /** A platform administrator's workspaces: a new source names the one it is for. */
   tenants?: ComboboxOption[];
+  /** Owner #5: the workspace the page's selector picked -- a new source's owner unless changed. */
+  tenantId?: number | null;
 }
 
 type ResultTab = 'preview' | 'schema';
@@ -135,7 +137,7 @@ export class SourcePanel {
         error: err => { this.loading.set(false); this.loadError.set(err?.error?.message || 'Could not read the source.'); },
       });
     } else {
-      this.take(blankSource('FILE'), false);
+      this.take({ ...blankSource('FILE'), tenantId: this.data.tenantId ?? null }, false);
       this.pickersFor('FILE');
     }
   }
