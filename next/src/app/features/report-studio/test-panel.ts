@@ -8,7 +8,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
-import { Problem, SampleRow, SourceRef, TemplateDefinition } from './report-studio.model';
+import { Problem, SampleRow, SourceRef, TemplateDefinition, keepable } from './report-studio.model';
 import { ReportSourcePicker } from './source-picker';
 
 export interface TestPanelData {
@@ -80,11 +80,12 @@ export interface TestPanelData {
           <section class="rs-preview-pdf" aria-label="PDF preview"><app-pdf-viewer [src]="src" /></section>
         }
 
-        @if (data.canKeep && checked() && source() && source()!.connector !== 'SAMPLE') {
+        @if (data.canKeep && checked() && keepable(source())) {
           <section class="flex flex-col gap-2 border-t pt-4 border-subtle" aria-labelledby="rsKeep">
             <h3 id="rsKeep" class="text-sm font-semibold">Keep this data with the template</h3>
             <p class="text-xs text-[color:var(--text-muted)]">
               @if (source()!.connector === 'INLINE_JSON') { The pasted data is stored with the template under this name, for the next test. }
+              @else if (source()!.connector === 'BUNDLE') { The files are read now, as you, and stored with the template as one document under this name. }
               @else { The template remembers the run's output and reads it again, as whoever tests, each time. }
             </p>
             <div class="flex flex-wrap items-center gap-2">
@@ -115,6 +116,7 @@ export class TestPanel {
   private readonly dialogRef = inject<DialogRef<boolean>>(DialogRef);
 
   readonly source = signal<SourceRef | null>(null);
+  readonly keepable = keepable;
   readonly rootPath = signal('$');
   readonly busy = signal(false);
   readonly error = signal('');

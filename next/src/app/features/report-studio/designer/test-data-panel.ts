@@ -5,7 +5,7 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { ReportStudioApi, studioError } from '../report-studio.api';
-import { SampleRow, SourceRef } from '../report-studio.model';
+import { SampleRow, SourceRef, keepable } from '../report-studio.model';
 import { ReportSourcePicker, SourceMode } from '../source-picker';
 
 export interface TestDataData {
@@ -36,9 +36,10 @@ export interface TestDataChoice { source: SourceRef | null; rootPath: string; ke
           <input class="input mono max-w-80" [ngModel]="rootPath()" (ngModelChange)="rootPath.set($event)" aria-label="Root path" placeholder="$" />
           <span class="block field-note text-[color:var(--text-muted)]">The template's paths are read from here ($ is the whole document).</span>
         </label>
-        @if (data.canKeep && source() && source()!.connector !== 'SAMPLE') {
+        @if (data.canKeep && keepable(source())) {
           <section class="flex flex-col gap-2 border-t pt-4 border-subtle" aria-labelledby="rsdKeep">
             <h3 id="rsdKeep" class="text-sm font-semibold">Keep it with the template</h3>
+            @if (source()!.connector === 'BUNDLE') { <p class="text-xs text-[color:var(--text-muted)]">The files are read now, as you, and stored with the template as one document.</p> }
             <div class="flex flex-wrap items-center gap-2">
               <input class="input max-w-64" [ngModel]="name()" (ngModelChange)="name.set($event)" aria-label="Sample name" placeholder="September, all sites" />
               <button type="button" class="btn btn-default btn-sm" [disabled]="busy() || !name().trim()" (click)="keep()"><app-icon name="save" />Keep as a test sample</button>
@@ -64,6 +65,7 @@ export class TestDataPanel {
   private readonly toast = inject(ToastService);
 
   readonly source = signal<SourceRef | null>(null);
+  readonly keepable = keepable;
   readonly mode = signal<SourceMode>(this.data.samples.length ? 'sample' : 'paste');
   readonly rootPath = signal(this.data.rootPath || '$');
   readonly name = signal('');

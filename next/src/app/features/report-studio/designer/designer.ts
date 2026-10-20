@@ -467,8 +467,11 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
    * file, else the bucket is asked for in the properties.
    */
   showAsImage(path: string): void {
-    const src = this.testSource() as (SourceRef & { bucket?: string }) | null;
-    const bucket = src?.connector === 'BUCKET_OBJECT' ? (src as { bucket?: string }).bucket ?? '' : '';
+    const src = this.testSource();
+    // A bucket file's bucket; of several files, the first that is a bucket file's.
+    const files = src?.connector === 'BUNDLE' ? Object.values(src.parts) : src ? [src] : [];
+    const bucketFile = files.find(f => f.connector === 'BUCKET_OBJECT') as { bucket?: string } | undefined;
+    const bucket = bucketFile?.bucket ?? '';
     const name = this.names()[0];
     const list = path.includes('[]') ? path.slice(0, path.indexOf('[]')) : null;
     const entry = list

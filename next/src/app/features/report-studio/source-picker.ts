@@ -9,12 +9,44 @@ import { GeneratedService, pipelineOf } from '../documents/generated/generated.s
 import { RunOutput } from '../jobs/run-steps/run-steps.model';
 import { RunRow } from '../tasks/steps/steps.model';
 import { ReportStudioApi } from './report-studio.api';
-import { DataSourceRow, PASTE_MAX_BYTES, SampleRow, SourceRef, jsonProblem } from './report-studio.model';
+import {
+  BUNDLE_MAX_PARTS, BUNDLE_PART_NAME, DataSourceRow, OneFileSource, PASTE_MAX_BYTES, SampleRow, SourceRef, jsonProblem,
+} from './report-studio.model';
 import { BucketSummary, StorageService } from '../objects/storage.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 
-export type SourceMode = 'paste' | 'run' | 'bucket' | 'saved' | 'sample';
+export type SourceMode = 'paste' | 'run' | 'bucket' | 'saved' | 'sample' | 'bundle';
 type Mode = SourceMode;
+
+/** One file of a bundle as the picker holds it: its name in the data, how it is picked, and the source picked. */
+interface BundleRow { id: number; name: string; mode: Mode; source: SourceRef | null; }
+
+/** What a bundle's file may be: any one-file way (never several files again). */
+const PART_MODES: Mode[] = ['run', 'bucket', 'saved', 'sample', 'paste'];
+
+/** Why a bundle's rows do not make a source yet (the first reason), or null when they do. */
+export function bundleProblem(rows: { name: string; source: SourceRef | null }[]): string | null {
+  if (!rows.length) return 'Add a file.';
+  if (rows.length > BUNDLE_MAX_PARTS) return `At most ${BUNDLE_MAX_PARTS} files.`;
+  const seen = new Set<string>();
+  for (const [i, r] of rows.entries()) {
+    const name = r.name.trim();
+    if (!name) return `Name file ${i + 1}: the report reads it as $.name.`;
+    if (!BUNDLE_PART_NAME.test(name)) return `"${name}" is not a name: a letter, then letters, digits or _.`;
+    if (seen.has(name)) return `Two files are called "${name}".`;
+    seen.add(name);
+    if (!r.source) return `Pick the data of "${name}".`;
+  }
+  return null;
+}
+
+/** The bundle the rows make: {connector: BUNDLE, parts: {name: source}}, or null while bundleProblem has a reason. */
+export function bundleOf(rows: { name: string; source: SourceRef | null }[]): SourceRef | null {
+  if (bundleProblem(rows)) return null;
+  const parts: Record<string, OneFileSource> = {};
+  for (const r of rows) parts[r.name.trim()] = r.source as OneFileSource;
+  return { connector: 'BUNDLE', parts };
+}
 
 /** A pipeline output a report can read: a kept file or dataset in JSON, CSV or a table format (a PDF is not data). */
 const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'dataset', '']);
@@ -117,8 +149,44 @@ const DATA_FORMATS = new Set(['json', 'jsonl', 'csv', 'parquet', 'xlsx', 'datase
             </select>
           </label>
         }
+        @case ('bundle') {
+          <div class="flex flex-col gap-3" role="group" aria-label="Several files">
+            <p class="field-note text-[color:var(--text-muted)]">
+              Each file is read as you and put side by side in one document: the report reads a file by its name ($.summary, $.latest[0]).
+              CSV becomes rows. At most {{ maxParts }} files of at most 2,000 rows.
+            </p>
+            @for (p of parts(); track p.id; let i = $index) {
+              <section class="rs-bundle-part" [attr.aria-label]="'File ' + (i + 1)">
+                <div class="rs-bundle-head">
+                  <label class="field flex-1 min-w-0">
+                    <span class="label">File {{ i + 1 }} is called</span>
+                    <input class="input mono" maxlength="64" [value]="p.name" [attr.aria-label]="'File ' + (i + 1) + ' name'" [placeholder]="i === 0 ? 'summary' : 'details'"
+                           [attr.aria-invalid]="!!partNameProblem(p) || null" (change)="renamePart(i, $any($event.target).value)" />
+                    @if (partNameProblem(p); as why) { <span class="block field-note text-[color:var(--crit-text)]">{{ why }}</span> }
+                  </label>
+                  <button type="button" class="btn btn-ghost btn-icon btn-sm" [attr.aria-label]="'Remove file ' + (i + 1)" [disabled]="parts().length === 1"
+                          (click)="removePart(i)"><app-icon name="trash" /></button>
+                </div>
+                <app-report-source-picker [only]="partModes" [samples]="samples()" [tenantId]="tenantId()" [mode]="p.mode"
+                                          (modeChange)="setPart(i, { mode: $event })" [source]="p.source" (sourceChange)="setPart(i, { source: $event })" />
+              </section>
+            }
+            <div class="flex flex-wrap items-center gap-3">
+              <button type="button" class="btn btn-default btn-sm" [disabled]="parts().length >= maxParts" (click)="addPart()">
+                <app-icon name="plus" />Add a file
+              </button>
+              <span class="text-xs text-[color:var(--text-muted)]">{{ parts().length }} of {{ maxParts }}</span>
+              @if (bundleWhy(); as why) { <span class="text-xs text-[color:var(--text-muted)]" role="status">{{ why }}</span> }
+            </div>
+          </div>
+        }
       }
     </div>
+  `,
+  styles: `
+    .rs-bundle-part { display: flex; flex-direction: column; gap: 0.75rem; padding: 0.75rem; border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md); background: var(--surface-sunken); }
+    .rs-bundle-head { display: flex; align-items: flex-end; gap: 0.5rem; }
   `,
 })
 export class ReportSourcePicker implements OnInit {
@@ -166,7 +234,50 @@ export class ReportSourcePicker implements OnInit {
     { id: 'bucket', label: 'Bucket file' },
     ...(this.auth.canOpen('report-data') ? [{ id: 'saved' as Mode, label: 'Uploads' }] : []),
     ...(this.samples().length ? [{ id: 'sample' as Mode, label: `Samples (${this.samples().length})` }] : []),
+    { id: 'bundle', label: 'Several files' },
   ]);
+
+  // ---------------------------------------------------------------- several files (a BUNDLE, media 2026-10-20)
+
+  readonly maxParts = BUNDLE_MAX_PARTS;
+  readonly partModes = PART_MODES;
+  private nextPart = 3;
+  readonly parts = signal<BundleRow[]>([{ id: 1, name: '', mode: 'run', source: null }, { id: 2, name: '', mode: 'run', source: null }]);
+  readonly bundleWhy = computed(() => bundleProblem(this.parts()));
+
+  /** A name's own problem (empty, not a name, taken by another file), shown under it once it is written. */
+  partNameProblem(p: BundleRow): string | null {
+    const name = p.name.trim();
+    if (!name) return null;
+    if (!BUNDLE_PART_NAME.test(name)) return 'A letter, then letters, digits or _ (no spaces).';
+    return this.parts().some(o => o.id !== p.id && o.name.trim() === name) ? 'Another file has this name.' : null;
+  }
+
+  addPart(): void {
+    if (this.parts().length >= BUNDLE_MAX_PARTS) return;
+    this.parts.update(list => [...list, { id: this.nextPart++, name: '', mode: 'run', source: null }]);
+    this.publish();
+  }
+
+  removePart(i: number): void {
+    if (this.parts().length <= 1) return;
+    this.parts.update(list => list.filter((_, at) => at !== i));
+    this.publish();
+  }
+
+  renamePart(i: number, name: string): void {
+    this.setPart(i, { name: name.trim() });
+  }
+
+  setPart(i: number, change: Partial<BundleRow>): void {
+    const row = this.parts()[i];
+    if (!row) return;
+    if (change.source !== undefined && JSON.stringify(change.source) === JSON.stringify(row.source)) delete change.source;
+    if (change.mode !== undefined && change.mode === row.mode) delete change.mode;
+    if (!Object.keys(change).length) return;
+    this.parts.update(list => list.map((p, at) => (at === i ? { ...p, ...change } : p)));
+    if (this.mode() === 'bundle') this.publish();
+  }
 
   readonly pasteError = computed(() => {
     const t = this.text();
@@ -211,6 +322,12 @@ export class ReportSourcePicker implements OnInit {
       case 'sample':
         this.source.set(this.sampleId() ? { connector: 'SAMPLE', sampleId: this.sampleId()! } : null);
         break;
+      case 'bundle': {
+        // Each file's picker publishes on every change; the same bundle again is not a new source (no second read).
+        const bundle = bundleOf(this.parts());
+        if (JSON.stringify(bundle) !== JSON.stringify(this.source())) this.source.set(bundle);
+        break;
+      }
     }
   }
 

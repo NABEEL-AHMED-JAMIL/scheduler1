@@ -3004,6 +3004,9 @@ button.connector-card:hover { border-color: var(--focus-ring); }
      than as one button left over (drawing 4, a 1440 screen's 24rem column). */
   .rs-source-modes .seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr)); width: 100%; }
   .rs-source-modes .seg-btn { justify-content: center; }
+  /* Several files (a BUNDLE): its parts by name, one a line. */
+  .rs-parts { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+  .rs-parts > li { overflow-wrap: anywhere; }
   .rs-banner-warn { border-color: color-mix(in oklab, var(--warn-text) 55%, var(--border-subtle));
                     background: color-mix(in oklab, var(--warn-text) 9%, var(--surface-raised)); }
 }

@@ -104,7 +104,52 @@ export type SourceRef =
   | { connector: 'BUCKET_OBJECT'; bucket: string; key: string }
   | { connector: 'UPLOAD' | 'SOURCE'; sourceId: string }
   | { connector: 'SAMPLE'; sampleId: string }
-  | { connector: 'SNAPSHOT'; snapshotId: string };
+  | { connector: 'SNAPSHOT'; snapshotId: string }
+  /** Several files as one report's data (media 2026-10-20): each part any one-file source, side by side as {name: its rows}. */
+  | { connector: 'BUNDLE'; parts: Record<string, OneFileSource> };
+
+/** Whether data may be kept as a template's test sample (media's saveSample: pasted data, a run's output, or several files). */
+export function keepable(s: SourceRef | null | undefined): boolean {
+  return !!s && (s.connector === 'INLINE_JSON' || s.connector === 'RUN_OUTPUT' || s.connector === 'BUNDLE');
+}
+
+/** A source that is one file: what a bundle's part may be (never a bundle or a snapshot). */
+export type OneFileSource = Exclude<SourceRef, { connector: 'BUNDLE' } | { connector: 'SNAPSHOT' }>;
+
+/** At most this many files in a bundle (media's Connectors.BUNDLE_PARTS); a part's name is a letter, then letters, digits or _. */
+export const BUNDLE_MAX_PARTS = 8;
+export const BUNDLE_PART_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
+
+/**
+ * A bundle's parts as a snapshot names them: by its ref ({connector: BUNDLE, parts: {name: ref}}) when the answer carries it,
+ * else from its label -- media's "2 files: summary, latest · <the first part's source>" (since 502aa0d, at most 160
+ * characters, cut with "…"), or the first form "2 files: summary (summary.csv) + latest (latest.csv)"; null when it is not
+ * a bundle. A name the label cut short is left out.
+ */
+export function bundleParts(s: { label?: string | null; sourceRef?: { connector?: string; parts?: Record<string, unknown> } | null } | null | undefined):
+  { name: string; label: string }[] | null {
+  if (!s) return null;
+  const parts = s.sourceRef?.connector === 'BUNDLE' ? s.sourceRef.parts : undefined;
+  const fromLabel = new Map<string, string>();
+  const m = /^(\d+) files: (.*)$/s.exec(s.label ?? '');
+  if (m && / \+ |^[A-Za-z][A-Za-z0-9_]{0,63} \(/.test(m[2])) {
+    for (const piece of m[2].split(/ \+ (?=[A-Za-z][A-Za-z0-9_]{0,63} \()/)) {
+      const p = /^([A-Za-z][A-Za-z0-9_]{0,63}) \((.*?)\)?(\.\.\.)?$/s.exec(piece.trim());
+      if (p) fromLabel.set(p[1], p[2]);
+    }
+  } else if (m) {
+    const [names, ...rest] = m[2].split(' · ');
+    const list = names.split(', ');
+    for (const [i, n] of list.entries()) {
+      const name = n.trim();
+      if (BUNDLE_PART_NAME.test(name) && !(i === list.length - 1 && !rest.length && name.endsWith('…'))) fromLabel.set(name, '');
+    }
+    const first = [...fromLabel.keys()][0];
+    if (first && rest.length) fromLabel.set(first, rest.join(' · '));
+  }
+  if (parts && typeof parts === 'object') return Object.keys(parts).map(name => ({ name, label: fromLabel.get(name) ?? '' }));
+  return m ? [...fromLabel].map(([name, label]) => ({ name, label })) : null;
+}
 
 export interface DataSourceRow {
   sourceId: string;
@@ -162,6 +207,8 @@ export interface OutputRow { format: 'PDF' | 'HTML'; bytes: number; pages?: numb
 export interface SnapshotRow {
   snapshotId: string; connector: string; label?: string | null; mode: string; format: string; pipelineRunId?: number | null;
   sourceVersion?: string | null; records?: number | null; bytes: number; sha256: string; takenAt?: string | null;
+  /** Where the data came from (ids only); a bundle's names its parts. Not every answer carries it. */
+  sourceRef?: { connector?: string; parts?: Record<string, unknown> } | null;
 }
 
 export interface ReportVersionRow {
