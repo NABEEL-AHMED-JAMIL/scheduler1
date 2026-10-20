@@ -34,6 +34,25 @@ function screen(runs: number) {
 }
 
 describe('Review › Runs', () => {
+  // 2026-10-20: Core's review/waiting answers "Reviews belong to a workspace" to the platform administrator's own sign-in.
+  it('reads nothing for a sign-in with no workspace, and says how to open one', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [RunsToReview],
+      providers: [
+        provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: AuthService, useValue: { isTenantAdmin: () => false, canOpen: () => true, user: signal({ appUserId: 4639, tenantId: null }) } },
+        { provide: TaskCountService, useValue: { refresh: vi.fn() } },
+      ],
+    });
+    const fixture = TestBed.createComponent(RunsToReview);
+    fixture.detectChanges();
+    expect(TestBed.inject(HttpTestingController).match(() => true)).toEqual([]);
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[data-test="needs-workspace"]')?.textContent).toContain('Runs to review are a workspace\'s');
+    expect(el.querySelector('app-review-waiting')).toBeNull();
+  });
+
   it('lists every run waiting, with no "Show all" step', () => {
     const { el } = screen(7);
     expect(el.querySelectorAll('[data-run]').length).toBe(7);

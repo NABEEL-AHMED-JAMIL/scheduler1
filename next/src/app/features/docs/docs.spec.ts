@@ -5,12 +5,16 @@ import { provideRouter } from '@angular/router';
 import { ThemeService } from '../../core/theme.service';
 import { Docs } from './docs';
 import { AuthService } from '../../core/auth/auth.service';
-import { NAV } from '../../core/nav/nav-tree';
+import { NAV, NavViewer, entryVisible } from '../../core/nav/nav-tree';
+import { NavAccess } from '../../core/nav/nav-access';
 
-function mount(signedIn = false) {
+function mount(signedIn = false, viewer?: NavViewer) {
   TestBed.resetTestingModule();
+  const seen: NavViewer = viewer ?? { canOpen: () => true, isAdmin: true, isPlatform: false, showTeam: false };
   TestBed.configureTestingModule({ imports: [Docs], providers: [provideRouter([]),
     { provide: AuthService, useValue: { isLoggedIn: signal(signedIn) } },
+    // The menu's own rule (nav-tree's entryVisible), for the reader the test names.
+    { provide: NavAccess, useValue: { visible: (gate: Parameters<typeof entryVisible>[0]) => entryVisible(gate, seen) } },
     { provide: ThemeService, useValue: { theme: signal('light'), toggle: () => {} } }] });
   const fixture = TestBed.createComponent(Docs);
   fixture.detectChanges();
@@ -103,6 +107,38 @@ describe('Docs for the current product', () => {
       .map(r => Array.from(r.querySelectorAll('td')).map(td => td.textContent!.trim()).join(' | '));
     expect(rows).toContain('Run & review | Review | All waiting, Approvals, Runs, Documents');
     expect(rows.some(r => r.includes('My requests'))).toBe(false);
+  });
+
+  // 2026-10-20: the map linked "Platform" for everyone, so a workspace administrator (4640) landed on Not available.
+  describe('links an entry only where the menu would show it', () => {
+    const row = (page: HTMLElement, entry: string) => Array.from(page.querySelectorAll<HTMLElement>('[data-test="doc-menu"] tbody tr'))
+      .find(r => r.querySelectorAll('td')[1]?.textContent?.trim().startsWith(entry))!;
+    const link = (page: HTMLElement, entry: string) => row(page, entry).querySelector('a')?.getAttribute('href') ?? null;
+
+    it('a workspace administrator: no link to Platform, which says whom it is for; their own pages linked', () => {
+      const page = mount(true, { canOpen: () => true, isAdmin: true, isPlatform: false, showTeam: false });
+      expect(link(page, 'Platform')).toBeNull();
+      expect(row(page, 'Platform').textContent).toContain('(for platform administrators)');
+      expect(link(page, 'Review')).toBe('/review');
+      expect(link(page, 'Administration')).toBe('/administration');
+    });
+
+    it('a platform administrator: Platform linked', () => {
+      expect(link(mount(true, { canOpen: () => true, isAdmin: true, isPlatform: true, showTeam: false }), 'Platform')).toBe('/platform');
+    });
+
+    it('a member: no link to an administrator\'s entry, nor to a page their access does not open', () => {
+      const page = mount(true, { canOpen: key => key !== 'document-review' && key !== 'task-inbox', isAdmin: false, isPlatform: false, showTeam: false });
+      expect(link(page, 'Platform')).toBeNull();
+      expect(link(page, 'Review')).toBeNull();
+      expect(row(page, 'Review').textContent).toContain('(not in your page access)');
+    });
+
+    it('signed out: every entry but the role-only ones', () => {
+      const page = mount(false);
+      expect(link(page, 'Platform')).toBeNull();
+      expect(link(page, 'Review')).toBe('/review');
+    });
   });
 
   it('keeps healthcare wording safe: synthetic examples, and no claim of compliance', () => {

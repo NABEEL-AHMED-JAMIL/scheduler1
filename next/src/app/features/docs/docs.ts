@@ -4,7 +4,8 @@ import { Icon } from '../../shared/ui/icon';
 import { BrandMark } from '../../shared/ui/brand-mark';
 import { ThemeService } from '../../core/theme.service';
 import { AuthService } from '../../core/auth/auth.service';
-import { NAV } from '../../core/nav/nav-tree';
+import { NAV, NavGate, NavTab } from '../../core/nav/nav-tree';
+import { NavAccess } from '../../core/nav/nav-access';
 
 interface Section { id: string; title: string; }
 
@@ -27,7 +28,18 @@ interface Step {
 }
 
 /** The menu as a map (Reference): every group, its entries and, for a hub, its tabs -- read from the menu's own tree. */
-interface MapRow { group: string; entry: string; path: string; tabs: string; }
+interface MapRow { group: string; entry: string; path: string; tabs: string; gate: NavGate & { tabs?: NavTab[] }; }
+
+/**
+ * Who a role-only entry is for, or null for an entry any role may have: Platform's tabs are all the platform
+ * administrators', Billing's Settings tab theirs too, Administration's Users a workspace administrator's.
+ */
+export function roleOnly(gate: NavGate & { tabs?: NavTab[] }): 'platform administrators' | 'workspace administrators' | null {
+  const tabs = gate.tabs ?? [];
+  if (gate.platformOnly || (tabs.length && tabs.every(t => t.platformOnly))) return 'platform administrators';
+  if (gate.adminOnly || (tabs.length && tabs.every(t => t.adminOnly || t.platformOnly))) return 'workspace administrators';
+  return null;
+}
 
 /**
  * The in-app guide (owner 2026-10-13: rewritten for the current product).
@@ -208,7 +220,14 @@ interface MapRow { group: string; entry: string; path: string; tabs: string; }
                   @for (m of menu; track m.path) {
                     <tr>
                       <td class="text-sm whitespace-nowrap text-[color:var(--text-secondary)]">{{ m.group }}</td>
-                      <td class="text-sm whitespace-nowrap"><a class="link-inline" [routerLink]="m.path">{{ m.entry }}</a></td>
+                      <td class="text-sm whitespace-nowrap">
+                        @if (linked(m)) {
+                          <a class="link-inline" [routerLink]="m.path">{{ m.entry }}</a>
+                        } @else {
+                          <span data-test="doc-menu-unlinked">{{ m.entry }}</span>
+                          <span class="ml-1 text-xs text-[color:var(--text-muted)]">({{ notLinkedWhy(m) }})</span>
+                        }
+                      </td>
                       <td class="text-sm">{{ m.tabs || '—' }}</td>
                     </tr>
                   }
@@ -587,9 +606,26 @@ export class Docs implements AfterViewInit {
   ];
 
   /** The menu's groups, entries and tabs, from the menu's own tree: the guide's map never drifts from the menu. */
-  readonly menu: MapRow[] = NAV.flatMap(item => item.children
-    ? item.children.filter(c => !c.crumbOnly).map(c => ({ group: item.label, entry: c.label, path: c.path, tabs: (c.tabs ?? []).map(t => t.label).join(', ') }))
-    : item.path ? [{ group: '', entry: item.label, path: item.path, tabs: (item.tabs ?? []).map(t => t.label).join(', ') }] : []);
+  readonly menu: MapRow[] = NAV.flatMap((item): MapRow[] => item.children
+    ? item.children.filter(c => !c.crumbOnly).map(c => ({ group: item.label, entry: c.label, path: c.path, tabs: (c.tabs ?? []).map(t => t.label).join(', '), gate: c }))
+    : item.path ? [{ group: '', entry: item.label, path: item.path, tabs: (item.tabs ?? []).map(t => t.label).join(', '), gate: item }] : []);
+
+  private readonly nav = inject(NavAccess);
+
+  /**
+   * Whether the map links an entry: by the menu's own rule (NavAccess, as the shell's menu) for a signed-in reader, so a
+   * workspace administrator is not sent to Platform's "Not available" (2026-10-20); signed out, every entry but the
+   * role-only ones (the sign-in comes first either way).
+   */
+  linked(m: MapRow): boolean {
+    return this.auth.isLoggedIn() ? this.nav.visible(m.gate) : !roleOnly(m.gate);
+  }
+
+  /** Why an entry is not linked: the role it is for, or the reader's page access. */
+  notLinkedWhy(m: MapRow): string {
+    const role = roleOnly(m.gate);
+    return role ? `for ${role}` : 'not in your page access';
+  }
 
   readonly frequencies = [
     { name: 'Mint', means: 'Every so many minutes', intervals: '5, 10, 15 … 55' },

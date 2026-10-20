@@ -31,7 +31,7 @@ const doc = (extractionId: number, over: Partial<Extraction> = {}): Extraction =
   dateFinished: '2026-10-13T03:10:47.871+00:00', ...over,
 });
 
-function screen(opts: { admin?: boolean; tasks?: boolean; documents?: boolean } = {}) {
+function screen(opts: { admin?: boolean; tasks?: boolean; documents?: boolean; tenantId?: number | null } = {}) {
   const opened: { component: unknown; data: unknown }[] = [];
   const refresh = vi.fn();
   TestBed.resetTestingModule();
@@ -41,7 +41,7 @@ function screen(opts: { admin?: boolean; tasks?: boolean; documents?: boolean } 
       provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
       { provide: AuthService, useValue: {
         canOpen: (p: string) => p === 'task-inbox' ? opts.tasks ?? true : p === 'document-review' ? opts.documents ?? true : false,
-        isTenantAdmin: () => !!opts.admin, user: signal({ appUserId: 4641, tenantId: 2960 }) } },
+        isTenantAdmin: () => !!opts.admin, user: signal({ appUserId: 4641, tenantId: opts.tenantId === undefined ? 2960 : opts.tenantId }) } },
       { provide: TaskCountService, useValue: { refresh } },
       { provide: Dialog, useValue: { open: (component: unknown, config: { data: unknown }) => { opened.push({ component, data: config.data }); return { closed: of(undefined) }; } } },
     ],
@@ -68,6 +68,16 @@ function answer(s: ReturnType<typeof screen>, data: { mine?: InboxTask[]; groups
 const rows = (el: HTMLElement) => Array.from(el.querySelectorAll<HTMLElement>('tr[data-item]'));
 
 describe('Review › All waiting', () => {
+  // 2026-10-20: as the platform administrator (no workspace) mine, groups and count each answered 400 "Pick a workspace".
+  it('reads nothing for a sign-in with no workspace, and says how to open one', () => {
+    const s = screen({ admin: false, tenantId: null });
+    expect(s.http.match(() => true)).toEqual([]);
+    expect(s.el.querySelector('[data-test="needs-workspace"]')?.textContent).toContain('Review is a workspace\'s, and this sign-in has none.');
+    expect(s.el.querySelector('[data-test="needs-workspace"] a')?.getAttribute('href')).toBe('/platform/workspaces');
+    expect(s.el.querySelector('[data-test="review-list"]')).toBeNull();
+    expect(s.el.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('lists approvals and documents together, each with what, from, since, who and age', () => {
     const s = screen();
     answer(s, { groups: [task(7)], docs: [doc(1133)] });
