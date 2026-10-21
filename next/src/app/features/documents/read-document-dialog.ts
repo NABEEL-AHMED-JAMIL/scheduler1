@@ -179,7 +179,7 @@ export class ReadDocumentDialog implements OnInit {
         if (r.status !== API_SUCCESS) { this.bucketsError.set(r.message); return; }
         this.buckets.set(r.data ?? []);
         if (r.data?.length) this.bucket.set(r.data[0].bucket);
-        else this.bucketsError.set('This workspace has no storage connection yet. An administrator adds one under Integration › Storage Connections.');
+        else this.bucketsError.set('This workspace has no storage connection yet. An administrator adds one under Connections › Storage.');
       },
       error: err => { this.bucketsLoading.set(false); this.bucketsError.set(refusalText(err, 'The storage connections could not be listed.')); },
     });

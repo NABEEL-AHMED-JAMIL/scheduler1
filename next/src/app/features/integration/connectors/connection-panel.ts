@@ -331,7 +331,7 @@ export class ConnectionPanel implements OnInit {
   asSource(stream: Stream): void {
     this.api.asSource(stream.id).subscribe(res => {
       if (res.status === API_SUCCESS) {
-        this.toast.success(`${stream.name} is a source now (Integration › Sources).`);
+        this.toast.success(`${stream.name} is a source now (Connections › Sources).`);
         this.load();
       } else {
         this.toast.error(res.message);

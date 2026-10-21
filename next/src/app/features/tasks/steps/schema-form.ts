@@ -325,7 +325,7 @@ export class SchemaForm {
   /** MIG-245: the workspace's active prompts, what a prompt setting offers. */
   readonly prompts = input<PromptChoice[]>([]);
   /** MIG-346: what a webhook setting says when its schema says nothing. */
-  readonly webhookHint = 'One of this workspace’s webhooks (Integration › API Clients).';
+  readonly webhookHint = 'One of this workspace’s webhooks (Developers › API Clients).';
   /** MIG-346: the workspace's webhooks, what a webhook setting offers (those that cannot take a step's delivery disabled). */
   readonly webhooks = input<WebhookChoice[]>([]);
   /** MIG-321: the workspace's buckets, what a bucket setting offers. */
