@@ -85,6 +85,17 @@ describe('a board that cannot be read', () => {
     expect(el.querySelector('app-load-error')).toBeNull();
   });
 
+  /** ZT-A10 (2026-10-21): Meridian's board link opened in Riverside read "Dashboard not found with 1524." and offered "Try again". */
+  it('ZT-A10: says a board that is not here is not here, with the way back and no retry', () => {
+    const { board, el, fixture } = render({ canEdit: true, byId: () => of({ status: 'ERROR', message: 'Dashboard not found with 1524.', data: null }) });
+    board.openDashboard(BOARD);
+    fixture.detectChanges();
+    const card = el.querySelector('[data-test="board-missing"]');
+    expect(card?.textContent).toContain("This dashboard isn't here");
+    expect(card?.textContent).toContain('another workspace');
+    expect(el.querySelector('app-load-error')).toBeNull();
+  });
+
   it('leaves one card without counts and still counts the cards after it', () => {
     const { board } = render({ canEdit: true, byId: (id: number) => id === 8
       ? throwError(() => new HttpErrorResponse({ status: 502 }))

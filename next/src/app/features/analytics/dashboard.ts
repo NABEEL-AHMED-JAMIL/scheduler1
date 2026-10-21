@@ -772,6 +772,11 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly boardError = signal('');
   /** UX review 2026-10-12: the board read was refused (403): the page says so, with whom to ask, and offers no retry. */
   readonly boardRefused = signal(false);
+  /**
+   * ZT-A10: the board the address names is not here -- deleted, or another workspace's (a link shared across workspaces).
+   * The server answers both with the same "not found" (it never tells them apart), and that is not a failure to retry.
+   */
+  readonly boardMissing = signal(false);
   readonly widgetError = signal('');
 
   /**
@@ -1176,6 +1181,7 @@ export class Dashboards implements OnInit, OnDestroy {
     this.boardLoading.set(true);
     this.boardError.set('');
     this.boardRefused.set(false);
+    this.boardMissing.set(false);
     this.widgetError.set('');
     // Two boards asked for in quick succession answer in whatever order the server manages, and
     // the one that answers last is not necessarily the one the reader is waiting for. Only the
@@ -1186,6 +1192,7 @@ export class Dashboards implements OnInit, OnDestroy {
         if (token !== this.boardToken) return;
         this.boardLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
+          this.boardMissing.set(/not found/i.test(response.message ?? ''));
           this.boardError.set(response.message || 'The dashboard could not be read.');
           return;
         }

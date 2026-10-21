@@ -142,6 +142,15 @@
           <p class="text-sm text-[color:var(--text-secondary)] max-w-md">{{ boardError() }}</p>
           <a [routerLink]="[]" class="btn btn-default btn-sm mt-2" (click)="leaveBoard()">All dashboards</a>
         </div>
+      } @else if (boardMissing()) {
+        <app-page-header title="Dashboard" [trail]="boardTrail" />
+        <!-- ZT-A10: a board that is not here (deleted, or another workspace's link) is said as that, with the way back. -->
+        <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="board-missing">
+          <span class="stat-glyph"><app-icon name="search" /></span>
+          <h2 class="text-base font-semibold">This dashboard isn't here</h2>
+          <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been deleted, or the link belongs to another workspace.</p>
+          <a [routerLink]="[]" class="btn btn-default btn-sm mt-2" (click)="leaveBoard()">All dashboards</a>
+        </div>
       } @else if (boardError()) {
         <app-page-header title="Dashboard" [trail]="boardTrail" />
         <div class="card"><app-load-error [message]="boardError()" (retry)="retryBoard()" /></div>
