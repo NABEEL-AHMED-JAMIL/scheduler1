@@ -61,6 +61,10 @@ import { RunStepLogData, RunStepLogPanel } from './run-step-log-panel';
       .rs-table thead th, .rs-table td { padding-left: 0.5rem; padding-right: 0.5rem; }
       .rs-name, .rs-sub { max-width: 18rem; } .rs-out-col { min-width: 0; max-width: 13rem; } .rs-step-col { min-width: 12rem; }
     }
+    /* ZT-P14: a 1024 tablet (958 px of card) needs the step column narrower still. */
+    @media (max-width: 1279px) {
+      .rs-name, .rs-sub { max-width: 14rem; } .rs-step-col { min-width: 10rem; }
+    }
   `,
   template: `
     @if (store.timeline(); as t) {

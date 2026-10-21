@@ -225,6 +225,7 @@ describe('RunStepsTable at a tablet\'s width (ZT-P14)', () => {
     const narrow = styles.search(/@media\s*\(max-width:\s*1439px\)/);
     expect(wide).toBeGreaterThan(-1);
     expect(narrow).toBeGreaterThan(wide);
+    expect(styles.search(/@media\s*\(max-width:\s*1279px\)/)).toBeGreaterThan(narrow);
   });
 });
 
