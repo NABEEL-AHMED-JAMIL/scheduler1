@@ -85,6 +85,11 @@ export class BrandProfilePage implements OnInit {
   ngOnInit(): void {
     this.load();
     const sub = this.redraw.pipe(debounceTime(500), switchMap(d => {
+      // ZT-R17: a brand is previewed by the workspace's own members; a platform administrator is told so without a refused call.
+      if (this.auth.isPlatformAdmin()) {
+        this.previewError.set(PLATFORM_PREVIEW);
+        return of(null);
+      }
       this.previewing.set(true);
       return this.api.previewBrand(this.profileId(), d).pipe(catchError(e => { this.previewError.set(studioError(e, 'The preview could not be drawn.').message); return of(null); }));
     })).subscribe(r => { this.previewing.set(false); if (r) { this.previewError.set(''); this.previewHtml.set(r.html); } });
@@ -253,3 +258,6 @@ export class BrandProfilePage implements OnInit {
     return l === 'LOCKED' ? 'Locked' : 'Allowed';
   }
 }
+
+/** What a platform administrator reads where the live preview would be (ZT-R17). */
+export const PLATFORM_PREVIEW = 'The live preview is drawn for the workspace\'s own members: someone in the workspace previews and changes its brand.';

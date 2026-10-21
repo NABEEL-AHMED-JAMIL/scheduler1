@@ -44,7 +44,7 @@ function screen() {
       { provide: WorkflowsApi, useValue: api }, { provide: ReportStudioApi, useValue: studio },
       { provide: BulkReviewApi, useValue: { tasks: vi.fn() } }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
       { provide: TaskCountService, useValue: { refresh: vi.fn(), count: signal(2), overdue: signal(0), mine: signal(2), groups: signal(0), done: signal(0), requests: signal(0) } },
-      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: ME, tenantId: 2960 }) } },
+      { provide: AuthService, useValue: { canOpen: () => true, user: signal({ appUserId: ME, tenantId: 2960, pageAccessProfileName: 'Reviewer' }) } },
     ],
   });
   const fixture = TestBed.createComponent(TaskInbox);
@@ -85,5 +85,14 @@ describe('Review inbox: a Report Studio review', () => {
     // who the step goes to is its chip, not a field
     expect(inbox.fields({ reviewers: { kind: 'group', value: '1063' }, amount: 12 })).toEqual([{ label: 'Amount', value: '12' }]);
     expect(el.querySelector('[data-test="action-bar"]')).not.toBeNull();
+  });
+
+  it('ZT-R16: names the group a task waits with -- the reader\'s own profile in My groups -- never a bare "Group"', () => {
+    const { inbox } = screen();
+    inbox.tab.set('groups');
+    expect(inbox.holder(LIST[0])).toBe('Reviewer');
+    inbox.tab.set('done');
+    expect(inbox.holder(LIST[0])).toBe('a group');
+    expect(inbox.holder(task(703, { assigneeKind: 'role', assigneeValue: 'TENANT_ADMIN' }))).toBe('Administrators');
   });
 });

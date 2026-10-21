@@ -8,6 +8,7 @@ import { AccessProfilesService } from '../admin/access-profiles/access-profiles.
 import { ReportStudioApi } from './report-studio.api';
 import { StudioSettings } from './report-studio.model';
 import { ReportSettings, assigneeOf, choiceOf } from './settings';
+import { AuthService } from '../../core/auth/auth.service';
 
 /**
  * Report Studio phase 7 -- Report Studio › Settings: who approves (automatic, the administrators or an access profile, the
@@ -21,7 +22,7 @@ const saved: StudioSettings = {
     publishers: { assignee: { kind: 'role', value: 'TENANT_ADMIN' }, automatic: true, why: 'No access profile may publish templates.' } },
 };
 
-function mount() {
+function mount(platformAdmin = false) {
   const api = {
     settings: vi.fn(() => of(saved)),
     saveSettings: vi.fn(() => of(saved)),
@@ -33,7 +34,8 @@ function mount() {
     { pageAccessProfileId: 1063, profileName: 'Reviewer', pageKeys: ['report-approve', 'report-library'], defaultProfile: true, userCount: 1 }] })) };
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: ReportStudioApi, useValue: api },
-    { provide: AccessProfilesService, useValue: profiles }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }] });
+    { provide: AccessProfilesService, useValue: profiles }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+    { provide: AuthService, useValue: { isPlatformAdmin: () => platformAdmin, canOpen: () => true } }] });
   const fixture = TestBed.createComponent(ReportSettings);
   fixture.detectChanges();
   return { fixture, api, el: fixture.nativeElement as HTMLElement };
@@ -74,5 +76,14 @@ describe('Report settings (Report Studio phase 7)', () => {
     expect(api.retentionPreview).toHaveBeenCalledWith(30);
     expect(el.querySelector('[data-test="retention-summary"]')!.textContent).toContain('1 approved or signed');
     expect(el.textContent).toContain('RPT-0005');
+  });
+
+  it('ZT-R17: tells a platform administrator the settings are the workspace\'s own, without asking for them (no 403 in red)', async () => {
+    const { fixture, api, el } = mount(true);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.settings).not.toHaveBeenCalled();
+    expect(el.querySelector('app-empty-state')?.textContent).toContain("The workspace's own settings");
+    expect(el.querySelector('app-load-error')).toBeNull();
   });
 });

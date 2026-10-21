@@ -742,7 +742,9 @@ export class TaskInbox implements OnInit {
   holder(t: InboxTask): string {
     if (t.assigneeUserId != null) return this.name(t.assigneeUserId);
     if (t.assigneeKind === 'role') return t.assigneeValue === 'TENANT_ADMIN' ? 'Administrators' : 'Any member';
-    return 'Group';
+    // ZT-R16: a task in My groups is one of the reader's own: their access profile ("With Reviewer"), never a bare "Group".
+    const mine = this.auth.user()?.pageAccessProfileName;
+    return this.tab() === 'groups' && mine ? mine : 'a group';
   }
 
   dueLabel(t: InboxTask): string {

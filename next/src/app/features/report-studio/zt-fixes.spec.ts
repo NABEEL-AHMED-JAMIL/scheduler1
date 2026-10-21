@@ -3,6 +3,7 @@ import { provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
+import { delay } from 'rxjs/operators';
 import { AuthService } from '../../core/auth/auth.service';
 import { TabCounts } from '../../core/nav/tab-counts';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
@@ -10,6 +11,8 @@ import { GeneratedService } from '../documents/generated/generated.service';
 import { ReportStudioApi } from './report-studio.api';
 import { RsTabCounts } from './rs-tab-counts';
 import { ReportOverview } from './overview';
+import { BrandProfilePage, PLATFORM_PREVIEW } from './assets/brand-profile';
+import { ToastService } from '../../shared/ui/toast.service';
 import { overviewTiles } from './overview';
 import { testChipWords } from './designer/designer';
 import { recordsWord } from './report-studio.model';
@@ -84,5 +87,29 @@ describe('Report Studio screens (zero-tolerance)', () => {
     expect(api.assets).toHaveBeenCalledTimes(1);
     fixture.componentInstance.load();
     expect(generated.schedules).toHaveBeenCalledTimes(1);
+  });
+
+  it('ZT-R17: a platform administrator\'s brand profile says the preview is the workspace\'s, and asks for none (no 403)', async () => {
+    vi.useFakeTimers();
+    try {
+      for (const admin of [true, false]) {
+        const api = { brandProfile: vi.fn(() => of({ profileId: 'P', name: 'Default', status: 'ACTIVE', isDefault: true, templates: 81, assets: [],
+          published: { version: 2, definition: { colors: {} } }, draft: null, versions: [] }).pipe(delay(0))), previewBrand: vi.fn(() => of({ html: '<p>x</p>' })),
+          assets: vi.fn(() => of({ assets: [], counts: {} })), usable: vi.fn(() => of({ assets: [], total: 0 })) };
+        TestBed.resetTestingModule();
+        TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideRouter([]), { provide: ReportStudioApi, useValue: api },
+          { provide: AuthService, useValue: { isPlatformAdmin: () => admin, canOpen: () => true, user: signal({ appUserId: 1 }) } },
+          { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } }] });
+        TestBed.overrideComponent(BrandProfilePage, { set: { template: '', imports: [] } });
+        const fixture = TestBed.createComponent(BrandProfilePage);
+        fixture.componentRef.setInput('profileId', 'P');
+        fixture.detectChanges();
+        vi.advanceTimersByTime(800);
+        expect(api.previewBrand).toHaveBeenCalledTimes(admin ? 0 : 1);
+        expect(fixture.componentInstance.previewError()).toBe(admin ? PLATFORM_PREVIEW : '');
+      }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

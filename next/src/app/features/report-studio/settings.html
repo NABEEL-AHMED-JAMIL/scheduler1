@@ -14,7 +14,10 @@
     </div>
   </app-page-header>
 
-  @if (error()) {
+  @if (workspaceOnly()) {
+    <app-empty-state class="card p-10" icon="settings" title="The workspace's own settings"
+                     message="Who approves reports, who publishes templates and what retention removes are set by each workspace's administrators, in their own console." />
+  } @else if (error()) {
     <app-load-error [message]="error()" (retry)="load()" />
   } @else if (settings(); as s) {
     <div class="rss-grid">

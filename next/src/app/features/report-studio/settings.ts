@@ -5,6 +5,8 @@ import { PageHeader } from '../../shared/ui/page-header';
 import { RefreshButton } from '../../shared/ui/refresh-button';
 import { Icon } from '../../shared/ui/icon';
 import { LoadError } from '../../shared/ui/load-error';
+import { EmptyState } from '../../shared/ui/empty-state';
+import { AuthService } from '../../core/auth/auth.service';
 import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfile, AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { ReportStudioApi, studioError } from './report-studio.api';
@@ -36,7 +38,7 @@ export function assigneeOf(c: WhoChoice): Assignee | null {
  */
 @Component({
   selector: 'app-report-settings',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, FormsModule, RouterLink, RsTimePipe],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe],
   templateUrl: './settings.html',
   styles: `
     .rss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr)); gap: 1rem; align-items: start; }
@@ -52,6 +54,9 @@ export class ReportSettings implements OnInit {
   private readonly api = inject(ReportStudioApi);
   private readonly profilesApi = inject(AccessProfilesService);
   private readonly toast = inject(ToastService);
+  private readonly auth = inject(AuthService);
+  /** ZT-R17: the settings are a workspace's own; a platform administrator is told so, not shown a refusal in red. */
+  readonly workspaceOnly = computed(() => this.auth.isPlatformAdmin());
 
   readonly loading = signal(true);
   readonly error = signal('');
@@ -90,8 +95,12 @@ export class ReportSettings implements OnInit {
   }
 
   load(): void {
-    this.loading.set(true);
     this.error.set('');
+    if (this.workspaceOnly()) {
+      this.loading.set(false);
+      return;
+    }
+    this.loading.set(true);
     this.api.settings().subscribe({
       next: s => { this.apply(s); this.loading.set(false); },
       error: e => { this.loading.set(false); this.error.set(studioError(e, 'The settings could not be read.').message); },
