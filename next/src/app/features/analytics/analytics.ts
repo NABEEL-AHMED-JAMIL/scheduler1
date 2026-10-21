@@ -1,6 +1,8 @@
 import { Component, Injector, LOCALE_ID, OnInit, afterNextRender, computed, inject, signal } from '@angular/core';
 import { Dialog } from '@angular/cdk/dialog';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { Icon } from '../../shared/ui/icon';
 import { TableShell } from '../../shared/ui/data-table';
 import { StatStrip, StatStripItem } from '../../shared/ui/stat-strip';
@@ -617,7 +619,7 @@ export const CANVAS_WRAP_KEY = 'result:canvas';
  */
 @Component({
   selector: 'app-analytics',
-  imports: [PageHeader, 
+  imports: [PageHeader, NeedsWorkspace,
     Icon, TableShell, SqlEditor, BarChart, Donut, RankedBar, Histogram, FilterBuilder, DataGrid,
     DatasetRegistry, RouterLink, ColumnCard, DatasetOverview, StatStrip, FormDialog,
     CdkMenu, CdkMenuItem, CdkMenuTrigger, DataText, WrapToggle,
@@ -627,6 +629,12 @@ export const CANVAS_WRAP_KEY = 'result:canvas';
   host: { '(document:keydown.escape)': 'onEscape()' },
 })
 export class Analytics implements OnInit {
+  private readonly auth = inject(AuthService);
+  /**
+   * ZT-A12 (owner 2026-10-21, "Managed session only"): a platform administrator's own sign-in has no workspace, and
+   * Analytics answers it 403 on a workspace's data; the page says so (NeedsWorkspace) and makes no call.
+   */
+  readonly noWorkspace = computed(() => !!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId);
   /**
    * The file picker slides in over the page (owner, 2026-09-28). It used to keep a 260px column
    * beside the data for good, when it is only needed to choose what to read; the data now has the
@@ -1156,6 +1164,7 @@ export class Analytics implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.storage.buckets().subscribe({
       next: response => {
         if (response.status !== API_SUCCESS) { this.browseError.set(response.message); return; }

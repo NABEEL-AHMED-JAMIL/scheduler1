@@ -1,5 +1,10 @@
 <div class="page">
-  @if (openId() === null) {
+  @if (noWorkspace()) {
+    <app-page-header>
+      <div class="page-head"><div><h1 class="page-title">Dashboards</h1></div></div>
+    </app-page-header>
+    <app-needs-workspace what="Dashboards are" todo="open, run and change its boards" icon="layers" />
+  } @else if (openId() === null) {
     <!-- ---- the cards: every board in the workspace ------------------------------------------ -->
     <!-- UX review 2026-10-12 (A2, G3, G12): Dashboards, the primary rightmost. -->
     <app-page-header>

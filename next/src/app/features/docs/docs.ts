@@ -274,9 +274,11 @@ export function roleOnly(gate: NavGate & { tabs?: NavTab[] }): 'platform adminis
               </table>
             </div>
             <p class="mt-3 text-sm text-[color:var(--text-secondary)]">
-              The roles nest: a platform administrator has everything a workspace administrator has,
-              and a workspace administrator everything a workspace member has. Page access then narrows a
-              member to the pages their profile names. The server enforces both, whatever the screen shows.
+              The roles nest: a workspace administrator has everything a workspace member has, and a
+              platform administrator working in a workspace (Work in this workspace) is that workspace's
+              administrator for the session. On their own sign-in a platform administrator reads no
+              workspace's data. Page access then narrows a member to the pages their profile names. The
+              server enforces all of it, whatever the screen shows.
             </p>
 
             <h3 class="mt-8 text-sm font-semibold">Run outcomes</h3>
@@ -665,7 +667,7 @@ export class Docs implements AfterViewInit {
   ];
 
   readonly roles = [
-    { name: 'Platform administrator', note: 'Every workspace, the requests for new ones, the rate cards and the settings that apply across all of them.' },
+    { name: 'Platform administrator', note: 'The list of workspaces, the requests for new ones, the rate cards and the settings that apply across all of them. A workspace\'s data -- its files, boards, queries, documents and approved data -- is read and changed only inside that workspace, with Work in this workspace on Platform › Workspaces, where every change is recorded.' },
     { name: 'Workspace administrator', note: 'Everything inside one workspace: its people and page access, connections, pipelines, schedules, settings, alerts and bills; decides any run\'s review.' },
     { name: 'Workspace member', note: 'Runs, reviews and reads within their workspace — the pages their page-access profile opens (all of them when the workspace uses no profiles).' },
   ];

@@ -1,6 +1,7 @@
 import { PageHeader } from '../../shared/ui/page-header';
 import { Crumb } from '../../core/nav/nav-tree';
 import { AuthService } from '../../core/auth/auth.service';
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
@@ -104,7 +105,7 @@ export { DatasetRegistry } from './dataset-registry';
  */
 @Component({
   selector: 'app-dashboards',
-  imports: [PageHeader, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
+  imports: [PageHeader, NeedsWorkspace, Icon, LoadError, RouterLink, CdkMenu, CdkMenuGroup, CdkMenuItem, CdkMenuItemRadio, CdkMenuTrigger, FilterBuilder, AnalyticsWidget, WidgetChart, Field, ServerTimePipe, KindPicker, ThemePicker, BoardFilterBar, BoardTable],
   templateUrl: './dashboard.html',
   styleUrls: ['./dashboard.css', './board/board.css'],
 })
@@ -114,6 +115,11 @@ export class Dashboards implements OnInit, OnDestroy {
 
   private readonly analytics = inject(AnalyticsService);
   private readonly auth = inject(AuthService);
+  /**
+   * ZT-A12 (owner 2026-10-21, "Managed session only"): a platform administrator's own sign-in has no workspace, and
+   * Analytics answers it 403 on a workspace's data; the boards say so (NeedsWorkspace) and makes no call.
+   */
+  readonly noWorkspace = computed(() => !!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId);
   /**
    * UX review 2026-10-12: whether the reader may change the boards -- a new board, a tile added, re-charted, re-set or
    * removed, the board's theme, a board deleted. A viewer's profile holds Saved Analyses only: they read the boards, run
@@ -923,6 +929,7 @@ export class Dashboards implements OnInit, OnDestroy {
   });
 
   ngOnInit(): void {
+    if (this.noWorkspace()) return;
     this.loadDashboards();
     this.loadSources();
     // The URL says which board is open: a link to ?board=7 opens it, and Back and Forward move

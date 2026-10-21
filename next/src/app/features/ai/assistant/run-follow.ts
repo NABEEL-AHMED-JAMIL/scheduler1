@@ -196,6 +196,8 @@ export class RunFollow implements OnInit {
   /** Once, for a completed run: the first dashboard its schedule's output feeds (a reader without dashboards gets none). */
   private findBoard(): void {
     if (this.boardAsked || (typeof this.auth?.canOpen === 'function' && !this.auth.canOpen('analytics-dashboards'))) return;
+    // ZT-A12: a platform administrator's own sign-in (no workspace) reads no workspace's boards; Analytics answers it 403.
+    if (typeof this.auth?.isPlatformAdmin === 'function' && this.auth.isPlatformAdmin() && !this.auth.user()?.tenantId) return;
     this.boardAsked = true;
     this.http.get<ApiResponse<{ analyticsDashboardId?: number; dashboardName: string; pipelines?: { jobId: number }[] }[]>>(
       `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).pipe(takeUntilDestroyed(this.destroy)).subscribe({

@@ -195,7 +195,8 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly feeds = signal<{ id: number; name: string }[]>([]);
   private readFeeds(): void {
     const job = Number(this.jobId());
-    if (!job || !this.auth.canOpen('analytics-dashboards')) return;
+    // ZT-A12: a platform administrator's own sign-in (no workspace) reads no workspace's boards; Analytics answers it 403.
+    if (!job || !this.auth.canOpen('analytics-dashboards') || (!!this.auth.isPlatformAdmin?.() && !this.auth.user?.()?.tenantId)) return;
     this.http.get<ApiResponse<{ analyticsDashboardId?: number | null; dashboardName?: string | null; pipelines?: { jobId: number }[] | null }[]>>(
       `${API_BASE}/analyticsWorkspace.json/fetchAllDashboards`).subscribe({
         next: r => this.feeds.set(boardsFedBy(r?.status === API_SUCCESS ? r.data ?? [] : [], job)),
