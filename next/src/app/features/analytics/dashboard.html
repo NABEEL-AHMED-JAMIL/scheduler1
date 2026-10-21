@@ -26,7 +26,7 @@
 
     @if (!canEdit()) {
       <!-- UX review 2026-10-12: a viewer reads the boards; changing them is another page's. -->
-      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page; ask your workspace admin.</p>
+      <p class="text-xs text-[color:var(--text-muted)] flex items-center gap-1.5" data-test="read-only"><app-icon name="lock" size="0.95em" />You can open, run and filter these dashboards. Changing them needs the Edit dashboards page, and reading data outside their tiles needs Analytics Studio; ask your workspace admin.</p>
     }
     @if (createOpen() && canEdit()) {
       <div class="card p-4 flex flex-wrap items-end gap-2">
@@ -232,7 +232,7 @@
         <!-- The filter bar (board/board-filter-bar.ts): a date range and the dimensions the board's editor chose. Every tile
              runs under it, applied by the server; the state is in the URL and kept for this viewer. -->
         @if (filterDefs().length) {
-          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEdit()" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
+          <app-board-filter-bar [defs]="filterDefs()" [state]="filterState()" [canEdit]="canEdit()" [boardId]="board()?.analyticsDashboardId ?? null" (stateChange)="setFilterState($event)" (edit)="openFilterEditor()" />
         }
 
         <!-- Reference, not the work: folded away so the widgets start near the top. -->

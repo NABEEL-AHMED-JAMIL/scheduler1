@@ -91,6 +91,8 @@ export class BoardFilterChip {
   readonly def = input.required<BoardFilterDef>();
   /** The values chosen now (the board owns them). */
   readonly values = input<string[]>([]);
+  /** ZT-A13: the board the chip is on -- a Saved Analyses reader may list only the values a filter of that board lists. */
+  readonly boardId = input<number | null>(null);
   readonly changed = output<string[]>();
 
   readonly open = signal(false);
@@ -156,7 +158,7 @@ export class BoardFilterChip {
     this.inFlight?.unsubscribe();
     this.loading.set(true);
     this.error.set('');
-    this.inFlight = this.api.values(source.connection, source.path, source.column, term, 200).subscribe({
+    this.inFlight = this.api.values(source.connection, source.path, source.column, term, 200, this.boardId()).subscribe({
       next: response => {
         this.loading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {

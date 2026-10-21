@@ -245,7 +245,7 @@ export class Dashboards implements OnInit, OnDestroy {
     const connection = key.slice(0, cut);
     const path = key.slice(cut + 1);
     this.boardColumnsLoading.set(true);
-    this.analytics.schema(connection, path).subscribe({
+    this.analytics.schema(connection, path, this.board()?.analyticsDashboardId).subscribe({
       next: response => {
         this.boardColumnsLoading.set(false);
         if (response.status !== API_SUCCESS || !response.data) {
@@ -596,6 +596,7 @@ export class Dashboards implements OnInit, OnDestroy {
       sources.set(widget.analyticsDashboardWidgetId, {
         connection: saved.connectionAlias, path: saved.datasetPath, sql: saved.queryText,
         connection2: saved.secondDatasetPath ? saved.secondConnectionAlias : null, path2: saved.secondDatasetPath || null,
+        boardId: widget.analyticsDashboardId ?? null, widgetId: widget.analyticsDashboardWidgetId,
       });
     }
     return sources;
@@ -2093,6 +2094,8 @@ export class Dashboards implements OnInit, OnDestroy {
         dimensions: config.dimensions ?? [],
         measure: { aggregation, field: config.measure?.field },
         queryId,
+        // ZT-A13: which tile this is. A Saved Analyses reader is run the tile's own saved analysis by the server.
+        ...tileOf(widget),
       };
       /*
        * The saved filters and the board's, ANDed. boardFilterFor returns null unless this widget
@@ -2160,6 +2163,7 @@ export class Dashboards implements OnInit, OnDestroy {
       path2: saved.secondDatasetPath || undefined,
       queryId,
       boardFilters: this.filterWire(),
+      ...tileOf(widget),
     }).subscribe({
       next: response => {
         if (response.status !== API_SUCCESS || !response.data) {
@@ -2245,6 +2249,16 @@ export class Dashboards implements OnInit, OnDestroy {
  * A saved work's name without the board's own name in front of it ("Riverside — Patient 360 — Risk level" on that
  * board is "Risk level"): the board says it once, in its header.
  */
+/**
+ * ZT-A13: a tile's board and widget ids, as a run carries them. A reader whose only Analytics page is Saved Analyses is run
+ * the tile's own saved statement or analysis by the server (TileScope); nothing at all when the widget has no id yet (the
+ * add form's preview of a tile that is not saved).
+ */
+export function tileOf(widget: DashboardWidget): { boardId?: number; widgetId?: number } {
+  return widget.analyticsDashboardId != null && widget.analyticsDashboardWidgetId != null
+    ? { boardId: widget.analyticsDashboardId, widgetId: widget.analyticsDashboardWidgetId } : {};
+}
+
 export function withoutBoardName(name: string | null | undefined, board: string | null | undefined): string {
   const n = (name ?? '').trim();
   const b = (board ?? '').trim();

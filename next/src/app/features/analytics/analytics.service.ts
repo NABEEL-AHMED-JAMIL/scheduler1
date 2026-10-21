@@ -215,6 +215,12 @@ export interface QueryRequest {
   path2?: string;
   /** A dashboard tile's board filters (board/board-filters.ts): the server narrows the dataset before the statement. */
   boardFilters?: BoardFilterWire[];
+  /**
+   * ZT-A13: the board and the tile this run is (a dashboard tile's). A reader whose only Analytics page is Saved Analyses is run
+   * the tile's own saved statement or analysis by the server, whatever else the request carries; anyone else is unaffected.
+   */
+  boardId?: number;
+  widgetId?: number;
 }
 
 /**
@@ -508,6 +514,12 @@ export interface AnalysisRequest {
   queryId?: string;
   /** A dashboard tile's board filters: the dataset is narrowed by them before the analysis reads it. */
   boardFilters?: BoardFilterWire[];
+  /**
+   * ZT-A13: the board and the tile this run is (a dashboard tile's). A reader whose only Analytics page is Saved Analyses is run
+   * the tile's own saved statement or analysis by the server, whatever else the request carries; anyone else is unaffected.
+   */
+  boardId?: number;
+  widgetId?: number;
   /**
    * The drill steps already taken, oldest first, echoed back exactly as the server sent them.
    *
@@ -867,6 +879,10 @@ function analysisBody(request: AnalysisRequest): Record<string, unknown> {
   if (request.sort) body['sort'] = { ...request.sort };
   if (request.queryId) body['queryId'] = request.queryId;
   if (request.boardFilters?.length) body['boardFilters'] = request.boardFilters;
+  if (request.boardId != null && request.widgetId != null) {
+    body['boardId'] = request.boardId;
+    body['widgetId'] = request.widgetId;
+  }
   // Echoed, not rebuilt. Sent even on a plain /analyze, because a re-run of a drilled analysis
   // is still the drilled analysis -- dropping the trail there would climb back out of it while
   // the breadcrumb bar went on saying otherwise.
@@ -901,10 +917,11 @@ export class AnalyticsService {
   private readonly workspace = `${API_BASE}/analyticsWorkspace.json`;
   private readonly datasets = `${API_BASE}/analyticsDataset.json`;
 
-  schema(connection: string, path: string): Observable<ApiResponse<DatasetSchema>> {
-    return this.http.get<ApiResponse<DatasetSchema>>(`${this.base}/schema`, {
-      params: { connection, path },
-    });
+  /** ZT-A13: on a board, its id -- a Saved Analyses reader may read the columns of the board's own datasets only. */
+  schema(connection: string, path: string, boardId?: number): Observable<ApiResponse<DatasetSchema>> {
+    const params: Record<string, string> = { connection, path };
+    if (boardId != null) params['boardId'] = String(boardId);
+    return this.http.get<ApiResponse<DatasetSchema>>(`${this.base}/schema`, { params });
   }
 
   /**
@@ -1027,6 +1044,10 @@ export class AnalyticsService {
     if (request.connection2 && request.path2) {
       body['connection2'] = request.connection2;
       body['path2'] = request.path2;
+    }
+    if (request.boardId != null && request.widgetId != null) {
+      body['boardId'] = request.boardId;
+      body['widgetId'] = request.widgetId;
     }
     return this.http.post<ApiResponse<QueryResult>>(`${this.base}/query`, body);
   }

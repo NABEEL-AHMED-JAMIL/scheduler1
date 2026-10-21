@@ -485,6 +485,11 @@ export class Docs implements AfterViewInit {
       ],
       todo: [
         'Dashboards: boards of tiles over your pipelines\' results; each board names the pipelines that feed it.',
+        'Someone whose Analytics page is Saved Analyses alone opens, filters and pages the boards and exports a table tile; '
+          + 'a statement of their own, or a file\'s rows outside a board, needs Analytics Studio.',
+        'A new file -- an upload, or a file a pipeline writes -- is checked for sensitive columns (names, record numbers, '
+          + 'national ids...) from a sample of its first rows before Analytics first reads it, so a viewer reads them masked from '
+          + 'the first read. The Data Catalog shows what was found; an administrator may correct it.',
         'Ask your data: ask a question in plain words and read the answer with the rows behind it; pin it to a dashboard.',
         'Analytics Studio and the Data Catalog: explore datasets, and find what was made from what.',
         'Files: the files runs wrote and the uploads, by connection and folder, each with a preview.',
