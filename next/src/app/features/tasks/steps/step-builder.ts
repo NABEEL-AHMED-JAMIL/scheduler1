@@ -145,6 +145,11 @@ export class StepBuilder implements OnInit {
   readonly legacy = computed(() => isLegacyDefinition(this.draft()));
   /** The saved pipeline still runs as its legacy step: the first save moves every task on it to the steps. */
   readonly savedLegacy = computed(() => !this.meta().stored || this.meta().legacy);
+  /**
+   * ZT-P5: no schedule runs this pipeline -- a new one made from Add steps yourself. Nothing runs as its legacy step, so
+   * nothing says it does, and its first save asks nothing.
+   */
+  readonly unscheduled = computed(() => !this.jobIds().length);
   readonly dirty = computed(() => this.yamlTyped() || this.jsonTyped() || !sameDefinition(this.draft(), this.meta().definition));
   readonly taskOptions = computed(() => taskOptions(this.tasks(), this.isAdmin()));
   /** UX review 2026-10-12 (B2, P5): the steps as runs of one stage -- read, check, transform, AI, review, write. */
@@ -159,7 +164,7 @@ export class StepBuilder implements OnInit {
   }
   readonly versionText = computed(() => {
     const m = this.meta();
-    return m.stored && !m.legacy ? `Version ${m.version}` : 'Runs as its legacy step: no steps saved';
+    return m.stored && !m.legacy ? `Version ${m.version}` : this.unscheduled() ? 'No steps saved yet' : 'Runs as its legacy step: no steps saved';
   });
   readonly latestVersion = computed(() => this.meta().versions?.[0] ?? null);
 
@@ -587,7 +592,7 @@ export class StepBuilder implements OnInit {
 
   /** Saves, asking first when the pipeline still runs as its legacy step; `then` hears whether it saved. */
   private persist(then: (ok: boolean) => void): void {
-    if (this.savedLegacy() && !this.legacy()) {
+    if (this.savedLegacy() && !this.legacy() && !this.unscheduled()) {
       confirmWith(this.dialog, {
         title: 'Run this pipeline as steps',
         body: `${this.meta().pipelineId} runs as its legacy step today: the task payload, sent to its worker. Once these steps are saved, every task on this pipeline runs them in the step engine from its next run.`,

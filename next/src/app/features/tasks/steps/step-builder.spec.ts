@@ -55,7 +55,7 @@ const TASKS = [
     disabledReason: 'integration-service is not there yet' },
 ];
 
-function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft; openStep?: string } = {}) {
+function build(opts: { view?: DefinitionView; jobs?: unknown[]; jobIds?: number[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft; openStep?: string } = {}) {
   const view = opts.view ?? VIEW;
   const api = {
     definition: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...view, version: 2 } })),
@@ -98,6 +98,7 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
   fixture.componentRef.setInput('view', view);
   fixture.componentRef.setInput('canManage', opts.canManage ?? true);
   fixture.componentRef.setInput('isAdmin', opts.isAdmin ?? true);
+  if (opts.jobIds) fixture.componentRef.setInput('jobIds', opts.jobIds);
   if (opts.openStep) fixture.componentRef.setInput('openStep', opts.openStep);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
@@ -442,7 +443,7 @@ describe('StepBuilder -- Validate points at the step', () => {
 
 describe('StepBuilder -- a legacy pipeline', () => {
   it('says it runs as its legacy step, and a real step replaces it', () => {
-    const { el, cards, builder, fixture } = build({ view: LEGACY });
+    const { el, cards, builder, fixture } = build({ view: LEGACY, jobIds: [2848] });
     expect(el.textContent).toContain('runs as its legacy step');
     expect(cards()).toEqual(['legacy']);
     builder.add('sample');
@@ -451,11 +452,24 @@ describe('StepBuilder -- a legacy pipeline', () => {
   });
 
   it('asks before the first save moves every task on the pipeline to the steps', async () => {
-    const { builder, api, dialog, fixture, click } = build({ view: LEGACY });
+    const { builder, api, dialog, fixture, click } = build({ view: LEGACY, jobIds: [2848] });
     builder.add('sample');
     fixture.detectChanges();
     click('Save');
     expect(dialog.open).toHaveBeenCalledWith(Confirm, expect.anything());
+    await new Promise(resolve => setTimeout(resolve));
+    expect(api.save).toHaveBeenCalled();
+  });
+});
+
+describe('StepBuilder -- a new pipeline (ZT-P5)', () => {
+  it('saves its first steps without the legacy question, and never says it runs as its legacy step', async () => {
+    const { builder, api, dialog, fixture, click, el } = build({ view: LEGACY, jobIds: [] });
+    expect(el.textContent).not.toContain('legacy step');
+    builder.add('sample');
+    fixture.detectChanges();
+    click('Save');
+    expect(dialog.open).not.toHaveBeenCalledWith(Confirm, expect.anything());
     await new Promise(resolve => setTimeout(resolve));
     expect(api.save).toHaveBeenCalled();
   });
