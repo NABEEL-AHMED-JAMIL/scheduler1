@@ -31,7 +31,7 @@ function screen() {
     groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
-    task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...LIST.find(t => t.id === id)!, subject: {}, history: [], tasks: [] } })),
+    task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...LIST.find(t => t.id === id)!, subject: { report: 'RPT-0005', pages: 3 }, history: [], tasks: [] } })),
     colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
   };
   const studio = { reviewCard: vi.fn(() => of({ reportId: ID, reportLabel: 'RPT-0005', name: 'Wound assessment', templateVersion: 2, version: 3, current: true,
@@ -66,5 +66,21 @@ describe('Review inbox: a Report Studio review', () => {
     expect(el.textContent).not.toContain('Ask for changes');
     expect(studio.reviewCard).toHaveBeenCalledWith(ID, 3);
     expect(el.querySelector('app-report-review-card')).not.toBeNull();
+    // one note box (the card's): the bar's comment and the request's raw fields are not shown for it
+    expect(el.querySelector('#task-comment')).toBeNull();
+    expect(el.querySelector('#task-details-title')).toBeNull();
+    inbox.passing.set(true);
+    fixture.detectChanges();
+    expect((el.querySelector('#task-comment') as HTMLTextAreaElement | null)?.placeholder).toBe('Note for the person you pass it to (optional)');
+  });
+
+  it("keeps another workflow's comment and its request details", async () => {
+    const { fixture, el, inbox } = screen();
+    inbox.openTask(702);
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.querySelector('#task-comment')).not.toBeNull();
+    expect(el.querySelector('#task-details-title')).not.toBeNull();
+    expect(el.textContent).toContain('Ask for changes');
   });
 });

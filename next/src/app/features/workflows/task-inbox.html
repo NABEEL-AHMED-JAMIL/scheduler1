@@ -186,11 +186,15 @@
 
           @if (canDecide()) {
             <div class="inbox-actions" data-test="action-bar">
-              <div class="inbox-comment">
-                <label class="sr-only" for="task-comment">Comment</label>
-                <textarea id="task-comment" class="input resize-y" rows="1" [ngModel]="comment()" (ngModelChange)="comment.set($event)"
-                          [placeholder]="d.rejectNeedsComment ? 'Comment: say why, if you reject it (required)' : 'Comment: a note for the requester (optional)'"></textarea>
-              </div>
+              <!-- A Report Studio review is decided in its card, with the card's note: the bar's comment is only Pass on's note then. -->
+              @if (!decidedInStudio(d) || passing()) {
+                <div class="inbox-comment">
+                  <label class="sr-only" for="task-comment">Comment</label>
+                  <textarea id="task-comment" class="input resize-y" rows="1" [ngModel]="comment()" (ngModelChange)="comment.set($event)"
+                            [placeholder]="decidedInStudio(d) ? 'Note for the person you pass it to (optional)'
+                              : d.rejectNeedsComment ? 'Comment: say why, if you reject it (required)' : 'Comment: a note for the requester (optional)'"></textarea>
+                </div>
+              }
               @if (passing()) {
                 <div class="flex items-end gap-2 flex-wrap" data-test="pass-on">
                   <div class="min-w-64 flex-1">
@@ -250,7 +254,8 @@
             @if (decidedInStudio(d) && d.subjectId) {
               <app-report-review-card [subjectId]="d.subjectId" [taskId]="d.state === 'Open' ? d.id : null" (decided)="onStudioDecided(d.id, $event)" (refused)="toast.error($event)" />
             }
-            @if (taskFields().length) {
+            <!-- The review card shows what the request names (the report, its version, who asked); its raw fields would repeat it. -->
+            @if (taskFields().length && !decidedInStudio(d)) {
               <section aria-labelledby="task-details-title">
                 <h3 class="section-title mb-3" id="task-details-title">Request details</h3>
                 <ng-container *ngTemplateOutlet="fieldList; context: { $implicit: taskFields() }" />
