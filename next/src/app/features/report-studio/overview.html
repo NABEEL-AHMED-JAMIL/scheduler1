@@ -23,16 +23,32 @@
   } @else if (data(); as d) {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Reports at a glance" />
 
-    <!-- Phase 7: what waits for a decision, in the Task inbox. -->
-    @if ((d.figures.waitingForApproval ?? 0) + (d.figures.publishRequests ?? 0) > 0) {
-      <div class="rs-banner mt-4" role="status" data-test="waiting-banner">
-        <app-icon name="inbox" class="shrink-0" />
-        <div class="min-w-0 flex-1">
-          <div class="font-semibold">@if (d.figures.waitingForApproval) { {{ d.figures.waitingForApproval }} report{{ d.figures.waitingForApproval === 1 ? '' : 's' }} waiting for approval }@if (d.figures.waitingForApproval && d.figures.publishRequests) { · }@if (d.figures.publishRequests) { {{ d.figures.publishRequests }} template{{ d.figures.publishRequests === 1 ? '' : 's' }} to publish }</div>
-          <div class="text-sm text-[color:var(--text-secondary)]">Reviewers decide them in Review › Approvals, with the pages beside Approve and sign.</div>
+    <!-- Phase 7 / ZT-R23: what waits for the reader's decision (Approvals lists exactly these), and what they asked for. -->
+    @if (waiting(); as w) {
+      @if (w.forYou.reports + w.forYou.templates > 0) {
+        <div class="rs-banner mt-4" role="status" data-test="waiting-banner">
+          <app-icon name="inbox" class="shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold">@if (w.forYou.reports) { {{ w.forYou.reports }} report{{ w.forYou.reports === 1 ? '' : 's' }} waiting for {{ w.split ? 'you' : 'approval' }} }@if (w.forYou.reports && w.forYou.templates) { · }@if (w.forYou.templates) { {{ w.forYou.templates }} template{{ w.forYou.templates === 1 ? '' : 's' }} to publish }</div>
+            <div class="text-sm text-[color:var(--text-secondary)]">Decide them in Review › Approvals, with the pages beside Approve and sign.</div>
+          </div>
+          <a routerLink="/review/approvals" class="btn btn-default btn-sm">Open Approvals</a>
         </div>
-        <a routerLink="/review/approvals" class="btn btn-default btn-sm">Open Approvals</a>
-      </div>
+      }
+      @if (w.asked.reports + w.asked.templates > 0) {
+        <div class="rs-banner mt-4" role="status" data-test="asked-banner">
+          <app-icon name="clock" class="shrink-0" />
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold">{{ w.asked.reports + w.asked.templates }} waiting for another approver: you asked for {{ w.asked.reports + w.asked.templates === 1 ? 'it' : 'these' }}</div>
+            @if (w.nobodyElse > 0) {
+              <div class="text-sm text-[color:var(--text-secondary)]" data-test="nobody-else">No one else in this workspace can approve {{ w.nobodyElse === 1 ? 'it' : w.nobodyElse + ' of them' }}; the platform administrator will decide {{ w.nobodyElse === 1 ? 'it' : 'them' }}.</div>
+            } @else {
+              <div class="text-sm text-[color:var(--text-secondary)]">Someone else decides {{ w.asked.reports + w.asked.templates === 1 ? 'it' : 'them' }}; you can follow {{ w.asked.reports + w.asked.templates === 1 ? 'it' : 'them' }} in Review › My requests.</div>
+            }
+          </div>
+          <a routerLink="/review/requests" class="btn btn-default btn-sm">My requests</a>
+        </div>
+      }
     }
 
     @if (blocked(); as j) {

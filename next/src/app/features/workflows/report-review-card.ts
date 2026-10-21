@@ -117,6 +117,13 @@ export const CARD_PAGES = 4;
             } @else if (c.whyNot) {
               <p class="rvc-why" data-test="review-why-not"><app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" /><span>{{ c.whyNot }}</span></p>
             }
+            <!-- ZT-R23 / ZT-W2: the maker is told nobody else here can decide it; a managed session why it may. -->
+            @if (c.waitingNote) {
+              <p class="rvc-why" data-test="review-waiting-note"><app-icon name="clock" size="0.95em" class="mt-0.5 shrink-0" /><span>{{ c.waitingNote }}</span></p>
+            }
+            @if (c.managedNote) {
+              <p class="rvc-why" data-test="review-managed-note"><app-icon name="shield" size="0.95em" class="mt-0.5 shrink-0" /><span>{{ c.managedNote }}</span></p>
+            }
           </div>
         </div>
       </section>

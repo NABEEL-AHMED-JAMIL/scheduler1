@@ -308,6 +308,8 @@ export interface ReportReviewCard {
   mayApprove: boolean;
   mayReject: boolean;
   whyNot?: string | null;
+  /** ZT-R23 / ZT-W2: nobody in the workspace but its requester or maker may decide it; the maker's line; a managed session's line. */
+  nobodyElseCan?: boolean; waitingNote?: string | null; managedNote?: string | null;
   secondApprover: boolean;
   stage: 'FIRST' | 'FINAL';
   signing: { configured: boolean; certificate?: string | null };
@@ -504,12 +506,17 @@ export interface ActivityRow { actor?: number | null; action: string; at: string
 
 export interface ReportDetail extends ReportRow { versions: ReportVersionRow[]; jobs: JobRow[]; activity: ActivityRow[]; }
 
+/** ZT-R23: open requests of one kind -- all, the reader's to decide, asked for by the reader, and of those nobody else's to decide. */
+export interface WaitingFor { open: number; forYou: number; askedByYou: number; nobodyElse: number; }
+
 export interface StudioOverview {
   figures: {
     versionsThisMonth: number; reports: number; publishedTemplates: number; templatesWithDrafts: number; templates: number;
     jobsFinishedThisMonth: number; jobsSucceededThisMonth: number; failedLast7Days: number; running: number;
     /** Phase 7: reports waiting for approval, and templates' publish requests, in the Task inbox (a workspace's own). */
     waitingForApproval?: number; publishRequests?: number;
+    /** ZT-R23: the same, split as Review › Approvals lists it -- for the reader, asked by them, and of those nobody else's. */
+    approvals?: WaitingFor; publishing?: WaitingFor;
   };
   recentReports: ReportRow[];
   recentJobs: JobRow[];

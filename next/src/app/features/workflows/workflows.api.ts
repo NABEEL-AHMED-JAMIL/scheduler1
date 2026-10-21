@@ -35,6 +35,9 @@ export interface InboxTask {
   overdue?: boolean;
   /** Set on Mine when the task is someone else's and the reader stands in for them today. */
   standingInFor?: number | null;
+  /** ZT-W2: in a managed session, an approval nobody but its requester could decide -- the platform administrator's -- and why. */
+  onlyTheRequesterCould?: boolean;
+  managedNote?: string | null;
 }
 
 export interface HistoryEvent {

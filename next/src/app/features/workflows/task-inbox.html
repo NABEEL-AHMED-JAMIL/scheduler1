@@ -181,7 +181,11 @@
                 <span class="pill" [class.pill-crit]="d.overdue && d.state === 'Open'" [class.pill-neutral]="!d.overdue || d.state !== 'Open'"><app-icon name="clock" size="0.9em" />{{ dueLabel(d) }}</span>
               }
               @if (d.standingInFor) { <span class="pill pill-neutral">Standing in for {{ name(d.standingInFor) }}</span> }
+              @if (d.onlyTheRequesterCould) { <span class="pill pill-warn" data-test="only-requester-pill"><app-icon name="shield" size="0.9em" />Only the requester could decide</span> }
             </div>
+            @if (d.managedNote) {
+              <p class="text-sm text-[color:var(--text-secondary)] mt-2 flex items-start gap-1.5" data-test="managed-note"><app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" /><span>{{ d.managedNote }}</span></p>
+            }
           </div>
 
           @if (canDecide()) {
@@ -237,8 +241,8 @@
               <app-icon name="info" size="0.95em" class="mt-0.5 shrink-0" />
               <!-- P2 #36: in a one-person workspace there is no one else, and the request would wait for ever. -->
               @if (aloneInWorkspace()) {
-                <span>This is your own request, and no one may approve their own. You are the only person in this workspace, so it waits
-                  until someone else joins: add a person under Administration › Users, then they decide it from Review › Approvals.</span>
+                <span>This is your own request, and no one may approve their own. No one else in this workspace can approve it; the
+                  platform administrator will decide it. Or add a person under Administration › Users, and they decide it from Review › Approvals.</span>
               } @else {
                 <span>This is your own request: someone else decides it.</span>
               }

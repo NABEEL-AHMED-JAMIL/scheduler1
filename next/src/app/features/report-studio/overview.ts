@@ -79,6 +79,25 @@ export class ReportOverview implements OnInit {
    * does the report's own job list (read when the recent jobs no longer reach back that far), so a report that was made
    * again since is not shown as blocked.
    */
+  /**
+   * ZT-R23: what the Overview says waits for a decision. The reader's own to decide (the button opens Approvals, which lists
+   * exactly those), and what they asked for that waits for someone else -- never a count that points at an empty list. A
+   * server without the split (older media) keeps the one figure.
+   */
+  readonly waiting = computed(() => {
+    const f = this.data()?.figures;
+    if (!f) return null;
+    if (!f.approvals || !f.publishing) {
+      const reports = f.waitingForApproval ?? 0, templates = f.publishRequests ?? 0;
+      return { forYou: { reports, templates }, asked: { reports: 0, templates: 0 }, nobodyElse: 0, split: false };
+    }
+    return {
+      forYou: { reports: f.approvals.forYou, templates: f.publishing.forYou },
+      asked: { reports: f.approvals.askedByYou, templates: f.publishing.askedByYou },
+      nobodyElse: f.approvals.nobodyElse + f.publishing.nobodyElse, split: true,
+    };
+  });
+
   readonly blocked = computed(() => {
     const d = this.data();
     const j = d?.failedJobs[0];
