@@ -13,9 +13,7 @@ export const PINNED: Record<string, unknown> = {
       "Intake",
       "No file drop yet"
     ],
-    "buttons": [
-      "Refresh"
-    ],
+    "buttons": [],
     "columns": [],
     "fields": [],
     "links": [
@@ -37,7 +35,6 @@ export const PINNED: Record<string, unknown> = {
       "No file drop yet"
     ],
     "buttons": [
-      "Refresh",
       "Set up the file drop"
     ],
     "columns": [],
