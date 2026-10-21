@@ -124,7 +124,7 @@
                     <app-page-limit-actions [job]="j" [compact]="true" /> }
                 }
               </td>
-              <td class="text-xs">@if (j.resultVersion) { v{{ j.resultVersion }}@if (j.pages) { · {{ j.pages }} p. } } @else { — }</td>
+              <td class="text-xs whitespace-nowrap">@if (j.resultVersion) { v{{ j.resultVersion }}@if (j.pages) { · {{ j.pages }} p. } } @else { — }</td>
               <td class="text-xs whitespace-nowrap">{{ (j.startedAt || j.createdAt) | rsTime: 'recent' }}</td>
               <td class="text-xs whitespace-nowrap">{{ j.finishedAt | rsTime: 'recent' }}</td>
             </tr>

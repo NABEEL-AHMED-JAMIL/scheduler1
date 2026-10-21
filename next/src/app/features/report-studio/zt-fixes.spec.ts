@@ -120,4 +120,8 @@ describe('Report Studio screens (zero-tolerance)', () => {
     expect(card).not.toContain('pageCount()');
     expect(html).toContain('@for (m of (inspect() ? missing().slice(0, 1) : []); track m.field.path)');
   });
+
+  it('ZT-R22: Generation jobs keeps "v3 · 200 p." on one line', async () => {
+    expect(await here('library.html')).toContain('<td class="text-xs whitespace-nowrap">@if (j.resultVersion) { v{{ j.resultVersion }}');
+  });
 });
