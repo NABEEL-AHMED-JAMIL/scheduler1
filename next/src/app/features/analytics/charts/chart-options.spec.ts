@@ -206,6 +206,12 @@ describe('what each kind says about the data', () => {
     expect((series(asked)[0]['label'] as { show: boolean }).show).toBe(true);
   });
 
+  /** ZT-A15 (2026-10-21, board 1528): the download and data-view icons printed over the month name "Dec". */
+  it('ZT-A15: a calendar with the toolbox starts below it, the month names in between', () => {
+    const cal = option(table({ dims: [dim('day', ['2025-01-01', '2025-12-31'], { date: true })], measures: [{ name: 'm', values: [1, 2] }] }), 'calendar', {}, true);
+    expect((cal['calendar'] as { top: number }[])[0].top).toBeGreaterThanOrEqual(56);
+  });
+
   it('ZT-A3: a sunburst leaves out a name that would print over its neighbour', () => {
     expect(series(option(twoDims(), 'sunburst'))[0]['labelLayout']).toEqual({ hideOverlap: true });
   });

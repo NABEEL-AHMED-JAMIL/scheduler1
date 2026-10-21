@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { readableCell } from '../../../shared/charts/number-format';
 import type { Mark } from '../widget-view';
+import { pointLabel } from '../../../shared/charts/line-chart';
 
 /** The latest figure of a series, the one before it, and the change between them. */
 export interface TrendFigure {
@@ -94,7 +95,7 @@ export function sparkPaths(values: readonly number[], width = 100, height = 28):
               @if ((figure().delta ?? 0) >= 0) { <path d="M5 1 9 8H1z" fill="currentColor" /> } @else { <path d="M5 9 1 2h8z" fill="currentColor" /> }
             </svg>{{ changeWords() }}
           </span>
-          <span class="kt-vs" [title]="'Against ' + (figure().previous?.name ?? '')">vs {{ figure().previous?.name }}</span>
+          <span class="kt-vs" [title]="'Against ' + (figure().previous?.name ?? '')">vs {{ when(figure().previous?.name) }}</span>
         }
       </div>
       @if (paths().line) {
@@ -109,7 +110,7 @@ export function sparkPaths(values: readonly number[], width = 100, height = 28):
           <path [attr.d]="paths().line" fill="none" stroke="currentColor" stroke-width="1.75" vector-effect="non-scaling-stroke" stroke-linejoin="round" />
           @if (paths().last; as p) { <circle [attr.cx]="p[0]" [attr.cy]="p[1]" r="2.2" fill="currentColor" vector-effect="non-scaling-stroke" /> }
         </svg>
-        <div class="kt-period"><span>{{ marks()[0]?.name }}</span><span>{{ figure().latest?.name }}</span></div>
+        <div class="kt-period"><span>{{ when(marks()[0]?.name) }}</span><span>{{ when(figure().latest?.name) }}</span></div>
       }
     </div>
   `,
@@ -126,6 +127,8 @@ export class KpiTrend {
   readonly format = input<(value: number) => string>(value => readableCell(String(value)));
 
   readonly figure = computed(() => trendFigure(this.marks()));
+  /** A period as the line charts write it ("1 Nov 2025"), not the ISO string the query returned (ZT-A14). */
+  protected readonly when = (name: string | null | undefined): string => (name ? pointLabel(name) : '');
   readonly latestText = computed(() => {
     const latest = this.figure().latest;
     return latest ? this.format()(latest.value) : '—';

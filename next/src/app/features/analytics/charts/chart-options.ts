@@ -1115,6 +1115,9 @@ const heatmap: Builder = (table, s, theme, context) => {
   });
 };
 
+/** The calendar's first row with the toolbox above it: the toolbox, then the month names, then the days (ZT-A15). */
+export const CALENDAR_TOP_WITH_TOOLBOX = 56;
+
 const calendar: Builder = (table, s, _theme, context) => {
   const values = figures(table);
   const byDay = new Map<string, number>();
@@ -1125,7 +1128,8 @@ const calendar: Builder = (table, s, _theme, context) => {
   const years = distinct([...byDay.keys()].map(day => day.split('-')[0])).sort();
   const all = [...byDay.values()];
   // Each year a band of the drawing's height, a week's seven rows to fit it, the scale below.
-  const top = context.interactive ? 40 : 20;
+  // ZT-A15: the month names sit above the grid, and at 40 the toolbox's icons printed over "Dec" at the top right.
+  const top = context.interactive ? CALENDAR_TOP_WITH_TOOLBOX : 20;
   const band = Math.max(60, ((context.height ?? 220) - top - 34) / Math.max(1, years.length));
   const cell = Math.max(6, Math.floor((band - 20) / 7));
   // A day back to the value it came from: a date column has one per day, so this is exact there.
