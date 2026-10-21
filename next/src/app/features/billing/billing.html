@@ -73,7 +73,8 @@
 
     <!-- Owner review 2026-10-12: the chart and By service are one height; the chart fills its card. -->
     <div class="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,28rem)] items-stretch mt-4">
-      <div class="card p-4 flex flex-col min-w-0" data-test="cost-by-day-card">
+      <!-- ZT-C4: the card keeps the drawn chart's height while the meter is read (it grew 175 px and moved every line below). -->
+      <div class="card p-4 flex flex-col min-w-0 min-h-[25.5rem]" data-test="cost-by-day-card">
         @if (loading() && !days().length) {
           <h2 class="font-semibold text-sm">Cost by day</h2>
           <div class="flex-1 py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2"></div>Reading the meter…</div>

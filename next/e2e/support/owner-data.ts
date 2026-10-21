@@ -5,7 +5,11 @@ import { riverside } from './fixtures';
 /**
  * Inputs only the owner may bring back. On 2026-10-20 LocalStack was emptied twice; the Kaggle files the rebuilt
  * workspace's tabular pipelines read went with it, and their raw downloads are not on this Mac. Nothing in the suite may
- * download them again (licences, the owner's account) or make up a stand-in: a check that reads one says so instead.
+ * download them again (licences, the owner's account): a check that reads one says so instead.
+ *
+ * Owner 2026-10-21: the two Kaggle files are not downloaded again. Synthetic stand-ins with the same keys, columns and kinds
+ * of values -- fictional rows only, from a seed -- are made and uploaded by etl-platform/demo/synthetic/kaggle_standins.py
+ * (--upload); the checks below read those now. A bucket that lost them again makes the same skip.
  *
  * waitOnOwnerData() looks each named input up in the workspace's bucket. When one is missing the test is skipped --
  * never passed -- with a line that starts "[waiting on owner data]", which etl-platform's final-regression.sh lists in its
@@ -13,9 +17,9 @@ import { riverside } from './fixtures';
  */
 export const OWNER_DATA = {
   readmission: { key: 'datasets/readmission/diabetic_data.csv',
-    what: 'Kaggle "Diabetes 130-US hospitals 1999-2008" (brandao/diabetes), the readmission pipeline\'s input' },
+    what: 'the "Diabetes 130-US hospitals" shape (a synthetic stand-in: demo/synthetic/kaggle_standins.py), the readmission pipeline\'s input' },
   appointments: { key: 'datasets/appointments/smart_hospital_appointment_dataset.csv',
-    what: 'Kaggle smart hospital appointments, the appointment no-shows pipeline\'s input' },
+    what: 'the smart hospital appointments shape (a synthetic stand-in: demo/synthetic/kaggle_standins.py), the appointment no-shows pipeline\'s input' },
 } as const;
 
 export type OwnerInput = keyof typeof OWNER_DATA;

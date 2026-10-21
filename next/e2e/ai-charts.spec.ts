@@ -122,7 +122,7 @@ test.describe('MIG-357: charts for analytics questions', () => {
   test('Riverside: readmission rate by age band and no-show rate by weekday, as charts whose figures are the data\'s',
     async ({ browser, request }, info) => {
       const s = await sessionAsPerson(request, riverside().admin);
-      // Both questions read Kaggle files only the owner may upload again (support/owner-data.ts).
+      // Both questions read the two tabular inputs (synthetic stand-ins since 2026-10-21; support/owner-data.ts).
       await waitOnOwnerData(request, s, 'readmission', 'appointments');
       const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
       await page.goto('/data/ask');
@@ -186,7 +186,7 @@ test.describe('MIG-357: charts for analytics questions', () => {
 
   test('the AI Assistant draws chart_data\'s answer in its Chart tab', async ({ browser, request }, info) => {
     const s = await sessionAsPerson(request, riverside().admin);
-    // The no-show rate is the appointments file's, a Kaggle file only the owner may upload again.
+    // The no-show rate is the appointments file's (a synthetic stand-in since 2026-10-21; support/owner-data.ts).
     await waitOnOwnerData(request, s, 'appointments');
     const page = await pageAs(browser, s, { viewport: { width: 1920, height: 1080 } });
     await page.goto('/ai/assistant');

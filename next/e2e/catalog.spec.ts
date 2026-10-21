@@ -75,7 +75,8 @@ test.describe('Data Catalog', () => {
     expect(upload, `run ${run} uploaded a file`).toBeTruthy();
     LINEAGE_FILE = upload.name;
     const listed = ((await getJson(request, s, `/analyticsCatalog.json/list?q=${encodeURIComponent(upload.name)}`)).data ?? [])
-      .find((a: { path: string }) => a.path === upload.key);
+      // ZT-C2: the asset of that connection (a first read had filed a second one under the bucket's own name).
+      .find((a: { path: string; connection?: string }) => a.path === upload.key && (!a.connection || a.connection === upload.bucket));
     expect(listed, `the catalog lists ${upload.bucket}/${upload.key}`).toBeTruthy();
     const graph = (await getJson(request, s, `/analyticsCatalog.json/lineage?assetId=${listed.assetId}&depth=2`)).data;
     LINEAGE_NAMES = (graph?.nodes ?? []).filter((n: { kind: string }) => n.kind === 'file' || n.kind === 'pipeline')
