@@ -2870,6 +2870,8 @@ button.connector-card:hover { border-color: var(--focus-ring); }
 .date-field { display: inline-flex; align-items: center; gap: 0.25rem; position: relative; }
 .date-field-button { display: inline-flex; align-items: center; gap: 0.45rem; min-width: 9.5rem; text-align: left; cursor: pointer; }
 .date-field-native { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+/* In a dense row (a form's table cell, ZT-F1): the height of the .input-sm controls beside it. */
+.date-field-sm .date-field-button { min-height: 1.75rem; min-width: 8.5rem; padding: 0.125rem 0.5rem; font-size: 0.75rem; }
 
 /* Ask your data (UI review U13): from 1280px an answer's sources stand beside its text instead of under it, so a
    wide screen holds the answer and what it came from side by side. */

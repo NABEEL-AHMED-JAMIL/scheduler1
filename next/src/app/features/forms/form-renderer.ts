@@ -66,7 +66,7 @@ const IMAGE_MIME: Record<string, string> = { jpg: 'image/jpeg', jpeg: 'image/jpe
                               }
                               @case ('date') {
                                 <!-- ZT-F1: a day as the console writes it ("19 Oct 2026"), not the computer's locale ("10/19/2026"). -->
-                                <app-date-field class="input-sm" [inputId]="idPrefix() + '-' + f.key + '-' + r + '-' + c.key"
+                                <app-date-field class="date-field-sm" [inputId]="idPrefix() + '-' + f.key + '-' + r + '-' + c.key"
                                                 [label]="c.label + ', row ' + (r + 1)" [value]="cellText(row, c.key)" [inactive]="disabled()"
                                                 [clearable]="true" (valueChange)="setCell(f.key, r, c.key, $event)" />
                               }
