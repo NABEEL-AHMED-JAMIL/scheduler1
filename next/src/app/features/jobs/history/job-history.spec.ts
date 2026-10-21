@@ -198,3 +198,13 @@ describe('Run history and assistant dock on a phone', () => {
     expect(button).toMatch(/<span class="sm:hidden">Ask<\/span>/);
   });
 });
+
+describe('JobHistory -- what started a run (ZT-P15)', () => {
+  it('says a form, a backfill and the timetable in words that read', () => {
+    const component = history();
+    expect(component.triggerWord('form')).toBe('started by a form submitted');
+    expect(component.triggerWord('backfill')).toBe('started by a backfill');
+    expect(component.triggerWord('schedule')).toBe('started by its timetable');
+  });
+});
+
