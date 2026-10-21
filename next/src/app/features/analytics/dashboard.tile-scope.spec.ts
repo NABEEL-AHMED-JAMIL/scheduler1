@@ -89,3 +89,41 @@ describe('ZT-A13: every read a board makes names its tile', () => {
     expect(exported.request.body).toEqual(expect.objectContaining({ boardId: 7, widgetId: 101, format: 'csv' }));
   });
 });
+
+/**
+ * ZT-M7 (2026-10-21): in a managed session each tile's query was an audited read of its own, so a board of six tiles run
+ * twice wrote twelve rows. The audit reads the query string before the body: a tile names its board and itself there, and
+ * the board's one "Opened board" row stands for its tiles. A run that is no tile names none, and keeps its own row.
+ */
+describe('a tile names its board in the query string (ZT-M7)', () => {
+  it('a tile\'s query, analysis and table page carry boardId and widgetId; an ad-hoc run carries neither', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting()] });
+    const analytics = TestBed.inject(AnalyticsService);
+    const board = TestBed.inject(BoardApi);
+    const http = TestBed.inject(HttpTestingController);
+
+    analytics.query({ connection: 'c', path: 'p', sql: 'SELECT 1', boardId: 7, widgetId: 101 }).subscribe();
+    const tile = http.expectOne(r => r.url.endsWith('/analytics.json/query'));
+    expect(tile.request.params.get('boardId')).toBe('7');
+    expect(tile.request.params.get('widgetId')).toBe('101');
+    expect(tile.request.body).toEqual(expect.objectContaining({ boardId: 7, widgetId: 101 }));
+
+    analytics.analyze({ connection: 'c', path: 'p', dimensions: ['ward'], measure: { aggregation: 'COUNT_ROWS' }, boardId: 7, widgetId: 100 } as any)
+      .subscribe();
+    const analysis = http.expectOne(r => r.url.endsWith('/analytics.json/analyze'));
+    expect(analysis.request.params.get('boardId')).toBe('7');
+    expect(analysis.request.params.get('widgetId')).toBe('100');
+
+    board.rows({ connection: 'c', path: 'p', sql: 'SELECT 1', page: 1, pageSize: 25, boardId: 7, widgetId: 102 }).subscribe();
+    const page = http.expectOne(r => r.url.endsWith('/analytics.json/rows'));
+    expect(page.request.params.get('boardId')).toBe('7');
+    expect(page.request.params.get('widgetId')).toBe('102');
+
+    analytics.query({ connection: 'c', path: 'p', sql: 'SELECT 1' }).subscribe();
+    const adHoc = http.expectOne(r => r.url.endsWith('/analytics.json/query'));
+    expect(adHoc.request.params.keys()).toEqual([]);
+    http.verify();
+  });
+});
+

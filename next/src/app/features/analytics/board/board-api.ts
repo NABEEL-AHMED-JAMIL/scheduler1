@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { API_BASE, ApiResponse } from '../../../core/api/api.config';
-import type { ExportFile, FilterClause } from '../analytics.service';
+import { tileParams, type ExportFile, type FilterClause } from '../analytics.service';
 import type { BoardFilterOutcome, BoardFilterWire, FilterFamily } from './board-filters';
 
 /** A column of a table page, with DuckDB's own type name. */
@@ -72,7 +72,7 @@ export class BoardApi {
   private readonly exports = `${API_BASE}/analyticsExport.json`;
 
   rows(request: TableRequest): Observable<ApiResponse<TablePage>> {
-    return this.http.post<ApiResponse<TablePage>>(`${this.base}/rows`, tableBody(request));
+    return this.http.post<ApiResponse<TablePage>>(`${this.base}/rows`, tableBody(request), { params: tileParams(request) });
   }
 
   /** ZT-A13: `boardId` -- a Saved Analyses reader may list only the values a filter of that board lists. */

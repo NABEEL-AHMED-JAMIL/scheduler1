@@ -21,9 +21,9 @@ const LAST: Dashboard = { analyticsDashboardId: 9, dashboardName: 'No-shows' };
 const WIDGET: DashboardWidget = { analyticsDashboardWidgetId: 100, analyticsDashboardId: 7, widgetTitle: 'Beds', analyticsAnalysisId: 11,
   visualizationType: 'ranked', displayOrder: 0 };
 
-function render(opts: { canEdit: boolean; byId?: (id: number) => any }) {
+function render(opts: { canEdit: boolean; byId?: (id: number) => any; listing?: Dashboard[] }) {
   const api = {
-    fetchAllDashboards: vi.fn(() => of(OK([BOARD, OTHER, LAST]))),
+    fetchAllDashboards: vi.fn(() => of(OK(opts.listing ?? [BOARD, OTHER, LAST]))),
     fetchDashboardById: vi.fn(opts.byId ?? ((id: number) => of(OK({ ...(id === 7 ? BOARD : id === 8 ? OTHER : LAST), widgets: [WIDGET] })))),
     fetchAllAnalyses: vi.fn(() => of(OK([]))), fetchAllQueries: vi.fn(() => of(OK([]))),
     analyze: vi.fn(() => new Subject().asObservable()), query: vi.fn(() => new Subject().asObservable()), cancel: vi.fn(() => of(OK(null))),
@@ -96,12 +96,17 @@ describe('a board that cannot be read', () => {
     expect(el.querySelector('app-load-error')).toBeNull();
   });
 
-  it('leaves one card without counts and still counts the cards after it', () => {
-    const { board } = render({ canEdit: true, byId: (id: number) => id === 8
-      ? throwError(() => new HttpErrorResponse({ status: 502 }))
-      : of(OK({ ...(id === 7 ? BOARD : LAST), widgets: [WIDGET] })) });
-    expect(board.cardFacts(BOARD)).toContain('1 widget');
+  /**
+   * ZT-M7 (2026-10-21): the cards read each board by id for their counts -- in a managed session four "Opened board" rows
+   * for a look at the list. They now read the listing's counts and open no board; a card from an older server that sends
+   * none has no counts.
+   */
+  it('ZT-M7: draws each card from the listing and opens no board', () => {
+    const listed = [{ ...BOARD, widgetCount: 1, fileCount: 1 }, OTHER, { ...LAST, widgetCount: 0, fileCount: 0 }];
+    const { board, api } = render({ canEdit: true, listing: listed });
+    expect(board.cardFacts(listed[0])).toBe('1 widget · 1 file');
     expect(board.cardFacts(OTHER)).toBe('');
-    expect(board.cardFacts(LAST)).toContain('1 widget');
+    expect(board.cardFacts(listed[2])).toBe('No widgets yet');
+    expect(api.fetchDashboardById).not.toHaveBeenCalled();
   });
 });

@@ -2663,7 +2663,7 @@ describe('choosing how a tile is drawn, from its menu', () => {
  */
 describe('the cards on the landing page', () => {
   const BOARDS: Dashboard[] = [
-    { ...BOARD, createdByName: 'Claude Demo Admin', dateCreated: '2026-09-24 22:43:00' },
+    { ...BOARD, createdByName: 'Claude Demo Admin', dateCreated: '2026-09-24 22:43:00', widgetCount: 3, fileCount: 1 },
     { analyticsDashboardId: 8, dashboardName: 'Quarter end', createdByName: 'Ann', dateUpdated: '2026-09-25T03:43:02.920+00:00' },
   ];
 
@@ -2701,10 +2701,11 @@ describe('the cards on the landing page', () => {
     expect(text()).toContain('What it is for (optional)');
   });
 
-  it('reads each board once, for its counts, and runs nothing', () => {
+  /** ZT-M7: the counts are the listing's; no board is opened to draw a card (a managed session's open is audited). */
+  it('opens no board for the cards, and runs nothing', () => {
     const { fetchDashboardById, analyze, query, text } = landing();
     text();
-    expect(fetchDashboardById).toHaveBeenCalledTimes(2);
+    expect(fetchDashboardById).not.toHaveBeenCalled();
     expect(analyze).not.toHaveBeenCalled();
     expect(query).not.toHaveBeenCalled();
   });

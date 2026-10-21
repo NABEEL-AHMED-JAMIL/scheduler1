@@ -1,6 +1,6 @@
 import type { BoardFilterOutcome, BoardFilterWire } from './board/board-filters';
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable, of, tap } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import type { PinChartRequest } from './charts/chart-answer';
@@ -739,6 +739,13 @@ export interface Dashboard {
   /** Present on fetchDashboardById, in display order. Absent on the listing. */
   widgets?: DashboardWidget[];
   /**
+   * ZT-M7: on the listing, what the board's card says -- its widgets and the distinct files they read -- so the
+   * Dashboards page draws its cards without opening a board (in a managed session each open is an audited read).
+   * Absent from an older server.
+   */
+  widgetCount?: number;
+  fileCount?: number;
+  /**
    * UX review B5: the pipelines whose output this board reads, the newest run first, from the catalog's lineage
    * (analytics-service DashboardSources). Read-only; absent from an older server.
    */
@@ -1049,7 +1056,7 @@ export class AnalyticsService {
       body['boardId'] = request.boardId;
       body['widgetId'] = request.widgetId;
     }
-    return this.http.post<ApiResponse<QueryResult>>(`${this.base}/query`, body);
+    return this.http.post<ApiResponse<QueryResult>>(`${this.base}/query`, body, { params: tileParams(request) });
   }
 
   // ---- the analysis: document 07's canvas ------------------------------------------------
@@ -1070,7 +1077,7 @@ export class AnalyticsService {
    */
   analyze(request: AnalysisRequest): Observable<ApiResponse<AnalysisResult>> {
     return this.http.post<ApiResponse<AnalysisResult>>(
-      `${this.base}/analyze`, analysisBody(request));
+      `${this.base}/analyze`, analysisBody(request), { params: tileParams(request) });
   }
 
   /**
@@ -1383,4 +1390,17 @@ export class AnalyticsService {
     Observable<ApiResponse<WriteBackResult>> {
     return this.http.post<ApiResponse<WriteBackResult>>(`${this.exports}/writeBack`, request);
   }
+}
+
+/**
+ * ZT-M7: a board's tile names its board and itself in the query string as well as the body. In a managed session the
+ * audit reads it there (before the body is read): the board's one "Opened board" row stands for every tile and refresh,
+ * and the server then runs the tile's own statement. Nothing for a request that is not a tile.
+ */
+export function tileParams(request: { boardId?: number | null; widgetId?: number | null }): HttpParams {
+  let params = new HttpParams();
+  if (request.boardId != null && request.widgetId != null) {
+    params = params.set('boardId', request.boardId).set('widgetId', request.widgetId);
+  }
+  return params;
 }

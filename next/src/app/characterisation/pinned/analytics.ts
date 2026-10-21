@@ -130,8 +130,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /analyticsWorkspace.json/fetchAllDashboards",
       "GET /analyticsWorkspace.json/fetchAllAnalyses",
       "GET /analyticsLibrary.json/fetchAllQueries",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1379"
+      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
     ],
     "headings": [],
     "buttons": [
@@ -153,9 +152,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /analyticsWorkspace.json/fetchAllDashboards",
       "GET /analyticsWorkspace.json/fetchAllAnalyses",
-      "GET /analyticsLibrary.json/fetchAllQueries",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1379",
-      "GET /analyticsWorkspace.json/fetchDashboardById?analyticsDashboardId=1378"
+      "GET /analyticsLibrary.json/fetchAllQueries"
     ],
     "headings": [
       "Dashboards"

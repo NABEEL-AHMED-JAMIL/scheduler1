@@ -5,7 +5,7 @@ import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { Component, DestroyRef, Injector, LOCALE_ID, OnDestroy, OnInit, afterNextRender, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from '@angular/cdk/dialog';
-import { Subscription, catchError, from, mergeMap, of } from 'rxjs';
+import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { Icon } from '../../shared/ui/icon';
 import { Field } from '../../shared/ui/field';
@@ -846,9 +846,10 @@ export class Dashboards implements OnInit, OnDestroy {
   readonly widgets = computed<DashboardWidget[]>(() => this.board()?.widgets ?? []);
 
   /**
-   * Each board's widgets, for the counts on its card. The listing carries no widgets, so each
-   * board is read once by id: metadata only, no session and no query permit (see
-   * fetchDashboardById). Kept up to date when a board is opened, added to or trimmed.
+   * The widgets of the boards opened on this page, for the counts on their cards. ZT-M7: a card
+   * that was never opened reads its counts from the listing (widgetCount, fileCount) -- this page
+   * opens no board to draw its cards, because in a managed session each open is an audited read
+   * ("Opened board N"). Kept up to date when a board is opened, added to or trimmed.
    */
   readonly cardWidgets = signal<Record<number, DashboardWidget[]>>({});
 
@@ -974,7 +975,6 @@ export class Dashboards implements OnInit, OnDestroy {
           return;
         }
         this.dashboards.set(response.data);
-        this.loadCardFacts(response.data);
       },
       error: err => {
         this.loading.set(false);
@@ -985,37 +985,16 @@ export class Dashboards implements OnInit, OnDestroy {
   }
 
   /**
-   * Reads the widgets of each board not already known, three at a time, for the card counts.
-   * A board that cannot be read keeps a card without counts rather than an error: the card still
-   * opens it, and opening says why.
+   * "7 widgets · 3 files" for a card: from the board's widgets once it was opened here, else from
+   * the listing's counts; '' from an older server that sends neither.
    */
-  private loadCardFacts(list: Dashboard[]): void {
-    const known = this.cardWidgets();
-    const ids = list.map(item => item.analyticsDashboardId)
-      .filter((id): id is number => typeof id === 'number' && !(id in known));
-    if (!ids.length) return;
-    from(ids).pipe(
-      // UX review 2026-10-12: one board that cannot be read (a refusal, a dropped connection) leaves its card without
-      // counts; it no longer ends the reading of every card after it, as an error in mergeMap did.
-      mergeMap(id => this.analytics.fetchDashboardById(id).pipe(catchError(() => of(null))), 3),
-      takeUntilDestroyed(this.destroyRef),
-    ).subscribe({
-      next: response => {
-        const id = response?.data?.analyticsDashboardId;
-        if (!response || response.status !== API_SUCCESS || !id) return;
-        this.cardWidgets.update(all => ({ ...all, [id]: response.data!.widgets ?? [] }));
-      },
-      error: () => {},
-    });
-  }
-
-  /** "7 widgets · 3 files" for a card, or '' until that board's widgets are known. */
   cardFacts(item: Dashboard): string {
     const widgets = item.analyticsDashboardId ? this.cardWidgets()[item.analyticsDashboardId] : undefined;
-    if (!widgets) return '';
-    if (!widgets.length) return 'No widgets yet';
-    const files = this.filesOf(widgets).length;
-    return `${widgets.length} widget${widgets.length === 1 ? '' : 's'}`
+    const count = widgets ? widgets.length : item.widgetCount;
+    if (count == null) return '';
+    if (!count) return 'No widgets yet';
+    const files = widgets ? this.filesOf(widgets).length : (item.fileCount ?? 0);
+    return `${count} widget${count === 1 ? '' : 's'}`
       + (files ? ` · ${files} file${files === 1 ? '' : 's'}` : '');
   }
 
