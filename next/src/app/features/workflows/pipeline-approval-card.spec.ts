@@ -55,6 +55,7 @@ describe('Pipeline approval card: the rows, not the raw subject', () => {
 
   describe('rendered', () => {
     let http: HttpTestingController;
+    let kept = csv;
     const subject = {
       link: '/pipelines/schedules/1006/runs/1019/logs', jobId: 1006, attempt: 1, jobName: 'Wound photo measurement (workflow)',
       stepKey: 'approve', stepIndex: 5, rowCount: 4, approvalId: 1019, jobQueueId: 1019, pipelineId: 'LHH_WOUND_PHOTO_REVIEW',
@@ -63,9 +64,10 @@ describe('Pipeline approval card: the rows, not the raw subject', () => {
     };
 
     beforeEach(() => {
+      kept = csv;
       TestBed.configureTestingModule({
         providers: [provideZonelessChangeDetection(), provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
-          { provide: StorageService, useValue: { download: (_b: string, k: string) => of(new Blob([k.endsWith('.csv') ? csv : 'jpg'],
+          { provide: StorageService, useValue: { download: (_b: string, k: string) => of(new Blob([k.endsWith('.csv') ? kept : 'jpg'],
             { type: k.endsWith('.csv') ? 'text/csv' : 'image/jpeg' })) } }],
       });
       http = TestBed.inject(HttpTestingController);
@@ -117,6 +119,12 @@ describe('Pipeline approval card: the rows, not the raw subject', () => {
       expect(first.textContent).toContain('Re-measure');
       expect(el.querySelector('[data-test="approval-photos"] figure')!.classList.contains('pac-odd')).toBe(true);
       expect(el.querySelector('[data-test="approval-photos"] figcaption')!.textContent).toBe('W-1 · Latest visit');
+    });
+
+    it('names a number in a caption by its column', async () => {
+      kept = csv.replace('photo_role', 'visit_no').replace(/First visit/g, '1').replace(/Latest visit/g, '6');
+      const el = (await render()).nativeElement as HTMLElement;
+      expect(el.querySelector('[data-test="approval-photos"] figcaption')!.textContent).toBe('W-1 · Visit no 6');
     });
 
     it('filters the rows and photos by a kind when its count is pressed, and back', async () => {

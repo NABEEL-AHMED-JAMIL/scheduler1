@@ -310,7 +310,9 @@ export class PipelineApprovalCard {
     const odd = this.isException();
     return this.shownRows().filter(r => typeof r[col] === 'string' && IMAGE.test(r[col] as string)).slice(0, MAX_PHOTOS)
       .map(r => ({ key: r[col] as string, odd: odd(r),
-        caption: captionCols.map(c => String(r[c] ?? '')).filter(Boolean).join(' · ') || (r[col] as string) }));
+        // A bare number says nothing on its own ("6"): it is named by its column ("Visit no 6").
+        caption: captionCols.map(c => { const v = String(r[c] ?? ''); return /^-?\d+(\.\d+)?$/.test(v) ? `${fieldLabel(c)} ${v}` : v; })
+          .filter(Boolean).join(' · ') || (r[col] as string) }));
   });
 
   constructor() {
