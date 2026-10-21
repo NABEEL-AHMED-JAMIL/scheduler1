@@ -128,7 +128,8 @@ export class GetStarted implements OnInit {
       storage: get('/storageConnection.json/fetchAllConnections').pipe(map(r => rows(r).length > 0)),
       inbox: get('/storage.json/inbox').pipe(map(r => ok(r) && !!r!.data?.configured)),
       topic: get('/setting.json/topics?q=&limit=1').pipe(map(r => rows(r).length > 0)),
-      registry: get('/pipeline.json/list?page=1&limit=1').pipe(map(r => rows(r).length > 0)),
+      // ZT-P11 (owner 2026-10-21): Home reads the count, never a pipeline's definition (those are Pipelines' or Schedules').
+      registry: get('/pipeline.json/count').pipe(map(r => ok(r) && Number(r!.data?.total ?? 0) > 0)),
       pipeline: this.http.post<ApiResponse<any>>(`${API_BASE}/sourceTask.json/listSourceTask?page=1&limit=1`, {})
         .pipe(catchError(() => of(null)), map(r => rows(r).length > 0)),
       jobs: get('/sourceJob.json/listSourceJob?page=1&limit=50').pipe(map(r => rows(r))),

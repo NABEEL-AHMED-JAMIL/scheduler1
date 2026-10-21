@@ -16,7 +16,7 @@ const EMPTY: Answers = {
   '/storageConnection.json/fetchAllConnections': [],
   '/storage.json/inbox': { configured: false },
   '/setting.json/topics?q=&limit=1': [],
-  '/pipeline.json/list?page=1&limit=1': { summary: { total: 0 }, rows: [] },
+  '/pipeline.json/count': { total: 0, active: 0 },
   '/sourceTask.json/listSourceTask?page=1&limit=1': [],
   '/sourceJob.json/listSourceJob?page=1&limit=50': [],
 };
@@ -63,11 +63,18 @@ describe('GetStarted (MIG-324)', () => {
       '/storageConnection.json/fetchAllConnections': [{ storageConnectionId: 1 }],
       '/storage.json/inbox': { configured: true },
       '/setting.json/topics?q=&limit=1': [{ sourceTaskTypeId: 1 }],
-      '/pipeline.json/list?page=1&limit=1': { rows: [{ pipelineKey: 1 }] },
+      '/pipeline.json/count': { total: 1, active: 1 },
       '/sourceJob.json/listSourceJob?page=1&limit=50': [{ jobId: 1, jobRunningStatus: 'Start' }],
     });
     expect(component.steps().filter(s => s.done).map(s => s.key)).toEqual(['storage', 'inbox', 'topic', 'registry', 'schedule']);
     expect(component.visible()).toBe(true);
+  });
+
+  it('ZT-P11: reads the pipelines\' count, never their list or a definition', () => {
+    const { get } = guide();
+    const paths = get.mock.calls.map(c => String(c[0]).replace(/^.*\/api\/v1/, ''));
+    expect(paths).toContain('/pipeline.json/count');
+    expect(paths.filter(p => p.startsWith('/pipeline.json/') && p !== '/pipeline.json/count')).toEqual([]);
   });
 
   it('goes away once a run has completed', () => {
