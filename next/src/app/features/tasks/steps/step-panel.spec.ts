@@ -53,6 +53,20 @@ describe('StepPanel', () => {
     expect(el.querySelector<HTMLInputElement>('#stepKey')!.value).toBe('keep');
   });
 
+  it('ZT-P13: offers no "Reads" for a task that reads no input, unless the step names one', () => {
+    const sample = { code: 'sample', description: 'Rows written in the step itself.', runsInEngine: true, inputSchema: null };
+    expect(open({ step: { key: 'rows', task: 'sample', config: { rows: [] } }, task: sample }).el.querySelector('#stepInput')).toBeNull();
+    const append = { code: 'append', runsInEngine: true, inputSchema: { type: 'array', description: 'Not read: the steps named in Steps are.' } };
+    expect(open({ step: { key: 'all', task: 'append', config: {} }, task: append }).el.querySelector('#stepInput')).toBeNull();
+    expect(open({ step: { key: 'rows', task: 'sample', input: 'read', config: {} }, task: sample }).el.querySelector('#stepInput')).not.toBeNull();
+    expect(open({}).el.querySelector('#stepInput')).not.toBeNull();
+  });
+
+  it('ZT-P13: gives "If it fails" the room its choices need', () => {
+    const { el } = open({});
+    expect(el.querySelector('#stepOnError')!.closest('app-field')!.classList.contains('fr-4')).toBe(true);
+  });
+
   it('offers only earlier steps as what the step reads', () => {
     const { el } = open({ earlierKeys: ['read', 'shape'] });
     const options = Array.from(el.querySelectorAll<HTMLOptionElement>('#stepInput option')).map(o => o.textContent!.trim());

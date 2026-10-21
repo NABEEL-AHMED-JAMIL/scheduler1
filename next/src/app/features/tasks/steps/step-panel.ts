@@ -65,6 +65,15 @@ export class StepPanel {
   readonly edit = signal<Step>(structuredClone(this.data.step));
   /** Whether the task's schema can draw a form at all: an object with at least one setting. */
   /** Report Studio phase 5: a generate_report step's design settings are edited by ReportStepDesign, the rest by the form. */
+  /**
+   * ZT-P13: "Reads" only for a task that takes the step before it in -- a read makes its own rows and an append reads the
+   * steps it names (the registry: no input schema, or one that says "Not read"); a step that already names one keeps it.
+   */
+  readonly showsReads = computed(() => {
+    const task = this.data.task as { inputSchema?: { description?: string } | null } | undefined;
+    if (this.edit().input || !task || task.inputSchema === undefined) return true;
+    return !!task.inputSchema && !/^not read/i.test(String(task.inputSchema.description ?? ''));
+  });
   readonly reportStep = this.data.task?.code === 'generate_report';
   readonly formSchema = this.reportStep && this.data.task?.configSchema ? withoutProperties(this.data.task.configSchema, REPORT_DESIGN_KEYS)
     : this.data.task?.configSchema;
