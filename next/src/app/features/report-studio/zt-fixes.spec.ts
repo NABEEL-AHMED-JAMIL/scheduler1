@@ -112,4 +112,12 @@ describe('Report Studio screens (zero-tolerance)', () => {
       vi.useRealTimers();
     }
   });
+
+  it('ZT-R20/R21: Create report claims no page count before a preview, and no "nothing for it" banner before data is chosen', async () => {
+    const html = await here('wizard/new-report.html');
+    const card = html.split('\n').find(l => l.includes("a published version can't be edited"))!;
+    expect(card).toContain('@if (pages(); as n)');
+    expect(card).not.toContain('pageCount()');
+    expect(html).toContain('@for (m of (inspect() ? missing().slice(0, 1) : []); track m.field.path)');
+  });
 });

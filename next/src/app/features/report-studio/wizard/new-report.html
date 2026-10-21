@@ -67,7 +67,7 @@
           <span class="rsw-icon"><app-icon name="file" /></span>
           <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5"><b>{{ tpl.name }}</b><span class="pill pill-ok">Published v{{ version() }}</span><app-icon name="lock" class="text-[color:var(--text-muted)]" /></div>
-            <span class="text-xs text-[color:var(--text-muted)]">{{ pageCount() }} page{{ pageCount() === 1 ? '' : 's' }} · {{ needed().length }} data field{{ needed().length === 1 ? '' : 's' }} · a published version can't be edited</span>
+            <span class="text-xs text-[color:var(--text-muted)]">@if (pages(); as n) {{{ n }} page{{ n === 1 ? '' : 's' }} · }{{ needed().length }} data field{{ needed().length === 1 ? '' : 's' }} · a published version can't be edited</span>
           </div>
           @if (!report()) {
             <label class="field rsw-name"><span class="label">Report name</span>
@@ -181,7 +181,8 @@
                 </tbody>
               </table>
             </section>
-            @for (m of missing().slice(0, 1); track m.field.path) {
+            <!-- ZT-R21: the "nothing for it" banner only once data is chosen; before, each field says "Pick the data first". -->
+            @for (m of (inspect() ? missing().slice(0, 1) : []); track m.field.path) {
               <div class="rs-banner rs-banner-crit" role="alert">
                 <app-icon name="alert" class="icon-crit shrink-0" />
                 <div class="text-sm min-w-0 flex-1"><b>Required field missing: {{ m.field.path }}</b><br>
