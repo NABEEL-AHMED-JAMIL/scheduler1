@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { provideZonelessChangeDetection, signal } from '@angular/core';
+import { WritableSignal, provideZonelessChangeDetection, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Router, provideRouter } from '@angular/router';
@@ -36,7 +36,7 @@ function screenWith(queue = vi.fn(() => ok({ total: 2, page: 0, size: 50, items:
       provideRouter([]),
       { provide: DocumentsApi, useValue: api },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
   const router = TestBed.inject(Router);
@@ -65,6 +65,17 @@ describe('ReviewQueue', () => {
     const rows = [...el.querySelectorAll('tbody tr')];
     expect(rows[1].textContent).toContain('medication-list-TEST-M7001.pdf');
     expect(el.textContent).not.toContain('original.pdf');
+  });
+
+  it('ZT-D11: a platform administrator\'s own sign-in (no workspace) gets the needs-workspace card and no queue call', async () => {
+    const queue = vi.fn(() => ok({ total: 2, page: 0, size: 50, items: ITEMS }));
+    const { fixture, el, api } = screenWith(queue);
+    (TestBed.inject(AuthService).user as unknown as WritableSignal<unknown>).set({ appUserId: 4639, tenantId: null });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(el.textContent).toContain('Documents are a workspace\'s, and this sign-in has none.');
+    expect(queue).not.toHaveBeenCalled();
+    expect(api.reads).not.toHaveBeenCalled();
   });
 
   it('shows whose claim a document is under', async () => {

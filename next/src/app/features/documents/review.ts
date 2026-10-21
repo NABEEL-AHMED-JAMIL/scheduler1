@@ -1,3 +1,4 @@
+import { NeedsWorkspace } from '../../shared/ui/needs-workspace';
 import { Avatar } from '../../shared/ui/avatar';
 import { Component, HostListener, Injector, afterNextRender, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -48,7 +49,7 @@ interface NewRow { tableKey: string; rowIndex: number; values: Record<string, st
  */
 @Component({
   selector: 'app-document-review',
-  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar, Avatar],
+  imports: [PageHeader, RouterLink, Icon, StatusPill, DataText, ServerTimePipe, PageViewer, ConfidenceBar, Avatar, NeedsWorkspace],
   templateUrl: './review.html',
   styles: [`
     .review-split { display: grid; gap: 1rem; align-items: start; grid-template-columns: minmax(0, 1fr); }
@@ -97,6 +98,8 @@ export class DocumentReview {
   readonly read = signal<OcrDocument | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** ZT-D11: a sign-in with no workspace (a platform administrator's own) reviews no workspace's document here; no call. */
+  readonly noWorkspace = computed(() => !this.auth.user()?.tenantId);
   /** ZT-D10: the service has no such document for this workspace (deleted, or another workspace's link): said as that. */
   readonly missing = signal(false);
   readonly busy = signal<Busy>('');
@@ -147,7 +150,7 @@ export class DocumentReview {
 
   readonly title = computed(() => {
     const r = this.read();
-    return r ? documentName(r) : this.detail() ? `Document ${this.detail()!.extractionId}` : this.missing() ? 'Document not found' : 'Document';
+    return r ? documentName(r) : this.detail() ? `Document ${this.detail()!.extractionId}` : this.missing() ? 'Document not found' : 'Review a document';
   });
   readonly subtitle = computed(() => {
     const d = this.detail();
@@ -175,6 +178,7 @@ export class DocumentReview {
   // -------------------------------------------------------------------------------------------- reading
 
   load(): void {
+    if (this.noWorkspace()) { this.loading.set(false); return; }
     const id = this.extractionId();
     if (!id) { this.loading.set(false); this.error.set('No document named.'); return; }
     this.loading.set(true);

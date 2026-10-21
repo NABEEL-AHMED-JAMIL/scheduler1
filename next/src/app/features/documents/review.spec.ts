@@ -106,7 +106,7 @@ async function screenWith(opts: { api?: ReturnType<typeof stubApi>; dialogAnswer
       { provide: DocumentsApi, useValue: api },
       { provide: Dialog, useValue: dialog },
       { provide: ToastService, useValue: toast },
-      { provide: AuthService, useValue: { user: signal({ appUserId: 4537 }) } },
+      { provide: AuthService, useValue: { user: signal({ appUserId: 4537, tenantId: 2924 }) } },
     ],
   });
   const router = TestBed.inject(Router);
@@ -401,6 +401,26 @@ describe('DocumentReview -- a link that is not here (ZT-D10)', () => {
     expect(el.textContent).not.toContain('No extraction 1185.');
     expect(el.textContent).not.toContain('Try again');
     expect(el.querySelector('h1')?.textContent?.trim()).toBe('Document not found');
+  });
+});
+
+describe('DocumentReview -- a sign-in with no workspace (ZT-D11)', () => {
+  it('a platform administrator\'s own sign-in reviews no workspace\'s document here, and makes no call', async () => {
+    const api = stubApi();
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: ActivatedRoute, useValue: { paramMap: of(convertToParamMap({ extractionId: '1185' })) } },
+        { provide: DocumentsApi, useValue: api }, { provide: Dialog, useValue: { openDialogs: [], open: vi.fn() } },
+        { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn(), info: vi.fn() } },
+        { provide: AuthService, useValue: { user: signal({ appUserId: 4639, tenantId: null }) } }],
+    });
+    const fixture = TestBed.createComponent(DocumentReview);
+    await fixture.whenStable();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('Documents are a workspace\'s, and this sign-in has none.');
+    expect(api.review).not.toHaveBeenCalled();
+    expect(api.read).not.toHaveBeenCalled();
   });
 });
 
