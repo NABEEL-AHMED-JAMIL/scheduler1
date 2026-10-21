@@ -55,7 +55,7 @@
               <th>Version</th>
               <th>Kind</th>
               <!-- Owner 2026-10-20 (§0.1): what used to be the overview's "What approved documents start" panel. -->
-              <th class="min-w-56">When approved, starts…</th>
+              <th class="min-w-40">When approved, starts…</th>
               <th class="text-right">State</th>
             </tr>
           </thead>
@@ -72,7 +72,7 @@
                 <td class="text-xs whitespace-nowrap">{{ thresholdOf(t) }}</td>
                 <td><span class="pill pill-neutral mono">v{{ t.currentVersion }}</span></td>
                 <td class="text-xs whitespace-nowrap">{{ t.builtIn ? 'Built-in' : 'This workspace' }}</td>
-                <td class="text-xs min-w-56 max-w-96" data-test="type-starts" [attr.data-type]="t.typeKey">
+                <td class="text-xs min-w-40 max-w-80" data-test="type-starts" [attr.data-type]="t.typeKey">
                   @if (!canSeeSchedules()) {
                     <span class="text-[color:var(--text-muted)]">—</span>
                   } @else if (triggers() === null) {
@@ -82,8 +82,8 @@
                       <a class="link-inline" [routerLink]="['/pipelines/schedules', s.jobId, 'executions']" [attr.data-job]="s.jobId">{{ s.name }}</a>@if (!s.on) {<span class="text-[color:var(--text-muted)]"> ({{ s.why }})</span>}@if (!last) {<span>, </span>}
                     }
                   } @else {
-                    <span class="text-[color:var(--text-muted)]">Nothing yet · </span>
-                    <a class="link-inline" [routerLink]="['/pipelines/schedules/new']" [queryParams]="{ whenApproved: t.documentTypeId }"
+                    <span class="block text-[color:var(--text-muted)]">Nothing yet</span>
+                    <a class="link-inline whitespace-nowrap" [routerLink]="['/pipelines/schedules/new']" [queryParams]="{ whenApproved: t.documentTypeId }"
                        [attr.aria-label]="'Set a schedule to start when a ' + t.name + ' is approved'">Set it on a schedule</a>
                   }
                 </td>
