@@ -121,15 +121,19 @@ describe('Run page: the Outputs tab', () => {
     const rows = [...el.querySelectorAll<HTMLElement>('.exec-file')];
     expect(rows.map(r => r.dataset['kind'])).toEqual(['file', 'bucket']);
     expect(rows[0].textContent).toContain('customers-clean.json');
-    expect(rows[0].querySelector('[data-test="output-label"]')?.textContent).toBe('JSON · 3 rows · 169 B');
-    expect(rows[0].textContent).toContain('kept until');
+    expect(rows[0].querySelector('[data-test="output-label"]')?.textContent).toBe('3 rows · 169 B');
+    expect(rows[0].textContent).toContain('With the run · until');
     expect(rows[1].textContent).toContain('ui-review-s3');
     expect(rows[1].textContent).toContain('registry-live-check/customers-clean.json');
   });
 
-  it('downloads a kept file through its dataset, in its own format', () => {
-    const { el, http } = mount();
-    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="file"] [data-format="json"]')!.click();
+  it('downloads a kept file through its dataset, in the format picked from its Download menu', () => {
+    const { el, http, fixture } = mount();
+    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="file"] [data-test="download"]')!.click();
+    fixture.detectChanges();
+    const items = [...document.body.querySelectorAll<HTMLButtonElement>('[cdkmenuitem][data-format], .menu-item[data-format]')];
+    expect(items.map(b => b.dataset['format'])).toEqual(['csv', 'json', 'jsonl']);
+    items.find(b => b.dataset['format'] === 'json')!.click();
     const req = http.expectOne(r => r.url.endsWith('/sourceJob.json/runDataset'));
     expect(req.request.params.get('runDatasetId')).toBe('1051');
     expect(req.request.params.get('format')).toBe('json');
@@ -141,7 +145,7 @@ describe('Run page: the Outputs tab', () => {
       rowCount: 1, byteCount: 22359, pageCount: 2, runDatasetId: 1060 };
     const { el, http } = mount([report, { ...report, runOutputId: 1003, pageCount: null }]);
     const labels = [...el.querySelectorAll('[data-test="output-label"]')].map(l => l.textContent);
-    expect(labels).toEqual(['PDF · 2 pages · 21.8 KB', 'PDF · 21.8 KB']);
+    expect(labels).toEqual(['2 pages · 21.8 KB', '21.8 KB']);
     expect(el.textContent).not.toContain('1 row');
     const buttons = [...el.querySelectorAll<HTMLButtonElement>('.exec-file[data-kind="file"]')][0].querySelectorAll<HTMLButtonElement>('[data-format]');
     expect([...buttons].map(b => b.dataset['format'])).toEqual(['pdf']);
@@ -159,16 +163,27 @@ describe('Run page: the Outputs tab', () => {
     expect(req.request.params.get('key')).toBe('registry-live-check/customers-clean.json');
   });
 
-  it('offers Visualise for a table the run put out (MIG-357)', () => {
-    const { el } = mount();
-    expect(el.querySelector('.exec-file[data-kind="bucket"] [data-test="visualise"]')).not.toBeNull();
+  it('offers Visualise for a table the run put out, in the row\'s more menu (MIG-357)', () => {
+    const { el, fixture } = mount();
+    el.querySelector<HTMLButtonElement>('.exec-file[data-kind="bucket"] [data-test="output-more"]')!.click();
+    fixture.detectChanges();
+    expect(document.body.querySelector('[data-test="visualise"]')).not.toBeNull();
+  });
+
+  it('groups the files by the step that made them, and a group folds (owner 2026-10-20)', () => {
+    const { el, fixture } = mount();
+    const groups = [...el.querySelectorAll<HTMLButtonElement>('[data-test="output-group"]')];
+    expect(groups.map(g => g.textContent!.replace(/\s+/g, ' ').trim())).toEqual(['Step 4 · out · 1 file', 'Step 5 · publish · 1 file']);
+    groups[0].click();
+    fixture.detectChanges();
+    expect(el.querySelectorAll('.exec-file').length).toBe(1);
   });
 
   it('says an expired file has expired, and offers no download', () => {
     const { el } = mount([{ ...KEPT, expired: true }]);
     const row = el.querySelector<HTMLElement>('.exec-file')!;
     expect(row.textContent).toContain('Expired');
-    expect([...row.querySelectorAll('button')].every(b => b.disabled)).toBe(true);
+    expect([...row.querySelectorAll<HTMLButtonElement>('button:not([data-test="output-more"])')].every(b => b.disabled)).toBe(true);
   });
 
   it('says so when the run recorded no files', () => {
