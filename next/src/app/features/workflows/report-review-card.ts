@@ -237,11 +237,18 @@ export class ReportReviewCard {
     this.strip.set([]);
     this.done.set(false);
     this.error.set('');
+    // QA 2026-10-20: after a decision the inbox opens the next task in this same card -- the note written for the last
+    // report must not stay in the box for the next one (nor its busy state or its page).
+    this.note.set('');
+    this.busy.set(false);
+    this.pageError.set('');
+    this.shownPage.set(1);
     if (!s) { this.loading.set(false); this.error.set('This task does not name what it is about.'); return; }
     this.loading.set(true);
     if (s.kind === 'report') {
       this.api.reviewCard(s.id, s.version).subscribe({
         next: c => {
+          if (this.subject() !== s) return;     // another task opened meanwhile
           this.report.set(c);
           this.loading.set(false);
           this.show(1);
@@ -249,7 +256,7 @@ export class ReportReviewCard {
           const strip = Array.from({ length: Math.max(0, pages) }, (_, i) => ({ page: i + 1, url: null as string | null }));
           this.strip.set(strip);
           strip.forEach(p => this.api.reviewPage(s.id, s.version, p.page, false).subscribe({
-            next: res => { if (res.body) this.strip.update(list => list.map(x => x.page === p.page ? { ...x, url: this.keep(res.body!) } : x)); },
+            next: res => { if (res.body && this.subject() === s) this.strip.update(list => list.map(x => x.page === p.page ? { ...x, url: this.keep(res.body!) } : x)); },
             error: () => undefined,
           }));
         },
@@ -290,7 +297,7 @@ export class ReportReviewCard {
     this.pageUrl.set(null);
     this.pageError.set('');
     this.api.reviewPage(s.id, s.version, page, true).subscribe({
-      next: res => { if (res.body && this.shownPage() === page) this.pageUrl.set(this.keep(res.body)); },
+      next: res => { if (res.body && this.shownPage() === page && this.subject() === s) this.pageUrl.set(this.keep(res.body)); },
       error: e => this.pageError.set(studioError(e, 'The page could not be drawn.').message),
     });
   }

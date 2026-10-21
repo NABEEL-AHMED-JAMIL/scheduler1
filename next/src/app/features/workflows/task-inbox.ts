@@ -838,6 +838,9 @@ export class TaskInbox implements OnInit {
     if (!subject) return [];
     return Object.entries(subject)
       .filter(([, v]) => v !== null && v !== undefined && v !== '')
+      // QA 2026-10-20: who a step goes to ({kind, value}: a group, a role, a person) is the workflow's routing, already
+      // shown as the "With ..." chip; as a field it read "Kind group / Value 1063".
+      .filter(([, v]) => !isAssignee(v))
       .map(([k, v]) => ({ label: labelOf(k), value: this.valueText(v) }));
   }
 
@@ -851,4 +854,12 @@ export class TaskInbox implements OnInit {
     const me = this.auth.user();
     return me?.username && text === me.username && me.fullName ? me.fullName : text;
   }
+}
+
+/** A step's assignee as a subject names it: {kind: group | role | user | subject, value} and nothing else. */
+function isAssignee(v: unknown): boolean {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return false;
+  const keys = Object.keys(v as object);
+  const kind = (v as { kind?: unknown }).kind;
+  return keys.length === 2 && keys.includes('kind') && keys.includes('value') && ['group', 'role', 'user', 'subject'].includes(String(kind));
 }

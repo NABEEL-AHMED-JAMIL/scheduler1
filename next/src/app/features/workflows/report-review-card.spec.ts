@@ -94,4 +94,21 @@ describe('Report review card (Report Studio phase 7)', () => {
     expect(el.querySelector('[data-test="review-decide"]')).toBeNull();
     expect(el.querySelector('[data-test="review-why-not"]')!.textContent).toContain('You generated it');
   });
+
+  it('starts the next task with an empty note (the inbox opens it in the same card after a decision)', async () => {
+    const { fixture, api, el } = mount(card());
+    await fixture.whenStable();
+    fixture.detectChanges();
+    fixture.componentInstance.note.set('Matches the admission notes.');
+    (el.querySelector('[data-test="review-approve"]') as HTMLButtonElement).click();
+    fixture.componentRef.setInput('subjectId', `report-version:01M5BPGWAKCV3194SB4JSSDZEQ:v2`);
+    fixture.componentRef.setInput('taskId', 913);
+    fixture.detectChanges();
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.reviewCard).toHaveBeenLastCalledWith('01M5BPGWAKCV3194SB4JSSDZEQ', 2);
+    expect(fixture.componentInstance.note()).toBe('');
+    expect((el.querySelector('#rvc-note') as HTMLTextAreaElement).value).toBe('');
+    expect(fixture.componentInstance.done()).toBe(false);
+  });
 });

@@ -31,7 +31,7 @@ function screen() {
     groups: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     done: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
-    task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...LIST.find(t => t.id === id)!, subject: { report: 'RPT-0005', pages: 3 }, history: [], tasks: [] } })),
+    task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...LIST.find(t => t.id === id)!, subject: { report: 'RPT-0005', pages: 3, reviewers: { kind: 'group', value: '1063' } }, history: [], tasks: [] } })),
     colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [] })),
   };
   const studio = { reviewCard: vi.fn(() => of({ reportId: ID, reportLabel: 'RPT-0005', name: 'Wound assessment', templateVersion: 2, version: 3, current: true,
@@ -82,5 +82,8 @@ describe('Review inbox: a Report Studio review', () => {
     expect(el.querySelector('#task-comment')).not.toBeNull();
     expect(el.querySelector('#task-details-title')).not.toBeNull();
     expect(el.textContent).toContain('Ask for changes');
+    // who the step goes to is its chip, not a field
+    expect(inbox.fields({ reviewers: { kind: 'group', value: '1063' }, amount: 12 })).toEqual([{ label: 'Amount', value: '12' }]);
+    expect(el.querySelector('[data-test="action-bar"]')).not.toBeNull();
   });
 });

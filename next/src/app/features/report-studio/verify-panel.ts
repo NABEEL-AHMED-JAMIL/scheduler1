@@ -43,7 +43,7 @@ export interface VerifyData { reportId: string; version: number; label: string; 
               <span class="mono text-xs break-all">{{ r.signature.certificateSha256 }}</span></dd>
             <dt>Unchanged</dt><dd>{{ r.signature.intact && r.signature.coversWholeFile ? 'Yes: nothing changed or added after signing' : 'No' }}</dd>
             <dt>Certified</dt><dd>{{ r.signature.certified ? 'Yes: no change is allowed after it' : 'No' }}</dd>
-            <dt>This workspace's</dt><dd>{{ r.matchesStored ? 'Yes: ' + r.reportLabel + ' v' + r.version : 'No stored approved version has this file' }}</dd>
+            <dt>In this workspace</dt><dd>{{ r.matchesStored ? 'Yes: ' + r.reportLabel + ' v' + r.version : 'No stored approved version has this file' }}</dd>
             <dt>SHA-256</dt><dd class="mono text-xs break-all">{{ r.sha256 }}</dd>
           </dl>
           <p class="text-xs text-[color:var(--text-muted)]">Adobe Reader shows the signature as intact with "validity unknown" until a trusted certificate replaces the
