@@ -16,7 +16,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
-import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson } from './designer.model';
+import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson, runSaveAs } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -257,6 +257,25 @@ export class WorkflowDesigner implements OnInit {
 
   removeVariable(s: DraftStep, i: number): void {
     this.setVariables(this.variableRows(s).filter((_, n) => n !== i));
+  }
+
+  /** Turns waiting on or off for a Run pipeline step; on, its outcome is kept at run_<key> unless named. */
+  setWaitFor(s: DraftStep, on: boolean): void {
+    this.set('waitFor', on);
+    if (on && !s.saveAs) this.set('saveAs', runSaveAs(s.key));
+    if (on && s.waitHours == null) this.set('waitHours', 24);
+  }
+
+  /** Puts a Condition on the run's outcome right after the selected Run pipeline step: completed one way, the rest the other. */
+  branchOnRun(s: DraftStep): void {
+    const i = this.selected();
+    if (i === null) return;
+    const step = newStep('condition', this.keys());
+    step.name = 'Completed?';
+    step.condition = { field: `${s.saveAs || runSaveAs(s.key)}.ok`, op: 'eq', value: true };
+    this.steps.update(list => [...list.slice(0, i + 1), step, ...list.slice(i + 1)]);
+    this.selected.set(i + 1);
+    this.touch();
   }
 
   /** Puts a Condition on the answer right after the selected Call API step: accepted one way, the rest the other. */
@@ -650,7 +669,7 @@ export class WorkflowDesigner implements OnInit {
         return `If ${c?.field || '…'} ${op}${this.needsValue(s) ? ' ' + this.conditionValue(s) : ''}`;
       }
       case 'notify': return `Tell ${this.who(s.to)}`;
-      case 'run_pipeline': return s.jobId ? this.jobName(s.jobId) : 'No schedule picked';
+      case 'run_pipeline': return s.jobId ? this.jobName(s.jobId) + (s.waitFor ? ` · waits, → ${s.saveAs || runSaveAs(s.key)}` : '') : 'No schedule picked';
       case 'call_api': {
         const r = this.requestOf(s);
         return s.requestId ? (r ? `${r.method} ${r.label}` : `API request #${s.requestId}`) + ` → ${s.saveAs || 'api'}` : 'No API request picked';

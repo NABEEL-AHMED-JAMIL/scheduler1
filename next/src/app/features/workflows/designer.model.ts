@@ -41,6 +41,9 @@ export interface DraftStep {
   // run_pipeline
   jobId?: number | null;
   onError?: 'fail' | 'continue';
+  /** 2026-10-21: wait until the run ends (its approvals included), keep its outcome at saveAs, give up after waitHours. */
+  waitFor?: boolean;
+  waitHours?: number | null;
   // call_api (owner #25): a saved API request, its environment, variables from the request's fields, where the answer goes
   requestId?: number | null;
   environmentId?: number | null;
@@ -131,6 +134,11 @@ export function toJson(steps: DraftStep[]): { steps: Record<string, unknown>[] }
         case 'run_pipeline':
           out['jobId'] = s.jobId;
           if (s.onError === 'continue') out['onError'] = 'continue';
+          if (s.waitFor) {
+            out['waitFor'] = true;
+            out['saveAs'] = s.saveAs || runSaveAs(s.key);
+            out['waitHours'] = s.waitHours ?? 24;
+          }
           break;
         case 'call_api':
           out['requestId'] = s.requestId;
@@ -160,6 +168,11 @@ export function fromJson(json: string | null | undefined): DraftStep[] {
   } catch {
     return [];
   }
+}
+
+/** Where a waiting Run pipeline step keeps its run's outcome by default: "run_" and its key ("run_lab_check"). */
+export function runSaveAs(key: string): string {
+  return 'run_' + key.replace(/-/g, '_');
 }
 
 /** Which step a problem ("steps[2].whenTrue: ...") is about, or null for the workflow as a whole. */

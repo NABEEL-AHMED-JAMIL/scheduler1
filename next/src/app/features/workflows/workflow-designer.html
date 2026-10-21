@@ -318,8 +318,31 @@
                         <app-combobox id="st-job" [numeric]="true" placeholder="Search schedules…" [allowClear]="false" [disabled]="!canEdit()"
                                       [options]="jobOptions()" [ngModel]="s.jobId == null ? null : s.jobId" (ngModelChange)="set('jobId', numberOrNull($event))" />
                       </div>
+                      <!-- 2026-10-21: wait for the run (its approvals included) and keep how it ended for a Condition. -->
                       <div>
-                        <label class="label" for="st-err">If it cannot start</label>
+                        <label class="flex items-center gap-2 text-sm">
+                          <input type="checkbox" [ngModel]="!!s.waitFor" (ngModelChange)="setWaitFor(s, $event)" [disabled]="!canEdit()" data-test="wf-run-wait" />
+                          Wait until the run ends, its approvals included
+                        </label>
+                        <p class="field-note text-[color:var(--text-muted)]">Off: the next step starts as soon as the run is queued.</p>
+                      </div>
+                      @if (s.waitFor) {
+                        <div>
+                          <label class="label" for="st-run-save">Keep how it ended as</label>
+                          <input id="st-run-save" class="input mono" [ngModel]="s.saveAs || ''" (ngModelChange)="set('saveAs', $event)" [disabled]="!canEdit()" data-test="wf-run-save" />
+                          <p class="field-note text-[color:var(--text-muted)]">
+                            A Condition after this step reads {{ s.saveAs }}.ok, .status (Completed, Failed, TimedOut) or .message.
+                            <button type="button" class="link-inline" (click)="branchOnRun(s)" data-test="wf-run-branch">Add a condition on it</button>
+                          </p>
+                        </div>
+                        <div>
+                          <label class="label" for="st-run-hours">Give up after (hours)</label>
+                          <input id="st-run-hours" type="number" min="1" max="2160" class="input" [ngModel]="s.waitHours ?? 24"
+                                 (ngModelChange)="set('waitHours', numberOrNull($event))" [disabled]="!canEdit()" data-test="wf-run-hours" />
+                        </div>
+                      }
+                      <div>
+                        <label class="label" for="st-err">{{ s.waitFor ? 'If it cannot start or does not complete' : 'If it cannot start' }}</label>
                         <select id="st-err" class="input" [ngModel]="s.onError || 'fail'" (ngModelChange)="set('onError', $event)">
                           <option value="fail">Stop the request</option>
                           <option value="continue">Carry on</option>

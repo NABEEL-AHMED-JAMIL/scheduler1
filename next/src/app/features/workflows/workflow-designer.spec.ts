@@ -10,7 +10,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { WorkflowDesigner } from './workflow-designer';
 import { WorkflowDetail, WorkflowsApi } from './workflows.api';
-import { fromJson, newStep, problemStep, toJson } from './designer.model';
+import { fromJson, newStep, problemStep, runSaveAs, toJson } from './designer.model';
 
 /**
  * The Workflow designer (MIG-276): the chain of steps an administrator edits and publishes as the next version, the
@@ -283,5 +283,24 @@ describe('Call API in a workflow (owner #25)', () => {
     expect(screen.actorOptions().find(o => o.value === '4598')).toEqual({ value: '4598', label: 'Vic Viewer', hint: 'Cannot open Approvals', disabled: true });
     expect(screen.actorOptions().find(o => o.value === '4597')!.disabled).toBeUndefined();
     expect(screen.colleagueOptions().find(o => o.value === '4598')!.disabled).toBeUndefined();
+  });
+
+  it('writes a Run pipeline step that waits with where its outcome goes and how long it waits, and branches on it', () => {
+    const run = newStep('run_pipeline', []);
+    run.jobId = 1006;
+    expect(toJson([run]).steps[0]).toEqual({ key: run.key, type: 'run_pipeline', name: run.name, jobId: 1006 });
+    run.waitFor = true;
+    expect(toJson([run]).steps[0]).toEqual({ key: run.key, type: 'run_pipeline', name: run.name, jobId: 1006, waitFor: true,
+      saveAs: runSaveAs(run.key), waitHours: 24 });
+    expect(runSaveAs('lab-check')).toBe('run_lab_check');
+
+    const { screen } = screenWith();
+    screen.steps.set([run]);
+    screen.selected.set(0);
+    screen.branchOnRun(run);
+    const condition = screen.steps()[1];
+    expect(condition.type).toBe('condition');
+    expect(condition.name).toBe('Completed?');
+    expect(condition.condition).toEqual({ field: `${runSaveAs(run.key)}.ok`, op: 'eq', value: true });
   });
 });
