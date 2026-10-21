@@ -175,7 +175,10 @@ export class NewPipeline implements OnInit {
   }
 
   toAssistant(): void {
-    const prompt = this.ask().trim();
+    // ZT-P12: what is typed here is a pipeline to design, said the way the assistant's own suggestions say it; without it
+    // "Read the visits file, ..." was answered as a question (the file read, no pipeline drawn).
+    const asked = this.ask().trim();
+    const prompt = asked && !/^design a pipeline\b/i.test(asked) ? `Design a pipeline: ${asked}` : asked;
     this.router.navigate(['/ai/assistant'], { queryParams: prompt ? { prompt } : {} });
   }
 

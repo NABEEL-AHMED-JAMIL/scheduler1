@@ -59,11 +59,15 @@ describe('New pipeline', () => {
     expect(el.querySelector('[data-test="full-form"]')?.getAttribute('href')).toBe('/pipelines/new/form');
   });
 
-  it('hands a description to the AI Assistant', () => {
+  it('hands a description to the AI Assistant as a pipeline to design (ZT-P12)', () => {
     const { component, navigate } = screen();
+    // "Read the visits file, ..." was taken as a question: the assistant read the file and answered, drawing no pipeline.
     component.ask.set('Flag readmissions within 30 days');
     component.toAssistant();
-    expect(navigate).toHaveBeenCalledWith(['/ai/assistant'], { queryParams: { prompt: 'Flag readmissions within 30 days' } });
+    expect(navigate).toHaveBeenCalledWith(['/ai/assistant'], { queryParams: { prompt: 'Design a pipeline: Flag readmissions within 30 days' } });
+    component.ask.set('design a pipeline: keep the paid orders');
+    component.toAssistant();
+    expect(navigate).toHaveBeenLastCalledWith(['/ai/assistant'], { queryParams: { prompt: 'design a pipeline: keep the paid orders' } });
   });
 
   it('makes a pipeline to add steps to and opens its step builder', async () => {
