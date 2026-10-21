@@ -74,6 +74,8 @@ const TRIGGER_WORDS: Record<string, string> = {
   // ZT-P15: "started by on its timetable" read wrong; a form's and a backfill's runs were "a file arrived" / "on its timetable".
   schedule: 'its timetable', manual: 'Run now', file: 'a file arrived', document: 'a document approved', form: 'a form submitted', backfill: 'a backfill',
   retry: 'a retry', api: 'the API',
+  // V220: a workflow request's run of the pipeline, beside the job's own runs.
+  workflow: 'a workflow',
 };
 
 @Component({
