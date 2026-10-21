@@ -3012,3 +3012,8 @@ button.connector-card:hover { border-color: var(--focus-ring); }
   .rs-banner-warn { border-color: color-mix(in oklab, var(--warn-text) 55%, var(--border-subtle));
                     background: color-mix(in oklab, var(--warn-text) 9%, var(--surface-raised)); }
 }
+
+/* ZT-C4 (the report designer's toolbar, under 1440): the brand's name arrives after the first paint, and a select as wide as its
+   text grew 157 px, wrapped the zoom onto a second line and pushed the whole canvas down (CLS 0.54 at 1024). A fixed width from
+   the first paint; the name ellipsizes. Here, not in designer.css, which is at its 8 kB budget. */
+@media (max-width: 1439px) { .rsd-toolbar .rsd-brand-select { width: 11rem; } }

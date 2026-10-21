@@ -102,8 +102,5 @@ button.rsd-chip:hover { border-color: var(--border-strong); color: var(--text-pr
 /* <1440: tools wrap, not scroll away */
 @media (max-width: 1439px) {
   .rsd-toolbar { flex-wrap: wrap; row-gap: 0.25rem; overflow-x: visible; }
-  /* ZT-C4: the brand's name arrives after the first paint; a select as wide as its text grew 157 px, wrapped the zoom onto a
-     second line and pushed the whole canvas down (CLS 0.54 at 1024). A fixed width from the first paint: the name ellipsizes. */
-  .rsd-brand-select { width: 11rem; }
 }
 .rsd-toolbar > .rsd-chip { max-width: 24rem; overflow: hidden; }
