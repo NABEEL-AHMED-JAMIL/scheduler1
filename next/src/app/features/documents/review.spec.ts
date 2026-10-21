@@ -175,9 +175,11 @@ describe('DocumentReview -- reading', () => {
   });
 
   it('says so when the document cannot be read', async () => {
-    const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404, error: { status: 'ERROR', message: 'No extraction 1005.' } }))) });
+    // A 404 is "not here" (ZT-D10); a document the service cannot read now says the service's words, with a retry.
+    const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 503, error: { status: 'ERROR', message: 'Document Intelligence is not answering.' } }))) });
     const { el } = await screenWith({ api });
-    expect(el.querySelector('[role="alert"]')?.textContent).toContain('No extraction 1005.');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('Document Intelligence is not answering.');
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('Try again');
   });
 });
 
@@ -386,6 +388,19 @@ describe('DocumentReview -- zero-tolerance documents (ZT-D)', () => {
     expect(note).toContain('“PO-77113 is not an open purchase order.” This view is read-only.');
     const { el: plain } = await screenWith({ api: stubApi({ ...rejected, rejectReason: 'Blurred' }) });
     expect(plain.querySelector('[data-test="view-only"]')?.textContent).toContain('“Blurred”. This view is read-only.');
+  });
+});
+
+describe('DocumentReview -- a link that is not here (ZT-D10)', () => {
+  it('says a document another workspace\'s link names is not here, with the way back and no retry', async () => {
+    const api = stubApi(INVOICE, { review: vi.fn(() => throwError(() => new HttpErrorResponse({ status: 404,
+      error: { status: 'ERROR', message: 'No extraction 1185.' } }))) });
+    const { el } = await screenWith({ api });
+    expect(el.querySelector('[data-test="document-missing"]')?.textContent).toContain('This document isn\'t here');
+    expect(el.querySelector('[data-test="document-missing"] a')?.getAttribute('href')).toBe('/review/documents');
+    expect(el.textContent).not.toContain('No extraction 1185.');
+    expect(el.textContent).not.toContain('Try again');
+    expect(el.querySelector('h1')?.textContent?.trim()).toBe('Document not found');
   });
 });
 

@@ -35,6 +35,14 @@
 
   @if (loading() && !detail()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Loading the document…</div>
+  } @else if (missing()) {
+    <!-- ZT-D10 (ZT-A10's rule): a document that is not here (deleted, or another workspace's link) is said as that, with the way back. -->
+    <div class="card p-8 flex flex-col items-center text-center gap-2" data-test="document-missing">
+      <span class="stat-glyph"><app-icon name="search" /></span>
+      <h2 class="text-base font-semibold">This document isn't here</h2>
+      <p class="text-sm text-[color:var(--text-secondary)] max-w-md">It may have been removed, or the link belongs to another workspace.</p>
+      <a routerLink="/review/documents" class="btn btn-default btn-sm mt-2">Document review</a>
+    </div>
   } @else if (error()) {
     <div class="card p-8 text-center" role="alert">
       <p class="text-sm text-crit-500">{{ error() }}</p>

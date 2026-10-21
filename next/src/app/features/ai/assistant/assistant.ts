@@ -149,6 +149,8 @@ export class Assistant implements OnInit {
   readonly messages = signal<AssistantMessage[]>([]);
   readonly threadLoading = signal(false);
   readonly threadError = signal('');
+  /** ZT-I5 (ZT-A10's rule): a conversation the service does not find -- deleted, or another workspace's link -- said as that. */
+  readonly threadMissing = signal(false);
   /** The conversation list beside the thread; folded away on narrower screens until asked for. */
   readonly historyOpen = signal(false);
 
@@ -374,6 +376,7 @@ export class Assistant implements OnInit {
     if (this.working()) return;
     this.threadLoading.set(true);
     this.threadError.set('');
+    this.threadMissing.set(false);
     this.error.set('');
     this.stopped.set(false);
     this.renaming.set(false);
@@ -383,7 +386,11 @@ export class Assistant implements OnInit {
     this.api.conversation(conversationId).subscribe({
       next: r => {
         this.threadLoading.set(false);
-        if (r.status !== API_SUCCESS || !r.data) { this.threadError.set(r.message || 'Could not open the conversation.'); return; }
+        if (r.status !== API_SUCCESS || !r.data) {
+          if (/not found/i.test(r.message ?? '')) this.threadMissing.set(true);
+          else this.threadError.set(r.message || 'Could not open the conversation.');
+          return;
+        }
         this.conversation.set(r.data.conversation);
         this.messages.set(mergeMessages([], r.data.messages ?? []));
         this.remember(r.data.conversation.conversationId);
@@ -391,7 +398,11 @@ export class Assistant implements OnInit {
         if (newest != null) this.showTrace(newest);
         this.tab.set(openingTab(this.tab(), { flow: !!this.flow(), chart: !!this.chart(), calls: newest != null }));
       },
-      error: err => { this.threadLoading.set(false); this.threadError.set(err?.error?.message || 'Could not open the conversation.'); },
+      error: err => {
+        this.threadLoading.set(false);
+        if (err?.status === 404) this.threadMissing.set(true);
+        else this.threadError.set(err?.error?.message || 'Could not open the conversation.');
+      },
     });
   }
 
@@ -407,6 +418,7 @@ export class Assistant implements OnInit {
     this.pickedChart.set(null);
     this.error.set('');
     this.threadError.set('');
+    this.threadMissing.set(false);
     this.stopped.set(false);
     this.renaming.set(false);
     this.remember(null);

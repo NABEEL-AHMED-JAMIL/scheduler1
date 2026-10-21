@@ -97,6 +97,8 @@ export class DocumentReview {
   readonly read = signal<OcrDocument | null>(null);
   readonly loading = signal(true);
   readonly error = signal('');
+  /** ZT-D10: the service has no such document for this workspace (deleted, or another workspace's link): said as that. */
+  readonly missing = signal(false);
   readonly busy = signal<Busy>('');
   /** What the reviewer has typed, by fieldId, until it is saved. */
   readonly edits = signal<Record<number, string>>({});
@@ -145,7 +147,7 @@ export class DocumentReview {
 
   readonly title = computed(() => {
     const r = this.read();
-    return r ? documentName(r) : this.detail() ? `Document ${this.detail()!.extractionId}` : 'Document';
+    return r ? documentName(r) : this.detail() ? `Document ${this.detail()!.extractionId}` : this.missing() ? 'Document not found' : 'Document';
   });
   readonly subtitle = computed(() => {
     const d = this.detail();
@@ -177,6 +179,7 @@ export class DocumentReview {
     if (!id) { this.loading.set(false); this.error.set('No document named.'); return; }
     this.loading.set(true);
     this.error.set('');
+    this.missing.set(false);
     this.api.review(id).subscribe({
       next: r => {
         this.loading.set(false);
@@ -185,7 +188,11 @@ export class DocumentReview {
         this.readFile(r.data.ocrDocumentId);
         this.locate();
       },
-      error: err => { this.loading.set(false); this.error.set(refusalText(err, 'The document could not be read.')); },
+      error: err => {
+        this.loading.set(false);
+        if ((err as { status?: number })?.status === 404) { this.missing.set(true); return; }
+        this.error.set(refusalText(err, 'The document could not be read.'));
+      },
     });
   }
 
