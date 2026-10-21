@@ -193,6 +193,23 @@ describe('what each kind says about the data', () => {
     expect((cal['calendar'] as { range: string }[]).map(c => c.range)).toEqual(['2025', '2026']);
   });
 
+  /** ZT-A3: Visualise on a 27-row run output wrote "10", "10", "10", "11" through each other in 9 px rows. */
+  it('ZT-A3: a heatmap writes figures in its cells only where a row has room for them', () => {
+    const rows = Array.from({ length: 27 }, (_, i) => `row ${i}`);
+    const tall = table({ dims: [dim('group', rows.map(() => 'all')), dim('level', rows)], measures: [{ name: 'n', values: rows.map((_, i) => i) }] });
+    const crowded = chartOption(tall, 'heatmap', {}, THEME, { height: 300 });
+    expect((series(crowded)[0]['label'] as { show: boolean }).show).toBe(false);
+    const roomy = chartOption(twoDims(), 'heatmap', {}, THEME, { height: 300 });
+    expect((series(roomy)[0]['label'] as { show: boolean }).show).toBe(true);
+    // The author's own choice stands.
+    const asked = chartOption(tall, 'heatmap', { labels: { show: true } }, THEME, { height: 300 });
+    expect((series(asked)[0]['label'] as { show: boolean }).show).toBe(true);
+  });
+
+  it('ZT-A3: a sunburst leaves out a name that would print over its neighbour', () => {
+    expect(series(option(twoDims(), 'sunburst'))[0]['labelLayout']).toEqual({ hideOverlap: true });
+  });
+
   it('a gauge reads its target from the settings, and ends on a round number past both', () => {
     const o = option(table({ measures: [{ name: 'total', values: [873] }] }), 'gauge', { refLines: { target: 900 } });
     expect(series(o)[0]['max']).toBe(1000);

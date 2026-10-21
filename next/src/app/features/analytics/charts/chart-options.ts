@@ -970,6 +970,9 @@ const sunburst: Builder = (table, s, theme, context) => {
       nodeClick: context.clickable ? false : 'rootToNode',
       itemStyle: { borderColor: theme.tokens.surface, borderWidth: 1 },
       label: { show: s.labels?.show ?? true, fontSize: labelPx(s), minAngle: 8, rotate: 'radial', overflow: 'truncate', textBorderWidth: 0 },
+      // ZT-A3: names on neighbouring thin wedges printed through each other ("Cus…" over "Con…"); the one that would
+      // overlap is left out, its name still in the tooltip.
+      labelLayout: { hideOverlap: true },
       emphasis: { focus: 'ancestor' },
     }],
   }, treePicker(table));
@@ -1074,13 +1077,19 @@ const chord: Builder = (table, s) => {
   });
 };
 
-const heatmap: Builder = (table, s, theme) => {
+/** The height a heatmap row needs for the figure written in its cells (ZT-A3); thinner rows print on each other. */
+export const HEATMAP_LABEL_ROW_PX = 16;
+
+const heatmap: Builder = (table, s, theme, context) => {
   const shaped = grid(table);
   const data: [number, number, number][] = [];
   shaped.cell.forEach((row, y) => row.forEach((value, x) => { if (value !== null) data.push([x, y, value]); }));
   const values = data.map(d => d[2]);
   const low = Math.min(...values), high = Math.max(...values);
-  const labelled = s.labels?.show ?? data.length <= 60;
+  // ZT-A3: 27 rows in a 300 px tile left 9 px a row, and "10", "10", "10", "11" printed through each other. A figure is
+  // written in its cell by default only where the row has room for it (the plot is the height less the axis and the scale).
+  const rowPx = context.height ? (context.height - 44 - 24) / Math.max(1, shaped.series.length) : Infinity;
+  const labelled = s.labels?.show ?? (data.length <= 60 && rowPx >= HEATMAP_LABEL_ROW_PX);
   // The cell's colour as the visual map paints it (a straight run from sunken to heat), so a
   // figure written in the cell is black or white by that cell's own fill.
   const cells = labelled

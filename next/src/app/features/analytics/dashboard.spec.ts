@@ -737,13 +737,65 @@ describe('a tile over a saved query, which has no types to read', () => {
     expect(view.issues.bar).toContain('a length cannot be negative');
   });
 
-  it('has nothing to label a one-column result with, and says that rather than drawing it', () => {
+  it('has nothing to label a one-column result with, and says that for every kind that names its figures', () => {
     const view = queryView(queryResult({
       columns: ['total'],
       rows: [['100'], ['250']],
     }));
-    expect(view.marks).toEqual([]);
     expect(view.issues.ranked).toContain('one column');
+    expect(view.issues.bar).toContain('one column');
+    expect(view.issues.line).toContain('one column');
+  });
+
+  /**
+   * ZT-A1 (2026-10-21, Meridian): a saved query whose figures go below zero drew nothing at all. Every kind was handed no
+   * marks, so a "Net result" of -4,887,895.84 read "a single figure needs one row, and this returned 1", and a month of
+   * profit with one loss month was refused as a line because "a length cannot be negative".
+   */
+  it('ZT-A1: draws a negative single figure, line, trend and comparison; only the lengths from zero refuse it', () => {
+    const net = queryView(queryResult({ columns: ['metric', 'value'], rows: [['Net result', '-4887895.84']], rowCount: 1 }));
+    expect(net.issues.kpi).toBe('');
+    expect(net.marks).toEqual([{ name: 'Net result', value: -4887895.84 }]);
+
+    const months = queryView(queryResult({
+      columns: ['month', 'result'],
+      rows: [['2025-01-01', '59096.56'], ['2025-02-01', '-138179.62'], ['2025-03-01', '217202.91']],
+      rowCount: 3,
+    }));
+    for (const kind of ['line', 'trendSummary', 'kpiTrend', 'distributionSummary', 'table'] as const) {
+      expect(months.issues[kind], kind).toBe('');
+    }
+    expect(months.issues.ranked).toContain('a length cannot be negative');
+    expect(months.issues.bar).toContain('a length cannot be negative');
+
+    const pair = queryView(queryResult({ columns: ['region', 'result'], rows: [['north', '120'], ['south', '-40']], rowCount: 2 }));
+    expect(pair.issues.comparison).toBe('');
+  });
+
+  it('ZT-A1: a scatter of a figure that goes below zero is drawn (profit against sales)', () => {
+    const view = queryView(queryResult({
+      columns: ['net_sales', 'profit'],
+      rows: [['2018.41', '-22.47'], ['2815.84', '1113.61'], ['144.13', '88.36']],
+      rowCount: 3,
+    }));
+    expect(view.issues.scatter).toBe('');
+  });
+
+  /**
+   * ZT-A2 (2026-10-21): "Distribution of the figures" needs "several numbers", and `SELECT bmi FROM dataset` -- several
+   * numbers -- was refused because one column has nothing to label its values with. The spread was refused the same way.
+   */
+  it('ZT-A2: one column of figures draws as a distribution and a spread', () => {
+    const view = queryView(queryResult({
+      columns: ['bmi'],
+      rows: ['21.5', '24.1', '27.9', '30.2', '19.8', '33.4', '25.0', '28.7', '22.2', '26.6'].map(v => [v]),
+      rowCount: 10,
+    }));
+    expect(view.issues.histogram).toBe('');
+    expect(view.issues.distributionSummary).toBe('');
+    expect(view.marks.map(m => m.value)).toEqual([21.5, 24.1, 27.9, 30.2, 19.8, 33.4, 25.0, 28.7, 22.2, 26.6]);
+    expect(view.issues.ranked).toContain('one column');
+    expect(view.issues.comparison).not.toBe('');
   });
 
   it('leaves out a row with no label and a row with no number, apart', () => {

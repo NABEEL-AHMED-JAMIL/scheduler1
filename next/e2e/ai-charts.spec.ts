@@ -220,8 +220,10 @@ test.describe('MIG-357: charts for analytics questions', () => {
     // The run's files are the run page's Outputs tab now, beside Steps, Map and Log.
     await page.goto(`/pipelines/schedules/${readmission.jobId}/runs/${readmission.run!.jobQueueId}`);
     await page.getByRole('tab', { name: /^Outputs/ }).click();
-    const output = page.locator('.exec-file [data-test="visualise"]').first();
-    await expect(output).toBeVisible({ timeout: 30_000 });
+    // Visualise is in each output's "More" menu (beside Copy file name), not a button of its own.
+    await page.locator('[data-test="output-more"]').first().click({ timeout: 30_000 });
+    const output = page.locator('[data-test="visualise"]').first();
+    await expect(output).toBeVisible();
     await output.click();
     await expect(page.locator('app-visualise-panel [data-test="chart-answer"]').first()).toBeVisible({ timeout: 60_000 });
     await page.waitForTimeout(1500);
