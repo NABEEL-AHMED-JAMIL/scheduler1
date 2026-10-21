@@ -87,7 +87,7 @@
         </thead>
         <tbody>
           @for (c of shown(); track c.clientId) {
-            <tr [class.opacity-70]="c.status !== 'Active'">
+            <tr [class.row-inactive]="c.status !== 'Active'">
               <td class="max-w-64">
                 <div class="font-medium truncate">{{ c.name }}</div>
                 <div class="mono text-xs text-[color:var(--text-muted)] truncate">{{ c.clientId }}</div>
@@ -167,7 +167,7 @@
         </thead>
         <tbody>
           @for (r of routes(); track r.routeId) {
-            <tr [class.opacity-70]="!r.active">
+            <tr [class.row-inactive]="!r.active">
               <td class="mono">{{ r.eventType }}</td>
               <td>{{ targetOf(r) }}</td>
               <td class="text-[color:var(--text-secondary)]">{{ r.contractName || (r.contractId ? 'Contract ' + r.contractId : '—') }}</td>
@@ -220,7 +220,7 @@
         </thead>
         <tbody>
           @for (w of webhooks(); track w.id) {
-            <tr [class.opacity-70]="!w.active">
+            <tr [class.row-inactive]="!w.active">
               <td class="max-w-96">
                 <div class="mono truncate" [title]="w.url">{{ w.url }}</div>
                 <div class="text-xs text-[color:var(--text-muted)] truncate">

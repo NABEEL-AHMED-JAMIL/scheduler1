@@ -66,7 +66,7 @@ import { SecretDialog, SecretDialogData } from './secret-dialog';
                 </thead>
                 <tbody>
                   @for (c of clients(); track c.clientId) {
-                    <tr [class.opacity-70]="c.status !== 'Active'">
+                    <tr [class.row-inactive]="c.status !== 'Active'">
                       <td class="max-w-64"><div class="flex items-center gap-1.5 min-w-0"><span class="pill pill-info">Test</span><span class="font-medium truncate">{{ c.name }}</span></div></td>
                       <td class="mono text-xs text-[color:var(--text-secondary)]">{{ c.clientId }}</td>
                       <td class="max-w-80">

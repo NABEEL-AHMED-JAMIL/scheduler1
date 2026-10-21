@@ -2219,6 +2219,8 @@ html.dark .access-cell-exception { background: color-mix(in oklab, var(--color-w
 .lookup-rail-item.is-selected { background: var(--pill-brand-bg); }
 .lookup-rail-item.is-selected .lookup-rail-key { color: var(--pill-brand-fg); }
 .lookup-rail-item.is-selected .lookup-rail-chev { opacity: 1; }
+/* ZT-C8: on the selection a row's second line is the secondary text: the muted one was 4.08:1 there (axe, WCAG AA). */
+.lookup-rail-item.is-selected .lookup-rail-sub { color: var(--text-secondary); }
 .lookup-rail-glyph { flex: none; width: 1.75rem; height: 1.75rem; border-radius: var(--radius-md); display: inline-flex; align-items: center; justify-content: center; background: var(--surface-sunken); color: var(--text-muted); }
 .lookup-rail-glyph.is-list { background: var(--pill-brand-bg); color: var(--pill-brand-fg); }
 .lookup-rail-glyph.is-managed { background: var(--color-warn-100); color: var(--color-warn-600); }
@@ -3017,3 +3019,9 @@ button.connector-card:hover { border-color: var(--focus-ring); }
    text grew 157 px, wrapped the zoom onto a second line and pushed the whole canvas down (CLS 0.54 at 1024). A fixed width from
    the first paint; the name ellipsizes. Here, not in designer.css, which is at its 8 kB budget. */
 @media (max-width: 1439px) { .rsd-toolbar .rsd-brand-select { width: 11rem; } }
+
+/* ZT-C8: a revoked, paused or inactive row reads as such without dimming its text: opacity took its scopes and names to 3.34:1
+   (axe, WCAG AA). The row's state pill says what it is; the row is quieter, not fainter. */
+tr.row-inactive > td { background: var(--surface-sunken); }
+tr.row-inactive > td, tr.row-inactive .pill-neutral { color: var(--text-secondary); }
+
