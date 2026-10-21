@@ -181,8 +181,15 @@ export class Combobox implements ControlValueAccessor {
     const q = this.typed() ? this.query().trim().toLowerCase() : '';
     const opts = this.options();
     if (!q || this.remote()) return opts;
-    return opts.filter(o =>
-      o.label.toLowerCase().includes(q) || (o.hint ?? '').toLowerCase().includes(q));
+    // ZT-P4: a name that matches comes before an option only its hint matches ("Compute" before Aggregate, whose hint
+    // "computes"), inside each group, so the first option -- what Enter takes -- is the one named. Groups keep their order.
+    const groups: string[] = [];
+    return opts
+      .map((o, i) => ({ o, i, named: o.label.toLowerCase().includes(q) }))
+      .filter(x => x.named || (x.o.hint ?? '').toLowerCase().includes(q))
+      .map(x => { const g = x.o.group ?? ''; if (!groups.includes(g)) groups.push(g); return x; })
+      .sort((a, b) => groups.indexOf(a.o.group ?? '') - groups.indexOf(b.o.group ?? '') || Number(!a.named) - Number(!b.named) || a.i - b.i)
+      .map(x => x.o);
   });
 
   /** The option the arrow keys are on, for aria-activedescendant; none while closed. */
