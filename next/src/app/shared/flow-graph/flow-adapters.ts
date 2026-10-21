@@ -358,6 +358,8 @@ export interface RunStepLike {
   recordsOut?: number | null;
   tries?: number | null;
   reusedFromAttempt?: number | null;
+  /** ZT-P9: the steps whose rows it took in (Core, from the definition the run followed); absent on older answers. */
+  reads?: string[] | null;
 }
 
 export type MapBasis = 'time' | 'rows';
@@ -395,14 +397,22 @@ export function runGraph<S extends RunStepLike>(steps: readonly S[], basis: MapB
       metrics: [
         { label: 'time', value: durationText(s.durationMs) },
         { label: 'share', value: share == null ? '—' : `${Math.round(share * 1000) / 10}%` },
-        { label: 'rows in', value: countText(s.recordsIn) },
-        { label: 'rows out', value: countText(s.recordsOut) },
+        // ZT-P10: "rows in" / "rows out" did not fit a metric cell and were drawn "rows…"; the node says rows already.
+        { label: 'in', value: countText(s.recordsIn) },
+        { label: 'out', value: countText(s.recordsOut) },
       ],
       share, hot: s === hot,
     };
   });
-  const edges: FlowEdge[] = steps.slice(1).map((s, i) => ({ from: steps[i].key, to: s.key,
-    label: steps[i].recordsOut != null ? `${countText(steps[i].recordsOut)} ${steps[i].recordsOut === 1 ? 'row' : 'rows'}` : null, tone: steps[i].status === 'Failed' ? 'crit' : null }));
+  const byKey = new Map(steps.map(s => [s.key, s] as const));
+  const edge = (from: S, to: S): FlowEdge => ({ from: from.key, to: to.key,
+    label: from.recordsOut != null ? `${countText(from.recordsOut)} ${from.recordsOut === 1 ? 'row' : 'rows'}` : null, tone: from.status === 'Failed' ? 'crit' : null });
+  // ZT-P9: from the steps each one reads when Core says so (a read after a read stands alone; a join and an append draw
+  // every source); an older answer without them is drawn as before, each step from the one before it.
+  const known = steps.some(s => Array.isArray(s.reads));
+  const edges: FlowEdge[] = known
+    ? steps.flatMap(s => (s.reads ?? []).map(k => byKey.get(k)).filter((f): f is S => !!f).map(f => edge(f, s)))
+    : steps.slice(1).map((s, i) => edge(steps[i], s));
   return { nodes, edges, hot };
 }
 

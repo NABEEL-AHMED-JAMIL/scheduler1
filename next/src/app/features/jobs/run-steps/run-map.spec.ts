@@ -20,7 +20,18 @@ describe('the run plan map', () => {
     expect(m.nodes[3].kind).toBe('output');
     expect(m.nodes[2].share).toBeCloseTo(2600 / 3199, 5);
     expect(m.nodes[2].metrics?.map(x => x.value)).toEqual(['2.6 sec', '81.3%', '101,766', '10']);
+    // ZT-P10: labels that fit a node's metric cell ("rows in" was drawn "rows…").
+    expect(m.nodes[2].metrics?.map(x => x.label)).toEqual(['time', 'share', 'in', 'out']);
     expect(m.edges.map(e => `${e.from}>${e.to} ${e.label}`)).toEqual(['read>banded 101,766 rows', 'banded>by_age 101,766 rows', 'by_age>save 10 rows']);
+  });
+
+  it('ZT-P9: draws each step from the steps it reads -- a read after a read stands alone, an append and a join from each source', () => {
+    const t = run([step('visits', 'read_file', 'Completed', 10, 0, 42), step('clinics', 'read_file', 'Completed', 10, 0, 4),
+      step('all', 'append', 'Completed', 10, 46, 46), step('joined', 'join', 'Completed', 10, 46, 46)]);
+    const reads: Record<string, string[]> = { visits: [], clinics: [], all: ['visits', 'clinics'], joined: ['all', 'clinics'] };
+    t.steps.forEach(s => (s as { reads?: string[] }).reads = reads[s.key]);
+    expect(runMap(t, 'time').edges.map(e => `${e.from}>${e.to} ${e.label}`))
+      .toEqual(['visits>all 42 rows', 'clinics>all 4 rows', 'all>joined 46 rows', 'clinics>joined 4 rows']);
   });
 
   it('marks the failed step before the slowest, in red', () => {
