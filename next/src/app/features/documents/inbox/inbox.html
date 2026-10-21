@@ -1,4 +1,4 @@
-<div [class.page]="!embedded">
+<div [class.page]="!embedded" [class.space-y-5]="embedded">
   @if (!embedded) {
     <!-- UX review B4 (IN1): one place for the settings -- the Settings card beside the upload, with its own Change. -->
     <app-page-header title="File drop"
