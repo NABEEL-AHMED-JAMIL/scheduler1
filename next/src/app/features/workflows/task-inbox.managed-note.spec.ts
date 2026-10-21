@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 
 /**
- * ZT-W2 (owner 2026-10-21, "Platform admin decides"): in a managed session the platform administrator's inbox holds the
+ * ZT-W2 (owner 2026-10-21, "Platform administrator decides"): in a managed session the platform administrator's inbox holds the
  * approvals nobody but their requester could decide; the task says so (workflow-service's managedNote) and wears a pill. The
  * requester alone in their workspace is told the platform administrator will decide it, not that it waits for someone to join;
  * a Report Studio card says the same to its maker and to the managed session.

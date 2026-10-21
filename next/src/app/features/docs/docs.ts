@@ -487,7 +487,7 @@ export class Docs implements AfterViewInit {
         'Dashboards: boards of tiles over your pipelines\' results; each board names the pipelines that feed it.',
         'Someone whose Analytics page is Saved Analyses alone opens, filters and pages the boards and exports a table tile; '
           + 'a statement of their own, or a file\'s rows outside a board, needs Analytics Studio.',
-        'A new file -- an upload, or a file a pipeline writes -- is checked for sensitive columns (names, record numbers, '
+        'A new file — an upload, or a file a pipeline writes — is checked for sensitive columns (names, record numbers, '
           + 'national ids...) from a sample of its first rows before Analytics first reads it, so a viewer reads them masked from '
           + 'the first read. The Data Catalog shows what was found; an administrator may correct it.',
         'Ask your data: ask a question in plain words and read the answer with the rows behind it; pin it to a dashboard.',
@@ -672,7 +672,7 @@ export class Docs implements AfterViewInit {
   ];
 
   readonly roles = [
-    { name: 'Platform administrator', note: 'The list of workspaces, the requests for new ones, the rate cards and the settings that apply across all of them. A workspace\'s data -- its files, boards, queries, documents and approved data -- is read and changed only inside that workspace, with Work in this workspace on Platform › Workspaces, where every change is recorded.' },
+    { name: 'Platform administrator', note: 'The list of workspaces, the requests for new ones, the rate cards and the settings that apply across all of them. A workspace\'s data — its files, boards, queries, documents and approved data — is read and changed only inside that workspace, with Work in this workspace on Platform › Workspaces, where every change is recorded.' },
     { name: 'Workspace administrator', note: 'Everything inside one workspace: its people and page access, connections, pipelines, schedules, settings, alerts and bills; decides any run\'s review.' },
     { name: 'Workspace member', note: 'Runs, reviews and reads within their workspace — the pages their page-access profile opens (all of them when the workspace uses no profiles).' },
   ];

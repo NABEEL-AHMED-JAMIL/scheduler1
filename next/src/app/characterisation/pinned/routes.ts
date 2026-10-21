@@ -1966,7 +1966,7 @@ export const PINNED: Record<string, unknown> = {
   },
   "old address /documents/review/:extractionId": {
     "lands": "/review/documents/:extractionId",
-    "heading": "Document"
+    "heading": "Review a document"
   },
   "old address /documents/transcript": {
     "lands": "/tools/transcript",
