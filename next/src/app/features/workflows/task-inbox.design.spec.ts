@@ -123,6 +123,17 @@ describe('Task inbox, the design', () => {
     expect([...detail.querySelectorAll('[data-test="decisions"] button')].map(b => b.textContent!.trim())).toEqual(['Approve', 'Reject', 'Ask for changes', 'Pass on']);
   });
 
+  it('says what passing on does while the task is being passed on, not the rule about rejecting', () => {
+    const { el, render } = screen();
+    const detail = el.querySelector('[data-test="task-detail"]')!;
+    ([...detail.querySelectorAll<HTMLButtonElement>('[data-test="decisions"] button')].find(b => b.textContent!.includes('Pass on')))!.click();
+    render();
+    expect(detail.querySelector('[data-test="pass-on"]')).not.toBeNull();
+    expect(detail.querySelector<HTMLTextAreaElement>('#task-comment')!.placeholder).toBe('Note for the person you pass it to (optional)');
+    expect(detail.querySelector('[data-test="decision-rule"]')!.textContent).toContain('moves to the person you pick');
+    expect(detail.querySelector('[data-test="decision-rule"]')!.textContent).not.toContain('Rejecting');
+  });
+
   it('shows the request\'s values by their shape: a table, a file chip, a quiet id, Yes', () => {
     const { el } = screen();
     const kind = (label: string) => [...el.querySelectorAll('[data-test="request-fields"] > div')]

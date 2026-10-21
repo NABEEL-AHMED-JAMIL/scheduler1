@@ -195,7 +195,7 @@
                 <div class="inbox-comment">
                   <label class="sr-only" for="task-comment">Comment</label>
                   <textarea id="task-comment" class="input resize-y" rows="1" [ngModel]="comment()" (ngModelChange)="comment.set($event)"
-                            [placeholder]="decidedInStudio(d) ? 'Note for the person you pass it to (optional)'
+                            [placeholder]="decidedInStudio(d) || passing() ? 'Note for the person you pass it to (optional)'
                               : d.rejectNeedsComment ? 'Comment: say why, if you reject it (required)' : 'Comment: a note for the requester (optional)'"></textarea>
                 </div>
               }
@@ -225,7 +225,9 @@
               }
               <p class="inbox-rule" data-test="decision-rule">
                 <app-icon name="info" size="0.95em" />
-                @if (decidedInStudio(d)) {
+                @if (passing()) {
+                  The task moves to the person you pick, with your note, and leaves your list; the request's history records who passed it.
+                } @else if (decidedInStudio(d)) {
                   Report Studio records the decision: it checks who may approve and signs the PDF. Pass it on here.
                 } @else if (d.stepType === 'approval') {
                   {{ d.rejectNeedsComment ? 'Rejecting needs a comment saying why; asking for changes needs one saying what.' : 'Asking for changes needs a comment saying what should change.' }}
