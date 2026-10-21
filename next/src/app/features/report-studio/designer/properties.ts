@@ -326,7 +326,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
               }
               @case ('filter') {
                 @if (b.type !== 'labelValue' || rowsShown()) {
-                  <div class="flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
+                  <div class="rsd-group flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
                     <div class="rsd-filter-head">
                       <span class="label">{{ f.label }}</span>
                       @if (filter() && !readonly()) {
@@ -364,7 +364,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                 }
               }
               @case ('series') {
-                <div class="flex flex-col gap-2" role="group" [attr.aria-label]="f.label">
+                <div class="rsd-group flex flex-col gap-2" role="group" [attr.aria-label]="f.label">
                   <span class="label">{{ f.label }}</span>
                   @for (x of seriesList(); track $index; let i = $index) {
                     <div class="rsd-column">
@@ -394,7 +394,7 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
                 </div>
               }
               @case ('object') {
-                <div class="flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
+                <div class="rsd-group flex flex-col gap-1.5" role="group" [attr.aria-label]="f.label">
                   <div class="rsd-filter-head">
                     <span class="label">{{ f.label }}</span>
                     @if (block()?.[f.key] && !readonly()) {
@@ -647,6 +647,10 @@ export function filterRows(rows: unknown[], f: RowFilter | null): unknown[] {
     .rsd-span { grid-column: 1 / -1; }
     .rsd-rule { display: grid; grid-template-columns: 1fr 1fr 0.8fr 0.7fr auto; gap: 0.25rem; align-items: center; }
     .rsd-colour { width: 2.25rem; padding: 0.125rem; flex: none; }
+    /* A group of controls that set one thing (a filter, the series, a setting's parts): one bordered box, so its
+       field, operator and value read as one, apart from the properties above and below. */
+    .rsd-group { padding: 0.5rem 0.625rem 0.625rem; border: 1px solid var(--border-control);
+      border-radius: var(--radius-md); background: var(--surface-sunken); }
     .rsd-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 1.75rem; }
     .rsd-filter-head .label { margin-bottom: 0; }
   `,

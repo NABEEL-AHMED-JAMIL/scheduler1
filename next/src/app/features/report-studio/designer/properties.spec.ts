@@ -113,6 +113,11 @@ describe('the properties panel: the template features of 2026-10-20', () => {
   it('builds a table\'s filter from the test data: field, is / is not / is one of, the values, and clears it', () => {
     const p = panel({ id: 't', type: 'table', dataset: 'primary.rows', columns: [{ id: 'c1', field: 'site' }] });
     expect(options(p.select('Filter field'))).toEqual(['All rows', 'site', 'status', 'accuracy']);
+    // Owner 2026-10-21: the filter's field, operator and value sit in one bordered box under its label.
+    const group = p.select('Filter field')!.closest('[role="group"]') as HTMLElement;
+    expect(group.classList).toContain('rsd-group');
+    expect(group.getAttribute('aria-label')).toBe('Show only rows where');
+    expect(group.querySelector('[aria-label="Filter operator"]')).not.toBeNull();
     expect(p.select('Filter operator')!.disabled).toBe(true);
     p.pick('Filter field', 'status');
     expect(p.last()).toEqual({ key: 'filter', value: { field: 'status', equals: '' } });
