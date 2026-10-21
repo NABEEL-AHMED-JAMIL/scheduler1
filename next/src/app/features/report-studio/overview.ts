@@ -68,17 +68,7 @@ export class ReportOverview implements OnInit {
 
   readonly kpis = computed((): StatStripItem[] => {
     const f = this.data()?.figures;
-    if (!f) return [];
-    const rate = f.jobsFinishedThisMonth ? `${((f.jobsSucceededThisMonth / f.jobsFinishedThisMonth) * 100).toFixed(1)}%` : '—';
-    return [
-      { label: 'Reports this month', value: f.versionsThisMonth, icon: 'file', tone: 'info', foot: `${f.reports} report${f.reports === 1 ? '' : 's'} in all` },
-      { label: 'Published templates', value: f.publishedTemplates, icon: 'template', tone: 'info',
-        foot: f.templatesWithDrafts ? `${f.templatesWithDrafts} ha${f.templatesWithDrafts === 1 ? 's' : 've'} draft changes` : `${f.templates} template${f.templates === 1 ? '' : 's'} in all` },
-      { label: 'Generated OK', value: rate, icon: 'checkCircle', tone: 'ok',
-        foot: `${f.jobsSucceededThisMonth} of ${f.jobsFinishedThisMonth} jobs this month` },
-      { label: 'Needs attention', value: f.failedLast7Days, icon: 'alert', tone: f.failedLast7Days ? 'crit' : 'muted',
-        foot: f.running ? `${f.running} running now` : f.failedLast7Days ? 'failed jobs, last 7 days' : 'nothing failed this week' },
-    ];
+    return f ? overviewTiles(f) : [];
   });
 
   /** The newest failed job, when its report made no version since: the banner. */
@@ -129,7 +119,8 @@ export class ReportOverview implements OnInit {
   private connect(d: StudioOverview): void {
     const used = d.pipelineRuns ?? [];
     this.pipelines.set([]);
-    if (!used.length || this.auth.isPlatformAdmin()) return;
+    // ZT-R9: the schedules are the Schedules page's (key 'jobs'); a reviewer without it is not asked (it was a 403 in the console).
+    if (!used.length || this.auth.isPlatformAdmin() || !this.auth.canOpen('jobs')) return;
     this.generated.schedules().subscribe({
       next: all => {
         const recent = [...all].sort((a, b) => String(b.lastJobRun ?? '').localeCompare(String(a.lastJobRun ?? ''))).slice(0, 10);
@@ -194,4 +185,21 @@ export class ReportOverview implements OnInit {
   newTemplate(): void {
     void this.router.navigate(['/reports/templates'], { queryParams: { new: 1 } });
   }
+}
+
+/** The overview's four figures (Figma 1's KPIs). */
+export function overviewTiles(f: StudioOverview['figures']): StatStripItem[] {
+  const rate = f.jobsFinishedThisMonth ? `${((f.jobsSucceededThisMonth / f.jobsFinishedThisMonth) * 100).toFixed(1)}%` : '—';
+  return [
+    // ZT-R1: the figure is the versions made this month (every Generate is one), not reports; "174 reports this month ·
+    // 66 reports in all" read as a contradiction.
+    { label: 'Versions this month', value: f.versionsThisMonth, icon: 'file', tone: 'info',
+      foot: `of ${f.reports} report${f.reports === 1 ? '' : 's'} in all` },
+    { label: 'Published templates', value: f.publishedTemplates, icon: 'template', tone: 'info',
+      foot: f.templatesWithDrafts ? `${f.templatesWithDrafts} ha${f.templatesWithDrafts === 1 ? 's' : 've'} draft changes` : `${f.templates} template${f.templates === 1 ? '' : 's'} in all` },
+    { label: 'Generated OK', value: rate, icon: 'checkCircle', tone: 'ok',
+      foot: `${f.jobsSucceededThisMonth} of ${f.jobsFinishedThisMonth} jobs this month` },
+    { label: 'Needs attention', value: f.failedLast7Days, icon: 'alert', tone: f.failedLast7Days ? 'crit' : 'muted',
+      foot: f.running ? `${f.running} running now` : f.failedLast7Days ? 'failed jobs, last 7 days' : 'nothing failed this week' },
+  ];
 }

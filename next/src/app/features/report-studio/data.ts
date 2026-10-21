@@ -16,7 +16,7 @@ import { BucketSummary, StorageService } from '../objects/storage.service';
 import { GeneratedService } from '../documents/generated/generated.service';
 import { API_SUCCESS } from '../../core/api/api.config';
 import { ReportStudioApi, studioError } from './report-studio.api';
-import { DataSourceRow, InspectResult, SourceRef, TemplateContract, TreeNode, size } from './report-studio.model';
+import { DataSourceRow, InspectResult, SourceRef, TemplateContract, TreeNode, recordsWord, size } from './report-studio.model';
 import { ReportSourcePicker, SourceMode } from './source-picker';
 import { collections, firstRecord, itemFields, sampleText, valueAt } from './designer/designer-model';
 import { RsTabCounts } from './rs-tab-counts';
@@ -210,7 +210,7 @@ export class ReportData implements OnInit {
     this.api.upload(file, '').subscribe({
       next: s => {
         this.busy.set(false);
-        this.toast.success(`${s.name} uploaded: ${s.records ?? '?'} record(s).`);
+        this.toast.success(`${s.name} uploaded: ${recordsWord(s.records)}.`);
         this.load();
         this.inspectSaved(s);
       },

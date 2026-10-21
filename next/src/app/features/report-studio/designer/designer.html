@@ -85,12 +85,12 @@
         </select>
       </label>
       <span class="flex-1"></span>
+      <!-- ZT-R2: the label is its own span, cut with an ellipsis (a flex box's bare text is clipped mid-letter), named in full on hover. -->
       <button type="button" class="rsd-chip" (click)="openTestData()" [disabled]="isPlatformAdmin()"
-              [title]="isPlatformAdmin() ? 'Test data is a workspace member\'s: the template is drawn with its paths showing' : ''"
+              [title]="isPlatformAdmin() ? 'Test data is a workspace member\'s: the template is drawn with its paths showing' : testChipText()"
               [attr.aria-label]="'Test data: ' + (testSource() ? testLabel() || 'chosen' : 'none')">
         <app-icon name="database" />
-        @if (testSource()) { {{ testLabel() || 'Test data' }}@if (records()) { · {{ records() }} record{{ records() === 1 ? '' : 's' }} } }
-        @else { No test data · add some }
+        <span class="rsd-chip-label">{{ testChipText() }}</span>
       </button>
       <span class="text-xs text-[color:var(--text-secondary)] px-1">{{ pageLabel() }}</span>
       <div class="rsd-zoom" role="group" aria-label="Zoom">

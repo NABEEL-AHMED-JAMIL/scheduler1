@@ -506,6 +506,11 @@ export function size(bytes: number | null | undefined): string {
 }
 
 /** Where a template came from, in words. */
+/** "1 record", "12 records", "? records" when the count is not known (ZT-R5: "1 record(s)"). */
+export function recordsWord(n: number | null | undefined): string {
+  return n == null ? '? records' : `${n.toLocaleString('en-US')} record${n === 1 ? '' : 's'}`;
+}
+
 export function originWord(t: Pick<TemplateRow, 'origin' | 'originRef'>): string {
   switch (t.origin) {
     case 'STARTER': return `From the ${(t.originRef ?? '').replace('starter:', '').replace(/-/g, ' ')} starter`;

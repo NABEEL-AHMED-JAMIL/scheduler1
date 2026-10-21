@@ -18,7 +18,7 @@ import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
   JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, deletedWords, idempotencyKey,
-  isRunning, size, stageWord,
+  isRunning, recordsWord, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
 import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
@@ -80,6 +80,7 @@ export class ReportPage implements OnInit {
   readonly stageWord = stageWord;
   readonly isRunning = isRunning;
   readonly size = size;
+  readonly recordsText = recordsWord;
 
   readonly current = computed<ReportVersionRow | undefined>(() => {
     const r = this.r();

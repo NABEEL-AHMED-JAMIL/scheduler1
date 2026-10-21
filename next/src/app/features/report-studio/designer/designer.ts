@@ -119,6 +119,8 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly testRoot = signal('$');
   readonly testLabel = signal('');
   readonly inspect = signal<InspectResult | null>(null);
+  /** The toolbar's test-data chip: what is chosen and its records, or the offer to add some (ZT-R2: shown whole on hover). */
+  readonly testChipText = computed(() => testChipWords(!!this.testSource(), this.testLabel(), this.records()));
   readonly zoom = signal(0.75);
   readonly heights = signal<Record<number, number>>({});
   readonly dragging = signal<DragData | null>(null);
@@ -1179,4 +1181,10 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
       if (done) { this.toast.success(`${t.name} v${t.draft!.version} published.`); this.load(); }
     });
   }
+}
+
+/** The designer toolbar's test-data chip (ZT-R2): what is chosen and how many records, or the offer to add some. */
+export function testChipWords(chosen: boolean, label: string, records: number): string {
+  if (!chosen) return 'No test data · add some';
+  return (label || 'Test data') + (records ? ` · ${records} record${records === 1 ? '' : 's'}` : '');
 }

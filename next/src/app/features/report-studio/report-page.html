@@ -218,7 +218,7 @@
                 <span class="label">{{ v.snapshot?.pipelineRunId ? 'Pipeline run' : 'Data' }}</span>
                 <b class="rsr-li-title truncate" [title]="v.snapshot?.label || ''">{{ v.snapshot?.label || '—' }}</b>
                 }
-                <span class="text-xs text-[color:var(--text-muted)] block">Frozen {{ v.snapshot?.takenAt | rsTime: 'recent' }} · {{ v.snapshot?.records ?? '?' }} record(s) · {{ size(v.snapshot?.bytes) }}</span></div></li>
+                <span class="text-xs text-[color:var(--text-muted)] block">Frozen {{ v.snapshot?.takenAt | rsTime: 'recent' }} · {{ recordsText(v.snapshot?.records) }} · {{ size(v.snapshot?.bytes) }}</span></div></li>
               <li><span class="rsr-li-icon"><app-icon name="play" /></span><div class="min-w-0"><span class="label">Generation job</span>
                 <b class="rsr-li-title">{{ v.jobLabel }}@if (v.jobMs) { · completed in {{ (v.jobMs / 1000).toFixed(1) }} s }</b>
                 <span class="text-xs text-[color:var(--text-muted)] block">@if (v.config?.['mapping']) { With a field mapping · } {{ v.rendererVersion }}</span></div></li>
@@ -255,9 +255,9 @@
                   @if (v.expired) { <span class="pill pill-neutral ml-1" [title]="'Its files were removed by the workspace\'s retention policy' + (v.expiredAt ? ' on ' + (v.expiredAt | rsTime: 'dateTime') : '') + '; its record stays.'">Removed by retention</span> }
                   @if (v.void) { <span class="pill pill-crit ml-1" [title]="'VOID: ' + v.void.reason + (v.void.by ? ' · ' + v.void.by : '')">VOID</span> }
                   @else if (canGenerate()) { <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
-                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | rsTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
+                <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | rsTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 xl:max-w-60 2xl:max-w-80 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
                 <td class="text-xs"><span class="whitespace-nowrap">Template v{{ v.templateVersion }}</span>
-                  <div class="mono text-[color:var(--text-muted)] max-w-36 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</div></td>
+                  <div class="mono text-[color:var(--text-muted)] max-w-36 xl:max-w-60 2xl:max-w-80 truncate" [title]="v.snapshot?.label || ''">{{ dataOf(v) }}</div></td>
                 <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verifyVersion(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | rsTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }
                   @else if (v.approval) { <span class="pill pill-neutral" [title]="v.approval.notSignedReason || ''">Approved</span> }
                   @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-ghost btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
