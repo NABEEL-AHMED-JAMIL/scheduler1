@@ -15,7 +15,7 @@ import { workflowGraph } from '../../shared/flow-graph/flow-adapters';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
-import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi } from './workflows.api';
+import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
@@ -193,8 +193,12 @@ export class WorkflowDesigner implements OnInit {
 
   readonly workflowProblems = computed(() => this.problems().filter(p => problemStep(p) === null));
 
+  /** Anyone may be told (a notice); a step's assignee or escalation must be able to open the inbox to act on it. */
   readonly colleagueOptions = computed<ComboboxOption[]>(() => this.colleagues()
     .map(c => ({ value: String(c.userId), label: c.fullName || c.username, hint: c.username })));
+  readonly actorOptions = computed<ComboboxOption[]>(() => this.colleagues()
+    .map(c => c.canAct === false ? { value: String(c.userId), label: c.fullName || c.username, hint: CANNOT_ACT, disabled: true }
+      : { value: String(c.userId), label: c.fullName || c.username, hint: c.username }));
 
   readonly jobOptions = computed<ComboboxOption[]>(() => this.jobs()
     .map(j => ({ value: String(j.jobId), label: j.jobName || `Schedule #${j.jobId}`, hint: `#${j.jobId}` })));

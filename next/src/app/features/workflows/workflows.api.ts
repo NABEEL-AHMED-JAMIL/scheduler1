@@ -58,7 +58,11 @@ export interface TaskDetail extends InboxTask {
     comment?: string | null }[];
 }
 
-export interface Colleague { userId: number; fullName?: string | null; username: string; }
+/** A person of the workspace; canAct is false for someone who cannot open the inbox, so cannot be handed a task (2026-10-21). */
+export interface Colleague { userId: number; fullName?: string | null; username: string; canAct?: boolean; }
+
+/** Why a person is listed but cannot be picked to act on a task. */
+export const CANNOT_ACT = 'Cannot open Approvals';
 
 /** The tabs' totals: open in Mine and My groups (total is the two, the menu's badge), overdue, Done and My requests. */
 export interface TaskCount { mine: number; groups: number; total: number; overdue: number; done?: number; requests?: number; }

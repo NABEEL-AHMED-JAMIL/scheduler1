@@ -49,7 +49,8 @@ function screen(link?: number) {
     requests: vi.fn(() => of({ status: 'SUCCESS', message: '', data: REQUESTS })),
     task: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: detailOf(MINE.find(t => t.id === id) ?? MINE[0]) })),
     request: vi.fn((id: number) => of({ status: 'SUCCESS', message: '', data: { ...REQUESTS[0], id, subject: { amount: 3 }, tasks: [], history: [] } })),
-    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' }] })),
+    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io', canAct: true },
+      { userId: 4598, fullName: 'Vic Viewer', username: 'vic@x.io', canAct: false }] })),
     act: vi.fn(() => of({ status: 'SUCCESS', message: 'Approved.', data: {} })),
     reassign: vi.fn(() => of({ status: 'SUCCESS', message: '', data: {} })),
   };
@@ -121,6 +122,13 @@ describe('Task inbox, the design', () => {
     expect(detail.querySelector('.inbox-detail-head')!.textContent).toContain('With Administrators');
     expect(detail.querySelector('[data-test="decision-rule"]')!.textContent).toContain('Rejecting needs a comment');
     expect([...detail.querySelectorAll('[data-test="decisions"] button')].map(b => b.textContent!.trim())).toEqual(['Approve', 'Reject', 'Ask for changes', 'Pass on']);
+  });
+
+  it('offers to pass a task only to someone who can open Approvals; a read-only viewer is listed, marked, never picked', () => {
+    const { inbox } = screen();
+    expect(inbox.colleagueOptions()).toEqual([
+      { value: '4597', label: 'Alex', hint: 'alex@x.io' },
+      { value: '4598', label: 'Vic Viewer', hint: 'Cannot open Approvals', disabled: true }]);
   });
 
   it('says what passing on does while the task is being passed on, not the rule about rejecting', () => {

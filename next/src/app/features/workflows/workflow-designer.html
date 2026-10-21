@@ -552,7 +552,7 @@
     </div>
     @if (who?.kind === 'user') {
       <app-combobox [numeric]="true" placeholder="Search people…" [allowClear]="false" [disabled]="!canEdit()" [ariaLabel]="label + ': person'"
-                    [options]="colleagueOptions()" [ngModel]="numberOrNull(who.value)" (ngModelChange)="setWho(field, 'user', $event == null ? null : '' + $event)" />
+                    [options]="field === 'to' ? colleagueOptions() : actorOptions()" [ngModel]="numberOrNull(who.value)" (ngModelChange)="setWho(field, 'user', $event == null ? null : '' + $event)" />
     }
     @if (who?.kind === 'role') {
       <select class="input" [ngModel]="who.value || ''" (ngModelChange)="setWho(field, 'role', $event)" [disabled]="!canEdit()" [attr.aria-label]="label + ': role'">

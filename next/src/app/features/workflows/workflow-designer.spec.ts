@@ -35,7 +35,8 @@ const WORKFLOW: WorkflowDetail = {
 function screenWith(opts: { admin?: boolean; problems?: string[]; tenantId?: number | null } = {}) {
   const admin = opts.admin ?? true;
   const api = {
-    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' }] })),
+    colleagues: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [{ userId: 4597, fullName: 'Alex', username: 'alex@x.io' },
+      { userId: 4598, fullName: 'Vic Viewer', username: 'vic@x.io', canAct: false }] })),
     list: vi.fn(() => of({ status: 'SUCCESS', message: '', data: [WORKFLOW] })),
     fetch: vi.fn(() => of({ status: 'SUCCESS', message: '', data: WORKFLOW })),
     publish: vi.fn(() => of(opts.problems
@@ -275,5 +276,12 @@ describe('Call API in a workflow (owner #25)', () => {
       variables: { patient: '{{patient.id}}' }, saveAs: 'call_api', onError: 'continue' });
     expect(toJson([{ ...step, variables: {}, onError: 'fail', environmentId: 4 }]).steps[0]).toEqual({ key: 'call-api', type: 'call_api',
       name: 'Call API', requestId: 12, environmentId: 4, saveAs: 'call_api' });
+  });
+
+  it('names a step\'s approver or escalation only among people who can open Approvals; anyone may be told', () => {
+    const { screen } = screenWith();
+    expect(screen.actorOptions().find(o => o.value === '4598')).toEqual({ value: '4598', label: 'Vic Viewer', hint: 'Cannot open Approvals', disabled: true });
+    expect(screen.actorOptions().find(o => o.value === '4597')!.disabled).toBeUndefined();
+    expect(screen.colleagueOptions().find(o => o.value === '4598')!.disabled).toBeUndefined();
   });
 });

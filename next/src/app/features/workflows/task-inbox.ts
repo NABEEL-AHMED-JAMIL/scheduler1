@@ -15,7 +15,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { Dialog } from '@angular/cdk/dialog';
 import { Observable } from 'rxjs';
-import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi } from './workflows.api';
+import { Colleague, Decision, InboxPage, InboxTask, RequestDetail, RequestRow, TaskDetail, WorkflowsApi, CANNOT_ACT } from './workflows.api';
 import { HistoryLine, compactTime, dropOwnStep, exactTime, historyLines, relativeTime, shortTime } from './history';
 import { TaskCountService } from './task-count.service';
 import { ListItem, RowTone, appendPage, choicesOf, commonOf, dueGroup, groupRows, matchesSearch, mergeHead, nextAfter, pastGroup, splitRef, stepFrom } from './inbox-list';
@@ -143,9 +143,11 @@ export class TaskInbox implements OnInit {
     }
   });
 
+  /** Whom a task may be passed to: listed all, and someone who cannot open the inbox (a read-only viewer) marked and never picked. */
   readonly colleagueOptions = computed<ComboboxOption[]>(() => this.colleagues()
     .filter(c => c.userId !== this.me())
-    .map(c => ({ value: String(c.userId), label: c.fullName || c.username, hint: c.username })));
+    .map(c => c.canAct === false ? { value: String(c.userId), label: c.fullName || c.username, hint: CANNOT_ACT, disabled: true }
+      : { value: String(c.userId), label: c.fullName || c.username, hint: c.username }));
 
   /** The open task is the reader's own request's approval: someone else decides it. */
   readonly ownRequest = computed(() => {
