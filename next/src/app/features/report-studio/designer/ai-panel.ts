@@ -84,12 +84,15 @@ export class AiPanel {
 
   readonly action = computed(() => ACTIONS.find(a => a.kind === this.kind())!);
   readonly hasData = computed(() => (this.data()?.fields.length ?? 0) > 0);
-  readonly canAsk = computed(() => this.editable() && !!this.status()?.available && !this.busy()
+  /** ZT-I3: "Explain the checks" with no problem to explain is not asked (the service answers 422, shown as an error). */
+  readonly nothingToExplain = computed(() => this.kind() === 'EXPLAIN_VALIDATION' && this.problems().length === 0);
+  readonly canAsk = computed(() => this.editable() && !!this.status()?.available && !this.busy() && !this.nothingToExplain()
     && (!this.action().needsWords || this.words().trim().length > 0) && (!this.action().needsData || this.hasData()));
   readonly why = computed(() => {
     if (!this.editable()) return 'The AI helps with a draft you can edit.';
     if (this.status() && !this.status()!.available) return this.status()!.reason ?? 'No model can answer in this workspace now.';
     if (this.action().needsData && !this.hasData()) return 'Pick test data first (Test data, in the toolbar).';
+    if (this.nothingToExplain()) return 'The checks find no problem, so there is nothing to explain.';
     return '';
   });
   readonly changes = computed(() => {
@@ -130,7 +133,8 @@ export class AiPanel {
     const data = this.data();
     const body = {
       templateId: this.templateId(), version: this.version(), revision: this.revision(), instruction: this.words().trim() || undefined,
-      data: data && data.fields.length ? { ...data, records: this.includeValues() ? data.records : undefined, includeValues: this.includeValues() } : null,
+      data: data && data.fields.length ? { ...data, fields: typedForTheAi(data), records: this.includeValues() ? data.records : undefined,
+        includeValues: this.includeValues() } : null,
       problems: this.kind() === 'EXPLAIN_VALIDATION' ? this.problems() : undefined,
       afterComponentId: this.kind() === 'DRAFT_TEXT' ? this.selectedId() : undefined,
     };
@@ -239,3 +243,39 @@ export class AiPanel {
     this.timer = null;
   }
 }
+
+/**
+ * ZT-I4: the fields as the AI is told them. A CSV's values are text (media's Inspect guesses no numbers), so a pipeline
+ * step's data -- a run's CSV -- had no number field, and "Suggest charts" found no chart for it. A text field whose every
+ * sampled value reads as a number is offered as a number; only the type is sent, never a value (unless the person ticks
+ * sample values).
+ */
+export function typedForTheAi(data: AiDataContext): { path: string; type: string }[] {
+  const records = data.records ?? [];
+  return data.fields.map(f => f.type === 'string' && readsAsNumbers(valuesAt(records, f.path, data.shape)) ? { ...f, type: 'number' } : f);
+}
+
+const NUMBER = /^-?\d+(\.\d+)?$/;
+
+function readsAsNumbers(values: unknown[]): boolean {
+  const given = values.filter(v => v !== null && v !== undefined && String(v).trim() !== '');
+  return given.length > 0 && given.every(v => NUMBER.test(String(v).trim().replace(/,/g, '')));
+}
+
+/** Every value at a schema path ("area_cm2" in a list's records, "visits[].areaCm2" inside one) in the sampled records. */
+function valuesAt(records: unknown[], path: string, shape?: string): unknown[] {
+  let at: unknown[] = shape === 'list' ? records : records.slice(0, 1);
+  for (const part of path.split('.')) {
+    const list = part.endsWith('[]');
+    const key = list ? part.slice(0, -2) : part;
+    const next: unknown[] = [];
+    for (const v of at) {
+      const got = v && typeof v === 'object' ? (v as Record<string, unknown>)[key] : undefined;
+      if (list && Array.isArray(got)) next.push(...got);
+      else if (!list && got !== undefined) next.push(got);
+    }
+    at = next;
+  }
+  return at;
+}
+

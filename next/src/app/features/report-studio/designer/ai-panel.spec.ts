@@ -164,6 +164,35 @@ describe('the AI assistant', () => {
   });
 });
 
+describe('the AI assistant on a pipeline step\'s data (ZT-I3, ZT-I4)', () => {
+  it('ZT-I3: does not ask to explain the checks when they find no problem, and says why', () => {
+    const { http, el, c, fixture } = panel();
+    fixture.componentRef.setInput('problems', []);
+    c.choose('EXPLAIN_VALIDATION');
+    fixture.detectChanges();
+    expect((el.querySelector('[data-ai-ask]') as HTMLButtonElement).disabled).toBe(true);
+    expect(el.querySelector('[data-ai-why]')!.textContent).toContain('The checks find no problem, so there is nothing to explain.');
+    c.ask();
+    http.expectNone(`${API_BASE}/reportDesigner.json/explainValidation`);
+  });
+
+  it('ZT-I4: tells the AI a CSV column whose sampled values are all numbers is a number, sending no value', () => {
+    const { http, click, c, fixture } = panel();
+    fixture.componentRef.setInput('data', {
+      label: 'Test sample · The step\'s data', shape: 'list',
+      fields: [{ path: 'site', type: 'string' }, { path: 'area_cm2', type: 'string' }, { path: 'change_pct', type: 'string' }, { path: 'patient', type: 'string' }],
+      records: [{ site: 'Left heel', area_cm2: '3.82', change_pct: '-34.6', patient: 'P-1042' }, { site: 'Sacrum', area_cm2: '13.95', change_pct: '7.8', patient: 'P-1118' }],
+    });
+    c.choose('SUGGEST_CHARTS');
+    fixture.detectChanges();
+    click('[data-ai-ask]');
+    const ask = http.expectOne(`${API_BASE}/reportDesigner.json/suggestCharts`);
+    expect(ask.request.body.data.fields).toEqual([{ path: 'site', type: 'string' }, { path: 'area_cm2', type: 'number' },
+      { path: 'change_pct', type: 'number' }, { path: 'patient', type: 'string' }]);
+    expect(ask.request.body.data.records).toBeUndefined();
+  });
+});
+
 describe('a proposal\'s patch', () => {
   it('adds, replaces, removes and tests on a copy, and refuses what does not fit', () => {
     const doc = { template: { components: [{ id: 'a' }, { id: 'c' }] } };
