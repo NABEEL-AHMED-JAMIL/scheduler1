@@ -63,6 +63,11 @@ export interface ReviewViewer {
   documents: boolean;
   /** A workspace administrator: decides any run through Core's run review. */
   admin: boolean;
+  /**
+   * Holds Schedules or the Queue, the pages Core's review/waiting answers (ZT-F2): a task-inbox holder without either was
+   * asked it on every page and refused (403) twice. Absent: asked as before.
+   */
+  runs?: boolean;
   me: number | null;
 }
 
@@ -111,7 +116,7 @@ export function loadReview(http: HttpClient, viewer: ReviewViewer, context?: Htt
     groups: viewer.tasks ? read(http.get<ApiResponse<InboxTask[]>>(`${inbox}/groups`, page)) : notAsked,
     // A reviewer's runs come with their tasks; Core's list adds the pipeline, when it finished and whether it is
     // individual review. Without Schedules or the Queue it answers 403, and the tasks are listed without it.
-    runs: viewer.tasks || viewer.admin
+    runs: viewer.admin || (viewer.tasks && viewer.runs !== false)
       ? read(http.get<ApiResponse<{ runs?: WaitingRun[]; more?: boolean }>>(`${API_BASE}/sourceJob.json/review/waiting`, { context })) : notAsked,
     documents: viewer.documents
       ? read(http.get<ApiResponse<{ items?: Extraction[]; total?: number }>>(`${API_BASE}/documentReview.json/queue`,
@@ -292,6 +297,7 @@ export function countReview(target: { injector: Injector; review: WritableSignal
   const viewer: ReviewViewer = {
     tasks: auth.canOpen('task-inbox'), documents: auth.canOpen('document-review'),
     admin: typeof auth.isTenantAdmin === 'function' && auth.isTenantAdmin(), me: auth.user()?.appUserId ?? null,
+    runs: auth.canOpen('jobs') || auth.canOpen('queue'),
   };
   if (!http || (!viewer.tasks && !viewer.documents && !viewer.admin)) { target.review.set(null); return; }
   loadReview(http, viewer, new HttpContext().set(BADGE_READ, true)).subscribe({

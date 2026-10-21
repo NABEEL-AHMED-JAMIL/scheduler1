@@ -178,6 +178,7 @@ export class ReviewHome implements OnInit {
     documents: this.auth.canOpen('document-review'),
     admin: this.auth.isTenantAdmin(),
     me: this.auth.user()?.appUserId ?? null,
+    runs: this.auth.canOpen('jobs') || this.auth.canOpen('queue'),
   }));
   /** The kinds the reader may see, in the tabs' order: a kind they may not open is not offered as a filter. */
   readonly kinds = computed<ReviewKind[]>(() => {

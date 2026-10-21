@@ -152,10 +152,21 @@ describe('Review sources: asked as the reader', () => {
     expect((await answer).total).toBe(1);
   });
 
+  /** ZT-F2 (2026-10-21, Zanium "Nurse Access"): the Task inbox without Schedules or the Queue, refused review/waiting twice a page. */
+  it('ZT-F2: the badge asks no run list of a task-inbox holder without Schedules or the Queue', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(),
+      { provide: AuthService, useValue: { canOpen: (p: string) => p === 'task-inbox', isTenantAdmin: () => false, user: () => ({ appUserId: 4696 }) } }] });
+    countReview({ injector: TestBed.inject(Injector), review: signal<ReviewCount | null>(null) });
+    const asked = TestBed.inject(HttpTestingController).match(() => true).map(r => r.request.url.replace(/^.*\/api\/v1\//, ''));
+    expect(asked).not.toContain('sourceJob.json/review/waiting');
+    expect(asked).toContain('taskInbox.json/count');
+  });
+
   it('counts for the badge as the page lists it', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [provideZonelessChangeDetection(), provideHttpClient(), provideHttpClientTesting(),
-      { provide: AuthService, useValue: { canOpen: (p: string) => p === 'task-inbox', isTenantAdmin: () => false, user: () => ({ appUserId: 4641 }) } }] });
+      { provide: AuthService, useValue: { canOpen: (p: string) => p === 'task-inbox' || p === 'queue', isTenantAdmin: () => false, user: () => ({ appUserId: 4641 }) } }] });
     const target = { injector: TestBed.inject(Injector), review: signal<ReviewCount | null>(null) };
     countReview(target);
     for (const r of TestBed.inject(HttpTestingController).match(() => true)) {
