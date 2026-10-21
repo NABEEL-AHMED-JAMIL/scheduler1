@@ -70,6 +70,10 @@ async function settled<T extends { status: string }>(read: () => Promise<T>, wha
 /**
  * An extraction in Review: the scan read by OCR (an unchanged file answers its earlier read), then extracted as an
  * invoice. A small local model now and then answers something that is not an extraction (Failed): asked again.
+ *
+ * Zero-tolerance §0.5 (2026-10-20): the scan is one document, read once; every run used to extract it anew, which listed
+ * the same file once per run. An invoice extraction of it still waiting in Review (one an earlier run left, or the phone
+ * check's) is used again, so a run adds at most one, and Documents in labels each as "Extraction n of m of this file".
  */
 async function seed(request: APIRequestContext, s: Session): Promise<number> {
   const types = await call<{ documentTypeId: number; typeKey: string; builtIn: boolean; status: string }[]>(request, s, 'GET', '/documentType.json/fetchAll');
@@ -79,6 +83,11 @@ async function seed(request: APIRequestContext, s: Session): Promise<number> {
   const read = await settled(() => call<{ ocrDocumentId: number; status: string }>(request, s, 'GET',
     `/documentOcr.json/fetchById?ocrDocumentId=${asked.ocrDocumentId}`), 'the OCR read');
   expect(read.status, 'the OCR read').toBe('Done');
+  const earlier = await call<{ extractionId: number; status: string; documentTypeId?: number | null }[]>(request, s, 'GET',
+    `/documentExtraction.json/fetchAll?ocrDocumentId=${read.ocrDocumentId}`);
+  const waiting = earlier.filter(e => e.status === 'Review' && Number(e.documentTypeId) === Number(invoice!.documentTypeId))
+    .sort((a, b) => b.extractionId - a.extractionId)[0];
+  if (waiting) return waiting.extractionId;
   let last = '';
   for (let attempt = 0; attempt < 3; attempt++) {
     const queued = await call<{ extractionId: number; status: string }>(request, s, 'POST', '/documentExtraction.json/extract',
@@ -152,7 +161,7 @@ test.describe('Document Intelligence', () => {
     await expect(page).not.toHaveURL(new RegExp(`/documents/review/${extractionId}$`), { timeout: 20_000 });
 
     // ---- the dataset: the approved document's row, with the corrected vendor as typed
-    await page.goto('/documents/in?tab=dataset');
+    await page.goto('/documents/approved-data');
     const dataset = page.locator('[data-test="dataset"]');
     await dataset.getByRole('combobox', { name: 'Document type' }).selectOption({ label: 'Invoice' });
     const row = dataset.locator('tbody tr', { hasText: `#${extractionId}` });

@@ -3,6 +3,7 @@ import { unsavedChangesGuard } from './shared/ui/unsaved-changes.guard';
 import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } from './core/auth/auth.guard';
 import { Shell } from './features/shell/shell';
 import { toFirstTab } from './core/nav/nav-access';
+import { toFirstSection } from './features/documents/intake/intake-sections';
 
 /**
  * MIG-246 / MIG-267: the entry point of a Wave 4 or Wave 5 page that is on the menu before it is built.
@@ -368,18 +369,50 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
-        path: 'documents/datasets',
-        title: 'Datasets',
+        // Owner 2026-10-20 (§0.1): "Approved data" is the Datasets tab renamed -- each type's approved documents, one row each.
+        path: 'documents/approved-data',
+        title: 'Approved data',
         loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
         data: { pageKey: 'document-intelligence', view: 'dataset' },
         canActivate: [pageGuard],
       },
       {
-        path: 'documents/email-in',
-        title: 'Email-in',
-        loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
-        data: { pageKey: 'document-intelligence', view: 'intake' },
+        // Owner 2026-10-20 (§0.1): Intake -- Upload, Email-in and File drop as one tab, three sections. The tab is shown to
+        // whoever holds either page; each section keeps its own page key, floor and guard, and the tab's own address opens
+        // the first section the reader may open. A child route inherits its parent's data, so each section names its own
+        // pageKeys too: otherwise the parent's either-page list would open every section to a holder of either page.
+        path: 'documents/intake',
+        title: 'Intake',
+        loadComponent: () => import('./features/documents/intake/intake').then(m => m.DocumentsIntake),
+        data: { pageKeys: ['document-intelligence', 'objects'] },
         canActivate: [pageGuard],
+        children: [
+          { path: '', pathMatch: 'full', redirectTo: toFirstSection },
+          {
+            path: 'upload',
+            title: 'Upload documents',
+            loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
+            data: { pageKey: 'document-intelligence', pageKeys: ['document-intelligence'], view: 'upload' },
+            canActivate: [pageGuard],
+          },
+          {
+            path: 'email-in',
+            title: 'Email-in',
+            loadComponent: () => import('./features/documents/intelligence').then(m => m.DocumentIntelligence),
+            data: { pageKey: 'document-intelligence', pageKeys: ['document-intelligence'], view: 'email' },
+            canActivate: [pageGuard],
+          },
+          {
+            // MIG-239: the workspace inbox -- upload files that start jobs with an inbox trigger. Browse files' page key and
+            // floor: the gateway leaves /storage.json open, storage-service lets every member read and upload, and only
+            // configuring it is an administrator's (gated inside the page).
+            path: 'file-drop',
+            title: 'File drop',
+            loadComponent: () => import('./features/documents/inbox/inbox').then(m => m.Inbox),
+            data: { pageKey: 'objects', pageKeys: ['objects'], minRole: 'TENANT_USER', embedded: true },
+            canActivate: [pageGuard, roleGuard],
+          },
+        ],
       },
       {
         path: 'tools/converter',
@@ -500,16 +533,6 @@ export const routes: Routes = [
         path: 'data/files',
         title: 'Browse files',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
-        data: { pageKey: 'objects', minRole: 'TENANT_USER' },
-        canActivate: [pageGuard, roleGuard],
-      },
-      {
-        // MIG-239: the workspace inbox -- upload files that start jobs with an inbox trigger. Browse files' page key and
-        // floor: the gateway leaves /storage.json open, storage-service lets every member read and upload, and only
-        // configuring it is an administrator's (gated inside the page).
-        path: 'documents/file-drop',
-        title: 'File drop',
-        loadComponent: () => import('./features/documents/inbox/inbox').then(m => m.Inbox),
         data: { pageKey: 'objects', minRole: 'TENANT_USER' },
         canActivate: [pageGuard, roleGuard],
       },
@@ -1027,7 +1050,7 @@ export const routes: Routes = [
         ['integration/developer/changelog', 'developers/portal/changelog'],
         ['integration/developer/guides/:slug', 'developers/portal/guides/:slug'],
         ['documents/intelligence', 'documents/in'],
-        ['documents/inbox', 'documents/file-drop'],
+        ['documents/inbox', 'documents/intake/file-drop'],
         ['documents/reports', 'reports/library'],
         // MIG-403: Analysis › Generated reports is Reports now (its pipeline files are Reports › From pipelines).
         ['data/reports', 'reports/library'],
@@ -1055,6 +1078,13 @@ export const routes: Routes = [
         ['administration/staff-activity', 'platform/staff-activity'],
         ['administration/work-in-workspace', 'platform/workspaces'],
         ['administration/reliability', 'platform/service-health'],
+      ]),
+      // Owner 2026-10-20 (§0.1): Datasets is Approved data, and Email-in and File drop are sections of Intake.
+      ...moved([
+        ['documents/datasets', 'documents/approved-data'],
+        ['documents/email-in', 'documents/intake/email-in'],
+        ['documents/file-drop', 'documents/intake/file-drop'],
+        ['documents/upload', 'documents/intake/upload'],
       ]),
       // Owner decisions #20-#23 (2026-10-19): the Platform pages that went -- Work in a workspace (its action is on
       // Workspaces), Reliability (now Service health), Billing analytics and Rate cards (now Billing's tabs).

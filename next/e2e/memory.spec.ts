@@ -15,7 +15,7 @@ const CYCLES = Number(process.env['E2E_MEMORY_CYCLES'] ?? 5);
 // The screens a workspace administrator opens most; each one loads its data and draws its tables or charts.
 const SCREENS = [
   '/dashboard', '/pipelines/list', '/pipelines/schedules', '/runs/latest', '/runs/by-date', '/runs/analytics',
-  '/data/files', '/data/reports', '/documents/file-drop', '/documents/in', '/data/analytics', '/data/ask',
+  '/data/files', '/data/reports', '/documents/intake/file-drop', '/documents/in', '/data/analytics', '/data/ask',
   '/forms/builder', '/forms/submissions', '/connections/api-collections', '/connections/sources', '/pipelines/prompts',
   '/settings/model-connections', '/billing/usage', '/billing/invoices', '/settings/task-registry', '/administration/users',
   '/administration/access-profiles', '/notifications',

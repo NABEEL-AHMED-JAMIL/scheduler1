@@ -1,21 +1,26 @@
-<div class="page">
-  <!-- UX review B4 (DI1): the standard header -- Refresh, the overflow (a new type, a stored file) and the one primary. -->
-  <app-page-header [title]="heading()"
-                   subtitle="Upload, mail in or read stored documents; each is split into fields against its document type, and values it is unsure of go to Document review.">
-    <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
-    <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow data-test="intelligence-more" [cdkMenuTriggerFor]="headerMenu" aria-label="More actions">
-      <app-icon name="dots" size="1.05em" />
-    </button>
-    <ng-template #headerMenu>
-      <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
-        @if (canManage()) {
-          <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openType(null)"><app-icon name="plus" />New document type</button>
-        }
-        <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="readDocument()"><app-icon name="folder" />Read a stored file</button>
-      </div>
-    </ng-template>
-    <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
-  </app-page-header>
+<div [class.page]="!embedded">
+  @if (!embedded) {
+    <!-- UX review B4 (DI1): the standard header -- Refresh, the overflow (a new type, a stored file) and the one primary. -->
+    <app-page-header [title]="heading()"
+                     subtitle="Documents read into fields against their document type; values it is unsure of go to Review › Documents.">
+      @if (!noWorkspace()) {
+        <app-refresh-button [loading]="loading() || datasetLoading()" (refresh)="refresh()" />
+        <button type="button" class="btn btn-ghost btn-icon btn-sm" data-overflow data-test="intelligence-more" [cdkMenuTriggerFor]="headerMenu" aria-label="More actions">
+          <app-icon name="dots" size="1.05em" />
+        </button>
+        <ng-template #headerMenu>
+          <div cdkMenu class="card shadow-xl py-1 min-w-56 text-sm">
+            @if (canManage()) {
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="addStarters()"><app-icon name="layers" />Add from starters</button>
+              <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="openType(null)"><app-icon name="plus" />New document type</button>
+            }
+            <button cdkMenuItem class="menu-item" (cdkMenuItemTriggered)="readDocument()"><app-icon name="folder" />Read a stored file</button>
+          </div>
+        </ng-template>
+        <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
+      }
+    </app-page-header>
+  }
   <app-managed-banner what="document types" />
 
   @if (!hubView) {
@@ -26,10 +31,19 @@
     </div>
   }
 
+  @if (noWorkspace()) {
+    <app-needs-workspace what="Documents are" todo="read documents, define their types and see the approved data" icon="file" />
+  } @else {
   @switch (tab()) {
     @case ('types') {
       <app-table-shell data-test="types" heading="Document types" columnsKey="document-types" [loading]="!types().length && !typesError()" [error]="typesError()"
                        [isEmpty]="!types().length" [shown]="types().length" [emptyMessage]="'No document types yet. Add one for each kind of document you receive: ' + exampleTypes + '.'" emptyIcon="file" (retry)="loadTypes()">
+        @if (canManage()) {
+          <ng-container toolbar>
+            <button type="button" class="btn btn-default btn-sm" data-test="add-starters" (click)="addStarters()"><app-icon name="layers" />Add from starters</button>
+            <button type="button" class="btn btn-default btn-sm" (click)="openType(null)"><app-icon name="plus" />New document type</button>
+          </ng-container>
+        }
         <table class="table-modern">
           <thead>
             <tr>
@@ -40,6 +54,8 @@
               <th>Auto-approve at</th>
               <th>Version</th>
               <th>Kind</th>
+              <!-- Owner 2026-10-20 (§0.1): what used to be the overview's "What approved documents start" panel. -->
+              <th class="min-w-56">When approved, starts…</th>
               <th class="text-right">State</th>
             </tr>
           </thead>
@@ -56,6 +72,21 @@
                 <td class="text-xs whitespace-nowrap">{{ thresholdOf(t) }}</td>
                 <td><span class="pill pill-neutral mono">v{{ t.currentVersion }}</span></td>
                 <td class="text-xs whitespace-nowrap">{{ t.builtIn ? 'Built-in' : 'This workspace' }}</td>
+                <td class="text-xs min-w-56 max-w-96" data-test="type-starts" [attr.data-type]="t.typeKey">
+                  @if (!canSeeSchedules()) {
+                    <span class="text-[color:var(--text-muted)]">—</span>
+                  } @else if (triggers() === null) {
+                    <span class="text-[color:var(--text-muted)]">Reading the schedules…</span>
+                  } @else if (startsOf(t).length) {
+                    @for (s of startsOf(t); track s.jobId; let last = $last) {
+                      <a class="link-inline" [routerLink]="['/pipelines/schedules', s.jobId, 'executions']" [attr.data-job]="s.jobId">{{ s.name }}</a>@if (!s.on) {<span class="text-[color:var(--text-muted)]"> ({{ s.why }})</span>}@if (!last) {<span>, </span>}
+                    }
+                  } @else {
+                    <span class="text-[color:var(--text-muted)]">Nothing yet · </span>
+                    <a class="link-inline" [routerLink]="['/pipelines/schedules/new']" [queryParams]="{ whenApproved: t.documentTypeId }"
+                       [attr.aria-label]="'Set a schedule to start when a ' + t.name + ' is approved'">Set it on a schedule</a>
+                  }
+                </td>
                 <td class="text-right"><app-status [label]="t.status" [quiet]="true" /></td>
               </tr>
             }
@@ -65,9 +96,9 @@
     }
 
     @case ('dataset') {
-      <app-table-shell data-test="dataset" heading="Dataset" columnsKey="document-dataset" [loading]="datasetLoading()" [error]="datasetError()"
+      <app-table-shell data-test="dataset" heading="Approved data" columnsKey="document-dataset" [loading]="datasetLoading()" [error]="datasetError()"
                        [isEmpty]="!dataset().length" [shown]="dataset().length" [total]="datasetTotal()"
-                       emptyMessage="No approved documents of this type yet. An approved document's values land here." emptyIcon="table" (retry)="loadDataset()">
+                       emptyMessage="No approved documents of this type yet. When one is approved, by a reviewer or on its own, its values land here as a row." emptyIcon="table" (retry)="loadDataset()">
         <ng-container toolbar>
           <select class="input max-w-48" aria-label="Document type" [value]="datasetType()" (change)="pickDatasetType($any($event.target).value)">
             @for (t of types(); track t.documentTypeId) { <option [value]="t.documentTypeId" [selected]="t.documentTypeId + '' === datasetType()">{{ t.name }}</option> }
@@ -111,7 +142,22 @@
       </app-table-shell>
     }
 
-    @case ('intake') {
+    @case ('upload') {
+      <section class="card p-4 mb-4" data-test="upload-section" aria-labelledby="upload-title">
+        <div class="flex flex-wrap items-center gap-3">
+          <app-icon name="upload" size="1.25rem" class="text-[color:var(--text-secondary)]" />
+          <div class="min-w-0 flex-1">
+            <h2 class="font-semibold text-sm" id="upload-title">Upload documents</h2>
+            <p class="text-xs text-[color:var(--text-muted)]">PDF, PNG, JPEG, TIFF or BMP, many at once. A file the workspace has received before, by any channel, is listed as already here and is not read again.</p>
+          </div>
+          <button type="button" class="btn btn-default btn-sm" (click)="readDocument()"><app-icon name="folder" />Read a stored file</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="uploadDocuments()"><app-icon name="upload" />Upload documents</button>
+        </div>
+      </section>
+      <ng-container [ngTemplateOutlet]="arrivals" />
+    }
+
+    @case ('email') {
       <section class="card p-4 mb-4" data-test="mailbox" aria-label="Email-in">
         <div class="flex flex-wrap items-start gap-3">
           <app-icon name="mail" size="1.25rem" class="text-[color:var(--text-secondary)] mt-0.5" />
@@ -146,89 +192,11 @@
         </div>
       </section>
 
-      <app-table-shell data-test="intake" heading="What arrived" columnsKey="document-intake" [loading]="intakeLoading()" [error]="intakeError()"
-                       [isEmpty]="!intakes().length" [shown]="intakes().length"
-                       emptyMessage="Nothing has arrived yet: upload documents, mail them to the email-in address, or send a form with a file field set to Document Intelligence."
-                       emptyIcon="inbox" (retry)="loadIntake()">
-        <ng-container toolbar>
-          <select class="input max-w-40" aria-label="Channel" [value]="channelFilter()" (change)="pickChannel($any($event.target).value)">
-            <option value="">All channels</option>
-            @for (c of channels; track c) { <option [value]="c" [selected]="c === channelFilter()">{{ channelLabels[c] }}</option> }
-          </select>
-        </ng-container>
-        <table class="table-modern">
-          <thead>
-            <tr>
-              <th>File</th>
-              <th>Channel</th>
-              <th>From</th>
-              <th>Outcome</th>
-              <th>Document</th>
-              <th>Arrived</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (i of intakes(); track i.intakeId) {
-              <tr>
-                <td class="max-w-64"><span class="font-medium [overflow-wrap:anywhere]">{{ i.fileName }}</span></td>
-                <td class="text-xs whitespace-nowrap">{{ channelLabels[i.channel] || i.channel }}</td>
-                <td class="text-xs max-w-72 [overflow-wrap:anywhere]">{{ i.sourceLabel || '—' }}</td>
-                <td class="text-xs max-w-80">
-                  <app-status [label]="i.outcome === 'Accepted' ? 'Taken' : i.outcome === 'Duplicate' ? 'Duplicate' : 'Refused'" [quiet]="true" />
-                  @if (i.reason) { <span class="block text-[color:var(--text-muted)] mt-0.5">{{ i.reason }}</span> }
-                  @if (i.extractionNote) { <span class="block text-[color:var(--warn-text)] mt-0.5">{{ i.extractionNote }}</span> }
-                </td>
-                <td class="text-xs whitespace-nowrap">
-                  @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/review/documents', i.extractionId]">#{{ i.extractionId }}</a> }
-                  @else if (i.ocrDocumentId) { <span class="mono">OCR {{ i.ocrDocumentId }}</span> } @else { — }
-                </td>
-                <td class="text-xs whitespace-nowrap">@if (i.dateCreated) { {{ i.dateCreated | serverTime: 'recent' }} } @else { — }</td>
-              </tr>
-            }
-          </tbody>
-        </table>
-      </app-table-shell>
+      <ng-container [ngTemplateOutlet]="arrivals" />
     }
 
     @default {
       <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Document Intelligence at a glance" />
-
-      <!-- UX review DI1 (2026-10-13): the types once, with what an approved document of each starts (the schedules set to
-           run "Also when a document is approved", MIG-364) -- not the Document types view again as cards. -->
-      <section class="card overflow-hidden" aria-labelledby="type-starts-title" data-test="type-starts">
-        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1 px-4 pt-3 pb-2">
-          <h3 class="chart-title m-0" id="type-starts-title">What approved documents start</h3>
-          <span class="chart-sub">A schedule set to run when a document of its type is approved starts once per approved document (or batch).</span>
-          @if (canManage()) {
-            <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="openType(null)"><app-icon name="plus" />Custom type</button>
-          }
-        </div>
-        <ul class="type-starts">
-          @for (row of typeStarts(); track row.type.documentTypeId) {
-            <li class="type-start" [attr.data-type]="row.type.typeKey">
-              <app-icon [name]="typeIcon(row.type)" class="text-[color:var(--text-secondary)]" />
-              <button type="button" class="link-inline font-medium text-left truncate" [title]="row.type.name" (click)="openType(row.type)">{{ row.type.name }}</button>
-              <span class="text-xs text-[color:var(--text-muted)] whitespace-nowrap">{{ countOf(row.type.fieldCount ?? 0, 'field') }} · {{ countOf(documentsOf(row.type), 'doc') }}</span>
-              <span class="text-xs min-w-0" data-test="type-start-what">
-                @if (!canSeeSchedules()) {
-                  <span class="text-[color:var(--text-muted)]">—</span>
-                } @else if (triggers() === null) {
-                  <span class="text-[color:var(--text-muted)]">Reading the schedules…</span>
-                } @else if (row.starts.length) {
-                  <span class="text-[color:var(--text-secondary)]">Starts </span>
-                  @for (s of row.starts; track s.jobId; let last = $last) {
-                    <a class="link-inline" [routerLink]="['/pipelines/schedules', s.jobId, 'executions']" [attr.data-job]="s.jobId">{{ s.name }}</a>@if (!s.on) {<span class="text-[color:var(--text-muted)]"> ({{ s.why }})</span>}@if (!last) {<span>, </span>}
-                  }
-                } @else {
-                  <span class="text-[color:var(--text-muted)]">Starts nothing: set it on a schedule (Also when a document is approved)</span>
-                }
-              </span>
-            </li>
-          } @empty {
-            <li class="px-4 py-3 text-sm text-[color:var(--text-muted)] border-t border-subtle">No active document types.</li>
-          }
-        </ul>
-      </section>
 
       <app-table-shell data-test="recent" heading="Recent documents" columnsKey="document-recent" [loading]="loading()" [error]="error()"
                        [isEmpty]="!filtered().length" [shown]="filtered().length" [total]="recent().length"
@@ -274,6 +242,7 @@
                     <a class="link-inline font-medium [overflow-wrap:anywhere]" [routerLink]="['/review/documents', r.extraction.extractionId]">{{ r.name }}</a>
                   } @else { <span class="font-medium [overflow-wrap:anywhere]">{{ r.name }}</span> }
                   @if (r.where) { <span class="block text-xs text-[color:var(--text-muted)]">{{ r.where }}</span> }
+                  @if (r.again) { <span class="block text-xs text-[color:var(--text-muted)]" data-test="again">{{ r.again }}</span> }
                 </td>
                 <td class="text-xs whitespace-nowrap">
                   @if (r.extraction) { {{ r.extraction.documentTypeName || r.extraction.documentTypeKey || 'Not classified' }} } @else { <span class="text-[color:var(--text-muted)]">Not extracted</span> }
@@ -304,4 +273,52 @@
       </app-table-shell>
     }
   }
+  }
+
+  <!-- What arrived by each channel (MIG-271): Intake's Upload and Email-in sections each open on their own channel. -->
+  <ng-template #arrivals>
+    <app-table-shell data-test="intake" heading="What arrived" columnsKey="document-intake" [loading]="intakeLoading()" [error]="intakeError()"
+                     [isEmpty]="!intakes().length" [shown]="intakes().length"
+                     [emptyMessage]="arrivalsEmpty()"
+                     emptyIcon="inbox" (retry)="loadIntake()">
+      <ng-container toolbar>
+        <app-refresh-button [loading]="intakeLoading()" (refresh)="loadIntake()" />
+        <select class="input max-w-40" aria-label="Channel" [value]="channelFilter()" (change)="pickChannel($any($event.target).value)">
+          <option value="">All channels</option>
+          @for (c of channels; track c) { <option [value]="c" [selected]="c === channelFilter()">{{ channelLabels[c] }}</option> }
+        </select>
+      </ng-container>
+      <table class="table-modern">
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Channel</th>
+            <th>From</th>
+            <th>Outcome</th>
+            <th>Document</th>
+            <th>Arrived</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (i of intakes(); track i.intakeId) {
+            <tr>
+              <td class="max-w-64"><span class="font-medium [overflow-wrap:anywhere]">{{ i.fileName }}</span></td>
+              <td class="text-xs whitespace-nowrap">{{ channelLabels[i.channel] || i.channel }}</td>
+              <td class="text-xs max-w-72 [overflow-wrap:anywhere]">{{ i.sourceLabel || '—' }}</td>
+              <td class="text-xs max-w-80">
+                <app-status [label]="i.outcome === 'Accepted' ? 'Taken' : i.outcome === 'Duplicate' ? 'Duplicate' : 'Refused'" [quiet]="true" />
+                @if (i.reason) { <span class="block text-[color:var(--text-muted)] mt-0.5">{{ i.reason }}</span> }
+                @if (i.extractionNote) { <span class="block text-[color:var(--warn-text)] mt-0.5">{{ i.extractionNote }}</span> }
+              </td>
+              <td class="text-xs whitespace-nowrap">
+                @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/review/documents', i.extractionId]">#{{ i.extractionId }}</a> }
+                @else if (i.ocrDocumentId) { <span class="mono">OCR {{ i.ocrDocumentId }}</span> } @else { — }
+              </td>
+              <td class="text-xs whitespace-nowrap">@if (i.dateCreated) { {{ i.dateCreated | serverTime: 'recent' }} } @else { — }</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </app-table-shell>
+  </ng-template>
 </div>

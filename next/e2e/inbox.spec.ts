@@ -64,9 +64,10 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('shows the configured inbox, its limit and its arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/file-drop');
-    // The inbox is Documents › File drop since the tab hubs (2026-10-12).
-    await expect(page.getByRole('heading', { name: 'File drop', level: 1 })).toBeVisible();
+    await page.goto('/documents/intake/file-drop');
+    // The inbox is Documents › Intake › File drop since 2026-10-20 (§0.1).
+    await expect(page.getByRole('heading', { name: 'Intake', level: 1 })).toBeVisible();
+    await expect(page.locator('[data-test="intake-sections"] [aria-current="page"]')).toHaveText('File drop');
     await expect(page.getByText(label).first()).toBeVisible();
     await expect(page.getByText(/Up to \d+ MB a file/).first()).toBeVisible();
     // The newest arrival the service reports, whatever put it there: a fixed name (live-customers.csv) fell off the
@@ -80,7 +81,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('uploads a small JSON file and lists it', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     const name = `E2E-inbox-${Date.now()}.json`;
     uploaded.push(name);
     await page.locator('app-file-dropzone input[type=file]').setInputFiles({
@@ -97,7 +98,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('shows the service\'s refusal for an executable, word for word', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     // The service's answer, read as it passes (route.fetch + fulfill: the real service answers, nothing is faked). Reading
     // it from a waitForResponse raced the page, which had already taken the body (final-regression 10-20).
     let refusal = '';
@@ -122,7 +123,7 @@ test.describe('Inbox (live storage-service)', () => {
   test('the settings dialog opens, and Cancel changes nothing', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request);
     const writes = settingsWrites(page);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     await page.getByRole('region', { name: 'Settings' }).getByRole('button', { name: 'Change' }).click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'File drop settings' })).toBeVisible();
@@ -137,7 +138,7 @@ test.describe('Inbox (live storage-service)', () => {
 
   test('a phone stacks upload, settings and arrivals', async ({ browser, request }, info) => {
     const page = await signedIn(browser, request, 390);
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     await expect(page.getByRole('heading', { name: 'Upload' })).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
     expect(overflow).toBeLessThanOrEqual(0);

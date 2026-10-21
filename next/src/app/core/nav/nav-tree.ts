@@ -115,13 +115,15 @@ export const NAV: NavItem[] = [
       },
       {
         label: 'Documents', path: '/documents', icon: 'file',
-        hint: 'Upload documents, read them into fields, and drop files that start schedules',
+        hint: 'Documents read into fields, their types, the approved data, and every way files come in',
         tabs: [
           { label: 'Documents in', path: '/documents/in', pageKey: 'document-intelligence', icon: 'search' },
           { label: 'Document types', path: '/documents/types', pageKey: 'document-intelligence', icon: 'file' },
-          { label: 'Datasets', path: '/documents/datasets', pageKey: 'document-intelligence', icon: 'table' },
-          { label: 'Email-in', path: '/documents/email-in', pageKey: 'document-intelligence', icon: 'mail' },
-          { label: 'File drop', path: '/documents/file-drop', pageKey: 'objects', icon: 'upload' },
+          { label: 'Approved data', path: '/documents/approved-data', pageKey: 'document-intelligence', icon: 'table' },
+          // Owner 2026-10-20 (§0.1): Upload, Email-in and File drop as one tab; each section keeps its own page and guard
+          // (features/documents/intake/intake-sections.ts), so the tab shows to whoever holds either page.
+          { label: 'Intake', path: '/documents/intake', pageKeys: ['document-intelligence', 'objects'], icon: 'upload',
+            alsoAt: ['/documents/intake/upload', '/documents/intake/email-in', '/documents/intake/file-drop'] },
         ],
       },
       {

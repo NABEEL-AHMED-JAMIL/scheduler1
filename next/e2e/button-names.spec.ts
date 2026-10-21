@@ -16,7 +16,7 @@ const PAGES = [
   '/dashboard',
   '/connections/connectors', '/connections/storage', '/connections/databases', '/connections/api-collections',
   '/connections/sources', '/connections/contracts',
-  '/documents/in', '/documents/types', '/documents/datasets', '/documents/email-in', '/documents/file-drop',
+  '/documents/in', '/documents/types', '/documents/approved-data', '/documents/intake/upload', '/documents/intake/email-in', '/documents/intake/file-drop',
   '/forms/builder', '/forms/submissions',
   '/pipelines/list', '/pipelines/schedules', '/pipelines/prompts',
   '/ai/assistant', '/workflows/designer',

@@ -25,7 +25,7 @@ export interface StartState {
 const STEPS: Omit<StartStep, 'done'>[] = [
   { key: 'storage', title: 'Connect your storage', link: '/connections/storage', linkLabel: 'Connections › Storage',
     why: 'Where pipelines read files from and keep what they write: an S3, Azure, MinIO or FTP connection of your own.' },
-  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/file-drop', linkLabel: 'Documents › File drop', optional: true,
+  { key: 'inbox', title: 'Turn on the inbox and upload a file', link: '/documents/intake/file-drop', linkLabel: 'Documents › Intake › File drop', optional: true,
     why: 'Files people upload land in your storage, each under a key a pipeline step can read. A schedule can also start when one arrives.' },
   { key: 'topic', title: 'Add a topic', link: '/settings/kafka', linkLabel: 'Settings › Kafka & Topics',
     why: 'Every pipeline publishes on a topic. It goes through the platform’s Kafka connection unless you add your own.' },

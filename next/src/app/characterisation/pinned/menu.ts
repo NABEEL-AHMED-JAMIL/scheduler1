@@ -4,7 +4,7 @@ export const PINNED: Record<string, unknown> = {
     "Home -> /dashboard",
     "Platform -> /platform",
     "Get data in › Connections — Connectors, storage, databases, APIs and the sources pipelines read -> /connections",
-    "Get data in › Documents — Upload documents, read them into fields, and drop files that start schedules -> /documents",
+    "Get data in › Documents — Documents read into fields, their types, the approved data, and every way files come in -> /documents",
     "Get data in › Forms — Your workspace's forms, and everything they collected -> /forms",
     "Build › Pipelines — What a run does, when it runs, and what its AI steps say -> /pipelines",
     "Build › AI Assistant — Describe a pipeline in plain language and run it -> /ai/assistant",
@@ -23,7 +23,7 @@ export const PINNED: Record<string, unknown> = {
   "the menu for a tenant user with every page": [
     "Home -> /dashboard",
     "Get data in › Connections — Connectors, storage, databases, APIs and the sources pipelines read -> /connections",
-    "Get data in › Documents — Upload documents, read them into fields, and drop files that start schedules -> /documents",
+    "Get data in › Documents — Documents read into fields, their types, the approved data, and every way files come in -> /documents",
     "Build › Pipelines — What a run does, when it runs, and what its AI steps say -> /pipelines",
     "Build › AI Assistant — Describe a pipeline in plain language and run it -> /ai/assistant",
     "Run & review › Runs — Recent runs, runs by date, how they measure up, and the ones that failed -> /runs",
@@ -34,7 +34,7 @@ export const PINNED: Record<string, unknown> = {
   ],
   "the menu for a tenant user with five pages (api-check TU)": [
     "Home -> /dashboard",
-    "Get data in › Documents — Upload documents, read them into fields, and drop files that start schedules -> /documents",
+    "Get data in › Documents — Documents read into fields, their types, the approved data, and every way files come in -> /documents",
     "Build › Pipelines — What a run does, when it runs, and what its AI steps say -> /pipelines",
     "Run & review › Runs — Recent runs, runs by date, how they measure up, and the ones that failed -> /runs",
     "See results › Analysis — Ask your data, explore it, and find what was made from it -> /data"
@@ -45,7 +45,7 @@ export const PINNED: Record<string, unknown> = {
   "the menu for a workspace administrator": [
     "Home -> /dashboard",
     "Get data in › Connections — Connectors, storage, databases, APIs and the sources pipelines read -> /connections",
-    "Get data in › Documents — Upload documents, read them into fields, and drop files that start schedules -> /documents",
+    "Get data in › Documents — Documents read into fields, their types, the approved data, and every way files come in -> /documents",
     "Get data in › Forms — Your workspace's forms, and everything they collected -> /forms",
     "Build › Pipelines — What a run does, when it runs, and what its AI steps say -> /pipelines",
     "Build › AI Assistant — Describe a pipeline in plain language and run it -> /ai/assistant",

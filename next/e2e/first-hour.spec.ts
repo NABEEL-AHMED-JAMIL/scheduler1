@@ -139,10 +139,11 @@ test.describe('a new organisation\'s first hour (MIG-324)', () => {
     lap('storage');
 
     // ── 2. The inbox, and a file in it ────────────────────────────────────────────────────────────────────────────
-    await page.goto('/documents/file-drop');
+    await page.goto('/documents/intake/file-drop');
     const setUp = page.getByRole('button', { name: 'Set up the inbox' });
-    // The inbox is Documents › File drop since the tab hubs (2026-10-12).
-    await expect(page.getByRole('heading', { level: 1, name: 'File drop', exact: true })).toBeVisible();
+    // The inbox is Documents › Intake › File drop since 2026-10-20 (§0.1).
+    await expect(page.getByRole('heading', { level: 1, name: 'Intake', exact: true })).toBeVisible();
+    await expect(page.locator('[data-test="intake-sections"] [aria-current="page"]')).toHaveText('File drop');
     if (await setUp.isVisible()) {
       await setUp.click();
       const dialog = page.getByRole('dialog').last();

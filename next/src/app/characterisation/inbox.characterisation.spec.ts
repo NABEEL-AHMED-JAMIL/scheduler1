@@ -40,32 +40,32 @@ describe('MIG-239: Inbox', () => {
   afterEach(() => restoreClock());
 
   it('the inbox, as a workspace administrator', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_ADMIN', null, CONFIGURED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_ADMIN', null, CONFIGURED);
     pin(FILE, 'the inbox, as a workspace administrator', v.surface, PINNED);
   });
 
   it('the inbox, as a tenant user with the page', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_USER', ALL_PAGES, CONFIGURED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_USER', ALL_PAGES, CONFIGURED);
     pin(FILE, 'the inbox, as a tenant user with the page', v.surface, PINNED);
   });
 
   it('the inbox, as a tenant user without the page', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_USER', ['jobs', 'queue'], CONFIGURED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_USER', ['jobs', 'queue'], CONFIGURED);
     pin(FILE, 'the inbox, as a tenant user without the page', v.surface, PINNED);
   });
 
   it('no inbox yet, as a workspace administrator', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_ADMIN', null, NOT_CONFIGURED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_ADMIN', null, NOT_CONFIGURED);
     pin(FILE, 'no inbox yet, as a workspace administrator', v.surface, PINNED);
   });
 
   it('no inbox yet, as a tenant user', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_USER', ALL_PAGES, NOT_CONFIGURED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_USER', ALL_PAGES, NOT_CONFIGURED);
     pin(FILE, 'no inbox yet, as a tenant user', v.surface, PINNED);
   });
 
   it('the settings dialog', async () => {
-    const v = await visit('/documents/file-drop', 'TENANT_ADMIN', null, CONFIGURED);
+    const v = await visit('/documents/intake/file-drop', 'TENANT_ADMIN', null, CONFIGURED);
     // UX review B4 (IN1): the Settings card's Change is the one way in.
     await click(v, 'Change');
     pin(FILE, 'the settings dialog', overlay(), PINNED);

@@ -58,6 +58,11 @@ const PAGE_PATHS: [string, PageKey][] = [
   ['/data/reports', 'tools-converter'],
   ['/documents/in', 'document-intelligence'],
   ['/documents/types', 'document-intelligence'],
+  ['/documents/approved-data', 'document-intelligence'],
+  ['/documents/intake/upload', 'document-intelligence'],
+  ['/documents/intake/email-in', 'document-intelligence'],
+  ['/documents/intake/file-drop', 'objects'],
+  // Before the Intake tab (owner 2026-10-20): the addresses links already carry.
   ['/documents/datasets', 'document-intelligence'],
   ['/documents/email-in', 'document-intelligence'],
   ['/documents/file-drop', 'objects'],

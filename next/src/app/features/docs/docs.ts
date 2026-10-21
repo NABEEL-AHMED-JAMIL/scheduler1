@@ -382,7 +382,9 @@ export class Docs implements AfterViewInit {
       todo: [
         'Connections: add storage (S3, Azure, MinIO, FTP), databases, API collections and connectors. Test each one before you save it.',
         'Sources and Data contracts: name what a pipeline reads, and the columns and rules it must meet.',
-        'Documents: define a document type (for example a synthetic intake form or a sample invoice) with the fields to read, then upload, mail in (Email-in) or drop files (File drop).',
+        'Documents: on Document types, add the types you read from the starters, grouped by market, or define your own with the fields to read.',
+        'Then send documents in on Documents › Intake: Upload, or mail them to the workspace\'s Email-in address. File drop, on the same tab, stores files that start pipelines.',
+        'An approved document\'s values land in Documents › Approved data. Document types says what each type\'s approval starts; set it on a schedule.',
         'Forms: build a form whose answers start a pipeline or feed a review.',
       ],
       notes: [

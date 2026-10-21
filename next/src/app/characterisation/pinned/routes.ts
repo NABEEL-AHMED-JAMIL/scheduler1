@@ -354,8 +354,8 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/documents/datasets",
-      "title": "Datasets",
+      "path": "/documents/approved-data",
+      "title": "Approved data",
       "pageKey": "document-intelligence",
       "guards": [
         "pageGuard"
@@ -363,11 +363,44 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
-      "path": "/documents/email-in",
+      "path": "/documents/intake",
+      "title": "Intake",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intake/",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/intake/upload",
+      "title": "Upload documents",
+      "pageKey": "document-intelligence",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intake/email-in",
       "title": "Email-in",
       "pageKey": "document-intelligence",
       "guards": [
         "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/documents/intake/file-drop",
+      "title": "File drop",
+      "pageKey": "objects",
+      "minRole": "TENANT_USER",
+      "guards": [
+        "pageGuard",
+        "roleGuard"
       ],
       "lazy": true
     },
@@ -497,17 +530,6 @@ export const PINNED: Record<string, unknown> = {
     {
       "path": "/data/files",
       "title": "Browse files",
-      "pageKey": "objects",
-      "minRole": "TENANT_USER",
-      "guards": [
-        "pageGuard",
-        "roleGuard"
-      ],
-      "lazy": true
-    },
-    {
-      "path": "/documents/file-drop",
-      "title": "File drop",
       "pageKey": "objects",
       "minRole": "TENANT_USER",
       "guards": [
@@ -1161,7 +1183,7 @@ export const PINNED: Record<string, unknown> = {
     },
     {
       "path": "/documents/inbox",
-      "redirectTo": "documents/file-drop",
+      "redirectTo": "documents/intake/file-drop",
       "guards": [],
       "lazy": false
     },
@@ -1318,6 +1340,30 @@ export const PINNED: Record<string, unknown> = {
     {
       "path": "/administration/reliability",
       "redirectTo": "platform/service-health",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/datasets",
+      "redirectTo": "documents/approved-data",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/email-in",
+      "redirectTo": "documents/intake/email-in",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/file-drop",
+      "redirectTo": "documents/intake/file-drop",
+      "guards": [],
+      "lazy": false
+    },
+    {
+      "path": "/documents/upload",
+      "redirectTo": "documents/intake/upload",
       "guards": [],
       "lazy": false
     },
@@ -1886,13 +1932,25 @@ export const PINNED: Record<string, unknown> = {
     "lands": "/tools/converter",
     "heading": "Document Converter"
   },
+  "old address /documents/datasets": {
+    "lands": "/documents/approved-data",
+    "heading": "Approved data"
+  },
+  "old address /documents/email-in": {
+    "lands": "/documents/intake/email-in",
+    "heading": "Intake"
+  },
+  "old address /documents/file-drop": {
+    "lands": "/documents/intake/file-drop",
+    "heading": "Intake"
+  },
   "old address /documents/files": {
     "lands": "/data/files",
     "heading": "Browse files"
   },
   "old address /documents/inbox": {
-    "lands": "/documents/file-drop",
-    "heading": "File drop"
+    "lands": "/documents/intake/file-drop",
+    "heading": "Intake"
   },
   "old address /documents/intelligence": {
     "lands": "/documents/in",
@@ -1913,6 +1971,10 @@ export const PINNED: Record<string, unknown> = {
   "old address /documents/transcript": {
     "lands": "/tools/transcript",
     "heading": "Audio Transcript"
+  },
+  "old address /documents/upload": {
+    "lands": "/documents/intake/upload",
+    "heading": "Intake"
   },
   "old address /integration/api-clients": {
     "lands": "/developers/api-clients",

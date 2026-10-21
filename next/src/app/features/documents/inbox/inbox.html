@@ -1,11 +1,15 @@
-<div class="page">
-  <!-- UX review B4 (IN1): one place for the settings -- the Settings card beside the upload, with its own Change. -->
-  <app-page-header title="File drop"
-                   subtitle="Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts every schedule set to start when a matching file arrives.">
-    @if (!noWorkspace()) {
-      <app-refresh-button [loading]="loading()" (refresh)="load()" />
-    }
-  </app-page-header>
+<div [class.page]="!embedded">
+  @if (!embedded) {
+    <!-- UX review B4 (IN1): one place for the settings -- the Settings card beside the upload, with its own Change. -->
+    <app-page-header title="File drop"
+                     subtitle="Upload files for this workspace's pipelines. Each file is checked, stored in the workspace's bucket, and starts every schedule set to start when a matching file arrives.">
+      @if (!noWorkspace()) {
+        <app-refresh-button [loading]="loading()" (refresh)="load()" />
+      }
+    </app-page-header>
+  } @else if (!noWorkspace()) {
+    <div class="flex justify-end -mt-2 mb-2"><app-refresh-button [loading]="loading()" (refresh)="load()" /></div>
+  }
   <app-managed-banner what="file drop settings" />
 
   @if (noWorkspace()) {

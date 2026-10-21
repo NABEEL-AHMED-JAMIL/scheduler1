@@ -158,7 +158,12 @@ const OLD_ADDRESSES: [string, string][] = [
   ['/integration/developer/changelog', '/developers/portal/changelog'],
   ['/integration/developer/guides/quickstart', '/developers/portal/guides/quickstart'],
   ['/documents/intelligence', '/documents/in'],
-  ['/documents/inbox', '/documents/file-drop'],
+  ['/documents/inbox', '/documents/intake/file-drop'],
+  // Owner 2026-10-20 (§0.1): Datasets renamed Approved data; Email-in and File drop are sections of Intake.
+  ['/documents/datasets', '/documents/approved-data'],
+  ['/documents/email-in', '/documents/intake/email-in'],
+  ['/documents/file-drop', '/documents/intake/file-drop'],
+  ['/documents/upload', '/documents/intake/upload'],
   ['/documents/reports', '/reports/library'],
   ['/data/reports', '/reports/library'],
   ['/documents/files', '/data/files'],
@@ -201,6 +206,12 @@ describe('MIG-246: every old address lands on its page', () => {
   it('carries the query string through a redirect (the dashboard drill-down, a notification link)', async () => {
     const landed = await land('/operations/jobs/history?targetDate=2026-09-28&targetHr=9&jobStatus=Failed');
     expect(landed.url).toBe('/runs/latest?targetDate=2026-09-28&targetHr=9&jobStatus=Failed');
+  });
+
+  it('carries the query string through the Documents tabs\' moves (owner 2026-10-20)', async () => {
+    expect((await land('/documents/datasets?type=1001')).url).toBe('/documents/approved-data?type=1001');
+    expect((await land('/documents/email-in?channel=email')).url).toBe('/documents/intake/email-in?channel=email');
+    expect((await land('/documents/file-drop?upload=1')).url).toBe('/documents/intake/file-drop?upload=1');
   });
 
   it('marks every old address a full match, so a short one cannot swallow a longer one', () => {
@@ -254,8 +265,10 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/documents/in', 'Documents in', 'document-intelligence', undefined],
     // Tab hubs (2026-10-12): Document Intelligence's views as tabs of Documents, same key.
     ['/documents/types', 'Document types', 'document-intelligence', undefined],
-    ['/documents/datasets', 'Datasets', 'document-intelligence', undefined],
-    ['/documents/email-in', 'Email-in', 'document-intelligence', undefined],
+    ['/documents/approved-data', 'Approved data', 'document-intelligence', undefined],
+    // Owner 2026-10-20 (§0.1): Intake's sections, each with its own key and floor.
+    ['/documents/intake/upload', 'Upload documents', 'document-intelligence', undefined],
+    ['/documents/intake/email-in', 'Email-in', 'document-intelligence', undefined],
     // UX review DR2 (2026-10-13): Document review is the Review hub's Documents tab, same key.
     ['/review/documents', 'Document review', 'document-review', undefined],
     ['/review/documents/:extractionId', 'Review a document', 'document-review', undefined],
@@ -264,7 +277,7 @@ describe('MIG-246: the renamed pages keep their gates', () => {
     ['/review/runs', 'Runs to review', 'task-inbox', undefined],
     ['/data/files', 'Browse files', 'objects', 'TENANT_USER'],
     // MIG-239: built. Browse files' key and floor: every member reads and uploads; configuring is an administrator's.
-    ['/documents/file-drop', 'File drop', 'objects', 'TENANT_USER'],
+    ['/documents/intake/file-drop', 'File drop', 'objects', 'TENANT_USER'],
     ['/tools/converter', 'Document Converter', 'tools-converter', undefined],
     // MIG-253's generated outputs, beneath Reports since MIG-403, still behind the converter's key.
     ['/reports/from-pipelines', 'Reports from pipelines', 'tools-converter', undefined],

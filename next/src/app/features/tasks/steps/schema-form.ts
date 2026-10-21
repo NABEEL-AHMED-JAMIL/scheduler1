@@ -348,7 +348,7 @@ export class SchemaForm {
   readonly environmentChoices = computed(() =>
     this.apiRequests().find(r => '' + r.id === '' + (this.current()['requestId'] ?? ''))?.environments ?? []);
   /** MIG-364: what a document-type setting says when its schema says nothing. */
-  readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document Intelligence).';
+  readonly documentTypeHint = 'One of this workspace’s document types (Documents › Document types).';
   readonly disabled = input(false);
   readonly valueChange = output<Record<string, unknown>>();
 

@@ -1,7 +1,7 @@
 // Recorded by scripts/characterisation/record.mjs -- see ../harness.ts. Review the diff: it is the baseline.
 export const PINNED: Record<string, unknown> = {
   "no inbox yet, as a tenant user": {
-    "url": "/documents/file-drop",
+    "url": "/documents/intake/file-drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -10,7 +10,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/colleagues"
     ],
     "headings": [
-      "File drop",
+      "Intake",
       "No file drop yet"
     ],
     "buttons": [
@@ -23,7 +23,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "no inbox yet, as a workspace administrator": {
-    "url": "/documents/file-drop",
+    "url": "/documents/intake/file-drop",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -33,7 +33,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /appUser.json/listUsers"
     ],
     "headings": [
-      "File drop",
+      "Intake",
       "No file drop yet"
     ],
     "buttons": [
@@ -44,15 +44,17 @@ export const PINNED: Record<string, unknown> = {
     "fields": [],
     "links": [
       "/documents",
-      "/documents/datasets",
-      "/documents/email-in",
-      "/documents/file-drop",
+      "/documents/approved-data",
       "/documents/in",
+      "/documents/intake",
+      "/documents/intake/email-in",
+      "/documents/intake/file-drop",
+      "/documents/intake/upload",
       "/documents/types"
     ]
   },
   "the inbox, as a tenant user with the page": {
-    "url": "/documents/file-drop",
+    "url": "/documents/intake/file-drop",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1",
@@ -61,7 +63,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /taskInbox.json/colleagues"
     ],
     "headings": [
-      "File drop",
+      "Intake",
       "Upload",
       "Settings",
       "Arrivals"
@@ -90,13 +92,13 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the inbox, as a tenant user without the page": {
-    "url": "/unauthorized?page=objects&title=File%20drop",
+    "url": "/unauthorized?page=document-intelligence&title=Intake",
     "requests": [
       "GET /notification.json/unreadCount",
       "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "File drop isn't part of your access"
+      "Intake isn't part of your access"
     ],
     "buttons": [
       "Request access"
@@ -108,7 +110,7 @@ export const PINNED: Record<string, unknown> = {
     ]
   },
   "the inbox, as a workspace administrator": {
-    "url": "/documents/file-drop",
+    "url": "/documents/intake/file-drop",
     "requests": [
       "GET /taskInbox.json/count",
       "GET /notification.json/unreadCount",
@@ -118,7 +120,7 @@ export const PINNED: Record<string, unknown> = {
       "GET /appUser.json/listUsers"
     ],
     "headings": [
-      "File drop",
+      "Intake",
       "Upload",
       "Settings",
       "Arrivals"
@@ -144,10 +146,12 @@ export const PINNED: Record<string, unknown> = {
     ],
     "links": [
       "/documents",
-      "/documents/datasets",
-      "/documents/email-in",
-      "/documents/file-drop",
+      "/documents/approved-data",
       "/documents/in",
+      "/documents/intake",
+      "/documents/intake/email-in",
+      "/documents/intake/file-drop",
+      "/documents/intake/upload",
       "/documents/types",
       "/pipelines/schedules"
     ]
