@@ -90,7 +90,7 @@
               [title]="isPlatformAdmin() ? 'Test data is a workspace member\'s: the template is drawn with its paths showing' : testChipText()"
               [attr.aria-label]="'Test data: ' + (testSource() ? testLabel() || 'chosen' : 'none')">
         <app-icon name="database" />
-        <span class="rsd-chip-label">{{ testChipText() }}</span>
+        <span class="min-w-0 truncate">{{ testChipText() }}</span>
       </button>
       <span class="text-xs text-[color:var(--text-secondary)] px-1">{{ pageLabel() }}</span>
       <div class="rsd-zoom" role="group" aria-label="Zoom">

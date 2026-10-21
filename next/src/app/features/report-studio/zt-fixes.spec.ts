@@ -42,9 +42,8 @@ describe('Report Studio screens (zero-tolerance)', () => {
     expect(testChipWords(true, '', 3)).toBe('Test data · 3 records');
     expect(testChipWords(false, 'x', 3)).toBe('No test data · add some');
     const html = await here('designer/designer.html');
-    expect(html).toContain('<span class="rsd-chip-label">{{ testChipText() }}</span>');
+    expect(html).toContain('<span class="min-w-0 truncate">{{ testChipText() }}</span>');
     expect(html).toMatch(/\[title\]="isPlatformAdmin\(\) \? [^"]+ : testChipText\(\)"/);
-    expect(await here('designer/designer.css')).toMatch(/\.rsd-chip-label \{[^}]*text-overflow: ellipsis/);
   });
 
   it('ZT-R5: a record count reads as words, and the versions card gives its people and data room on a wide screen', async () => {
