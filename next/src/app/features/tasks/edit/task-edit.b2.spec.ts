@@ -21,11 +21,12 @@ const STEPS = { legacy: false, stored: true, version: 3, versions: [], pipelineK
   definition: { version: 1, steps: [{ key: 'manifest', task: 'read_file' }, { key: 'save', task: 'save_file' }] } };
 const JOBS = [{ jobId: 2903, jobName: 'Manual', jobStatus: 'Active' }, { jobId: 2935, jobName: 'Nightly', jobStatus: 'Active' }];
 
-function editor(opts: { jobs?: unknown[]; put?: unknown } = {}) {
+function editor(opts: { jobs?: unknown[]; put?: unknown; jobsAfterAdd?: unknown[] } = {}) {
   const navigate = vi.fn();
   const request = vi.fn(() => of({ status: API_SUCCESS }));
   const put = vi.fn(() => of(opts.put ?? { status: API_SUCCESS, message: 'SourceTask updated.' }));
   const opened: { component: unknown; data: any }[] = [];
+  const added: unknown[] = [];
   TestBed.resetTestingModule();
   TestBed.configureTestingModule({ providers: [
     { provide: HttpClient, useValue: {
@@ -38,7 +39,10 @@ function editor(opts: { jobs?: unknown[]; put?: unknown } = {}) {
         if (url.endsWith('fetchSourceJobQueueListWithJobId')) return of({ status: API_SUCCESS, data: { jobQueues: [{ jobQueueId: 8300 }, { jobQueueId: 8301 }] } });
         return of({ status: API_SUCCESS, data: [] });
       },
-      post: (url: string) => of({ status: API_SUCCESS, data: url.includes('fetchAllLinkJobsWithSourceTaskId') ? (opts.jobs ?? JOBS) : [] }),
+      post: vi.fn((url: string, body?: unknown) => {
+        if (url.includes('addSourceJob')) { added.push(body); return of({ status: API_SUCCESS, message: 'Job save with jobId 3041.' }); }
+        return of({ status: API_SUCCESS, data: url.includes('fetchAllLinkJobsWithSourceTaskId') ? (added.length && opts.jobsAfterAdd ? opts.jobsAfterAdd : (opts.jobs ?? JOBS)) : [] });
+      }),
       put,
       request,
     } },
@@ -51,7 +55,7 @@ function editor(opts: { jobs?: unknown[]; put?: unknown } = {}) {
   (component as any).tab = () => '';
   component.ngOnInit();
   TestBed.tick();
-  return { component, navigate, request, put, opened };
+  return { component, navigate, request, put, opened, added };
 }
 
 describe('TaskEdit -- the header, the overview and one save (B2)', () => {
@@ -70,11 +74,13 @@ describe('TaskEdit -- the header, the overview and one save (B2)', () => {
     expect(drawer.data).toMatchObject({ jobQueueId: 8301, jobId: 2935, jobName: 'Nightly' });
   });
 
-  it('cannot run a pipeline no schedule runs, and says to schedule one', async () => {
-    const { component, request } = editor({ jobs: [] });
-    expect(component.runHint()).toContain('No schedule runs this pipeline yet');
+  it('ZT-P6: runs a pipeline no schedule runs yet by giving it an on-demand schedule first, and says so', async () => {
+    const { component, request, added, opened } = editor({ jobs: [], jobsAfterAdd: [{ jobId: 3041, jobName: 'Brain tumour MRI grading (on demand)', jobStatus: 'Active' }] });
+    expect(component.runHint()).toContain('an on-demand schedule');
     await component.runNow();
-    expect(request).not.toHaveBeenCalled();
+    expect(added).toEqual([expect.objectContaining({ jobName: 'Brain tumour MRI grading (on demand)', taskDetail: { taskDetailId: 1864 }, execution: 'Manual', jobStatus: 'Active' })]);
+    expect(request).toHaveBeenCalledWith('POST', expect.stringContaining('sourceJob.json/'), { body: { jobId: 3041 } });
+    expect(opened.find(o => o.component === RunDrawer)?.data).toMatchObject({ jobId: 3041 });
   });
 
   it('opens a new schedule for this pipeline', () => {
