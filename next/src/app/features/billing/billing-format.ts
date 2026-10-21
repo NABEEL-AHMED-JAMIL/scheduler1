@@ -123,6 +123,18 @@ export function daysOverdue(dueAt: string | null | undefined, now = Date.now()):
   return dueAt ? Math.max(0, Math.floor((now - new Date(dueAt).getTime()) / MS_PER_DAY)) : 0;
 }
 
+/** ZT-B2: the calendar day "yyyy-MM-dd" at an instant in a time zone (a workspace's billing zone). */
+export function dayInZone(zone: string, at: Date): string {
+  try {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  } catch {
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' }).format(at);
+  }
+}
+/** "October 2026" for a month's first day, "2026-10-01". */
+export function monthName(firstDay: string): string {
+  return new Intl.DateTimeFormat('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${firstDay.slice(0, 10)}T00:00:00Z`));
+}
 export function firstOfMonth(d: Date): string { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`; }
 export function daysInMonth(d: Date): number { return new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate(); }
 /** "2026-09": the month a period is closed under. */

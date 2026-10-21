@@ -69,3 +69,30 @@ describe('BillingDocuments Report Studio comparison', () => {
     expect(component.comparable({ documentId: 7, kind: 'invoice' } as never)).toBe(false);
   });
 });
+
+/** ZT-B6: a listed document whose file is gone from storage says so and what to do, in Billing's words (410), not "could not be read". */
+describe('BillingDocuments preview of a file that is gone', () => {
+  it('shows the refusal Billing gave for the blob it asked for', async () => {
+    const said = 'The file of RCP-2026-10-0004 is no longer in storage. The payment and its receipt number stand; ask the platform for a copy.';
+    const body = new Blob([JSON.stringify({ status: 'ERROR', message: said })], { type: 'application/json' });
+    const api = {
+      documents: vi.fn(() => of({ status: API_SUCCESS, data: [{ documentId: 110, kind: 'receipt', number: 'RCP-2026-10-0004', fileName: 'RCP-2026-10-0004.pdf', issuedAt: '2026-10-13T05:26:02Z', tenantId: 2960 }] })),
+      documentBlob: vi.fn(() => new Subject<Blob>()),
+    };
+    const failed = new Subject<Blob>();
+    api.documentBlob.mockReturnValue(failed);
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [
+      { provide: BillingApi, useValue: api }, { provide: ToastService, useValue: { success: vi.fn(), error: vi.fn() } },
+      { provide: ActivatedRoute, useValue: { queryParamMap: of(new Map()), paramMap: of(new Map()), snapshot: { queryParamMap: new Map() } } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
+    ] });
+    const component = TestBed.runInInjectionContext(() => new BillingDocuments());
+    component.load();
+    expect(api.documentBlob).toHaveBeenCalledWith(110);
+    failed.error({ status: 410, error: body });
+    await new Promise(r => setTimeout(r, 0));
+    await new Promise(r => setTimeout(r, 0));
+    expect(component.previewError()).toBe(said);
+  });
+});

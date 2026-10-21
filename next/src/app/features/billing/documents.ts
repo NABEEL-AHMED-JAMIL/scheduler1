@@ -1,4 +1,5 @@
 import { DestroyRef, Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
+import { refusalOf } from '../../shared/ui/blob-refusal';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { ActivatedRoute, RouterLink } from '@angular/router';
@@ -160,7 +161,8 @@ export class BillingDocuments implements OnInit, OnDestroy {
     this.revoke(); this.previewLoading.set(true); this.previewError.set('');
     this.api.documentBlob(documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.previewLoading.set(false); if (this.selectedId() !== documentId) return; this.previewUrl.set(URL.createObjectURL(b)); },
-      error: () => { this.previewLoading.set(false); this.previewError.set('The document could not be read.'); },
+      // ZT-B6: Billing's reason (a file gone from storage says so and what to do) arrives as a blob body; read it.
+      error: async err => { const why = await refusalOf(err); this.previewLoading.set(false); this.previewError.set(why || 'The document could not be read.'); },
     });
   }
   private revoke(): void { const u = this.previewUrl(); if (u) URL.revokeObjectURL(u); this.previewUrl.set(null); }

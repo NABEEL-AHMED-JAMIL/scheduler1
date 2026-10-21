@@ -143,4 +143,14 @@ describe('layout rules', () => {
     }
     expect(off).toEqual([]);
   });
+  /**
+   * ZT-M (Kafka & Topics, 2026-10-21): a fixed-layout table gives its Actions column the width it declares, so a column
+   * narrower than its header cut "ACTIONS" to "ACTIC" at every width. The header is uppercase 11px with the cell's padding:
+   * 4.5rem at least.
+   */
+  it('gives a fixed table\'s Actions column room for its header', async () => {
+    const { css } = await sources();
+    const width = /width:\s*([\d.]+)rem/.exec(rule(css, '.kafka-table .kc-act'))?.[1];
+    expect(Number(width)).toBeGreaterThanOrEqual(4.5);
+  });
 });

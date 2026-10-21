@@ -594,8 +594,10 @@ export class Docs implements AfterViewInit {
         'Cost & usage: month to date and a forecast at the last week\'s pace; Cost by day (daily or cumulative); Cost by pipeline, '
           + 'with By pipeline and, for the pipeline you pick, By run; AI model calls by source or every call; By service; and Line by '
           + 'line, what is behind each charge. A run\'s own page links to what it cost.',
-        'Invoices: each closed month, its lines frozen with the rate card that priced them, with payment slips, credit notes and a PDF.',
-        'Billing documents: every bill, slip and statement in one place.',
+        'Invoices: each closed month, its lines frozen with the rate card that priced them, with payment slips, credit notes and a PDF. '
+          + 'A month is issued once it is over in the workspace\'s billing time zone; until then its draft is rebuilt from the meter.',
+        'Billing documents: every bill, slip and statement in one place. A statement lists what was issued in its range, oldest first, '
+          + 'in the workspace\'s billing days: invoiced, credited, paid (net of refunds), the balance open and any credit owed to you.',
       ],
       fields: [
         { name: 'What is metered', required: false, note: 'Storage kept (measured nightly), bytes written, read and deleted, storage operations, pipeline runs and their minutes, model tokens, images described, documents converted, analytics queries, API calls and seats.' },

@@ -54,6 +54,30 @@ function page(platformAdmin: boolean, detail: object = DETAIL, clients = { listO
 }
 
 describe('InvoicePane', () => {
+  it('ZT-B2: a draft whose month is still running in its zone is issued once the month is over', () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-10-21T17:00:00Z'));
+    try {
+      const running = { ...DETAIL, number: 'INV-2026-10-0005', periodStart: '2026-10-01', periodEnd: '2026-10-31', status: 'draft', timeZone: 'America/Chicago',
+        issuedAt: null, dueAt: null, payments: [], documents: [] };
+      const { fixture } = page(true, running);
+      const button = [...fixture.nativeElement.querySelectorAll('button')].find((b: HTMLButtonElement) => b.textContent?.trim() === 'Issue') as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      expect(fixture.nativeElement.textContent).toContain('October 2026 is still running in America/Chicago: issue it once the month is over');
+
+      // 04:30 UTC on 1 November is still 31 October in Chicago; at 05:00 the month is over there.
+      vi.setSystemTime(new Date('2026-11-01T04:30:00Z'));
+      const late = page(true, running);
+      expect(([...late.fixture.nativeElement.querySelectorAll('button')].find((b: HTMLButtonElement) => b.textContent?.trim() === 'Issue') as HTMLButtonElement).disabled).toBe(true);
+      vi.setSystemTime(new Date('2026-11-01T05:00:00Z'));
+      const over = page(true, running);
+      expect(([...over.fixture.nativeElement.querySelectorAll('button')].find((b: HTMLButtonElement) => b.textContent?.trim() === 'Issue') as HTMLButtonElement).disabled).toBe(false);
+      expect(over.fixture.nativeElement.textContent).not.toContain('still running');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('MIG-337: an API line says which client made the calls, by name, and the others by id', () => {
     const lines = [{ invoiceLineId: 9, sort: 0, meter: 'api.calls', description: 'API calls', quantity: '852', unit: 'call', per: 1000, unitPrice: '0.1',
       amount: '0.0852', manual: false, breakdown: '[{"subjectType":"api_client","subjectId":"cl_portal","quantity":"812"},'

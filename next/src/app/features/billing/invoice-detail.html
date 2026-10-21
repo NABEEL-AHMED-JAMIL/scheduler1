@@ -28,10 +28,11 @@
           @if (i.issuedAt) { · issued {{ i.issuedAt | serverTime: 'date' }} }@if (i.dueAt && i.kind === 'invoice' && i.status !== 'paid') { · due {{ i.dueAt | serverTime: 'date' }} }
           @if (paidByCardAt(); as at) { · <span data-paid-by-card>Paid by card on {{ at | serverTime: 'date' }}</span> }
         </p>
+        @if (isPlatformAdmin() && stillRunning(); as why) { <p class="text-xs text-[color:var(--text-muted)] mt-1" data-month-running>{{ why }}</p> }
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
         @if (isPlatformAdmin() && i.status === 'draft') {
-          <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue'"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
+          <button type="button" class="btn btn-primary btn-sm" (click)="issue()" [disabled]="busy() === 'issue' || !!stillRunning()" [attr.title]="stillRunning() || null"><app-icon name="check" [busy]="busy() === 'issue'" />Issue</button>
         } @else if (canPayByCard() && !isPlatformAdmin()) {
           <button type="button" class="btn btn-primary btn-sm" (click)="payNow()" [disabled]="busy() === 'card'" title="Pay by card on Stripe's secure page" data-pay-now><app-icon name="external" [busy]="busy() === 'card'" />Pay now</button>
         } @else if (isOpen()) {

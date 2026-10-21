@@ -1,4 +1,5 @@
 import { DestroyRef, Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { refusalOf } from '../../shared/ui/blob-refusal';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
@@ -77,7 +78,7 @@ export class DocumentViewDialog implements OnInit, OnDestroy {
   ngOnInit(): void {
     this.api.documentBlob(this.data.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.blob.set(b); this.url.set(URL.createObjectURL(b)); },
-      error: () => this.error.set('The document could not be read.'),
+      error: async err => this.error.set((await refusalOf(err)) || 'The document could not be read.'),
     });
   }
   ngOnDestroy(): void { const u = this.url(); if (u) URL.revokeObjectURL(u); }

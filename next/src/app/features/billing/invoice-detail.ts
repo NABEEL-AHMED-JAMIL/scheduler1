@@ -21,7 +21,7 @@ import { paymentMethodChip, paymentStateChip } from './payment-chips';
 import { RECEIPT_VERIFY_TITLE_ID, ReceiptVerifyDialog, ReceiptVerifyData } from './receipt-verify';
 import { BillingApi, cardPaymentChip, DOCUMENT_KIND_LABEL, InvoiceDetail as Detail, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, PaymentRow, InvoiceLine, AppliedTier, LineSubject, paymentMethodLabel } from './billing.service';
 import { ApiClientsApi } from '../integration/api-clients/api-clients.api';
-import { daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits } from './billing-format';
+import { dayInZone, daysOverdue, formatMoney, formatQuantity, formatUnitPrice, moneyDigits, monthName } from './billing-format';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 
 /** One entry of the invoice's story, in order. */
@@ -60,6 +60,16 @@ export class InvoicePane implements OnDestroy {
   readonly loading = signal(true);
   readonly error = signal('');
   readonly invoice = signal<Detail | null>(null);
+  /**
+   * ZT-B2: a draft whose month is still running in its billing time zone is issued once the month is over there (Billing refuses
+   * it before: the close skips a month issued by hand, so the rest of it was never billed). The reason, or '' when it may be issued.
+   */
+  readonly stillRunning = computed(() => {
+    const i = this.invoice();
+    if (!i || i.status !== 'draft' || i.kind !== 'invoice' || !i.periodEnd) return '';
+    const zone = i.timeZone || 'America/Chicago';
+    return dayInZone(zone, new Date()) > i.periodEnd.slice(0, 10) ? '' : `${monthName(i.periodStart)} is still running in ${zone}: issue it once the month is over`;
+  });
   readonly busy = signal('');
   readonly qrUrl = signal<string | null>(null);
   readonly copied = signal(false);

@@ -2314,7 +2314,7 @@ html.dark .lookup-rail-glyph.is-managed { background: color-mix(in oklab, var(--
 .kafka-table .kc-state { width: 9rem; }
 .kafka-table .kc-members { width: 6rem; }
 .kafka-table .kc-topics { width: 16rem; }
-.kafka-table .kc-act { width: 3rem; }
+.kafka-table .kc-act { width: 5.5rem; }
 @media (min-width: 1600px) { .kafka-table .kc-read { width: 16rem; } .kafka-table .kc-pipes { width: 13rem; } }
 .lookup-detail-head { padding: 0.75rem 1.25rem; }
 
