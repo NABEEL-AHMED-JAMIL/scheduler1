@@ -301,6 +301,16 @@ describe('DocumentIntelligence -- intake', () => {
     expect(opened[0].component).toBe(UploadDocumentsDialog);
   });
 
+  it('ZT-D4: links a duplicate to the earlier document by the number screens show, never "OCR n"', async () => {
+    const { fixture, el } = screenWith({ view: 'upload' });
+    await fixture.whenStable();
+    fixture.detectChanges();
+    const duplicate = [...el.querySelectorAll('tbody tr')].find(r => r.textContent!.includes('Duplicate'))!;
+    expect(duplicate.querySelector('a')?.getAttribute('href')).toBe('/review/documents/1020');
+    expect(duplicate.textContent).toContain('#1020');
+    expect(el.textContent).not.toContain('OCR 1010');
+  });
+
   it('draws the email-in section with the address, listing what was mailed in first', async () => {
     const { fixture, el, api } = screenWith({ view: 'email' });
     await fixture.whenStable();

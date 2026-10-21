@@ -49,7 +49,7 @@
             @if (d.autoApproved) {Approved on its own} @else {Approved by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.ruleOverride) {, over a failing rule}. It is in its type's dataset; this view is read-only.
           }
           @case ('Rejected') {
-            Rejected by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}. This view is read-only.
+            Rejected by <app-avatar [appUserId]="d.reviewedBy" [name]="reviewer(d.reviewedBy, d.reviewedByName)" [size]="1.15" [decorative]="true" class="inline-block align-[-0.3em] mx-0.5" />{{ reviewer(d.reviewedBy, d.reviewedByName) }}@if (d.dateReviewed) { on {{ d.dateReviewed | serverTime: 'dateTime' }}}@if (d.rejectReason) {: “{{ d.rejectReason }}”}@if (!endsSentence(d.rejectReason)) {.} This view is read-only.
           }
           @case ('Failed') { The extraction failed: {{ d.error || 'no reason was given' }}. Extract the document again from Document Intelligence. }
           @default { This document is {{ statusText().toLowerCase() }}; it is not waiting for review. This view is read-only. }
@@ -200,7 +200,7 @@
 
         @if (inReview()) {
           <p class="text-xs text-[color:var(--text-muted)] flex items-start gap-1.5">
-            <app-icon name="send" size="0.95em" class="mt-0.5 shrink-0" />On approve, the document's values go to its type's dataset (Document Intelligence › Dataset), and your corrections are kept with it.
+            <app-icon name="send" size="0.95em" class="mt-0.5 shrink-0" />On approve, the document's values go to its type's approved data (Documents › Approved data), and your corrections are kept with it.
           </p>
         }
       </div>

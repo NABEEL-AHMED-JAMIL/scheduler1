@@ -13,7 +13,7 @@ import { DataText } from '../../shared/ui/data-text';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import { confirmWith } from '../../shared/ui/confirm';
 import {
-  ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, fieldName, fileName, isLow, lowLine,
+  ExtractedField, OcrDocument, ReviewDetail, RuleOutcome, TableView, correctionsOf, documentFields, documentName, fieldName, isLow, lowLine,
   nextInQueue, nextRowIndex, refusalText, ruleText, shortcutOf, skippedWhy, statusLabel, statusOf, stepIndex, tableViews, typeLabel,
   isNumberColumn, linesMinWidthRem,
 } from './documents.model';
@@ -145,7 +145,7 @@ export class DocumentReview {
 
   readonly title = computed(() => {
     const r = this.read();
-    return r ? fileName(r.sourceKey) : this.detail() ? `Document ${this.detail()!.extractionId}` : 'Document';
+    return r ? documentName(r) : this.detail() ? `Document ${this.detail()!.extractionId}` : 'Document';
   });
   readonly subtitle = computed(() => {
     const d = this.detail();
@@ -402,6 +402,11 @@ export class DocumentReview {
   }
 
   /** Who did it, by name: "you", their name, or (someone Identity no longer knows) their number. */
+  /** Whether a reason already ends its sentence, so the note after it adds no second full stop (ZT-D7). */
+  endsSentence(text: string | null | undefined): boolean {
+    return !!text && /[.!?…]["'”’)\]]*$/.test(text.trim());
+  }
+
   reviewer(id: number | null | undefined, name?: string | null): string {
     if (id == null) return 'someone';
     return id === this.me() ? 'you' : name || `user ${id}`;

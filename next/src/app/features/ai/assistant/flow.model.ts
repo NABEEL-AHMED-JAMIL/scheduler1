@@ -30,7 +30,8 @@ export interface FlowNodeSpec {
   problems?: FlowProblem[];
 }
 
-export interface FlowTrigger { type: 'manual' | 'schedule' | 'inbox' | string; every?: string | null; at?: string | null; }
+/** What starts a designed pipeline's runs; document (ZT-I1): an approved document of the type, as a job's document trigger (MIG-364). */
+export interface FlowTrigger { type: 'manual' | 'schedule' | 'inbox' | 'document' | string; every?: string | null; at?: string | null; documentTypeId?: number | null; }
 
 export interface FlowDefinitionStep {
   key: string;
@@ -108,6 +109,7 @@ export function triggerWhen(t: FlowTrigger, startDate: string): string {
     return `It runs ${every}${at} (America/Chicago), from ${startDate}.`;
   }
   if (t.type === 'inbox') return 'It runs when a file lands in its inbox.';
+  if (t.type === 'document') return 'It runs when a document of its type is approved, once per document.';
   return 'Nothing runs until you press Run now.';
 }
 

@@ -57,6 +57,16 @@ describe('ReviewQueue', () => {
     expect(rows[1].querySelector('a')?.getAttribute('href')).toBe('/review/documents/1005');
   });
 
+  it('ZT-D1: names an uploaded document by the file it arrived as, not its stored key ("original.pdf")', async () => {
+    const { fixture, el, api } = screenWith();
+    api.reads.mockReturnValue(ok([{ ocrDocumentId: 1001, sourceBucket: 'etl-documents', sourceKey: 'ocr/2960/1061/original.pdf',
+      originalName: 'medication-list-TEST-M7001.pdf', status: 'Done' }]) as never);
+    await fixture.whenStable();
+    const rows = [...el.querySelectorAll('tbody tr')];
+    expect(rows[1].textContent).toContain('medication-list-TEST-M7001.pdf');
+    expect(el.textContent).not.toContain('original.pdf');
+  });
+
   it('shows whose claim a document is under', async () => {
     const { fixture, el } = screenWith();
     await fixture.whenStable();

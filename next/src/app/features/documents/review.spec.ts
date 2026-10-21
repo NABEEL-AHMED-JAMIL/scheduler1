@@ -364,6 +364,31 @@ describe('DocumentReview -- corrections and decisions', () => {
   });
 });
 
+describe('DocumentReview -- zero-tolerance documents (ZT-D)', () => {
+  it('ZT-D1: names an uploaded document by the file it arrived as, not its stored key ("original.pdf")', async () => {
+    const api = stubApi(INVOICE, { read: vi.fn(() => ok({ ocrDocumentId: 1001, sourceBucket: 'etl-documents',
+      sourceKey: 'ocr/2960/1067/original.pdf', originalName: 'referral-ZT-R2001.pdf', status: 'Done', pageCount: 1 })) });
+    const { el } = await screenWith({ api });
+    expect(el.querySelector('h1')?.textContent?.trim()).toBe('referral-ZT-R2001.pdf');
+  });
+
+  it('ZT-D2: says approved values go to Documents › Approved data, the tab\'s name', async () => {
+    const { el } = await screenWith();
+    expect(el.textContent).toContain('Documents › Approved data');
+    expect(el.textContent).not.toContain('Document Intelligence › Dataset');
+  });
+
+  it('ZT-D7: ends a rejection whose reason ends its sentence with one full stop', async () => {
+    const rejected = { ...CORRECTED, status: 'Rejected', reviewedBy: 99, reviewedByName: 'Sam Reviewer', dateReviewed: '2026-09-29T05:04:08.939+00:00',
+      rejectReason: 'PO-77113 is not an open purchase order.' };
+    const { el } = await screenWith({ api: stubApi(rejected) });
+    const note = el.querySelector('[data-test="view-only"]')?.textContent ?? '';
+    expect(note).toContain('“PO-77113 is not an open purchase order.” This view is read-only.');
+    const { el: plain } = await screenWith({ api: stubApi({ ...rejected, rejectReason: 'Blurred' }) });
+    expect(plain.querySelector('[data-test="view-only"]')?.textContent).toContain('“Blurred”. This view is read-only.');
+  });
+});
+
 describe('DocumentReview -- read-only', () => {
   it('shows a decided document without a control to change it', async () => {
     const approved = { ...CORRECTED, status: 'Approved', reviewedBy: 4537, dateReviewed: '2026-09-29T05:04:08.939+00:00' };

@@ -9,7 +9,7 @@ import { FileDropzone } from '../../shared/ui/file-dropzone';
 import { SegmentOption, Segmented } from '../../shared/ui/segmented';
 import { ObjectPicker, PickedObject, objectPickerConfig } from '../../shared/ui/object-picker';
 import { BucketSummary, StorageService } from '../objects/storage.service';
-import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, fileName, isWorking, refusalText, statusLabel } from './documents.model';
+import { DocumentType, Extraction, OCR_EXTENSIONS, OcrDocument, documentName, isWorking, refusalText, statusLabel } from './documents.model';
 import { DocumentsApi } from './documents.service';
 
 export interface ReadDocumentData {
@@ -141,7 +141,7 @@ export class ReadDocumentDialog implements OnInit {
     { id: 'stored', label: 'A stored file', icon: 'folder', disabled: this.locked() },
   ]);
   readonly activeTypes = computed(() => this.data.types.filter(t => t.status === 'Active'));
-  readonly readName = computed(() => this.data.read ? `${fileName(this.data.read.sourceKey)} · OCR document ${this.data.read.ocrDocumentId}` : '');
+  readonly readName = computed(() => this.data.read ? `${documentName(this.data.read)} · OCR document ${this.data.read.ocrDocumentId}` : '');
   readonly working = computed(() => ['upload', 'read', 'extract'].includes(this.stage()));
   readonly locked = computed(() => this.stage() !== 'form' && this.stage() !== 'failed');
   readonly ready = computed(() => {

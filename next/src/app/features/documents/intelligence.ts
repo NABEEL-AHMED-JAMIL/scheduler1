@@ -308,6 +308,17 @@ export class DocumentIntelligence implements OnInit {
   readonly channelLabels = CHANNEL_LABELS;
   readonly channels = Object.keys(CHANNEL_LABELS);
   readonly intakes = signal<IntakeRow[]>([]);
+  /**
+   * ZT-D4: the document a file was taken as, by its OCR read -- so a duplicate links to the earlier document by the number
+   * every screen shows (#1159), not the OCR read's own number ("OCR 1054"), which no screen names.
+   */
+  readonly takenAs = computed(() => {
+    const byRead = new Map<number, number>();
+    for (const i of this.intakes()) {
+      if (i.ocrDocumentId && i.extractionId && !byRead.has(i.ocrDocumentId)) byRead.set(i.ocrDocumentId, i.extractionId);
+    }
+    return byRead;
+  });
   readonly intakeLoading = signal(false);
   readonly intakeError = signal('');
   readonly channelFilter = signal('');

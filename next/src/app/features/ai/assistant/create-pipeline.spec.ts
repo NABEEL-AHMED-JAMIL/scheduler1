@@ -62,6 +62,39 @@ describe('the Create pipeline dialog', () => {
     expect(posted).toHaveLength(1);
   });
 
+  it('ZT-I1: a flow an approved document starts is created with its document trigger', async () => {
+    const posted: { url: string; body: unknown }[] = [];
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [CreatePipeline],
+      providers: [provideZonelessChangeDetection(), provideRouter([]),
+        { provide: DIALOG_DATA, useValue: { flow: flow({ type: 'document', documentTypeId: 1009 }), definition: flow({ type: 'manual' }).definition } },
+        { provide: DialogRef, useValue: { close: vi.fn() } },
+        { provide: AuthService, useValue: { user: signal({ appUserId: 4640, tenantId: 2960 }) } },
+        { provide: ConversationApi, useValue: { pipelineCreated: vi.fn(() => of({ status: 'SUCCESS' })) } },
+        { provide: HttpClient, useValue: {
+          get: (url: string) => of(url.includes('pipeline.json/list')
+            ? { status: 'SUCCESS', data: { rows: [{ pipelineKey: 1500, pipelineId: 'DIABETES_REVIEW' }] } }
+            : { status: 'SUCCESS', data: [{ sourceTaskTypeId: 1, serviceName: 'Pipelines' }] }),
+          post: (url: string, body: unknown) => {
+            posted.push({ url, body });
+            if (url.includes('listSourceTask')) return of({ status: 'SUCCESS', data: [{ taskDetailId: 2100, pipelineId: 'DIABETES_REVIEW', taskName: 'Diabetes review' }] });
+            if (url.includes('addSourceJob')) return of({ status: 'SUCCESS', message: 'Saved with jobId 3100.' });
+            return of({ status: 'SUCCESS', message: 'Saved.', data: { version: 1 } });
+          } } }],
+    });
+    const fixture = TestBed.createComponent(CreatePipeline);
+    fixture.detectChanges();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.textContent).toContain('When a document of type 1009 is approved');
+    expect(el.querySelector('[data-runs-when]')!.textContent).toContain('when a document of its type is approved');
+    await fixture.componentInstance.create();
+    const trigger = posted.find(p => p.url.endsWith('/sourceJob.json/documentTrigger/save'));
+    expect(trigger?.body).toEqual({ jobId: 3100, documentTypeId: 1009, enabled: true });
+    expect(fixture.componentInstance.steps().map(s => s.label)).toContain('Trigger');
+    expect(fixture.componentInstance.created()).toMatchObject({ jobId: 3100 });
+  });
+
   it('a sign-in with no workspace (a platform administrator) is told to open one, and cannot create (owner 2026-10-20)', () => {
     const { el, fixture } = open({ flow: flow({ type: 'manual' }), definition: flow({ type: 'manual' }).definition }, null);
     expect(el.textContent).toContain('Work in this workspace');

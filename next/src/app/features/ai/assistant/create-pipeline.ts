@@ -191,6 +191,7 @@ export class CreatePipeline implements OnInit {
     const t = this.trigger();
     if (t.type === 'schedule') return `On a schedule: every ${t.every ?? 'day'}${t.at ? ' at ' + t.at : ''} (America/Chicago).`;
     if (t.type === 'inbox') return 'When a file lands in the pipeline\'s inbox (an inbox trigger on its schedule).';
+    if (t.type === 'document') return `When a document of type ${t.documentTypeId ?? '?'} is approved (a document trigger on its schedule), once per document.`;
     return 'On demand: Run now, or the API.';
   });
 
@@ -250,7 +251,7 @@ export class CreatePipeline implements OnInit {
     if (!this.canCreate() || this.busy() || this.created() || this.data.update) return;
     this.busy.set(true);
     const trigger = this.trigger();
-    const labels = CREATE_STEPS.filter(l => l !== 'Trigger' || trigger.type === 'inbox');
+    const labels = CREATE_STEPS.filter(l => l !== 'Trigger' || trigger.type === 'inbox' || trigger.type === 'document');
     this.steps.set(labels.map(label => ({ label, state: 'todo' as StepState })));
     const name = this.name().trim();
     const pid = this.pipelineId();
@@ -286,11 +287,17 @@ export class CreatePipeline implements OnInit {
         if (!Number.isFinite(jobId)) throw new Error('The schedule was saved but its id did not come back; find it under Schedules.');
         return `Schedule ${jobId}, ${trigger.type === 'schedule' ? 'on its timetable' : 'run on demand'}.`;
       });
-      // 5. The inbox trigger, when a file starts the run.
+      // 5. The inbox trigger, when a file starts the run; the document trigger (ZT-I1), when an approved document does.
       if (trigger.type === 'inbox') {
         await this.step('Trigger', async () => {
           await this.post('/sourceJob.json/inboxTrigger/save', { jobId, enabled: true, filePattern: '*' });
           return 'A file in the inbox starts a run.';
+        });
+      } else if (trigger.type === 'document') {
+        await this.step('Trigger', async () => {
+          if (!trigger.documentTypeId) throw new Error('The design names no document type; set it on the schedule under When it runs.');
+          const r = await this.post('/sourceJob.json/documentTrigger/save', { jobId, documentTypeId: trigger.documentTypeId, enabled: true });
+          return r.message || 'An approved document of the type starts a run.';
         });
       }
       this.created.set({ pipelineId: pid, pipelineKey, taskDetailId, jobId, jobName: name, version });

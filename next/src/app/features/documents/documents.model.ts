@@ -683,8 +683,12 @@ export function recentRows(reads: OcrDocument[], extractions: Extraction[]): Rec
   return [...rows, ...unread];
 }
 
-/** A document's name: the file's own as it arrived (MIG-271), else the last part of its key. */
-function nameOf(r: OcrDocument): string { return r.originalName || fileName(r.sourceKey); }
+/**
+ * A document's name: the file's own as it arrived (MIG-271), else the last part of its key. Every screen names a document
+ * this way (ZT-D1: Review named every upload "original.pdf", the key's last part, so a reviewer could not tell them apart).
+ */
+export function documentName(r: Pick<OcrDocument, 'originalName' | 'sourceKey'>): string { return r.originalName?.trim() || fileName(r.sourceKey); }
+function nameOf(r: OcrDocument): string { return documentName(r); }
 
 /** Where a document came from: the channel's sentence for one that arrived (MIG-271), else its storage connection. */
 function whereOf(r: OcrDocument): string {

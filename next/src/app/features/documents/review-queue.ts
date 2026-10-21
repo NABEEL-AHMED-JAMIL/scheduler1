@@ -11,7 +11,7 @@ import { Pagination } from '../../shared/ui/pagination';
 import { PAGE_SIZES } from '../../shared/ui/pager';
 import { ServerTimePipe } from '../../shared/ui/server-time.pipe';
 import {
-  AGE_FILTERS, CLAIM_FILTERS, CONFIDENCE_FILTERS, DocumentType, Extraction, OcrDocument, QUEUE_STATUSES, fileName, lowLine,
+  AGE_FILTERS, CLAIM_FILTERS, CONFIDENCE_FILTERS, DocumentType, Extraction, OcrDocument, QUEUE_STATUSES, documentName, lowLine,
   refusalText, statusLabel,
 } from './documents.model';
 import { DocumentsApi } from './documents.service';
@@ -262,7 +262,7 @@ export class ReviewQueue implements OnInit {
 
   nameOf(e: Extraction): string {
     const read = this.reads().get(e.ocrDocumentId);
-    return read ? fileName(read.sourceKey) : `OCR document ${e.ocrDocumentId}`;
+    return read ? documentName(read) : `OCR document ${e.ocrDocumentId}`;
   }
 
   label(e: Extraction): string { return statusLabel(e); }

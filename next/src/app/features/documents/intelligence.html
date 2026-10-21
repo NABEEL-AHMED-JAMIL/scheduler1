@@ -312,7 +312,9 @@
               </td>
               <td class="text-xs whitespace-nowrap">
                 @if (i.extractionId) { <a class="link-inline mono" [routerLink]="['/review/documents', i.extractionId]">#{{ i.extractionId }}</a> }
-                @else if (i.ocrDocumentId) { <span class="mono">OCR {{ i.ocrDocumentId }}</span> } @else { — }
+                @else if (i.ocrDocumentId && takenAs().get(i.ocrDocumentId); as earlier) {
+                  <a class="link-inline mono" [routerLink]="['/review/documents', earlier]" title="The earlier document this file is">#{{ earlier }}</a>
+                } @else { — }
               </td>
               <td class="text-xs whitespace-nowrap">@if (i.dateCreated) { {{ i.dateCreated | serverTime: 'recent' }} } @else { — }</td>
             </tr>
