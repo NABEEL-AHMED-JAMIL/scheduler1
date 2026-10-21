@@ -105,8 +105,7 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
     .pac-facts dd { margin: 0.125rem 0 0; font-size: 0.875rem; font-weight: 500; overflow-wrap: anywhere; }
     .pac-facts dd a { text-decoration: underline; text-underline-offset: 2px; }
     .pac-ask { display: flex; gap: 0.625rem; align-items: flex-start; padding: 0.75rem 1rem; border-radius: var(--radius-lg);
-               border: 1px solid color-mix(in srgb, var(--accent-500, #3b82f6) 35%, transparent);
-               background: color-mix(in srgb, var(--accent-500, #3b82f6) 7%, transparent); font-size: 0.875rem; }
+               border: 1px solid color-mix(in oklab, var(--accent-mark-strong) 35%, transparent); background: var(--accent-soft); font-size: 0.875rem; }
     .pac-ask b { display: block; font-size: 0.75rem; letter-spacing: 0.03em; text-transform: uppercase; margin-bottom: 0.125rem; }
     .pac-figures { display: flex; flex-wrap: wrap; gap: 0.5rem; }
     .pac-figure { border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 0.375rem 0.75rem; font-size: 0.8125rem; }
@@ -116,7 +115,10 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
     .pac-break-label { color: var(--text-muted); margin-right: 0.125rem; }
     .pac-chip { border: 1px solid var(--border-subtle); border-radius: 999px; padding: 0.125rem 0.625rem; background: var(--surface);
                 cursor: pointer; font-size: 0.8125rem; }
-    .pac-chip[aria-pressed='true'] { background: var(--text-primary); color: var(--surface); border-color: var(--text-primary); }
+    .pac-chip:hover { background: var(--surface-sunken); }
+    /* Selected as the console marks a selection (the open inbox row): the soft accent and its mark, never solid ink. */
+    .pac-chip[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent-text); border-color: var(--accent-mark-strong);
+                                     box-shadow: 0 0 0 1px var(--accent-mark-strong); }
     .pac-chip b { font-weight: 600; margin-left: 0.25rem; }
     .pac-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr)); gap: 0.625rem; }
     .pac-photo { margin: 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; background: var(--surface-inset); }
@@ -126,8 +128,8 @@ export function orderedColumns(columns: string[], kinds: string[]): string[] {
     .pac-table { max-height: 26rem; overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
     .pac-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
     .pac-table td { white-space: nowrap; }
-    .pac-photo.pac-odd { border-color: var(--warn-500, #d97706); box-shadow: 0 0 0 1px var(--warn-500, #d97706); }
-    .pac-table tr.pac-odd td { background: color-mix(in srgb, var(--warn-500, #d97706) 9%, transparent); }
+    .pac-photo.pac-odd { border-color: var(--color-warn-500); box-shadow: 0 0 0 1px var(--color-warn-500); }
+    .pac-table tr.pac-odd td { background: var(--pill-warn-bg); }
     .pac-tech summary { cursor: pointer; font-size: 0.8125rem; color: var(--text-secondary); }
     .pac-tech dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.5rem 1rem; margin: 0.625rem 0 0; }
     .pac-tech dt { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
