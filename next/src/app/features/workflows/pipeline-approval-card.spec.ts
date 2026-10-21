@@ -6,7 +6,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { of } from 'rxjs';
 import { StorageService } from '../objects/storage.service';
-import { PipelineApprovalCard, breakdowns, imageColumnOf, parseCsv, shownColumns } from './pipeline-approval-card';
+import { PipelineApprovalCard, breakdowns, imageColumnOf, orderedColumns, parseCsv, shownColumns } from './pipeline-approval-card';
 
 /**
  * Owner 2026-10-21 (task 1047): a pipeline step's approval listed its raw subject -- job id, step index, approval id and the
@@ -40,6 +40,17 @@ describe('Pipeline approval card: the rows, not the raw subject', () => {
     expect(b[0].column).toBe('measurement_check');
     expect(b[0].counts).toEqual([{ value: 'Matches the chart', count: 3 }, { value: 'Re-measure: photo and chart disagree', count: 1 }]);
     expect(b.map(x => x.column)).not.toContain('length_diff_pct');
+  });
+
+  it('puts a row\'s identity, what tells its rows apart, and its kinds first', () => {
+    expect(orderedColumns(['location', 'length_diff_pct', 'photo_role', 'measurement_check', 'wound_id'], ['measurement_check']))
+      .toEqual(['wound_id', 'photo_role', 'measurement_check', 'location', 'length_diff_pct']);
+  });
+
+  it('breaks down by a status-like column alone when the rows have one', () => {
+    const rows = [1, 2, 3, 4].map(i => ({ id: String(i), site: i % 2 ? 'heel' : 'hip', check: i === 4 ? 'Re-measure' : 'Matches' }));
+    expect(breakdowns(rows, ['id', 'site', 'check']).map(b => b.column)).toEqual(['check']);
+    expect(breakdowns(rows, ['id', 'site']).map(b => b.column)).toEqual(['site']);
   });
 
   describe('rendered', () => {
@@ -96,6 +107,16 @@ describe('Pipeline approval card: the rows, not the raw subject', () => {
       expect(el.querySelectorAll('[data-test="approval-photos"] figure')).toHaveLength(4);
       expect(el.querySelector('[data-test="approval-pdf"]')!.textContent).toContain('Wound_photo_review.pdf');
       expect(el.querySelector('[data-test="approval-rows"] thead')!.textContent).not.toContain('Source key');
+    });
+
+    it('lists the exception first, marked, in the table and the photos, with its count', async () => {
+      const el = (await render()).nativeElement as HTMLElement;
+      expect(el.querySelector('[data-test="approval-exceptions"]')!.textContent).toContain('1 to look at first');
+      const first = el.querySelector('[data-test="approval-rows"] tbody tr')!;
+      expect(first.classList.contains('pac-odd')).toBe(true);
+      expect(first.textContent).toContain('Re-measure');
+      expect(el.querySelector('[data-test="approval-photos"] figure')!.classList.contains('pac-odd')).toBe(true);
+      expect(el.querySelector('[data-test="approval-photos"] figcaption')!.textContent).toBe('W-1 · Latest visit');
     });
 
     it('filters the rows and photos by a kind when its count is pressed, and back', async () => {

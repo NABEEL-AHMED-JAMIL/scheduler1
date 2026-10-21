@@ -24,6 +24,10 @@ const MAX_ROWS = 200;
 const MAX_PHOTOS = 24;
 /** A column whose values sort rows into a few kinds: what a reviewer counts first. */
 const CATEGORY_HINT = /(status|check|decision|priority|risk|trend|result|flag|outcome|tier|band|urgency|class)/i;
+/** A column that tells one row of an item from another (its visit, its date, its role). */
+const DISTINGUISH = /(role|visit|date|stage|step|period|version)/i;
+/** Columns shown before "All columns". */
+const FIRST_COLUMNS = 8;
 
 /** A CSV file's rows (RFC 4180: quoted fields, doubled quotes, CRLF), keyed by its header. */
 export function parseCsv(text: string): Row[] {
@@ -71,8 +75,16 @@ export function breakdowns(rows: Row[], columns: string[]): { column: string; la
     return { column, label: fieldLabel(column), counts: [...counts].map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count) };
   }).filter(b => b.counts.length >= 2 && b.counts.length <= 6 && b.counts.every(c => c.value.length <= 60)
     && !b.counts.every(c => /^-?\d+(\.\d+)?$/.test(c.value)));
-  out.sort((a, b) => Number(CATEGORY_HINT.test(b.column)) - Number(CATEGORY_HINT.test(a.column)));
-  return out.slice(0, 2);
+  const hinted = out.filter(b => CATEGORY_HINT.test(b.column));
+  return (hinted.length ? hinted : out).slice(0, 2);
+}
+
+/** A row's identity first, then what tells its rows apart (a visit, a date), then its kinds, then the rest. */
+export function orderedColumns(columns: string[], kinds: string[]): string[] {
+  const id = columns.find(c => /(^id$|_id$|^name$|_name$)/i.test(c));
+  const apart = columns.find(c => c !== id && DISTINGUISH.test(c));
+  const front = [id, apart, ...kinds].filter((c, i, a): c is string => !!c && a.indexOf(c) === i);
+  return [...front, ...columns.filter(c => !front.includes(c))];
 }
 
 /**
@@ -114,6 +126,8 @@ export function breakdowns(rows: Row[], columns: string[]): { column: string; la
     .pac-table { max-height: 26rem; overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
     .pac-table thead th { position: sticky; top: 0; z-index: 1; background: var(--surface); }
     .pac-table td { white-space: nowrap; }
+    .pac-photo.pac-odd { border-color: var(--warn-500, #d97706); box-shadow: 0 0 0 1px var(--warn-500, #d97706); }
+    .pac-table tr.pac-odd td { background: color-mix(in srgb, var(--warn-500, #d97706) 9%, transparent); }
     .pac-tech summary { cursor: pointer; font-size: 0.8125rem; color: var(--text-secondary); }
     .pac-tech dl { display: grid; grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr)); gap: 0.5rem 1rem; margin: 0.625rem 0 0; }
     .pac-tech dt { font-size: 0.6875rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
@@ -150,6 +164,7 @@ export function breakdowns(rows: Row[], columns: string[]): { column: string; la
         <div class="pac-head">
           <h3 class="section-title m-0" id="pac-rows-title">Rows to approve</h3>
           @if (rows().length) { <span class="pill pill-neutral" data-test="approval-row-count">{{ shownRows().length }} of {{ rowCount() ?? rows().length }}</span> }
+          @if (exceptions()) { <span class="pill pill-warn" data-test="approval-exceptions" title="Rows outside the commonest {{ breakdown()[0].label.toLowerCase() }}; listed first">{{ exceptions() }} to look at first</span> }
           <span class="flex-1"></span>
           @if (pdf(); as p) {
             <button type="button" class="btn btn-default btn-sm" (click)="openPdf(p)" [disabled]="opening()" data-test="approval-pdf"><app-icon name="file" />{{ p.name || 'Report PDF' }}</button>
@@ -176,7 +191,7 @@ export function breakdowns(rows: Row[], columns: string[]): { column: string; la
           @if (photoRows().length) {
             <div class="pac-gallery" data-test="approval-photos">
               @for (p of photoRows(); track p.key) {
-                <figure class="pac-photo">
+                <figure class="pac-photo" [class.pac-odd]="p.odd">
                   @if (photoUrls()[p.key]; as src) { <img [src]="src" [alt]="'Photo: ' + p.caption" loading="lazy" /> }
                   @else { <div class="pac-ph">{{ photoErrors()[p.key] ? 'Cannot be read' : 'Loading…' }}</div> }
                   <figcaption [title]="p.caption">{{ p.caption }}</figcaption>
@@ -185,11 +200,17 @@ export function breakdowns(rows: Row[], columns: string[]): { column: string; la
             </div>
             @if (shownRows().length > photoRows().length) { <p class="text-xs text-[color:var(--text-muted)] m-0">The first {{ photoRows().length }} photos; every row is in the table.</p> }
           }
+          @if (allColumns().length > columns().length || allShown()) {
+            <div class="flex items-center gap-2 text-xs text-[color:var(--text-muted)]">
+              <span>{{ columns().length }} of {{ allColumns().length }} columns</span>
+              <button type="button" class="btn btn-ghost btn-xs" (click)="allShown.set(!allShown())" data-test="approval-columns">{{ allShown() ? 'Fewer columns' : 'All columns' }}</button>
+            </div>
+          }
           <div class="pac-table" data-test="approval-rows">
             <table class="table-modern">
               <thead><tr>@for (c of columns(); track c) { <th scope="col">{{ label(c) }}</th> }</tr></thead>
               <tbody>
-                @for (r of shownRows(); track $index) { <tr>@for (c of columns(); track c) { <td>{{ r[c] }}</td> }</tr> }
+                @for (r of shownRows(); track $index) { <tr [class.pac-odd]="odd(r)">@for (c of columns(); track c) { <td>{{ r[c] }}</td> }</tr> }
               </tbody>
             </table>
           </div>
@@ -261,21 +282,35 @@ export class PipelineApprovalCard {
 
   readonly pdf = computed(() => this.outputs().find(o => (o.format ?? '').toLowerCase() === 'pdf' && o.runDatasetId && !o.expired) ?? null);
   readonly imageColumn = computed(() => imageColumnOf(this.rows()));
-  readonly columns = computed(() => shownColumns(this.rows(), this.imageColumn()));
-  readonly breakdown = computed(() => breakdowns(this.rows(), this.columns()));
+  readonly allColumns = computed(() => {
+    const cols = shownColumns(this.rows(), this.imageColumn());
+    return orderedColumns(cols, breakdowns(this.rows(), cols).map(b => b.column));
+  });
+  readonly allShown = signal(false);
+  readonly columns = computed(() => this.allShown() ? this.allColumns() : this.allColumns().slice(0, FIRST_COLUMNS));
+  readonly breakdown = computed(() => breakdowns(this.rows(), this.allColumns()));
+  /** The rows outside the first kind's commonest value (the photos to re-measure, the claims on hold): shown first, marked. */
+  readonly isException = computed(() => {
+    const b = this.breakdown()[0];
+    const common = b?.counts[0]?.value;
+    return (r: Row) => !!b && String(r[b.column] ?? '').trim() !== common;
+  });
+  readonly exceptions = computed(() => this.rows().filter(this.isException()).length);
   readonly shownRows = computed(() => {
     const f = this.filter();
-    return f ? this.rows().filter(r => String(r[f.column] ?? '').trim() === f.value) : this.rows();
+    const rows = f ? this.rows().filter(r => String(r[f.column] ?? '').trim() === f.value) : this.rows();
+    const odd = this.isException();
+    return [...rows.filter(odd), ...rows.filter(r => !odd(r))];
   });
   /** The photos of the rows shown, captioned by the row's first identifying columns. */
   readonly photoRows = computed(() => {
     const col = this.imageColumn();
     if (!col) return [];
-    const cols = this.columns();
-    const idCols = cols.filter(c => /(^id$|_id$|name$|role$|visit)/i.test(c)).slice(0, 2);
-    const captionCols = idCols.length ? idCols : cols.slice(0, 2);
+    const captionCols = this.allColumns().slice(0, 2);
+    const odd = this.isException();
     return this.shownRows().filter(r => typeof r[col] === 'string' && IMAGE.test(r[col] as string)).slice(0, MAX_PHOTOS)
-      .map(r => ({ key: r[col] as string, caption: captionCols.map(c => String(r[c] ?? '')).filter(Boolean).join(' · ') || (r[col] as string) }));
+      .map(r => ({ key: r[col] as string, odd: odd(r),
+        caption: captionCols.map(c => String(r[c] ?? '')).filter(Boolean).join(' · ') || (r[col] as string) }));
   });
 
   constructor() {
@@ -293,6 +328,8 @@ export class PipelineApprovalCard {
   }
 
   label(c: string): string { return fieldLabel(c); }
+
+  odd(r: Row): boolean { return this.isException()(r); }
 
   isOn(column: string, value: string): boolean {
     const f = this.filter();
