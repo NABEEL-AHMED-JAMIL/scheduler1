@@ -170,18 +170,14 @@ export const PINNED: Record<string, unknown> = {
     "url": "/connections/api-collections",
     "requests": [
       "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants"
+      "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
       "API Collections"
     ],
     "buttons": [],
     "columns": [],
-    "fields": [
-      "Pick a workspace",
-      "Workspace"
-    ],
+    "fields": [],
     "links": [
       "/connections",
       "/connections/api-collections",
@@ -189,7 +185,8 @@ export const PINNED: Record<string, unknown> = {
       "/connections/contracts",
       "/connections/databases",
       "/connections/sources",
-      "/connections/storage"
+      "/connections/storage",
+      "/platform/workspaces"
     ]
   },
   "the list, as a tenant user with the page": {

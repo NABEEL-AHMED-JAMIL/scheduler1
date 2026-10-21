@@ -3,7 +3,10 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { Dialog } from '@angular/cdk/dialog';
+import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
+import { AuthService } from '../../../core/auth/auth.service';
+import { AlertRulePanel } from './alert-rule-panel';
+import { Alerts } from './alerts';
 import { of } from 'rxjs';
 import { API_BASE, API_SUCCESS } from '../../../core/api/api.config';
 import { ToastService } from '../../../shared/ui/toast.service';
@@ -191,5 +194,46 @@ describe('Alerts', () => {
     expect(el.querySelector('[data-check="Billing reconciliation"]')!.textContent).toContain('Does not agree');
     expect(el.querySelector('[data-test="health-tiles"]')!.textContent).toContain('1 failing');
     clearInterval((fixture.componentInstance as unknown as { timer: ReturnType<typeof setInterval> }).timer);
+  });
+});
+
+describe('ZT-A12 follow-up: Settings › Alerts on the platform administrator\'s own sign-in', () => {
+  function panel(user: { tenantId: number | null } | null, platform: boolean) {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [AlertRulePanel],
+      providers: [
+        provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: AuthService, useValue: { isPlatformAdmin: () => platform, user: () => user } },
+        { provide: DialogRef, useValue: { close: () => {} } },
+        { provide: DIALOG_DATA, useValue: { scope: 'workspace', rule: null,
+          kinds: [{ kind: 'RUN_FAILED', label: 'Runs failed', threshold: 1, windowMinutes: 60, whatToDo: 'x', runbook: 'y' }] } },
+      ],
+    });
+    const fixture = TestBed.createComponent(AlertRulePanel);
+    fixture.detectChanges();
+    return TestBed.inject(HttpTestingController);
+  }
+
+  it('the rule panel reads no schedules and no access profiles (the rules are the platform\'s own)', () => {
+    const http = panel({ tenantId: null }, true);
+    expect(http.match(r => r.url.includes('/sourceJob.json/listSourceJob'))).toEqual([]);
+    expect(http.match(r => r.url.includes('/pageAccess.json/'))).toEqual([]);
+  });
+
+  it('a workspace administrator (and a managed session) still picks a schedule and groups', () => {
+    const http = panel({ tenantId: 2924 }, false);
+    expect(http.match(r => r.url.includes('/sourceJob.json/listSourceJob')).length).toBe(1);
+  });
+
+  it('the page itself asks for the platform\'s rules on the own sign-in', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({
+      imports: [Alerts],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting(),
+        { provide: AuthService, useValue: { isPlatformAdmin: () => true, user: () => ({ tenantId: null }), canOpen: () => true } }],
+    });
+    const fixture = TestBed.createComponent(Alerts);
+    expect(fixture.componentInstance.scope()).toBe('platform');
   });
 });

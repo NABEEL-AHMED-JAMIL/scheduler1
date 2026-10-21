@@ -280,6 +280,12 @@ export function roleOnly(gate: NavGate & { tabs?: NavTab[] }): 'platform adminis
               workspace's data. Page access then narrows a member to the pages their profile names. The
               server enforces all of it, whatever the screen shows.
             </p>
+            <p class="mt-3 text-sm text-[color:var(--text-secondary)]" data-test="managed-session-record">
+              In Work in this workspace every change is recorded, and so is every data read — opening, exporting or
+              downloading a board, a query result, an export, a document's fields, page images, approved data and its
+              CSV, a run's outputs, a report PDF, a file preview or a download. The workspace sees them in Administration ›
+              Our team's activity, and the platform in Platform › Staff activity. Lists and counts are not recorded.
+            </p>
 
             <h3 class="mt-8 text-sm font-semibold">Run outcomes</h3>
             <div class="mt-3 overflow-x-auto scroll-table">
@@ -672,7 +678,7 @@ export class Docs implements AfterViewInit {
   ];
 
   readonly roles = [
-    { name: 'Platform administrator', note: 'The list of workspaces, the requests for new ones, the rate cards and the settings that apply across all of them. A workspace\'s data — its files, boards, queries, documents and approved data — is read and changed only inside that workspace, with Work in this workspace on Platform › Workspaces, where every change is recorded.' },
+    { name: 'Platform administrator', note: 'On their own sign-in, the platform\'s pages only: the workspaces, the requests for new ones, managed-service grants, Staff activity, service health, the engine settings, billing for every workspace, the rate cards, the catalogue of task types, the limits and the counts. A workspace\'s data — its pipelines, schedules, runs, files, boards, queries, documents, approved data, reports, forms, prompts and connections — opens only inside that workspace, with Work in this workspace on Platform › Workspaces; its pages say so on the own sign-in and read nothing.' },
     { name: 'Workspace administrator', note: 'Everything inside one workspace: its people and page access, connections, pipelines, schedules, settings, alerts and bills; decides any run\'s review.' },
     { name: 'Workspace member', note: 'Runs, reviews and reads within their workspace — the pages their page-access profile opens (all of them when the workspace uses no profiles).' },
   ];

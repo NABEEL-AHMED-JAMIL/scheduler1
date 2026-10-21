@@ -205,43 +205,14 @@ export const PINNED: Record<string, unknown> = {
     "url": "/connections/sources",
     "requests": [
       "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /dataSource.json/list?limit=50&page=1",
-      "GET /tenant.json/listTenants"
+      "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
-      "Sources",
-      "Sources (2 of 2)"
+      "Sources"
     ],
-    "buttons": [
-      "Actions for LIVE-CHECK 0928 customers CSV",
-      "Actions for LIVE-CHECK platform bucket probe",
-      "Cards",
-      "Columns",
-      "LIVE-CHECK 0928 customers CSV",
-      "LIVE-CHECK platform bucket probe",
-      "New source",
-      "Refresh",
-      "Table"
-    ],
-    "columns": [
-      [
-        "Source",
-        "Kind",
-        "Format",
-        "Last test",
-        "Created",
-        "Workspace",
-        "State",
-        "Actions"
-      ]
-    ],
-    "fields": [
-      "All workspaces",
-      "Kind",
-      "Search sources",
-      "Workspace"
-    ],
+    "buttons": [],
+    "columns": [],
+    "fields": [],
     "links": [
       "/connections",
       "/connections/api-collections",
@@ -249,7 +220,8 @@ export const PINNED: Record<string, unknown> = {
       "/connections/contracts",
       "/connections/databases",
       "/connections/sources",
-      "/connections/storage"
+      "/connections/storage",
+      "/platform/workspaces"
     ]
   },
   "the sources, as a tenant user with the page": {

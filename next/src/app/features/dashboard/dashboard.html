@@ -90,14 +90,18 @@
         <div class="card p-4">
           <div class="flex flex-wrap items-baseline gap-2 mb-4">
             <h2 class="text-sm font-semibold">Runs by hour</h2>
-            <span class="text-xs text-[color:var(--text-muted)]">
-              Click any cell to see which schedules ran in that hour
+            <span class="text-xs text-[color:var(--text-muted)]" data-test="heat-hint">
+              @if (ownSignIn()) {
+                Which schedules ran in an hour shows in a workspace's "Work in this workspace"
+              } @else {
+                Click any cell to see which schedules ran in that hour
+              }
             </span>
           </div>
           @if (errors().hourly; as reason) {
             <app-load-error [message]="reason" (retry)="retry('hourly')" />
           } @else {
-            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" (cellClicked)="onHeatCell($event)" />
+            <app-heatmap [data]="heatCells()" [selected]="selectedHeat()" [interactive]="!ownSignIn()" (cellClicked)="onHeatCell($event)" />
           }
         </div>
       </div>

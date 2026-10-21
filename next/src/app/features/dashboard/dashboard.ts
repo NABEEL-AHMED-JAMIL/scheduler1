@@ -26,6 +26,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { JobEventsService } from '../../core/socket/job-events.service';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../core/auth/workspace-data';
 import { workspaceName } from '../../shared/ui/workspace-name';
 
 const WEEKDAY_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -80,7 +81,13 @@ export class Dashboard implements OnInit {
    * The counts drill into Run history, which is the Jobs page. Without that page (a tenant user's
    * access profile) every count landed on /unauthorized, so for them they are figures, not links.
    */
-  readonly canOpenJobs = computed(() => this.auth.canOpen('jobs'));
+  readonly canOpenJobs = computed(() => this.auth.canOpen('jobs') && !this.ownSignIn());
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in keeps Home's
+   * three counts (every workspace's), and does not drill into an hour: which schedules ran in it, and their runs, are a
+   * workspace's data, which Core answers 403 outside "Work in this workspace". The cells are figures, not buttons.
+   */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   /**
    * A platform administrator's hour lists every workspace's jobs, and two workspaces can each have
    * a "Nightly import" (review dashboard#17), so they get a Workspace column. Everyone else's hour
@@ -316,6 +323,8 @@ export class Dashboard implements OnInit {
       this.range.set({ from, to, preset });
       this.appliedStart.set(from); this.appliedEnd.set(to);
     }
+    // A shared link to an hour opens on the counts alone for the own sign-in (no drill-down; see ownSignIn).
+    if (this.ownSignIn()) return;
     const date = query.get('date') ?? '';
     const hr = Number(query.get('hr'));
     if (!ISO_DAY.test(date) || query.get('hr') === null || !Number.isInteger(hr) || hr < 0 || hr > 23) return;
@@ -455,7 +464,7 @@ export class Dashboard implements OnInit {
   }
 
   selectCell(date: string, hr: number, count: number, day?: string, dates?: string[]): void {
-    if (!count || !date) return;
+    if (!count || !date || this.ownSignIn()) return;
     const dayName = day ?? this.hourly().find(h => h.date === date)?.dayCode ?? '';
     this.selectedCell.set({ date, hr, day: dayName, dates: dates?.length ? dates : [date] });
     this.readBreakdown(date, hr);
@@ -495,6 +504,7 @@ export class Dashboard implements OnInit {
   }
 
   private readBreakdown(date: string, hr: number): void {
+    if (this.ownSignIn()) return;
     this.breakdownLoading.set(true);
     this.breakdownError.set('');
     this.breakdown.set([]);

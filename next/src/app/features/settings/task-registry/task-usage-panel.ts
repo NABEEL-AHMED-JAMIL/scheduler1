@@ -20,6 +20,12 @@ export interface TaskUsagePanelData {
   count: number;
   /** A platform administrator's chosen workspace (null: every workspace). */
   tenantId: number | null;
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in sees the count
+   * and not the list -- the pipelines and runs behind it are a workspace's data, which Core answers 403 outside "Work in
+   * this workspace". Nothing is read.
+   */
+  countsOnly?: boolean;
 }
 
 /**
@@ -34,7 +40,12 @@ export interface TaskUsagePanelData {
   imports: [SidePanel, Icon, RouterLink, StatusPill, ServerTimePipe],
   template: `
     <app-side-panel [heading]="heading()" [subtitle]="subtitle()">
-      @if (loading()) {
+      @if (data.countsOnly) {
+        <p class="text-sm text-[color:var(--text-secondary)] py-6 text-center" data-test="usage-counts-only">
+          The {{ data.list === 'runs' ? 'runs' : 'pipelines' }} themselves are a workspace's: open it with "Work in this workspace"
+          on Platform › Workspaces to see them.
+        </p>
+      } @else if (loading()) {
         <div class="py-10 text-center text-sm text-[color:var(--text-muted)]"><div class="spinner mx-auto mb-2" role="status" aria-label="Loading"></div>Loading…</div>
       } @else if (error()) {
         <p class="text-sm text-crit-500 py-6 text-center" role="alert">{{ error() }}</p>
@@ -134,6 +145,7 @@ export class TaskUsagePanel implements OnInit {
   }
 
   ngOnInit(): void {
+    if (this.data.countsOnly) { this.loading.set(false); return; }
     const failed = (message?: string) => { this.loading.set(false); this.error.set(message || 'The list could not be read.'); };
     if (this.data.list === 'runs') {
       this.api.taskRuns(this.data.of, this.data.tenantId).subscribe({

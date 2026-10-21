@@ -4,6 +4,7 @@ import { anonymousOnly, authGuard, pageGuard, passwordChangeGuard, roleGuard } f
 import { Shell } from './features/shell/shell';
 import { toFirstTab } from './core/nav/nav-access';
 import { toFirstSection } from './features/documents/intake/intake-sections';
+import { WorkspaceDataCard, withWorkspaceCards } from './core/auth/workspace-data';
 
 /**
  * MIG-246 / MIG-267: the entry point of a Wave 4 or Wave 5 page that is on the menu before it is built.
@@ -12,6 +13,15 @@ import { toFirstSection } from './features/documents/intake/intake-sections';
 /** Old address -> today's, as whole-address redirects (params and the query string carry over). */
 function moved(pairs: [from: string, to: string][]): Route[] {
   return pairs.map(([path, redirectTo]) => ({ path, redirectTo, pathMatch: 'full' as const }));
+}
+
+/**
+ * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): a workspace's page, which the platform administrator's own
+ * sign-in meets as the needs-workspace card in its place (withWorkspaceCards, core/auth/workspace-data.ts): its words,
+ * "{what} a workspace's, and this sign-in has none." and "... "Work in this workspace" ... to {todo}.".
+ */
+function workspace(what: string, todo: string, icon: string): WorkspaceDataCard {
+  return { what, todo, icon };
 }
 
 export const routes: Routes = [
@@ -81,7 +91,8 @@ export const routes: Routes = [
     // On the shell rather than on each child: the password gate has to see every move
     // between the children, and only the profile screen is exempt.
     canActivateChild: [passwordChangeGuard],
-    children: [
+    // Every route marked workspaceData gets its needs-workspace twin in front of it, for the own sign-in only.
+    children: withWorkspaceCards([
       {
         // The dashboard has its own address rather than living at the root, so it can be linked
         // to and returned to by name. Run history already tried to send people to /dashboard
@@ -109,7 +120,7 @@ export const routes: Routes = [
         title: 'Storage connections',
         loadComponent: () =>
           import('./features/admin/storage/storage-connections').then(m => m.StorageConnections),
-        data: { minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN', workspaceData: workspace('Storage connections are', 'see, test and change its storage connections', 'database') },
         canActivate: [roleGuard],
       },
       {
@@ -141,7 +152,7 @@ export const routes: Routes = [
         title: 'API Collections',
         loadComponent: () =>
           import('./features/integration/api-collections/api-collections').then(m => m.ApiCollections),
-        data: { pageKey: 'api-collections' },
+        data: { pageKey: 'api-collections', workspaceData: workspace('API collections are', 'test and version its APIs', 'plug') },
         canActivate: [pageGuard],
       },
       {
@@ -149,7 +160,7 @@ export const routes: Routes = [
         title: 'API collection',
         loadComponent: () =>
           import('./features/integration/api-collections/collection').then(m => m.Collection),
-        data: { pageKey: 'api-collections' },
+        data: { pageKey: 'api-collections', workspaceData: workspace('An API collection is', 'test and version its APIs', 'plug') },
         canActivate: [pageGuard],
       },
       {
@@ -161,7 +172,7 @@ export const routes: Routes = [
         title: 'Sources',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources', view: 'sources' },
+        data: { pageKey: 'sources', view: 'sources', workspaceData: workspace('Sources are', 'see and test the sources its pipelines read', 'database') },
         canActivate: [pageGuard],
       },
       {
@@ -171,7 +182,7 @@ export const routes: Routes = [
         title: 'Database connections',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources', view: 'connections' },
+        data: { pageKey: 'sources', view: 'connections', workspaceData: workspace('Database connections are', 'see, test and change its database connections', 'database') },
         canActivate: [pageGuard],
       },
       {
@@ -179,7 +190,7 @@ export const routes: Routes = [
         title: 'Data contracts',
         loadComponent: () =>
           import('./features/integration/sources/sources').then(m => m.Sources),
-        data: { pageKey: 'sources', view: 'contracts' },
+        data: { pageKey: 'sources', view: 'contracts', workspaceData: workspace('Data contracts are', 'see and change its data contracts', 'shield') },
         canActivate: [pageGuard],
       },
       {
@@ -189,7 +200,7 @@ export const routes: Routes = [
         path: 'connections/connectors',
         title: 'Connections',
         loadComponent: () => import('./features/integration/connectors/connectors').then(m => m.Connectors),
-        data: { pageKey: 'connector-hub' },
+        data: { pageKey: 'connector-hub', workspaceData: workspace('Connections are', 'connect its databases, apps and folders', 'plug') },
         canActivate: [pageGuard],
       },
       {
@@ -197,7 +208,7 @@ export const routes: Routes = [
         path: 'integration/connectors/oauth/callback',
         title: 'Connecting',
         loadComponent: () => import('./features/integration/connectors/oauth-callback').then(m => m.OAuthCallback),
-        data: { pageKey: 'connector-hub' },
+        data: { pageKey: 'connector-hub', workspaceData: workspace('A connection is', 'connect its apps', 'plug') },
         canActivate: [pageGuard],
       },
       // ---------------------------------------------------------------------------------------------
@@ -210,7 +221,7 @@ export const routes: Routes = [
         path: 'pipelines/list',
         title: 'Pipelines',
         loadComponent: () => import('./features/tasks/tasks').then(m => m.Tasks),
-        data: { pageKey: 'tasks' },
+        data: { pageKey: 'tasks', workspaceData: workspace('Pipelines are', 'see, build and run its pipelines', 'layers') },
         canActivate: [pageGuard],
       },
       {
@@ -229,7 +240,7 @@ export const routes: Routes = [
         path: 'pipelines/new/form',
         title: 'New pipeline',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
-        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN', workspaceData: workspace('A pipeline is', 'build its pipelines', 'layers') },
         canActivate: [pageGuard, roleGuard],
       },
       {
@@ -239,42 +250,42 @@ export const routes: Routes = [
         path: 'pipelines/bulk',
         title: 'Bulk pipelines',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { pageKey: 'tasks', kind: 'task', minRole: 'TENANT_ADMIN' },
+        data: { pageKey: 'tasks', kind: 'task', minRole: 'TENANT_ADMIN', workspaceData: workspace('Pipelines are', 'export and import its pipelines', 'layers') },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'pipelines/:taskDetailId/edit',
         title: 'Pipeline',
         loadComponent: () => import('./features/tasks/edit/task-edit').then(m => m.TaskEdit),
-        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN' },
+        data: { pageKey: 'tasks', minRole: 'TENANT_ADMIN', workspaceData: workspace('A pipeline is', 'see and change its pipelines', 'layers') },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'pipelines/schedules',
         title: 'Schedules & triggers',
         loadComponent: () => import('./features/jobs/jobs').then(m => m.Jobs),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', workspaceData: workspace('Schedules are', 'see, change and run its schedules', 'calendar') },
         canActivate: [pageGuard],
       },
       {
         path: 'pipelines/schedules/new',
         title: 'New schedule',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', workspaceData: workspace('A schedule is', 'add its schedules', 'calendar') },
         canActivate: [pageGuard],
       },
       {
         path: 'pipelines/schedules/bulk',
         title: 'Bulk schedules',
         loadComponent: () => import('./features/bulk/bulk-transfer').then(m => m.BulkTransfer),
-        data: { pageKey: 'jobs', kind: 'job' },
+        data: { pageKey: 'jobs', kind: 'job', workspaceData: workspace('Schedules are', 'export and import its schedules', 'calendar') },
         canActivate: [pageGuard],
       },
       {
         path: 'pipelines/schedules/:jobId/edit',
         title: 'Schedule',
         loadComponent: () => import('./features/jobs/edit/job-edit').then(m => m.JobEdit),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', workspaceData: workspace('A schedule is', 'see and change its schedules', 'calendar') },
         canActivate: [pageGuard],
       },
       {
@@ -282,7 +293,7 @@ export const routes: Routes = [
         title: 'Schedule assistant',
         loadComponent: () =>
           import('./features/jobs/assistant/job-assistant').then(m => m.JobAssistant),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', workspaceData: workspace('A schedule\'s assistant is', 'ask about its schedules and their runs', 'sparkle') },
         canActivate: [pageGuard],
       },
       {
@@ -291,7 +302,7 @@ export const routes: Routes = [
         title: 'Schedule runs',
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', workspaceData: workspace('A schedule\'s runs are', 'see its runs', 'history') },
         canActivate: [pageGuard],
       },
       {
@@ -301,7 +312,7 @@ export const routes: Routes = [
         path: 'pipelines/schedules/:jobId/runs/:jobQueueId',
         title: 'Run',
         loadComponent: () => import('./features/jobs/logs/job-logs').then(m => m.JobLogs),
-        data: { pageKey: 'jobs', pageKeys: ['jobs', 'queue'] },
+        data: { pageKey: 'jobs', pageKeys: ['jobs', 'queue'], workspaceData: workspace('A run is', 'see its runs, their steps, logs and outputs', 'play') },
         canActivate: [pageGuard],
         children: [{ path: '', children: [] }, { path: 'logs', children: [] }],
       },
@@ -313,14 +324,14 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/jobs/history/job-history').then(m => m.JobHistory),
         // UX review 2026-10-12 (R2): with the Queue too -- a reviewer's runs waiting for review are listed here.
-        data: { pageKey: 'jobs', pageKeys: ['jobs', 'queue'] },
+        data: { pageKey: 'jobs', pageKeys: ['jobs', 'queue'], workspaceData: workspace('Runs are', 'see its runs', 'play') },
         canActivate: [pageGuard],
       },
       {
         path: 'runs/by-date',
         title: 'Runs by date',
         loadComponent: () => import('./features/queue/queue').then(m => m.Queue),
-        data: { pageKey: 'queue' },
+        data: { pageKey: 'queue', workspaceData: workspace('Runs are', 'see its runs by date', 'calendar') },
         canActivate: [pageGuard],
       },
       {
@@ -328,7 +339,7 @@ export const routes: Routes = [
         path: 'runs/failed',
         title: 'Failed runs',
         loadComponent: () => import('./features/runs/failed/failed-runs').then(m => m.FailedRuns),
-        data: { pageKey: 'queue' },
+        data: { pageKey: 'queue', workspaceData: workspace('Failed runs are', 'see and retry its failed runs', 'alert') },
         canActivate: [pageGuard],
       },
       {
@@ -336,7 +347,7 @@ export const routes: Routes = [
         path: 'runs/backfills',
         title: 'Backfills',
         loadComponent: () => import('./features/runs/backfills/backfills').then(m => m.Backfills),
-        data: { pageKey: 'jobs' },
+        data: { pageKey: 'jobs', workspaceData: workspace('Backfills are', 'see and start its backfills', 'history') },
         canActivate: [pageGuard],
       },
       {
@@ -344,7 +355,7 @@ export const routes: Routes = [
         title: 'Run analytics',
         loadComponent: () =>
           import('./features/reports/reports').then(m => m.Reports),
-        data: { pageKey: 'reports' },
+        data: { pageKey: 'reports', workspaceData: workspace('Run analytics are', 'see how its runs measure up', 'chart') },
         canActivate: [pageGuard],
       },
       // ---------------------------------------------------------------------------------------------
@@ -427,7 +438,7 @@ export const routes: Routes = [
         path: 'reports/from-pipelines',
         title: 'Reports from pipelines',
         loadComponent: () => import('./features/documents/generated/generated-reports').then(m => m.GeneratedReports),
-        data: { pageKey: 'tools-converter' },
+        data: { pageKey: 'tools-converter', workspaceData: workspace('Reports from pipelines are', 'see the reports its pipelines made', 'file') },
         canActivate: [pageGuard],
       },
       // MIG-403: See results › Reports (Report Studio). Each tab its own page key; the detail pages their tab's.
@@ -435,14 +446,14 @@ export const routes: Routes = [
         path: 'reports/overview',
         title: 'Reports overview',
         loadComponent: () => import('./features/report-studio/overview').then(m => m.ReportOverview),
-        data: { pageKey: 'report-studio' },
+        data: { pageKey: 'report-studio', workspaceData: workspace('Report Studio is', 'design, make and approve its reports', 'template') },
         canActivate: [pageGuard],
       },
       {
         path: 'reports/templates',
         title: 'Report templates',
         loadComponent: () => import('./features/report-studio/templates').then(m => m.ReportTemplates),
-        data: { pageKeys: ['report-templates', 'report-generate'] },
+        data: { pageKeys: ['report-templates', 'report-generate'], workspaceData: workspace('Report templates are', 'design and publish its report templates', 'template') },
         canActivate: [pageGuard],
       },
       {
@@ -450,7 +461,7 @@ export const routes: Routes = [
         path: 'reports/templates/:templateId/design',
         title: 'Template designer',
         loadComponent: () => import('./features/report-studio/designer/designer').then(m => m.ReportDesigner),
-        data: { pageKey: 'report-templates', canvas: true },
+        data: { pageKey: 'report-templates', canvas: true, workspaceData: workspace('A report template is', 'design its report templates', 'template') },
         canActivate: [pageGuard],
         canDeactivate: [unsavedChangesGuard],
       },
@@ -459,28 +470,28 @@ export const routes: Routes = [
         path: 'reports/new',
         title: 'Create report',
         loadComponent: () => import('./features/report-studio/wizard/new-report').then(m => m.NewReport),
-        data: { pageKey: 'report-generate' },
+        data: { pageKey: 'report-generate', workspaceData: workspace('A new report is', 'make its reports', 'template') },
         canActivate: [pageGuard],
       },
       {
         path: 'reports/templates/:templateId',
         title: 'Report template',
         loadComponent: () => import('./features/report-studio/template-page').then(m => m.ReportTemplatePage),
-        data: { pageKeys: ['report-templates', 'report-generate'] },
+        data: { pageKeys: ['report-templates', 'report-generate'], workspaceData: workspace('A report template is', 'see and publish its report templates', 'template') },
         canActivate: [pageGuard],
       },
       {
         path: 'reports/library',
         title: 'Report library',
         loadComponent: () => import('./features/report-studio/library').then(m => m.ReportLibrary),
-        data: { pageKey: 'report-library' },
+        data: { pageKey: 'report-library', workspaceData: workspace('The report library is', 'see, approve and send its reports', 'file') },
         canActivate: [pageGuard],
       },
       {
         path: 'reports/library/:reportId',
         title: 'Report',
         loadComponent: () => import('./features/report-studio/report-page').then(m => m.ReportPage),
-        data: { pageKey: 'report-library' },
+        data: { pageKey: 'report-library', workspaceData: workspace('A report is', 'see, approve and send its reports', 'file') },
         canActivate: [pageGuard],
       },
       {
@@ -488,7 +499,7 @@ export const routes: Routes = [
         path: 'reports/assets',
         title: 'Assets & branding',
         loadComponent: () => import('./features/report-studio/assets/assets').then(m => m.ReportAssets),
-        data: { pageKey: 'report-assets' },
+        data: { pageKey: 'report-assets', workspaceData: workspace('Report assets are', 'see and approve its images, signatures and branding', 'image') },
         canActivate: [pageGuard],
       },
       {
@@ -496,7 +507,7 @@ export const routes: Routes = [
         path: 'reports/assets/branding/:profileId',
         title: 'Brand profile',
         loadComponent: () => import('./features/report-studio/assets/brand-profile').then(m => m.BrandProfilePage),
-        data: { pageKey: 'report-assets' },
+        data: { pageKey: 'report-assets', workspaceData: workspace('A brand profile is', 'change its reports\' branding', 'image') },
         canActivate: [pageGuard],
       },
       {
@@ -505,7 +516,7 @@ export const routes: Routes = [
         path: 'reports/assets/:assetId',
         title: 'Asset',
         loadComponent: () => import('./features/report-studio/assets/asset-page').then(m => m.AssetPage),
-        data: { pageKeys: ['report-assets', 'report-approve'] },
+        data: { pageKeys: ['report-assets', 'report-approve'], workspaceData: workspace('A report asset is', 'see and approve its images and signatures', 'image') },
         canActivate: [pageGuard],
       },
       {
@@ -520,7 +531,7 @@ export const routes: Routes = [
         path: 'reports/data',
         title: 'Report data',
         loadComponent: () => import('./features/report-studio/data').then(m => m.ReportData),
-        data: { pageKey: 'report-data' },
+        data: { pageKey: 'report-data', workspaceData: workspace('Report data is', 'see the data its reports read', 'table') },
         canActivate: [pageGuard],
       },
       {
@@ -533,7 +544,7 @@ export const routes: Routes = [
         path: 'data/files',
         title: 'Browse files',
         loadComponent: () => import('./features/objects/objects').then(m => m.Objects),
-        data: { pageKey: 'objects', minRole: 'TENANT_USER' },
+        data: { pageKey: 'objects', minRole: 'TENANT_USER', workspaceData: workspace('Files are', 'see, upload and download its files', 'folder') },
         canActivate: [pageGuard, roleGuard],
       },
       {
@@ -602,14 +613,14 @@ export const routes: Routes = [
         path: 'forms/builder',
         title: 'Forms',
         loadComponent: () => import('./features/forms/form-builder').then(m => m.FormBuilder),
-        data: { pageKey: 'forms' },
+        data: { pageKey: 'forms', workspaceData: workspace('Forms are', 'build and share its forms', 'list') },
         canActivate: [pageGuard],
       },
       {
         path: 'forms/:formId/fill',
         title: 'Fill in a form',
         loadComponent: () => import('./features/forms/form-fill').then(m => m.FormFill),
-        data: { pageKey: 'forms' },
+        data: { pageKey: 'forms', workspaceData: workspace('A form is', 'fill in its forms', 'list') },
         canActivate: [pageGuard],
       },
       {
@@ -617,7 +628,7 @@ export const routes: Routes = [
         path: 'forms/submissions',
         title: 'Form submissions',
         loadComponent: () => import('./features/forms/form-submissions').then(m => m.FormSubmissions),
-        data: { pageKey: 'form-submissions' },
+        data: { pageKey: 'form-submissions', workspaceData: workspace('Form submissions are', 'see what its forms collected', 'list') },
         canActivate: [pageGuard],
       },
       // ---------------------------------------------------------------------------------------------
@@ -689,21 +700,21 @@ export const routes: Routes = [
         path: 'pipelines/prompts',
         title: 'Prompts',
         loadComponent: () => import('./features/ai/prompts/prompts').then(m => m.Prompts),
-        data: { pageKey: 'ai-prompts' },
+        data: { pageKey: 'ai-prompts', workspaceData: workspace('Prompts are', 'see, try and change its prompts', 'sparkle') },
         canActivate: [pageGuard],
       },
       {
         path: 'pipelines/prompts/new',
         title: 'New prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
-        data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
+        data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN', workspaceData: workspace('A prompt is', 'add its prompts', 'sparkle') },
         canActivate: [pageGuard, roleGuard],
       },
       {
         path: 'pipelines/prompts/:promptId/edit',
         title: 'Prompt',
         loadComponent: () => import('./features/ai/prompts/prompt-edit').then(m => m.PromptEdit),
-        data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN' },
+        data: { pageKey: 'ai-prompts', minRole: 'TENANT_ADMIN', workspaceData: workspace('A prompt is', 'see, try and change its prompts', 'sparkle') },
         canActivate: [pageGuard, roleGuard],
       },
       {
@@ -714,7 +725,7 @@ export const routes: Routes = [
         title: 'AI Assistant',
         // Its pages (the assistant, and All conversations) are in its own lazy route table.
         loadChildren: () => import('./features/ai/assistant/assistant.routes').then(m => m.routes),
-        data: { pageKey: 'ai-prompts' },
+        data: { pageKey: 'ai-prompts', workspaceData: workspace('The AI Assistant is', 'describe and run its pipelines in plain language', 'sparkle') },
         canActivate: [pageGuard],
       },
       {
@@ -736,7 +747,7 @@ export const routes: Routes = [
         path: 'settings/model-connections',
         title: 'Model connections',
         loadComponent: () => import('./features/ai/connections/connections').then(m => m.Connections),
-        data: { minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN', workspaceData: workspace('Model connections are', 'see, test and change its model connections', 'plug') },
         canActivate: [roleGuard],
       },
       // ---------------------------------------------------------------------------------------------
@@ -758,7 +769,7 @@ export const routes: Routes = [
         path: 'settings/task-registry/new',
         title: 'New registry task',
         loadComponent: () => import('./features/settings/task-registry/registry-task-editor').then(m => m.RegistryTaskEditor),
-        data: { minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN', workspaceData: workspace('A registry task is', 'add and change its registry tasks', 'list') },
         canActivate: [roleGuard],
         canDeactivate: [unsavedChangesGuard],
       },
@@ -766,7 +777,7 @@ export const routes: Routes = [
         path: 'settings/task-registry/:pipelineKey',
         title: 'Edit registry task',
         loadComponent: () => import('./features/settings/task-registry/registry-task-editor').then(m => m.RegistryTaskEditor),
-        data: { minRole: 'TENANT_ADMIN' },
+        data: { minRole: 'TENANT_ADMIN', workspaceData: workspace('A registry task is', 'add and change its registry tasks', 'list') },
         canActivate: [roleGuard],
         canDeactivate: [unsavedChangesGuard],
       },
@@ -1174,7 +1185,7 @@ export const routes: Routes = [
         title: 'Page not found',
         loadComponent: () => import('./features/not-found/not-found').then(m => m.NotFound),
       },
-    ],
+    ]),
   },
   { path: '**', redirectTo: '' },
 ];

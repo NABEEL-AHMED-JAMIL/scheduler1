@@ -248,7 +248,7 @@ test.describe('MIG-254: a platform administrator (faked; the owner\'s account is
     await page.getByRole('menuitem', { name: 'Work in this workspace' }).click();
     await expect(page).toHaveURL(/\/dashboard$/);
     const bar = page.locator('[data-managed-session]');
-    await expect(bar).toContainText('Managed session: Claude Demo — every change is audited');
+    await expect(bar).toContainText('Managed session: Claude Demo — every change and every data read is recorded');
     await shot(page, info, 'managed-session-bar');
     // Our staff build in a MANAGED workspace: no customer banner, and the writes are there.
     await page.goto('/pipelines/list');

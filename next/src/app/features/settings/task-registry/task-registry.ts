@@ -30,6 +30,7 @@ import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { setByWords } from '../../ai/assistant/assistant.model';
 import { TaskChange, TaskControlState, TaskUsage, UsageCount, changeWords, usageById } from '../../tasks/steps/task-usage.model';
 import { TaskUsagePanel, TaskUsagePanelData } from './task-usage-panel';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { TaskPanel, TaskPanelData, TaskPanelResult } from './task-panel';
 import { REGISTRY_KINDS, RegistryRow, TASK_STATES, filterRows, kindCounts, registryRows } from './task-registry.model';
 import { PageHeader } from '../../../shared/ui/page-header';
@@ -115,6 +116,12 @@ export class TaskRegistry implements OnInit {
 
   readonly hasFilters = computed(() => !!this.kindFilter() || !!this.stateFilter() || !!this.search().trim() || this.pipelinesOnly());
   readonly isPlatformAdmin = computed(() => this.auth.isPlatformAdmin());
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in sees the
+   * registry, its switches and its counts, and not a workspace's pipelines -- the Legacy rows (pipeline.json/list) and
+   * the lists behind a count are a workspace's data, shown in "Work in this workspace".
+   */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   /** Switches the workspace's tasks, as on the step builder's Settings tab (Core refuses anyone else). */
   readonly isWorkspaceAdmin = computed(() => this.auth.isTenantAdmin());
   /**
@@ -245,7 +252,7 @@ export class TaskRegistry implements OnInit {
   openUsage(row: RegistryRow, list: 'pipelines' | 'runs'): void {
     const count = this.countOf(row);
     const data: TaskUsagePanelData = {
-      list, name: row.name, count: list === 'runs' ? count.runs : count.pipelines, tenantId: this.tenantParam(),
+      list, name: row.name, count: list === 'runs' ? count.runs : count.pipelines, tenantId: this.tenantParam(), countsOnly: this.ownSignIn(),
       of: row.legacy && row.pipeline?.pipelineKey != null ? { pipelineKey: row.pipeline.pipelineKey } : { code: row.code },
     };
     this.dialog.open<void>(TaskUsagePanel, sidePanelConfig(data, 'wide', 'right'));
@@ -317,6 +324,7 @@ export class TaskRegistry implements OnInit {
   private loadTicket = 0;
   loadPipelines(): void {
     const ticket = ++this.loadTicket;
+    if (this.ownSignIn()) { this.loading.set(false); this.error.set(''); this.forms.set([]); this.summary.set(EMPTY_SUMMARY); return; }
     this.loading.set(true);
     this.error.set('');
     const params: Record<string, string> = { page: '1', limit: String(LIST_LIMIT) };

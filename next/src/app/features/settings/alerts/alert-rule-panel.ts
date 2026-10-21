@@ -7,6 +7,8 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { refusal } from '../../../shared/ui/bulk/bulk.model';
 import { AccessProfile, AccessProfilesService } from '../../admin/access-profiles/access-profiles.service';
 import { AlertKindInfo, AlertRule, AlertScope, AlertsApi, ruleSentence } from './alerts.api';
+import { AuthService } from '../../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 
 export interface AlertRulePanelData {
   scope: AlertScope;
@@ -164,6 +166,7 @@ export class AlertRulePanel implements OnInit {
   private readonly api = inject(AlertsApi);
   private readonly http = inject(HttpClient);
   private readonly profilesApi = inject(AccessProfilesService);
+  private readonly auth = inject(AuthService, { optional: true });
 
   readonly draft = signal<AlertRule>(this.data.rule ? structuredClone(this.data.rule) : this.fresh(this.data.kinds[0]));
   readonly schedules = signal<Schedule[]>([]);
@@ -182,7 +185,9 @@ export class AlertRulePanel implements OnInit {
   readonly windowLabel = computed(() => this.draft().kind === 'REVIEW_WAITING' ? 'Waiting longer than (minutes)' : 'Within (minutes)');
 
   ngOnInit(): void {
-    if (this.data.scope !== 'workspace') return;
+    // A workspace's schedules and access profiles; the platform's rules (and the platform administrator's own sign-in,
+    // ZT-A12 follow-up) name neither, and Core answers the own sign-in 403 on the schedules.
+    if (this.data.scope !== 'workspace' || isOwnPlatformSignIn(this.auth)) return;
     this.http.get<ApiResponse<Schedule[]>>(`${API_BASE}/sourceJob.json/listSourceJob`).subscribe({
       next: r => this.schedules.set((r?.data ?? []).map(j => ({ jobId: j.jobId, jobName: j.jobName }))),
       error: () => this.schedules.set([]),

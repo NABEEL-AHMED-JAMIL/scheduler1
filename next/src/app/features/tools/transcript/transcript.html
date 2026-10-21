@@ -12,7 +12,11 @@
         <span class="limits-note">Billed by the minute of audio. If the transcriber is busy you're told so; nothing is lost, try again in about {{ limits().retryAfterSeconds }} seconds. A file over the upload limit can go to a bucket first.</span>
       </div>
       <div class="space-y-4">
-        <app-segmented [value]="mode()" (valueChange)="setMode($event)" [options]="modeOptions" ariaLabel="Choose a source" />
+        @if (ownSignIn) {
+          <p class="text-sm text-[color:var(--text-muted)]" data-test="bucket-in-workspace">A recording in a workspace's bucket is transcribed in "Work in this workspace", opened from Platform › Workspaces.</p>
+        } @else {
+          <app-segmented [value]="mode()" (valueChange)="setMode($event)" [options]="modeOptions" ariaLabel="Choose a source" />
+        }
 
         @if (mode() === 'upload') {
           <app-file-dropzone [file]="file()" (fileChange)="onFile($event)" accept=".mp3,.m4a"

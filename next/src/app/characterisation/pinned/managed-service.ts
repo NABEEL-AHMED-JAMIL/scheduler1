@@ -55,7 +55,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Our team's activity",
-      "Changes"
+      "Activity"
     ],
     "buttons": [
       "Load older",
@@ -65,11 +65,12 @@ export const PINNED: Record<string, unknown> = {
       [
         "When",
         "Staff member",
-        "Change",
+        "Change or read",
         "Service"
       ]
     ],
     "fields": [
+      "Changes or data reads",
       "Filter by staff member"
     ],
     "links": [
@@ -144,7 +145,7 @@ export const PINNED: Record<string, unknown> = {
     ],
     "headings": [
       "Staff activity",
-      "Changes"
+      "Activity"
     ],
     "buttons": [
       "Columns",
@@ -156,12 +157,13 @@ export const PINNED: Record<string, unknown> = {
         "When",
         "Staff member",
         "Workspace",
-        "Change",
+        "Change or read",
         "Service"
       ]
     ],
     "fields": [
       "All workspaces",
+      "Changes or data reads",
       "Filter by staff member",
       "Workspace"
     ],

@@ -7,7 +7,7 @@ import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config
 import { TableShell } from '../../../shared/ui/data-table';
 import { Icon } from '../../../shared/ui/icon';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
-import { ActionsPage, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
+import { ActionsPage, ActivityKind, ManagedAction, ManagedServiceApi, StaffCandidate, personName, staffOf } from './managed-service.api';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 
@@ -47,11 +47,64 @@ export function targetText(target: string | null | undefined): string {
     .join(' · ');
 }
 
+/**
+ * How a data read reads (ZT-A12 follow-up, owner 2026-10-21): Identity's `readKind` -> the verb and the thing, so a row says
+ * "Opened board 41" or "Downloaded run output 8913:csv". Keyed by the kind in lower case with spaces; a kind not listed
+ * here reads "Read <kind> <id>".
+ */
+const READS: Record<string, [verb: string, thing: string]> = {
+  'board': ['Opened', 'board'],
+  'tile': ['Opened', 'tile'],
+  'query result': ['Read', 'query result'],
+  'export': ['Downloaded', 'export'],
+  'file preview': ['Previewed', 'file'],
+  'file download': ['Downloaded', 'file'],
+  'page images': ['Opened', 'page images of document'],
+  'document': ['Opened', 'document'],
+  'document fields': ['Opened', 'the fields of document'],
+  'approved data': ['Opened', 'approved data'],
+  'approved data csv': ['Downloaded', 'approved data CSV'],
+  'run outputs': ['Opened', 'the outputs of run'],
+  'run output': ['Downloaded', 'run output'],
+  'step logs': ['Opened', 'the step logs of run'],
+  'run log': ['Opened', 'the log of run'],
+  'run ai answers': ['Opened', 'the AI answers of run'],
+  'prompt runs': ['Opened', 'the runs of prompt'],
+  'report pdf': ['Downloaded', 'report PDF'],
+  'report page image': ['Opened', 'report page image'],
+  'form submission': ['Opened', 'form submission'],
+  'form submissions csv': ['Downloaded', 'form submissions CSV'],
+  'ask your data answer': ['Read', 'Ask your data answer'],
+  'ask your data chart': ['Opened', 'Ask your data chart'],
+  'assistant tool results': ['Read', 'assistant tool results'],
+  'assistant result rows': ['Read', 'assistant result rows'],
+  'schedules export': ['Downloaded', 'schedules export'],
+  'pipelines export': ['Downloaded', 'pipelines export'],
+};
+
+/** A row that is a data read, not a change: Identity names what was read. */
+export function isRead(a: Pick<ManagedAction, 'readKind'>): boolean {
+  return !!a.readKind?.trim();
+}
+
+/** A data read in words: "Opened board 41", "Downloaded run output 8913:csv"; an unknown kind "Read <kind> <id>". */
+export function readText(a: Pick<ManagedAction, 'readKind' | 'readId'>): string {
+  const kind = (a.readKind ?? '').trim();
+  if (!kind) return '';
+  const key = kind.replace(/([a-z0-9])([A-Z])/g, '$1 $2').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').toLowerCase();
+  const id = a.readId === null || a.readId === undefined || a.readId === '' ? '' : ` ${a.readId}`;
+  const known = READS[key];
+  return known ? `${known[0]} ${known[1]}${id}` : `Read ${kind}${id}`;
+}
+
 /** How many rows a page asks for: the service's default is 100 and its most 500. */
 export const ACTIONS_PAGE = 50;
 
 /**
- * MIG-254: the managed-service audit, newest first, one page at a time (paging.nextBeforeId).
+ * MIG-254: the managed-service audit, newest first, one page at a time (paging.nextBeforeId). Since the ZT-A12 follow-up
+ * (owner 2026-10-21, "Managed session only") it holds every data read of a managed session too -- a board, a run's
+ * outputs, a report PDF, a file opened, exported or downloaded -- marked Read and said in words (readText); lists and
+ * counts are not recorded. The kind filter asks Identity for the changes, the reads, or both.
  *
  * Two pages from one component, told apart by the route's `scope`: Administration › Staff activity for a platform
  * administrator (every workspace, filtered by workspace and staff member), and Our team's activity for a workspace
@@ -85,15 +138,23 @@ export class StaffActivity implements OnInit {
     : [...this.seen().values()].sort((a, b) => personName(a).localeCompare(personName(b))));
   readonly tenantFilter = signal<number | null>(inject(WorkspaceDirectory).remembered());
   readonly staffFilter = signal<number | null>(null);
-  readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter());
+  /** Changes and reads (''), only the changes, or only the data reads (ZT-A12 follow-up): Identity's `kind`. */
+  readonly kindFilter = signal<'' | ActivityKind>('');
+  readonly kinds: { value: '' | ActivityKind; label: string }[] = [
+    { value: '', label: 'Changes and reads' }, { value: 'changes', label: 'Changes' }, { value: 'reads', label: 'Data reads' }];
+  readonly hasFilters = computed(() => !!this.tenantFilter() || !!this.staffFilter() || !!this.kindFilter());
   readonly name = personName;
   readonly change = changeText;
   readonly targetOf = targetText;
+  readonly isRead = isRead;
+  readonly read = readText;
 
-  readonly emptyMessage = computed(() => this.hasFilters()
-    ? 'No change matches those filters.'
-    : this.showWorkspace() ? 'Our staff have not changed anything in a customer\'s workspace yet.'
-      : 'Our team has not changed anything in this workspace yet.');
+  readonly emptyMessage = computed(() => {
+    if (this.hasFilters()) return this.kindFilter() === 'reads' ? 'No data read matches those filters.'
+      : this.kindFilter() === 'changes' ? 'No change matches those filters.' : 'Nothing matches those filters.';
+    return this.showWorkspace() ? 'Our staff have not changed or read anything in a customer\'s workspace yet.'
+      : 'Our team has not changed or opened anything in this workspace yet.';
+  });
 
   ngOnInit(): void {
     this.load();
@@ -125,8 +186,9 @@ export class StaffActivity implements OnInit {
   }
 
   private fetch(beforeId: number | null, take: (rows: ManagedAction[]) => void, done: () => void): void {
+    const kind = this.kindFilter();
     this.api.actions({ tenantId: this.showWorkspace() ? this.tenantFilter() : null, appUserId: this.staffFilter(), beforeId,
-      limit: ACTIONS_PAGE }).subscribe({
+      limit: ACTIONS_PAGE, ...(kind ? { kind } : {}) }).subscribe({
       next: (r: ActionsPage) => {
         done();
         if (r.status !== API_SUCCESS) { this.error.set(r.message || 'The activity could not be read.'); return; }
@@ -155,7 +217,8 @@ export class StaffActivity implements OnInit {
 
   setTenant(value: string): void { this.tenantFilter.set(value ? Number(value) : null); this.load(); }
   setStaff(value: string): void { this.staffFilter.set(value ? Number(value) : null); this.load(); }
-  clearFilters(): void { this.tenantFilter.set(null); this.staffFilter.set(null); this.load(); }
+  setKind(value: string): void { this.kindFilter.set(value === 'reads' || value === 'changes' ? value : ''); this.load(); }
+  clearFilters(): void { this.tenantFilter.set(null); this.staffFilter.set(null); this.kindFilter.set(''); this.load(); }
 
   workspaceName(a: ManagedAction): string {
     return a.tenantName?.trim() || `Workspace ${a.tenantId}`;

@@ -4,25 +4,24 @@ export const PINNED: Record<string, unknown> = {
     "url": "/administration/data-policies",
     "requests": [
       "GET /notification.json/unreadCount",
-      "GET /notification.json/list?limit=20&page=1",
-      "GET /tenant.json/listTenants"
+      "GET /notification.json/list?limit=20&page=1"
     ],
     "headings": [
       "Data policies"
     ],
-    "buttons": [],
-    "columns": [],
-    "fields": [
-      "Pick a workspace",
-      "Workspace"
+    "buttons": [
+      "Platform minimums"
     ],
+    "columns": [],
+    "fields": [],
     "links": [
       "/administration",
       "/administration/access-profiles",
       "/administration/appearance",
       "/administration/data-policies",
       "/administration/security",
-      "/administration/users"
+      "/administration/users",
+      "/platform/workspaces"
     ],
     "page": {
       "state": "",

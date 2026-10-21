@@ -162,17 +162,14 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
       "GET /pipeline.json/steps/tasks",
-      "GET /pipeline.json/steps/tasks/usage",
-      "GET /pipeline.json/list?limit=1000&page=1"
+      "GET /pipeline.json/steps/tasks/usage"
     ],
     "headings": [
       "Task Registry",
-      "Tasks (17 of 17)"
+      "Tasks (16 of 16)"
     ],
     "buttons": [
-      "Actions for Reference: CSV check and summarise",
       "Columns",
-      "New registry task",
       "Only mine",
       "Open Aggregate",
       "Open Enrich",
@@ -182,7 +179,6 @@ export const PINNED: Record<string, unknown> = {
       "Open Read CSV/JSON/Parquet",
       "Open Read Database",
       "Open Read S3",
-      "Open Reference: CSV check and summarise",
       "Open Sample rows",
       "Open Save File",
       "Open Select columns",
@@ -244,8 +240,7 @@ export const PINNED: Record<string, unknown> = {
       "Save Filesave_fileKeeps the rows as a CSV, JSON or JSON Lines file with the run. | Output | core | Rows → Rows | 0 | 0 | On",
       "Send Notificationsend_notificationSends a notice about the run to the job's owner, the workspace's admins, everyone, or named people. | Output | notifications-service | Rows → Rows | 0 | 0 | On",
       "Upload to bucketupload_bucketWrites the rows as a CSV, JSON or JSON Lines object in a workspace bucket (storage-service). | Output | storage-service | Rows → Rows | 0 | 0 | Unavailablestorage-service does not accept Core's pipeline caller (CORE_PIPELINES) yet (process.pipeline.storage.trusted-caller is off)Show all",
-      "Write Databasewrite_databaseInserts or upserts the rows into a table of a workspace database connection (integration-service). Off by default. | Output | integration-service | Rows → Rows | 0 | 0 | Unavailableintegration-service has no database write path; MIG-229's connections are read-only (process.pipeline.integration.database-write is off)Show all",
-      "Reference: CSV check and summariseREF_CSV_CHECK_V1service-1 reference pipeline. Reads a CSV, validates it, writes summary.json and rejects.csv. | Legacy | workerservice-1 reference worker | Payload: 7 fields → Worker | 0 | 0 | On"
+      "Write Databasewrite_databaseInserts or upserts the rows into a table of a workspace database connection (integration-service). Off by default. | Output | integration-service | Rows → Rows | 0 | 0 | Unavailableintegration-service has no database write path; MIG-229's connections are read-only (process.pipeline.integration.database-write is off)Show all"
     ]
   },
   "the registry, as a tenant user (admin-only)": {

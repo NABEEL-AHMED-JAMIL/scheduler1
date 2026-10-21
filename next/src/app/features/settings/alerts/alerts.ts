@@ -1,4 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
+import { AuthService } from '../../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { AlertRules } from './alert-rules';
 
@@ -15,8 +17,16 @@ import { AlertRules } from './alert-rules';
       <app-page-header title="Alerts">
         <p subtitle class="page-subtitle">Be told when runs fail, schedules miss their slot, runs drag or reviews wait — by the bell, mail or your webhooks.</p>
       </app-page-header>
-      <app-alert-rules scope="workspace" />
+      <app-alert-rules [scope]="scope()" />
     </div>
   `,
 })
-export class Alerts {}
+export class Alerts {
+  private readonly auth = inject(AuthService);
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in has no
+   * workspace; the rules Core answers it are the platform's own, edited as the platform's (no schedule or access-profile
+   * picker, which would read a workspace's schedules and groups).
+   */
+  readonly scope = computed(() => (isOwnPlatformSignIn(this.auth) ? 'platform' as const : 'workspace' as const));
+}

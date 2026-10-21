@@ -337,8 +337,11 @@ describe('RateCardEditor, pricing rules', () => {
     component.name.set('With rules');
     component.addRule();
     const http = TestBed.inject(HttpTestingController);
-    http.expectOne(r => r.url.endsWith('/sourceTask.json/listSourceTask')).flush({ status: API_SUCCESS,
-      data: [{ taskDetailId: 1933, taskName: 'X-ray triage', tenantId: 2905, tenantName: 'MedAxis' }] });
+    // ZT-A12 follow-up: ids and names only (Core's GET /sourceTask.json/names); the full list is a workspace's data.
+    expect(http.match(r => r.url.includes('/sourceTask.json/listSourceTask'))).toEqual([]);
+    const names = http.expectOne(r => r.url.endsWith('/sourceTask.json/names'));
+    expect(names.request.method).toBe('GET');
+    names.flush({ status: API_SUCCESS, data: [{ taskDetailId: 1933, taskName: 'X-ray triage', tenantId: 2905, tenantName: 'MedAxis' }] });
     const key = component.rules()[0].key;
     expect(component.problems()).toContain('Rule 1 needs a pipeline of 1 to 120 characters, with no space at either end.');
     expect(component.draft()).toBe('Fix the pricing rules first.');

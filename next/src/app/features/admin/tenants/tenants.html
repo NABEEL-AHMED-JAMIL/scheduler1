@@ -277,7 +277,7 @@
       <div cdkMenu class="card shadow-xl py-1 min-w-48 text-sm">
         <!-- Owner #20 (2026-10-19): where Work in a workspace went. -->
         <button cdkMenuItem class="menu-item" data-work-in [disabled]="tenant.status !== 'Active'"
-                [title]="tenant.status === 'Active' ? 'Open a managed session: you work there as its administrator, and every change is audited' : 'Only an active workspace can be opened'"
+                [title]="tenant.status === 'Active' ? 'Open a managed session: you work there as its administrator, and every change and every data read is recorded' : 'Only an active workspace can be opened'"
                 (cdkMenuItemTriggered)="workIn(tenant)">
           <app-icon name="external" class="icon-info" />Work in this workspace
         </button>

@@ -9,15 +9,21 @@
         </p>
       </div>
       <div class="flex items-center gap-2">
-        <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event === null ? '' : '' + $event)" />
-        @if (!waitingForWorkspace()) {
-          <app-refresh-button [loading]="loading()" (refresh)="load()" />
+        @if (ownSignIn()) {
+          <button type="button" class="btn btn-default btn-sm" (click)="openPlatformMinimums()" data-retention-platform><app-icon name="settings" />Platform minimums</button>
+        } @else {
+          <app-workspace-select [value]="tenantId()" (valueChange)="pickWorkspace($event === null ? '' : '' + $event)" />
+          @if (!waitingForWorkspace()) {
+            <app-refresh-button [loading]="loading()" (refresh)="load()" />
+          }
         }
       </div>
     </div>
   </app-page-header>
 
-  @if (waitingForWorkspace()) {
+  @if (ownSignIn()) {
+    <app-needs-workspace what="A data policy is" todo="see and change its data policy, review policy and retention" icon="shield" />
+  } @else if (waitingForWorkspace()) {
     <div class="card p-8 text-center text-sm text-[color:var(--text-muted)]">Pick the workspace whose data policy to read, above.</div>
   } @else if (error()) {
     <div class="card p-0"><app-load-error [message]="error()" (retry)="load()" /></div>

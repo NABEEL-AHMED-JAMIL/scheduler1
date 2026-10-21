@@ -27,6 +27,7 @@ import { localIsoDay } from '../../../shared/ui/local-day';
 import { instantOf } from '../../../core/instant';
 import { AuthService } from '../../../core/auth/auth.service';
 import { ConversionAction, ConversionPanel, ConversionPanelData } from './conversion-panel';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 
 interface FormatFamily {
   key: string;
@@ -168,7 +169,14 @@ export class Converter implements OnInit {
   /** Upload, or pick something already in a bucket -- the endpoint only takes a multipart
       file, so a bucket choice is fetched and handed over as one. */
   readonly mode = signal<ConverterMode>('upload');
-  readonly modeOptions: SegmentOption<ConverterMode>[] = [
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in converts an
+   * upload only. A file in a bucket, a dataset and a run are a workspace's data, which media-service answers it 403 on
+   * (listObjects, render); those sources open in "Work in this workspace". Saving to one of the platform's own buckets
+   * (the only buckets the own sign-in is answered) stays.
+   */
+  readonly ownSignIn = isOwnPlatformSignIn(inject(AuthService, { optional: true }));
+  readonly modeOptions: SegmentOption<ConverterMode>[] = this.ownSignIn ? [{ id: 'upload', label: 'Upload a file', icon: 'upload' }] : [
     { id: 'upload', label: 'Upload a file', icon: 'upload' },
     { id: 'bucket', label: 'From a bucket', icon: 'folder' },
     // MIG-253: rows rendered through a template (media-service's render), not a file converted.

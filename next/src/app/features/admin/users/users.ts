@@ -9,6 +9,7 @@ import { Dialog } from '@angular/cdk/dialog';
 import { CdkMenu, CdkMenuItem, CdkMenuTrigger } from '@angular/cdk/menu';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import { AuthService } from '../../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 import { ROLE_META, ROLE_RANK, isUserRole, roleLabel as labelOf } from '../../../core/auth/auth.models';
 import { ToastService } from '../../../shared/ui/toast.service';
 import { copyText } from '../../../shared/ui/clipboard.util';
@@ -299,6 +300,9 @@ export class Users implements OnInit {
    * row can read its own numbers without scanning.
    */
   private loadStats(): void {
+    // ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): what each person's schedules and runs came to is a
+    // workspace's data, which Core answers the platform administrator's own sign-in 403; their rows show no counts.
+    if (isOwnPlatformSignIn(this.auth)) return;
     this.http.get<ApiResponse<UserStatistic[]>>(`${API_BASE}/dashboard.json/userStatistics`)
       .subscribe({
         next: response => {

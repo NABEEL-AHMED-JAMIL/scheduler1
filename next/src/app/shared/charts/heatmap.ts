@@ -58,11 +58,13 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i);
                         [style.background]="background(cell.value)"
                         [class.ring-2]="isSelected(row.day, cell.hour)"
                         [disabled]="!cell.value"
+                        [class.cursor-default]="!interactive()"
+                        [attr.aria-disabled]="interactive() ? null : 'true'"
                         (mouseenter)="hovered.set({ day: row.day, cell })"
                         (mouseleave)="hovered.set(null)"
                         (focus)="hovered.set({ day: row.day, cell })"
                         (blur)="hovered.set(null)"
-                        (click)="cellClicked.emit({ day: row.day, hour: cell.hour, key: cell.key, keys: cell.keys, value: cell.value })">
+                        (click)="interactive() && cellClicked.emit({ day: row.day, hour: cell.hour, key: cell.key, keys: cell.keys, value: cell.value })">
                   <span class="sr-only">{{ tooltip(row.day, cell) }}</span>
                 </button>
               }
@@ -103,6 +105,8 @@ export class Heatmap {
   readonly data = input.required<HeatCell[]>();
   readonly selected = input<{ day: string; hour: number } | null>(null);
   readonly cellClicked = output<HeatSelection>();
+  /** False: the cells are figures to read (hover and focus still say them), and a click drills into nothing. */
+  readonly interactive = input(true);
 
   readonly hours = HOURS;
   readonly hovered = signal<{ day: string; cell: HeatCell } | null>(null);

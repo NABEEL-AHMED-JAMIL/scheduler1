@@ -3,7 +3,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { DIALOG_DATA, DialogRef } from '@angular/cdk/dialog';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
-import { LIST_LIMIT } from '../../core/api/list-limit';
 import { ToastService } from '../../shared/ui/toast.service';
 import { SidePanel } from '../../shared/ui/side-panel';
 import { Icon } from '../../shared/ui/icon';
@@ -31,6 +30,17 @@ export interface RateCardEditorData { base: RateCard; workspaces: ComboboxOption
 export type RateCardEditorResult = RateCard | RateCardDraftRow | null;
 /** A pipeline the rule picker offers: Core's list, as a platform administrator sees it (every workspace's). */
 interface PipelineChoice { taskDetailId: number; taskName: string; tenantId?: number | null; tenantName?: string | null; }
+/**
+ * One row of Core's GET /sourceTask.json/names (ZT-A12 follow-up, owner 2026-10-21 "Managed session only"): a pipeline's id,
+ * name and workspace and nothing else -- what a rule needs to name it (tenantName may be null). The full list
+ * (listSourceTask) is a workspace's data and answers the platform administrator's own sign-in 403.
+ */
+interface PipelineName { taskDetailId?: number | null; taskName?: string | null; tenantId?: number | null; tenantName?: string | null; }
+function choiceOf(p: PipelineName): PipelineChoice | null {
+  const id = Number(p.taskDetailId);
+  return Number.isFinite(id) && id > 0
+    ? { taskDetailId: id, taskName: p.taskName || `#${id}`, tenantId: p.tenantId ?? null, tenantName: p.tenantName ?? null } : null;
+}
 
 /**
  * A new version of the calculation, drafted from an existing one. Nothing here edits a saved
@@ -375,8 +385,12 @@ export class RateCardEditor {
   private loadPipelines(): void {
     if (this.pipelines() || this.pipelinesLoading()) return;
     this.pipelinesLoading.set(true);
-    this.http.post<ApiResponse<PipelineChoice[]>>(`${API_BASE}/sourceTask.json/listSourceTask`, {}, { params: { limit: LIST_LIMIT } }).subscribe({
-      next: r => { this.pipelinesLoading.set(false); this.pipelines.set(r.status === API_SUCCESS ? r.data ?? [] : []); },
+    // Ids and names only (Core's names list): the rule picker never reads a workspace's pipelines themselves.
+    this.http.get<ApiResponse<PipelineName[]>>(`${API_BASE}/sourceTask.json/names`).subscribe({
+      next: r => {
+        this.pipelinesLoading.set(false);
+        this.pipelines.set(r.status === API_SUCCESS ? (r.data ?? []).map(choiceOf).filter((p): p is PipelineChoice => !!p) : []);
+      },
       error: () => { this.pipelinesLoading.set(false); this.pipelines.set([]); },
     });
   }

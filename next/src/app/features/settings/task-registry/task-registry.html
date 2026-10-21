@@ -11,7 +11,7 @@
       <div class="flex items-center gap-2 ml-auto">
         <app-workspace-select [allowAll]="true" [value]="tenantFilter() ? +tenantFilter() : null" (valueChange)="setFilter(tenantFilter, $event === null ? '' : '' + $event)" />
         <app-refresh-button [loading]="loading() || tasksLoading()" (refresh)="load()" />
-        @if (!locked()) {
+        @if (!locked() && !ownSignIn()) {
         <button type="button" class="btn btn-primary btn-sm" (click)="create()">
           <app-icon name="plus" />New registry task
         </button>
@@ -28,13 +28,22 @@
       <span>Choose a workspace above to enable, disable or block a task for it. With all workspaces the counts are every workspace's.</span>
     </div>
   }
+  @if (ownSignIn()) {
+    <!-- ZT-A12 follow-up (owner 2026-10-21): a workspace's pipelines are its data, shown only in a managed session. -->
+    <div class="card flex flex-wrap items-center gap-2 px-4 py-2.5 text-sm" role="note" data-test="legacy-in-workspace">
+      <app-icon name="info" class="text-[color:var(--text-muted)]" />
+      <span>A workspace's pipelines (its Legacy tasks) show in "Work in this workspace", opened from Platform › Workspaces.</span>
+    </div>
+  }
 
   <div class="grid grid-cols-2 sm:grid-cols-4 stat-strip stat-row is-md is-start" role="list">
     @for (tile of [
       { label: 'Step tasks', value: taskTiles().total, foot: taskTiles().on + ' on' + (taskTiles().unavailable ? ' · ' + taskTiles().unavailable + ' unavailable' : ''), icon: 'layers', tone: 'info' },
       { label: 'In use', value: taskTiles().inUse, foot: 'step tasks a pipeline runs', icon: 'activity', tone: 'ok' },
       { label: 'Blocked', value: taskTiles().blocked, foot: taskTiles().blocked ? 'by a platform administrator' : 'none', icon: 'lock', tone: taskTiles().blocked ? 'crit' : 'muted' },
-      { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active' + (summary().untopped ? ' · ' + summary().untopped + ' with no topic' : ''), icon: 'send', tone: summary().untopped ? 'warn' : 'info' }
+      ownSignIn()
+        ? { label: 'Legacy pipelines', value: '—', foot: 'in Work in this workspace', icon: 'send', tone: 'muted' }
+        : { label: 'Legacy pipelines', value: summary().total, foot: summary().active + ' active' + (summary().untopped ? ' · ' + summary().untopped + ' with no topic' : ''), icon: 'send', tone: summary().untopped ? 'warn' : 'info' }
     ]; track tile.label) {
       <app-stat-tile [label]="tile.label" [value]="tile.value" [icon]="tile.icon"
                      [tone]="$any(tile.tone)" [foot]="tile.foot" />

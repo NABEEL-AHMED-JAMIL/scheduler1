@@ -144,33 +144,17 @@ export const PINNED: Record<string, unknown> = {
       "GET /notification.json/list?limit=20&page=1",
       "GET /tenant.json/listTenants",
       "GET /pipeline.json/steps/tasks",
-      "GET /pipeline.json/steps/tasks/usage",
-      "GET /pipeline.json/list?limit=1000&page=1"
+      "GET /pipeline.json/steps/tasks/usage"
     ],
     "headings": [
       "Task Registry",
-      "Tasks (1 of 1)"
+      "Tasks (0 of 0)"
     ],
     "buttons": [
-      "Actions for Reference: CSV check and summarise",
-      "Columns",
-      "New registry task",
       "Only mine",
-      "Open Reference: CSV check and summarise",
       "Refresh"
     ],
-    "columns": [
-      [
-        "Task",
-        "Kind",
-        "Service",
-        "Input → output",
-        "Pipelines",
-        "Runs this month",
-        "State",
-        "Actions"
-      ]
-    ],
+    "columns": [],
     "fields": [
       "All topics",
       "All workspaces",

@@ -57,7 +57,11 @@
     }
 
   <div class="space-y-4">
-    <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
+    @if (ownSignIn) {
+      <p class="text-sm text-[color:var(--text-muted)]" data-test="sources-in-workspace">A file in a workspace's bucket, a PDF from a dataset and a PDF from a run are made in "Work in this workspace", opened from Platform › Workspaces.</p>
+    } @else {
+      <app-segmented class="seg-wrap" [(value)]="mode" [options]="modeOptions" ariaLabel="Choose a source" />
+    }
 
     <!-- MIG-253: a dataset, or one a run kept, rendered through a template; each mode its own panel. -->
     @if (mode() === 'dataset') {

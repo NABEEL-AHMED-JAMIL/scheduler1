@@ -27,7 +27,7 @@ describe('MIG-254: the shell and the managed service', () => {
     localStorage.setItem(PLATFORM_SESSION_KEY, JSON.stringify({ username: 'sam', accessToken: 'p', refreshToken: 'r' }));
     const v = await visit('/dashboard', 'TENANT_ADMIN', null, {}, { mgmt: 'MANAGED', msvc: true });
     // The harness's session names its workspace "Claude Demo", as the openSession answer would.
-    expect(said(bar(v))).toContain('Managed session: Claude Demo — every change is audited');
+    expect(said(bar(v))).toContain('Managed session: Claude Demo — every change and every data read is recorded');
     const exit = Array.from(bar(v)!.querySelectorAll('button')).find(b => said(b) === 'Exit');
     expect(exit).toBeTruthy();
     const auth = TestBed.inject(AuthService);

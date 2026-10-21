@@ -8,6 +8,7 @@ import { confirmWith } from '../../shared/ui/confirm';
 import { RouterLink } from '@angular/router';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../core/api/api.config';
 import { AuthService } from '../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../core/auth/workspace-data';
 import { UnreadCountService } from '../../core/notifications/unread-count.service';
 import { roleLabel as labelOf } from '../../core/auth/auth.models';
 import { BillingBrief } from '../billing/billing-brief';
@@ -97,6 +98,8 @@ export class Profile implements OnInit {
   });
   private readonly pictures = inject(AvatarCache);
   readonly auth = inject(AuthService);
+  /** ZT-A12 follow-up: the platform administrator's own sign-in (no workspace): no activity card, no myActivity call. */
+  readonly ownSignIn = computed(() => isOwnPlatformSignIn(this.auth));
   private readonly security = inject(AccountSecurityApi);
 
   readonly profile = signal<UserProfile | null>(null);
@@ -239,6 +242,7 @@ export class Profile implements OnInit {
         error: () => { /* the server still holds the rules */ },
       });
     }
+    if (this.ownSignIn()) { this.activityLoading.set(false); this.notifications.refresh(); return; }
     this.http.get<ApiResponse<UserActivity>>(`${API_BASE}/sourceJob.json/myActivity`).subscribe({
       next: r => {
         this.activityLoading.set(false);

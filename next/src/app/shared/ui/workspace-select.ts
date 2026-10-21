@@ -42,7 +42,7 @@ import { ManagedSession } from '../../features/admin/managed-service/managed-ses
         <button type="button" class="btn btn-ghost btn-sm whitespace-nowrap" data-test="work-in-workspace"
                 [disabled]="opening()" (click)="workIn()"
                 [attr.aria-label]="'Work in ' + directory.nameOf(value())"
-                title="Open a managed session in this workspace: you work there as its administrator, and every change is audited.">
+                title="Open a managed session in this workspace: you work there as its administrator, and every change and every data read is recorded.">
           <app-icon name="external" [busy]="opening()" />Work in this workspace
         </button>
       }

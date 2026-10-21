@@ -15,6 +15,8 @@ import { ActionsBar } from '../../../shared/ui/actions-bar';
 import { Section } from '../../../shared/ui/section';
 import { ServerTimePipe } from '../../../shared/ui/server-time.pipe';
 import { formatSize } from '../../../shared/ui/format-size';
+import { AuthService } from '../../../core/auth/auth.service';
+import { isOwnPlatformSignIn } from '../../../core/auth/workspace-data';
 
 const AUDIO_EXTENSIONS = ['mp3', 'm4a'];
 
@@ -65,10 +67,16 @@ export class Transcript implements OnDestroy {
   private readonly toast = inject(ToastService);
   readonly reader = inject(ReadAloudService);
 
+  /**
+   * ZT-A12 follow-up (owner 2026-10-21, "Managed session only"): the platform administrator's own sign-in transcribes an
+   * upload only -- a recording in a bucket is a workspace's file, which media-service answers it 403 on
+   * (extractFromBucket); that source opens in "Work in this workspace".
+   */
+  readonly ownSignIn = isOwnPlatformSignIn(inject(AuthService, { optional: true }));
   readonly mode = signal<'upload' | 'bucket'>('upload');
   readonly modeOptions: SegmentOption<'upload' | 'bucket'>[] = [
     { id: 'upload', label: 'Upload a file', icon: 'upload' },
-    { id: 'bucket', label: 'From a bucket', icon: 'folder' },
+    ...(this.ownSignIn ? [] : [{ id: 'bucket' as const, label: 'From a bucket', icon: 'folder' }]),
   ];
   readonly timestamps = signal(false);
   readonly file = signal<File | null>(null);
@@ -201,6 +209,7 @@ export class Transcript implements OnDestroy {
   }
 
   setMode(mode: 'upload' | 'bucket'): void {
+    if (mode === 'bucket' && this.ownSignIn) return;
     this.mode.set(mode);
     this.transcript.set('');
     this.error.set('');

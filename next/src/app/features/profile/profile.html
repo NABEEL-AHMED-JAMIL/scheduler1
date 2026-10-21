@@ -258,7 +258,10 @@
           }
         </app-section>
 
-        <div class="card p-4">
+        <!-- ZT-A12 follow-up (owner 2026-10-21): schedules and runs are a workspace's; the platform administrator's own
+             sign-in has none to show, and Core answers myActivity 403 for it. -->
+        @if (!ownSignIn()) {
+        <div class="card p-4" data-test="your-activity">
           <div class="flex items-baseline gap-2 mb-4">
             <h3 class="text-sm font-semibold">Your activity</h3>
             <span class="text-xs text-[color:var(--text-muted)] ml-auto">
@@ -356,6 +359,7 @@
             </p>
           }
         </div>
+        }
       </div>
     </div>
   }
