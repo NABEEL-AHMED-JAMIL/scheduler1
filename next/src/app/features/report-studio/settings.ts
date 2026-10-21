@@ -12,6 +12,7 @@ import { AccessProfile, AccessProfilesService } from '../admin/access-profiles/a
 import { ReportStudioApi, studioError } from './report-studio.api';
 import { Assignee, RetentionPreview, StudioSettings, size } from './report-studio.model';
 import { RsTimePipe } from './rs-time.pipe';
+import { PageLimitCard } from './page-limit-card';
 
 /** The settings' "who": automatic (worked out from the page gate), an access profile, the administrators, or everyone. */
 type WhoChoice = 'auto' | 'admins' | 'members' | `group:${number}`;
@@ -38,7 +39,7 @@ export function assigneeOf(c: WhoChoice): Assignee | null {
  */
 @Component({
   selector: 'app-report-settings',
-  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe],
+  imports: [PageHeader, RefreshButton, Icon, LoadError, EmptyState, FormsModule, RouterLink, RsTimePipe, PageLimitCard],
   templateUrl: './settings.html',
   styles: `
     .rss-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(28rem, 1fr)); gap: 1rem; align-items: start; }

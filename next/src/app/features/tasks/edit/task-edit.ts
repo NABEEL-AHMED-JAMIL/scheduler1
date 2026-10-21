@@ -83,6 +83,8 @@ export class TaskEdit implements OnInit {
   readonly taskDetailId = input<string>('');
   /** ?tab= -- which of the step builder's tabs is open (MIG-249); ignored for a legacy pipeline unless it names one. */
   readonly tab = input<string>('');
+  /** Owner 2026-10-21: ?step= opens that step's settings (a report over its page limit links to its Generate report step). */
+  readonly step = input<string>('');
 
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);

@@ -18,7 +18,7 @@ import { ReportStudioApi, studioError } from './report-studio.api';
 import { ProblemList } from './problem-list';
 import {
   JobRow, OutputRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportDetail, ReportVersionRow, VersionRow, bundleParts, chipWord, deletedWords, idempotencyKey,
-  isRunning, recordsWord, size, stageWord,
+  isRunning, pageLimitOf, recordsWord, size, stageWord,
 } from './report-studio.model';
 import { fileNameOf, saveBlob } from './report-files';
 import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
@@ -26,6 +26,7 @@ import { VerifyData, VerifyPanel } from './verify-panel';
 import { askVoidReason } from './void-dialog';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
 import { formatDuration } from '../../shared/ui/time-format';
+import { PageLimitActions } from './page-limit-actions';
 
 type Tab = 'details' | 'versions' | 'activity' | 'access';
 
@@ -38,7 +39,7 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
  */
 @Component({
   selector: 'app-report-page',
-  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet],
+  imports: [PageHeader, RefreshButton, Icon, StatusPill, RsTimePipe, LoadError, ProblemList, RouterLink, FormsModule, NgTemplateOutlet, PageLimitActions],
   templateUrl: './report-page.html',
   styleUrl: './report-page.css',
 })
@@ -100,6 +101,11 @@ export class ReportPage implements OnInit {
     const v = this.current();
     return j?.status === 'SUCCEEDED' && v && j.resultVersion === v.version && v.version > 1 ? j : null;
   });
+  /** Owner 2026-10-21: the job failed for the page limit (its own next steps then, not Fix field mapping). */
+  overLimit(j: JobRow): boolean {
+    return !!pageLimitOf(j);
+  }
+
   readonly failedJobs = computed(() => this.r()?.jobs.filter(j => j.status === 'FAILED') ?? []);
   readonly running = computed(() => this.r()?.jobs.find(j => isRunning(j.status)) ?? null);
   readonly canGenerate = computed(() => this.auth.canOpen('report-generate') && !this.auth.isPlatformAdmin() && this.r()?.status !== 'ARCHIVED');

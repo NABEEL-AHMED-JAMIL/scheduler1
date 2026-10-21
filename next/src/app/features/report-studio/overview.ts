@@ -17,6 +17,7 @@ import { GeneratedService, pipelineOf } from '../documents/generated/generated.s
 import { RunRow } from '../tasks/steps/steps.model';
 import { RsTabCounts } from './rs-tab-counts';
 import { formatDuration } from '../../shared/ui/time-format';
+import { PageLimitActions } from './page-limit-actions';
 
 /** A pipeline whose runs fed reports lately (the Overview's "Connected pipelines"), as the person may see it. */
 export interface ConnectedPipeline {
@@ -39,7 +40,7 @@ const FAIL_WORDS: Record<string, string> = {
  */
 @Component({
   selector: 'app-report-overview',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, RsTimePipe, LoadError, RouterLink],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, StatStrip, StatusPill, RsTimePipe, LoadError, RouterLink, PageLimitActions],
   templateUrl: './overview.html',
 })
 export class ReportOverview implements OnInit {

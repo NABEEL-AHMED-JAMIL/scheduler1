@@ -42,6 +42,7 @@
           <div class="font-semibold">{{ j.reportName }} · generation {{ isMapping(j) ? 'blocked' : 'failed' }}</div>
           <div class="text-sm">{{ j.label }} could not make a new version: {{ j.error }}
             The report's last version is unchanged.</div>
+          <app-page-limit-actions [job]="j" />
         </div>
         @if (isMapping(j) && canGenerate()) {
           <button type="button" class="btn btn-default btn-sm shrink-0" (click)="fixMapping(j)"><app-icon name="arrowRight" />Fix field mapping</button>

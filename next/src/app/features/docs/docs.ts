@@ -538,7 +538,13 @@ export class Docs implements AfterViewInit {
           + 'kept version uses, after the days you set. Each report\'s current version, every approved or signed version and a version waiting '
           + 'for approval always stay; a removed version keeps its record and says Removed by retention. Reports › Settings previews what would go.',
         'Generating is limited to 30 a minute a person, and previews to 30 (the designer\'s live page to 120); past that you are asked to '
-          + 'wait a few seconds. A report is at most 300 pages: narrow the data, or lower a table\'s row limit.',
+          + 'wait a few seconds.',
+        'Most pages in one report (Reports › Settings › Report size): each workspace\'s own, 300 unless its administrators set fewer. '
+          + 'Every page counts, a long table\'s too, in Create report, a preview and a pipeline\'s Generate report step. Only the platform '
+          + 'administrator can let a workspace go past 300, up to the platform\'s hard maximum. A report over the limit is not made: the '
+          + 'message names the limit and who can raise it, and the failed job and the report\'s page offer what applies: Make one report '
+          + 'per row (a pipeline step\'s settings), Lower the table\'s rows (the template in the designer), Export the data as CSV (a '
+          + 'run\'s data), and Raise the limit for a workspace administrator.',
         'In a template\'s designer (and a pipeline step\'s own design) the AI assistant, in the right pane, drafts a template from '
           + 'plain words, suggests field mappings (with how sure it is) and charts for your test data, explains the checks\' problems '
           + 'and writes a paragraph of the data\'s own values, labelled "Drafted with AI". Each is a proposal: shown as a list of '

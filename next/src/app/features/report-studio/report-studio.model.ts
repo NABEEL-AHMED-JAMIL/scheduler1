@@ -345,6 +345,58 @@ export interface StudioSettings {
   editable?: boolean;
 }
 
+/**
+ * Owner 2026-10-21: a workspace's page limit ("Most pages in one report"): its administrators' number under the workspace's
+ * ceiling (the platform's, or what a platform administrator set for the workspace, up to the hard maximum).
+ */
+export interface PageLimit {
+  tenantId: number;
+  /** The pages one report may have now. */
+  limit: number;
+  /** What the workspace's administrators set; null: the ceiling. */
+  workspaceLimit: number | null;
+  /** The most the workspace's administrators may set. */
+  ceiling: number;
+  /** What a platform administrator set for this workspace; null: the platform's. */
+  ceilingOverride: number | null;
+  platformCeiling: number;
+  hardMax: number;
+  raisedBy: PageLimitRaiser;
+  rowVersion: number;
+  /** The caller may set the workspace's own number (its administrators). */
+  editable: boolean;
+  /** The caller may set the workspace's ceiling (a platform administrator). */
+  ceilingEditable: boolean;
+}
+
+export type PageLimitRaiser = 'WORKSPACE_ADMIN' | 'PLATFORM_ADMIN' | 'NOBODY';
+
+/** What a report over its limit could do instead, where it applies (media's NextSteps). */
+export type PageLimitStep =
+  | { action: 'PER_ROW'; label: string; pipeline: { jobId: number; jobQueueId: number; stepKey: string } }
+  | { action: 'LOWER_ROWS'; label: string; templateId: string; componentIds: string[] }
+  | { action: 'EXPORT_CSV'; label: string; source: { connector: string; runDatasetId?: number; jobQueueId?: number; jobId?: number } };
+
+/** A failed job's page-limit diagnostic: the numbers, who can raise the limit, the next steps. */
+export interface PageLimitHit {
+  pages: number;
+  atLeast: boolean;
+  limit: number;
+  ceiling: number;
+  hardMax: number;
+  raisedBy: PageLimitRaiser;
+}
+
+/** The page-limit diagnostic of a failed job, if that is why it failed. */
+export function pageLimitOf(job: { errorCode?: string | null; diagnostics?: unknown[] | null } | null | undefined):
+  { hit: PageLimitHit; steps: PageLimitStep[] } | null {
+  if (!job || job.errorCode !== 'LIMIT_EXCEEDED') return null;
+  for (const d of (job.diagnostics ?? []) as { code?: string; pageLimit?: PageLimitHit; nextSteps?: PageLimitStep[] }[]) {
+    if (d?.code === 'LIMIT_EXCEEDED' && d.pageLimit) return { hit: d.pageLimit, steps: Array.isArray(d.nextSteps) ? d.nextSteps : [] };
+  }
+  return null;
+}
+
 /** Phase 7: what the retention class REPORTS would remove at so many days, and what it keeps. */
 export interface RetentionPreview {
   cutoff: string;

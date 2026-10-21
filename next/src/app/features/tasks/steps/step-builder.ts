@@ -90,6 +90,9 @@ export class StepBuilder implements OnInit {
   readonly jobIds = input<number[]>([]);
   /** The pipeline's workspace: a platform administrator's reads of its API requests name it. Null: the reader's own. */
   readonly tenantId = input<number | null>(null);
+  /** Owner 2026-10-21: a step to open first, by key -- a report over its page limit links to its Generate report step. */
+  readonly openStep = input<string>('');
+  private openedFirst = false;
   /** A save made a new version (or found none to make): the page's copy is stale. */
   readonly saved = output<DefinitionView>();
 
@@ -171,6 +174,18 @@ export class StepBuilder implements OnInit {
 
   constructor() {
     this.reloadTasks();
+    // The step the address names (?step=), opened once the tasks (its settings' form) are read.
+    effect(() => {
+      const key = this.openStep();
+      const ready = this.tasks().length > 0;
+      untracked(() => {
+        if (!key || !ready || this.openedFirst) return;
+        const index = this.draft().steps.findIndex(s => s.key === key);
+        if (index < 0) return;
+        this.openedFirst = true;
+        this.open(index);
+      });
+    });
     // A draft handed over for this pipeline (the AI Assistant's, MIG-252) shows on its text tab as typed text, unsaved.
     effect(() => {
       const key = this.meta().pipelineKey;

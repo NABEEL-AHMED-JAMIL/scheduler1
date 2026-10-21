@@ -73,6 +73,8 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
   readonly templateId = input.required<string>();
   /** Phase 5: opened from a generate_report step -- where "Back to the pipeline" goes (a path of this console only). */
   readonly backParam = input<string | undefined>(undefined, { alias: 'back' });
+  /** Owner 2026-10-21: opened from a report over its page limit -- the table, repeat or image grid to select first. */
+  readonly selectParam = input<string | undefined>(undefined, { alias: 'select' });
   readonly back = computed(() => {
     const b = this.backParam();
     return b && b.startsWith('/') && !b.startsWith('//') ? b : null;
@@ -311,6 +313,8 @@ export class ReportDesigner implements OnInit, HasUnsavedChanges {
           this.testLabel.set(`Test sample · ${t.samples[0].name}`);
         }
         this.testRoot.set(this.def() ? rootPathOf(this.def()!) : '$');
+        const pick = this.selectParam();
+        if (pick && !this.selected() && find(this.blocks(), pick)) this.selected.set(pick);
         this.inspectTestData();
         this.draw(true);
         if (!this.isPlatformAdmin()) {

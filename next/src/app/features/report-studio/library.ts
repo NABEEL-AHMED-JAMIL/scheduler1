@@ -19,6 +19,7 @@ import { JobRow, REPORT_DELETE_WORDS, REPORT_KEPT_WORDS, ReportRow, chipWord, de
 import { RsTabCounts } from './rs-tab-counts';
 import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
+import { PageLimitActions } from './page-limit-actions';
 
 type View = 'reports' | 'jobs';
 
@@ -32,7 +33,7 @@ type View = 'reports' | 'jobs';
  */
 @Component({
   selector: 'app-report-library',
-  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, Pagination, RsTimePipe, RouterLink],
+  imports: [PageHeader, WorkspaceSelect, RefreshButton, Icon, TableShell, StatusPill, Segmented, Pagination, RsTimePipe, RouterLink, PageLimitActions],
   styles: `
     .rs-bulk-bar { position: sticky; bottom: 0.75rem; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 0.75rem;
       margin: 0.5rem 0.75rem; padding: 0.5rem 0.75rem; border: 1px solid var(--border-strong); border-radius: var(--radius-lg);

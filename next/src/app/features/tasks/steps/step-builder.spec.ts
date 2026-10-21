@@ -55,7 +55,7 @@ const TASKS = [
     disabledReason: 'integration-service is not there yet' },
 ];
 
-function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft } = {}) {
+function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: unknown; canManage?: boolean; isAdmin?: boolean; tasks?: unknown[]; offer?: HandedDraft; openStep?: string } = {}) {
   const view = opts.view ?? VIEW;
   const api = {
     definition: vi.fn(() => of({ status: 'SUCCESS', message: '', data: { ...view, version: 2 } })),
@@ -98,6 +98,7 @@ function build(opts: { view?: DefinitionView; jobs?: unknown[]; dialogAnswer?: u
   fixture.componentRef.setInput('view', view);
   fixture.componentRef.setInput('canManage', opts.canManage ?? true);
   fixture.componentRef.setInput('isAdmin', opts.isAdmin ?? true);
+  if (opts.openStep) fixture.componentRef.setInput('openStep', opts.openStep);
   fixture.detectChanges();
   const el = fixture.nativeElement as HTMLElement;
   const builder = fixture.componentInstance;
@@ -164,6 +165,16 @@ describe('StepBuilder -- the step cards', () => {
     expect(panel.data).toMatchObject({ index: 1, earlierKeys: ['read'], canManage: true, step: { key: 'keep' } });
     expect(panel.data.task.code).toBe('select');
     expect(cards()).toEqual(['read', 'shape']);
+  });
+
+  // Owner 2026-10-21: a report over its page limit links to its Generate report step (?step=): that step opens, once.
+  it('opens the step the address names, once its task is known, and only that one', () => {
+    const { opened, fixture } = build({ openStep: 'keep' });
+    fixture.detectChanges();
+    const panels = opened.filter(o => o.component === StepPanel);
+    expect(panels).toHaveLength(1);
+    expect(panels[0].data).toMatchObject({ index: 1, step: { key: 'keep' } });
+    expect(build({ openStep: 'no-such-step' }).opened.filter(o => o.component === StepPanel)).toHaveLength(0);
   });
 
   // MIG-245: a task with a prompt setting gets the workspace's prompts to choose from -- asked for once, only then.

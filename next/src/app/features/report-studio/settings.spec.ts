@@ -26,6 +26,9 @@ function mount(platformAdmin = false) {
   const api = {
     settings: vi.fn(() => of(saved)),
     saveSettings: vi.fn(() => of(saved)),
+    // Owner 2026-10-21: the Report size card (page-limit.spec.ts tests it).
+    pageLimit: vi.fn(() => of({ tenantId: 2960, limit: 300, workspaceLimit: null, ceiling: 300, ceilingOverride: null, platformCeiling: 300,
+      hardMax: 2000, raisedBy: 'PLATFORM_ADMIN', rowVersion: 3, editable: true, ceilingEditable: false })),
     retentionPreview: vi.fn(() => of({ cutoff: '', days: 30, count: 2, bytes: 2048, total: 9, versions: [{ reportId: 'R', reportLabel: 'RPT-0005',
       name: 'Wound assessment', version: 1, createdAt: '2026-10-01T10:00:00Z', bytes: 1024 }], snapshots: [], kept: { approved: 1, current: 4, waiting: 1, heldRuns: 0 } })),
   };

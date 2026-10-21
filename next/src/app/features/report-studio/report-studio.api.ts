@@ -7,7 +7,7 @@ import {
   AssetDetail, AssetLibrary, BrandDefinition, BrandProfileDetail, BrandProfileRow, Contrast, Person, Usable,
 } from './assets.model';
 import {
-  ApprovalAnswer, DataSourceRow, RetentionPreview, ReportReviewCard, Review, StudioSettings, TemplateReviewCard, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
+  ApprovalAnswer, DataSourceRow, PageLimit, RetentionPreview, ReportReviewCard, Review, StudioSettings, TemplateReviewCard, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
   TemplateContract, TemplateDetail, TemplateLibrary, VerifyResult, VersionRow,
 } from './report-studio.model';
 
@@ -356,6 +356,21 @@ export class ReportStudioApi {
   /** Saves the settings (workspace administrators). */
   saveSettings(body: Pick<StudioSettings, 'approvals' | 'publishing' | 'rowVersion'>): Observable<StudioSettings> {
     return ReportStudioApi.data$(this.http.post<ApiResponse<StudioSettings>>(`${this.studio}/settings/save`, body));
+  }
+
+  /** Owner 2026-10-21: the workspace's page limit (anyone of it; a platform administrator names the workspace). */
+  pageLimit(tenantId?: number | null): Observable<PageLimit> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<PageLimit>>(`${this.studio}/pageLimit`, { params: ReportStudioApi.scope(tenantId) }));
+  }
+
+  /** Sets the workspace's own limit, or back to the ceiling with null (workspace administrators). */
+  savePageLimit(limit: number | null, rowVersion: number): Observable<PageLimit> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<PageLimit>>(`${this.studio}/pageLimit/save`, { limit, rowVersion }));
+  }
+
+  /** Sets a workspace's ceiling, or back to the platform's with null (a platform administrator). */
+  savePageCeiling(tenantId: number, ceiling: number | null, rowVersion: number): Observable<PageLimit> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<PageLimit>>(`${this.studio}/pageLimit/ceiling`, { tenantId, ceiling, rowVersion }));
   }
 
   /** What the retention class REPORTS would remove at so many days (workspace administrators). */
