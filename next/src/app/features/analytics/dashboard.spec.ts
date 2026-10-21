@@ -1985,6 +1985,20 @@ describe('narrowing the board by clicking a mark', () => {
     expect(view.marks[1].operands).toBeUndefined();
   });
 
+  it('ZT-A7: marks the roll-up row as the rest of a Top-N, so a ranked chart lists it last', () => {
+    const view = analysisView(analysisResult({
+      columns: [
+        { name: 'department', type: 'VARCHAR', role: 'DIMENSION' },
+        { name: 'row_count', type: 'BIGINT', role: 'MEASURE' },
+      ],
+      rows: [['Radiology', '100000'], ['Surgery', '100000'], ['Other', '200000']],
+      dimensions: ['department'],
+      other: { label: 'Other', values: ['Oncology', 'Pediatrics'], valueCount: 2, valuesTruncated: false },
+      rollupRows: [2],
+    }), 'COUNT_ROWS');
+    expect(view.marks.map(mark => [mark.name, !!mark.rollup])).toEqual([['Radiology', false], ['Surgery', false], ['Other', true]]);
+  });
+
   it('clicks a real row that the label match alone would have refused', () => {
     // The half the fallback gets wrong, and the reason the field is worth sending: a real
     // sub-category spelled "Other", in a result where the roll-up is a DIFFERENT row.

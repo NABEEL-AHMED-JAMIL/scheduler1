@@ -19,6 +19,8 @@ export interface RankedItem {
    * not contain. The caller says which rows those are and why, on the tile.
    */
   inert?: boolean;
+  /** The rolled-up rest of a Top-N: listed after the ranked rows, however large it is (ZT-A7). */
+  rollup?: boolean;
 }
 
 /**
@@ -94,7 +96,8 @@ export class RankedBar {
     const source = this.data().filter(d => (d.value ?? 0) > 0);
     if (!source.length) return [];
 
-    const ordered = this.sorted() ? [...source].sort((a, b) => b.value - a.value) : source;
+    // ZT-A7: the rest of a Top-N is not a rank -- "Other (2 groups)" of 200,000 sat above eight departments of 100,000.
+    const ordered = this.sorted() ? [...source].sort((a, b) => Number(!!a.rollup) - Number(!!b.rollup) || b.value - a.value) : source;
     const limit = this.max();
     const head = ordered.slice(0, limit);
     const tail = ordered.slice(limit);

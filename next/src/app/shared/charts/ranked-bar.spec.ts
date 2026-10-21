@@ -28,6 +28,15 @@ describe('ranked bar value labels', () => {
 
   const money = (value: number) => `£${value.toFixed(2)}`;
 
+  /** ZT-A7 (2026-10-21): the 1M-row overview listed "Other" (200,000) above eight departments of 100,000 each. */
+  it('ZT-A7: lists the rest of a Top-N after the ranked rows, however large it is', () => {
+    const chart = bar({
+      data: [{ name: 'Radiology', value: 100000 }, { name: 'Other', value: 200000, rollup: true, inert: true }, { name: 'Surgery', value: 90000 }],
+      max: 10,
+    });
+    expect(chart.rows().map(r => r.name)).toEqual(['Radiology', 'Surgery', 'Other']);
+  });
+
   it('formats every row, not just the rolled-up one', () => {
     const chart = bar({
       data: [

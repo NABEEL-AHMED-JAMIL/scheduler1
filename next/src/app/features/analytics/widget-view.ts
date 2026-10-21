@@ -45,6 +45,8 @@ export interface Mark {
    * finally settled -- rather than at each of the places that decide to withhold them.
    */
   inert?: boolean;
+  /** The rolled-up rest of a Top-N ("Other"): drawn after the ranked groups whatever its size (ZT-A7). */
+  rollup?: boolean;
 }
 
 /**
@@ -250,9 +252,10 @@ export function mergeMarks(pairs: Mark[]): { marks: Mark[]; merged: number } {
       // screen. Dropped rather than picked between: see MarkOperand.
       delete existing.operands;
     } else {
-      byName.set(pair.name, pair.operands
-        ? { name: pair.name, value: pair.value, operands: pair.operands }
-        : { name: pair.name, value: pair.value });
+      byName.set(pair.name, {
+        ...(pair.operands ? { name: pair.name, value: pair.value, operands: pair.operands } : { name: pair.name, value: pair.value }),
+        ...(pair.rollup ? { rollup: true } : {}),
+      });
     }
   }
   // Insertion order is the result's own order, which is what "bars in order" is for: a saved
@@ -835,7 +838,8 @@ export function analysisView(result: AnalysisResult, aggregation: Aggregation | 
         .join(' · ');
       const operands = narrowable && !rolled?.has(at)
         ? markOperands(columns, dimensionAt, row, otherLabel) : null;
-      pairs.push(operands ? { name, value, operands } : { name, value });
+      const rollup = rolled ? rolled.has(at) : !!otherLabel && dimensionAt.length === 1 && row[dimensionAt[0]] === otherLabel;
+      pairs.push({ ...(operands ? { name, value, operands } : { name, value }), ...(rollup ? { rollup: true } : {}) });
     }
   }
   const { marks, merged } = mergeMarks(pairs);
