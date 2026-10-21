@@ -25,6 +25,7 @@ import { REPORT_FILE_TITLE_ID, ReportFileDialog } from './report-file-dialog';
 import { VerifyData, VerifyPanel } from './verify-panel';
 import { askVoidReason } from './void-dialog';
 import { sidePanelConfig } from '../../shared/ui/side-panel';
+import { formatDuration } from '../../shared/ui/time-format';
 
 type Tab = 'details' | 'versions' | 'activity' | 'access';
 
@@ -42,6 +43,9 @@ type Tab = 'details' | 'versions' | 'activity' | 'access';
   styleUrl: './report-page.css',
 })
 export class ReportPage implements OnInit {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
+
   readonly reportId = input.required<string>();
   private readonly api = inject(ReportStudioApi);
   private readonly auth = inject(AuthService);

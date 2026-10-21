@@ -394,33 +394,33 @@ describe('a chart of how long runs took', () => {
 
   it('labels a 25 second run 25s, not 0', () => {
     const { chart } = durationChart(runs, 600);
-    expect(chart.bars().map(bar => bar.display)).toEqual(['25s', '27s', '41s', '50s', '1m', '3.3m']);
+    expect(chart.bars().map(bar => bar.display)).toEqual(['25 sec', '27 sec', '41 sec', '50 sec', '1 min', '3.3 min']);
   });
 
   it('gives the full duration in the tooltip', () => {
     const { chart } = durationChart(runs, 600);
-    expect(chart.bars()[0].hint).toBe('#7336: 25.3s');
-    expect(chart.bars()[5].hint).toBe('#7341: 3m 20s');
+    expect(chart.bars()[0].hint).toBe('#7336: 25 sec');
+    expect(chart.bars()[5].hint).toBe('#7341: 3 min 20 sec');
   });
 
   it('draws the short label above the bar', () => {
     const { el } = durationChart(runs, 600);
     const labels = [...el.querySelectorAll('span.bar-value')].map(s => s.textContent!.trim());
-    expect(labels).toContain('25s');
+    expect(labels).toContain('25 sec');
     expect(labels).not.toContain('0');
   });
 
   it('says a sub-second run was one, rather than zero', () => {
     const { chart } = durationChart([{ name: '#1', value: 0.42 }, { name: '#2', value: 12 }], 600);
-    expect(chart.bars()[0].display).toBe('<1s');
-    expect(chart.bars()[0].hint).toBe('#1: 420ms');
+    expect(chart.bars()[0].display).toBe('<1 sec');
+    expect(chart.bars()[0].hint).toBe('#1: 420 ms');
   });
 
   it('withholds the labels rather than writing a duration as a plain number when none fits', () => {
     const many: Bar[] = Array.from({ length: 80 }, (_, at) => ({ name: '#' + at, value: 3000 + at }));
     const { chart } = durationChart(many, 400);
     expect((chart as any).showValues()).toBe(false);
-    expect(chart.bars()[0].hint).toBe('#0: 50m');
+    expect(chart.bars()[0].hint).toBe('#0: 50 min');
   });
 
   it('leaves a chart of counts as it was', () => {

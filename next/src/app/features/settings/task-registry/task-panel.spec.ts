@@ -80,7 +80,7 @@ describe('TaskPanel -- a step task', () => {
     expect(text()).toContain('Input Rows Any rows.');
     expect(text()).toContain('Output Rows The rows that meet the conditions, unchanged.');
     expect(text()).toContain('Service core');
-    expect(text()).toContain('Retry Up to 3 tries, 10 s apart');
+    expect(text()).toContain('Retry Up to 3 tries, 10 sec apart');
     expect(text()).toContain('Timeout 5 min');
     expect(text()).toContain('Who may add it Workspace administrators');
     expect(text()).toContain('AI tool name filter_rows');

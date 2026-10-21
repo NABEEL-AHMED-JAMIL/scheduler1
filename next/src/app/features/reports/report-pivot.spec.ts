@@ -112,7 +112,7 @@ describe('the exported grid says what the screen says', () => {
     pivot.setMeasure('min');
     pivot.export('csv');
 
-    expect(pivot.cellText(0, 0)).toBe('0s');
+    expect(pivot.cellText(0, 0)).toBe('0 sec');
     expect(lastExport!.rows[0][1]).toBe(0);
   });
 
@@ -184,15 +184,15 @@ describe('the column header histogram bins the measure that is selected', () => 
     pivot.setMeasure('execMax');
     // report-history's two runs executed in 2s and 6s; queued to finished they took 40s and 60s.
     const hints = pivot.columnHistogram(0).map(bin => bin.hint);
-    expect(hints[hints.length - 1]).toContain('6s');
-    expect(hints.join(' ')).not.toContain('58s');
+    expect(hints[hints.length - 1]).toContain('6 sec');
+    expect(hints.join(' ')).not.toContain('58 sec');
   });
 
   it('reads the queued-to-finished column under every other duration measure', () => {
     const pivot = pivotFor(data);
     pivot.setMeasure('max');
     const hints = pivot.columnHistogram(0).map(bin => bin.hint);
-    expect(hints[hints.length - 1]).toContain('58s');
+    expect(hints[hints.length - 1]).toContain('58 sec');
   });
 
   it('bins the same population the cells above it are measured over', () => {

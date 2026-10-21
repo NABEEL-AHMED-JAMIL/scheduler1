@@ -59,7 +59,7 @@ describe('JobEdit schedule summary', () => {
     expect(edit.retryLine()).toBe('Priority 1; a failed run is not retried.');
     expect(edit.emailLine()).toBe('Nobody is emailed.');
     edit.form.patchValue({ maxAttempts: 3, failJob: true });
-    expect(edit.retryLine()).toBe('Priority 1; up to 3 attempts, 60 s apart at first.');
+    expect(edit.retryLine()).toBe('Priority 1; up to 3 attempts, 60 sec apart at first.');
     expect(edit.emailLine()).toBe('When a run fails.');
   });
 

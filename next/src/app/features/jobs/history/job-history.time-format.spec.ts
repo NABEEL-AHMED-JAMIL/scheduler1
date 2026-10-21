@@ -45,9 +45,9 @@ describe('Run history on the console clock', () => {
       run(2, '2026-09-24T11:00:00', '2026-09-24T11:01:59.600'),
       run(3, '2026-09-24T12:00:00', '2026-09-24T12:00:00.420'),
     ]);
-    expect(h.runs().map(r => h.duration(r))).toEqual(['25.3s', '2m', '420ms']);
-    expect(h.durationTiles().map(t => t.value)).toEqual(['420ms', '25.3s', '2m']);
-    expect(h.durationTrend().map(b => compactDuration(b.value))).toEqual(['25s', '2m', '<1s']);
+    expect(h.runs().map(r => h.duration(r))).toEqual(['25 sec', '2 min', '420 ms']);
+    expect(h.durationTiles().map(t => t.value)).toEqual(['420 ms', '25 sec', '2 min']);
+    expect(h.durationTrend().map(b => compactDuration(b.value))).toEqual(['25 sec', '2 min', '<1 sec']);
     expect(h.durationTrend().map(b => b.name)).toEqual(['24 Sep', '24 Sep', '24 Sep']);
   });
 

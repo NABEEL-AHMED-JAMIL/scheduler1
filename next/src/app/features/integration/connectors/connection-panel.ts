@@ -15,6 +15,7 @@ import {
   stateIcon, stateTone,
 } from './connectors.model';
 import { ConnectPanel, ConnectPanelData } from './connect-panel';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /** What the page hands the panel: the connection to open, the gallery (for Add tables), and a way to say the list changed. */
 export interface ConnectionPanelData {
@@ -254,8 +255,7 @@ export class ConnectionPanel implements OnInit {
     const start = instantOf(run.startedAt);
     const end = instantOf(run.finishedAt);
     if (!start || !end) return '—';
-    const seconds = Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
-    return seconds < 60 ? `${seconds} s` : `${Math.round(seconds / 60)} min`;
+    return formatDuration(Math.max(0, (end.getTime() - start.getTime()) / 1000));
   }
 
   test(): void {

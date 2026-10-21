@@ -123,7 +123,7 @@ describe('Billing', () => {
     expect(component.fmtGb(0.43 / 1024)).toBe('440.3 KB');
     expect(component.fmtGb(12 / 1024)).toBe('12 MB');
     expect(component.fmtGb(38.2)).toBe('38.2 GB');
-    expect(component.fmtQuantity({ ...component.lines()[2], unit: 'minute', quantity: 0.0017 })).toBe('0.1 s');
+    expect(component.fmtQuantity({ ...component.lines()[2], unit: 'minute', quantity: 0.0017 })).toBe('0.1 sec');
   });
 
   it('stacks each day by service and forecasts at the last seven calendar days\' pace, only for the open month', () => {

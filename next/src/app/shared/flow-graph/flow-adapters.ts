@@ -1,4 +1,5 @@
 import { FlowEdge, FlowMetric, FlowNode, FlowNodeKind, FlowTone } from './flow-graph.model';
+import { formatDuration } from '../ui/time-format';
 
 /**
  * Every screen that draws a flow reads its own source -- a pipeline's steps, a workflow's steps, the AI Assistant's
@@ -361,12 +362,9 @@ export interface RunStepLike {
 
 export type MapBasis = 'time' | 'rows';
 
-/** A duration in the run's own words: ms under a second, then seconds, then minutes. */
+/** A duration from milliseconds, in the console's words (formatDuration): "420 ms", "1.4 sec", "2 min 5 sec". */
 export function durationText(ms: number | null | undefined): string {
-  if (ms == null) return '—';
-  if (ms < 1000) return `${ms} ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)} s`;
-  return `${Math.floor(ms / 60_000)} min ${Math.round((ms % 60_000) / 1000)} s`;
+  return ms == null ? '—' : formatDuration(ms / 1000);
 }
 
 export function countText(n: number | null | undefined): string {

@@ -31,6 +31,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { WorkspaceSelect } from '../../../shared/ui/workspace-select';
 import { WorkspaceDirectory } from '../../../core/workspaces/workspace-directory';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Source', AI_TOOL: 'AI tool' };
 
@@ -49,6 +50,9 @@ const USER_KINDS: Record<string, string> = { PIPELINE: 'Pipeline', SOURCE: 'Sour
   templateUrl: './collection.html',
 })
 export class Collection implements OnChanges {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
+
   private readonly api = inject(ApiCollectionsApi);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);

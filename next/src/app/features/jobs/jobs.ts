@@ -533,7 +533,7 @@ export class Jobs implements OnInit {
           .map(q => ({
             name: `#${q.jobQueueId}`,
             // Seconds, to one decimal. This plotted minutes, so a 25 second run -- most of them --
-            // was labelled 0 and a minute-long one 1; the chart's duration unit writes "25s" instead.
+            // was labelled 0 and a minute-long one 1; the chart's duration unit writes "25 sec" instead.
             value: Math.max(0, Math.round(
               (new Date(q.endTime).getTime() - new Date(q.startTime).getTime()) / 100) / 10),
             color: statusColor(q.jobStatus),

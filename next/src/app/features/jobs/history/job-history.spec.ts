@@ -105,9 +105,9 @@ describe('Run history stat strips', () => {
       { jobQueueId: 3, jobId: 41, jobStatus: 'Failed', startTime: at(0), endTime: at(3700 - 0) },
     ] as any[]);
     expect(h.durationTiles()).toEqual([
-      { label: 'Fastest', value: '5s' },
-      { label: 'Median',  value: '1m 30s' },
-      { label: 'Slowest', value: '1h 2m' },
+      { label: 'Fastest', value: '5 sec' },
+      { label: 'Median',  value: '1 min 30 sec' },
+      { label: 'Slowest', value: '1 h 2 min' },
     ]);
   });
 

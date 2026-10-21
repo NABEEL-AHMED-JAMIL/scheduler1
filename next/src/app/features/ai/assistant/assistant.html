@@ -286,7 +286,7 @@
                   <li class="flex items-center gap-2 min-w-0" [attr.data-live-call]="c.toolName">
                     <span class="mono truncate">{{ c.toolName }}</span>
                     <span class="pill" [class]="'pill pill-' + o.tone">{{ o.label }}</span>
-                    @if (c.durationMs != null) { <span class="text-[color:var(--text-muted)] tabular-nums">{{ c.durationMs }} ms</span> }
+                    @if (c.durationMs != null) { <span class="text-[color:var(--text-muted)] tabular-nums">{{ tookMs(c.durationMs) }}</span> }
                   </li>
                 }
               </ol>

@@ -23,6 +23,7 @@ import { statusColor } from '../../../shared/charts/status-color';
 import { PageHeader } from '../../../shared/ui/page-header';
 import { RefreshButton } from '../../../shared/ui/refresh-button';
 import { readableRunError } from './run-error';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /**
  * Model connections: where prompts run. The same rail-and-pane the Kafka page has, because
@@ -152,10 +153,10 @@ export class Connections implements OnInit {
       ?? kind;
   }
 
-  /** A run's time as the list shows it: seconds with one decimal, or milliseconds under a second. */
+  /** A run's time as the list shows it, in the console's duration words ("420 ms", "1.4 sec"). */
   latency(ms: number | null | undefined): string {
     if (ms == null) return '—';
-    return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+    return formatDuration(ms / 1000);
   }
 
   ngOnInit(): void {

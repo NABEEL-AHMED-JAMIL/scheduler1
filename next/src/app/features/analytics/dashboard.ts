@@ -43,6 +43,7 @@ import { BoardSection, parseSections, sectionsByWidget, segmentsOf, withSection 
 import { colorKeysOf } from './charts/board-colors';
 import { CHART_SLOTS } from '../../shared/charts/status-color';
 import { Mark, widgetConfigOf, widgetConfigString, WidgetView, combineFilters, analysisView, queryView, WidgetRun, SavedAnalysisConfig, mintQueryId, TILE_ROWS, WidgetSpan, fillRows, SM_SPAN, LG_SPAN, ROW_KINDS, SEARCH_FROM, fileName, SPANS } from './widget-view';
+import { formatDuration } from '../../shared/ui/time-format';
 
 /**
  * How many of a board's tiles run at once (owner 2026-10-12: tiles load in parallel). Three of the four permits the
@@ -108,6 +109,8 @@ export { DatasetRegistry } from './dataset-registry';
   styleUrls: ['./dashboard.css', './board/board.css'],
 })
 export class Dashboards implements OnInit, OnDestroy {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
 
   private readonly analytics = inject(AnalyticsService);
   private readonly auth = inject(AuthService);

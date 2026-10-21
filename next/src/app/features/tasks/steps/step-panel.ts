@@ -93,9 +93,9 @@ export class StepPanel {
   readonly columns = this.data.columns ?? [];
   /** Blank tries and timeout are the task's own defaults (the registry's retry and timeoutSeconds), else the pipeline's. */
   readonly triesHint = `1 to 10. Blank: ${this.plural(this.data.task?.retry?.maxAttempts ?? 1, 'try', 'tries')}, the task's default.`;
-  readonly delayHint = `0 to 3600. Blank: ${this.data.task?.retry?.delaySeconds ? this.data.task.retry.delaySeconds + ' s' : 'none'}.`;
+  readonly delayHint = `0 to 3600. Blank: ${this.data.task?.retry?.delaySeconds ? this.data.task.retry.delaySeconds + ' sec' : 'none'}.`;
   readonly timeoutHint = this.data.task?.timeoutSeconds
-    ? `Each try, 1 to 86400. Blank: ${this.data.task.timeoutSeconds} s, the task's default.`
+    ? `Each try, 1 to 86400. Blank: ${this.data.task.timeoutSeconds} sec, the task's default.`
     : 'Each try, 1 to 86400. Blank: the pipeline\'s default.';
   readonly defaultOnErrorText = computed(() => `Default (the pipeline's: ${onErrorLabel(this.data.defaultOnError || 'fail').toLowerCase()})`);
 

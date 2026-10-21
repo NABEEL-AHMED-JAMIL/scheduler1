@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { TIME_FORMATS, resolveFormat, dayLabel, hourLabel, hourRange, axisHour, formatDuration, compactDuration } from './time-format';
+import { TIME_FORMATS, resolveFormat, dayLabel, hourLabel, hourRange, axisHour, formatDuration, compactDuration, elapsedDuration } from './time-format';
 import { ServerTimePipe } from './server-time.pipe';
 
 /**
@@ -53,25 +53,57 @@ describe('days and hours', () => {
 });
 
 describe('durations', () => {
-  it('writes one way at every size', () => {
-    expect(formatDuration(0.42)).toBe('420ms');
-    expect(formatDuration(0)).toBe('0s');
-    expect(formatDuration(25.25)).toBe('25.3s');
-    expect(formatDuration(59.611)).toBe('59.6s');
-    expect(formatDuration(60.3)).toBe('1m');
-    expect(formatDuration(119.6)).toBe('2m');
-    expect(formatDuration(200)).toBe('3m 20s');
-    expect(formatDuration(3900)).toBe('1h 5m');
-    expect(formatDuration(7200)).toBe('2h');
+  it('writes one way at every size, with the unit spelled out', () => {
+    expect(formatDuration(0.42)).toBe('420 ms');
+    expect(formatDuration(0)).toBe('0 sec');
+    expect(formatDuration(1.4)).toBe('1.4 sec');
+    expect(formatDuration(25.25)).toBe('25 sec');
+    expect(formatDuration(60.3)).toBe('1 min');
+    expect(formatDuration(200)).toBe('3 min 20 sec');
+    expect(formatDuration(180)).toBe('3 min');
+    expect(formatDuration(3900)).toBe('1 h 5 min');
+    expect(formatDuration(7200)).toBe('2 h');
+    expect(formatDuration(2 * 86400 + 3 * 3600)).toBe('2 d 3 h');
+    expect(formatDuration(2 * 86400)).toBe('2 d');
     expect(formatDuration(null)).toBe('—');
+    expect(formatDuration(undefined)).toBe('—');
+    expect(formatDuration(NaN)).toBe('—');
     expect(formatDuration(-1)).toBe('—');
   });
 
+  it('crosses each boundary where it should', () => {
+    expect(formatDuration(0.999)).toBe('999 ms');
+    expect(formatDuration(0.9996)).toBe('1 sec');
+    expect(formatDuration(1)).toBe('1 sec');
+    expect(formatDuration(9.94)).toBe('9.9 sec');
+    expect(formatDuration(9.95)).toBe('10 sec');
+    expect(formatDuration(10)).toBe('10 sec');
+    expect(formatDuration(14.9)).toBe('15 sec');
+    expect(formatDuration(59.4)).toBe('59 sec');
+    expect(formatDuration(59.6)).toBe('1 min');
+    expect(formatDuration(119.6)).toBe('2 min');
+    expect(formatDuration(3599.4)).toBe('59 min 59 sec');
+    expect(formatDuration(3599.6)).toBe('1 h');
+    expect(formatDuration(3600)).toBe('1 h');
+    expect(formatDuration(24 * 3600 - 20)).toBe('1 d');
+    expect(formatDuration(25 * 3600)).toBe('1 d 1 h');
+  });
+
   it('keeps bar labels short, and a 25 second run never reads 0', () => {
-    expect(compactDuration(25.4)).toBe('25s');
-    expect(compactDuration(0.3)).toBe('<1s');
-    expect(compactDuration(60)).toBe('1m');
-    expect(compactDuration(204)).toBe('3.4m');
-    expect(compactDuration(7200)).toBe('2h');
+    expect(compactDuration(25.4)).toBe('25 sec');
+    expect(compactDuration(0.3)).toBe('<1 sec');
+    expect(compactDuration(0)).toBe('0 sec');
+    expect(compactDuration(60)).toBe('1 min');
+    expect(compactDuration(204)).toBe('3.4 min');
+    expect(compactDuration(7200)).toBe('2 h');
+    expect(compactDuration(null)).toBe('—');
+  });
+
+  it('ticks a live counter at a steady width', () => {
+    expect(elapsedDuration(0)).toBe('0 sec');
+    expect(elapsedDuration(45)).toBe('45 sec');
+    expect(elapsedDuration(125)).toBe('2 min 05 sec');
+    expect(elapsedDuration(3720)).toBe('1 h 02 min');
+    expect(elapsedDuration(null)).toBe('—');
   });
 });

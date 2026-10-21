@@ -518,7 +518,7 @@ export class Reports implements OnInit {
    */
   readonly durationFoot = computed(() => {
     const parts: string[] = [];
-    // The split, when it is known, rather than the caveat alone. "34s · 0s running" says in
+    // The split, when it is known, rather than the caveat alone. "34 sec · 0 sec running" says in
     // four words what the old "wait included" only hinted at.
     parts.push(this.medianExecution() >= 0
       ? `${formatDuration(this.medianExecution())} running, rest is queue wait`

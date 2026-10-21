@@ -8,7 +8,7 @@
     <app-stat-tile label="Settings" [value]="'' + settings().length" icon="settings" tone="info" foot="on the allow-list" />
     <app-stat-tile label="Changed" [value]="'' + changedCount()" icon="edit" [tone]="changedCount() ? 'warn' : 'muted'" foot="from their default" />
     <app-stat-tile label="Workspace values" [value]="'' + overrideCount()" icon="building" [tone]="overrideCount() ? 'info' : 'muted'" foot="a workspace's own" />
-    <app-stat-tile label="Read by the engine" [value]="cacheSeconds() + ' s'" icon="clock" tone="muted" foot="at most this after a change" />
+    <app-stat-tile label="Read by the engine" [value]="cacheSeconds() + ' sec'" icon="clock" tone="muted" foot="at most this after a change" />
   </div>
 
   @if (error()) {

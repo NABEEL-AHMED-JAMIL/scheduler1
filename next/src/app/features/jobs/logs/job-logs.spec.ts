@@ -192,9 +192,9 @@ describe('JobLogs for a run that does not exist', () => {
 describe('JobLogs on the console clock', () => {
   it('writes the run and the AI step with the shared duration format', () => {
     const { el, component } = page('ai');
-    expect(component.duration()).toBe('2m 8s');
-    expect(el.textContent).toContain('9.9s');
-    expect(el.textContent).not.toContain('9.9 s');
+    expect(component.duration()).toBe('2 min 8 sec');
+    expect(el.textContent).toContain('9.9 sec');
+    expect(el.textContent).not.toContain('9.9s');
   });
 
   it('writes a long wait in minutes', () => {
@@ -202,8 +202,8 @@ describe('JobLogs on the console clock', () => {
     const at = (time: string) => `2026-09-20T${time}`;
     component.runStartedAt.set(at('18:00:00'));
     component.logs.set([{ jobAuditLogId: 1, logsDetail: 'waited', dateCreated: at('18:02:05') }] as any);
-    expect(component.topGaps()[0].display).toBe('2m 5s');
-    expect(component.gapSummary()?.totalLabel).toBe('2m 5s');
+    expect(component.topGaps()[0].display).toBe('2 min 5 sec');
+    expect(component.gapSummary()?.totalLabel).toBe('2 min 5 sec');
   });
 
   it('times the log\'s lines on the 24-hour clock, the full date in each one\'s title', () => {
@@ -268,7 +268,7 @@ describe('JobLogs with the run\'s steps', () => {
     expect(el.querySelector('[data-tab="steps"]')?.getAttribute('aria-selected')).toBe('true');
     expect(el.querySelector('[data-tab="ai"]')?.textContent).toContain('AI answers (1)');
     const summary = el.querySelector('[data-test="run-summary"]')!;
-    expect(summary.textContent).toContain('2m 8s');
+    expect(summary.textContent).toContain('2 min 8 sec');
     expect(summary.compareDocumentPosition(el.querySelector('[data-test="run-tabs"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

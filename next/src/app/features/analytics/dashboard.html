@@ -177,7 +177,7 @@
               }
               <!-- Last on the line: it goes while the board runs and comes back with another length, and nothing may sit
                    after it to be moved (the filter pill did, on every click that narrowed: e2e board-layout). -->
-              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ (loadMs()! / 1000).toFixed(1) }} s</span> }
+              @if (loadMs() !== null && !running()) { <span data-test="load-time" [attr.data-load-ms]="loadMs()">Loaded in {{ took(loadMs()!) }}</span> }
             </p>
           </div>
           <div class="flex items-center gap-1.5 shrink-0">

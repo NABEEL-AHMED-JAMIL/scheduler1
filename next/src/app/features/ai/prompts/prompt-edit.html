@@ -229,7 +229,7 @@
           <div class="mt-4">
             <div class="flex items-center gap-2 flex-wrap text-xs">
               <span class="pill" [class]="'pill ' + runPill(run.status)">{{ runLabel(run.status) }}</span>
-              @if (run.latencyMs != null) { <span>{{ (run.latencyMs / 1000) | number: '1.1-1' }} s</span> }
+              @if (run.latencyMs != null) { <span>{{ took(run.latencyMs) }}</span> }
               @if (run.tokensIn != null) { <span class="text-[color:var(--text-muted)]">{{ run.tokensIn | number }} in · {{ run.tokensOut | number }} out</span> }
               @if ((run.attempts ?? 1) > 1) { <span class="text-[color:var(--text-muted)]">{{ run.attempts }} attempts</span> }
               <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="showRendered.set(!showRendered())">{{ showRendered() ? 'Hide input' : 'Show rendered input' }}</button>
@@ -267,7 +267,7 @@
                   @if (r.error) { <div class="truncate" [class]="r.status === 'review' ? 'text-warn-500' : 'text-crit-500'" [title]="r.error">{{ r.error }}</div> }
                 </div>
                 <span class="text-[color:var(--text-muted)] whitespace-nowrap">
-                  @if (r.latencyMs != null) { {{ (r.latencyMs / 1000) | number: '1.1-1' }} s }
+                  @if (r.latencyMs != null) { {{ took(r.latencyMs) }} }
                   @if (r.tokensIn != null) { · {{ r.tokensIn }}→{{ r.tokensOut }} }
                 </span>
               </li>

@@ -125,14 +125,14 @@ export const permissionLabel = (p: string | null | undefined) => (p === 'TENANT_
 export function retryText(retry: StepTaskEntry['retry']): string {
   const tries = retry?.maxAttempts ?? 1;
   if (tries <= 1) return 'Once, no retry';
-  return `Up to ${tries} tries, ${retry?.delaySeconds ?? 0} s apart`;
+  return `Up to ${tries} tries, ${retry?.delaySeconds ?? 0} sec apart`;
 }
 
 export function timeoutText(seconds: number | null | undefined): string {
   if (!seconds) return 'No limit';
   if (seconds % 3600 === 0) return `${seconds / 3600} h`;
   if (seconds % 60 === 0 && seconds >= 120) return `${seconds / 60} min`;
-  return `${seconds} s`;
+  return `${seconds} sec`;
 }
 
 /** A setting of a task's config, for reading rather than filling in. */

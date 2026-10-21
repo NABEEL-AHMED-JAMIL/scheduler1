@@ -155,7 +155,7 @@ describe('Notification bell timestamps', () => {
     vi.setSystemTime(new Date('2026-09-14T22:03:13Z'));
     const { bell } = build();
 
-    expect(bell.ago('2026-09-14T17:02:13')).toBe('1m ago');
+    expect(bell.ago('2026-09-14T17:02:13')).toBe('1 min ago');
   });
 
   it('reads the REST form and the socket form of one moment as one moment', () => {
@@ -165,7 +165,7 @@ describe('Notification bell timestamps', () => {
     vi.setSystemTime(new Date('2026-09-15T01:02:13Z'));
     const { bell } = build();
 
-    expect(bell.ago('2026-09-14T17:02:13')).toBe('3h ago');
+    expect(bell.ago('2026-09-14T17:02:13')).toBe('3 h ago');
     expect(bell.ago('2026-09-14T17:02:13')).toBe(bell.ago('2026-09-14T22:02:13Z'));
   });
 

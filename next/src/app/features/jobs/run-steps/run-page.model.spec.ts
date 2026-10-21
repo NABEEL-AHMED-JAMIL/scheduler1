@@ -143,7 +143,7 @@ describe('run page: the steps table\'s rows', () => {
     expect(rows.map(r => r.slowest)).toEqual([false, true, false]);
     expect(rows[1].share).toBe(1);
     expect(rows[0].share).toBeCloseTo(24 / 3097);
-    expect(rows[1].duration).toBe('3.1s');
+    expect(rows[1].duration).toBe('3.1 sec');
     expect(stepRows(timeline([steps[0]]), [])[0].slowest).toBe(false);
   });
 

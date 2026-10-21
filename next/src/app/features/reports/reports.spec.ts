@@ -84,7 +84,7 @@ describe('the median duration tile', () => {
     reports.rawData.set(inFlight);
 
     expect(reports.medianDuration()).toBe(44);
-    expect(formatDuration(reports.medianDuration())).toBe('44s');
+    expect(formatDuration(reports.medianDuration())).toBe('44 sec');
   });
 });
 

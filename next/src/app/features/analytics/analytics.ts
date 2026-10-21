@@ -3446,7 +3446,7 @@ export class Analytics implements OnInit {
     return this.took(run.durationMs);
   }
 
-  /** Milliseconds as the console writes a duration ("340ms", "4.2s"); nothing when unmeasured. */
+  /** Milliseconds as the console writes a duration ("340 ms", "4.2 sec"); nothing when unmeasured. */
   took(ms: number | null | undefined): string {
     return ms === null || ms === undefined ? '' : formatDuration(ms / 1000);
   }

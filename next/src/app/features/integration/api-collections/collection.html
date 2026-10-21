@@ -122,11 +122,11 @@
                 </td>
                 <td class="text-xs">{{ authText(r) }}</td>
                 <td class="text-xs">{{ r.folderId == null ? '—' : folderName(r.folderId) }}</td>
-                <td class="text-right tabular text-xs whitespace-nowrap">{{ r.timeoutMs ? (r.timeoutMs / 1000) + ' s' : '—' }}</td>
+                <td class="text-right tabular text-xs whitespace-nowrap">{{ r.timeoutMs ? (r.timeoutMs / 1000) + ' sec' : '—' }}</td>
                 <td class="text-xs whitespace-nowrap">
                   @if (lastTest(r); as t) {
                     <span [class.text-ok-500]="t.outcome === 'OK'" [class.text-crit-500]="t.outcome !== 'OK'">
-                      {{ t.statusCode ?? (t.outcome === 'BLOCKED' ? 'Blocked' : 'Failed') }} · {{ t.durationMs }} ms
+                      {{ t.statusCode ?? (t.outcome === 'BLOCKED' ? 'Blocked' : 'Failed') }} · {{ took(t.durationMs) }}
                     </span>
                   } @else { <span class="text-[color:var(--text-muted)]">not tested</span> }
                 </td>

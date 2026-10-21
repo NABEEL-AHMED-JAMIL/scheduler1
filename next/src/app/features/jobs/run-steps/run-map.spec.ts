@@ -19,7 +19,7 @@ describe('the run plan map', () => {
     expect(m.nodes[0].kind).toBe('read');
     expect(m.nodes[3].kind).toBe('output');
     expect(m.nodes[2].share).toBeCloseTo(2600 / 3199, 5);
-    expect(m.nodes[2].metrics?.map(x => x.value)).toEqual(['2.6 s', '81.3%', '101,766', '10']);
+    expect(m.nodes[2].metrics?.map(x => x.value)).toEqual(['2.6 sec', '81.3%', '101,766', '10']);
     expect(m.edges.map(e => `${e.from}>${e.to} ${e.label}`)).toEqual(['read>banded 101,766 rows', 'banded>by_age 101,766 rows', 'by_age>save 10 rows']);
   });
 
@@ -38,7 +38,7 @@ describe('the run plan map', () => {
   });
 
   it('says durations and kinds in a few words', () => {
-    expect([durationText(450), durationText(4600), durationText(125_000), durationText(null)]).toEqual(['450 ms', '4.6 s', '2 min 5 s', '—']);
+    expect([durationText(450), durationText(4600), durationText(125_000), durationText(null)]).toEqual(['450 ms', '4.6 sec', '2 min 5 sec', '—']);
     expect([stepKind('ai_prompt'), stepKind('sample'), stepKind('send_notification'), stepKind('legacy')]).toEqual(['ai', 'read', 'output', 'legacy']);
   });
 });

@@ -53,7 +53,7 @@ describe('billing-format', () => {
     expect(formatBytes(0)).toBe('0 B');
     expect(formatQuantity(131000000000, 'byte')).toBe('122 GB');
     expect(formatQuantity(0.5, 'GB-hour')).toBe('21.33 MB · day');
-    expect(formatQuantity(0.3, 'minute')).toBe('18 s');
+    expect(formatQuantity(0.3, 'minute')).toBe('18 sec');
     expect(formatQuantity(16596, 'token')).toBe('16,596');
     expect(formatQuantity(0.005, 'run')).toBe('0.005');
   });

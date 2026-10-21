@@ -106,7 +106,7 @@ describe('Ask your data -- as drawn', () => {
     expect(source.querySelector('a')!.getAttribute('href')).toBe('/pipelines/schedules/2853/runs/7447/logs');
     expect(source.textContent).toContain('Pipeline result');
     expect(source.textContent).toContain('WC-0002');
-    expect(turn.querySelector('[data-test=meta]')!.textContent).toContain('gemma3:4b on Local Ollama in 8.4s');
+    expect(turn.querySelector('[data-test=meta]')!.textContent).toContain('gemma3:4b on Local Ollama in 8.4 sec');
 
     (answer.querySelector('button') as HTMLButtonElement).click();
     fixture.detectChanges();

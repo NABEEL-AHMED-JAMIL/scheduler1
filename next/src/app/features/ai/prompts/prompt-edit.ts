@@ -21,6 +21,7 @@ import { PageHeader } from '../../../shared/ui/page-header';
 import { Section } from '../../../shared/ui/section';
 import { FormRow } from '../../../shared/ui/form-row';
 import { ActionsBar } from '../../../shared/ui/actions-bar';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /**
  * The prompt editor, with Try it beside it: the template and its variables on the left, the
@@ -33,6 +34,9 @@ import { ActionsBar } from '../../../shared/ui/actions-bar';
   templateUrl: './prompt-edit.html',
 })
 export class PromptEdit implements OnInit {
+  /** Milliseconds in the console's duration words (formatDuration): "420 ms", "1.4 sec", "15 sec". */
+  took(ms: number): string { return formatDuration(ms / 1000); }
+
   readonly promptId = input<string>();
   private readonly fb = inject(FormBuilder);
   private readonly http = inject(HttpClient);

@@ -7,6 +7,7 @@ import { AiDataContext, AiDesignerApi, AiStatus, ChangedBlock, Proposal, Proposa
 import { Problem } from '../report-studio.model';
 import { RsTimePipe } from '../rs-time.pipe';
 import { typeWord } from './designer-model';
+import { elapsedDuration } from '../../../shared/ui/time-format';
 
 /** One action the AI assistant offers, in the designer's words. */
 interface AiAction { kind: ProposalKind; label: string; hint: string; needsWords: boolean; needsData: boolean; placeholder: string; }
@@ -76,6 +77,8 @@ export class AiPanel {
   readonly previewing = signal(false);
   readonly history = signal<Proposal[]>([]);
   readonly elapsed = signal(0);
+  /** The counter while the model drafts: "45 sec", "2 min 05 sec". */
+  elapsedText(): string { return elapsedDuration(this.elapsed()); }
   private timer: ReturnType<typeof setInterval> | null = null;
   private call: Subscription | null = null;
 

@@ -109,7 +109,7 @@ describe('Model connections -- what the selected connection has been doing', () 
 
   it('says a run\'s time in seconds, or milliseconds under one', () => {
     const { screen } = screenAt(null);
-    expect(screen.latency(2400)).toBe('2.4 s');
+    expect(screen.latency(2400)).toBe('2.4 sec');
     expect(screen.latency(380)).toBe('380 ms');
     expect(screen.latency(null)).toBe('—');
   });

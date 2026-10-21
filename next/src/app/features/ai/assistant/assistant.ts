@@ -40,6 +40,7 @@ import { DataPolicyApi } from '../../admin/data-policies/data-policy.api';
 import { PolicyLevel, levelSummary, levelsOf, policyState } from '../../admin/data-policies/data-policy.model';
 import { sensitivityText } from '../../../shared/ui/sensitivity';
 import { PageHeader } from '../../../shared/ui/page-header';
+import { elapsedDuration, formatDuration } from '../../../shared/ui/time-format';
 
 interface Connection { connectionId: number; name: string; isDefault?: boolean; status?: string; defaultModel?: string | null; provider?: string; }
 interface TraceState { loading: boolean; error: string; trace: ToolTrace | null; }
@@ -209,7 +210,7 @@ export class Assistant implements OnInit {
     const facts: string[] = [];
     if (picked?.provider) facts.push(picked.provider);
     if (last?.toolMode) facts.push(last.toolMode === 'native' ? 'native tool calling' : 'JSON tool protocol');
-    if (last?.seconds != null) facts.push(`last answer ${last.seconds.toFixed(1)} s`);
+    if (last?.seconds != null) facts.push(`last answer ${formatDuration(last.seconds)}`);
     return { name: this.modelLabel(), model, facts: facts.join(' · '), tone: last == null ? 'neutral' : last.ok ? 'ok' : 'warn' };
   });
 
@@ -807,9 +808,10 @@ export class Assistant implements OnInit {
     return '';
   }
   elapsedText(): string {
-    const s = this.elapsed();
-    return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, '0')}s`;
+    return elapsedDuration(this.elapsed());
   }
+  /** A tool call's time, from milliseconds, in the console's duration words. */
+  tookMs(ms: number): string { return formatDuration(ms / 1000); }
   liveCalls(): ToolCall[] { return this.live()?.calls ?? []; }
 
   private remember(conversationId: number | null): void {

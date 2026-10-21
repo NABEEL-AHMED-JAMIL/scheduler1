@@ -11,6 +11,7 @@ import { Icon } from '../../../shared/ui/icon';
 import { StatusPill } from '../../../shared/ui/status-pill';
 import { Timeline, runFinished } from '../../tasks/steps/steps.model';
 import { RetryDialog, RetryDialogData } from '../../jobs/retry/retry-dialog';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /**
  * How long to wait before reading an unfinished run again when no push arrives: quick at first (a run's first steps take
@@ -128,7 +129,7 @@ export class RunFollow implements OnInit {
     const ended = steps.map(s => s.endedAt).filter(Boolean).sort().reverse()[0];
     const ms = started && ended && this.state().final ? Date.parse(ended) - Date.parse(started) : null;
     return { done, total: steps.length, percent: Math.round((done / steps.length) * 100), failed, current: running?.key ?? null,
-      duration: ms != null && ms >= 0 ? (ms < 1000 ? `${ms} ms` : ms < 60000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms / 60000)} min`) : null };
+      duration: ms != null && ms >= 0 ? formatDuration(ms / 1000) : null };
   });
 
   readonly failure = computed(() => {

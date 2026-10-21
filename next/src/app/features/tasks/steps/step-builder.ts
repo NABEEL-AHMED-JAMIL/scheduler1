@@ -275,7 +275,7 @@ export class StepBuilder implements OnInit {
     const parts: string[] = [];
     if (step.input) parts.push(`reads ${step.input}`);
     if ((step.retry?.maxAttempts ?? 1) > 1) parts.push(`${step.retry!.maxAttempts} tries`);
-    if (step.timeoutSeconds) parts.push(`${step.timeoutSeconds} s timeout`);
+    if (step.timeoutSeconds) parts.push(`${step.timeoutSeconds} sec timeout`);
     if (step.onError) parts.push(onErrorLabel(step.onError).toLowerCase() + ' on failure');
     return parts.join(' · ');
   }

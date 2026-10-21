@@ -32,7 +32,7 @@
         <span><b>CSV or TSV to PDF</b> up to {{ l.tableMaxFileSizeMb }} MB, first {{ l.pdfMaxRows.toLocaleString('en-US') }} rows printed</span>
         <span><b>XLSX to PDF</b> up to {{ l.xlsxMaxFileSizeMb }} MB</span>
         <span><b>Output</b> up to {{ l.maxOutputMb }} MB, {{ l.pdfMaxPages.toLocaleString('en-US') }} pages</span>
-        <span><b>Time</b> {{ l.timeoutSeconds }} s a file</span>
+        <span><b>Time</b> {{ l.timeoutSeconds }} sec a file</span>
         <span><b>Queue</b> {{ l.slots }} at once, {{ l.maxWaiting }} more waiting</span>
         <span class="limits-note">If it's busy you're told so; nothing is lost, try again in about 30 seconds.</span>
       } @else {

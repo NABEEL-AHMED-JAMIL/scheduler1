@@ -40,7 +40,7 @@
   <div class="flex items-center gap-2">
     @if (busy()) {
       <span class="spinner" role="status" aria-label="The AI is drafting"></span>
-      <span class="text-xs text-[color:var(--text-secondary)]" aria-live="polite">Drafting · {{ elapsed() }} s{{ status()?.local ? ' · a local model can take a minute' : '' }}</span>
+      <span class="text-xs text-[color:var(--text-secondary)]" aria-live="polite">Drafting · {{ elapsedText() }}{{ status()?.local ? ' · a local model can take a minute' : '' }}</span>
       <button type="button" class="btn btn-ghost btn-sm ml-auto" (click)="cancel()">Stop waiting</button>
     } @else {
       <button type="button" class="btn btn-primary btn-sm" [disabled]="!canAsk()" (click)="ask()" data-ai-ask><app-icon name="sparkle" />{{ action().label }}</button>

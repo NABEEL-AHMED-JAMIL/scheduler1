@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, input, signal } from '@an
 import { Icon } from '../../../shared/ui/icon';
 import { formatSize } from '../../../shared/ui/format-size';
 import { ToolCall, outcomeLook } from './assistant.model';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /** The run a trace belongs to, as progress or the trace answers it. */
 export interface TraceRun {
@@ -87,7 +88,7 @@ export function bars(calls: readonly ToolCall[]): { seq: number; percent: number
                   <span class="tp-bar" aria-hidden="true">
                     <span class="tp-fill" [class.crit]="o.tone === 'crit'" [style.width.%]="barOf(c.seq)"></span>
                   </span>
-                  <span class="text-[11px] text-[color:var(--text-muted)] shrink-0 tabular-nums w-16 text-right">{{ c.durationMs != null ? c.durationMs + ' ms' : '—' }}</span>
+                  <span class="text-[11px] text-[color:var(--text-muted)] shrink-0 tabular-nums w-20 text-right">{{ seconds(c.durationMs) }}</span>
                   <app-icon [name]="open ? 'chevronUp' : 'chevronDown'" size="0.85em" class="shrink-0 text-[color:var(--text-muted)]" />
                 </button>
                 @if (open) {
@@ -145,7 +146,7 @@ export class TracePanel {
   barOf(seq: number): number { return this.widths().get(seq) ?? 0; }
   look(outcome: string) { return outcomeLook(outcome); }
   args(c: ToolCall): string { return prettyArguments(c.arguments); }
-  seconds(ms: number | null | undefined): string { return ms == null ? '—' : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`; }
+  seconds(ms: number | null | undefined): string { return ms == null ? '—' : formatDuration(ms / 1000); }
 
   facts(c: ToolCall): string {
     const parts: string[] = [];

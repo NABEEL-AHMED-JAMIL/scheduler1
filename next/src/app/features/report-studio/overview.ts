@@ -16,6 +16,7 @@ import { JobRow, StudioOverview, chipWord, isRunning, stageWord } from './report
 import { GeneratedService, pipelineOf } from '../documents/generated/generated.service';
 import { RunRow } from '../tasks/steps/steps.model';
 import { RsTabCounts } from './rs-tab-counts';
+import { formatDuration } from '../../shared/ui/time-format';
 
 /** A pipeline whose runs fed reports lately (the Overview's "Connected pipelines"), as the person may see it. */
 export interface ConnectedPipeline {
@@ -159,11 +160,11 @@ export class ReportOverview implements OnInit {
     return j.requestedByName || 'A workspace member';
   }
 
-  /** A finished job's chip as the drawing words it: "Completed · 8.4 s", "Failed · required field". */
+  /** A finished job's chip as the drawing words it: "Completed · 8.4 sec", "Failed · required field". */
   jobChip(j: JobRow): string {
     if (j.status === 'SUCCEEDED') {
       const ms = j.startedAt && j.finishedAt ? (instantOf(j.finishedAt)?.getTime() ?? 0) - (instantOf(j.startedAt)?.getTime() ?? 0) : 0;
-      return ms > 0 ? `Completed · ${(ms / 1000).toFixed(1)} s` : 'Completed';
+      return ms > 0 ? `Completed · ${formatDuration(ms / 1000)}` : 'Completed';
     }
     if (j.status === 'FAILED') return FAIL_WORDS[j.errorCode ?? ''] ? `Failed · ${FAIL_WORDS[j.errorCode!]}` : 'Failed';
     return chipWord(j.status);

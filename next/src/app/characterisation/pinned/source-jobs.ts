@@ -13,7 +13,7 @@ export const PINNED: Record<string, unknown> = {
       "Recent runs"
     ],
     "buttons": [
-      "40s#7331",
+      "40 sec#7331",
       "Actions for Reference CSV check (e2e)",
       "Actions for UI-REVIEW Clean customers (manual, notify on completion)",
       "Change",

@@ -137,7 +137,7 @@ describe('StepPanel', () => {
     const left = el.querySelector<HTMLInputElement>('#cfg-left')!;
     expect(Array.from(el.querySelectorAll(`#${left.getAttribute('list')} option`)).map(o => o.getAttribute('value'))).toEqual(['id', 'patient']);
     expect(el.textContent).toContain('Blank: 2 tries, the task\'s default.');
-    expect(el.textContent).toContain('Blank: 120 s, the task\'s default.');
+    expect(el.textContent).toContain('Blank: 120 sec, the task\'s default.');
   });
 });
 

@@ -87,7 +87,7 @@ describe('Run page: the steps table', () => {
     const slow = el.querySelectorAll('tr.is-slowest');
     expect(slow.length).toBe(1);
     expect((slow[0] as HTMLElement).dataset['step']).toBe('shape');
-    expect(el.querySelector('[data-test="slowest-note"]')?.textContent).toContain('Slowest: shape · 900ms');
+    expect(el.querySelector('[data-test="slowest-note"]')?.textContent).toContain('Slowest: shape · 900 ms');
     expect((slow[0].querySelector('.rs-fill') as HTMLElement).style.width).toBe('100%');
   });
 

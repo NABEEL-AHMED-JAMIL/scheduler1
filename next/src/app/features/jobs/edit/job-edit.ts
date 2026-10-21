@@ -366,7 +366,7 @@ export class JobEdit implements OnInit {
     const attempts = Number(v['maxAttempts'] ?? 1);
     const priority = `Priority ${v['priority'] ?? 1}`;
     if (!(attempts > 1)) return `${priority}; a failed run is not retried.`;
-    return `${priority}; up to ${attempts} attempts, ${v['retryBackoffSeconds'] ?? 60} s apart at first.`;
+    return `${priority}; up to ${attempts} attempts, ${v['retryBackoffSeconds'] ?? 60} sec apart at first.`;
   });
   readonly emailLine = computed(() => {
     const v = this.values();

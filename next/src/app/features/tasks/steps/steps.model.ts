@@ -1,4 +1,5 @@
 import type { RunParameter } from '../../jobs/run-parameters/run-parameters';
+import { formatDuration } from '../../../shared/ui/time-format';
 
 /**
  * MIG-249: the step builder's shapes and the pure rules behind them.
@@ -919,14 +920,10 @@ export function parseJson(text: string): { value?: unknown; error?: string } {
   }
 }
 
-/** "1.2 s", "340 ms", "2 min 5 s": how long a step took. */
+/** "1.2 sec", "340 ms", "2 min 5 sec": how long a step took, in formatDuration's words. */
 export function durationText(ms: number | null | undefined): string {
   if (ms === null || ms === undefined) return '';
-  if (ms < 1000) return `${ms} ms`;
-  const seconds = ms / 1000;
-  if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)} s`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes} min ${Math.round(seconds - minutes * 60)} s`;
+  return formatDuration(ms / 1000);
 }
 
 /** A step error's words: the engine stores {message, ...}; anything else as text. */

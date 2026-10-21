@@ -114,7 +114,7 @@ export function formatQuantity(quantity: number, unit: string | undefined): stri
   if (unit === 'byte') return formatBytes(quantity);
   if (unit === 'GB') return formatGb(quantity);
   if (unit === 'GB-hour') return quantity < 1 ? `${formatGb(quantity / HOURS_PER_DAY)} · day` : `${quantity.toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
-  if (unit === 'minute') return quantity < 1 ? `${(quantity * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} s` : quantity.toLocaleString(undefined, { maximumFractionDigits: 1 });
+  if (unit === 'minute') return quantity < 1 ? `${(quantity * 60).toLocaleString(undefined, { maximumFractionDigits: 1 })} sec` : quantity.toLocaleString(undefined, { maximumFractionDigits: 1 });
   return quantity.toLocaleString(undefined, { maximumFractionDigits: quantity < 10 ? 3 : 0 });
 }
 

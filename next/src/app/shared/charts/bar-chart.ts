@@ -291,7 +291,7 @@ export class BarChart {
   readonly format = input<(value: number) => string>(compactNumber);
   /**
    * What the values are. 'duration' reads them as seconds: the label above a bar is the short
-   * form ("25s", "3.4m") and the tooltip the full one ("25.3s", "3m 20s"), as every other duration
+   * form ("25 sec", "3.4 min") and the tooltip the full one ("25 sec", "3 min 20 sec"), as every other duration
    * in the console is written. The run charts plotted minutes through the number format before
    * this, so a 25 second run was labelled 0.
    *

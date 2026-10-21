@@ -91,7 +91,7 @@ describe('measures', () => {
     // The whole point of the sentinel: 0s and "—" must not be the same answer.
     const instant: RunRow[] = [[0,0,0,0,0,'x',1]] as RunRow[];
     const untimed: RunRow[] = [[0,0,0,0,-1,'x',2]] as RunRow[];
-    expect(formatDuration(aggregate(instant, 'median'))).toBe('0s');
+    expect(formatDuration(aggregate(instant, 'median'))).toBe('0 sec');
     expect(formatDuration(aggregate(untimed, 'median'))).toBe('—');
   });
 });
@@ -186,13 +186,13 @@ describe('formatting', () => {
   // no-data sentinel is NEGATIVE (NO_DURATION = -1) and every caller already guards on `>= 0`
   // before calling, so the dash is still what they see for a genuinely missing duration.
   // The page's own humanSeconds is gone; durations are written by the console's formatDuration.
-  it.each([[-1,'—'],[0,'0s'],[0.23,'230ms'],[45,'45s'],[90,'1m 30s'],[3660,'1h 1m']])('%ds reads as %s', (s, out) => {
+  it.each([[-1,'—'],[0,'0 sec'],[0.23,'230 ms'],[45,'45 sec'],[90,'1 min 30 sec'],[3660,'1 h 1 min']])('%ds reads as %s', (s, out) => {
     expect(formatMeasure(s as number, 'avg')).toBe(out);
   });
 
   it('counts are tallies, durations are times', () => {
     expect(formatMeasure(1535, 'count')).toBe('1,535');
-    expect(formatMeasure(90, 'avg')).toBe('1m 30s');
+    expect(formatMeasure(90, 'avg')).toBe('1 min 30 sec');
   });
 
   it('writes the Day dictionary as days for the grid, leaving the rows and the order alone', () => {

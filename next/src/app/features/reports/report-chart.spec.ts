@@ -59,7 +59,7 @@ describe('the y axis under a sub-second measure', () => {
     // and a bar reaching 23% of the plot height measured against the second of them as 0s while
     // its own tooltip said 230ms.
     expect((chart as any).gridLines().map((line: any) => line.label))
-      .toEqual(['0s', '250ms', '500ms', '750ms', '1s']);
+      .toEqual(['0 sec', '250 ms', '500 ms', '750 ms', '1 sec']);
   });
 
   it('gives a reader five different numbers to measure a bar against', () => {
