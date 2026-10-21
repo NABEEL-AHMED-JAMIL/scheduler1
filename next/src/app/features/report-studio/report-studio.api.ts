@@ -514,7 +514,10 @@ export class ReportStudioApi {
   /** One output as a file: a signed link (five minutes, the reader's own), then the proxied download. */
   download(reportId: string, version: number, format: 'PDF' | 'HTML'): Observable<HttpResponse<Blob>> {
     return new Observable<HttpResponse<Blob>>(subscriber => {
-      const inner = this.http.post<ApiResponse<{ token: string }>>(`${this.library}/downloadLink`, { reportId, version, format }).subscribe({
+      // ZT-A12 follow-up: the link is the audited "report PDF" read, and the audit reads which report from the query string;
+      // the body is unchanged.
+      const inner = this.http.post<ApiResponse<{ token: string }>>(`${this.library}/downloadLink`, { reportId, version, format },
+        { params: { reportId, version, format } }).subscribe({
         next: r => {
           const token = r.data?.token;
           if (!token) { subscriber.error(new Error(r.message || 'No download link.')); return; }

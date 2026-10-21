@@ -45,8 +45,11 @@ describe('ReportStudioApi', () => {
     const { api, http } = setup();
     let got: Blob | null = null;
     api.download('R1', 2, 'PDF').subscribe(r => got = r.body);
-    const link = http.expectOne(`${API_BASE}/reportLibrary.json/downloadLink`);
+    const link = http.expectOne(r => r.url === `${API_BASE}/reportLibrary.json/downloadLink`);
+    expect(link.request.method).toBe('POST');
     expect(link.request.body).toEqual({ reportId: 'R1', version: 2, format: 'PDF' });
+    // ZT-A12 follow-up: the audited "report PDF" read takes its id from the query string as well.
+    expect(link.request.urlWithParams).toBe(`${API_BASE}/reportLibrary.json/downloadLink?reportId=R1&version=2&format=PDF`);
     link.flush(ok({ token: 'abc.def' }));
     const file = http.expectOne(r => r.url === `${API_BASE}/reportLibrary.json/download`);
     expect(file.request.params.get('token')).toBe('abc.def');
