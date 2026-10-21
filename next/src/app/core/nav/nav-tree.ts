@@ -224,6 +224,8 @@ export const NAV: NavItem[] = [
           // MIG-406: logos, images, signatures and stamps, and brand profiles. The trail reads See results › Reports ›
           // Assets & branding, then the asset or brand profile's own name: no word twice.
           { label: 'Assets & branding', path: '/reports/assets', pageKey: 'report-assets', icon: 'image' },
+          // Phase 7: who approves reports and publishes templates, and what retention would remove; administrators only.
+          { label: 'Settings', path: '/reports/settings', adminOnly: true, icon: 'settings' },
         ],
       },
       {

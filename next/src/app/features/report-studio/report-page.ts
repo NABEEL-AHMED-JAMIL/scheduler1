@@ -64,6 +64,9 @@ export class ReportPage implements OnInit {
   readonly againData = signal<'same' | 'other'>('same');
   /** Phase 4: "Mark this version as COPY" -- the new version carries COPY on every page. */
   readonly againCopy = signal(false);
+  /** Phase 7: "Ask for approval when it is ready" -- the new version waits in the reviewers' Task inbox. */
+  readonly againAsk = signal(false);
+  readonly asking = signal(false);
   /** Phase 4: the console's verify link (a report's QR code) opens Verify signature for its version. */
   readonly verify = input<string | undefined>();
   readonly version = input<string | undefined>();
@@ -187,7 +190,45 @@ export class ReportPage implements OnInit {
    * report's current version (media refuses a superseded one: a newer version exists).
    */
   mayApprove(v: ReportVersionRow): boolean {
-    return this.canApprove() && !v.approval && v.createdBy !== this.me() && v.version === this.r()?.currentVersion;
+    const review = v.review?.state === 'OPEN' ? v.review : null;
+    // Phase 7: nobody approves the review they asked for, nor gives both approvals of two.
+    return this.canApprove() && !v.approval && !v.expired && v.createdBy !== this.me() && v.version === this.r()?.currentVersion
+      && !(review && review.requestedBy === this.me()) && !(review?.firstApproval && review.firstApproval.by === this.me());
+  }
+
+  /** Phase 7: the version's review is open in the Task inbox. */
+  waiting(v: ReportVersionRow): boolean {
+    return v.review?.state === 'OPEN';
+  }
+
+  /** Phase 7: whoever may generate asks for the current version's approval (once; it is a task for the reviewers). */
+  mayAsk(v: ReportVersionRow): boolean {
+    return this.canGenerate() && !v.approval && !v.expired && !v.void && this.hasPdf(v) && v.version === this.r()?.currentVersion && !this.waiting(v);
+  }
+
+  async ask(v: ReportVersionRow): Promise<void> {
+    const r = this.r();
+    if (!r) return;
+    const ok = await confirmWith(this.dialog, { title: `Ask for approval of ${r.label} v${v.version}?`, confirmLabel: 'Ask for approval',
+      body: 'It waits for the reviewers in Review › Approvals. Someone who did not generate it approves it, and its PDF is signed in their name; a newer version replaces the request.' });
+    if (!ok) return;
+    this.asking.set(true);
+    this.api.requestReportApproval(r.reportId, v.version).subscribe({
+      next: () => { this.asking.set(false); this.toast.success(`v${v.version} waits for approval in the reviewers' Review › Approvals.`); this.load(); },
+      error: e => { this.asking.set(false); this.toast.error(studioError(e).message); },
+    });
+  }
+
+  /** The review's state in words, for the version's details. */
+  reviewWords(v: ReportVersionRow): string {
+    const q = v.review;
+    if (!q) return '';
+    switch (q.state) {
+      case 'OPEN': return q.firstApproval ? `First approval by ${q.firstApproval.byName}; waiting for a second approver` : 'Waiting for approval';
+      case 'REJECTED': return `Rejected by ${q.decidedByName ?? 'a reviewer'}`;
+      case 'APPROVED': return `Approved by ${q.decidedByName ?? 'a reviewer'}`;
+      default: return q.closeReason ?? 'The request was closed';
+    }
   }
 
   /** An older version nobody approved: a newer one replaced it, so only the current version can be approved now. */
@@ -206,7 +247,11 @@ export class ReportPage implements OnInit {
     this.api.approve(r.reportId, v.version).subscribe({
       next: a => {
         this.approving.set(false);
-        this.toast.success(a.signed ? `v${v.version} approved and its PDF signed.` : `v${v.version} approved. ${a.notSignedReason ?? ''}`);
+        if (a.stage === 'FIRST') {
+          this.toast.success(`First approval of v${v.version} recorded; a second person approves it next, and its PDF is signed then.`);
+        } else {
+          this.toast.success(a.signed ? `v${v.version} approved and its PDF signed.` : `v${v.version} approved. ${a.notSignedReason ?? ''}`);
+        }
         this.load();
       },
       error: e => { this.approving.set(false); this.toast.error(studioError(e).message); },
@@ -293,6 +338,7 @@ export class ReportPage implements OnInit {
       rootPath: (v.config?.['rootPath'] as string | undefined) ?? '$', ...(v.config?.['mapping'] ? { mapping: v.config['mapping'] } : {}),
       reason: `Again from v${v.version}'s data, template v${this.againVersion() ?? v.templateVersion}`,
       ...(this.againCopy() ? { markAsCopy: true } : {}),
+      ...(this.againAsk() ? { requestApproval: true } : {}),
     }, this.againKey).subscribe({
       next: job => {
         this.againBusy.set(false);
@@ -341,6 +387,8 @@ export class ReportPage implements OnInit {
 
   /** A version's files, the PDF first (as the people who read it open it). */
   outputsOf(v: ReportVersionRow): OutputRow[] {
+    // Phase 7: a version whose files retention removed has nothing to open or download.
+    if (v.expired) return [];
     return [...v.outputs].sort((a, b) => (a.format === 'PDF' ? -1 : 0) - (b.format === 'PDF' ? -1 : 0));
   }
 

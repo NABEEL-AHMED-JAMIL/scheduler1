@@ -354,6 +354,18 @@ export class BillingApi {
   }
   removeStamp(tenantId?: number | null): Observable<ApiResponse<ReceiptStamp>> { return this.http.post<ApiResponse<ReceiptStamp>>(`${this.base}/stamp/remove`, null, { params: this.tenantParam(tenantId == null ? null : String(tenantId)) }); }
   stampSpecimen(tenantId?: number | null): Observable<Blob> { return this.http.get(`${this.base}/stamp/specimen`, { params: this.tenantParam(tenantId == null ? null : String(tenantId)), responseType: 'blob' }); }
+  // ---- Report Studio phase 7, the comparison month (RS-Q11): platform administrators ----
+  /** Compares an issued invoice, credit note or receipt with Report Studio's copy of it, now. */
+  studioCompare(documentId: number): Observable<ApiResponse<StudioComparison>> {
+    return this.http.post<ApiResponse<StudioComparison>>(`${this.base}/studioComparison/run`, null, { params: { documentId: String(documentId) } });
+  }
+  /** The verdicts kept, newest first (one workspace's, or every one's), and how many documents have none yet. */
+  studioComparisons(tenantId?: string | null): Observable<ApiResponse<{ comparisons: StudioComparisonRow[]; byVerdict: Record<string, number>; notYetCompared: number }>> {
+    return this.http.get<ApiResponse<{ comparisons: StudioComparisonRow[]; byVerdict: Record<string, number>; notYetCompared: number }>>(`${this.base}/studioComparisons`,
+      { params: { ...this.tenantParam(tenantId), limit: '500' } });
+  }
+  /** Report Studio's copy of a document as a PDF (drawn again, never stored). */
+  studioCopy(documentId: number): Observable<Blob> { return this.http.get(`${this.base}/studioComparison/copy`, { params: { documentId: String(documentId) }, responseType: 'blob' }); }
   documentBlob(documentId: number): Observable<Blob> { return this.http.get(`${this.base}/document`, { params: { documentId: String(documentId) }, responseType: 'blob' }); }
   statement(from: string, to: string, tenantId?: string | null): Observable<ApiResponse<DocumentRow>> {
     return this.http.post<ApiResponse<DocumentRow>>(`${this.base}/statement`, null, { params: { from, to, ...this.tenantParam(tenantId) } });
@@ -502,3 +514,13 @@ export const INVOICE_STATUS_TONE: Record<string, string> = {
 export const DOCUMENT_KIND_LABEL: Record<string, string> = {
   invoice: 'Invoice', credit_note: 'Credit note', receipt: 'Receipt', statement: 'Statement', payment_slip: 'Payment slip',
 };
+
+/** Report Studio phase 7 (RS-Q11): an issued document compared with Report Studio's copy of it. */
+export interface StudioComparison {
+  documentId: number; number?: string | null; kind: string; verdict: 'MATCH' | 'DIFFER' | 'FAILED'; checked?: number; missing?: string[];
+  notInIssued?: string[]; copyPages?: number; error?: string;
+}
+export interface StudioComparisonRow {
+  id: number; tenantId: number; documentId: number; kind: string; number?: string | null; verdict: 'MATCH' | 'DIFFER' | 'FAILED'; checked: number;
+  differences: { missing?: string[]; notInIssued?: string[] }; copyPages?: number | null; error?: string | null; comparedAt: string;
+}

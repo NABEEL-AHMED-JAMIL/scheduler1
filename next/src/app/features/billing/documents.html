@@ -87,6 +87,12 @@
               <span class="pill pill-neutral">{{ kindLabel[d.kind] }}</span>
               @if (state(d); as c) { <span [class]="c.cls" [title]="c.title || c.label" data-doc-state-head><app-icon [name]="c.icon" size="0.85em" />{{ c.label }}</span> }
               @if (isPlatformAdmin() && d.tenantName) { <span class="pill pill-neutral"><app-icon name="building" size="0.8em" class="opacity-70" />{{ d.tenantName }}</span> }
+              <!-- Report Studio phase 7 (RS-Q11): the comparison month's verdict, platform administrators only. -->
+              @if (comparable(d) && verdictOf(d); as v) {
+                <span class="pill" [class.pill-ok]="v.verdict === 'MATCH'" [class.pill-crit]="v.verdict !== 'MATCH'" data-test="studio-verdict"
+                      [title]="v.verdict === 'MATCH' ? v.checked + ' items checked' : v.verdict === 'DIFFER' ? 'The copy lacks: ' + (v.differences.missing ?? []).join('; ') : (v.error ?? '')">
+                  Report Studio copy: {{ v.verdict === 'MATCH' ? 'matches' : v.verdict === 'DIFFER' ? 'differs' : 'failed' }}</span>
+              }
             </div>
             <div class="flex items-baseline gap-x-3 gap-y-1 mt-1 min-w-0 flex-wrap">
               <h2 class="lookup-detail-key" [class.mono]="title(d) === d.number" [title]="d.number || d.fileName">{{ title(d) }}</h2>
@@ -100,6 +106,12 @@
           <div class="flex items-center gap-1.5 shrink-0">
             @if (d.kind === 'receipt' && d.number) {
               <button type="button" class="btn btn-default btn-sm" (click)="verify(d)" data-test="verify-receipt" [title]="d.signed ? 'Check its digital signature, hash and certificate' : 'Issued before receipts were signed'"><app-icon name="shield" />Verify signature</button>
+            }
+            @if (comparable(d)) {
+              <button type="button" class="btn btn-default btn-sm" [disabled]="comparing()" (click)="compare(d)" data-test="studio-compare"
+                      title="The comparison month: does Report Studio's copy say every number, line and total this one says?"><app-icon name="check" />Compare</button>
+              <button type="button" class="btn btn-ghost btn-sm" [class.is-active]="sideBySide()" (click)="toggleSideBySide(d)" data-test="studio-side-by-side"
+                      [attr.aria-pressed]="sideBySide()"><app-icon name="columns" />Side by side</button>
             }
             <button type="button" class="btn btn-primary btn-sm" (click)="download(d)"><app-icon name="download" />Download</button>
             <button type="button" class="btn btn-ghost btn-icon btn-sm" [cdkMenuTriggerFor]="docMenu" aria-label="More actions"><app-icon name="dots" size="1.05em" /></button>
@@ -119,6 +131,12 @@
             <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="refresh" class="spin icon-muted" /> Reading {{ d.fileName }}…</div>
           } @else if (previewError()) {
             <div class="lookup-entries-empty lookup-detail-empty"><app-icon name="alert" size="1.5rem" class="icon-crit" /><p class="text-crit-500">{{ previewError() }}</p></div>
+          } @else if (previewUrl() && previewKind() === 'pdf' && sideBySide()) {
+            <div class="grid grid-cols-2 gap-2 flex-1 min-h-0" data-test="side-by-side">
+              <div class="flex flex-col min-h-0"><p class="text-xs font-semibold px-2 py-1">As issued</p><app-pdf-viewer [src]="previewUrl()" /></div>
+              <div class="flex flex-col min-h-0"><p class="text-xs font-semibold px-2 py-1">Report Studio's copy (not stored)</p>
+                @if (copyUrl()) { <app-pdf-viewer [src]="copyUrl()" /> } @else { <p class="text-xs text-[color:var(--text-muted)] p-2">{{ copyError() || 'Drawing it…' }}</p> }</div>
+            </div>
           } @else if (previewUrl() && previewKind() === 'pdf') {
             <app-pdf-viewer [src]="previewUrl()" />
           } @else if (previewUrl() && previewKind() === 'image') {

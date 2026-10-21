@@ -9,7 +9,7 @@ import { Icon } from '../../shared/ui/icon';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { PdfViewer } from '../objects/preview/pdf-viewer';
 import { formatSize } from '../../shared/ui/format-size';
-import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE } from './billing.service';
+import { BillingApi, DOCUMENT_KINDS, DOCUMENT_KIND_LABEL, DocumentRow, INVOICE_STATUS_LABEL, INVOICE_STATUS_TONE, StudioComparisonRow } from './billing.service';
 import { Dialog } from '@angular/cdk/dialog';
 import { PaymentChip, paymentStateChip } from './payment-chips';
 import { RECEIPT_VERIFY_TITLE_ID, ReceiptVerifyDialog, ReceiptVerifyData } from './receipt-verify';
@@ -56,6 +56,12 @@ export class BillingDocuments implements OnInit, OnDestroy {
   readonly kinds = DOCUMENT_KINDS;
   readonly humanSize = formatSize;
   private wanted: number | null = null;
+  /** Report Studio phase 7, the comparison month (platform administrators): each document's newest verdict, and the copy shown beside it. */
+  readonly verdicts = signal<Map<number, StudioComparisonRow>>(new Map());
+  readonly comparing = signal(false);
+  readonly sideBySide = signal(false);
+  readonly copyUrl = signal<string | null>(null);
+  readonly copyError = signal('');
 
   readonly years = computed(() => { const ys = new Set(this.rows().map(r => r.issuedAt.slice(0, 4))); ys.add(String(new Date().getFullYear())); return [...ys].sort().reverse(); });
   readonly inYear = computed(() => this.rows().filter(r => r.issuedAt.startsWith(this.year())));
@@ -84,10 +90,56 @@ export class BillingDocuments implements OnInit, OnDestroy {
     this.route.queryParamMap.subscribe(q => { const id = Number(q.get('document')); this.wanted = id > 0 ? id : null; if (this.wanted && this.rows().length) this.pick(this.wanted); });
     this.workspaces.ready(() => this.load());
   }
-  ngOnDestroy(): void { this.revoke(); }
+  ngOnDestroy(): void { this.revoke(); this.revokeCopy(); }
+
+  /** Invoices, credit notes and receipts are compared with Report Studio's copies this month (RS-Q11). */
+  comparable(d: DocumentRow): boolean { return this.isPlatformAdmin() && ['invoice', 'credit_note', 'receipt'].includes(d.kind); }
+  verdictOf(d: DocumentRow): StudioComparisonRow | null { return this.verdicts().get(d.documentId) ?? null; }
+
+  private loadVerdicts(): void {
+    if (!this.isPlatformAdmin()) return;
+    this.api.studioComparisons(this.workspaces.tenantId()).subscribe({
+      next: r => {
+        const by = new Map<number, StudioComparisonRow>();
+        for (const c of r.data?.comparisons ?? []) if (!by.has(c.documentId)) by.set(c.documentId, c);
+        this.verdicts.set(by);
+      },
+      error: () => this.verdicts.set(new Map()),
+    });
+  }
+
+  compare(d: DocumentRow): void {
+    this.comparing.set(true);
+    this.api.studioCompare(d.documentId).subscribe({
+      next: r => {
+        this.comparing.set(false);
+        const c = r.data;
+        if (r.status !== API_SUCCESS || !c) { this.toast.error(r.message); return; }
+        this.toast[c.verdict === 'MATCH' ? 'success' : 'error'](c.verdict === 'MATCH' ? `Report Studio's copy says the same (${c.checked} items checked).`
+          : c.verdict === 'DIFFER' ? `Report Studio's copy lacks ${c.missing?.length ?? 0} item(s): ${(c.missing ?? []).slice(0, 3).join('; ')}`
+          : `The comparison failed: ${c.error}`);
+        this.loadVerdicts();
+      },
+      error: err => { this.comparing.set(false); this.toast.error(err?.error?.message || 'The comparison could not be made.'); },
+    });
+  }
+
+  toggleSideBySide(d: DocumentRow): void {
+    const on = !this.sideBySide();
+    this.sideBySide.set(on);
+    this.revokeCopy();
+    if (!on) return;
+    this.copyError.set('');
+    this.api.studioCopy(d.documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: b => { if (this.selectedId() === d.documentId) this.copyUrl.set(URL.createObjectURL(b)); },
+      error: () => this.copyError.set('Report Studio\'s copy could not be drawn just now.'),
+    });
+  }
+  private revokeCopy(): void { const u = this.copyUrl(); if (u) URL.revokeObjectURL(u); this.copyUrl.set(null); }
 
   load(): void {
     this.loading.set(true); this.error.set('');
+    this.loadVerdicts();
     this.api.documents(this.workspaces.tenantId()).subscribe({
       next: r => {
         this.loading.set(false);
@@ -104,6 +156,7 @@ export class BillingDocuments implements OnInit, OnDestroy {
   pick(documentId: number): void {
     if (this.selectedId() === documentId && this.previewUrl()) return;
     this.selectedId.set(documentId);
+    this.sideBySide.set(false); this.revokeCopy();
     this.revoke(); this.previewLoading.set(true); this.previewError.set('');
     this.api.documentBlob(documentId).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
       next: b => { this.previewLoading.set(false); if (this.selectedId() !== documentId) return; this.previewUrl.set(URL.createObjectURL(b)); },

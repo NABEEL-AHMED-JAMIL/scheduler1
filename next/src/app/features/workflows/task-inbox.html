@@ -203,7 +203,9 @@
                 </div>
               } @else {
                 <div class="inbox-buttons" data-test="decisions">
-                  @if (d.stepType === 'approval') {
+                  @if (decidedInStudio(d)) {
+                    <span class="text-sm text-[color:var(--text-secondary)]" data-test="decided-in-card">Approve or reject it in the card below.</span>
+                  } @else if (d.stepType === 'approval') {
                     <button type="button" class="btn btn-primary" [disabled]="busy()" (click)="decide('approve')"><app-icon name="check" />Approve</button>
                     <button type="button" class="btn btn-default" [disabled]="busy()" (click)="decide('reject')"><app-icon name="close" />Reject</button>
                     <button type="button" class="btn btn-default" [disabled]="busy()" (click)="decide('changes')"><app-icon name="chat" />Ask for changes</button>
@@ -215,7 +217,9 @@
               }
               <p class="inbox-rule" data-test="decision-rule">
                 <app-icon name="info" size="0.95em" />
-                @if (d.stepType === 'approval') {
+                @if (decidedInStudio(d)) {
+                  Report Studio records the decision: it checks who may approve and signs the PDF. Pass it on here.
+                } @else if (d.stepType === 'approval') {
                   {{ d.rejectNeedsComment ? 'Rejecting needs a comment saying why; asking for changes needs one saying what.' : 'Asking for changes needs a comment saying what should change.' }}
                 } @else {
                   A comment is optional.
@@ -241,6 +245,10 @@
             <!-- Owner 2026-10-20: a run's review shows what is reviewed (image, DRAFT answer, truth, measurements, PDF) here. -->
             @if (runOf(d); as run) {
               <app-run-review-card [jobQueueId]="run.jobQueueId" [attempt]="run.attempt" [link]="run.link" />
+            }
+            <!-- Report Studio phase 7: what is reviewed (the report's pages, the draft, the picture) and its decision. -->
+            @if (decidedInStudio(d) && d.subjectId) {
+              <app-report-review-card [subjectId]="d.subjectId" [taskId]="d.state === 'Open' ? d.id : null" (decided)="onStudioDecided(d.id, $event)" (refused)="toast.error($event)" />
             }
             @if (taskFields().length) {
               <section aria-labelledby="task-details-title">

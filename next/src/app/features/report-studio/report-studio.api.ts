@@ -7,7 +7,7 @@ import {
   AssetDetail, AssetLibrary, BrandDefinition, BrandProfileDetail, BrandProfileRow, Contrast, Person, Usable,
 } from './assets.model';
 import {
-  Approval, DataSourceRow, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
+  ApprovalAnswer, DataSourceRow, RetentionPreview, ReportReviewCard, Review, StudioSettings, TemplateReviewCard, InspectResult, JobRow, PreviewResult, Problem, ReportDetail, ReportRow, SourceRef, StudioOverview,
   TemplateContract, TemplateDetail, TemplateLibrary, VerifyResult, VersionRow,
 } from './report-studio.model';
 
@@ -292,9 +292,76 @@ export class ReportStudioApi {
 
   // ---------------------------------------------------------------- MIG-406: approvals that sign, and verify
 
-  /** Approve a report version (report-approve; never the person who generated it): its PDF is certified in the approver's name. */
-  approve(reportId: string, version: number, note = ''): Observable<Approval> {
-    return ReportStudioApi.data$(this.http.post<ApiResponse<Approval>>(`${this.approving}/approve`, { reportId, version, note }));
+  /**
+   * Approve a report version (report-approve; never the person who generated it): its PDF is certified in the approver's
+   * name. Phase 7: with a second approver, the first approval answers stage FIRST and the PDF is signed at the second.
+   */
+  approve(reportId: string, version: number, note = '', taskId?: number | null): Observable<ApprovalAnswer> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<ApprovalAnswer>>(`${this.approving}/approve`,
+      { reportId, version, note, ...(taskId ? { taskId } : {}) }));
+  }
+
+  // ---------------------------------------------------------------- phase 7: reviews in the Task inbox
+
+  /** Reject the version waiting for approval, saying why (report-approve). */
+  rejectVersion(reportId: string, version: number, note: string, taskId?: number | null): Observable<Review> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<Review>>(`${this.approving}/reject`,
+      { reportId, version, note, ...(taskId ? { taskId } : {}) }));
+  }
+
+  /** The review card of a report version (report-approve). */
+  reviewCard(reportId: string, version?: number | null): Observable<ReportReviewCard> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<ReportReviewCard>>(`${this.approving}/review`,
+      { params: { reportId, ...(version ? { version: String(version) } : {}) } }));
+  }
+
+  /** A page of the version's PDF as a PNG for the review card: 320 px, or 720 px when wide. */
+  reviewPage(reportId: string, version: number, page = 1, wide = false): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.approving}/page`, { params: { reportId, version: String(version), page: String(page), wide: String(wide) },
+      responseType: 'blob', observe: 'response' });
+  }
+
+  /** "Ask for approval" of a report's current version (report-generate): it waits in the reviewers' Task inbox. */
+  requestReportApproval(reportId: string, version?: number | null, note = ''): Observable<Review> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<Review>>(`${this.generating}/requestApproval`,
+      { reportId, ...(version ? { version } : {}), note }));
+  }
+
+  /** The publish card of a template's draft (report-publish). */
+  publishCard(templateId: string): Observable<TemplateReviewCard> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<TemplateReviewCard>>(`${this.publishing}/review`, { params: { templateId } }));
+  }
+
+  /** The draft's first page as a PNG, for the publish card (report-publish). */
+  publishDraftPage(templateId: string): Observable<HttpResponse<Blob>> {
+    return this.http.get(`${this.publishing}/draftPage`, { params: { templateId }, responseType: 'blob', observe: 'response' });
+  }
+
+  /** Send a publish request back, saying why (report-publish). */
+  rejectPublish(templateId: string, note: string): Observable<Review> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<Review>>(`${this.publishing}/rejectPublish`, { templateId, note }));
+  }
+
+  /** The reviews waiting in the workspace (the overview's "Waiting for approval"). */
+  reviews(kind?: string | null, limit = 20): Observable<{ reviews: Review[]; total: number }> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<{ reviews: Review[]; total: number }>>(`${this.studio}/reviews`,
+      { params: { ...(kind ? { kind } : {}), limit: String(limit) } }));
+  }
+
+  /** The workspace's Report Studio settings. */
+  settings(): Observable<StudioSettings> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<StudioSettings>>(`${this.studio}/settings`));
+  }
+
+  /** Saves the settings (workspace administrators). */
+  saveSettings(body: Pick<StudioSettings, 'approvals' | 'publishing' | 'rowVersion'>): Observable<StudioSettings> {
+    return ReportStudioApi.data$(this.http.post<ApiResponse<StudioSettings>>(`${this.studio}/settings/save`, body));
+  }
+
+  /** What the retention class REPORTS would remove at so many days (workspace administrators). */
+  retentionPreview(days: number, limit = 50): Observable<RetentionPreview> {
+    return ReportStudioApi.data$(this.http.get<ApiResponse<RetentionPreview>>(`${this.studio}/retention`,
+      { params: { days: String(days), limit: String(limit) } }));
   }
 
   verify(reportId: string, version: number): Observable<VerifyResult> {

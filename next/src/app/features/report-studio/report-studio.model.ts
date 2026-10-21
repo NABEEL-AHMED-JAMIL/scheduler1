@@ -88,6 +88,8 @@ export interface ApprovalRequest {
   revision: number;
   note?: string | null;
   current: boolean;
+  /** Phase 7: the publish request's task in the publishers' Task inbox. */
+  review?: Review | null;
 }
 
 export interface TemplateDetail extends TemplateRow {
@@ -98,6 +100,8 @@ export interface TemplateDetail extends TemplateRow {
   reports: number;
   activity?: ActivityRow[];
   approval?: ApprovalRequest | null;
+  /** Phase 7: the workspace publishes by a second person (nobody publishes a draft they edited last or asked about). */
+  publishNeedsSecondPerson?: boolean;
 }
 
 /** A template's data contract, as the Data tab and Create report read it (MIG-404): paths only. */
@@ -243,6 +247,115 @@ export interface ReportVersionRow {
   approval?: Approval | null;
   /** Phase 4: marked VOID -- why, by whom, when; every download of it is a VOID copy. */
   void?: { reason: string; by?: string | null; at?: string | null } | null;
+  /** Phase 7: its newest review in the Task inbox (asked for, approved, rejected or cancelled). */
+  review?: Review | null;
+  /** Phase 7: the workspace's retention policy removed its files; its record stays. */
+  expired?: boolean;
+  expiredAt?: string | null;
+}
+
+/**
+ * Phase 7: a review in the Task inbox -- a report version waiting for approval, a template's publish request, a signature
+ * or stamp waiting for approval. Report Studio decides it; the inbox holds the task.
+ */
+export interface Review {
+  requestId: string;
+  kind: 'REPORT_VERSION' | 'TEMPLATE_PUBLISH' | 'ASSET_VERSION';
+  subjectId: string;
+  version: number;
+  title: string;
+  state: 'OPEN' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  requestedBy: number;
+  requestedByName?: string | null;
+  requestedAt?: string | null;
+  note?: string | null;
+  needsSecond: boolean;
+  workflowSubjectId?: string | null;
+  inTaskInbox: boolean;
+  madeBy?: number | null;
+  madeByName?: string | null;
+  revision?: number | null;
+  reviewers?: { kind: string; value: string } | null;
+  firstApproval?: { by: number; byName?: string | null; at?: string | null; note?: string | null } | null;
+  decidedAt?: string | null;
+  decidedBy?: number | null;
+  decidedByName?: string | null;
+  decisionNote?: string | null;
+  closeReason?: string | null;
+}
+
+/** Phase 7: what the Task inbox's review card shows of a report version, and whether the reader may decide it. */
+export interface ReportReviewCard {
+  reportId: string;
+  reportLabel: string;
+  name: string;
+  templateName?: string | null;
+  templateVersion: number;
+  version: number;
+  currentVersion?: number | null;
+  current: boolean;
+  pages?: number | null;
+  createdAt?: string | null;
+  generatedBy?: number | null;
+  generatedByName?: string | null;
+  hasPdf: boolean;
+  pipeline?: { jobQueueId: number; name?: string | null } | null;
+  problems: number;
+  approval?: Approval | null;
+  void: boolean;
+  expired: boolean;
+  review?: Review | null;
+  mayApprove: boolean;
+  mayReject: boolean;
+  whyNot?: string | null;
+  secondApprover: boolean;
+  stage: 'FIRST' | 'FINAL';
+  signing: { configured: boolean; certificate?: string | null };
+}
+
+/** Phase 7: an approval's answer -- the approval (signed or not), or the first of two. */
+export interface ApprovalAnswer extends Partial<Approval> {
+  stage: 'FIRST' | 'APPROVED';
+  message?: string;
+  approval?: Approval;
+  review?: Review;
+}
+
+/** Phase 7: what the publish card shows of a template's draft. */
+export interface TemplateReviewCard extends TemplateRow {
+  draft?: VersionRow | null;
+  review?: Review | null;
+  summary: { errors: number; warnings: number };
+  problems: Problem[];
+  mayPublish: boolean;
+  whyNot?: string | null;
+  publishNeedsSecondPerson: boolean;
+  changedSinceAsked: boolean;
+}
+
+/** Phase 7: whom a review goes to: named in the settings, or worked out from the page gate. */
+export interface Assignee { kind: 'group' | 'role' | 'user'; value: string; }
+
+/** Phase 7: the workspace's Report Studio settings (Report Studio › Settings, administrators). */
+export interface StudioSettings {
+  approvals: { reviewers: Assignee | null; everyVersion: boolean; secondApprover: boolean };
+  publishing: { publishers: Assignee | null; secondPerson: boolean };
+  rowVersion: number;
+  resolved?: { reviewers: { assignee: Assignee; automatic: boolean; why: string }; publishers: { assignee: Assignee; automatic: boolean; why: string } };
+  editable?: boolean;
+}
+
+/** Phase 7: what the retention class REPORTS would remove at so many days, and what it keeps. */
+export interface RetentionPreview {
+  cutoff: string;
+  days: number;
+  count: number;
+  bytes: number;
+  total: number;
+  versions: { reportId: string; reportLabel: string; name: string; version: number; createdAt: string; bytes: number }[];
+  snapshots: { snapshotId: string; label?: string | null; takenAt: string; bytes: number; why: string }[];
+  kept: { approved: number; current: number; waiting: number; heldRuns: number };
+  note?: string;
 }
 
 /** A report version's approval (MIG-406): never by whoever generated it; signed when its PDF was certified. */
@@ -343,6 +456,8 @@ export interface StudioOverview {
   figures: {
     versionsThisMonth: number; reports: number; publishedTemplates: number; templatesWithDrafts: number; templates: number;
     jobsFinishedThisMonth: number; jobsSucceededThisMonth: number; failedLast7Days: number; running: number;
+    /** Phase 7: reports waiting for approval, and templates' publish requests, in the Task inbox (a workspace's own). */
+    waitingForApproval?: number; publishRequests?: number;
   };
   recentReports: ReportRow[];
   recentJobs: JobRow[];

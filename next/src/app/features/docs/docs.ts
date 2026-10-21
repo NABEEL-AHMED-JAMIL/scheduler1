@@ -497,6 +497,7 @@ export class Docs implements AfterViewInit {
         { label: 'Reports › Library', path: '/reports/library' },
         { label: 'Reports › Data', path: '/reports/data' },
         { label: 'Reports › Assets & branding', path: '/reports/assets' },
+        { label: 'Reports › Settings (administrators)', path: '/reports/settings' },
       ],
       todo: [
         'Assets & branding: upload logos and images, and make a brand profile so every report has the same header, footer, '
@@ -513,6 +514,11 @@ export class Docs implements AfterViewInit {
           + 'chooses Approve and sign: the PDF gets a digital signature in their name. Only the current version can be approved; '
           + 'an older one that was never approved reads Superseded.',
         'Verify signature checks a version\'s PDF, or a file someone sent you, against the workspace\'s approved reports.',
+        'Ask for approval on a report\'s page (or tick Ask for approval when it is ready when you generate) and the version waits in the '
+          + 'reviewers\' Review › Approvals, which shows the first page and the next ones beside Approve and sign and Reject, which needs a reason '
+          + 'the person who asked reads. Approving there signs the PDF just as on the report\'s page. A newer version replaces the request.',
+        'Templates › Ask for approval in the designer waits for the publishers in Review › Approvals: they publish the draft there, or send it '
+          + 'back saying why. A signature or stamp waiting for approval waits there too.',
       ],
       notes: [
         'Mark this version as COPY when you generate it, or let a template say Every download after the first says COPY.',
@@ -523,6 +529,14 @@ export class Docs implements AfterViewInit {
           + 'that storage does not remove stay until an operator removes them; the message after a delete says so.',
         'You can delete several reports at once in the Library: tick them, then Delete. Approved ones cannot be ticked.',
         'The Library, Templates and Assets lists page and search on the server, so a large library opens as quickly as a small one.',
+        'Reports › Settings (workspace administrators): who approves reports and signatures, and who publishes templates (the access '
+          + 'profile that may, worked out for you, or one you choose); Ask for approval of every new version; Two approvals, where a second '
+          + 'person approves after the first and the signature names both; and Publishing needs a second person. All are off at first.',
+        'Retention (Administration › Data policies) has a class Reports: the files of versions a newer one replaced, and the frozen data no '
+          + 'kept version uses, after the days you set. Each report\'s current version, every approved or signed version and a version waiting '
+          + 'for approval always stay; a removed version keeps its record and says Removed by retention. Reports › Settings previews what would go.',
+        'Generating is limited to 30 a minute a person, and previews to 30 (the designer\'s live page to 120); past that you are asked to '
+          + 'wait a few seconds. A report is at most 300 pages: narrow the data, or lower a table\'s row limit.',
         'In a template\'s designer (and a pipeline step\'s own design) the AI assistant, in the right pane, drafts a template from '
           + 'plain words, suggests field mappings (with how sure it is) and charts for your test data, explains the checks\' problems '
           + 'and writes a paragraph of the data\'s own values, labelled "Drafted with AI". Each is a proposal: shown as a list of '

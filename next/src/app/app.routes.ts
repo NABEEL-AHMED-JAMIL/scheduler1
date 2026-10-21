@@ -476,6 +476,14 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // Report Studio phase 7: who approves and publishes, a second approver, what retention would remove; administrators.
+        path: 'reports/settings',
+        title: 'Report settings',
+        loadComponent: () => import('./features/report-studio/settings').then(m => m.ReportSettings),
+        data: { minRole: 'TENANT_ADMIN' },
+        canActivate: [roleGuard],
+      },
+      {
         path: 'reports/data',
         title: 'Report data',
         loadComponent: () => import('./features/report-studio/data').then(m => m.ReportData),

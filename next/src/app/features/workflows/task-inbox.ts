@@ -1,4 +1,5 @@
 import { RunReviewCard } from './run-review-card';
+import { ReportReviewCard, STUDIO_SUBJECT_TYPES, studioSubject } from './report-review-card';
 import { Avatar } from '../../shared/ui/avatar';
 import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
@@ -45,7 +46,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RunReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, ReportReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -62,7 +63,7 @@ export class TaskInbox implements OnInit {
   readonly auth = inject(AuthService);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
-  private readonly toast = inject(ToastService);
+  readonly toast = inject(ToastService);
   private readonly dialog = inject(Dialog);
   private readonly badge = inject(TaskCountService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -635,13 +636,29 @@ export class TaskInbox implements OnInit {
 
   /** An approval task, open, not the reader's own request: theirs to decide, so theirs to pick. */
   pickable(t: InboxTask): boolean {
-    return t.stepType === 'approval' && t.state === 'Open' && t.requestState !== 'Approved' && !(t.requestedBy != null && t.requestedBy === this.me());
+    return t.stepType === 'approval' && t.state === 'Open' && t.requestState !== 'Approved' && !(t.requestedBy != null && t.requestedBy === this.me())
+      && !this.decidedInStudio(t);
+  }
+
+  /**
+   * Report Studio phase 7: a report waiting for approval, a template's publish request, a signature waiting for approval --
+   * decided in its review card through Report Studio (it signs what is approved), never by the inbox's own buttons or bulk.
+   */
+  decidedInStudio(t: { subjectType?: string | null; subjectId?: string | null }): boolean {
+    return STUDIO_SUBJECT_TYPES.includes(t.subjectType ?? '') || studioSubject(t.subjectId) !== null;
+  }
+
+  /** The review card told us the decision is made: say so, and move on as after any decision. */
+  onStudioDecided(taskId: number, message: string): void {
+    this.toast.success(message);
+    this.afterChange(taskId, nextAfter(this.shownIds(), taskId));
   }
 
   /** Why an approval task's checkbox is off. */
   pickTitle(t: InboxTask | undefined): string {
     if (!t || this.pickable(t)) return '';
     if (t.requestedBy != null && t.requestedBy === this.me()) return 'Your own request: someone else decides it.';
+    if (this.decidedInStudio(t)) return 'Decided in its review card: Report Studio signs what is approved.';
     return 'No longer waiting for a decision.';
   }
 

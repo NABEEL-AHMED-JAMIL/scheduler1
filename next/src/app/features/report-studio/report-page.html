@@ -65,7 +65,8 @@
                 <h2 class="section-title">Current version</h2>
                 <div class="flex flex-wrap gap-1">@if (current(); as v) { <span class="pill pill-info">Version {{ v.version }}</span><app-status label="Ready" />
                   @if (v.approval?.signed) { <span class="pill pill-ok"><app-icon name="check" />Signed</span> }
-                  @else if (v.approval) { <span class="pill pill-neutral">Approved</span> } }</div>
+                  @else if (v.approval) { <span class="pill pill-neutral">Approved</span> }
+                  @else if (waiting(v)) { <span class="pill pill-warn" data-test="waiting-for-approval"><app-icon name="clock" />Waiting for approval</span> } }</div>
               </div>
               @if (current(); as v) {
                 <div class="rsr-current">
@@ -99,6 +100,11 @@
                         <dt>{{ ap.signed ? 'Approved and signed' : 'Approved' }}</dt>
                         <dd>{{ ap.approverName }} · {{ ap.approvedAt | rsTime: 'recent' }}@if (ap.signed) { · <button type="button" class="link-inline" (click)="verifyVersion(v)">check signature</button> }
                           @if (!ap.signed && ap.notSignedReason) { <span class="text-xs text-[color:var(--text-muted)] block">{{ ap.notSignedReason }}</span> }</dd>
+                      } @else if (v.review) {
+                        <dt>Approval</dt><dd data-test="review-state">{{ reviewWords(v) }}@if (v.review.state === 'OPEN') {
+                          <span class="text-xs text-[color:var(--text-muted)] block">Asked by {{ v.review.requestedByName }} · {{ v.review.requestedAt | rsTime: 'recent' }}@if (v.review.inTaskInbox) { · in the reviewers' <a routerLink="/review/approvals" class="link-inline">Review › Approvals</a> }@if (v.review.needsSecond) { · two approvals }</span> }
+                          @if (v.review.state === 'REJECTED' && v.review.decisionNote) { <span class="text-xs block">“{{ v.review.decisionNote }}”</span> }
+                          @if (canApprove() && v.createdBy === me()) { <span class="text-xs text-[color:var(--text-muted)] block">You generated it; someone else approves it.</span> }</dd>
                       } @else {
                         <dt>Approval</dt><dd>Not approved yet@if (canApprove() && v.createdBy === me()) { <span class="text-xs text-[color:var(--text-muted)] block">You generated it; someone else approves it.</span> }</dd>
                       }
@@ -108,7 +114,8 @@
                     <div class="flex flex-wrap gap-2">
                       @if (hasPdf(v)) { <button type="button" class="btn btn-default btn-sm" (click)="open()"><app-icon name="maximize" />Open report</button> }
                       <button type="button" class="btn btn-default btn-sm" (click)="tabTo('versions')">View generation job</button>
-                      @if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-primary btn-sm" [disabled]="approving()" (click)="approve(v)"><app-icon name="shield" />Approve and sign v{{ v.version }}</button> }
+                      @if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-primary btn-sm" [disabled]="approving()" (click)="approve(v)"><app-icon name="shield" />{{ v.review?.state === 'OPEN' && v.review.needsSecond && !v.review.firstApproval ? 'Give the first approval of v' + v.version : 'Approve and sign v' + v.version }}</button> }
+                      @if (mayAsk(v)) { <button type="button" class="btn btn-default btn-sm" [disabled]="asking()" (click)="ask(v)" data-test="ask-approval"><app-icon name="inbox" />Ask for approval</button> }
                       @if (v.approval?.signed) { <button type="button" class="btn btn-default btn-sm" (click)="verifyVersion(v)"><app-icon name="shield" />Verify signature</button> }
                     </div>
                     @if (v.diagnostics.length) {
@@ -179,6 +186,8 @@
               </select></label>
             <label class="rsd-check text-sm"><input type="checkbox" class="checkbox" [checked]="againCopy()" (change)="againCopy.set($any($event.target).checked)" />
               <span>Mark this version as COPY</span></label>
+            <label class="rsd-check text-sm"><input type="checkbox" class="checkbox" [checked]="againAsk()" (change)="againAsk.set($any($event.target).checked)" data-test="again-ask" />
+              <span>Ask for approval when it is ready</span></label>
             <p class="text-xs text-[color:var(--text-muted)]"><app-icon name="link" /> Creates version {{ nextVersion() }}. Version {{ nextVersion() - 1 }} and the others are kept.@if (current()?.approval) { It needs its own approval before it is signed. }</p>
             @if (againJob(); as j) {
               <div class="flex flex-col gap-1" aria-live="polite">
@@ -243,6 +252,7 @@
               <tr>
                 <td>v{{ v.version }}@if (v.version === r.currentVersion) { <span class="pill pill-ok ml-1">Current</span> }
                   @if (v.config?.['markAsCopy'] === true) { <span class="pill pill-neutral ml-1" title="Generated marked as COPY: every page of its files says COPY">COPY</span> }
+                  @if (v.expired) { <span class="pill pill-neutral ml-1" [title]="'Its files were removed by the workspace\'s retention policy' + (v.expiredAt ? ' on ' + (v.expiredAt | rsTime: 'dateTime') : '') + '; its record stays.'">Removed by retention</span> }
                   @if (v.void) { <span class="pill pill-crit ml-1" [title]="'VOID: ' + v.void.reason + (v.void.by ? ' · ' + v.void.by : '')">VOID</span> }
                   @else if (canGenerate()) { <button type="button" class="btn btn-ghost btn-xs ml-1" (click)="voidIt(v)" [attr.aria-label]="'Mark version ' + v.version + ' VOID'" title="Mark this version VOID">Void</button> }</td>
                 <td class="text-xs"><span class="whitespace-nowrap">{{ v.createdAt | rsTime: 'recent' }}</span><div class="text-[color:var(--text-muted)] max-w-36 truncate" [title]="versionBy(v) + (v.reason ? ' · ' + v.reason : '')">{{ versionBy(v) }}@if (v.reason) { · {{ v.reason }} }</div></td>
@@ -251,6 +261,7 @@
                 <td>@if (v.approval?.signed) { <button type="button" class="pill pill-ok" (click)="verifyVersion(v)" [title]="'Signed by ' + v.approval!.approverName + ', ' + (v.approval!.approvedAt | rsTime: 'dateTime') + '. Click to check the signature.'"><app-icon name="check" />Signed</button> }
                   @else if (v.approval) { <span class="pill pill-neutral" [title]="v.approval.notSignedReason || ''">Approved</span> }
                   @else if (mayApprove(v) && hasPdf(v)) { <button type="button" class="btn btn-ghost btn-sm" [disabled]="approving()" (click)="approve(v)">Approve</button> }
+                  @else if (waiting(v)) { <span class="pill pill-warn" [title]="reviewWords(v)">Waiting</span> }
                   @else if (superseded(v)) { <span class="text-xs text-[color:var(--text-muted)]" title="A newer version replaced it; only the current version can be approved.">Superseded</span> }
                   @else { <span class="text-xs text-[color:var(--text-muted)]">—</span> }</td>
                 <td class="whitespace-nowrap text-right">

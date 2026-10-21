@@ -161,11 +161,13 @@ describe('Docs for what shipped by 2026-10-20', () => {
   it('sends the reader to every tab of Reports, by the names the menu gives them', () => {
     const page = mount();
     const reports = section(page, 'reports');
-    expect(where(reports)).toEqual(['/reports/overview', '/reports/templates', '/reports/library', '/reports/data', '/reports/assets']);
+    expect(where(reports)).toEqual(['/reports/overview', '/reports/templates', '/reports/library', '/reports/data', '/reports/assets', '/reports/settings']);
     const hub = NAV.flatMap(i => i.children ?? []).find(c => c.label === 'Reports')!;
     for (const tab of hub.tabs!) expect(reports.textContent, tab.label).toContain(tab.label);
     for (const words of ['Approve and sign', 'Verify signature', 'Void', 'Mark this version as COPY', 'Archive', 'Delete', 'Superseded',
-      'Brand profile'.toLowerCase(), 'Signatures and stamps', 'watermark', 'QR codes', 'KPI tiles', 'Create report']) {
+      'Brand profile'.toLowerCase(), 'Signatures and stamps', 'watermark', 'QR codes', 'KPI tiles', 'Create report',
+      // Phase 7: reviews in the Task inbox, the settings, retention.
+      'Ask for approval', 'Review › Approvals', 'Two approvals', 'Publishing needs a second person', 'Removed by retention']) {
       expect(reports.textContent!.toLowerCase(), words).toContain(words.toLowerCase());
     }
   });

@@ -23,6 +23,18 @@
   } @else if (data(); as d) {
     <app-stat-strip [items]="kpis()" [cols]="2" [smCols]="4" align="start" size="md" label="Reports at a glance" />
 
+    <!-- Phase 7: what waits for a decision, in the Task inbox. -->
+    @if ((d.figures.waitingForApproval ?? 0) + (d.figures.publishRequests ?? 0) > 0) {
+      <div class="rs-banner mt-4" role="status" data-test="waiting-banner">
+        <app-icon name="inbox" class="shrink-0" />
+        <div class="min-w-0 flex-1">
+          <div class="font-semibold">@if (d.figures.waitingForApproval) { {{ d.figures.waitingForApproval }} report{{ d.figures.waitingForApproval === 1 ? '' : 's' }} waiting for approval }@if (d.figures.waitingForApproval && d.figures.publishRequests) { · }@if (d.figures.publishRequests) { {{ d.figures.publishRequests }} template{{ d.figures.publishRequests === 1 ? '' : 's' }} to publish }</div>
+          <div class="text-sm text-[color:var(--text-secondary)]">Reviewers decide them in Review › Approvals, with the pages beside Approve and sign.</div>
+        </div>
+        <a routerLink="/review/approvals" class="btn btn-default btn-sm">Open Approvals</a>
+      </div>
+    }
+
     @if (blocked(); as j) {
       <div class="rs-banner rs-banner-crit mt-4" role="status">
         <app-icon name="alert" class="icon-crit shrink-0" />

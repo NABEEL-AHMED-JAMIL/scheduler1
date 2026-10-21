@@ -23,7 +23,7 @@
           @else if (t.currentPublishedVersion) { <span class="pill pill-ok">Published v{{ t.currentPublishedVersion }}</span> }
           @if (approval(); as a) {
             <span class="pill" [class]="a.current ? 'pill-warn' : 'pill-neutral'" [title]="a.note || ''">
-              Approval asked{{ a.requestedByName ? ' by ' + a.requestedByName : '' }}{{ a.current ? '' : ' · draft changed since' }}
+              Approval asked{{ a.requestedByName ? ' by ' + a.requestedByName : '' }}{{ a.current ? '' : ' · draft changed since' }}{{ a.review?.inTaskInbox ? ' · waiting in the publishers\' Approvals' : '' }}
             </span>
           }
           <span class="text-xs text-[color:var(--text-muted)]" aria-live="polite">
