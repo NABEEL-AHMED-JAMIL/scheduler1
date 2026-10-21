@@ -121,7 +121,7 @@
                 @else {
                   <app-status [label]="chipWord(j.status)" />
                   @if (j.errorCode) { <div class="text-xs mono mt-0.5">{{ j.errorCode }}</div> <div class="text-xs text-[color:var(--text-muted)] max-w-80">{{ j.error }}</div>
-                    <app-page-limit-actions [job]="j" /> }
+                    <app-page-limit-actions [job]="j" [compact]="true" /> }
                 }
               </td>
               <td class="text-xs">@if (j.resultVersion) { v{{ j.resultVersion }}@if (j.pages) { · {{ j.pages }} p. } } @else { — }</td>

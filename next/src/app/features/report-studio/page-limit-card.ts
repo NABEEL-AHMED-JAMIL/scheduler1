@@ -46,7 +46,8 @@ export function pagesIn(value: unknown, max: number): number | null {
             generated it, or the pipeline's run, is told this limit, who can raise it and what to do instead. Previews follow it as well.</p>
         </div>
         @if (platformAdmin()) {
-          <app-workspace-select [(value)]="tenantId" (valueChange)="load()" />
+          <!-- Its own box: the selector puts itself first among its siblings (order: -2), as in a page header. -->
+          <div class="flex items-center gap-2 min-w-0"><app-workspace-select [(value)]="tenantId" (valueChange)="load()" /></div>
         }
       </div>
 

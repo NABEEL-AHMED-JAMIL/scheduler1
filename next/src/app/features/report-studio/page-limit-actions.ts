@@ -35,26 +35,26 @@ export const STEP_WORDS: Record<PageLimitStep['action'], string> = {
         @for (s of steps(); track s.action) {
           @switch (s.action) {
             @case ('PER_ROW') {
-              <button type="button" class="btn btn-default btn-sm" [disabled]="opening()" (click)="perRow(s)" data-test="next-per-row"
+              <button type="button" class="btn btn-default" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" [disabled]="opening()" (click)="perRow(s)" data-test="next-per-row"
                       title="Open the pipeline's Generate report step at One report per row"><app-icon name="layers" [busy]="opening()" />{{ words.PER_ROW }}</button>
             }
             @case ('LOWER_ROWS') {
-              <a class="btn btn-default btn-sm" [routerLink]="['/reports/templates', s.templateId, 'design']" [queryParams]="{ select: s.componentIds[0] }"
+              <a class="btn btn-default" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" [routerLink]="['/reports/templates', s.templateId, 'design']" [queryParams]="{ select: s.componentIds[0] }"
                  data-test="next-lower-rows" title="Open the template in the designer, on its first table, repeat or image grid"><app-icon name="edit" />{{ words.LOWER_ROWS }}</a>
             }
             @case ('EXPORT_CSV') {
               @if (s.source.runDatasetId) {
-                <button type="button" class="btn btn-default btn-sm" [disabled]="exporting()" (click)="csv(s.source.runDatasetId)" data-test="next-export-csv">
+                <button type="button" class="btn btn-default" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" [disabled]="exporting()" (click)="csv(s.source.runDatasetId)" data-test="next-export-csv">
                   <app-icon name="download" [busy]="exporting()" />{{ words.EXPORT_CSV }}</button>
               } @else if (s.source.jobId && s.source.jobQueueId) {
-                <a class="btn btn-default btn-sm" [routerLink]="['/pipelines/schedules', s.source.jobId, 'runs', s.source.jobQueueId]" [queryParams]="{ tab: 'outputs' }"
+                <a class="btn btn-default" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" [routerLink]="['/pipelines/schedules', s.source.jobId, 'runs', s.source.jobQueueId]" [queryParams]="{ tab: 'outputs' }"
                    data-test="next-export-csv" title="The run's Outputs: each kept table downloads as CSV"><app-icon name="download" />{{ words.EXPORT_CSV }}</a>
               }
             }
           }
         }
         @if (canRaise()) {
-          <a class="btn btn-ghost btn-sm" routerLink="/reports/settings" data-test="next-raise-limit"><app-icon name="settings" />Raise the limit</a>
+          <a class="btn btn-ghost" [class.btn-sm]="!compact()" [class.btn-xs]="compact()" routerLink="/reports/settings" data-test="next-raise-limit"><app-icon name="settings" />Raise the limit</a>
         }
       </div>
     }
@@ -69,6 +69,8 @@ export class PageLimitActions {
   readonly job = input<FailedJobLike | null | undefined>(null);
   /** Space above the buttons (under a sentence). */
   readonly spaced = input(true);
+  /** Smaller buttons, for a table's cell (Generation jobs). */
+  readonly compact = input(false);
   readonly words = STEP_WORDS;
   readonly opening = signal(false);
   readonly exporting = signal(false);
