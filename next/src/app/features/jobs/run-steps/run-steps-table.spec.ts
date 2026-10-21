@@ -216,3 +216,15 @@ describe('run-steps model', () => {
     expect(focusStep([])).toBeNull();
   });
 });
+
+describe('RunStepsTable at a tablet\'s width (ZT-P14)', () => {
+  it('narrows the step and output columns after their wide rules, so the narrowing wins', async () => {
+    const { RunStepsTable } = await import('./run-steps-table');
+    const styles = ((RunStepsTable as unknown as { ɵcmp: { styles: string[] } }).ɵcmp.styles ?? []).join('\n');
+    const wide = styles.search(/\.rs-out-col[^{]*\{\s*min-width:\s*13rem/);
+    const narrow = styles.search(/@media\s*\(max-width:\s*1439px\)/);
+    expect(wide).toBeGreaterThan(-1);
+    expect(narrow).toBeGreaterThan(wide);
+  });
+});
+
