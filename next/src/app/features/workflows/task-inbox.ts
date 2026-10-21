@@ -1,4 +1,5 @@
 import { RunReviewCard } from './run-review-card';
+import { PipelineApprovalCard } from './pipeline-approval-card';
 import { ReportReviewCard, STUDIO_SUBJECT_TYPES, studioSubject } from './report-review-card';
 import { Avatar } from '../../shared/ui/avatar';
 import { Component, ElementRef, Injector, OnInit, afterRenderEffect, computed, effect, inject, signal, untracked, viewChild } from '@angular/core';
@@ -46,7 +47,7 @@ export interface FieldView { label: string; value: string; view: ValueView; }
  */
 @Component({
   selector: 'app-task-inbox',
-  imports: [RunReviewCard, ReportReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
+  imports: [RunReviewCard, PipelineApprovalCard, ReportReviewCard, RefreshButton, PageHeader, FormsModule, NgTemplateOutlet, RouterLink, Icon, StatusPill, Combobox, Avatar, BulkBar],
   templateUrl: './task-inbox.html',
   host: { '(document:keydown)': 'onKey($event)' },
   styles: `
@@ -810,6 +811,11 @@ export class TaskInbox implements OnInit {
       time: compactTime(at, now, undefined, true), timeTitle: at ? 'Started ' + exactTime(at) : '', crit: false, workflow: r.workflowName,
       group: pastGroup(at, now), haystack: [r.title, r.workflowName, r.currentStep, this.name(r.requestedBy)].join(' ').toLowerCase(),
     };
+  }
+
+  /** A pipeline step's approval (the "approval" step pausing a run): its subject is the step's, "pipeline-approval:<run>". */
+  stepApproval(d: { subjectId?: string | null; subject?: Record<string, unknown> | null }): boolean {
+    return /^pipeline-approval:\d+$/.test(d.subjectId ?? '') || (d.subject?.['approvalId'] != null && d.subject?.['stepKey'] != null);
   }
 
   /** The run a "Pipeline run review" task is about, from its subject ("pipeline-run:8517" and the run's own fields). */

@@ -251,7 +251,10 @@
 
           <div class="inbox-detail-body">
             <!-- Owner 2026-10-20: a run's review shows what is reviewed (image, DRAFT answer, truth, measurements, PDF) here. -->
-            @if (runOf(d); as run) {
+            <!-- Owner 2026-10-21: a pipeline step's approval shows the step, what it asks, and the rows it holds -- not its raw subject. -->
+            @if (stepApproval(d) && d.subject) {
+              <app-pipeline-approval-card [subject]="d.subject" [open]="d.state === 'Open'" />
+            } @else if (runOf(d); as run) {
               <app-run-review-card [jobQueueId]="run.jobQueueId" [attempt]="run.attempt" [link]="run.link" />
             }
             <!-- Report Studio phase 7: what is reviewed (the report's pages, the draft, the picture) and its decision. -->
@@ -259,7 +262,7 @@
               <app-report-review-card [subjectId]="d.subjectId" [taskId]="d.state === 'Open' ? d.id : null" (decided)="onStudioDecided(d.id, $event)" (refused)="toast.error($event)" />
             }
             <!-- The review card shows what the request names (the report, its version, who asked); its raw fields would repeat it. -->
-            @if (taskFields().length && !decidedInStudio(d)) {
+            @if (taskFields().length && !decidedInStudio(d) && !stepApproval(d)) {
               <section aria-labelledby="task-details-title">
                 <h3 class="section-title mb-3" id="task-details-title">Request details</h3>
                 <ng-container *ngTemplateOutlet="fieldList; context: { $implicit: taskFields() }" />
