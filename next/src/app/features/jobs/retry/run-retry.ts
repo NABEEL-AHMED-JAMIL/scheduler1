@@ -67,7 +67,7 @@ export interface AttemptDetail {
   fromStepIndex?: number | null;
   fromStepKey?: string | null;
   reusedSteps?: number;
-  requestedVia?: 'console' | 'api' | string;
+  requestedVia?: 'console' | 'api' | 'platform' | string;
   requestedByUserId?: number | null;
   requestedBy?: string | null;
   requestedAt?: string | null;
@@ -101,6 +101,7 @@ export function attemptSentence(detail: AttemptDetail): string {
       + `step${detail.reusedSteps === 1 ? '' : 's'} of attempt ${detail.previousAttempt}`
     : `run again from the start after attempt ${detail.previousAttempt} failed`;
   // Core names an API client "API client <id>"; a person by name.
-  const who = detail.requestedBy ? ` by ${detail.requestedBy}` : detail.requestedVia === 'api' ? ' through the API' : '';
+  const who = detail.requestedBy ? ` by ${detail.requestedBy}` : detail.requestedVia === 'api' ? ' through the API'
+    : detail.requestedVia === 'platform' ? ' automatically, after Core restarted while it ran' : '';
   return `Attempt ${detail.attempt}: ${how}${who}`;
 }

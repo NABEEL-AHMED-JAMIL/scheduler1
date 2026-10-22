@@ -170,6 +170,8 @@ export interface StepTaskEntry {
   /** Whether a workspace admin may switch it (legacy never: existing pipelines always stay runnable). */
   overridable?: boolean;
   aiToolName?: string | null;
+  /** Owner 2026-10-21: a try can be made again without doing anything twice; such a step is tried again on a passing error. */
+  repeatSafe?: boolean;
   runsInEngine?: boolean;
   /** On in this workspace: its default, or the workspace's switch. */
   enabled?: boolean;

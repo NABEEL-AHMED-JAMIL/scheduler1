@@ -97,6 +97,14 @@ describe('Task inbox', () => {
     expect(toast.success).toHaveBeenCalledWith('Passed to Sam.');
   });
 
+  it('names the signed-in person in a history by name with "(you)", and as "you" elsewhere', () => {
+    const { screen } = screenWith();
+    (screen.auth.user as unknown as { set: (u: unknown) => void }).set({ appUserId: 4537, tenantId: 2924, fullName: 'Nabeel Ahmed' });
+    expect(screen.historyName(4537)).toBe('Nabeel Ahmed (you)');
+    expect(screen.name(4537)).toBe('you');
+    expect(screen.historyName(4597)).toBe('Alex');
+  });
+
   it('does not offer the requester a decision on their own request', () => {
     const { el } = screenWith({ ...DETAIL, requestedBy: 4537 } as TaskDetail);
     expect(el.querySelector('[data-test="decisions"]')).toBeNull();

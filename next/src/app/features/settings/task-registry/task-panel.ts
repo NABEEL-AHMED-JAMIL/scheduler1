@@ -162,7 +162,7 @@ export class TaskPanel {
       { label: 'Output', shape: legacy ? this.row().output : schemaShape(t.outputSchema), description: t.outputSchema ? t.outputSchema.description ?? '' : none('out') },
     ];
   });
-  readonly retry = computed(() => retryText(this.task().retry));
+  readonly retry = computed(() => retryText(this.task().retry, this.task().repeatSafe === true));
   readonly timeout = computed(() => timeoutText(this.task().timeoutSeconds));
   readonly permission = computed(() => permissionLabel(this.task().requiredPermission));
 

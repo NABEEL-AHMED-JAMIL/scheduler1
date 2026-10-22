@@ -121,6 +121,9 @@ describe('Task Registry -- the panel\'s words', () => {
     expect(retryText({ maxAttempts: 1, delaySeconds: 0 })).toBe('Once, no retry');
     expect(retryText({ maxAttempts: 3, delaySeconds: 10 })).toBe('Up to 3 tries, 10 sec apart');
     expect(retryText(null)).toBe('Once, no retry');
+    expect(retryText(null, true)).toBe('Once; up to 3 more when a service is briefly away (5, 15, 45 sec)');
+    expect(retryText({ maxAttempts: 3, delaySeconds: 10 }, true)).toBe('Up to 3 tries, 10 sec apart; up to 3 more when a service is briefly '
+      + 'away (5, 15, 45 sec)');
     expect(timeoutText(null)).toBe('No limit');
     expect(timeoutText(300)).toBe('5 min');
     expect(timeoutText(90)).toBe('90 sec');

@@ -163,12 +163,12 @@ export class TaskInbox implements OnInit {
   /** The task's history, its own lines without its name: the heading already says it. */
   readonly taskHistory = computed<HistoryLine[]>(() => {
     const d = this.detail();
-    return d ? dropOwnStep(historyLines(d.history, id => this.name(id), key => this.stepName(key, d.tasks)), d.name) : [];
+    return d ? dropOwnStep(historyLines(d.history, id => this.historyName(id), key => this.stepName(key, d.tasks)), d.name) : [];
   });
 
   readonly requestHistory = computed<HistoryLine[]>(() => {
     const r = this.request();
-    return r ? historyLines(r.history, id => this.name(id), key => this.stepName(key, r.tasks)) : [];
+    return r ? historyLines(r.history, id => this.historyName(id), key => this.stepName(key, r.tasks)) : [];
   });
 
   // ---- the list ---------------------------------------------------------------------------------------------------
@@ -733,6 +733,15 @@ export class TaskInbox implements OnInit {
     if (id === this.me()) return 'you';
     const c = this.colleagues().find(x => x.userId === id);
     return c ? (c.fullName || c.username) : `user ${id}`;
+  }
+
+  /** Owner 2026-10-21: in a history, the signed-in person by name with "(you)", so a screenshot or an export says who it was. */
+  historyName(id: number | null | undefined): string {
+    if (id != null && id === this.me()) {
+      const mine = this.auth.user()?.fullName || this.colleagues().find(x => x.userId === id)?.fullName;
+      if (mine) return `${mine} (you)`;
+    }
+    return this.name(id);
   }
 
   stepName(key: string | null | undefined, tasks: { stepKey: string; name: string }[]): string {

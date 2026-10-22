@@ -122,10 +122,13 @@ export function kindCounts(rows: RegistryRow[]): Record<string, number> {
 
 export const permissionLabel = (p: string | null | undefined) => (p === 'TENANT_ADMIN' ? 'Workspace administrators' : 'Any member');
 
-export function retryText(retry: StepTaskEntry['retry']): string {
+export function retryText(retry: StepTaskEntry['retry'], repeatSafe = false): string {
   const tries = retry?.maxAttempts ?? 1;
-  if (tries <= 1) return 'Once, no retry';
-  return `Up to ${tries} tries, ${retry?.delaySeconds ?? 0} sec apart`;
+  const base = tries <= 1 ? 'Once' : `Up to ${tries} tries, ${retry?.delaySeconds ?? 0} sec apart`;
+  // Owner 2026-10-21: Core tries a step that is safe to repeat again when a service or storage is briefly away, unless the
+  // pipeline's own step sets its retry.
+  if (repeatSafe) return `${base}; up to 3 more when a service is briefly away (5, 15, 45 sec)`;
+  return tries <= 1 ? 'Once, no retry' : base;
 }
 
 export function timeoutText(seconds: number | null | undefined): string {
