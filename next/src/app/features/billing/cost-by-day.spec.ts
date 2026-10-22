@@ -28,6 +28,9 @@ describe('Cost by day, the component', () => {
     const items = [...el.querySelectorAll('[data-test="cost-by-day-legend"] li')].filter(li => li.querySelector('.cbd-swatch:not(.is-forecast)'));
     expect(items.map(li => li.textContent!.trim())).toEqual(['Model calls', 'Analytics & tools', 'API']);
     expect(items.map(li => li.getAttribute('data-zero'))).toEqual([null, null, 'true']);
+    // ZT-C10: the name keeps its contrast; only the swatch is dimmed.
+    expect(items.map(li => li.classList.contains('opacity-50') || li.classList.contains('opacity-40'))).toEqual([false, false, false]);
+    expect(items.map(li => li.querySelector('.cbd-swatch')!.classList.contains('opacity-40'))).toEqual([false, false, true]);
   });
 
   it('picks a clicked day, and unpicks it on a second click; a day to come is not a day to pick', () => {
