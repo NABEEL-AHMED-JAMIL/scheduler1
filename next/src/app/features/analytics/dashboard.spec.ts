@@ -882,6 +882,20 @@ describe('the board on screen', () => {
     expect(rendered.text()).toContain('2 rows');
   });
 
+  /** ZT §3.11 (CLS 0.12-0.62 at 1024): a figure tile ran as three lines and no foot, then drew a figure and its count line. */
+  it('holds a running figure tile at its figure\'s size and its count line\'s place until the answer lands', () => {
+    const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'kpi', widgetConfig: JSON.stringify({ span: 3 }) })] });
+    rendered.text();
+    const el = rendered.fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('[aria-busy="true"] app-kpi-card.kpi-reserve .kpi-figure.is-lg')).not.toBeNull();
+    expect(el.querySelector('[data-test="tile-count-pending"]')).not.toBeNull();
+    rendered.finishAnalysis(analysisResult({ columns: [{ name: 'revenue', type: 'DECIMAL(18,3)', role: 'MEASURE' }], rows: [['42']], rowCount: 1 }));
+    rendered.text();
+    expect(el.querySelector('app-kpi-card.kpi-reserve')).toBeNull();
+    expect(el.querySelector('[data-test="tile-count-pending"]')).toBeNull();
+    expect(el.querySelector('.dash-count')?.textContent).toContain('ran');
+  });
+
   it('draws an em dash for a null cell rather than an empty one', () => {
     const rendered = renderedBoard({ widgets: [widgetOn({ visualizationType: 'table' })] });
     rendered.finishAnalysis(analysisResult({ rows: [['north', null]], rowCount: 1 }));

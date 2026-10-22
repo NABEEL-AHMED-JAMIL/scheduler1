@@ -515,6 +515,9 @@
                          text that changes length moves its start, which the browser scores as a shift. -->
                     @let count = counted(view, kind, rowLimit(widget), settingsOf(widget)) + ' · ran ' + clock(view.ranAt);
                     <span class="dash-count text-[11px] text-[color:var(--text-muted)] ml-auto whitespace-nowrap" [title]="view.notes.join(' ')">@for (words of [count]; track words) {<span>{{ words }}</span>}</span>
+                  } @else if (!table && (stateOf(run) === 'queued' || stateOf(run) === 'running')) {
+                    <!-- ZT §3.11: the count line's place, held while the tile waits and runs (it came with the answer, 30 px). -->
+                    <span class="dash-count text-[11px] ml-auto whitespace-nowrap" aria-hidden="true" data-test="tile-count-pending">&nbsp;</span>
                   }
                 </div>
               </app-analytics-widget>
