@@ -827,6 +827,136 @@
         }
       }
     },
+    "/runs/{runId}/items": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "listRunItems",
+        "summary": "The run's items: each file, recording, document or row it processed one by one, with its status.",
+        "description": "A pipeline that works item by item (a step per recording, per file, per document, per row of a per-row call, or one that splits a PDF into its pages) keeps one item per thing it processed: its status (running, done, failed), the step it failed at and why in words, how many of its sub-items (a document's pages) failed, and the files its steps made for it, by file id (GET /v1/files/{fileId} downloads one). In the run's order, cursor paging; parentId lists one item's sub-items. Any other run -- one that reads a table whole -- has no items: an empty list. An item retried in a later attempt shows its latest version (attempt). Never a bucket, a key in a bucket or a storage key.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "$ref": "#/components/parameters/Limit"
+          },
+          {
+            "$ref": "#/components/parameters/Cursor"
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "running",
+                "done",
+                "failed"
+              ]
+            },
+            "description": "failed takes in an item with failed sub-items."
+          },
+          {
+            "name": "parentId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "An item's id: its sub-items."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The items.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunItemPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
+    "/runs/{runId}/items/{itemKey}": {
+      "get": {
+        "tags": [
+          "runs"
+        ],
+        "operationId": "getRunItem",
+        "summary": "One item of a run, with each of its steps.",
+        "description": "The item by its id (\"2\"; a sub-item \"3.12\") -- or by its key, when the key has no '/'. As listRunItems lists it, with steps: each step's status for this item (done, failed, not_run, shared -- a combining step whose output belongs to many items, sharedBy saying how many -- or left_out, when a filter left the item out), its message, rows and files.\n",
+        "security": [
+          {
+            "clientCredentials": [
+              "runs:read"
+            ]
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/RunId"
+          },
+          {
+            "name": "itemKey",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The item.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunItem"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/Forbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          }
+        }
+      }
+    },
     "/runs/{runId}/review": {
       "get": {
         "tags": [
@@ -3501,6 +3631,271 @@
           },
           "review": {
             "$ref": "#/components/schemas/Review"
+          }
+        }
+      },
+      "RunItemPage": {
+        "type": "object",
+        "required": [
+          "runId",
+          "summary",
+          "data",
+          "nextCursor"
+        ],
+        "properties": {
+          "runId": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "object",
+            "required": [
+              "items",
+              "done",
+              "failed",
+              "running"
+            ],
+            "description": "Over the run's items (not sub-items): failed counts an item with failed sub-items.",
+            "properties": {
+              "items": {
+                "type": "integer"
+              },
+              "done": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              },
+              "running": {
+                "type": "integer"
+              }
+            }
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunItem"
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "RunItem": {
+        "type": "object",
+        "required": [
+          "id",
+          "key",
+          "name",
+          "status",
+          "attempt",
+          "files"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The item's id in the run: \"2\", a sub-item \"3.12\". The same in every attempt."
+          },
+          "key": {
+            "type": "string",
+            "description": "What names the item: the file's path in the run's own folder, a document id, a row's key."
+          },
+          "name": {
+            "type": "string"
+          },
+          "parentId": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "A sub-item's item (a page's document)."
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "running",
+              "done",
+              "failed"
+            ]
+          },
+          "failedStep": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "The key of the step it failed at."
+          },
+          "failedStepName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Why it failed, in words."
+          },
+          "attempt": {
+            "type": "integer",
+            "description": "The run attempt this version of the item is from: a retried item's latest."
+          },
+          "startedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "endedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "durationMs": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subItems": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "done": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "fileId",
+                "name"
+              ],
+              "properties": {
+                "fileId": {
+                  "type": "string",
+                  "description": "GET /v1/files/{fileId} downloads it."
+                },
+                "name": {
+                  "type": "string"
+                },
+                "step": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "format": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "bytes": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "expiresAt": {
+                  "type": [
+                    "string",
+                    "null"
+                  ],
+                  "format": "date-time"
+                }
+              }
+            }
+          },
+          "steps": {
+            "type": "array",
+            "description": "getRunItem only.",
+            "items": {
+              "type": "object",
+              "required": [
+                "key",
+                "status"
+              ],
+              "properties": {
+                "key": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "task": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "done",
+                    "failed",
+                    "not_run",
+                    "shared",
+                    "left_out"
+                  ]
+                },
+                "message": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "rows": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "files": {
+                  "type": "integer"
+                },
+                "sharedBy": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "durationMs": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "reusedFromAttempt": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                }
+              }
+            }
           }
         }
       },

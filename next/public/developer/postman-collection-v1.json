@@ -377,6 +377,87 @@
           "response": []
         },
         {
+          "name": "The run's items: each file, recording, document or row it processed one by one, with its status.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/items",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "items"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": true
+                },
+                {
+                  "key": "cursor",
+                  "value": "string",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "running",
+                  "disabled": true,
+                  "description": "failed takes in an item with failed sub-items."
+                },
+                {
+                  "key": "parentId",
+                  "value": "123",
+                  "disabled": true,
+                  "description": "An item's id: its sub-items."
+                }
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                }
+              ]
+            },
+            "description": "The run's items: each file, recording, document or row it processed one by one, with its status.\n\nA pipeline that works item by item (a step per recording, per file, per document, per row of a per-row call, or one that splits a PDF into its pages) keeps one item per thing it processed: its status (running, done, failed), the step it failed at and why in words, how many of its sub-items (a document's pages) failed, and the files its steps made for it, by file id (GET /v1/files/{fileId} downloads one). In the run's order, cursor paging; parentId lists one item's sub-items. Any other run -- one that reads a table whole -- has no items: an empty list. An item retried in a later attempt shows its latest version (attempt). Never a bucket, a key in a bucket or a storage key.\n\noperationId: listRunItems"
+          },
+          "response": []
+        },
+        {
+          "name": "One item of a run, with each of its steps.",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/runs/:runId/items/:itemKey",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "runs",
+                ":runId",
+                "items",
+                ":itemKey"
+              ],
+              "variable": [
+                {
+                  "key": "runId",
+                  "value": "123"
+                },
+                {
+                  "key": "itemKey",
+                  "value": "string"
+                }
+              ]
+            },
+            "description": "One item of a run, with each of its steps.\n\nThe item by its id (\"2\"; a sub-item \"3.12\") -- or by its key, when the key has no '/'. As listRunItems lists it, with steps: each step's status for this item (done, failed, not_run, shared -- a combining step whose output belongs to many items, sharedBy saying how many -- or left_out, when a filter left the item out), its message, rows and files.\n\noperationId: getRunItem"
+          },
+          "response": []
+        },
+        {
           "name": "A signed, read-only link to the run's page (15 minutes) to embed in a portal.",
           "request": {
             "method": "POST",
