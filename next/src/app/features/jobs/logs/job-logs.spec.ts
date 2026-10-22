@@ -598,3 +598,36 @@ describe('Run page: a run waiting at an Approval step', () => {
       { analyticsDashboardId: 7, dashboardName: ' ', pipelines: [{ jobId: 1 }] }], 1)).toEqual([{ id: 7, name: 'Dashboard #7' }]);
   });
 });
+
+/**
+ * MIG-416 (the browser budget, CLS 0.16 at 1024): the run, its review and its steps answered apart, and the review box
+ * stacked above the tabs before it moved beside the summary. The body is drawn once all three have answered.
+ */
+describe('JobLogs drawn once its parts have answered (MIG-416)', () => {
+  const ENGINE = { jobQueueId: 6839, jobId: 2808, runStatus: 'Completed', attempt: 1, attempts: [1], legacy: false, aiSteps: [],
+    steps: [{ stepExecutionId: 1, index: 0, key: 'read', task: 'read_file', status: 'Completed', durationMs: 5, recordsIn: 0, recordsOut: 2,
+      tries: 1, onError: 'fail', datasets: [], log: 'step' }] };
+  const hidden = (el: HTMLElement, test: string) => !!el.querySelector(`[data-test="${test}"]`)?.closest('.run-waiting');
+
+  it('holds the summary and the tabs behind one busy card until the review and the steps have answered', () => {
+    const { fixture, el, component } = page('steps');
+    const http = TestBed.inject(HttpTestingController);
+    expect(el.querySelector('[data-test="run-pending"]')?.getAttribute('aria-busy')).toBe('true');
+    expect(hidden(el, 'run-summary')).toBe(true);
+    expect(hidden(el, 'run-tabs')).toBe(true);
+    http.match(r => r.url.endsWith('/sourceJob.json/stepExecutions')).forEach(r => r.flush({ status: API_SUCCESS, data: ENGINE }));
+    fixture.detectChanges();
+    expect(component.topReady()).toBe(false);
+    http.match(r => r.url.endsWith('/sourceJob.json/review')).forEach(r => r.flush({ status: API_SUCCESS, data: { reviewStatus: 'NOT_REQUIRED' } }));
+    fixture.detectChanges();
+    TestBed.tick();
+    fixture.detectChanges();
+    expect(component.topReady()).toBe(true);
+    expect(el.querySelector('[data-test="run-pending"]')).toBeNull();
+    expect(hidden(el, 'run-summary')).toBe(false);
+    expect(hidden(el, 'run-tabs')).toBe(false);
+    component.refresh();
+    fixture.detectChanges();
+    expect(hidden(el, 'run-tabs')).toBe(false);
+  });
+});

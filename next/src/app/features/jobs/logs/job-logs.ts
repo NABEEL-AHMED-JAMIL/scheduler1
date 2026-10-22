@@ -81,6 +81,8 @@ export function runHasAi(timeline: { steps?: { task: string }[]; aiSteps?: unkno
   // One read of the run's steps and outputs for the whole page: the summary, every tab, the step log panel.
   providers: [RunTimelineStore, RunApprovalStore],
   styles: `
+    .run-waiting { display: none !important; }
+    .run-pending { min-height: 40vh; }
     .run-top { display: grid; gap: 1rem; align-items: stretch; }
     @media (min-width: 1024px) { .run-top.has-next { grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); } }
     /* Six facts: one row on their own, three by two beside the Next steps, so the strip fills the box's height evenly. */
@@ -210,6 +212,19 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly store = inject(RunTimelineStore);
   /** The run's review as Next steps read it, for the header's one pill. */
   readonly review = signal<RunReviewView | null>(null);
+  /** MIG-416: the review's first answer (none required is an answer), then the page's body may be drawn. */
+  readonly reviewKnown = signal(false);
+  reviewRead(review: RunReviewView | null): void {
+    this.review.set(review);
+    this.reviewKnown.set(true);
+  }
+  /** Latched once the run, its review and its steps (or that it has none) have answered; a missing run or an error shows at once. */
+  private readonly topDrawn = signal(false);
+  readonly topReady = computed(() => this.topDrawn() || this.missing() || (!!this.error() && !this.run()));
+  protected readonly drawTop = effect(() => {
+    const steps = this.store.timeline() !== null || this.store.legacy() || this.store.readError();
+    if (!this.topDrawn() && !!this.run() && this.reviewKnown() && steps) this.topDrawn.set(true);
+  });
   /** The run's Approval steps: the request it waits at, the reader's task about it, the groups' names. */
   readonly approvals = inject(RunApprovalStore);
   /** The Next steps box is drawn (the run waits for an approval, or its results need a review): the strip shares the row with it. */

@@ -26,8 +26,13 @@
     }
   </app-page-header>
 
+  <!-- MIG-416 (CLS 0.16 at 1024): the run, its review and its steps arrive apart; the review box stacked above the tabs
+       and then moved beside the summary. The page's body is drawn once all three have answered, and stays drawn. -->
+  @if (!topReady()) {
+    <div class="card p-4 text-sm text-[color:var(--text-muted)] run-pending" aria-busy="true" data-test="run-pending">Loading the run…</div>
+  }
   @if (run(); as r) {
-    <div class="run-top" [class.has-next]="hasNext()">
+    <div class="run-top" [class.has-next]="hasNext()" [class.run-waiting]="!topReady()">
       <section class="card overflow-clip min-w-0 flex flex-col" aria-label="This run" data-test="run-summary">
         <dl class="run-facts flex-1" [class.is-wide]="facts().length > 6">
           @for (f of facts(); track f.label) {
@@ -40,7 +45,7 @@
         }
       </section>
       <app-run-approval [now]="now()" (decided)="decided()" />
-      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" (reviewChange)="review.set($event)" />
+      <app-run-decision [jobQueueId]="jobQueueId()" (decided)="refresh()" (reviewChange)="reviewRead($event)" />
     </div>
   }
 
@@ -56,6 +61,7 @@
       <button type="button" class="btn btn-default btn-sm" (click)="load()">Try again</button>
     </div>
   }
+  <div class="contents" [class.run-waiting]="!topReady()">
   <div class="tabs" role="tablist" aria-label="Run" data-test="run-tabs">
     @for (t of tabs(); track t.id) {
       <button type="button" role="tab" class="tab" [class.tab-active]="tab() === t.id" [attr.aria-selected]="tab() === t.id"
@@ -134,5 +140,6 @@
       </app-run-log>
     }
   }
+  </div>
   }
 </div>
