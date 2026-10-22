@@ -6,6 +6,7 @@ import { SidePanel } from '../../../shared/ui/side-panel';
 import { Icon } from '../../../shared/ui/icon';
 import { Field } from '../../../shared/ui/field';
 import { SchemaForm } from './schema-form';
+import { CallApiPreview } from './call-api-preview';
 import { REPORT_DESIGN_KEYS, ReportDesignSettings, ReportStepDesign } from './report-step-design';
 import {
   LIMITS, ON_ERRORS, ApiRequestChoice, BucketChoice, DocumentTypeChoice, JsonSchema, PromptChoice, WebhookChoice, Step, StepProblem, StepTaskEntry, canonicalStep, fieldsOf, onErrorLabel, parseJson, problemsAt, taskLabel,
@@ -31,6 +32,8 @@ export interface StepPanelData {
   documentTypes?: DocumentTypeChoice[];
   /** Owner #25: the workspace's saved API requests, for a task whose settings name one. */
   apiRequests?: ApiRequestChoice[];
+  /** MIG-419: the pipeline's sample rows, for a Call API step's "What the first call sends". */
+  sampleRows?: Record<string, unknown>[] | null;
   /** The server's problems with this step, at paths relative to it ("retry.maxAttempts", "config.columns"). */
   problems: StepProblem[];
   /** Report Studio phase 5: the pipeline the step is in (key null while never saved), its name and its schedules. */
@@ -50,7 +53,7 @@ type ConfigMode = 'form' | 'json';
  */
 @Component({
   selector: 'app-step-panel',
-  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign],
+  imports: [SidePanel, Icon, Field, SchemaForm, FormRow, Section, ReportStepDesign, CallApiPreview],
   templateUrl: './step-panel.html',
 })
 export class StepPanel {

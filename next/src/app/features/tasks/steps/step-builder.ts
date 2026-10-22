@@ -412,6 +412,7 @@ export class StepBuilder implements OnInit {
       webhooks: this.webhookChoices() ?? [],
       documentTypes: this.documentTypeChoices() ?? [],
       apiRequests: this.apiRequestChoices() ?? [],
+      sampleRows: sampleRowsOf(this.draft()),
       pipeline: { key: this.view().stored ? this.view().pipelineKey : null, name: this.pipelineName(), jobIds: this.jobIds() },
     };
     // Focus goes back to the step's own card, not to whatever opened the panel: from Add step that was the box, whose

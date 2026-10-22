@@ -385,7 +385,8 @@
                           }
                           <button type="button" class="btn btn-ghost btn-sm" (click)="addVariable(s)"><app-icon name="plus" />Add a variable</button>
                         </div>
-                        <p class="field-note text-[color:var(--text-muted)]">From the request's fields by name (patient.id), and subject_id, instance and call_key.</p>
+                        <p class="field-note text-[color:var(--text-muted)]" data-test="wf-api-variables-note">From the request's fields by name (patient.id), and subject_id, instance and call_key.
+                          A variable that is only <span class="mono">{{ '{{' }}subject{{ '}}' }}</span>, or only an object or list of it (<span class="mono">{{ '{{' }}patient{{ '}}' }}</span>), is sent as JSON.</p>
                       </div>
                       <div>
                         <label class="label" for="st-save">Keep the answer as</label>

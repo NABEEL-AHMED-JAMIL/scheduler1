@@ -56,6 +56,10 @@
                       spellcheck="false" (input)="typeConfig($any($event.target).value)"></textarea>
           </app-field>
         }
+        @if (s.task === 'call_api') {
+          <!-- MIG-419: what the first call sends, from the pipeline's sample rows. -->
+          <app-call-api-preview class="block mt-3" [config]="s.config ?? {}" [rows]="data.sampleRows ?? null" />
+        }
       </section>
       <!-- How it runs: the related numbers on one row (A4). -->
       <app-section title="How it runs" sub="Retries, the time limit, and what happens when it fails." [level]="3">
