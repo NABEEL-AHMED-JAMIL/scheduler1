@@ -247,6 +247,8 @@ export class ScheduleItems implements OnInit {
   readonly loading = signal(false);
   readonly error = signal('');
   readonly compareRuns = signal<number[]>([]);
+  /** The two rows ticked, in the order ticked (their item keys may differ: the same file in two folders). */
+  readonly compareRows = signal<AcrossRow[]>([]);
   readonly comparison = signal<Comparison | null>(null);
   readonly compareError = signal('');
 
@@ -279,6 +281,7 @@ export class ScheduleItems implements OnInit {
         this.searchApplied.set(key ? '' : search);
         this.pageNo.set(0);
         this.compareRuns.set([]);
+        this.compareRows.set([]);
         this.comparison.set(null);
         if (key) this.range.set({ ...presetRange('all'), preset: 'all' });
         this.load();
@@ -361,6 +364,7 @@ export class ScheduleItems implements OnInit {
     this.searchApplied.set(text);
     this.pageNo.set(0);
     this.compareRuns.set([]);
+    this.compareRows.set([]);
     this.comparison.set(null);
     this.router.navigate([], { queryParams: { search: text || null, key: null }, queryParamsHandling: 'merge', replaceUrl: true });
     this.load();
@@ -400,18 +404,20 @@ export class ScheduleItems implements OnInit {
   tick(r: AcrossRow): void {
     const rows = this.page()?.items ?? [];
     const next = ticked(this.compareRuns(), r.jobQueueId);
-    // Both runs must be of one item: a tick on another item's run starts again from it.
-    const keys = new Set(next.map(id => rows.find(x => x.jobQueueId === id)?.key));
-    this.compareRuns.set(keys.size > 1 ? [r.jobQueueId] : next);
+    // Both runs must be of one item -- by name (ZT-I22: the same file from another folder) -- or a tick starts again from it.
+    const picked = next.map(id => id === r.jobQueueId ? r : this.compareRows().find(x => x.jobQueueId === id) ?? rows.find(x => x.jobQueueId === id)!);
+    const same = new Set(picked.map(x => x.label)).size === 1;
+    this.compareRows.set(same ? picked : [r]);
+    this.compareRuns.set(this.compareRows().map(x => x.jobQueueId));
     this.comparison.set(null);
     this.compareError.set('');
-    if (this.compareRuns().length === 2) this.compare(r.key);
+    if (this.compareRuns().length === 2) this.compare();
   }
 
-  private compare(key: string): void {
-    const [a, b] = this.compareRuns();
+  private compare(): void {
+    const [a, b] = this.compareRows();
     this.compareRequest?.unsubscribe();
-    this.compareRequest = this.api.compare(Number(this.jobId()), key, a, b).subscribe({
+    this.compareRequest = this.api.compare(Number(this.jobId()), a.key, a.jobQueueId, b.jobQueueId, b.key).subscribe({
       next: c => this.comparison.set(c),
       error: err => this.compareError.set(refusalText(err, 'The two runs could not be compared.')),
     });

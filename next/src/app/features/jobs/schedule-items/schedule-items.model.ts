@@ -102,9 +102,11 @@ export function acrossQuery(jobId: number, f: { search?: string; key?: string; s
 /** "call-a.m4a · processed 4 times · latest result first"; when a search finds several items, how many. */
 export function headline(page: AcrossPage | null | undefined): { title: string; sub: string } | null {
   if (!page || !page.total) return null;
-  if (page.distinctKeys === 1 && page.keys.length) {
-    const k = page.keys[0];
-    return { title: k.label, sub: `processed ${k.runs === 1 ? 'once' : `${k.runs.toLocaleString('en-GB')} times`} · latest result first` };
+  // ZT-I22: one file name across folders (an inbox's dated folders) is one item to the reader.
+  const labels = new Set(page.keys.map(k => k.label));
+  if (page.keys.length && labels.size === 1 && page.distinctKeys === page.keys.length) {
+    const runs = page.keys.reduce((n, k) => n + k.runs, 0);
+    return { title: page.keys[0].label, sub: `processed ${runs === 1 ? 'once' : `${runs.toLocaleString('en-GB')} times`} · latest result first` };
   }
   return { title: `${plural(page.distinctKeys, 'item')}`, sub: `${plural(page.total, 'run')} in all · latest first${page.capped ? ' · the newest 2,000 looked at' : ''}` };
 }

@@ -16,6 +16,9 @@ describe('schedule items model', () => {
     expect(headline({ ...one, keys: [{ key: 'k', label: 'x', runs: 1 }], total: 1 })?.sub).toBe('processed once · latest result first');
     expect(headline({ ...one, distinctKeys: 3, total: 9 })?.title).toBe('3 items');
     expect(headline({ ...one, total: 0 })).toBeNull();
+    // ZT-I22: the same file in three folders is one item to the reader.
+    expect(headline({ ...one, total: 3, distinctKeys: 3, keys: [{ key: 'a/x.m4a', label: 'x.m4a', runs: 1 }, { key: 'b/x.m4a', label: 'x.m4a', runs: 1 },
+      { key: 'c/x.m4a', label: 'x.m4a', runs: 1 }] })).toEqual({ title: 'x.m4a', sub: 'processed 3 times · latest result first' });
   });
 
   it('reads a row: its status, version and report', () => {

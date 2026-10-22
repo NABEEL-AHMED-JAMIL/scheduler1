@@ -98,4 +98,21 @@ describe('Schedule items tab', () => {
     expect(ask.request.body.search).toBe('risk = High');
     expect(ask.request.body.key).toBeUndefined();
   });
+
+  it('compares the same file from two folders by its name (ZT-I22)', () => {
+    const { http, el, fixture } = mount('');
+    const two = PAGE({ distinctKeys: 2, fields: [], keys: [{ key: 'voice-intake/mig421-1100/call-a.m4a', label: 'call-a.m4a', runs: 1 },
+      { key: 'voice-intake/mig420-0231/call-a.m4a', label: 'call-a.m4a', runs: 1 }],
+      items: [row(1860, 'Moderate', { key: 'voice-intake/mig421-1100/call-a.m4a' }), row(1857, 'High', { key: 'voice-intake/mig420-0231/call-a.m4a' })] });
+    http.match(r => r.url.endsWith('/sourceJob.json/itemRuns')).forEach(r => r.flush({ status: API_SUCCESS, data: two }));
+    fixture.detectChanges();
+    expect(el.querySelector('[data-test="across-title"]')?.textContent?.trim()).toBe('call-a.m4a');
+    const boxes = [...el.querySelectorAll('[data-test="across-compare"]')] as HTMLInputElement[];
+    boxes[0].click();
+    boxes[1].click();
+    fixture.detectChanges();
+    const ask = http.expectOne(r => r.url.endsWith('/itemRuns/compare'));
+    expect(ask.request.params.get('key')).toBe('voice-intake/mig421-1100/call-a.m4a');
+    expect(ask.request.params.get('bKey')).toBe('voice-intake/mig420-0231/call-a.m4a');
+  });
 });

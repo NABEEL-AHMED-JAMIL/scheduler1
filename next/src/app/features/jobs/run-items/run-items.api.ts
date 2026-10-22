@@ -115,10 +115,11 @@ export class RunItemsApi {
   }
 
   /** MIG-421: one item in two runs, step by step, and the pipeline change between them. */
-  compare(jobId: number, key: string, a: number, b: number): Observable<Comparison> {
-    return this.http.get<ApiResponse<Comparison>>(`${BASE}/itemRuns/compare`, {
-      params: { jobId: String(jobId), key, a: String(a), b: String(b) },
-    }).pipe(map(dataOf));
+  compare(jobId: number, key: string, a: number, b: number, bKey?: string | null): Observable<Comparison> {
+    const params: Record<string, string> = { jobId: String(jobId), key, a: String(a), b: String(b) };
+    // ZT-I22: the same file from another folder is the same item by name, not by key.
+    if (bKey && bKey !== key) params['bKey'] = bKey;
+    return this.http.get<ApiResponse<Comparison>>(`${BASE}/itemRuns/compare`, { params }).pipe(map(dataOf));
   }
 
   counts(jobQueueIds: number[]): Observable<Record<string, ItemCounts>> {
