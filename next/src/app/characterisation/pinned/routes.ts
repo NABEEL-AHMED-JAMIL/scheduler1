@@ -460,6 +460,25 @@ export const PINNED: Record<string, unknown> = {
       "lazy": true
     },
     {
+      "path": "/pipelines/schedules/:jobId/items",
+      "title": "Schedule items",
+      "pageKey": "jobs",
+      "guards": [
+        "ownSignInOnly",
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
+      "path": "/pipelines/schedules/:jobId/items",
+      "title": "Schedule items",
+      "pageKey": "jobs",
+      "guards": [
+        "pageGuard"
+      ],
+      "lazy": true
+    },
+    {
       "path": "/pipelines/schedules/:jobId/runs/:jobQueueId",
       "title": "Run",
       "pageKey": "jobs",

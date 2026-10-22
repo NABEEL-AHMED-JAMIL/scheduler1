@@ -14,11 +14,13 @@ import { attachmentName } from '../run-steps/run-steps.model';
 import { plural } from '../run-steps/run-page.model';
 import { RunItemsApi, refusalText } from './run-items.api';
 import {
-  CellLook, FILTER_LABEL, ITEM_FILTERS, ItemFilter, ItemStep, ItemsPage, RunItem, cellLook, fieldText, filterCount, itemLook,
-  itemPanelConfig, itemStats, itemSub, itemTime, itemsQuery, retriedSentence, retryRefusal, stepColumns,
+  CellLook, FILTER_LABEL, ItemFilter, ItemStep, ItemsPage, MAX_ZIP_ITEMS, NO_SELECTION, RunItem, Selection, SelectionAnswer, cellLook,
+  fieldText, filterCount, filtersOf, isSelected, itemLook, itemPanelConfig, itemStats, itemSub, itemTime, itemsQuery, pageState,
+  retriedSentence, retryLabel, retryRefusal, selectedCount, selectionBody, stepColumns, toggled, withPage, zipItemsLabel,
 } from './run-items.model';
 import { ItemPanelData, RunItemPanel } from './run-item-panel';
 import { ItemFilesData, RunItemFiles } from './run-item-files';
+import { ReviewChoice, ReviewDialogData, RunItemsReview } from './run-items-review';
 
 /** A document's pages (or any item's sub-items), read when its row is opened. */
 interface Children { items: RunItem[]; total: number; page: number; failedOnly: boolean; loading: boolean; error: string; }
@@ -55,6 +57,18 @@ export const CHILD_PAGE = 15;
     /* ZT-I15: at 1024 the table scrolls inside its card; Open stays at its right edge, over the row's own background. */
     .ri-table .ri-open { position: sticky; right: 0; background: var(--surface-raised); }
     .ri-table th.ri-open { background: var(--surface-sunken); }
+    /* MIG-421: the selection's box column and the floating bar of what to do with the selected items. */
+    .ri-pick { width: 2.5rem; padding-right: 0 !important; }
+    .ri-table tr.is-picked > td { background: color-mix(in oklab, var(--info-soft) 45%, var(--surface-raised)); }
+    .ri-bar { position: sticky; bottom: 1rem; z-index: 5; align-self: center; display: flex; flex-wrap: wrap; align-items: center; gap: 0.625rem;
+              padding: 0.625rem 0.75rem 0.625rem 1.125rem; border-radius: var(--radius-card); background: var(--text-primary); color: var(--surface-raised);
+              box-shadow: 0 12px 32px var(--shadow-color); max-width: calc(100% - 1rem); }
+    .ri-bar .btn-bar { height: 2.125rem; padding: 0 0.875rem; border-radius: var(--radius-md); font-size: 0.875rem; border: 1px solid color-mix(in oklab, var(--surface-raised) 35%, transparent);
+                       background: transparent; color: inherit; }
+    .ri-bar .btn-bar.is-main { background: var(--surface-raised); color: var(--text-primary); border-color: transparent; font-weight: 500; }
+    .ri-bar .btn-bar:disabled { opacity: 0.5; }
+    .ri-bar .ri-bar-link { color: color-mix(in oklab, var(--surface-raised) 75%, transparent); font-size: 0.8125rem; text-decoration: underline; }
+    .ri-bar .ri-bar-rule { width: 1px; height: 1.5rem; background: color-mix(in oklab, var(--surface-raised) 30%, transparent); }
   `,
   template: `
     <section class="flex flex-col gap-3" data-test="run-items" aria-label="Items">
@@ -65,7 +79,7 @@ export const CHILD_PAGE = 15;
       <div class="card overflow-clip">
         <div class="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-subtle">
           <div class="flex flex-wrap items-center gap-1.5" role="group" aria-label="Show items">
-            @for (f of filters; track f) {
+            @for (f of filters(); track f) {
               <button type="button" class="btn btn-default btn-sm gap-1.5 ring-[color:var(--focus-ring)]" [class.ring-2]="status() === f"
                       [attr.aria-pressed]="status() === f" [attr.data-filter]="f" (click)="setStatus(f)">
                 {{ filterLabel[f] + ' ' }}<span class="tabular font-semibold">{{ count(f) }}</span>
@@ -78,6 +92,12 @@ export const CHILD_PAGE = 15;
             <input class="input input-sm w-full pl-8" type="search" placeholder="Search an item, or a value like risk = High"
                    [value]="searchText()" (input)="typed($any($event.target).value)" (keydown.enter)="searchNow()" data-test="items-search" />
           </label>
+          @if (refs().length) {
+            <span class="pill pill-brand inline-flex items-center gap-1.5" data-test="items-refs">
+              {{ refsLabel() }}
+              <button type="button" class="btn btn-ghost btn-icon btn-xs" aria-label="Show every item" (click)="showAll()"><app-icon name="close" size="0.8em" /></button>
+            </span>
+          }
           <span class="flex-1"></span>
           @if (fieldList().length) {
             <button type="button" class="btn btn-default btn-sm" [cdkMenuTriggerFor]="columnsMenu" data-test="items-columns"
@@ -133,6 +153,10 @@ export const CHILD_PAGE = 15;
             <table class="ri-table" data-test="items-table">
               <thead>
                 <tr>
+                  <th scope="col" class="ri-pick">
+                    <input type="checkbox" data-test="items-pick-page" [checked]="pageTick() === 'all'" [indeterminate]="pageTick() === 'some'"
+                           [attr.aria-label]="'Select the ' + rows().length + ' items on this page'" (change)="tickPage($any($event.target).checked)" />
+                  </th>
                   <th scope="col" class="text-right">#</th>
                   <th scope="col">Item</th>
                   <th scope="col">Status</th>
@@ -148,7 +172,8 @@ export const CHILD_PAGE = 15;
               </thead>
               <tbody>
                 @for (item of rows(); track item.ref) {
-                  <tr [class.is-failed]="item.status === 'failed'" [attr.data-ref]="item.ref">
+                  <tr [class.is-failed]="item.status === 'failed'" [class.is-picked]="picked(item.ref)" [attr.data-ref]="item.ref">
+                    <td class="ri-pick"><input type="checkbox" [checked]="picked(item.ref)" (change)="tick(item.ref)" [attr.aria-label]="'Select ' + item.label" data-test="item-pick" /></td>
                     <td class="text-right tabular text-[color:var(--text-muted)]">{{ item.position ?? item.ref }}</td>
                     <td>
                       <div class="flex items-start gap-1.5 min-w-0">
@@ -195,6 +220,7 @@ export const CHILD_PAGE = 15;
                     @for (child of kids.items; track child.ref) {
                       <tr class="is-child" [class.is-failed]="child.status === 'failed'" [attr.data-child]="child.ref">
                         <td></td>
+                        <td></td>
                         <td><span class="ri-name ri-child-name" [title]="child.label">{{ child.label }}</span></td>
                         <td class="whitespace-nowrap"><span class="pill pill-{{ look(child).tone }}">{{ look(child).label }}</span></td>
                         @for (s of columns(); track s.key) {
@@ -223,7 +249,7 @@ export const CHILD_PAGE = 15;
                     }
                     <tr class="is-child">
                       <td></td>
-                      <td [attr.colspan]="span() - 1" class="text-xs text-[color:var(--text-secondary)]" data-test="children-foot">
+                      <td [attr.colspan]="span()" class="text-xs text-[color:var(--text-secondary)]" data-test="children-foot">
                         @if (kids.loading) { Reading the pages… }
                         @else if (kids.error) { <span class="text-crit-500">{{ kids.error }}</span> }
                         @else {
@@ -247,6 +273,30 @@ export const CHILD_PAGE = 15;
           <app-pagination [total]="data()!.total" [page]="page() + 1" [size]="size()" (goTo)="goTo($event - 1)" (setSize)="setSize($event)" />
         }
       </div>
+
+      @if (selected() > 0) {
+        <div class="ri-bar" role="region" [attr.aria-label]="selected() + ' items selected'" data-test="items-bar">
+          <span class="text-sm font-semibold tabular" data-test="bar-count">{{ selected() }} selected</span>
+          @if (!selection().all && (data()?.total ?? 0) > selected()) {
+            <button type="button" class="ri-bar-link" data-test="bar-select-all" (click)="selectAll()">Select all {{ data()!.total }} matching</button>
+          }
+          <span class="ri-bar-rule" aria-hidden="true"></span>
+          @if (canRetry()) {
+            <button type="button" class="btn-bar is-main" data-test="bar-retry" [disabled]="!(counted()?.failed) || bulkBusy() || !!retryWhy()"
+                    [title]="!(counted()?.failed) ? 'None of the selected items failed' : retryWhy() || 'Retry only the failed items of the selection'"
+                    (click)="retrySelected()">{{ retryText() }}</button>
+          }
+          <button type="button" class="btn-bar" data-test="bar-zip" [disabled]="bulkBusy() || selected() > maxZip"
+                  [title]="zipTitle()"
+                  (click)="downloadZip()">{{ zipText() }}</button>
+          <button type="button" class="btn-bar" data-test="bar-csv" [disabled]="bulkBusy()" (click)="downloadCsvOfSelection()">Export CSV</button>
+          @if (canRetry()) {
+            <button type="button" class="btn-bar" data-test="bar-review" [disabled]="bulkBusy()" (click)="sendToReview()">Send to review</button>
+          }
+          <button type="button" class="btn btn-ghost btn-icon btn-sm text-inherit" aria-label="Clear the selection" data-test="bar-clear" (click)="clearSelection()">
+            <app-icon name="close" /></button>
+        </div>
+      }
     </section>
   `,
 })
@@ -265,13 +315,23 @@ export class RunItems implements OnInit {
   readonly statusChange = output<ItemFilter>();
   /** Items were queued again: the page re-reads the run. */
   readonly retried = output<void>();
+  /** MIG-421: the schedule, for "All runs of this item". */
+  readonly jobId = input<string | number | null>(null);
+  /** MIG-421: only these items (a Task inbox task's link, ?items=2,6,9). */
+  readonly refs = input<string[]>([]);
 
   private readonly api = inject(RunItemsApi);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
 
-  readonly filters = ITEM_FILTERS;
+  readonly filters = computed(() => filtersOf(this.data()?.summary));
   readonly filterLabel = FILTER_LABEL;
+  readonly maxZip = MAX_ZIP_ITEMS;
+  /** MIG-421: what is ticked, and what Core says it is (how many, how many failed). */
+  readonly selection = signal<Selection>(NO_SELECTION);
+  readonly counted = signal<SelectionAnswer | null>(null);
+  readonly bulkBusy = signal(false);
+  readonly showRefs = signal(true);
   readonly childPageSize = CHILD_PAGE;
 
   readonly status = signal<ItemFilter>('all');
@@ -288,9 +348,16 @@ export class RunItems implements OnInit {
   readonly children = signal<ReadonlyMap<string, Children>>(new Map());
 
   readonly rows = computed(() => this.data()?.items ?? []);
+  readonly activeRefs = computed(() => this.showRefs() ? this.refs() : []);
+  readonly refsLabel = computed(() => `Showing the ${this.activeRefs().length === 1 ? 'item' : this.activeRefs().length + ' items'} sent to review`);
+  readonly selected = computed(() => selectedCount(this.selection(), this.data()?.total ?? 0));
+  readonly pageTick = computed(() => pageState(this.selection(), this.rows().map(r => r.ref)));
+  readonly retryText = computed(() => retryLabel(this.counted()?.failed ?? 0));
+  readonly zipText = computed(() => zipItemsLabel(this.selected()));
+  readonly zipTitle = computed(() => this.selected() > MAX_ZIP_ITEMS ? `A zip holds at most ${MAX_ZIP_ITEMS} items` : 'Each item\'s files in a folder of its own');
   readonly columns = computed(() => stepColumns(this.data()?.steps ?? []));
   readonly fieldList = computed(() => this.data()?.fields ?? []);
-  readonly span = computed(() => 5 + this.columns().length + this.fields().length);
+  readonly span = computed(() => 6 + this.columns().length + this.fields().length);
   readonly retryWhy = computed(() => retryRefusal(this.data()?.summary));
   readonly tiles = computed<StatStripItem[]>(() => {
     const summary = this.data()?.summary;
@@ -321,7 +388,7 @@ export class RunItems implements OnInit {
   ngOnInit(): void {
     this.status.set(this.initialStatus());
     const first = this.first();
-    if (first && first.page === 0 && first.size === this.size()) this.data.set(first);
+    if (first && first.page === 0 && first.size === this.size() && !this.activeRefs().length) this.data.set(first);
     else this.load();
   }
 
@@ -341,7 +408,7 @@ export class RunItems implements OnInit {
     this.error.set('');
     this.request?.unsubscribe();
     this.request = this.api.list(itemsQuery(id, {
-      status: this.status(), search: this.searchApplied(), page: this.page(), size: this.size(), fields: this.fields(),
+      status: this.status(), search: this.searchApplied(), page: this.page(), size: this.size(), fields: this.fields(), refs: this.activeRefs(),
     })).subscribe({
       next: page => {
         this.loading.set(false);
@@ -360,6 +427,7 @@ export class RunItems implements OnInit {
     if (this.status() === f) return;
     this.status.set(f);
     this.page.set(0);
+    this.clearSelection();
     this.children.set(new Map());
     this.statusChange.emit(f);
     this.load();
@@ -377,6 +445,7 @@ export class RunItems implements OnInit {
     if (text === this.searchApplied()) return;
     this.searchApplied.set(text);
     this.page.set(0);
+    this.clearSelection();
     this.load();
   }
 
@@ -411,6 +480,7 @@ export class RunItems implements OnInit {
       status: item.parentRef ? null : this.status(), search: item.parentRef ? null : this.searchApplied(),
       childNoun: this.data()?.summary?.childNoun ?? 'page',
       onRetried: () => this.afterRetry(),
+      jobId: this.jobId() ?? null,
     };
     this.dialog.open(RunItemPanel, itemPanelConfig(data));
   }
@@ -501,6 +571,103 @@ export class RunItems implements OnInit {
     this.children.set(new Map());
     this.retried.emit();
     this.load(true);
+  }
+
+  // MIG-421: bulk select.
+  picked(ref: string): boolean { return isSelected(this.selection(), ref); }
+
+  tick(ref: string): void { this.setSelection(toggled(this.selection(), ref)); }
+
+  tickPage(on: boolean): void { this.setSelection(withPage(this.selection(), this.rows().map(r => r.ref), on)); }
+
+  /** "Select all N matching": every item the filter and search find, on every page. */
+  selectAll(): void { this.setSelection({ all: true, refs: [], except: [] }); }
+
+  clearSelection(): void { this.selection.set(NO_SELECTION); this.counted.set(null); }
+
+  showAll(): void { this.showRefs.set(false); this.page.set(0); this.clearSelection(); this.load(); }
+
+  private bodyOf() {
+    return selectionBody(Number(this.jobQueueId()), this.selection(), this.status(), this.searchApplied());
+  }
+
+  /** What Core says the selection is -- how many, how many failed -- asked again as it changes. */
+  private setSelection(next: Selection): void {
+    this.selection.set(next);
+    if (!selectedCount(next, this.data()?.total ?? 0)) { this.counted.set(null); return; }
+    this.api.selection(this.bodyOf()).subscribe({
+      next: answer => this.counted.set(answer),
+      error: () => this.counted.set(null),
+    });
+  }
+
+  async retrySelected(): Promise<void> {
+    const failed = this.counted()?.failed ?? 0;
+    if (!failed || this.bulkBusy()) return;
+    const ok = await confirmWith(this.dialog, {
+      title: `Retry ${plural(failed, 'failed item')}?`,
+      body: `Only the failed ${failed === 1 ? 'item' : 'items'} of the ${plural(this.selected(), 'item')} selected ${failed === 1 ? 'runs' : 'run'} again, `
+        + 'each from the step it failed at; the others are left as they are, and only what runs again is billed.',
+      confirmLabel: retryLabel(failed),
+    });
+    if (!ok) return;
+    this.bulkBusy.set(true);
+    this.api.retry({ ...this.bodyOf(), onlyFailed: true, from: 'failed_step' }).subscribe({
+      next: answer => {
+        this.bulkBusy.set(false);
+        this.toast.success(retriedSentence(answer.data, answer.message));
+        this.clearSelection();
+        this.afterRetry();
+      },
+      error: err => { this.bulkBusy.set(false); this.toast.error(refusalText(err, 'The items could not be retried.')); },
+    });
+  }
+
+  downloadZip(): void {
+    if (this.bulkBusy()) return;
+    this.bulkBusy.set(true);
+    const id = Number(this.jobQueueId());
+    this.api.zipMany(this.bodyOf()).subscribe({
+      next: response => {
+        this.bulkBusy.set(false);
+        if (!response.body) { this.toast.error('The server returned an empty file.'); return; }
+        StorageService.saveBlob(response.body, attachmentName(response.headers.get('content-disposition')) || `run-${id}-items.zip`);
+      },
+      error: async err => { this.bulkBusy.set(false); this.toast.error(await refusalOf(err) || refusalText(err, 'The files could not be downloaded.')); },
+    });
+  }
+
+  downloadCsvOfSelection(): void {
+    if (this.bulkBusy()) return;
+    const sel = this.selection();
+    this.bulkBusy.set(true);
+    const id = Number(this.jobQueueId());
+    this.api.csv(id, sel.all ? this.status() : 'all', sel.all ? this.searchApplied() : '', this.fields(), sel.all ? [] : sel.refs, sel.all ? sel.except : [])
+      .subscribe({
+        next: response => {
+          this.bulkBusy.set(false);
+          if (!response.body) { this.toast.error('The server returned an empty file.'); return; }
+          StorageService.saveBlob(response.body, attachmentName(response.headers.get('content-disposition')) || `run-${id}-items.csv`);
+        },
+        error: async err => { this.bulkBusy.set(false); this.toast.error(await refusalOf(err) || 'The items could not be downloaded.'); },
+      });
+  }
+
+  sendToReview(): void {
+    if (this.bulkBusy()) return;
+    const data: ReviewDialogData = { count: this.selected(), labels: this.counted()?.labels ?? [] };
+    this.dialog.open<ReviewChoice | null>(RunItemsReview, { data, hasBackdrop: true }).closed.subscribe(choice => {
+      if (!choice) return;
+      this.bulkBusy.set(true);
+      this.api.review({ ...this.bodyOf(), reviewers: choice.reviewers, note: choice.note || undefined }).subscribe({
+        next: answer => {
+          this.bulkBusy.set(false);
+          this.toast.success(`Sent ${plural(answer.data?.items ?? this.selected(), 'item')} to review: a task in Review › Approvals.`);
+          this.clearSelection();
+        },
+        error: err => { this.bulkBusy.set(false); this.toast.error(refusalText(err, 'The items were not sent to review.')); },
+      });
+    });
   }
 
   downloadCsv(): void {

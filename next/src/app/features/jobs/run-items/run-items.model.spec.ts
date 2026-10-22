@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
-  ItemsSummary, cellLook, countsLine, filterOf, itemLook, itemStats, itemSub, itemsQuery, rangeLabel, retryRefusal, zipLabel,
+  ItemsSummary, NO_SELECTION, cellLook, countsLine, filterOf, filtersOf, isSelected, itemLook, itemStats, itemSub, itemsQuery, pageState,
+  rangeLabel, refsOf, retryLabel, retryRefusal, selectedCount, selectionBody, toggled, withPage, zipItemsLabel, zipLabel,
 } from './run-items.model';
 
 /** MIG-420: how the Items tab reads Core's run items. */
@@ -55,5 +56,33 @@ describe('Run items: the readings', () => {
     expect(zipLabel(18 * 1024 * 1024)).toBe('Download all (zip, 18.0 MB)');
     expect(filterOf('FAILED')).toBe('failed');
     expect(filterOf('nonsense')).toBe('all');
+  });
+
+  // MIG-421
+  it('selects rows by ref, or all matching less the unticked, and says it as Core\'s bodies', () => {
+    let sel = NO_SELECTION;
+    sel = toggled(sel, '4');
+    sel = toggled(sel, '6');
+    expect(isSelected(sel, '4')).toBe(true);
+    expect(selectedCount(sel, 9)).toBe(2);
+    expect(selectionBody(8814, sel, 'all', '')).toEqual({ jobQueueId: 8814, refs: ['4', '6'] });
+    expect(pageState(sel, ['4', '6', '10'])).toBe('some');
+    expect(pageState(withPage(sel, ['4', '6', '10'], true), ['4', '6', '10'])).toBe('all');
+    const all = toggled({ all: true, refs: [], except: [] }, '13');
+    expect(selectedCount(all, 9)).toBe(8);
+    expect(isSelected(all, '13')).toBe(false);
+    expect(selectionBody(8814, all, 'failed', ' risk = High ')).toEqual({ jobQueueId: 8814, all: true, status: 'failed', search: 'risk = High', except: ['13'] });
+    expect(retryLabel(1)).toBe('Retry 1 failed');
+    expect(zipItemsLabel(3)).toBe('Download zip (3 items)');
+  });
+
+  it('reads a Task inbox link\'s items and shows Check by hand only when an OCR step marked a page', () => {
+    expect(refsOf('2,6, 9,x,1.12')).toEqual(['2', '6', '9', '1.12']);
+    expect(refsOf(null)).toEqual([]);
+    const summary = { items: 1, done: 1, failed: 0, running: 0, failedItems: 0, files: 0 };
+    expect(filtersOf(summary)).toEqual(['all', 'done', 'failed', 'running']);
+    expect(filtersOf({ ...summary, check: 1 })).toEqual(['all', 'done', 'failed', 'running', 'check']);
+    expect(filterOf('check')).toBe('check');
+    expect(itemLook({ status: 'done', failedStep: null, children: null, flag: 'check' } as never).label).toBe('Check by hand');
   });
 });

@@ -91,7 +91,8 @@
     @case ('items') {
       @if (items()?.itemRun) {
         <app-run-items [jobQueueId]="jobQueueId()" [first]="itemsFirst()" [initialStatus]="itemStatus()" [runDuration]="duration()"
-                       [canRetry]="canOpenSchedule()" [refreshKey]="loads()" (statusChange)="itemStatusChanged($event)" (retried)="refresh()" />
+                       [canRetry]="canOpenSchedule()" [refreshKey]="loads()" (statusChange)="itemStatusChanged($event)" (retried)="refresh()"
+                       [jobId]="canOpenSchedule() ? jobId() : null" [refs]="itemRefs()" />
       } @else {
         <p class="card p-4 text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the run's items…</p>
       }

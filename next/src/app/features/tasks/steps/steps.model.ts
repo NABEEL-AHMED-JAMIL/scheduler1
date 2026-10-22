@@ -681,6 +681,11 @@ export function outputColumns(definition: Definition, index: number, tasks: Step
     case 'split_pages':
       return fileRowColumns(definition, index, tasks, ['file_name', 'file_stem', 'page', 'page_count', 'page_text', 'page_chars',
         'page_image', 'page_status', 'page_error']);
+    // MIG-421: Read text from pages -- each page's row, then what OCR read on it.
+    case 'ocr_pages': {
+      const columns = input();
+      return columns ? union(columns, ['ocr_text', 'ocr_sureness', 'ocr_source', 'ocr_words', 'ocr_status', 'ocr_note']) : null;
+    }
     // Owner #16 (2026-10-19): the common tasks added to the registry.
     case 'unpivot': {
       const columns = input();

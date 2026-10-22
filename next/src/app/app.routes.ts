@@ -306,6 +306,15 @@ export const routes: Routes = [
         canActivate: [pageGuard],
       },
       {
+        // MIG-421: a schedule's items across its runs (search an item or a value), and two runs of one item compared.
+        path: 'pipelines/schedules/:jobId/items',
+        title: 'Schedule items',
+        loadComponent: () =>
+          import('./features/jobs/schedule-items/schedule-items').then(m => m.ScheduleItems),
+        data: { pageKey: 'jobs', workspaceData: workspace('A schedule\'s items are', 'see its items', 'history') },
+        canActivate: [pageGuard],
+      },
+      {
         // UX review 2026-10-12 (R2): the run page opens with Schedules or the Queue -- a reviewer holds the Queue, and Core
         // answers a run's reads only to its owner or one of its reviewers (RunReaders). Run page fix: the bare address opens
         // its Steps and /logs its Log (?tab= any other); both are this one page, which moves between them in place.

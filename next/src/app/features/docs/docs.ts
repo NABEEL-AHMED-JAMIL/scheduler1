@@ -425,6 +425,9 @@ export class Docs implements AfterViewInit {
           + 'Timestamps, each stretch of speech with its start and end) or a Convert file step (each file in another format — '
           + 'pdf, docx, xlsx, csv, png and more — written to a bucket or kept with the run). Both read the files the run was '
           + 'started for, or those a File key column names; When a file fails says whether the step stops, skips that file or keeps it with the reason.',
+        'For scanned documents, add Split pages, then Read text from pages: it reads the page images with the platform\'s own OCR (only the pages '
+          + 'with no text layer, unless you choose Every page), adds the text and how sure it is, and marks a page below the sureness you set Check by hand: '
+          + 'it goes to Review with its image beside the text. Each page read is billed as ocr.pages.',
         'Save File and Upload to bucket write all the rows as one file; with One file per row they write a file for each row '
           + '— a folder of recordings, one insight file each — named from the row\'s columns, as in {{file_stem}}-insight.json. '
           + 'JSON columns are written as lists and objects rather than as text; Generate report reads its JSON columns the same way.',
@@ -455,6 +458,12 @@ export class Docs implements AfterViewInit {
         'Items is there when the pipeline works item by item (each file, recording or document): every item with how it went at each step. '
           + 'Filter by Done or Failed, search a name or a value such as risk = High, and Open an item to see its steps, why it failed and its data at each step. '
           + 'A step that made many files (a page image per page) opens their list. Retry failed items runs only the failed ones again, from the step each failed at.',
+        'Tick items to act on several at once (Select all N matching takes every item the filter and search find, on every page): Retry N failed '
+          + 'retries only the failed ones, Download zip gives each item\'s files in a folder of its own, Export CSV the selected rows, and Send to review '
+          + 'asks a team or a role to check them in Review › Approvals. A report already made for an item is kept: a retry makes only the reports it needs.',
+        'A schedule\'s Items tab (beside its Runs) finds an item across all its runs (by name, or a value such as risk = High), newest first, with how '
+          + 'each run started, the pipeline version, the status and the report. Tick two runs to compare them field by field, with what changed in the '
+          + 'pipeline between them. An item\'s panel opens it with All runs of this item.',
         'On Outputs, View shows a file in place: a kept PDF in the PDF viewer, a kept table as a table, a file the run put in a bucket in the file preview. Download takes it away.',
         'Retry a failed run from the step that failed (Runs › Failed groups failures by their error), or run a schedule for each period of a past range (Backfills).',
       ],

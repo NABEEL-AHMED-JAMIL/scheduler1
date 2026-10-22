@@ -31,7 +31,7 @@ import { stepKind } from '../run-steps/run-map';
 import { RUN_TABS, RunTab, runFacts, runStatusLook, runTabFromUrl, runTabUrl, startedBy } from '../run-steps/run-page.model';
 import { RunItems } from '../run-items/run-items';
 import { RunItemsApi } from '../run-items/run-items.api';
-import { ItemFilter, ItemsPage, filterOf, itemsQuery } from '../run-items/run-items.model';
+import { ItemFilter, ItemsPage, filterOf, itemsQuery, refsOf } from '../run-items/run-items.model';
 
 export type { RunTab } from '../run-steps/run-page.model';
 /** The tab a `?tab=` value names on the bare run address (kept for the callers that read it). */
@@ -347,6 +347,8 @@ export class JobLogs implements OnInit, OnDestroy {
   readonly itemsRead = signal(false);
   /** The Items tab's filter, kept in the address (?tab=items&status=failed opens it filtered). */
   readonly itemStatus = signal<ItemFilter>(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
+  /** MIG-421: a Task inbox task's link names its items (?tab=items&items=2,6,9): the tab shows only them. */
+  readonly itemRefs = signal<string[]>(refsOf(this.activated.snapshot?.queryParamMap?.get('items')));
   /** The status the first answer was asked for: the tab draws it only while it shows that one. */
   private readonly itemsAskedFor = signal<ItemFilter>('all');
   readonly itemsFirst = computed(() => this.itemsAskedFor() === this.itemStatus() ? this.items() : null);
@@ -404,6 +406,7 @@ export class JobLogs implements OnInit, OnDestroy {
       if (event instanceof NavigationEnd) {
         this.tab.set(this.tabOfAddress());
         this.itemStatus.set(filterOf(this.activated.snapshot?.queryParamMap?.get('status')));
+        this.itemRefs.set(refsOf(this.activated.snapshot?.queryParamMap?.get('items')));
       }
     });
     inject(DestroyRef).onDestroy(() => navigations.unsubscribe());

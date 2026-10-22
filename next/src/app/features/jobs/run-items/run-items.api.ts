@@ -3,8 +3,13 @@ import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable, map, switchMap, throwError } from 'rxjs';
 import { API_BASE, API_SUCCESS, ApiResponse } from '../../../core/api/api.config';
 import {
-  AttentionRun, ItemCounts, ItemData, ItemDetail, ItemFilesPage, ItemFilter, ItemsPage, ItemsQuery, RetryAnswer, RetryBody,
+  AttentionRun, ItemCounts, ItemData, ItemDetail, ItemFilesPage, ItemFilter, ItemsPage, ItemsQuery, RetryAnswer, RetryBody, ReviewAnswer,
+  Reviewers, SelectionAnswer,
 } from './run-items.model';
+import { AcrossPage, AcrossQuery, Comparison } from '../schedule-items/schedule-items.model';
+
+/** A bulk selection as the bulk endpoints take it. */
+export type SelectionBody = { jobQueueId: number; refs?: string[]; all?: boolean; status?: ItemFilter; search?: string; except?: string[] };
 
 const BASE = `${API_BASE}/sourceJob.json`;
 
@@ -65,12 +70,55 @@ export class RunItemsApi {
     );
   }
 
-  /** The list as CSV, with the filter, the search and the columns shown (masked as on screen). */
-  csv(jobQueueId: number, status: ItemFilter, search: string, fields: string[]): Observable<HttpResponse<Blob>> {
+  /**
+   * The list as CSV, with the filter, the search and the columns shown (masked as on screen); MIG-421: or of a selection --
+   * the refs ticked, or all matching less except.
+   */
+  csv(jobQueueId: number, status: ItemFilter, search: string, fields: string[], refs?: string[], except?: string[]): Observable<HttpResponse<Blob>> {
     const params: Record<string, string | string[]> = { jobQueueId: String(jobQueueId), status };
     if (search.trim()) params['search'] = search.trim();
     if (fields.length) params['fields'] = fields;
+    if (refs?.length) params['refs'] = refs;
+    if (except?.length) params['except'] = except;
     return this.http.get(`${BASE}/runItems/csv`, { params, responseType: 'blob', observe: 'response' });
+  }
+
+  /** MIG-421: how many items a selection names and how many of them failed, before a bulk action. */
+  selection(body: SelectionBody): Observable<SelectionAnswer> {
+    return this.http.post<ApiResponse<SelectionAnswer>>(`${BASE}/runItems/selection`, body).pipe(map(dataOf));
+  }
+
+  /** MIG-421: the selected items' files as one zip, a folder each: a two-minute signed link first, then the zip. */
+  zipMany(sel: SelectionBody): Observable<HttpResponse<Blob>> {
+    const params: Record<string, string | string[]> = { jobQueueId: String(sel.jobQueueId) };
+    if (sel.all) params['all'] = 'true';
+    if (sel.refs?.length) params['refs'] = sel.refs;
+    if (sel.status && sel.status !== 'all') params['status'] = sel.status;
+    if (sel.search) params['search'] = sel.search;
+    if (sel.except?.length) params['except'] = sel.except;
+    return this.http.get<ApiResponse<{ token: string; expiresAt?: string; items?: number; files?: number }>>(`${BASE}/runItems/zipLink`, { params }).pipe(
+      map(dataOf),
+      switchMap(link => link?.token
+        ? this.http.get(`${BASE}/runItems/zip`, { params: { jobQueueId: String(sel.jobQueueId), token: link.token }, responseType: 'blob', observe: 'response' })
+        : throwError(() => new Error('No link to the files.'))),
+    );
+  }
+
+  /** MIG-421: the selected items to a team or role, as a Task inbox task naming them. */
+  review(body: SelectionBody & { reviewers: Reviewers; note?: string }): Observable<{ data: ReviewAnswer; message: string }> {
+    return this.http.post<ApiResponse<ReviewAnswer>>(`${BASE}/reviewRunItems`, body).pipe(map(r => ({ data: dataOf(r), message: r.message ?? '' })));
+  }
+
+  /** MIG-421: a schedule's items across its runs, newest first (the item records only). */
+  acrossRuns(query: AcrossQuery): Observable<AcrossPage> {
+    return this.http.post<ApiResponse<AcrossPage>>(`${BASE}/itemRuns`, query).pipe(map(dataOf));
+  }
+
+  /** MIG-421: one item in two runs, step by step, and the pipeline change between them. */
+  compare(jobId: number, key: string, a: number, b: number): Observable<Comparison> {
+    return this.http.get<ApiResponse<Comparison>>(`${BASE}/itemRuns/compare`, {
+      params: { jobId: String(jobId), key, a: String(a), b: String(b) },
+    }).pipe(map(dataOf));
   }
 
   counts(jobQueueIds: number[]): Observable<Record<string, ItemCounts>> {

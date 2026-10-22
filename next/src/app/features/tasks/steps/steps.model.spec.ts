@@ -288,6 +288,11 @@ describe('steps model -- the columns a step can pick from', () => {
         .toEqual(['id', 'path', ...turned]);
     });
 
+    it('MIG-421: Read text from pages keeps each page\'s row and adds what it read', () => {
+      expect(outputColumns(after([{ key: 'r.pdf', page: 1, page_text: '', page_image: 'r-page-01.png' }], 'ocr_pages', { fromStep: 'read' }), 1))
+        .toEqual(['key', 'page', 'page_text', 'page_image', 'ocr_text', 'ocr_sureness', 'ocr_source', 'ocr_words', 'ocr_status', 'ocr_note']);
+    });
+
     it('adds segments with Timestamps, and the status and error columns when a failed file is skipped or kept', () => {
       expect(outputColumns(one('transcribe_audio', { timestamps: true, onError: 'skip' }), 0))
         .toEqual(['bucket', 'key', ...heard, 'segments', 'transcribe_status', 'transcribe_error']);

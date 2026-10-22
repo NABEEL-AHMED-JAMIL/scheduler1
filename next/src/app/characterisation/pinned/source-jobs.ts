@@ -125,6 +125,7 @@ export const PINNED: Record<string, unknown> = {
     "links": [
       "/pipelines",
       "/pipelines/schedules",
+      "/pipelines/schedules/2833/items",
       "/pipelines/schedules/2833/runs/7331"
     ]
   },

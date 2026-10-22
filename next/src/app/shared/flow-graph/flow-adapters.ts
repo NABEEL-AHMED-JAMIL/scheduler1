@@ -102,6 +102,8 @@ const TASK_ICONS: Record<string, string> = {
   transcribe_audio: 'mic', convert_file: 'refresh',
   // MIG-420: a PDF into its pages, each a sub-item of its document.
   split_pages: 'layers',
+  // MIG-421: page images read as text (OCR).
+  ocr_pages: 'text',
 };
 
 const strings = (v: unknown): string[] => (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && !!x);

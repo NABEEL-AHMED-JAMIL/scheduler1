@@ -22,6 +22,15 @@
     </p>
   </app-page-header>
 
+  <!-- MIG-421: a schedule's two views -- its runs, and its items across those runs. -->
+  @if (jobId() && !isDrillDown()) {
+    <nav class="flex gap-1 border-b border-subtle" aria-label="Schedule" data-test="schedule-tabs">
+      <a class="px-3.5 py-2.5 text-sm font-semibold border-b-2 border-[color:var(--text-primary)] -mb-px" aria-current="page">Runs</a>
+      <a class="px-3.5 py-2.5 text-sm text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] -mb-px"
+         [routerLink]="['/pipelines/schedules', jobId(), 'items']" data-test="schedule-items-tab">Items</a>
+    </nav>
+  }
+
   <!-- UX review B3 (E1): Latest and By date, the two views of the one Runs page. -->
   @if (!jobId() && !isDrillDown()) {
     <!-- MIG-416 (CLS 0.29 at 1024): the list above, the facets and the runs arrive at different times; the explorer is drawn

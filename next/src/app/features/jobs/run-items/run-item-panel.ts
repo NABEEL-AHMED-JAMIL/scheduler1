@@ -1,5 +1,6 @@
 import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
 import { DIALOG_DATA, Dialog, DialogRef } from '@angular/cdk/dialog';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { Icon } from '../../../shared/ui/icon';
 import { Segmented, SegmentOption } from '../../../shared/ui/segmented';
@@ -27,6 +28,24 @@ export interface ItemPanelData {
   childNoun?: string | null;
   /** Called after a retry here, so the list behind the panel reads its items again. */
   onRetried?: () => void;
+  /** MIG-421: the run's schedule, when the reader may open it: "All runs of this item" goes to its Items tab. */
+  jobId?: string | number | null;
+}
+
+/** MIG-421: an OCR'd page's reading -- the text, how sure, where it came from -- from the OCR step's row. */
+export interface PageReading { text: string; sureness: number | null; source: string | null; status: string | null; note: string | null; }
+
+export function pageReading(data: ItemData | null | undefined): PageReading | null {
+  const row = data?.rows?.[0];
+  if (!row) return null;
+  const sure = row['ocr_sureness'];
+  return {
+    text: String(row['ocr_text'] ?? ''),
+    sureness: typeof sure === 'number' ? sure : sure === null || sure === undefined || sure === '' ? null : Number(sure),
+    source: row['ocr_source'] === undefined || row['ocr_source'] === null ? null : String(row['ocr_source']),
+    status: row['ocr_status'] === undefined || row['ocr_status'] === null ? null : String(row['ocr_status']),
+    note: row['ocr_note'] === undefined || row['ocr_note'] === null ? null : String(row['ocr_note']),
+  };
 }
 
 /** The step a panel shows the data of first: the one asked for, else the step the item failed at, else the last with data. */
@@ -75,6 +94,13 @@ export function notMade(detail: ItemDetail): string[] {
                border-radius: var(--radius-md); font-size: 0.8125rem; max-width: 100%; }
     .ip-chip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .ip-chip.is-dashed { border-style: dashed; color: var(--text-secondary); }
+    .ip-page { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--border-subtle); border-radius: var(--radius-card); overflow: clip; }
+    .ip-page > div { padding: 0.875rem; display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+    .ip-page > div + div { border-left: 1px solid var(--border-subtle); }
+    .ip-page img { width: 100%; height: auto; max-height: 30rem; object-fit: contain; border-radius: var(--radius-md); background: var(--surface-sunken); }
+    .ip-page pre { margin: 0; max-height: 30rem; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.75rem; line-height: 1.7;
+                   padding: 0.75rem; border-radius: var(--radius-md); background: var(--surface-sunken); }
+    @media (max-width: 1100px) { .ip-page { grid-template-columns: minmax(0, 1fr); } .ip-page > div + div { border-left: 0; border-top: 1px solid var(--border-subtle); } }
     button.ip-chip:hover { background: var(--surface-sunken); }
     @media (max-width: 1279px) { .ip-steps > li { grid-template-columns: 1.5rem minmax(7rem, 10rem) minmax(0, 1fr) 5rem 3rem; } }
   `,
@@ -99,16 +125,22 @@ export function notMade(detail: ItemDetail): string[] {
               <span class="pill pill-{{ look().tone }}" data-test="item-status">{{ look().label }}</span>
             </div>
             <p class="text-sm text-[color:var(--text-secondary)] break-words" data-test="item-meta">{{ meta() }}</p>
-            @if (data.canRetry && !earlier() && d.item.status !== 'running') {
+            @if ((data.canRetry && !earlier() && d.item.status !== 'running') || data.jobId) {
               <div class="flex flex-wrap items-center gap-2">
+                @if (data.canRetry && !earlier() && d.item.status !== 'running') {
                 <button type="button" class="btn btn-sm" [class.btn-primary]="d.item.status === 'failed'" [class.btn-default]="d.item.status !== 'failed'"
                         data-test="item-retry" [disabled]="retrying()" (click)="retry('item')">
                   <app-icon name="play" />Retry this item</button>
-                @if (d.retry.possible && d.retry.fromStep) {
+                }
+                @if (data.canRetry && !earlier() && d.item.status !== 'running' && d.retry.possible && d.retry.fromStep) {
                   <button type="button" class="btn btn-default btn-sm" data-test="item-retry-from" [disabled]="retrying()" (click)="retry('failed_step')">
                     Retry from {{ d.retry.fromStep }}</button>
-                } @else if (d.retry.why && d.item.status === 'failed') {
+                } @else if (data.canRetry && d.retry.why && d.item.status === 'failed') {
                   <span class="text-xs text-[color:var(--text-muted)]" data-test="item-retry-why">{{ d.retry.why }}</span>
+                }
+                @if (data.jobId && !d.item.parentRef) {
+                  <button type="button" class="btn btn-default btn-sm" data-test="item-all-runs" (click)="allRuns()">
+                    <app-icon name="history" />All runs of this item</button>
                 }
               </div>
             }
@@ -128,6 +160,38 @@ export function notMade(detail: ItemDetail): string[] {
               <app-icon name="history" />An earlier version of this item: attempt {{ attempt() }}.
               <button type="button" class="link-inline" (click)="choose(null)">Back to the current one</button>
             </p>
+          }
+
+          @if (ocrStep(); as o) {
+            <section class="ip-section" aria-labelledby="ip-page-heading" data-test="item-page-view">
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 id="ip-page-heading" class="ip-heading mr-auto">Page image beside the text read</h3>
+                @if (reading(); as r) {
+                  @if (r.status === 'check') {
+                    <span class="pill pill-warn" data-test="page-check">Check by hand · {{ sureText(r) }} sure</span>
+                  } @else if (r.source === 'text-layer') {
+                    <span class="pill pill-neutral">Its own text layer</span>
+                  } @else if (r.sureness !== null) {
+                    <span class="pill pill-ok">{{ sureText(r) }} sure</span>
+                  }
+                }
+              </div>
+              <div class="ip-page">
+                <div>
+                  <span class="ip-heading">Page image</span>
+                  @if (pageImage()) { <img [src]="pageImage()" [alt]="'The image of ' + d.item.label" data-test="page-image" /> }
+                  @else if (pageImageNote()) { <p class="text-sm text-[color:var(--text-muted)]">{{ pageImageNote() }}</p> }
+                  @else { <p class="text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the image…</p> }
+                </div>
+                <div>
+                  <span class="ip-heading">Text read</span>
+                  @if (reading(); as r) {
+                    <pre class="mono" data-test="page-text">{{ r.text || '(no text was read)' }}</pre>
+                    @if (r.note) { <p class="text-xs text-[color:var(--text-secondary)]">{{ r.note }}</p> }
+                  } @else { <p class="text-sm text-[color:var(--text-muted)]" aria-busy="true">Reading the text…</p> }
+                </div>
+              </div>
+            </section>
           }
 
           <section class="ip-section" aria-labelledby="ip-steps-heading">
@@ -248,8 +312,14 @@ export class RunItemPanel implements OnInit {
   private readonly api = inject(RunItemsApi);
   private readonly dialog = inject(Dialog);
   private readonly toast = inject(ToastService);
+  private readonly router = inject(Router, { optional: true });
 
   readonly itemRef = signal(this.data.ref);
+  /** MIG-421: an OCR'd page: its image (an object URL) and the text read. */
+  readonly ocrStep = computed(() => (this.detail()?.steps ?? []).find(s => s.task === 'ocr_pages' && s.hasData) ?? null);
+  readonly reading = signal<PageReading | null>(null);
+  readonly pageImage = signal<string | null>(null);
+  readonly pageImageNote = signal('');
   /** The attempt shown; null for the current one. */
   readonly attempt = signal<number | null>(null);
   readonly detail = signal<ItemDetail | null>(null);
@@ -311,7 +381,42 @@ export class RunItemPanel implements OnInit {
   private dataRequest?: Subscription;
 
   constructor() {
-    inject(DestroyRef).onDestroy(() => { this.request?.unsubscribe(); this.dataRequest?.unsubscribe(); });
+    inject(DestroyRef).onDestroy(() => { this.request?.unsubscribe(); this.dataRequest?.unsubscribe(); this.dropImage(); });
+  }
+
+  sureText(r: PageReading): string { return r.sureness === null ? '' : `${Math.round(r.sureness)} %`; }
+
+  /** "All runs of this item": the schedule's Items tab, showing every run that processed it. */
+  allRuns(): void {
+    const d = this.detail();
+    if (!d || !this.data.jobId || !this.router) return;
+    this.ref.close();
+    this.router.navigate(['/pipelines/schedules', this.data.jobId, 'items'], { queryParams: { key: d.item.key } });
+  }
+
+  private dropImage(): void {
+    const url = this.pageImage();
+    if (url) URL.revokeObjectURL(url);
+    this.pageImage.set(null);
+  }
+
+  /** MIG-421: an OCR'd page's image and the text read, side by side. */
+  private readPage(detail: ItemDetail): void {
+    this.reading.set(null);
+    this.dropImage();
+    this.pageImageNote.set('');
+    const step = detail.steps.find(s => s.task === 'ocr_pages' && s.hasData);
+    if (!step) return;
+    this.api.data(this.data.jobQueueId, detail.item.ref, step.key, this.attempt()).subscribe({
+      next: d => this.reading.set(pageReading(d) ?? { text: '', sureness: null, source: null, status: null, note: d.note ?? null }),
+      error: () => this.reading.set({ text: '', sureness: null, source: null, status: null, note: 'The text read could not be shown.' }),
+    });
+    const image = detail.files.find(f => /\.(png|jpe?g|tiff?|bmp|webp)$/i.test(f.name) && !f.expired);
+    if (!image) { this.pageImageNote.set('This page kept no image.'); return; }
+    this.api.file(this.data.jobQueueId, detail.item.ref, image.fileRef, true).subscribe({
+      next: blob => this.pageImage.set(URL.createObjectURL(blob)),
+      error: () => this.pageImageNote.set('The page image could not be shown.'),
+    });
   }
 
   ngOnInit(): void { this.load(this.data.stepKey ?? null); }
@@ -323,6 +428,7 @@ export class RunItemPanel implements OnInit {
     this.request = this.api.detail(this.data.jobQueueId, this.itemRef(), this.attempt(), this.data.status, this.data.search).subscribe({
       next: detail => {
         this.detail.set(detail);
+        this.readPage(detail);
         const first = firstDataStep(detail, stepKey);
         if (first) this.showData(first, true); else { this.dataStep.set(null); this.stepData.set(null); }
       },
