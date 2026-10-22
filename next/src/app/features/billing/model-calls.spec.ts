@@ -42,9 +42,10 @@ class Host {
 }
 
 function mount(rows: object[] = [call('ai-run#4913', '2026-10-20T00:29:00Z'), call('ai-run#4912', '2026-10-20T00:28:00Z'), call('ai-run#4900', '2026-10-19T15:00:00Z', { job_queue_id: 8381 })],
-  days: object[] = [{ day: '2026-10-19', runs: 199, amount: '36.69' }]) {
+  days: object[] = [{ day: '2026-10-19', runs: 199, amount: '36.69' }], promptNames = new Map<number, string>()) {
   const api = {
     runSummary: vi.fn(() => of({ status: API_SUCCESS, message: '', data: SUMMARY })),
+    promptNames: vi.fn(() => of(promptNames)),
     runs: vi.fn((_q: UsageQuery, page: number) => of({ status: API_SUCCESS, message: '', data: { total: 2066, page, limit: 25, rows: page === 1 ? rows : [call('ai-run#1', '2026-10-01T15:00:00Z')], days } })),
   };
   TestBed.resetTestingModule();
@@ -64,6 +65,21 @@ const text = (e: Element | null) => {
 };
 
 describe('Cost & usage: AI model calls', () => {
+  it('ZT-B8: names a saved prompt by its name, reading the names once, and keeps the id when there is none', async () => {
+    const { fixture, el, api } = mount(undefined, undefined, new Map([[1075, 'Visit note one-line summary']]));
+    await fixture.whenStable();
+    fixture.detectChanges();
+    expect(api.promptNames).toHaveBeenCalledTimes(1);
+    const link = el.querySelector('[data-test="model-source-prompt"]');
+    expect(text(link)).toBe('Visit note one-line summary');
+    expect(link?.getAttribute('href')).toBe('/pipelines/prompts/1075/edit');
+
+    const unnamed = mount();
+    await unnamed.fixture.whenStable();
+    expect(text(unnamed.el.querySelector('[data-test="model-source-prompt"]'))).toBe('Prompt 1075');
+  });
+
+
   it('opens on the month in four figures and By source, the dearest first, without reading every call', async () => {
     const { fixture, el, api } = mount();
     await fixture.whenStable();

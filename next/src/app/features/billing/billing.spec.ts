@@ -36,6 +36,7 @@ function page(platformAdmin = false, rows: object[] = LINES, days: object[] = DA
     tenantId: Object.assign(() => tenantId.value, { set: (v: string | null) => { tenantId.value = v; } }),
     effective: () => tenantId.value ?? options[0]?.value ?? null,
     effectiveId: () => { const e = tenantId.value ?? options[0]?.value ?? null; return e === null ? null : Number(e); },
+    effectiveIsSandbox: () => false,
     chosenId: () => (tenantId.value === null ? null : Number(tenantId.value)),
     options: () => options,
     ready: (then: () => void) => then(), isPlatformAdmin: () => platformAdmin,
@@ -217,7 +218,7 @@ describe('Billing', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [
       { provide: BillingApi, useValue: { usageByMeter: off, usageByDay: off, subjects: off, runs: off, refreshUsage: off } },
-      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, effectiveId: () => null, chosenId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
+      { provide: WorkspacePicker, useValue: { tenantId: () => null, effective: () => null, effectiveId: () => null, effectiveIsSandbox: () => false, chosenId: () => null, options: () => [], ready: (then: () => void) => then(), isPlatformAdmin: () => false } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => false } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ] });
@@ -277,7 +278,7 @@ describe('Billing, rendered', () => {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({ providers: [provideRouter([]),
       { provide: BillingApi, useValue: api },
-      { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => null, { set: () => {} }), effective: () => '2905', effectiveId: () => 2905, chosenId: () => null, options: () => options, ready: (then: () => void) => then(), isPlatformAdmin: () => true } },
+      { provide: WorkspacePicker, useValue: { tenantId: Object.assign(() => null, { set: () => {} }), effective: () => '2905', effectiveId: () => 2905, effectiveIsSandbox: () => false, chosenId: () => null, options: () => options, ready: (then: () => void) => then(), isPlatformAdmin: () => true } },
       { provide: AuthService, useValue: { isPlatformAdmin: () => true } },
       { provide: ToastService, useValue: { success: () => {}, error: () => {} } },
     ] });

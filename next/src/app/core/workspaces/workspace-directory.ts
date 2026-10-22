@@ -12,6 +12,8 @@ export interface WorkspaceOption {
   tenantCode?: string | null;
   status?: string | null;
   managementMode?: string | null;
+  /** MIG-336: the workspace a sandbox belongs to; null for a workspace that is not a sandbox (never billed when set). */
+  sandboxOf?: number | null;
 }
 
 const CHOSEN_KEY = 'etl_workspace_choice';
@@ -74,7 +76,7 @@ export class WorkspaceDirectory {
         map(r => (r?.status === API_SUCCESS ? (r.data ?? []) : [])),
         tap(list => {
           this.workspaces.set(list.map(t => ({ tenantId: t.tenantId, tenantName: t.tenantName, tenantCode: t.tenantCode, status: t.status,
-            managementMode: t.managementMode })));
+            managementMode: t.managementMode, sandboxOf: t.sandboxOf ?? null })));
           this.loaded.set(true);
           this.error.set('');
         }),

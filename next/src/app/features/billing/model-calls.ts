@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { API_SUCCESS } from '../../core/api/api.config';
+import { AuthService } from '../../core/auth/auth.service';
 import { instantOf } from '../../core/instant';
 import { StatTile } from '../../shared/ui/stat-tile';
 import { TableShell } from '../../shared/ui/data-table';
@@ -120,7 +121,7 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
                   <tr data-test="model-source">
                     <td class="min-w-44">
                       @if (sourcePrompt(s); as id) {
-                        <a class="link-inline font-medium" [routerLink]="['/pipelines/prompts', id, 'edit']">{{ s.label }}</a>
+                        <a class="link-inline font-medium" [routerLink]="['/pipelines/prompts', id, 'edit']" data-test="model-source-prompt">{{ promptLabel(id, s.label) }}</a>
                       } @else { <span class="font-medium">{{ s.label }}</span> }
                       <span class="block text-[11px] text-[color:var(--text-muted)]">{{ sourceKind(s) }}</span>
                     </td>
@@ -199,7 +200,7 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
                   <tr [title]="runRates(r)" [class.is-repeat]="isRepeat(g.rows, i)">
                     <td class="text-xs tabular whitespace-nowrap" data-test="run-time">{{ runTime(r) }}</td>
                     <td class="min-w-40">
-                      @if (promptOf(r); as id) { <a class="link-inline font-medium" [routerLink]="['/pipelines/prompts', id, 'edit']">{{ runLabel(r) }}</a> }
+                      @if (promptOf(r); as id) { <a class="link-inline font-medium" [routerLink]="['/pipelines/prompts', id, 'edit']">{{ promptLabel(id, runLabel(r)) }}</a> }
                       @else { <span class="font-medium">{{ runLabel(r) }}</span> }
                       <span class="block text-[11px] mono text-[color:var(--text-muted)]">{{ r.run }}</span>
                     </td>
@@ -234,7 +235,11 @@ export function rateSentences(rates: ModelCallRate[], models: (string | null)[],
 })
 export class ModelCalls {
   private readonly api = inject(BillingApi);
+  private readonly auth = inject(AuthService);
   private readonly locale = inject(LOCALE_ID);
+  /** ZT-B8: the workspace's saved prompts by id, read once when a saved prompt called a model; empty until then. */
+  readonly promptNames = signal(new Map<number, string>());
+  private promptNamesRead = false;
   /** The month on screen (the page's own range and workspace). */
   readonly query = input.required<UsageQuery>();
   readonly currency = input('USD');
@@ -342,9 +347,24 @@ export class ModelCalls {
         this.summaryLoading.set(false);
         if (r.status !== API_SUCCESS) { this.summary.set(null); this.summaryError.set(r.message || 'The model calls could not be read.'); return; }
         this.summary.set(r.data ?? null);
+        this.readPromptNames();
       },
       error: err => { this.summaryLoading.set(false); this.summaryError.set(err?.error?.message || 'The model calls could not be read.'); },
     });
+  }
+
+  /** A saved prompt's name, else what the meter calls it ("Prompt 1000"). */
+  promptLabel(id: number, fallback: string): string { return this.promptNames().get(id) ?? fallback; }
+
+  /**
+   * ZT-B8: names for the saved prompts once one appears. Not on the platform's own sign-in, which reads no workspace's
+   * prompts (ZT-M4): there the id stays.
+   */
+  private readPromptNames(): void {
+    if (this.promptNamesRead || !this.sources().some(s => promptIdOf(s) !== null)) return;
+    if (this.auth.isPlatformAdmin() && !this.auth.isManagedSession()) return;
+    this.promptNamesRead = true;
+    this.api.promptNames().subscribe(names => this.promptNames.set(names));
   }
 
   private resetRuns(): void {

@@ -24,4 +24,21 @@ describe('WorkspacePicker', () => {
     picker.tenantId.set('2905');
     expect(picker.name()).toBe('MedAxis Care Network (#2905)');
   });
+
+  it('ZT-B12: opens Cost & usage on a billed workspace, a sandbox only when it is picked, and says when it is one', () => {
+    TestBed.resetTestingModule();
+    TestBed.configureTestingModule({ providers: [provideHttpClient(), provideHttpClientTesting(), { provide: AuthService, useValue: { isPlatformAdmin: () => true } }] });
+    const picker = TestBed.inject(WorkspacePicker);
+    picker.tenantId.set(null);
+    picker.ready(() => {});
+    TestBed.inject(HttpTestingController).expectOne(r => r.url.endsWith('/tenant.json/listTenants')).flush({ status: API_SUCCESS, data: [
+      { tenantId: 1004, tenantName: 'Cedar Valley Home Care (sandbox)', sandboxOf: 1002 }, { tenantId: 1003, tenantName: 'Lakeside Home Health (sandbox)', sandboxOf: 1001 },
+      { tenantId: 1002, tenantName: 'Cedar Valley Home Care', sandboxOf: null },
+    ] });
+    expect(picker.effective()).toBe('1002');
+    expect(picker.effectiveIsSandbox()).toBe(false);
+    picker.tenantId.set('1003');
+    expect(picker.effectiveIsSandbox()).toBe(true);
+    picker.tenantId.set(null);
+  });
 });

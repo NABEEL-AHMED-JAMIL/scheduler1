@@ -2,7 +2,7 @@ import { Injectable, computed, inject } from '@angular/core';
 import { AuthService } from '../../core/auth/auth.service';
 import { WorkspaceDirectory } from '../../core/workspaces/workspace-directory';
 
-interface TenantOption { tenantId: number; tenantName: string; }
+interface TenantOption { tenantId: number; tenantName: string; sandboxOf?: number | null; }
 
 /**
  * Which workspace the billing screens are looking at -- since owner #5 (2026-10-19) the platform-wide choice of the one
@@ -17,7 +17,7 @@ export class WorkspacePicker {
   private readonly auth = inject(AuthService);
   private readonly directory = inject(WorkspaceDirectory);
 
-  readonly tenants = computed<TenantOption[]>(() => this.directory.workspaces().map(w => ({ tenantId: w.tenantId, tenantName: w.tenantName })));
+  readonly tenants = computed<TenantOption[]>(() => this.directory.workspaces().map(w => ({ tenantId: w.tenantId, tenantName: w.tenantName, sandboxOf: w.sandboxOf ?? null })));
   /** The choice as the billing calls send it (a string id), or null; `set` is a pick, kept for the session. */
   readonly tenantId = Object.assign(computed(() => {
     const chosen = this.directory.chosen();
@@ -33,8 +33,21 @@ export class WorkspacePicker {
   readonly options = computed(() => this.tenants().map(t => ({ value: String(t.tenantId), label: this.labels().get(t.tenantId) ?? t.tenantName })));
   readonly isPlatformAdmin = this.auth.isPlatformAdmin;
   readonly name = computed(() => this.options().find(o => o.value === this.tenantId())?.label ?? '');
-  /** The choice, or the first workspace when none was made: for the screens that must look at one. */
-  readonly effective = computed(() => this.tenantId() ?? (this.tenants().length ? String(this.tenants()[0].tenantId) : null));
+  /**
+   * The choice, or the first workspace when none was made: for the screens that must look at one. ZT-B12: the first that
+   * is billed -- a sandbox (never billed) only when there is nothing else.
+   */
+  readonly effective = computed(() => {
+    const chosen = this.tenantId();
+    if (chosen) return chosen;
+    const first = this.tenants().find(t => !t.sandboxOf) ?? this.tenants()[0];
+    return first ? String(first.tenantId) : null;
+  });
+  /** ZT-B12: whether the workspace on screen is a sandbox -- its usage priced to show what it would cost, never billed. */
+  readonly effectiveIsSandbox = computed(() => {
+    const id = this.effective();
+    return !!id && !!this.tenants().find(t => String(t.tenantId) === id)?.sandboxOf;
+  });
   /** The choice as a number (the shared selector's value), or null for none / every workspace. */
   readonly chosenId = computed(() => this.directory.chosen());
   /** The effective one as a number, for the shared selector on a page that needs one. */

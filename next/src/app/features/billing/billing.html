@@ -3,7 +3,11 @@
     <div class="page-head">
       <div>
         <h1 class="page-title">Cost &amp; usage</h1>
-        <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
+        @if (workspaces.effectiveIsSandbox()) {
+          <p class="page-subtitle">What this sandbox used, and what it would cost — a sandbox is never billed.</p>
+        } @else {
+          <p class="page-subtitle">What this workspace used, and what it costs — the same lines the invoice will carry.</p>
+        }
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         <app-workspace-select [value]="workspaces.effectiveId()" (valueChange)="pickTenant($event === null ? '' : '' + $event)" />
@@ -34,6 +38,9 @@
     <!-- Owner #7: the facts of the month as chips -- the card that prices it, the currency, the day, yesterday and the
          billing time zone -- rather than one dotted line that wrapped mid-fact at 1024. -->
     <div class="bill-meta" data-test="usage-meta">
+      @if (workspaces.effectiveIsSandbox()) {
+        <span class="pill pill-warn" data-test="usage-sandbox" title="Test usage through API test keys: priced here to show what it would cost, never drafted or invoiced">Sandbox · never billed</span>
+      }
       @if (rateCard(); as card) {
         <span class="bill-meta-chip" data-test="usage-card" [title]="'Priced with ' + card.name + ' v' + card.version"><app-icon name="layers" size="0.9em" />Priced with <b>{{ card.name }}</b> v{{ card.version }}</span>
         @if (card.tenantSpecific) { <span class="pill pill-brand">This workspace's card</span> }

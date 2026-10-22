@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 import { API_BASE, ApiResponse } from '../../core/api/api.config';
 
 export interface BillingAccount {
@@ -407,6 +408,16 @@ export class BillingApi {
       params: { from: q.from, to: q.to, page: String(page), limit: String(limit), ...narrow, ...this.tenantParam(q.tenantId) } });
   }
   /** AI model calls (Cost & usage redesign): the range's calls added up by source and by model, priced as /runs prices them. */
+  /**
+   * ZT-B8: the workspace's saved prompts by id, so AI model calls names "Visit note summary" rather than "Prompt 1000"
+   * (aiPrompt.json/list, the reader's own workspace's). Empty when they cannot be read: the rows keep the id.
+   */
+  promptNames(): Observable<Map<number, string>> {
+    return this.http.get<ApiResponse<{ promptId?: number; name?: string }[]>>(`${API_BASE}/aiPrompt.json/list`).pipe(
+      map(r => new Map((r?.data ?? []).filter(p => p.promptId != null && p.name).map(p => [Number(p.promptId), String(p.name)] as [number, string]))),
+      catchError(() => of(new Map<number, string>())));
+  }
+
   runSummary(q: UsageQuery): Observable<ApiResponse<ModelCallSummary>> {
     return this.http.get<ApiResponse<ModelCallSummary>>(`${this.base}/runs/summary`, { params: { from: q.from, to: q.to, ...this.tenantParam(q.tenantId) } });
   }
