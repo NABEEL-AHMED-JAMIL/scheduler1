@@ -16,7 +16,7 @@ import { ToastService } from '../../shared/ui/toast.service';
 import { confirmWith } from '../../shared/ui/confirm';
 import { AccessProfilesService } from '../admin/access-profiles/access-profiles.service';
 import { Colleague, RequestRow, WorkflowDetail, WorkflowSummary, WorkflowsApi, CANNOT_ACT } from './workflows.api';
-import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, fromJson, newStep, problemStep, subjectWho, toJson, runSaveAs } from './designer.model';
+import { DraftStep, OPERATORS, STEP_TYPES, StepType, Who, WhoKind, canEnd, fromJson, newStep, problemStep, subjectWho, toJson, runSaveAs } from './designer.model';
 import { shortTime } from './history';
 import { splitTail } from './inbox-list';
 import { PageHeader } from '../../shared/ui/page-header';
@@ -677,6 +677,16 @@ export class WorkflowDesigner implements OnInit {
       case 'save_dataset': return `Into ${s.dataset || '…'}`;
       case 'wait': return s.hours ? `For ${hours(s.hours)}` : 'For …';
     }
+  }
+
+  /** The step can end the request, so it may say how: the "ends as" choice shows. */
+  endsHere(s: DraftStep): boolean {
+    const all = this.steps();
+    return canEnd(s, all.indexOf(s) === all.length - 1);
+  }
+
+  hasApprovals(): boolean {
+    return this.steps().some(x => x.type === 'approval');
   }
 
   branches(s: DraftStep): string {

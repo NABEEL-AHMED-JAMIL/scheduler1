@@ -72,6 +72,19 @@ function screenWith(opts: { admin?: boolean; problems?: string[]; tenantId?: num
 }
 
 describe('Workflow designer -- the step model', () => {
+  it('says how the request ends only on a step that can end it', () => {
+    const problem = { ...newStep('task', []), key: 'problem', next: 'end', endsAs: 'failed' as const };
+    const goesOn = { ...newStep('notify', []), key: 'tell', endsAs: 'failed' as const };
+    const last = { ...newStep('notify', []), key: 'done', endsAs: 'completed' as const };
+    const json = toJson([goesOn, problem, last]);
+    expect(json.steps[0]['endsAs']).toBeUndefined();
+    expect(json.steps[1]['endsAs']).toBe('failed');
+    expect(json.steps[2]['endsAs']).toBe('completed');
+    const branch = { ...newStep('condition', []), whenTrue: 'tell', whenFalse: 'problem', endsAs: 'failed' as const };
+    expect(toJson([branch, goesOn, problem]).steps[0]['endsAs']).toBeUndefined();
+    expect(toJson([{ ...branch, whenFalse: 'end' }, goesOn]).steps[0]['endsAs']).toBe('failed');
+  });
+
   it('sends each step with its type\'s fields only, and reads a version back', () => {
     const approval = newStep('approval', []);
     const condition = newStep('condition', ['approval']);

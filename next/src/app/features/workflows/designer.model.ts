@@ -19,11 +19,15 @@ export function subjectWho(value: string | null | undefined): string {
 
 export interface Who { kind: WhoKind; value?: string | null; }
 
+export type EndsAs = 'approved' | 'rejected' | 'completed' | 'failed';
+
 export interface DraftStep {
   key: string;
   type: StepType;
   name?: string;
   next?: string | null;
+  /** 2026-10-21: how the request ends when it ends right after this step; none = as its latest approval went. */
+  endsAs?: EndsAs | null;
   // approval, task
   assignee?: Who;
   slaHours?: number | null;
@@ -103,13 +107,21 @@ export function newStep(type: StepType, taken: string[]): DraftStep {
   }
 }
 
+/** Whether the request can end right after this step: it goes to the end, a branch does, or it is the last and goes nowhere. */
+export function canEnd(s: DraftStep, last: boolean): boolean {
+  if (s.type === 'condition') return !s.whenTrue || s.whenTrue === 'end' || !s.whenFalse || s.whenFalse === 'end';
+  return s.next === 'end' || (!s.next && last);
+}
+
 /** The steps as the engine reads them: each with its type's fields only, empty ones left out. */
 export function toJson(steps: DraftStep[]): { steps: Record<string, unknown>[] } {
   return {
-    steps: steps.map(s => {
+    steps: steps.map((s, i) => {
       const out: Record<string, unknown> = { key: s.key, type: s.type };
       if (s.name) out['name'] = s.name;
       if (s.next) out['next'] = s.next;
+      // A step that no longer ends the request drops it: the engine refuses endsAs on one that always goes on.
+      if (s.endsAs && canEnd(s, i === steps.length - 1)) out['endsAs'] = s.endsAs;
       switch (s.type) {
         case 'approval':
         case 'task':
