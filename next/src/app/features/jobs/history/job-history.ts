@@ -86,6 +86,8 @@ const TRIGGER_WORDS: Record<string, string> = {
   // UX review 2026-10-12 (B2/B3): this screen's own rules, in its lazy chunk rather than the console's first download.
   styles: `
 /* UX review 2026-10-12 (B3): Runs as an explorer -- the facets rail at the left, the histogram and the list beside it. */
+.explorer-waiting { display: none !important; }
+.explorer-pending { min-height: 60vh; }
 .runs-explorer { display: grid; grid-template-columns: 15rem minmax(0, 1fr); gap: 1rem; align-items: start; }
 .runs-explorer-rail { position: sticky; top: 1rem; max-height: calc(100vh - 2rem); overflow-y: auto; }
 @media (max-width: 1023px) { .runs-explorer { grid-template-columns: minmax(0, 1fr); } .runs-explorer-rail { position: static; max-height: none; } }
@@ -176,6 +178,15 @@ export class JobHistory {
   readonly explorerFilter = signal<ExplorerFilter>(NO_FILTER);
   readonly facets = signal<RunFacets | null>(null);
   readonly facetsLoading = signal(false);
+  /** MIG-416: the facets' first answer (or that there are none to ask for), the review list's, and the runs': then the explorer shows. */
+  readonly facetsSettled = signal(false);
+  readonly reviewSettled = signal(false);
+  /** Latched: once drawn, a refresh or a new filter never hides the explorer again. */
+  private readonly explorerDrawn = signal(false);
+  readonly explorerReady = computed(() => !this.explorer() || this.explorerDrawn());
+  protected readonly drawExplorer = effect(() => {
+    if (!this.explorerDrawn() && this.facetsSettled() && this.reviewSettled() && !this.loading()) this.explorerDrawn.set(true);
+  });
   readonly facetsUnavailable = signal(false);
   private facetsRequest?: Subscription;
   readonly histogram = computed(() => histogramBars(this.facets()));
@@ -198,16 +209,17 @@ export class JobHistory {
   private loadFacets(): void {
     this.facetsRequest?.unsubscribe();
     // The counts are Runs by date's (page queue): a reader holding Schedules alone gets the list without them, not a 403.
-    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); return; }
+    if (typeof this.auth.canOpen === 'function' && !this.auth.canOpen('queue')) { this.facets.set(null); this.facetsUnavailable.set(true); this.facetsSettled.set(true); return; }
     this.facetsLoading.set(true);
     this.facetsRequest = this.explorerApi.facets(explorerBody(this.explorerFilter(), RECENT_WINDOW)).subscribe({
       next: r => {
         this.facetsLoading.set(false);
+        this.facetsSettled.set(true);
         const ok = r.status === API_SUCCESS && !!r.data && typeof r.data === 'object';
         this.facets.set(ok ? (r.data as RunFacets) : null);
         this.facetsUnavailable.set(!ok);
       },
-      error: () => { this.facetsLoading.set(false); this.facets.set(null); this.facetsUnavailable.set(true); },
+      error: () => { this.facetsLoading.set(false); this.facetsSettled.set(true); this.facets.set(null); this.facetsUnavailable.set(true); },
     });
   }
   /** The server has runs older than the ones loaded; Load older reads the next window. */

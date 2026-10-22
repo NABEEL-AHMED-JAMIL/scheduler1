@@ -108,6 +108,8 @@ export class ReviewWaiting implements OnInit {
   readonly all = input(false);
   /** A bulk decision was made here (the page around it reads its counts again). */
   readonly decided = output<void>();
+  /** Each answer, or a failure to get one: Runs holds its explorer until the list's place is known (no layout shift). */
+  readonly settled = output<void>();
   /** The newest few, so a long backlog never pushes Executions' own table off the screen; the rest on request. */
   readonly FIRST = 5;
   readonly expanded = signal(false);
@@ -151,9 +153,10 @@ export class ReviewWaiting implements OnInit {
           this.runs.set(ok ? answer.data!.runs ?? [] : []);
           this.more.set(ok ? !!answer.data!.more : false);
           this.loaded.set(true);
+          this.settled.emit();
         },
         // A list that cannot load is left out rather than shown as an error: Executions is still the page.
-        error: () => { this.runs.set([]); this.more.set(false); this.loaded.set(true); },
+        error: () => { this.runs.set([]); this.more.set(false); this.loaded.set(true); this.settled.emit(); },
       });
   }
 

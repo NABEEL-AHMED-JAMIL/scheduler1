@@ -209,3 +209,33 @@ describe('JobHistory -- what started a run (ZT-P15)', () => {
   });
 });
 
+
+/**
+ * MIG-416 (the browser budget, CLS 0.29 at 1024): the review list above, the facets and the runs answered at different
+ * times and each pushed the explorer down. It is drawn once all three have answered, and stays drawn.
+ */
+describe('Runs explorer drawn once, when its parts have answered (MIG-416)', () => {
+  it('waits for the runs, the facets and the review list, then never hides again', () => {
+    posts.length = 0;
+    const h = history({});
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(false);
+    h.load();
+    TestBed.tick();
+    expect(h.loading()).toBe(false);
+    expect(h.facetsSettled()).toBe(true);
+    expect(h.explorerReady()).toBe(false);
+    h.reviewSettled.set(true);
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(true);
+    h.loading.set(true);
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(true);
+  });
+
+  it('is never held on a schedule\'s own runs, which have no review list or facets', () => {
+    const h = history({ jobId: '41' });
+    TestBed.tick();
+    expect(h.explorerReady()).toBe(true);
+  });
+});

@@ -24,7 +24,12 @@
 
   <!-- UX review B3 (E1): Latest and By date, the two views of the one Runs page. -->
   @if (!jobId() && !isDrillDown()) {
-    <app-review-waiting />
+    <!-- MIG-416 (CLS 0.29 at 1024): the list above, the facets and the runs arrive at different times; the explorer is drawn
+         once all three have answered, so nothing moves under the reader. -->
+    @if (!explorerReady()) {
+      <div class="card p-4 text-sm text-[color:var(--text-muted)] explorer-pending" aria-busy="true" data-test="runs-pending">Loading runs…</div>
+    }
+    <app-review-waiting [class.explorer-waiting]="!explorerReady()" (settled)="reviewSettled.set(true)" />
   }
 
   @if (isDrillDown()) {
@@ -278,7 +283,7 @@
 
   <!-- UX review 2026-10-12 (B3, E1): opened from the menu, Runs is an explorer -- facets on the left with the server's
        counts, a time histogram above the list. A schedule's own runs and a dashboard drill-down keep one column. -->
-  <div [class.runs-explorer]="explorer()">
+  <div [class.runs-explorer]="explorer()" [class.explorer-waiting]="!explorerReady()">
   @if (explorer()) {
     <aside class="card p-4 runs-explorer-rail" data-test="run-facets">
       <app-run-facets-rail [facets]="facets()" [filter]="explorerFilter()" [unavailable]="facetsUnavailable()" [loading]="facetsLoading()"
